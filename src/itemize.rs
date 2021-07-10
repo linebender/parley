@@ -13,6 +13,7 @@ pub struct SpanData {
     pub strikethrough: bool,
     pub start: usize,
     pub end: usize,
+    pub count: usize,
 }
 
 impl SpanData {
@@ -103,6 +104,7 @@ impl Default for SpanData {
             strikethrough: false,
             start: 0,
             end: 0,
+            count: 0,
         }
     }
 }
@@ -115,6 +117,7 @@ pub struct ItemData {
     pub level: u8,
     pub start: usize,
     pub end: usize,
+    pub count: usize,
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -208,11 +211,12 @@ pub fn normalize_spans(attrs: &[RangedAttribute], defaults: SpanData, spans: &mu
     spans.truncate(spans.len() - merged_count);
 }
 
-pub fn itemize(text: &str, spans: &[SpanData], items: &mut Vec<ItemData>) {
+pub fn itemize(text: &str, spans: &mut [SpanData], items: &mut Vec<ItemData>) {
     use swash::text::Codepoint as _;
     let mut span_index = 0;
-    let mut span_end = spans[0].end;
-    let mut cur_size = spans[0].size;
+    let mut span = &mut spans[0];
+    let mut span_end = span.end;
+    let mut cur_size = span.size;
     let mut size = cur_size;
     let mut cur_script = text
         .chars()
@@ -222,6 +226,7 @@ pub fn itemize(text: &str, spans: &[SpanData], items: &mut Vec<ItemData>) {
     let cur_level = 0;
     let mut start = 0;
     let mut end = 0;
+    let mut count = 0;
     macro_rules! push_item {
         () => {
             if start != end {
@@ -232,23 +237,28 @@ pub fn itemize(text: &str, spans: &[SpanData], items: &mut Vec<ItemData>) {
                     size: cur_size as f32,
                     start,
                     end,
+                    count,
                 });
-                start = end;
             }
         };
     }
     for (i, ch) in text.char_indices() {
         if i >= span_end {
             span_index += 1;
-            span_end = spans[span_index].end;
-            size = spans[span_index].size;
+            span = &mut spans[span_index];
+            span_end = span.end;
+            size = span.size;
         }
+        span.count += 1;
+        count += 1;
         let mut script = ch.script();
         if !real_script(script) {
             script = cur_script;
         }
         if cur_size != size || script != cur_script {
             push_item!();
+            start = end;
+            count = 0;
         }
         cur_script = script;
         cur_size = size;

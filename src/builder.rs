@@ -117,7 +117,7 @@ fn convert_attr(attr: &TextAttribute, fcx: &FontContext) -> AttributeKind {
 
 fn build(state: &mut LayoutState, layout: &mut Layout) {
     state.items.clear();
-    itemize(&layout.text, &state.spans, &mut state.items);
+    itemize(&layout.text, &mut state.spans, &mut state.items);
     if state.items.is_empty() {
         return;
     }
@@ -178,8 +178,8 @@ fn shape(
                 offset: (start + i) as u32,
                 len: ch.len_utf8() as u8,
                 info: ch.into(),
-                // FIXME: precompute and store this somewhere
-                data: match spans.binary_search_by(|probe| probe.start.cmp(&i)) {
+                // FIXME: Precompute and store this somewhere
+                data: match spans.binary_search_by(|probe| probe.start.cmp(&(start + i))) {
                     Ok(index) => index as u32,
                     Err(index) => index.saturating_sub(1) as u32,
                 },
@@ -230,10 +230,10 @@ impl<'a> shape::partition::Selector for FontSelector<'a> {
             self.span_index = span_index;
             let span = &self.spans[span_index as usize];
             let family = span.family;
-            let diff_family = family != span.family;
+            let diff_family = family != self.family;
             let attrs = span.attributes();
             let diff_attrs = attrs != self.attrs;
-            self.family = span.family;
+            self.family = family;
             self.attrs = attrs;
             if diff_attrs || diff_family {
                 if diff_attrs {
