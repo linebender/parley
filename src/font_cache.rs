@@ -43,7 +43,7 @@ impl FontCache {
         let mut count = self.sources.len();
         while count > RETAINED_SOURCE_COUNT {
             self.sources.retain(|_, v| {
-                if count <= RETAINED_SOURCE_COUNT && v.0 <= target_serial {
+                if count > RETAINED_SOURCE_COUNT && v.0 <= target_serial {
                     count -= 1;
                     false
                 } else {
