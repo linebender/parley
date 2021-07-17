@@ -1,6 +1,6 @@
 use super::font_cache::FontCache;
-use super::{Glyph, Layout, LayoutBuilder, Run};
 use super::itemize::{ItemData, RangedAttribute, SpanData};
+use super::{Glyph, Layout, LayoutBuilder, Run};
 use fount::Library;
 use piet::{FontFamily, TextAlignment, TextStorage};
 use std::cell::RefCell;

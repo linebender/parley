@@ -222,7 +222,7 @@ pub fn itemize(text: &str, spans: &mut [SpanData], items: &mut Vec<ItemData>) {
         .chars()
         .map(|ch| ch.script())
         .find(|&script| real_script(script))
-        .unwrap_or(Script::Latin);    
+        .unwrap_or(Script::Latin);
     let cur_level = 0;
     let mut start = 0;
     let mut end = 0;
