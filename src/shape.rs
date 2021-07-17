@@ -91,6 +91,8 @@ impl<'a> FontSelector<'a> {
         first_item: &ItemData,
     ) -> Self {
         let first_span = &spans[0];
+        let attrs = first_span.attributes();
+        font_cache.select_family(first_span.family, attrs);
         Self {
             font_cache,
             spans,
@@ -98,7 +100,7 @@ impl<'a> FontSelector<'a> {
             script: first_item.script,
             locale: first_item.locale,
             family: first_span.family,
-            attrs: first_span.attributes(),
+            attrs,
         }
     }
 }

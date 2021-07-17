@@ -65,7 +65,6 @@ impl piet::TextLayoutBuilder for LayoutBuilder {
     fn build(self) -> Result<Self::Out, piet::Error> {
         let mut state = self.state.borrow_mut();
         let state = &mut *state;
-        normalize_spans(&state.attributes, state.defaults, &mut state.spans);
         let mut layout = Layout {
             text: self.text,
             glyphs: vec![],
@@ -111,6 +110,7 @@ fn convert_attr(attr: &TextAttribute, fcx: &FontContext) -> AttributeKind {
 }
 
 fn build(state: &mut LayoutState, layout: &mut Layout) {
+    normalize_spans(&state.attributes, state.defaults, &mut state.spans);
     state.items.clear();
     itemize(&layout.text, &mut state.spans, &mut state.items);
     if state.items.is_empty() {
