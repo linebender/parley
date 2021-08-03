@@ -1,6 +1,6 @@
 use super::font::Font;
-use super::itemize::FamilyKind;
-use fount::{FontContext, FontData, FontId, Library, Locale, SourceId};
+use crate::font::*;
+use fount::{FamilyId, FontContext, FontData, FontId, GenericFamily, Library, Locale, SourceId};
 use std::collections::HashMap;
 use swash::proxy::CharmapProxy;
 use swash::text::cluster::*;
@@ -10,11 +10,76 @@ use swash::{Attributes, FontRef};
 // Make this configurable?
 const RETAINED_SOURCE_COUNT: usize = 12;
 
+pub struct SystemFontCollection {
+    cache: FontCache,
+    in_session: bool,
+}
+
+impl SystemFontCollection {
+    pub fn new() -> Self {
+        Self {
+            cache: FontCache::new(&Library::default()),
+            in_session: false,
+        }
+    }
+
+    pub fn context(&self) -> &FontContext {
+        &self.cache.context
+    }
+}
+
+impl FontCollection for SystemFontCollection {
+    type Family = FamilyId;
+    type Font = Font;
+
+    /// Begins a layout sesion with this collection.
+    fn begin_session(&mut self) {
+        self.in_session = true;
+    }
+
+    /// Ends a layout session with this collection.
+    fn end_session(&mut self) {
+        if self.in_session {
+            self.in_session = false;
+            self.cache.reset();
+        }
+    }
+
+    /// Returns a handle for the font family in the collection with the specified family and attributes. Handles
+    /// returned by this function are only guaranteed to be valid between calls to `begin_session` and
+    /// `end_session`.
+    fn query_family(&mut self, name: &str) -> Option<Self::Family> {
+        assert_eq!(self.in_session, true);
+        self.cache
+            .context
+            .family_by_name(name)
+            .map(|family| family.id())
+    }
+
+    /// Uses the specified family, attributes and fallbacks to select an appropriate font for a character cluster.
+    fn map(
+        &mut self,
+        family: &FontFamilyHandle<Self::Family>,
+        attributes: impl Into<Attributes>,
+        fallbacks: &FontFallbacks,
+        cluster: &mut CharCluster,
+    ) -> Option<Self::Font> {
+        assert_eq!(self.in_session, true);
+        let attrs = attributes.into();
+        self.cache.select_family(family, attrs);
+        self.cache
+            .select_fallbacks(fallbacks.script, fallbacks.locale, attrs);
+        self.cache.map_cluster(cluster)
+    }
+}
+
+type SystemFamily = FontFamilyHandle<FamilyId>;
+
 #[derive(Clone)]
 pub struct FontCache {
     pub context: FontContext,
     sources: SourceCache,
-    selected_params: Option<(FamilyKind, Attributes)>,
+    selected_params: Option<(SystemFamily, Attributes)>,
     selected_fonts: Vec<CachedFont>,
     fallback_params: (Script, Option<Locale>, Attributes),
     fallback_fonts: Vec<CachedFont>,
@@ -43,13 +108,13 @@ impl FontCache {
         self.sources.prune();
     }
 
-    pub fn select_family(&mut self, kind: FamilyKind, attrs: Attributes) {
-        if self.selected_params != Some((kind, attrs)) {
-            self.selected_params = Some((kind, attrs));
-            let families = match &kind {
-                FamilyKind::Named(id) => core::slice::from_ref(id),
-                FamilyKind::Default => self.context.default_families(),
-                FamilyKind::Generic(family) => self.context.generic_families(*family),
+    pub fn select_family(&mut self, family: &SystemFamily, attrs: Attributes) {
+        if self.selected_params != Some((*family, attrs)) {
+            self.selected_params = Some((*family, attrs));
+            let families = match &family {
+                SystemFamily::Default => self.context.default_families(),
+                SystemFamily::Named(id) => core::slice::from_ref(id),
+                SystemFamily::Generic(family) => self.context.generic_families(*family),
             };
             self.selected_fonts.clear();
             let context = &self.context;
@@ -92,7 +157,6 @@ impl FontCache {
         }
         if cluster.info().is_emoji() {
             if self.emoji_font.is_none() {
-                use fount::GenericFamily;
                 self.emoji_font = self
                     .context
                     .generic_families(GenericFamily::Emoji)
@@ -180,6 +244,7 @@ impl SourceCache {
             data,
             offset,
             key: entry.cache_key(),
+            synthesis: Default::default(),
         })
     }
 }

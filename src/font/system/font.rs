@@ -1,11 +1,12 @@
 use fount::FontData;
-use swash::{CacheKey, FontRef};
+use swash::{CacheKey, FontRef, Synthesis};
 
 #[derive(Clone)]
 pub struct Font {
     pub data: FontData,
     pub offset: u32,
     pub key: CacheKey,
+    pub synthesis: Synthesis,
 }
 
 impl Font {
@@ -20,6 +21,6 @@ impl Font {
 
 impl PartialEq for Font {
     fn eq(&self, other: &Self) -> bool {
-        self.key == other.key
+        self.key == other.key && self.synthesis == other.synthesis
     }
 }

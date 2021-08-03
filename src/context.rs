@@ -1,25 +1,55 @@
-use super::font_cache::FontCache;
-use super::itemize::{ItemData, RangedAttribute, SpanData};
-use super::{Glyph, Layout, LayoutBuilder, Run};
+use super::font::{FontCollection, FontFamily, FontFamilyHandle, GenericFontFamily};
+use super::itemize::{AttributeKind, ItemData, RangedAttribute, SpanData};
+use super::{Alignment, Attribute};
+use super::{Glyph, Layout, Run};
+use core::ops::{Bound, Range, RangeBounds};
 use fount::Library;
-use piet::{FontFamily, TextAlignment, TextStorage};
-use std::cell::RefCell;
-use std::rc::Rc;
 use swash::shape::ShapeContext;
 
-#[derive(Clone)]
-pub struct LayoutContext {
-    state: Rc<RefCell<LayoutState>>,
+pub struct LayoutContext<C: FontCollection> {
+    state: LayoutState<C>,
 }
 
-impl LayoutContext {
+impl<C: FontCollection> LayoutContext<C> {
     pub fn new() -> Self {
-        Self::with_library(&Library::default())
+        Self {
+            state: LayoutState::new(),
+        }
     }
 
-    fn with_library(library: &Library) -> Self {
-        let state = LayoutState {
-            font_cache: FontCache::new(library),
+    pub fn new_layout<'a>(&'a mut self, fonts: &'a mut C, text: &'a str) -> LayoutBuilder<'a, C> {
+        fonts.begin_session();
+        LayoutBuilder {
+            state: &mut self.state,
+            fonts,
+            text,
+        }
+    }
+}
+
+pub struct LayoutBuilder<'a, C: FontCollection> {
+    state: &'a mut LayoutState<C>,
+    fonts: &'a mut C,
+    text: &'a str,
+}
+
+impl<'a, C: FontCollection> LayoutBuilder<'a, C> {}
+
+pub struct LayoutState<C: FontCollection> {
+    pub shape_context: ShapeContext,
+    pub defaults: SpanData<C::Family>,
+    pub attributes: Vec<RangedAttribute<C::Family>>,
+    pub spans: Vec<SpanData<C::Family>>,
+    pub items: Vec<ItemData>,
+    pub glyphs: Vec<Glyph>,
+    pub runs: Vec<Run<C::Font>>,
+    pub max_width: f64,
+    pub alignment: Alignment,
+}
+
+impl<C: FontCollection> LayoutState<C> {
+    pub fn new() -> Self {
+        Self {
             shape_context: ShapeContext::new(),
             defaults: SpanData::default(),
             attributes: vec![],
@@ -28,70 +58,96 @@ impl LayoutContext {
             glyphs: vec![],
             runs: vec![],
             max_width: f64::MAX,
-            alignment: TextAlignment::Start,
-        };
-        Self {
-            state: Rc::new(RefCell::new(state)),
+            alignment: Alignment::Start,
         }
     }
 
-    pub fn new_layout(&mut self, text: impl TextStorage) -> LayoutBuilder {
-        self.state.borrow_mut().reset(text.as_str().len());
-        LayoutBuilder::new(self.state.clone(), text)
-    }
-}
-
-impl piet::Text for LayoutContext {
-    type TextLayoutBuilder = LayoutBuilder;
-    type TextLayout = Layout;
-
-    fn font_family(&mut self, family_name: &str) -> Option<FontFamily> {
-        self.state
-            .borrow()
-            .font_cache
-            .context
-            .family_by_name(family_name)?;
-        Some(FontFamily::new_unchecked(family_name))
-    }
-
-    fn load_font(&mut self, data: &[u8]) -> Result<FontFamily, piet::Error> {
-        let s = self.state.borrow();
-        let ctx = &s.font_cache.context;
-        // TODO: expose the full set of fonts
-        if let Some(reg) = ctx.register_fonts(data.into()) {
-            if let Some(family) = ctx.family(reg.families[0]) {
-                return Ok(FontFamily::new_unchecked(family.name()));
-            }
-        }
-        Err(piet::Error::FontLoadingFailed)
-    }
-
-    fn new_text_layout(&mut self, text: impl TextStorage) -> Self::TextLayoutBuilder {
-        self.new_layout(text)
-    }
-}
-
-pub struct LayoutState {
-    pub font_cache: FontCache,
-    pub shape_context: ShapeContext,
-    pub defaults: SpanData,
-    pub attributes: Vec<RangedAttribute>,
-    pub spans: Vec<SpanData>,
-    pub items: Vec<ItemData>,
-    pub glyphs: Vec<Glyph>,
-    pub runs: Vec<Run>,
-    pub max_width: f64,
-    pub alignment: TextAlignment,
-}
-
-impl LayoutState {
     fn reset(&mut self, len: usize) {
-        self.font_cache.reset();
         self.defaults = SpanData::default();
         self.defaults.end = len;
         self.attributes.clear();
         self.spans.clear();
+        self.items.clear();
+        self.runs.clear();
         self.max_width = f64::MAX;
-        self.alignment = TextAlignment::Start;
+        self.alignment = Alignment::Start;
     }
+
+    pub fn default_attribute(&mut self, attribute: AttributeKind<C::Family>) {
+        self.defaults.apply(&attribute);
+    }
+
+    pub fn range_attribute(
+        &mut self,
+        text_len: usize,
+        range: impl RangeBounds<usize>,
+        attribute: AttributeKind<C::Family>,
+    ) {
+        let range = resolve_range(range, text_len);
+        if !range.is_empty() {
+            self.attributes.push(RangedAttribute {
+                attr: attribute,
+                start: range.start,
+                end: range.end,
+            });
+        }
+    }
+
+    pub fn build(&mut self, fonts: &mut C, text: &str) {
+        use super::itemize::{itemize, normalize_spans};
+        use super::shape::{shape, FontSelector};
+        self.defaults.end = text.len();
+        normalize_spans(&self.attributes, &self.defaults, &mut self.spans);
+        self.items.clear();
+        itemize(text, &mut self.spans, &mut self.items);
+        if self.items.is_empty() {
+            return;
+        }
+        let mut font_selector = FontSelector::new(fonts, &self.spans, &self.items[0]);
+        shape(
+            &mut self.shape_context,
+            &mut font_selector,
+            &self.spans,
+            &self.items,
+            text,
+            &mut self.glyphs,
+            &mut self.runs,
+        );
+    }
+}
+
+fn convert_attr<C: FontCollection>(attr: &Attribute, fonts: &mut C) -> AttributeKind<C::Family> {
+    match attr {
+        Attribute::FontFamily(family) => AttributeKind::Family(match family {
+            FontFamily::Named(name) => fonts
+                .query_family(name)
+                .map(|f| FontFamilyHandle::Named(f))
+                .unwrap_or(FontFamilyHandle::Default),
+            FontFamily::Generic(family) => FontFamilyHandle::Generic(*family),
+        }),
+        Attribute::FontSize(size) => AttributeKind::Size(*size as _),
+        Attribute::FontWeight(weight) => AttributeKind::Weight(*weight),
+        Attribute::FontStyle(style) => AttributeKind::Style(*style),
+        Attribute::FontStretch(stretch) => AttributeKind::Stretch(*stretch),
+        Attribute::Color(color) => AttributeKind::Color(*color),
+        Attribute::Underline(yes) => AttributeKind::Underline(*yes),
+        Attribute::Strikethrough(yes) => AttributeKind::Strikethrough(*yes),
+    }
+}
+
+/// Resolves a `RangeBounds` into a range in the range 0..len.
+pub fn resolve_range(range: impl RangeBounds<usize>, len: usize) -> Range<usize> {
+    let start = match range.start_bound() {
+        Bound::Unbounded => 0,
+        Bound::Included(n) => *n,
+        Bound::Excluded(n) => *n + 1,
+    };
+
+    let end = match range.end_bound() {
+        Bound::Unbounded => len,
+        Bound::Included(n) => *n + 1,
+        Bound::Excluded(n) => *n,
+    };
+
+    start.min(len)..end.min(len)
 }

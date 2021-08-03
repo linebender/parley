@@ -1,13 +1,16 @@
+use super::font::FontFamilyHandle;
+use core::fmt::Debug;
 use fount::{FamilyId, GenericFamily, Locale};
 use swash::text::Script;
-use swash::{Attributes, Style, Weight};
+use swash::{Attributes, Stretch, Style, Weight};
 
-#[derive(Copy, Clone, Debug)]
-pub struct SpanData {
-    pub family: FamilyKind,
+#[derive(Clone, Debug)]
+pub struct SpanData<F: Clone + PartialEq + Debug> {
+    pub family: FontFamilyHandle<F>,
+    pub size: f64,
+    pub stretch: Stretch,
     pub style: Style,
     pub weight: Weight,
-    pub size: f64,
     pub color: [u8; 4],
     pub underline: bool,
     pub strikethrough: bool,
@@ -16,61 +19,28 @@ pub struct SpanData {
     pub count: usize,
 }
 
-impl SpanData {
-    pub fn apply(&mut self, attr: &AttributeKind) -> bool {
+impl<F: Clone + PartialEq + Debug> SpanData<F> {
+    pub fn apply(&mut self, attr: &AttributeKind<F>) -> bool {
         match attr {
-            AttributeKind::Family(family) => {
-                if self.family != *family {
-                    self.family = *family;
-                    return true;
-                }
-            }
-            AttributeKind::Color(color) => {
-                if self.color != *color {
-                    self.color = *color;
-                    return true;
-                }
-            }
-            AttributeKind::Style(style) => {
-                if self.style != *style {
-                    self.style = *style;
-                    return true;
-                }
-            }
-            AttributeKind::Weight(weight) => {
-                if self.weight != *weight {
-                    self.weight = *weight;
-                    return true;
-                }
-            }
-            AttributeKind::Size(size) => {
-                if self.size != *size {
-                    self.size = *size;
-                    return true;
-                }
-            }
-            AttributeKind::Underline(yes) => {
-                if self.underline != *yes {
-                    self.underline = *yes;
-                    return true;
-                }
-            }
-            AttributeKind::Strikethrough(yes) => {
-                if self.strikethrough != *yes {
-                    self.strikethrough = *yes;
-                    return true;
-                }
-            }
+            AttributeKind::Family(family) => self.family = family.clone(),
+            AttributeKind::Color(color) => self.color = *color,
+            AttributeKind::Size(size) => self.size = *size,
+            AttributeKind::Stretch(stretch) => self.stretch = *stretch,
+            AttributeKind::Style(style) => self.style = *style,
+            AttributeKind::Weight(weight) => self.weight = *weight,
+            AttributeKind::Underline(yes) => self.underline = *yes,
+            AttributeKind::Strikethrough(yes) => self.strikethrough = *yes,
         }
         false
     }
 
-    pub fn check(&self, attr: &AttributeKind) -> bool {
+    pub fn check(&self, attr: &AttributeKind<F>) -> bool {
         match attr {
             AttributeKind::Family(family) => self.family == *family,
+            AttributeKind::Size(size) => self.size == *size,
+            AttributeKind::Stretch(stretch) => self.stretch == *stretch,
             AttributeKind::Style(style) => self.style == *style,
             AttributeKind::Weight(weight) => self.weight == *weight,
-            AttributeKind::Size(size) => self.size == *size,
             AttributeKind::Color(color) => self.color == *color,
             AttributeKind::Underline(yes) => self.underline == *yes,
             AttributeKind::Strikethrough(yes) => self.strikethrough == *yes,
@@ -79,26 +49,28 @@ impl SpanData {
 
     pub fn can_merge(&self, other: &Self) -> bool {
         self.family == other.family
+            && self.size == other.size
+            && self.stretch == other.stretch
             && self.style == other.style
             && self.weight == other.weight
-            && self.size == other.size
             && self.color == other.color
             && self.underline == other.underline
             && self.strikethrough == other.strikethrough
     }
 
     pub fn attributes(&self) -> Attributes {
-        Attributes::new(Default::default(), self.weight, self.style)
+        Attributes::new(self.stretch, self.weight, self.style)
     }
 }
 
-impl Default for SpanData {
+impl<F: Clone + PartialEq + Debug> Default for SpanData<F> {
     fn default() -> Self {
         Self {
-            family: FamilyKind::Default,
+            family: FontFamilyHandle::Default,
+            size: 16.,
+            stretch: Stretch::NORMAL,
             style: Style::Normal,
             weight: Weight::NORMAL,
-            size: 16.,
             color: [0, 0, 0, 255],
             underline: false,
             strikethrough: false,
@@ -120,32 +92,31 @@ pub struct ItemData {
     pub count: usize,
 }
 
-#[derive(Copy, Clone, PartialEq)]
-pub enum AttributeKind {
-    Family(FamilyKind),
+#[derive(Clone, PartialEq)]
+pub enum AttributeKind<F: Clone + PartialEq + Debug> {
+    Family(FontFamilyHandle<F>),
     Style(Style),
     Weight(Weight),
+    Stretch(Stretch),
     Size(f64),
     Color([u8; 4]),
     Underline(bool),
     Strikethrough(bool),
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum FamilyKind {
-    Default,
-    Named(FamilyId),
-    Generic(GenericFamily),
-}
-
-pub struct RangedAttribute {
-    pub attr: AttributeKind,
+#[derive(Clone)]
+pub struct RangedAttribute<F: Clone + PartialEq + Debug> {
+    pub attr: AttributeKind<F>,
     pub start: usize,
     pub end: usize,
 }
 
-pub fn normalize_spans(attrs: &[RangedAttribute], defaults: SpanData, spans: &mut Vec<SpanData>) {
-    spans.push(defaults);
+pub fn normalize_spans<F: Clone + PartialEq + Debug>(
+    attrs: &[RangedAttribute<F>],
+    defaults: &SpanData<F>,
+    spans: &mut Vec<SpanData<F>>,
+) {
+    spans.push(defaults.clone());
     for attr in attrs {
         if attr.start >= attr.end {
             continue;
@@ -211,7 +182,11 @@ pub fn normalize_spans(attrs: &[RangedAttribute], defaults: SpanData, spans: &mu
     spans.truncate(spans.len() - merged_count);
 }
 
-pub fn itemize(text: &str, spans: &mut [SpanData], items: &mut Vec<ItemData>) {
+pub fn itemize<F: Clone + PartialEq + Debug>(
+    text: &str,
+    spans: &mut [SpanData<F>],
+    items: &mut Vec<ItemData>,
+) {
     use swash::text::Codepoint as _;
     let mut span_index = 0;
     let mut span = &mut spans[0];
@@ -280,7 +255,10 @@ struct SpanSplitRange {
     last: Option<usize>,
 }
 
-fn span_split_range(attr: &RangedAttribute, spans: &[SpanData]) -> SpanSplitRange {
+fn span_split_range<F: Clone + PartialEq + Debug>(
+    attr: &RangedAttribute<F>,
+    spans: &[SpanData<F>],
+) -> SpanSplitRange {
     let mut range = SpanSplitRange::default();
     let start_span_index = match spans.binary_search_by(|span| span.start.cmp(&attr.start)) {
         Ok(index) => index,
