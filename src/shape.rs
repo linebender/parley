@@ -1,6 +1,6 @@
 use super::font::*;
 use super::itemize::*;
-use super::{Glyph, Layout, Run, Brush};
+use super::{Brush, Glyph, Layout, Run};
 use fount::Locale;
 use swash::shape::{self, ShapeContext};
 use swash::text::cluster::CharCluster;
@@ -84,7 +84,11 @@ pub struct FontSelector<'a, C: FontCollection, B: Brush> {
 }
 
 impl<'a, C: FontCollection, B: Brush> FontSelector<'a, C, B> {
-    pub fn new(fonts: &'a mut C, spans: &'a [SpanData<C::Family, B>], first_item: &ItemData) -> Self {
+    pub fn new(
+        fonts: &'a mut C,
+        spans: &'a [SpanData<C::Family, B>],
+        first_item: &ItemData,
+    ) -> Self {
         let first_span = &spans[0];
         let attrs = first_span.attributes();
         Self {

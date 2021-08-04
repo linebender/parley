@@ -81,7 +81,7 @@ pub enum Color<B: Brush = ()> {
     /// 32-bit color in RGBA order.
     Solid([u8; 4]),
     /// Custom brush.
-    Brush(B)
+    Brush(B),
 }
 
 /// Trait for types that represent custom rendering styles.

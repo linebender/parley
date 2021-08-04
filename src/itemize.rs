@@ -1,9 +1,9 @@
 use super::font::FontFamilyHandle;
+use super::{Brush, Color};
 use core::fmt::Debug;
 use fount::{FamilyId, GenericFamily, Locale};
 use swash::text::Script;
 use swash::{Attributes, Stretch, Style, Weight};
-use super::{Brush, Color};
 
 #[derive(Clone, Debug)]
 pub struct SpanData<F: Clone + PartialEq + Debug, B: Brush> {

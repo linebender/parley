@@ -17,7 +17,11 @@ impl<C: FontCollection, B: Brush> LayoutContext<C, B> {
         }
     }
 
-    pub fn new_layout<'a>(&'a mut self, fonts: &'a mut C, text: &'a str) -> LayoutBuilder<'a, C, B> {
+    pub fn new_layout<'a>(
+        &'a mut self,
+        fonts: &'a mut C,
+        text: &'a str,
+    ) -> LayoutBuilder<'a, C, B> {
         fonts.begin_session();
         LayoutBuilder {
             state: &mut self.state,
@@ -116,7 +120,10 @@ impl<C: FontCollection, B: Brush> LayoutState<C, B> {
     }
 }
 
-fn convert_attr<C: FontCollection, B: Brush>(attr: &Attribute<B>, fonts: &mut C) -> AttributeKind<C::Family, B> {
+fn convert_attr<C: FontCollection, B: Brush>(
+    attr: &Attribute<B>,
+    fonts: &mut C,
+) -> AttributeKind<C::Family, B> {
     match attr {
         Attribute::FontFamily(family) => AttributeKind::Family(match family {
             FontFamily::Named(name) => fonts
