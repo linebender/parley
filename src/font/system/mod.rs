@@ -1,12 +1,12 @@
 mod collection;
 mod font;
 
-use super::FontInstance;
+use super::FontHandle;
 pub use collection::SystemFontCollection;
 pub use font::Font;
 use swash::{FontRef, Synthesis};
 
-impl FontInstance for Font {
+impl FontHandle for Font {
     fn as_font_ref(&self) -> FontRef {
         self.as_ref()
     }

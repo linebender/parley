@@ -3,15 +3,16 @@ use core::fmt::Debug;
 use fount::{FamilyId, GenericFamily, Locale};
 use swash::text::Script;
 use swash::{Attributes, Stretch, Style, Weight};
+use super::{Brush, Color};
 
 #[derive(Clone, Debug)]
-pub struct SpanData<F: Clone + PartialEq + Debug> {
+pub struct SpanData<F: Clone + PartialEq + Debug, B: Brush> {
     pub family: FontFamilyHandle<F>,
     pub size: f64,
     pub stretch: Stretch,
     pub style: Style,
     pub weight: Weight,
-    pub color: [u8; 4],
+    pub color: Color<B>,
     pub underline: bool,
     pub strikethrough: bool,
     pub start: usize,
@@ -19,11 +20,11 @@ pub struct SpanData<F: Clone + PartialEq + Debug> {
     pub count: usize,
 }
 
-impl<F: Clone + PartialEq + Debug> SpanData<F> {
-    pub fn apply(&mut self, attr: &AttributeKind<F>) -> bool {
+impl<F: Clone + PartialEq + Debug, B: Brush> SpanData<F, B> {
+    pub fn apply(&mut self, attr: &AttributeKind<F, B>) -> bool {
         match attr {
             AttributeKind::Family(family) => self.family = family.clone(),
-            AttributeKind::Color(color) => self.color = *color,
+            AttributeKind::Color(color) => self.color = color.clone(),
             AttributeKind::Size(size) => self.size = *size,
             AttributeKind::Stretch(stretch) => self.stretch = *stretch,
             AttributeKind::Style(style) => self.style = *style,
@@ -34,7 +35,7 @@ impl<F: Clone + PartialEq + Debug> SpanData<F> {
         false
     }
 
-    pub fn check(&self, attr: &AttributeKind<F>) -> bool {
+    pub fn check(&self, attr: &AttributeKind<F, B>) -> bool {
         match attr {
             AttributeKind::Family(family) => self.family == *family,
             AttributeKind::Size(size) => self.size == *size,
@@ -63,7 +64,7 @@ impl<F: Clone + PartialEq + Debug> SpanData<F> {
     }
 }
 
-impl<F: Clone + PartialEq + Debug> Default for SpanData<F> {
+impl<F: Clone + PartialEq + Debug, B: Brush> Default for SpanData<F, B> {
     fn default() -> Self {
         Self {
             family: FontFamilyHandle::Default,
@@ -71,7 +72,7 @@ impl<F: Clone + PartialEq + Debug> Default for SpanData<F> {
             stretch: Stretch::NORMAL,
             style: Style::Normal,
             weight: Weight::NORMAL,
-            color: [0, 0, 0, 255],
+            color: Color::Solid([0, 0, 0, 255]),
             underline: false,
             strikethrough: false,
             start: 0,
@@ -93,28 +94,28 @@ pub struct ItemData {
 }
 
 #[derive(Clone, PartialEq)]
-pub enum AttributeKind<F: Clone + PartialEq + Debug> {
+pub enum AttributeKind<F: Clone + PartialEq + Debug, B: Brush> {
     Family(FontFamilyHandle<F>),
     Style(Style),
     Weight(Weight),
     Stretch(Stretch),
     Size(f64),
-    Color([u8; 4]),
+    Color(Color<B>),
     Underline(bool),
     Strikethrough(bool),
 }
 
 #[derive(Clone)]
-pub struct RangedAttribute<F: Clone + PartialEq + Debug> {
-    pub attr: AttributeKind<F>,
+pub struct RangedAttribute<F: Clone + PartialEq + Debug, B: Brush> {
+    pub attr: AttributeKind<F, B>,
     pub start: usize,
     pub end: usize,
 }
 
-pub fn normalize_spans<F: Clone + PartialEq + Debug>(
-    attrs: &[RangedAttribute<F>],
-    defaults: &SpanData<F>,
-    spans: &mut Vec<SpanData<F>>,
+pub fn normalize_spans<F: Clone + PartialEq + Debug, B: Brush>(
+    attrs: &[RangedAttribute<F, B>],
+    defaults: &SpanData<F, B>,
+    spans: &mut Vec<SpanData<F, B>>,
 ) {
     spans.push(defaults.clone());
     for attr in attrs {
@@ -182,9 +183,9 @@ pub fn normalize_spans<F: Clone + PartialEq + Debug>(
     spans.truncate(spans.len() - merged_count);
 }
 
-pub fn itemize<F: Clone + PartialEq + Debug>(
+pub fn itemize<F: Clone + PartialEq + Debug, B: Brush>(
     text: &str,
-    spans: &mut [SpanData<F>],
+    spans: &mut [SpanData<F, B>],
     items: &mut Vec<ItemData>,
 ) {
     use swash::text::Codepoint as _;
@@ -255,9 +256,9 @@ struct SpanSplitRange {
     last: Option<usize>,
 }
 
-fn span_split_range<F: Clone + PartialEq + Debug>(
-    attr: &RangedAttribute<F>,
-    spans: &[SpanData<F>],
+fn span_split_range<F: Clone + PartialEq + Debug, B: Brush>(
+    attr: &RangedAttribute<F, B>,
+    spans: &[SpanData<F, B>],
 ) -> SpanSplitRange {
     let mut range = SpanSplitRange::default();
     let start_span_index = match spans.binary_search_by(|span| span.start.cmp(&attr.start)) {

@@ -1,23 +1,23 @@
 use super::font::{FontCollection, FontFamily, FontFamilyHandle, GenericFontFamily};
 use super::itemize::{AttributeKind, ItemData, RangedAttribute, SpanData};
-use super::{Alignment, Attribute};
+use super::{Alignment, Attribute, Brush};
 use super::{Glyph, Layout, Run};
 use core::ops::{Bound, Range, RangeBounds};
 use fount::Library;
 use swash::shape::ShapeContext;
 
-pub struct LayoutContext<C: FontCollection> {
-    state: LayoutState<C>,
+pub struct LayoutContext<C: FontCollection, B: Brush> {
+    state: LayoutState<C, B>,
 }
 
-impl<C: FontCollection> LayoutContext<C> {
+impl<C: FontCollection, B: Brush> LayoutContext<C, B> {
     pub fn new() -> Self {
         Self {
             state: LayoutState::new(),
         }
     }
 
-    pub fn new_layout<'a>(&'a mut self, fonts: &'a mut C, text: &'a str) -> LayoutBuilder<'a, C> {
+    pub fn new_layout<'a>(&'a mut self, fonts: &'a mut C, text: &'a str) -> LayoutBuilder<'a, C, B> {
         fonts.begin_session();
         LayoutBuilder {
             state: &mut self.state,
@@ -27,19 +27,19 @@ impl<C: FontCollection> LayoutContext<C> {
     }
 }
 
-pub struct LayoutBuilder<'a, C: FontCollection> {
-    state: &'a mut LayoutState<C>,
+pub struct LayoutBuilder<'a, C: FontCollection, B: Brush> {
+    state: &'a mut LayoutState<C, B>,
     fonts: &'a mut C,
     text: &'a str,
 }
 
-impl<'a, C: FontCollection> LayoutBuilder<'a, C> {}
+impl<'a, C: FontCollection, B: Brush> LayoutBuilder<'a, C, B> {}
 
-pub struct LayoutState<C: FontCollection> {
+pub struct LayoutState<C: FontCollection, B: Brush = ()> {
     pub shape_context: ShapeContext,
-    pub defaults: SpanData<C::Family>,
-    pub attributes: Vec<RangedAttribute<C::Family>>,
-    pub spans: Vec<SpanData<C::Family>>,
+    pub defaults: SpanData<C::Family, B>,
+    pub attributes: Vec<RangedAttribute<C::Family, B>>,
+    pub spans: Vec<SpanData<C::Family, B>>,
     pub items: Vec<ItemData>,
     pub glyphs: Vec<Glyph>,
     pub runs: Vec<Run<C::Font>>,
@@ -47,7 +47,7 @@ pub struct LayoutState<C: FontCollection> {
     pub alignment: Alignment,
 }
 
-impl<C: FontCollection> LayoutState<C> {
+impl<C: FontCollection, B: Brush> LayoutState<C, B> {
     pub fn new() -> Self {
         Self {
             shape_context: ShapeContext::new(),
@@ -73,7 +73,7 @@ impl<C: FontCollection> LayoutState<C> {
         self.alignment = Alignment::Start;
     }
 
-    pub fn default_attribute(&mut self, attribute: AttributeKind<C::Family>) {
+    pub fn default_attribute(&mut self, attribute: AttributeKind<C::Family, B>) {
         self.defaults.apply(&attribute);
     }
 
@@ -81,7 +81,7 @@ impl<C: FontCollection> LayoutState<C> {
         &mut self,
         text_len: usize,
         range: impl RangeBounds<usize>,
-        attribute: AttributeKind<C::Family>,
+        attribute: AttributeKind<C::Family, B>,
     ) {
         let range = resolve_range(range, text_len);
         if !range.is_empty() {
@@ -116,7 +116,7 @@ impl<C: FontCollection> LayoutState<C> {
     }
 }
 
-fn convert_attr<C: FontCollection>(attr: &Attribute, fonts: &mut C) -> AttributeKind<C::Family> {
+fn convert_attr<C: FontCollection, B: Brush>(attr: &Attribute<B>, fonts: &mut C) -> AttributeKind<C::Family, B> {
     match attr {
         Attribute::FontFamily(family) => AttributeKind::Family(match family {
             FontFamily::Named(name) => fonts
@@ -129,7 +129,7 @@ fn convert_attr<C: FontCollection>(attr: &Attribute, fonts: &mut C) -> Attribute
         Attribute::FontWeight(weight) => AttributeKind::Weight(*weight),
         Attribute::FontStyle(style) => AttributeKind::Style(*style),
         Attribute::FontStretch(stretch) => AttributeKind::Stretch(*stretch),
-        Attribute::Color(color) => AttributeKind::Color(*color),
+        Attribute::Color(color) => AttributeKind::Color(color.clone()),
         Attribute::Underline(yes) => AttributeKind::Underline(*yes),
         Attribute::Strikethrough(yes) => AttributeKind::Strikethrough(*yes),
     }

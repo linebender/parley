@@ -1,16 +1,16 @@
 use super::font::*;
 use super::itemize::*;
-use super::{Glyph, Layout, Run};
+use super::{Glyph, Layout, Run, Brush};
 use fount::Locale;
 use swash::shape::{self, ShapeContext};
 use swash::text::cluster::CharCluster;
 use swash::text::Script;
 use swash::{Attributes, FontRef, Synthesis};
 
-pub fn shape<C: FontCollection>(
+pub fn shape<C: FontCollection, B: Brush>(
     shape_context: &mut ShapeContext,
-    font_selector: &mut FontSelector<C>,
-    spans: &[SpanData<C::Family>],
+    font_selector: &mut FontSelector<C, B>,
+    spans: &[SpanData<C::Family, B>],
     items: &[ItemData],
     text: &str,
     glyphs: &mut Vec<Glyph>,
@@ -73,9 +73,9 @@ pub fn shape<C: FontCollection>(
     }
 }
 
-pub struct FontSelector<'a, C: FontCollection> {
+pub struct FontSelector<'a, C: FontCollection, B: Brush> {
     fonts: &'a mut C,
-    spans: &'a [SpanData<C::Family>],
+    spans: &'a [SpanData<C::Family, B>],
     span_index: u32,
     script: Script,
     locale: Option<Locale>,
@@ -83,8 +83,8 @@ pub struct FontSelector<'a, C: FontCollection> {
     attrs: Attributes,
 }
 
-impl<'a, C: FontCollection> FontSelector<'a, C> {
-    pub fn new(fonts: &'a mut C, spans: &'a [SpanData<C::Family>], first_item: &ItemData) -> Self {
+impl<'a, C: FontCollection, B: Brush> FontSelector<'a, C, B> {
+    pub fn new(fonts: &'a mut C, spans: &'a [SpanData<C::Family, B>], first_item: &ItemData) -> Self {
         let first_span = &spans[0];
         let attrs = first_span.attributes();
         Self {
@@ -99,7 +99,7 @@ impl<'a, C: FontCollection> FontSelector<'a, C> {
     }
 }
 
-impl<'a, C: FontCollection> shape::partition::Selector for FontSelector<'a, C> {
+impl<'a, C: FontCollection, B: Brush> shape::partition::Selector for FontSelector<'a, C, B> {
     type SelectedFont = SelectedFont<C::Font>;
 
     fn select_font(&mut self, cluster: &mut CharCluster) -> Option<Self::SelectedFont> {
@@ -136,17 +136,17 @@ impl<'a, C: FontCollection> shape::partition::Selector for FontSelector<'a, C> {
     }
 }
 
-pub struct SelectedFont<F: FontInstance> {
+pub struct SelectedFont<F: FontHandle> {
     pub font: F,
 }
 
-impl<F: FontInstance> PartialEq for SelectedFont<F> {
+impl<F: FontHandle> PartialEq for SelectedFont<F> {
     fn eq(&self, other: &Self) -> bool {
         self.font == other.font
     }
 }
 
-impl<F: FontInstance> shape::partition::SelectedFont for SelectedFont<F> {
+impl<F: FontHandle> shape::partition::SelectedFont for SelectedFont<F> {
     fn font(&self) -> FontRef {
         self.font.as_font_ref()
     }

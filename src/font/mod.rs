@@ -10,7 +10,7 @@ pub use swash::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight
 
 pub mod system;
 
-pub trait FontInstance: Clone + PartialEq {
+pub trait FontHandle: Clone + PartialEq {
     fn as_font_ref(&self) -> FontRef;
 
     fn synthesis(&self) -> Option<Synthesis> {
@@ -20,7 +20,7 @@ pub trait FontInstance: Clone + PartialEq {
 
 pub trait FontCollection {
     type Family: Clone + PartialEq + Debug;
-    type Font: FontInstance;
+    type Font: FontHandle;
 
     /// Begins a layout sesion with this collection.
     fn begin_session(&mut self);

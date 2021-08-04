@@ -2,6 +2,7 @@ use super::context::LayoutState;
 use super::font::system::{Font, SystemFontCollection};
 use super::font::{FontCollection, FontFamilyHandle, GenericFontFamily};
 use super::itemize::*;
+use super::Color;
 use super::Layout;
 use fount::FamilyId;
 use piet::kurbo::{Point, Rect, Size};
@@ -174,7 +175,10 @@ impl piet::TextLayoutBuilder for PietTextLayoutBuilder {
     }
 }
 
-fn convert_attr(attr: &TextAttribute, fonts: &mut SystemFontCollection) -> AttributeKind<FamilyId> {
+fn convert_attr(
+    attr: &TextAttribute,
+    fonts: &mut SystemFontCollection,
+) -> AttributeKind<FamilyId, ()> {
     use piet::FontStyle;
     use swash::{Style, Weight};
     match attr {
@@ -201,7 +205,7 @@ fn convert_attr(attr: &TextAttribute, fonts: &mut SystemFontCollection) -> Attri
         }),
         TextAttribute::TextColor(color) => {
             let (r, g, b, a) = color.as_rgba8();
-            AttributeKind::Color([r, g, b, a])
+            AttributeKind::Color(Color::Solid([r, g, b, a]))
         }
         TextAttribute::Underline(yes) => AttributeKind::Underline(*yes),
         TextAttribute::Strikethrough(yes) => AttributeKind::Strikethrough(*yes),
