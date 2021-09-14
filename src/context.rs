@@ -1,160 +1,228 @@
-use super::font::{FontCollection, FontFamily, FontFamilyHandle, GenericFontFamily};
-use super::itemize::{AttributeKind, ItemData, RangedAttribute, SpanData};
-use super::{Alignment, Attribute, Brush};
-use super::{Glyph, Layout, Run};
-use core::ops::{Bound, Range, RangeBounds};
-use fount::Library;
+//! Context for layout.
+
+use super::bidi;
+use super::font::FontContext;
+use super::layout::Layout;
+use super::resolve::range::*;
+use super::resolve::*;
+use super::style::*;
+
 use swash::shape::ShapeContext;
+use swash::text::cluster::CharInfo;
 
-pub struct LayoutContext<C: FontCollection, B: Brush> {
-    state: LayoutState<C, B>,
+use std::cell::{RefCell, RefMut};
+use std::ops::{Deref, DerefMut, RangeBounds};
+use std::rc::Rc;
+
+/// Context for building a text layout.
+pub struct LayoutContext<B: Brush = [u8; 4]> {
+    bidi: bidi::BidiResolver,
+    rcx: ResolveContext,
+    styles: Vec<RangedStyle<B>>,
+    rsb: RangedStyleBuilder<B>,
+    info: Vec<(CharInfo, u16)>,
+    scx: ShapeContext,
 }
 
-impl<C: FontCollection, B: Brush> LayoutContext<C, B> {
+impl<B: Brush> LayoutContext<B> {
     pub fn new() -> Self {
         Self {
-            state: LayoutState::new(),
+            bidi: bidi::BidiResolver::new(),
+            rcx: ResolveContext::default(),
+            styles: vec![],
+            rsb: RangedStyleBuilder::default(),
+            info: vec![],
+            scx: ShapeContext::default(),
         }
     }
 
-    pub fn new_layout<'a>(
+    pub fn ranged_builder<'a>(
         &'a mut self,
-        fonts: &'a mut C,
+        fcx: &'a mut FontContext,
         text: &'a str,
-    ) -> LayoutBuilder<'a, C, B> {
-        fonts.begin_session();
-        LayoutBuilder {
-            state: &mut self.state,
-            fonts,
+    ) -> RangedLayoutBuilder<B, &'a str> {
+        self.begin(text);
+        fcx.cache.reset();
+        RangedLayoutBuilder {
             text,
+            lcx: MaybeShared::Borrowed(self),
+            fcx: MaybeShared::Borrowed(fcx),
+        }
+    }
+
+    fn begin(&mut self, text: &str) {
+        self.rcx.clear();
+        self.styles.clear();
+        self.rsb.begin(text.len());
+        self.info.clear();
+        self.bidi.clear();
+        let mut a = swash::text::analyze(text.chars());
+        for x in a.by_ref() {
+            self.info.push((CharInfo::new(x.0, x.1), 0));
+        }
+        if a.needs_bidi_resolution() {
+            self.bidi.resolve(
+                text.chars()
+                    .zip(self.info.iter().map(|info| info.0.bidi_class())),
+                None,
+            );
         }
     }
 }
 
-pub struct LayoutBuilder<'a, C: FontCollection, B: Brush> {
-    state: &'a mut LayoutState<C, B>,
-    fonts: &'a mut C,
-    text: &'a str,
+#[doc(hidden)]
+pub struct RcLayoutContext<B: Brush> {
+    lcx: Rc<RefCell<LayoutContext<B>>>,
 }
 
-impl<'a, C: FontCollection, B: Brush> LayoutBuilder<'a, C, B> {}
-
-pub struct LayoutState<C: FontCollection, B: Brush = ()> {
-    pub shape_context: ShapeContext,
-    pub defaults: SpanData<C::Family, B>,
-    pub attributes: Vec<RangedAttribute<C::Family, B>>,
-    pub spans: Vec<SpanData<C::Family, B>>,
-    pub items: Vec<ItemData>,
-    pub glyphs: Vec<Glyph>,
-    pub runs: Vec<Run<C::Font>>,
-    pub max_width: f64,
-    pub alignment: Alignment,
-}
-
-impl<C: FontCollection, B: Brush> LayoutState<C, B> {
+impl<B: Brush> RcLayoutContext<B> {
     pub fn new() -> Self {
         Self {
-            shape_context: ShapeContext::new(),
-            defaults: SpanData::default(),
-            attributes: vec![],
-            spans: vec![],
-            items: vec![],
-            glyphs: vec![],
-            runs: vec![],
-            max_width: f64::MAX,
-            alignment: Alignment::Start,
+            lcx: Rc::new(RefCell::new(LayoutContext::new())),
         }
     }
 
-    fn reset(&mut self, len: usize) {
-        self.defaults = SpanData::default();
-        self.defaults.end = len;
-        self.attributes.clear();
-        self.spans.clear();
-        self.items.clear();
-        self.runs.clear();
-        self.max_width = f64::MAX;
-        self.alignment = Alignment::Start;
-    }
-
-    pub fn default_attribute(&mut self, attribute: AttributeKind<C::Family, B>) {
-        self.defaults.apply(&attribute);
-    }
-
-    pub fn range_attribute(
+    pub fn ranged_builder<T: TextSource>(
         &mut self,
-        text_len: usize,
-        range: impl RangeBounds<usize>,
-        attribute: AttributeKind<C::Family, B>,
-    ) {
-        let range = resolve_range(range, text_len);
-        if !range.is_empty() {
-            self.attributes.push(RangedAttribute {
-                attr: attribute,
-                start: range.start,
-                end: range.end,
-            });
+        fcx: Rc<RefCell<FontContext>>,
+        text: T,
+    ) -> RangedLayoutBuilder<'static, B, T> {
+        self.lcx.borrow_mut().begin("");
+        RangedLayoutBuilder {
+            text,
+            lcx: MaybeShared::Shared(self.lcx.clone()),
+            fcx: MaybeShared::Shared(fcx),
         }
     }
+}
 
-    pub fn build(&mut self, fonts: &mut C, text: &str) {
-        use super::itemize::{itemize, normalize_spans};
-        use super::shape::{shape, FontSelector};
-        self.defaults.end = text.len();
-        normalize_spans(&self.attributes, &self.defaults, &mut self.spans);
-        self.items.clear();
-        itemize(text, &mut self.spans, &mut self.items);
-        if self.items.is_empty() {
-            return;
+/// Builder for constructing a text layout with ranged attributes.
+pub struct RangedLayoutBuilder<'a, B: Brush, T: TextSource> {
+    text: T,
+    lcx: MaybeShared<'a, LayoutContext<B>>,
+    fcx: MaybeShared<'a, FontContext>,
+}
+
+impl<'a, B: Brush, T: TextSource> RangedLayoutBuilder<'a, B, T> {
+    pub fn push_default(&mut self, property: Property<B>) {
+        let mut lcx = self.lcx.borrow_mut();
+        let mut fcx = self.fcx.borrow_mut();
+        let resolved = lcx.rcx.resolve(&mut fcx, &property);
+        lcx.rsb.push_default(resolved);
+    }
+
+    pub fn push(&mut self, property: Property<B>, range: impl RangeBounds<usize>) {
+        let mut lcx = self.lcx.borrow_mut();
+        let mut fcx = self.fcx.borrow_mut();
+        let resolved = lcx.rcx.resolve(&mut fcx, &property);
+        lcx.rsb.push(resolved, range);
+    }
+
+    pub fn build_into(&mut self, layout: &mut Layout<B>) {
+        layout.data.clear();
+        let mut lcx = self.lcx.borrow_mut();
+        let lcx = &mut *lcx;
+        let text = self.text.as_str();
+        layout.data.has_bidi = !lcx.bidi.levels().is_empty();
+        layout.data.base_level = lcx.bidi.base_level();
+        layout.data.text_len = text.len();
+        let mut fcx = self.fcx.borrow_mut();
+        lcx.rsb.finish(&mut lcx.styles);
+        let mut char_index = 0;
+        for (i, style) in lcx.styles.iter().enumerate() {
+            for _ in text[style.range.clone()].chars() {
+                lcx.info[char_index].1 = i as u16;
+                char_index += 1;
+            }
         }
-        let mut font_selector = FontSelector::new(fonts, &self.spans, &self.items[0]);
-        shape(
-            &mut self.shape_context,
-            &mut font_selector,
-            &self.spans,
-            &self.items,
-            text,
-            &mut self.glyphs,
-            &mut self.runs,
+        use super::layout::{Decoration, Style};
+        fn conv_deco<B: Brush>(
+            deco: &ResolvedDecoration<B>,
+            default_brush: &B,
+        ) -> Option<Decoration<B>> {
+            if deco.enabled {
+                Some(Decoration {
+                    brush: deco.brush.clone().unwrap_or_else(|| default_brush.clone()),
+                    offset: deco.offset,
+                    size: deco.size,
+                })
+            } else {
+                None
+            }
+        }
+        layout.data.styles.extend(lcx.styles.iter().map(|s| {
+            let s = &s.style;
+            Style {
+                brush: s.brush.clone(),
+                underline: conv_deco(&s.underline, &s.brush),
+                strikethrough: conv_deco(&s.strikethrough, &s.brush),
+            }
+        }));
+        super::shape::shape_text(
+            &lcx.rcx,
+            &mut fcx,
+            &lcx.styles,
+            &lcx.info,
+            lcx.bidi.levels(),
+            &mut lcx.scx,
+            self.text.as_str(),
+            layout,
         );
     }
-}
 
-fn convert_attr<C: FontCollection, B: Brush>(
-    attr: &Attribute<B>,
-    fonts: &mut C,
-) -> AttributeKind<C::Family, B> {
-    match attr {
-        Attribute::FontFamily(family) => AttributeKind::Family(match family {
-            FontFamily::Named(name) => fonts
-                .query_family(name)
-                .map(|f| FontFamilyHandle::Named(f))
-                .unwrap_or(FontFamilyHandle::Default),
-            FontFamily::Generic(family) => FontFamilyHandle::Generic(*family),
-        }),
-        Attribute::FontSize(size) => AttributeKind::Size(*size as _),
-        Attribute::FontWeight(weight) => AttributeKind::Weight(*weight),
-        Attribute::FontStyle(style) => AttributeKind::Style(*style),
-        Attribute::FontStretch(stretch) => AttributeKind::Stretch(*stretch),
-        Attribute::Color(color) => AttributeKind::Color(color.clone()),
-        Attribute::Underline(yes) => AttributeKind::Underline(*yes),
-        Attribute::Strikethrough(yes) => AttributeKind::Strikethrough(*yes),
+    pub fn build(&mut self) -> Layout<B> {
+        let mut layout = Layout::default();
+        self.build_into(&mut layout);
+        layout
     }
 }
 
-/// Resolves a `RangeBounds` into a range in the range 0..len.
-pub fn resolve_range(range: impl RangeBounds<usize>, len: usize) -> Range<usize> {
-    let start = match range.start_bound() {
-        Bound::Unbounded => 0,
-        Bound::Included(n) => *n,
-        Bound::Excluded(n) => *n + 1,
-    };
+#[doc(hidden)]
+pub trait TextSource {
+    fn as_str(&self) -> &str;
+}
 
-    let end = match range.end_bound() {
-        Bound::Unbounded => len,
-        Bound::Included(n) => *n + 1,
-        Bound::Excluded(n) => *n,
-    };
+impl<'a> TextSource for &'a str {
+    fn as_str(&self) -> &str {
+        *self
+    }
+}
 
-    start.min(len)..end.min(len)
+enum MaybeShared<'a, T> {
+    Shared(Rc<RefCell<T>>),
+    Borrowed(&'a mut T),
+}
+
+impl<'a, T> MaybeShared<'a, T> {
+    pub fn borrow_mut(&mut self) -> BorrowMut<T> {
+        match self {
+            Self::Shared(shared) => BorrowMut::Shared(shared.borrow_mut()),
+            Self::Borrowed(borrowed) => BorrowMut::Borrowed(borrowed),
+        }
+    }
+}
+
+enum BorrowMut<'a, T> {
+    Shared(RefMut<'a, T>),
+    Borrowed(&'a mut T),
+}
+
+impl<'a, T> Deref for BorrowMut<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Shared(shared) => shared.deref(),
+            Self::Borrowed(borrowed) => borrowed,
+        }
+    }
+}
+
+impl<'a, T> DerefMut for BorrowMut<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            Self::Shared(shared) => shared.deref_mut(),
+            Self::Borrowed(borrowed) => borrowed,
+        }
+    }
 }

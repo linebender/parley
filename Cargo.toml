@@ -8,4 +8,4 @@ edition = "2018"
 [dependencies]
 swash = { git = "https://github.com/dfrg/swash" }
 fount = { git = "https://github.com/dfrg/fount" }
-piet = "0.4.0"
+

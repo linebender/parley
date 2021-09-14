@@ -1,161 +1,202 @@
-use super::font::*;
-use super::itemize::*;
-use super::{Brush, Glyph, Layout, Run};
-use fount::Locale;
-use swash::shape::{self, ShapeContext};
-use swash::text::cluster::CharCluster;
-use swash::text::Script;
+use super::font::{Font, FontContext};
+use super::layout::Layout;
+use super::resolve::range::RangedStyle;
+use super::resolve::ResolveContext;
+use super::style::{Brush, FontFeature, FontVariation};
+use swash::shape::*;
+use swash::text::cluster::{CharCluster, CharInfo, Token};
+use swash::text::{Language, Script};
 use swash::{Attributes, FontRef, Synthesis};
 
-pub fn shape<C: FontCollection, B: Brush>(
-    shape_context: &mut ShapeContext,
-    font_selector: &mut FontSelector<C, B>,
-    spans: &[SpanData<C::Family, B>],
-    items: &[ItemData],
+pub fn shape_text<B: Brush>(
+    rcx: &ResolveContext,
+    fcx: &mut FontContext,
+    styles: &[RangedStyle<B>],
+    infos: &[(CharInfo, u16)],
+    levels: &[u8],
+    scx: &mut ShapeContext,
     text: &str,
-    glyphs: &mut Vec<Glyph>,
-    runs: &mut Vec<Run<C::Font>>,
+    layout: &mut Layout<B>,
 ) {
-    use swash::text::cluster::*;
-    for item in items {
-        font_selector.script = item.script;
-        font_selector.locale = item.locale;
-        // font_selector
-        //     .font_cache
-        //     .select_fallbacks(item.script, item.locale, font_selector.attrs);
-        let options = shape::partition::SimpleShapeOptions {
-            size: item.size,
-            script: item.script,
-            language: item.locale,
-            ..Default::default()
-        };
-        let start = item.start;
-        let item_text = &text[start..item.end];
-        shape::partition::shape(
-            shape_context,
-            font_selector,
-            &options,
-            item_text.char_indices().map(|(i, ch)| Token {
-                ch,
-                offset: (start + i) as u32,
-                len: ch.len_utf8() as u8,
-                info: ch.into(),
-                // FIXME: Precompute and store this somewhere
-                data: match spans.binary_search_by(|probe| probe.start.cmp(&(start + i))) {
-                    Ok(index) => index as u32,
-                    Err(index) => index.saturating_sub(1) as u32,
+    let mut cur_style = &styles[0].style;
+    let mut cur_style_index = 0;
+    let mut cur_size = cur_style.font_size;
+    let mut cur_level = levels.get(0).copied().unwrap_or(0);
+    let mut cur_script = infos
+        .iter()
+        .map(|x| x.0.script())
+        .find(|&script| real_script(script))
+        .unwrap_or(Script::Latin);
+    let mut cur_locale = cur_style.locale;
+    let mut cur_variations = cur_style.font_variations;
+    let mut cur_features = cur_style.font_features;
+    let mut char_range = 0..0;
+    let mut text_range = 0..0;
+    macro_rules! shape_run {
+        () => {
+            let item_text = &text[text_range.clone()];
+            let item_infos = &infos[char_range.start..];
+            let first_style_index = item_infos[0].1;
+            let mut fs =
+                FontSelector::new(fcx, rcx, styles, first_style_index, cur_script, cur_locale);
+            let options = partition::SimpleShapeOptions {
+                size: cur_size,
+                script: cur_script,
+                language: cur_locale,
+                direction: if cur_level & 1 != 0 {
+                    Direction::RightToLeft
+                } else {
+                    Direction::LeftToRight
                 },
-            }),
-            |font, shaper| {
-                let glyph_start = glyphs.len();
-                let mut text_start = usize::MAX;
-                let mut text_end = 0;
-                shaper.shape_with(|cluster| {
-                    for g in cluster.glyphs {
-                        glyphs.push(Glyph {
-                            id: g.id,
-                            x: g.x,
-                            y: g.y,
-                            advance: g.advance,
-                        });
-                    }
-                    let range = cluster.source.to_range();
-                    text_start = range.start.min(text_start);
-                    text_end = range.end.max(text_end);
-                });
-                runs.push(Run {
-                    font: font.font.clone(),
-                    glyph_range: glyph_start..glyphs.len(),
-                    text_range: text_start..text_end,
-                });
-            },
-        );
+                variations: rcx.variations(cur_variations).unwrap_or(&[]),
+                features: rcx.features(cur_features).unwrap_or(&[]),
+                insert_dotted_circles: false,
+            };
+            partition::shape(
+                scx,
+                &mut fs,
+                &options,
+                item_text.char_indices().zip(item_infos).map(
+                    |((offset, ch), (info, style_index))| Token {
+                        ch,
+                        offset: (text_range.start + offset) as u32,
+                        len: ch.len_utf8() as u8,
+                        info: *info,
+                        data: *style_index as _,
+                    },
+                ),
+                |font, shaper| {
+                    layout
+                        .data
+                        .push_run(font.font.clone(), font.synthesis, shaper, cur_level);
+                },
+            );
+        };
+    }
+    for ((char_index, ch), (info, style_index)) in text.chars().enumerate().zip(infos) {
+        let mut break_run = false;
+        if cur_style_index != *style_index {
+            cur_style_index = *style_index;
+            cur_style = &styles[*style_index as usize].style;
+            if cur_style.font_size != cur_size
+                || cur_style.locale != cur_locale
+                || cur_style.font_variations != cur_variations
+                || cur_style.font_features != cur_features
+            {
+                break_run = true;
+            }
+        }
+        let mut script = info.script();
+        if !real_script(script) {
+            script = cur_script;
+        }
+        let level = levels.get(char_index).copied().unwrap_or(0);
+        if break_run || level != cur_level || script != cur_script {
+            shape_run!();
+            cur_size = cur_style.font_size;
+            cur_level = level;
+            cur_script = script;
+            cur_locale = cur_style.locale;
+            cur_variations = cur_style.font_variations;
+            cur_features = cur_style.font_features;
+            text_range.start = text_range.end;
+            char_range.start = char_range.end;
+        }
+        text_range.end += ch.len_utf8();
+        char_range.end += 1;
+    }
+    if !text_range.is_empty() {
+        shape_run!();
     }
 }
 
-pub struct FontSelector<'a, C: FontCollection, B: Brush> {
-    fonts: &'a mut C,
-    spans: &'a [SpanData<C::Family, B>],
-    span_index: u32,
-    script: Script,
-    locale: Option<Locale>,
-    family: FontFamilyHandle<C::Family>,
-    attrs: Attributes,
+fn real_script(script: Script) -> bool {
+    script != Script::Common && script != Script::Unknown && script != Script::Inherited
 }
 
-impl<'a, C: FontCollection, B: Brush> FontSelector<'a, C, B> {
-    pub fn new(
-        fonts: &'a mut C,
-        spans: &'a [SpanData<C::Family, B>],
-        first_item: &ItemData,
+struct FontSelector<'a, B: Brush> {
+    fcx: &'a mut FontContext,
+    rcx: &'a ResolveContext,
+    styles: &'a [RangedStyle<B>],
+    style_index: u16,
+    script: Script,
+    locale: Option<Language>,
+    attrs: Attributes,
+    variations: &'a [FontVariation],
+    features: &'a [FontFeature],
+}
+
+impl<'a, B: Brush> FontSelector<'a, B> {
+    fn new(
+        fcx: &'a mut FontContext,
+        rcx: &'a ResolveContext,
+        styles: &'a [RangedStyle<B>],
+        style_index: u16,
+        script: Script,
+        locale: Option<Language>,
     ) -> Self {
-        let first_span = &spans[0];
-        let attrs = first_span.attributes();
+        let style = &styles[style_index as usize].style;
+        let fonts_id = style.font_stack.id();
+        let fonts = rcx.stack(style.font_stack).unwrap_or(&[]);
+        let attrs = Attributes::new(style.font_stretch, style.font_weight, style.font_style);
+        let variations = rcx.variations(style.font_variations).unwrap_or(&[]);
+        let features = rcx.features(style.font_features).unwrap_or(&[]);
+        fcx.cache.select_families(fonts_id, fonts, attrs);
+        fcx.cache.select_fallbacks(script, locale, attrs);
         Self {
-            fonts,
-            spans,
-            span_index: 0,
-            script: first_item.script,
-            locale: first_item.locale,
-            family: first_span.family.clone(),
+            fcx,
+            rcx,
+            styles,
+            style_index,
+            script,
+            locale,
             attrs,
+            variations,
+            features,
         }
     }
 }
 
-impl<'a, C: FontCollection, B: Brush> shape::partition::Selector for FontSelector<'a, C, B> {
-    type SelectedFont = SelectedFont<C::Font>;
+impl<'a, B: Brush> partition::Selector for FontSelector<'a, B> {
+    type SelectedFont = SelectedFont;
 
     fn select_font(&mut self, cluster: &mut CharCluster) -> Option<Self::SelectedFont> {
-        let span_index = cluster.user_data();
-        if span_index != self.span_index {
-            self.span_index = span_index;
-            let span = &self.spans[span_index as usize];
-            let family = span.family.clone();
-            let diff_family = family != self.family;
-            let attrs = span.attributes();
-            let diff_attrs = attrs != self.attrs;
-            self.family = family;
+        let style_index = cluster.user_data() as u16;
+        if style_index != self.style_index {
+            self.style_index = style_index;
+            let style = &self.styles[style_index as usize].style;
+            let fonts_id = style.font_stack.id();
+            let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
+            let attrs = Attributes::new(style.font_stretch, style.font_weight, style.font_style);
+            let variations = self.rcx.variations(style.font_variations).unwrap_or(&[]);
+            let features = self.rcx.features(style.font_features).unwrap_or(&[]);
+            self.fcx.cache.select_families(fonts_id, fonts, attrs);
+            if self.attrs != attrs {
+                self.fcx
+                    .cache
+                    .select_fallbacks(self.script, self.locale, attrs);
+            }
             self.attrs = attrs;
-            // if diff_attrs || diff_family {
-            //     if diff_attrs {
-            //         self.font_cache.select_family(family, attrs);
-            //         self.font_cache
-            //             .select_fallbacks(self.script, self.locale, attrs);
-            //     } else {
-            //         self.font_cache.select_family(family, attrs);
-            //     }
-            // }
+            self.variations = variations;
+            self.features = features;
         }
-        let font = self.fonts.map(
-            &self.family,
-            self.attrs,
-            &FontFallbacks {
-                script: self.script,
-                locale: self.locale,
-            },
-            cluster,
-        )?;
-        Some(SelectedFont { font })
+        let (font, synthesis) = self.fcx.cache.map_cluster(cluster)?;
+        Some(SelectedFont { font, synthesis })
     }
 }
 
-pub struct SelectedFont<F: FontHandle> {
-    pub font: F,
+#[derive(PartialEq)]
+struct SelectedFont {
+    font: Font,
+    synthesis: Synthesis,
 }
 
-impl<F: FontHandle> PartialEq for SelectedFont<F> {
-    fn eq(&self, other: &Self) -> bool {
-        self.font == other.font
-    }
-}
-
-impl<F: FontHandle> shape::partition::SelectedFont for SelectedFont<F> {
+impl partition::SelectedFont for SelectedFont {
     fn font(&self) -> FontRef {
-        self.font.as_font_ref()
+        self.font.as_ref()
     }
 
     fn synthesis(&self) -> Option<Synthesis> {
-        self.font.synthesis()
+        Some(self.synthesis)
     }
 }
