@@ -1,8 +1,8 @@
 //! Greedy line breaking.
 
-use super::data::*;
-use super::layout::*;
-use super::style::Brush;
+use crate::data::*;
+use crate::layout::*;
+use crate::style::Brush;
 
 use core::ops::Range;
 
@@ -44,7 +44,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     /// Computes the next line in the paragraph. Returns the advance and size
     /// (width and height for horizontal layouts) of the line.
     pub fn break_next(&mut self, max_advance: f32, alignment: Alignment) -> Option<(f32, f32)> {
-        use swash::text::cluster::Boundary;
         self.prev_state = Some(self.state.clone());
         let run_count = self.layout.runs.len();
         while self.state.i < run_count {
