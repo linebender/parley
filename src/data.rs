@@ -1,4 +1,5 @@
 use super::layout::{Alignment, Decoration, Glyph, LineMetrics, RunMetrics, Style};
+use super::style::Brush;
 use super::util::*;
 use crate::font::Font;
 use core::ops::Range;
@@ -43,6 +44,8 @@ impl ClusterData {
 pub struct RunData {
     /// Index of the font for the run.
     pub font_index: usize,
+    /// Font size.
+    pub font_size: f32,
     /// Synthesis information for the font.
     pub synthesis: Synthesis,
     /// Range of normalized coordinates in the layout data.
@@ -102,14 +105,14 @@ pub struct LineRunData {
 }
 
 #[derive(Clone)]
-pub struct StyleData<B> {
+pub struct StyleData<B: Brush> {
     pub brush: B,
     pub underline: Option<Decoration<B>>,
     pub strikethrough: Option<Decoration<B>>,
 }
 
 #[derive(Clone)]
-pub struct LayoutData<B> {
+pub struct LayoutData<B: Brush> {
     pub has_bidi: bool,
     pub base_level: u8,
     pub text_len: usize,
@@ -123,7 +126,7 @@ pub struct LayoutData<B> {
     pub line_runs: Vec<LineRunData>,
 }
 
-impl<B> Default for LayoutData<B> {
+impl<B: Brush> Default for LayoutData<B> {
     fn default() -> Self {
         Self {
             has_bidi: false,
@@ -141,7 +144,7 @@ impl<B> Default for LayoutData<B> {
     }
 }
 
-impl<B> LayoutData<B> {
+impl<B: Brush> LayoutData<B> {
     pub fn clear(&mut self) {
         self.has_bidi = false;
         self.base_level = 0;
@@ -157,7 +160,14 @@ impl<B> LayoutData<B> {
     }
 
     #[allow(unused_assignments)]
-    pub fn push_run(&mut self, font: Font, synthesis: Synthesis, shaper: Shaper, bidi_level: u8) {
+    pub fn push_run(
+        &mut self,
+        font: Font,
+        font_size: f32,
+        synthesis: Synthesis,
+        shaper: Shaper,
+        bidi_level: u8,
+    ) {
         let font_index = self
             .fonts
             .iter()
@@ -174,6 +184,7 @@ impl<B> LayoutData<B> {
         let coords_end = self.coords.len();
         let mut run = RunData {
             font_index,
+            font_size,
             synthesis,
             coords_range: coords_start..coords_end,
             text_range: 0..0,

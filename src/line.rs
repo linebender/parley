@@ -2,6 +2,7 @@
 
 use super::data::*;
 use super::layout::*;
+use super::style::Brush;
 
 use core::ops::Range;
 
@@ -12,21 +13,21 @@ struct LineLayout {
 }
 
 impl LineLayout {
-    fn swap<B>(&mut self, layout: &mut LayoutData<B>) {
+    fn swap<B: Brush>(&mut self, layout: &mut LayoutData<B>) {
         core::mem::swap(&mut self.lines, &mut layout.lines);
         core::mem::swap(&mut self.runs, &mut layout.line_runs);
     }
 }
 
 /// Line breaking support for a paragraph.
-pub struct BreakLines<'a, B> {
+pub struct BreakLines<'a, B: Brush> {
     layout: &'a mut LayoutData<B>,
     lines: LineLayout,
     state: BreakerState,
     prev_state: Option<BreakerState>,
 }
 
-impl<'a, B> BreakLines<'a, B> {
+impl<'a, B: Brush> BreakLines<'a, B> {
     pub(crate) fn new(layout: &'a mut LayoutData<B>) -> Self {
         let mut lines = LineLayout::default();
         lines.swap(layout);
@@ -343,7 +344,7 @@ impl<'a, B> BreakLines<'a, B> {
     }
 }
 
-impl<'a, B> Drop for BreakLines<'a, B> {
+impl<'a, B: Brush> Drop for BreakLines<'a, B> {
     fn drop(&mut self) {
         self.lines.swap(self.layout);
     }
@@ -374,7 +375,7 @@ struct BreakerState {
     prev_boundary: Option<PrevBoundaryState>,
 }
 
-fn commit_line<B>(
+fn commit_line<B: Brush>(
     layout: &LayoutData<B>,
     lines: &mut LineLayout,
     state: &mut LineState,

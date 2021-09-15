@@ -2,6 +2,7 @@
 
 use super::data::*;
 use super::font::Font;
+use super::style::Brush;
 use core::ops::Range;
 use swash::text::cluster::{Boundary, ClusterInfo};
 use swash::{GlyphId, NormalizedCoord, Synthesis};
@@ -25,11 +26,11 @@ impl Default for Alignment {
 
 /// Text layout.
 #[derive(Clone)]
-pub struct Layout<B> {
+pub struct Layout<B: Brush> {
     pub(crate) data: LayoutData<B>,
 }
 
-impl<B> Layout<B> {
+impl<B: Brush> Layout<B> {
     /// Creates an empty layout.
     pub fn new() -> Self {
         Self::default()
@@ -196,7 +197,7 @@ impl<B> Layout<B> {
     }
 }
 
-impl<B> Default for Layout<B> {
+impl<B: Brush> Default for Layout<B> {
     fn default() -> Self {
         Self {
             data: Default::default(),
@@ -206,13 +207,13 @@ impl<B> Default for Layout<B> {
 
 /// Sequence of clusters with a single font and style.
 #[derive(Copy, Clone)]
-pub struct Run<'a, B> {
+pub struct Run<'a, B: Brush> {
     layout: &'a LayoutData<B>,
     data: &'a RunData,
     line_data: Option<&'a LineRunData>,
 }
 
-impl<'a, B> Run<'a, B> {
+impl<'a, B: Brush> Run<'a, B> {
     pub(crate) fn new(
         layout: &'a LayoutData<B>,
         data: &'a RunData,
@@ -228,6 +229,11 @@ impl<'a, B> Run<'a, B> {
     /// Returns the font for the run.
     pub fn font(&self) -> &Font {
         self.layout.fonts.get(self.data.font_index).unwrap()
+    }
+
+    /// Returns the font size for the run.
+    pub fn font_size(&self) -> f32 {
+        self.data.font_size
     }
 
     /// Returns the synthesis suggestions for the font associated with the run.
@@ -321,13 +327,13 @@ impl<'a, B> Run<'a, B> {
     }
 }
 
-struct Clusters<'a, B> {
+struct Clusters<'a, B: Brush> {
     run: &'a Run<'a, B>,
     range: Range<usize>,
     rev: bool,
 }
 
-impl<'a, B> Clone for Clusters<'a, B> {
+impl<'a, B: Brush> Clone for Clusters<'a, B> {
     fn clone(&self) -> Self {
         Self {
             run: self.run,
@@ -337,7 +343,7 @@ impl<'a, B> Clone for Clusters<'a, B> {
     }
 }
 
-impl<'a, B> Iterator for Clusters<'a, B> {
+impl<'a, B: Brush> Iterator for Clusters<'a, B> {
     type Item = Cluster<'a, B>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -374,12 +380,12 @@ pub struct RunMetrics {
 
 /// Atomic unit of text.
 #[derive(Copy, Clone)]
-pub struct Cluster<'a, B> {
+pub struct Cluster<'a, B: Brush> {
     run: &'a Run<'a, B>,
     data: &'a ClusterData,
 }
 
-impl<'a, B> Cluster<'a, B> {
+impl<'a, B: Brush> Cluster<'a, B> {
     /// Returns the range of text that defines the cluster.
     pub fn text_range(&self) -> Range<usize> {
         self.data.text_range(self.run.data)
@@ -461,22 +467,13 @@ impl Glyph {
 }
 
 /// Line in a text layout.
-#[derive(Copy)]
-pub struct Line<'a, B> {
+#[derive(Copy, Clone)]
+pub struct Line<'a, B: Brush> {
     layout: &'a LayoutData<B>,
     data: &'a LineData,
 }
 
-impl<'a, B> Clone for Line<'a, B> {
-    fn clone(&self) -> Self {
-        Self {
-            layout: self.layout,
-            data: self.data,
-        }
-    }
-}
-
-impl<'a, B> Line<'a, B> {
+impl<'a, B: Brush> Line<'a, B> {
     /// Returns the metrics for the line.
     pub fn metrics(&self) -> &LineMetrics {
         &self.data.metrics
@@ -518,6 +515,16 @@ impl<'a, B> Line<'a, B> {
             line_data: Some(line_data),
         })
     }
+
+    /// Returns an iterator over the glyph runs for the line.
+    pub fn glyph_runs(&self) -> impl Iterator<Item = GlyphRun<'a, B>> + 'a + Clone {
+        GlyphRunIter {
+            line: self.clone(),
+            run_index: 0,
+            glyph_start: 0,
+            offset: 0.,
+        }
+    }
 }
 
 /// Metrics information for a line.
@@ -547,8 +554,8 @@ impl LineMetrics {
 }
 
 /// Style properties.
-#[derive(Clone)]
-pub struct Style<B> {
+#[derive(Clone, Debug)]
+pub struct Style<B: Brush> {
     /// Brush for drawing glyphs.
     pub brush: B,
     /// Underline decoration.
@@ -558,8 +565,8 @@ pub struct Style<B> {
 }
 
 /// Underline or strikethrough decoration.
-#[derive(Clone)]
-pub struct Decoration<B> {
+#[derive(Clone, Debug)]
+pub struct Decoration<B: Brush> {
     /// Brush used to draw the decoration.
     pub brush: B,
     /// Offset of the decoration from the baseline. If `None`, use the metrics
@@ -589,6 +596,96 @@ pub struct HitTestResult {
     pub is_leading: bool,
     /// True if the hit was inside the layout bounds.
     pub is_inside: bool,
+}
+
+/// Sequence of fully positioned glyphs with the same style.
+#[derive(Clone)]
+pub struct GlyphRun<'a, B: Brush> {
+    run: Run<'a, B>,
+    style: &'a Style<B>,
+    glyph_start: usize,
+    glyph_count: usize,
+    offset: f32,
+    baseline: f32,
+}
+
+impl<'a, B: Brush> GlyphRun<'a, B> {
+    /// Returns the underlying run.
+    pub fn run(&self) -> &Run<'a, B> {
+        &self.run
+    }
+
+    /// Returns the associated style.
+    pub fn style(&self) -> &Style<B> {
+        self.style
+    }
+
+    /// Returns an iterator over fully positioned glyphs in the run.
+    pub fn glyphs(&'a self) -> impl Iterator<Item = Glyph> + 'a + Clone {
+        let mut offset = self.offset;
+        let baseline = self.baseline;
+        let glyphs = self
+            .run
+            .visual_clusters()
+            .map(|cluster| cluster.glyphs())
+            .flatten();
+        glyphs
+            .skip(self.glyph_start)
+            .take(self.glyph_count)
+            .map(move |mut g| {
+                g.x += offset;
+                g.y += baseline;
+                offset += g.advance;
+                g
+            })
+    }
+}
+
+#[derive(Clone)]
+struct GlyphRunIter<'a, B: Brush> {
+    line: Line<'a, B>,
+    run_index: usize,
+    glyph_start: usize,
+    offset: f32,
+}
+
+impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
+    type Item = GlyphRun<'a, B>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let run = self.line.get(self.run_index)?;
+            let mut iter = run
+                .visual_clusters()
+                .map(|c| c.glyphs())
+                .flatten()
+                .skip(self.glyph_start);
+            if let Some(first) = iter.next() {
+                let mut advance = first.advance;
+                let style_index = first.style_index();
+                let mut glyph_count = 1;
+                for glyph in iter.take_while(|g| g.style_index() == style_index) {
+                    glyph_count += 1;
+                    advance += glyph.advance;
+                }
+                let style = run.layout.styles.get(style_index)?;
+                let glyph_start = self.glyph_start;
+                self.glyph_start += glyph_count;
+                let offset = self.offset;
+                self.offset += advance;
+                return Some(GlyphRun {
+                    run,
+                    style,
+                    glyph_start,
+                    glyph_count,
+                    offset: offset + self.line.data.metrics.offset,
+                    baseline: self.line.data.metrics.baseline,
+                });
+            }
+            self.run_index += 1;
+            self.glyph_start = 0;
+        }
+    }
 }
 
 #[derive(Clone)]

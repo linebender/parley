@@ -66,9 +66,13 @@ pub fn shape_text<B: Brush>(
                     },
                 ),
                 |font, shaper| {
-                    layout
-                        .data
-                        .push_run(font.font.clone(), font.synthesis, shaper, cur_level);
+                    layout.data.push_run(
+                        font.font.clone(),
+                        cur_size,
+                        font.synthesis,
+                        shaper,
+                        cur_level,
+                    );
                 },
             );
         };
