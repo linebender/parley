@@ -1,3 +1,4 @@
+use parley::context::RangedBuilder;
 use parley::layout::Cursor;
 use parley::style::Brush;
 use parley::*;
@@ -92,7 +93,7 @@ impl TextLayout for ParleyTextLayout {
 
 pub struct ParleyTextLayoutBuilder {
     text: ParleyTextStorage,
-    builder: context::RangedLayoutBuilder<'static, ParleyBrush, ParleyTextStorage>,
+    builder: RangedBuilder<'static, ParleyBrush, ParleyTextStorage>,
     max_width: f64,
     alignment: layout::Alignment,
 }

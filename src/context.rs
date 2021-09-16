@@ -40,10 +40,10 @@ impl<B: Brush> LayoutContext<B> {
         &'a mut self,
         fcx: &'a mut FontContext,
         text: &'a str,
-    ) -> RangedLayoutBuilder<B, &'a str> {
+    ) -> RangedBuilder<B, &'a str> {
         self.begin(text);
         fcx.cache.reset();
-        RangedLayoutBuilder {
+        RangedBuilder {
             text,
             lcx: MaybeShared::Borrowed(self),
             fcx: MaybeShared::Borrowed(fcx),
@@ -101,9 +101,9 @@ impl<B: Brush> RcLayoutContext<B> {
         &mut self,
         fcx: Rc<RefCell<FontContext>>,
         text: T,
-    ) -> RangedLayoutBuilder<'static, B, T> {
+    ) -> RangedBuilder<'static, B, T> {
         self.lcx.borrow_mut().begin(text.as_str());
-        RangedLayoutBuilder {
+        RangedBuilder {
             text,
             lcx: MaybeShared::Shared(self.lcx.clone()),
             fcx: MaybeShared::Shared(fcx),
@@ -112,13 +112,13 @@ impl<B: Brush> RcLayoutContext<B> {
 }
 
 /// Builder for constructing a text layout with ranged attributes.
-pub struct RangedLayoutBuilder<'a, B: Brush, T: TextSource> {
+pub struct RangedBuilder<'a, B: Brush, T: TextSource> {
     text: T,
     lcx: MaybeShared<'a, LayoutContext<B>>,
     fcx: MaybeShared<'a, FontContext>,
 }
 
-impl<'a, B: Brush, T: TextSource> RangedLayoutBuilder<'a, B, T> {
+impl<'a, B: Brush, T: TextSource> RangedBuilder<'a, B, T> {
     pub fn push_default(&mut self, property: Property<B>) {
         let mut lcx = self.lcx.borrow_mut();
         let mut fcx = self.fcx.borrow_mut();
