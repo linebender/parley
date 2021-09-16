@@ -135,7 +135,7 @@ impl TextLayoutBuilder for ParleyTextLayoutBuilder {
         let mut layout = self.builder.build();
         layout.break_all_lines(Some(self.max_width as f32), self.alignment);
         Ok(ParleyTextLayout {
-            text: self.text.clone(),
+            text: self.text,
             layout,
         })
     }
