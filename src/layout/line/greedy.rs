@@ -74,6 +74,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 max_advance,
                                 alignment,
                                 true,
+                                false,
                             ) {
                                 self.state.runs = self.lines.runs.len();
                                 self.state.lines = self.lines.lines.len();
@@ -119,6 +120,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             max_advance,
                             alignment,
                             false,
+                            false,
                         ) {
                             self.state.runs = self.lines.runs.len();
                             self.state.lines = self.lines.lines.len();
@@ -142,6 +144,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 max_advance,
                                 alignment,
                                 false,
+                                false,
                             ) {
                                 self.state.runs = self.lines.runs.len();
                                 self.state.lines = self.lines.lines.len();
@@ -159,6 +162,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 &mut self.state.line,
                                 max_advance,
                                 alignment,
+                                false,
                                 false,
                             ) {
                                 self.state.runs = self.lines.runs.len();
@@ -187,6 +191,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             max_advance,
                             alignment,
                             false,
+                            false,
                         ) {
                             self.state.runs = self.lines.runs.len();
                             self.state.lines = self.lines.lines.len();
@@ -213,6 +218,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             &mut self.state.line,
             max_advance,
             alignment,
+            false,
             true,
         ) {
             self.state.runs = self.lines.runs.len();
@@ -398,10 +404,12 @@ fn commit_line<B: Brush>(
     max_advance: f32,
     alignment: Alignment,
     explicit_break: bool,
+    is_last: bool,
 ) -> bool {
+    let is_empty = layout.text_len == 0;
     state.clusters.end = state.clusters.end.min(layout.clusters.len());
-    if state.runs.is_empty() {
-        state.runs.end += 1;
+    if state.runs.end == 0 && is_last {
+        state.runs.end = 1;
     }
     let last_run = state.runs.len() - 1;
     let runs_start = lines.runs.len();
@@ -414,7 +422,9 @@ fn commit_line<B: Brush>(
         if i == last_run {
             cluster_range.end = state.clusters.end;
         }
-        if cluster_range.start > cluster_range.end {
+        if cluster_range.start > cluster_range.end
+            || (!is_empty && cluster_range.start == cluster_range.end)
+        {
             continue;
         }
         let run = Run::new(layout, run_data, None);
@@ -425,7 +435,7 @@ fn commit_line<B: Brush>(
                 .get(cluster_range.start - run_data.cluster_range.start)
                 .unwrap();
             let last_cluster = run
-                .get(cluster_range.end - run_data.cluster_range.start - 1)
+                .get((cluster_range.end - run_data.cluster_range.start).saturating_sub(1))
                 .unwrap();
             first_cluster.text_range().start..last_cluster.text_range().end
         };

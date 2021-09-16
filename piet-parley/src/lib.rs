@@ -77,7 +77,13 @@ impl TextLayout for ParleyTextLayout {
     fn hit_test_point(&self, point: Point) -> HitTestPoint {
         let cursor = Cursor::from_point(&self.layout, point.x as f32, point.y as f32);
         let mut result = HitTestPoint::default();
-        result.idx = cursor.text_range().start;
+        let range = cursor.text_range();
+        // FIXME: this is horribly broken for BiDi text
+        if cursor.is_trailing() {
+            result.idx = range.end;
+        } else {
+            result.idx = range.start;
+        }
         result.is_inside = cursor.is_inside();
         result
     }
@@ -189,12 +195,17 @@ impl Text for ParleyText {
     fn new_text_layout(&mut self, text: impl TextStorage) -> Self::TextLayoutBuilder {
         let text = ParleyTextStorage(Rc::new(text));
         let builder = self.lcx.ranged_builder(self.fcx.clone(), text.clone());
-        ParleyTextLayoutBuilder {
+        let builder = ParleyTextLayoutBuilder {
             builder,
             text,
             max_width: f64::INFINITY,
             alignment: layout::Alignment::Start,
-        }
+        };
+        let defaults = piet::util::LayoutDefaults::default();
+        builder
+            .default_attribute(TextAttribute::FontFamily(defaults.font))
+            .default_attribute(TextAttribute::FontSize(defaults.font_size))
+            .default_attribute(TextAttribute::TextColor(defaults.fg_color))
     }
 }
 

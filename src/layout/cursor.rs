@@ -26,56 +26,58 @@ impl Cursor {
         let last_line = layout.data.lines.len().saturating_sub(1);
         for (line_index, line) in layout.lines().enumerate() {
             let line_metrics = line.metrics();
-            if y <= line_metrics.baseline || line_index == last_line {
-                if y > line_metrics.baseline + line_metrics.leading * 0.5 {
-                    result.is_inside = false;
-                    x = f32::MAX;
-                } else if y < 0. {
-                    x = 0.;
+            if y > line_metrics.baseline + line_metrics.descent + line_metrics.leading * 0.5 {
+                if line_index != last_line {
+                    continue;
                 }
-                result.baseline = line_metrics.baseline;
-                result.path.line_index = line_index;
-                let mut last_edge = line_metrics.offset;
-                for (run_index, run) in line.runs().enumerate() {
-                    result.path.run_index = run_index;
-                    let cluster_range = run.data().cluster_range.clone();
-                    for (cluster_index, cluster) in run.visual_clusters().enumerate() {
-                        let range = cluster.text_range();
-                        result.text_start = range.start;
-                        result.text_end = range.end;
-                        if run.is_rtl() {
-                            result.path.cluster_index = cluster_range.end - cluster_index - 1;
-                        } else {
-                            result.path.cluster_index = cluster_index;
-                        }
-                        let advance = cluster.advance();
-                        if x >= last_edge {
-                            let far_edge = last_edge + advance;
-                            if x < far_edge {
+                result.is_inside = false;
+                x = f32::MAX;
+            } else if y < 0. {
+                x = 0.;
+            }
+            result.baseline = line_metrics.baseline;
+            result.path.line_index = line_index;
+            let mut last_edge = line_metrics.offset;
+            for (run_index, run) in line.runs().enumerate() {
+                result.path.run_index = run_index;
+                let cluster_range = run.data().cluster_range.clone();
+                for (cluster_index, cluster) in run.visual_clusters().enumerate() {
+                    let range = cluster.text_range();
+                    result.text_start = range.start;
+                    result.text_end = range.end;
+                    if run.is_rtl() {
+                        result.path.cluster_index = cluster_range.end - cluster_index - 1;
+                    } else {
+                        result.path.cluster_index = cluster_index;
+                    }
+                    let advance = cluster.advance();
+                    if x >= last_edge {
+                        let far_edge = last_edge + advance;
+                        if x < far_edge {
+                            result.is_leading = false;
+                            let middle = (last_edge + far_edge) * 0.5;
+                            result.advance = advance;
+                            if x <= middle {
+                                result.is_leading = true;
+                                result.offset = last_edge;
+                            } else {
                                 result.is_leading = false;
-                                let middle = (last_edge + far_edge) * 0.5;
-                                result.advance = advance;
-                                if x <= middle {
-                                    result.is_leading = true;
-                                    result.offset = last_edge;
-                                } else {
-                                    result.is_leading = false;
-                                    result.offset = far_edge;
-                                }
-                                return result;
+                                result.offset = far_edge;
                             }
-                            last_edge = far_edge;
-                        } else {
-                            result.is_inside = false;
-                            result.is_leading = true;
-                            result.offset = line_metrics.offset;
                             return result;
                         }
+                        last_edge = far_edge;
+                    } else {
+                        result.is_inside = false;
+                        result.is_leading = true;
+                        result.offset = line_metrics.offset;
+                        return result;
                     }
                 }
-                break;
             }
+            break;
         }
+        result.is_inside = false;
         result
     }
 
@@ -165,6 +167,12 @@ impl Cursor {
     /// cluster.
     pub fn is_leading(&self) -> bool {
         self.is_leading
+    }
+
+    /// Returns true if the cursor is on the leading edge of the target
+    /// cluster.
+    pub fn is_trailing(&self) -> bool {
+        !self.is_leading
     }
 
     /// Returns true if the target cluster is part of a right-to-left run.
