@@ -47,6 +47,23 @@ impl FontContext {
             cache: FontCache::new(),
         }
     }
+
+    /// Returns true if a family of the specified name exists in the context.
+    pub fn has_family(&self, name: &str) -> bool {
+        self.cache.context.family_by_name(name).is_some()
+    }
+
+    /// Registers the fonts in the specified font data. Returns the family name
+    /// for the first registerd font.
+    ///
+    /// This API is temporary to support piet until the more of the underlying
+    /// font collection code is exposed.
+    pub fn register_fonts(&mut self, data: Vec<u8>) -> Option<String> {
+        let reg = self.cache.context.register_fonts(data)?;
+        let first_family = reg.families.get(0)?;
+        let family = self.cache.context.family(*first_family)?;
+        Some(family.name().to_owned())
+    }
 }
 
 #[derive(Clone)]

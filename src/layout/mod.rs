@@ -8,10 +8,10 @@ pub(crate) mod data;
 
 pub mod cursor;
 
-use data::*;
 use super::font::Font;
 use super::style::Brush;
 use core::ops::Range;
+use data::*;
 use swash::text::cluster::{Boundary, ClusterInfo};
 use swash::{GlyphId, NormalizedCoord, Synthesis};
 
@@ -27,6 +27,7 @@ pub enum Alignment {
     Start,
     Middle,
     End,
+    Justified,
 }
 
 impl Default for Alignment {
@@ -50,6 +51,22 @@ impl<B: Brush> Layout<B> {
     /// Returns the style collection for the layout.
     pub fn styles(&self) -> &[Style<B>] {
         &self.data.styles
+    }
+
+    /// Returns the width of the layout.
+    pub fn width(&self) -> f32 {
+        self.data.width
+    }
+
+    /// Returns the width of the layout, including the width of any trailing
+    /// whitespace.
+    pub fn full_width(&self) -> f32 {
+        self.data.full_width
+    }
+
+    /// Returns the height of the layout.
+    pub fn height(&self) -> f32 {
+        self.data.height
     }
 
     /// Returns the number of lines in the layout.

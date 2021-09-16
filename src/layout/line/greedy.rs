@@ -24,10 +24,13 @@ pub struct BreakLines<'a, B: Brush> {
     lines: LineLayout,
     state: BreakerState,
     prev_state: Option<BreakerState>,
+    done: bool,
 }
 
 impl<'a, B: Brush> BreakLines<'a, B> {
     pub(crate) fn new(layout: &'a mut LayoutData<B>) -> Self {
+        layout.width = 0.;
+        layout.height = 0.;
         let mut lines = LineLayout::default();
         lines.swap(layout);
         lines.lines.clear();
@@ -37,12 +40,16 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             lines,
             state: BreakerState::default(),
             prev_state: None,
+            done: false,
         }
     }
 
     /// Computes the next line in the paragraph. Returns the advance and size
     /// (width and height for horizontal layouts) of the line.
     pub fn break_next(&mut self, max_advance: f32, alignment: Alignment) -> Option<(f32, f32)> {
+        if self.done {
+            return None;
+        }
         self.prev_state = Some(self.state.clone());
         let run_count = self.layout.runs.len();
         while self.state.i < run_count {
@@ -212,6 +219,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             self.state.lines = self.lines.lines.len();
             self.state.line.x = 0.;
             let line = self.lines.lines.last().unwrap();
+            self.done = true;
             return Some((line.metrics.advance, line.size()));
         }
         None
@@ -223,6 +231,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             self.state = state;
             self.lines.lines.truncate(self.state.lines);
             self.lines.runs.truncate(self.state.runs);
+            self.done = false;
             true
         } else {
             false
@@ -342,6 +351,17 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
 impl<'a, B: Brush> Drop for BreakLines<'a, B> {
     fn drop(&mut self) {
+        let mut width = 0f32;
+        let mut full_width = 0f32;
+        let mut height = 0f32;
+        for line in &self.lines.lines {
+            width = width.max(line.metrics.advance - line.metrics.trailing_whitespace);
+            full_width = full_width.max(line.metrics.advance);
+            height += line.metrics.size();
+        }
+        self.layout.width = width;
+        self.layout.full_width = full_width;
+        self.layout.height = height;
         self.lines.swap(self.layout);
     }
 }
@@ -380,10 +400,9 @@ fn commit_line<B: Brush>(
     explicit_break: bool,
 ) -> bool {
     state.clusters.end = state.clusters.end.min(layout.clusters.len());
-    if state.runs.is_empty() || state.clusters.is_empty() {
-        return false;
+    if state.runs.is_empty() {
+        state.runs.end += 1;
     }
-    // let line_index = lines.lines.len();
     let last_run = state.runs.len() - 1;
     let runs_start = lines.runs.len();
     for (i, run_data) in layout.runs[state.runs.clone()].iter().enumerate() {
@@ -395,17 +414,21 @@ fn commit_line<B: Brush>(
         if i == last_run {
             cluster_range.end = state.clusters.end;
         }
-        if cluster_range.start >= cluster_range.end {
+        if cluster_range.start > cluster_range.end {
             continue;
         }
         let run = Run::new(layout, run_data, None);
-        let first_cluster = run
-            .get(cluster_range.start - run_data.cluster_range.start)
-            .unwrap();
-        let last_cluster = run
-            .get(cluster_range.end - run_data.cluster_range.start - 1)
-            .unwrap();
-        let text_range = first_cluster.text_range().start..last_cluster.text_range().end;
+        let text_range = if run_data.cluster_range.is_empty() {
+            0..0
+        } else {
+            let first_cluster = run
+                .get(cluster_range.start - run_data.cluster_range.start)
+                .unwrap();
+            let last_cluster = run
+                .get(cluster_range.end - run_data.cluster_range.start - 1)
+                .unwrap();
+            first_cluster.text_range().start..last_cluster.text_range().end
+        };
         let line_run = LineRunData {
             run_index,
             bidi_level: run_data.bidi_level,

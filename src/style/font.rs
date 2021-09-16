@@ -16,6 +16,8 @@ pub type FontFeature = swash::Setting<u16>;
 pub enum FontStack<'a> {
     /// Font family list in CSS format.
     Source(&'a str),
+    /// Single font family.
+    Single(FontFamily<'a>),
     /// Ordered list of font families.
     List(&'a [FontFamily<'a>]),
 }

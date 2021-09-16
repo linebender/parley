@@ -56,7 +56,7 @@ impl<B: Brush> RangedStyleBuilder<B> {
             range: 0..self.len,
         });
         for prop in &self.properties {
-            if prop.range.start >= prop.range.end {
+            if prop.range.start > prop.range.end {
                 continue;
             }
             let split_range = split_range(prop, &styles);

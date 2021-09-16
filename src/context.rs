@@ -56,6 +56,7 @@ impl<B: Brush> LayoutContext<B> {
         self.rsb.begin(text.len());
         self.info.clear();
         self.bidi.clear();
+        let text = if text.is_empty() { " " } else { text };
         let mut a = swash::text::analyze(text.chars());
         for x in a.by_ref() {
             self.info.push((CharInfo::new(x.0, x.1), 0));
@@ -70,7 +71,21 @@ impl<B: Brush> LayoutContext<B> {
     }
 }
 
+impl<B: Brush> Default for LayoutContext<B> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<B: Brush> Clone for LayoutContext<B> {
+    fn clone(&self) -> Self {
+        // None of the internal state is visible so just return a new instance.
+        Self::new()
+    }
+}
+
 #[doc(hidden)]
+#[derive(Clone)]
 pub struct RcLayoutContext<B: Brush> {
     lcx: Rc<RefCell<LayoutContext<B>>>,
 }
@@ -87,7 +102,7 @@ impl<B: Brush> RcLayoutContext<B> {
         fcx: Rc<RefCell<FontContext>>,
         text: T,
     ) -> RangedLayoutBuilder<'static, B, T> {
-        self.lcx.borrow_mut().begin("");
+        self.lcx.borrow_mut().begin(text.as_str());
         RangedLayoutBuilder {
             text,
             lcx: MaybeShared::Shared(self.lcx.clone()),
@@ -122,7 +137,12 @@ impl<'a, B: Brush, T: TextSource> RangedLayoutBuilder<'a, B, T> {
         layout.data.clear();
         let mut lcx = self.lcx.borrow_mut();
         let lcx = &mut *lcx;
-        let text = self.text.as_str();
+        let mut text = self.text.as_str();
+        let is_empty = text.is_empty();
+        if is_empty {
+            // Force a layout to have at least one line.
+            text = " ";
+        }
         layout.data.has_bidi = !lcx.bidi.levels().is_empty();
         layout.data.base_level = lcx.bidi.base_level();
         layout.data.text_len = text.len();
@@ -166,10 +186,16 @@ impl<'a, B: Brush, T: TextSource> RangedLayoutBuilder<'a, B, T> {
             &lcx.info,
             lcx.bidi.levels(),
             &mut lcx.scx,
-            self.text.as_str(),
+            text,
             layout,
         );
-        layout.data.apply_spacing();
+        layout.data.finish();
+        if is_empty {
+            let run = &mut layout.data.runs[0];
+            run.cluster_range.end = 0;
+            run.text_range.end = 0;
+            layout.data.clusters.clear();
+        }
     }
 
     pub fn build(&mut self) -> Layout<B> {

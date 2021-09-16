@@ -145,6 +145,9 @@ pub struct LayoutData<B: Brush> {
     pub has_bidi: bool,
     pub base_level: u8,
     pub text_len: usize,
+    pub width: f32,
+    pub full_width: f32,
+    pub height: f32,
     pub fonts: Vec<Font>,
     pub coords: Vec<i16>,
     pub styles: Vec<Style<B>>,
@@ -161,6 +164,9 @@ impl<B: Brush> Default for LayoutData<B> {
             has_bidi: false,
             base_level: 0,
             text_len: 0,
+            width: 0.,
+            full_width: 0.,
+            height: 0.,
             fonts: Vec::new(),
             coords: Vec::new(),
             styles: Vec::new(),
@@ -178,6 +184,9 @@ impl<B: Brush> LayoutData<B> {
         self.has_bidi = false;
         self.base_level = 0;
         self.text_len = 0;
+        self.width = 0.;
+        self.full_width = 0.;
+        self.height = 0.;
         self.fonts.clear();
         self.coords.clear();
         self.styles.clear();
@@ -350,7 +359,7 @@ impl<B: Brush> LayoutData<B> {
         flush_run!();
     }
 
-    pub fn apply_spacing(&mut self) {
+    pub fn finish(&mut self) {
         for run in &self.runs {
             let word = run.word_spacing;
             let letter = run.letter_spacing;

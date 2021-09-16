@@ -21,7 +21,7 @@ impl Cursor {
     pub fn from_point<B: Brush>(layout: &Layout<B>, mut x: f32, y: f32) -> Self {
         let mut result = Self {
             is_inside: x >= 0. && y >= 0.,
-            .. Default::default()
+            ..Default::default()
         };
         let last_line = layout.data.lines.len().saturating_sub(1);
         for (line_index, line) in layout.lines().enumerate() {
@@ -84,7 +84,7 @@ impl Cursor {
         let mut result = Self {
             is_leading: true,
             is_inside: true,
-            .. Default::default()
+            ..Default::default()
         };
         if position >= layout.data.text_len {
             result.is_inside = false;

@@ -150,10 +150,18 @@ impl ResolveContext {
                         }
                     }
                 }
-                let resolved = self.families.insert(&self.tmp_families);
-                self.tmp_families.clear();
-                resolved
             }
+            FontStack::Single(family) => match family {
+                FontFamily::Named(name) => {
+                    if let Some(family) = fcx.cache.context.family_by_name(name) {
+                        self.tmp_families.push(family.id());
+                    }
+                }
+                FontFamily::Generic(family) => {
+                    self.tmp_families
+                        .extend_from_slice(fcx.cache.context.generic_families(family));
+                }
+            },
             FontStack::List(families) => {
                 for family in families {
                     match family {
@@ -168,11 +176,11 @@ impl ResolveContext {
                         }
                     }
                 }
-                let resolved = self.families.insert(&self.tmp_families);
-                self.tmp_families.clear();
-                resolved
             }
         }
+        let resolved = self.families.insert(&self.tmp_families);
+        self.tmp_families.clear();
+        resolved
     }
 
     /// Resolves font variation settings.
