@@ -282,10 +282,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 if !have_metrics && line_run.is_whitespace {
                     continue;
                 }
+                let line_height = line_run.compute_line_height(&self.layout);
                 let run = &self.layout.runs[line_run.run_index];
-                line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent);
-                line.metrics.descent = line.metrics.descent.max(run.metrics.descent);
-                line.metrics.leading = line.metrics.leading.max(run.metrics.leading);
+                line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent * line_height);
+                line.metrics.descent = line.metrics.descent.max(run.metrics.descent * line_height);
+                line.metrics.leading = line.metrics.leading.max(run.metrics.leading * line_height);
                 have_metrics = true;
             }
             if needs_reorder && run_count > 1 {
@@ -318,9 +319,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     line.metrics.offset = offset;
                 }
             }
-            // if line.explicit_break {
-            //     // self.lines.clusters.get_mut(line.clusters.1.saturating_sub(1) as usize).map(|c| c.flags |= CLUSTER_NEWLINE);
-            // }
             if !have_metrics {
                 // Line consisting entirely of whitespace?
                 if !line.run_range.is_empty() {

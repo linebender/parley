@@ -1,7 +1,7 @@
+use crate::font::Font;
 use crate::layout::{Alignment, Decoration, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::*;
-use crate::font::Font;
 use core::ops::Range;
 use swash::shape::Shaper;
 use swash::text::cluster::{Boundary, ClusterInfo};
@@ -25,6 +25,7 @@ pub struct ClusterData {
 impl ClusterData {
     pub const LIGATURE_START: u16 = 1;
     pub const LIGATURE_COMPONENT: u16 = 2;
+    pub const DIVERGENT_STYLES: u16 = 4;
 
     pub fn is_ligature_start(&self) -> bool {
         self.flags & Self::LIGATURE_START != 0
@@ -32,6 +33,10 @@ impl ClusterData {
 
     pub fn is_ligature_component(&self) -> bool {
         self.flags & Self::LIGATURE_COMPONENT != 0
+    }
+
+    pub fn has_divergent_styles(&self) -> bool {
+        self.flags & Self::DIVERGENT_STYLES != 0
     }
 
     pub fn text_range(&self, run: &RunData) -> Range<usize> {
@@ -106,6 +111,26 @@ pub struct LineRunData {
     pub text_range: Range<usize>,
     /// Range of clusters.
     pub cluster_range: Range<usize>,
+}
+
+impl LineRunData {
+    pub fn compute_line_height<B: Brush>(&self, layout: &LayoutData<B>) -> f32 {
+        let mut line_height = 0f32;
+        let glyph_start = layout.runs[self.run_index].glyph_start;
+        for cluster in &layout.clusters[self.cluster_range.clone()] {
+            if cluster.glyph_len != 0xFF && cluster.has_divergent_styles() {
+                let start = glyph_start + cluster.glyph_offset as usize;
+                let end = start + cluster.glyph_len as usize;
+                for glyph in &layout.glyphs[start..end] {
+                    line_height = line_height.max(layout.styles[glyph.style_index()].line_height);
+                }
+            } else {
+                line_height =
+                    line_height.max(layout.styles[cluster.style_index as usize].line_height);
+            }
+        }
+        line_height
+    }
 }
 
 #[derive(Clone)]
@@ -306,12 +331,18 @@ impl<B: Brush> LayoutData<B> {
             }
             // Otherwise, encode all of the glyphs.
             cluster_data.glyph_offset = (self.glyphs.len() - run.glyph_start) as u16;
-            self.glyphs.extend(cluster.glyphs.iter().map(|g| Glyph {
-                id: g.id,
-                style_index: g.data as _,
-                x: g.x,
-                y: g.y,
-                advance: g.advance,
+            self.glyphs.extend(cluster.glyphs.iter().map(|g| {
+                let style_index = g.data as u16;
+                if cluster_data.style_index != style_index {
+                    cluster_data.flags |= ClusterData::DIVERGENT_STYLES;
+                }
+                Glyph {
+                    id: g.id,
+                    style_index,
+                    x: g.x,
+                    y: g.y,
+                    advance: g.advance,
+                }
             }));
             glyph_count += glyph_len;
             push_components!();
