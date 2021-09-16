@@ -156,6 +156,7 @@ impl<'a, B: Brush, T: TextSource> RangedLayoutBuilder<'a, B, T> {
                 brush: s.brush.clone(),
                 underline: conv_deco(&s.underline, &s.brush),
                 strikethrough: conv_deco(&s.strikethrough, &s.brush),
+                line_height: s.line_height,
             }
         }));
         super::shape::shape_text(
@@ -168,6 +169,7 @@ impl<'a, B: Brush, T: TextSource> RangedLayoutBuilder<'a, B, T> {
             self.text.as_str(),
             layout,
         );
+        layout.data.apply_spacing();
     }
 
     pub fn build(&mut self) -> Layout<B> {

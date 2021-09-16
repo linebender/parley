@@ -8,6 +8,7 @@ use super::style::{
     FontWeight, Property,
 };
 use crate::font::*;
+use crate::util::nearly_eq;
 use fount::FamilyId;
 use swash::text::Language;
 use swash::Setting;
@@ -377,7 +378,7 @@ impl<B: Brush> ResolvedStyle<B> {
         use ResolvedProperty::*;
         match property {
             FontStack(value) => self.font_stack == *value,
-            FontSize(value) => self.font_size == *value,
+            FontSize(value) => nearly_eq(self.font_size, *value),
             FontStretch(value) => self.font_stretch == *value,
             FontStyle(value) => self.font_style == *value,
             FontWeight(value) => self.font_weight == *value,
@@ -393,9 +394,9 @@ impl<B: Brush> ResolvedStyle<B> {
             StrikethroughOffset(value) => self.strikethrough.offset == *value,
             StrikethroughSize(value) => self.strikethrough.size == *value,
             StrikethroughBrush(value) => self.strikethrough.brush == *value,
-            LineHeight(value) => self.line_height == *value,
-            WordSpacing(value) => self.word_spacing == *value,
-            LetterSpacing(value) => self.letter_spacing == *value,
+            LineHeight(value) => nearly_eq(self.line_height, *value),
+            WordSpacing(value) => nearly_eq(self.word_spacing, *value),
+            LetterSpacing(value) => nearly_eq(self.letter_spacing, *value),
         }
     }
 }

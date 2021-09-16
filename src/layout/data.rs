@@ -1,6 +1,6 @@
-use super::layout::{Alignment, Decoration, Glyph, LineMetrics, RunMetrics, Style};
-use super::style::Brush;
-use super::util::*;
+use crate::layout::{Alignment, Decoration, Glyph, LineMetrics, RunMetrics, Style};
+use crate::style::Brush;
+use crate::util::*;
 use crate::font::Font;
 use core::ops::Range;
 use swash::shape::Shaper;
@@ -62,6 +62,10 @@ pub struct RunData {
     pub glyph_start: usize,
     /// Metrics for the run.
     pub metrics: RunMetrics,
+    /// Additional word spacing.
+    pub word_spacing: f32,
+    /// Additional letter spacing.
+    pub letter_spacing: f32,
     /// Total advance of the run.
     pub advance: f32,
 }
@@ -167,6 +171,8 @@ impl<B: Brush> LayoutData<B> {
         synthesis: Synthesis,
         shaper: Shaper,
         bidi_level: u8,
+        word_spacing: f32,
+        letter_spacing: f32,
     ) {
         let font_index = self
             .fonts
@@ -201,6 +207,8 @@ impl<B: Brush> LayoutData<B> {
                 strikethrough_offset: metrics.strikeout_offset,
                 strikethrough_size: metrics.stroke_size,
             },
+            word_spacing,
+            letter_spacing,
             advance: 0.,
         };
         // Track these so that we can flush if they overflow a u16.
@@ -221,7 +229,6 @@ impl<B: Brush> LayoutData<B> {
         let mut first = true;
         shaper.shape_with(|cluster| {
             if cluster.info.boundary() == Boundary::Mandatory {
-                // Force break runs at newlines to simplify line breaking.
                 run.ends_with_newline = true;
                 flush_run!();
             }
@@ -310,5 +317,33 @@ impl<B: Brush> LayoutData<B> {
             push_components!();
         });
         flush_run!();
+    }
+
+    pub fn apply_spacing(&mut self) {
+        for run in &self.runs {
+            let word = run.word_spacing;
+            let letter = run.letter_spacing;
+            if nearly_zero(word) && nearly_zero(letter) {
+                continue;
+            }
+            let clusters = &mut self.clusters[run.cluster_range.clone()];
+            for cluster in clusters {
+                let mut spacing = letter;
+                if !nearly_zero(word) && cluster.info.whitespace().is_space_or_nbsp() {
+                    spacing += word;
+                }
+                if !nearly_zero(spacing) {
+                    cluster.advance += spacing;
+                    if cluster.glyph_len != 0xFF {
+                        let start = run.glyph_start + cluster.glyph_offset as usize;
+                        let end = start + cluster.glyph_len as usize;
+                        let glyphs = &mut self.glyphs[start..end];
+                        if let Some(last) = glyphs.last_mut() {
+                            last.advance += spacing;
+                        }
+                    }
+                }
+            }
+        }
     }
 }

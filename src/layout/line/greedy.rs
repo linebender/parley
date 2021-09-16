@@ -1,6 +1,5 @@
 //! Greedy line breaking.
 
-use crate::data::*;
 use crate::layout::*;
 use crate::style::Brush;
 
@@ -380,7 +379,7 @@ fn commit_line<B: Brush>(
     state: &mut LineState,
     max_advance: f32,
     alignment: Alignment,
-    explicit: bool,
+    explicit_break: bool,
 ) -> bool {
     state.clusters.end = state.clusters.end.min(layout.clusters.len());
     if state.runs.is_empty() || state.clusters.is_empty() {
@@ -423,12 +422,14 @@ fn commit_line<B: Brush>(
     if runs_start == runs_end {
         return false;
     }
-    let mut line = LineData::default();
-    line.run_range = runs_start..runs_end;
+    let mut line = LineData {
+        run_range: runs_start..runs_end,
+        max_advance,
+        alignment,
+        explicit_break,
+        ..Default::default()
+    };
     line.metrics.advance = state.x;
-    line.max_advance = max_advance;
-    line.alignment = alignment;
-    line.explicit_break = explicit;
     lines.lines.push(line);
     state.clusters.start = state.clusters.end;
     state.clusters.end += 1;

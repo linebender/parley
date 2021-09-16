@@ -4,9 +4,11 @@ mod cluster;
 mod line;
 mod run;
 
+pub(crate) mod data;
+
 pub mod cursor;
 
-use super::data::*;
+use data::*;
 use super::font::Font;
 use super::style::Brush;
 use core::ops::Range;
@@ -153,6 +155,8 @@ pub struct Style<B: Brush> {
     pub underline: Option<Decoration<B>>,
     /// Strikethrough decoration.
     pub strikethrough: Option<Decoration<B>>,
+    /// Multiplicative line height factor.
+    pub(crate) line_height: f32,
 }
 
 /// Underline or strikethrough decoration.

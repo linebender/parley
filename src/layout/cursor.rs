@@ -19,8 +19,10 @@ pub struct Cursor {
 impl Cursor {
     /// Creates a new cursor from the specified layout and point.
     pub fn from_point<B: Brush>(layout: &Layout<B>, mut x: f32, y: f32) -> Self {
-        let mut result = Self::default();
-        result.is_inside = x >= 0. && y >= 0.;
+        let mut result = Self {
+            is_inside: x >= 0. && y >= 0.,
+            .. Default::default()
+        };
         let last_line = layout.data.lines.len().saturating_sub(1);
         for (line_index, line) in layout.lines().enumerate() {
             let line_metrics = line.metrics();
@@ -79,9 +81,11 @@ impl Cursor {
 
     /// Creates a new cursor for the specified layout and text position.
     pub fn from_position<B: Brush>(layout: &Layout<B>, mut position: usize) -> Self {
-        let mut result = Self::default();
-        result.is_leading = true;
-        result.is_inside = true;
+        let mut result = Self {
+            is_leading: true,
+            is_inside: true,
+            .. Default::default()
+        };
         if position >= layout.data.text_len {
             result.is_inside = false;
             result.is_leading = false;

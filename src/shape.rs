@@ -1,12 +1,25 @@
 use super::font::{Font, FontContext};
 use super::layout::Layout;
 use super::resolve::range::RangedStyle;
-use super::resolve::ResolveContext;
+use super::resolve::{ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
+use crate::util::nearly_eq;
 use swash::shape::*;
 use swash::text::cluster::{CharCluster, CharInfo, Token};
 use swash::text::{Language, Script};
 use swash::{Attributes, FontRef, Synthesis};
+
+struct Item {
+    style_index: u16,
+    size: f32,
+    script: Script,
+    level: u8,
+    locale: Option<Language>,
+    variations: Resolved<FontVariation>,
+    features: Resolved<FontFeature>,
+    word_spacing: f32,
+    letter_spacing: f32,
+}
 
 pub fn shape_text<B: Brush>(
     rcx: &ResolveContext,
@@ -18,38 +31,51 @@ pub fn shape_text<B: Brush>(
     text: &str,
     layout: &mut Layout<B>,
 ) {
-    let mut cur_style = &styles[0].style;
-    let mut cur_style_index = 0;
-    let mut cur_size = cur_style.font_size;
-    let mut cur_level = levels.get(0).copied().unwrap_or(0);
-    let mut cur_script = infos
-        .iter()
-        .map(|x| x.0.script())
-        .find(|&script| real_script(script))
-        .unwrap_or(Script::Latin);
-    let mut cur_locale = cur_style.locale;
-    let mut cur_variations = cur_style.font_variations;
-    let mut cur_features = cur_style.font_features;
+    if text.is_empty() || styles.is_empty() {
+        return;
+    }
+    let mut style = &styles[0].style;
+    let mut item = Item {
+        style_index: 0,
+        size: style.font_size,
+        level: levels.get(0).copied().unwrap_or(0),
+        script: infos
+            .iter()
+            .map(|x| x.0.script())
+            .find(|&script| real_script(script))
+            .unwrap_or(Script::Latin),
+        locale: style.locale,
+        variations: style.font_variations,
+        features: style.font_features,
+        word_spacing: style.word_spacing,
+        letter_spacing: style.letter_spacing,
+    };
     let mut char_range = 0..0;
     let mut text_range = 0..0;
-    macro_rules! shape_run {
+    macro_rules! shape_item {
         () => {
             let item_text = &text[text_range.clone()];
             let item_infos = &infos[char_range.start..];
             let first_style_index = item_infos[0].1;
-            let mut fs =
-                FontSelector::new(fcx, rcx, styles, first_style_index, cur_script, cur_locale);
+            let mut fs = FontSelector::new(
+                fcx,
+                rcx,
+                styles,
+                first_style_index,
+                item.script,
+                item.locale,
+            );
             let options = partition::SimpleShapeOptions {
-                size: cur_size,
-                script: cur_script,
-                language: cur_locale,
-                direction: if cur_level & 1 != 0 {
+                size: item.size,
+                script: item.script,
+                language: item.locale,
+                direction: if item.level & 1 != 0 {
                     Direction::RightToLeft
                 } else {
                     Direction::LeftToRight
                 },
-                variations: rcx.variations(cur_variations).unwrap_or(&[]),
-                features: rcx.features(cur_features).unwrap_or(&[]),
+                variations: rcx.variations(item.variations).unwrap_or(&[]),
+                features: rcx.features(item.features).unwrap_or(&[]),
                 insert_dotted_circles: false,
             };
             partition::shape(
@@ -68,10 +94,12 @@ pub fn shape_text<B: Brush>(
                 |font, shaper| {
                     layout.data.push_run(
                         font.font.clone(),
-                        cur_size,
+                        item.size,
                         font.synthesis,
                         shaper,
-                        cur_level,
+                        item.level,
+                        item.word_spacing,
+                        item.letter_spacing,
                     );
                 },
             );
@@ -79,30 +107,32 @@ pub fn shape_text<B: Brush>(
     }
     for ((char_index, ch), (info, style_index)) in text.chars().enumerate().zip(infos) {
         let mut break_run = false;
-        if cur_style_index != *style_index {
-            cur_style_index = *style_index;
-            cur_style = &styles[*style_index as usize].style;
-            if cur_style.font_size != cur_size
-                || cur_style.locale != cur_locale
-                || cur_style.font_variations != cur_variations
-                || cur_style.font_features != cur_features
+        let mut script = info.script();
+        if !real_script(script) {
+            script = item.script;
+        }
+        let level = levels.get(char_index).copied().unwrap_or(0);
+        if item.style_index != *style_index {
+            item.style_index = *style_index;
+            style = &styles[*style_index as usize].style;
+            if !nearly_eq(style.font_size, item.size)
+                || style.locale != item.locale
+                || style.font_variations != item.variations
+                || style.font_features != item.features
+                || !nearly_eq(style.letter_spacing, item.letter_spacing)
+                || !nearly_eq(style.word_spacing, item.word_spacing)
             {
                 break_run = true;
             }
         }
-        let mut script = info.script();
-        if !real_script(script) {
-            script = cur_script;
-        }
-        let level = levels.get(char_index).copied().unwrap_or(0);
-        if break_run || level != cur_level || script != cur_script {
-            shape_run!();
-            cur_size = cur_style.font_size;
-            cur_level = level;
-            cur_script = script;
-            cur_locale = cur_style.locale;
-            cur_variations = cur_style.font_variations;
-            cur_features = cur_style.font_features;
+        if break_run || level != item.level || script != item.script {
+            shape_item!();
+            item.size = style.font_size;
+            item.level = level;
+            item.script = script;
+            item.locale = style.locale;
+            item.variations = style.font_variations;
+            item.features = style.font_features;
             text_range.start = text_range.end;
             char_range.start = char_range.end;
         }
@@ -110,7 +140,7 @@ pub fn shape_text<B: Brush>(
         char_range.end += 1;
     }
     if !text_range.is_empty() {
-        shape_run!();
+        shape_item!();
     }
 }
 
