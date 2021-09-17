@@ -29,6 +29,7 @@ pub struct BreakLines<'a, B: Brush> {
 
 impl<'a, B: Brush> BreakLines<'a, B> {
     pub(crate) fn new(layout: &'a mut LayoutData<B>) -> Self {
+        unjustify(layout);
         layout.width = 0.;
         layout.height = 0.;
         let mut lines = LineLayout::default();
@@ -60,6 +61,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             while self.state.j < cluster_end {
                 let cluster = run.get(self.state.j - cluster_start).unwrap();
                 let is_ligature_continuation = cluster.is_ligature_continuation();
+                let is_space = cluster.info().whitespace().is_space_or_nbsp();
                 let boundary = cluster.info().boundary();
                 match boundary {
                     Boundary::Mandatory => {
@@ -74,7 +76,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 &mut self.state.line,
                                 max_advance,
                                 alignment,
-                                true,
+                                BreakReason::Explicit,
                                 false,
                             ) {
                                 self.state.runs = self.lines.runs.len();
@@ -99,8 +101,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 self.state.line.skip_mandatory_break = false;
                 let mut advance = cluster.advance();
                 if cluster.is_ligature_start() {
-                    while (self.state.j + 1) < cluster_end {
-                        let cluster = run.get(self.state.j + 1).unwrap();
+                    while let Some(cluster) = run.get(self.state.j + 1) {
                         if !cluster.is_ligature_continuation() {
                             break;
                         } else {
@@ -111,7 +112,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 }
                 let next_x = self.state.line.x + advance;
                 if next_x > max_advance {
-                    if cluster.info().whitespace().is_space_or_nbsp() {
+                    if is_space {
                         // Hang overflowing whitespace
                         self.state.line.runs.end = self.state.i + 1;
                         self.state.line.clusters.end = self.state.j + 1;
@@ -122,7 +123,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             &mut self.state.line,
                             max_advance,
                             alignment,
-                            false,
+                            BreakReason::Regular,
                             false,
                         ) {
                             self.state.runs = self.lines.runs.len();
@@ -146,7 +147,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 &mut self.state.line,
                                 max_advance,
                                 alignment,
-                                false,
+                                BreakReason::Emergency,
                                 false,
                             ) {
                                 self.state.runs = self.lines.runs.len();
@@ -165,7 +166,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 &mut self.state.line,
                                 max_advance,
                                 alignment,
-                                false,
+                                BreakReason::Regular,
                                 false,
                             ) {
                                 self.state.runs = self.lines.runs.len();
@@ -193,7 +194,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             &mut self.state.line,
                             max_advance,
                             alignment,
-                            false,
+                            BreakReason::Emergency,
                             false,
                         ) {
                             self.state.runs = self.lines.runs.len();
@@ -211,6 +212,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     self.state.line.clusters.end = self.state.j + 1;
                     self.state.line.x = next_x;
                     self.state.j += 1;
+                    if is_space {
+                        self.state.line.num_spaces += 1;
+                    }
                 }
             }
             self.state.i += 1;
@@ -221,7 +225,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             &mut self.state.line,
             max_advance,
             alignment,
-            false,
+            BreakReason::None,
             true,
         ) {
             self.state.runs = self.lines.runs.len();
@@ -330,7 +334,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 0.
             };
             line.metrics.trailing_whitespace = trailing_whitespace;
-            if line.alignment != Alignment::Start {
+            if line.alignment != Alignment::Start
+                && line.max_advance.is_finite()
+                && line.max_advance < f32::MAX
+            {
                 let extra = line.max_advance - line.metrics.advance + trailing_whitespace;
                 if extra > 0. {
                     let offset = if line.alignment == Alignment::Middle {
@@ -338,7 +345,44 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     } else {
                         extra
                     };
-                    line.metrics.offset = offset;
+                    if line.alignment == Alignment::Justified {
+                        if line.break_reason != BreakReason::None && line.num_spaces != 0 {
+                            let adjustment = extra / line.num_spaces as f32;
+                            let mut applied = 0;
+                            for line_run in &self.lines.runs[line.run_range.clone()] {
+                                if line_run.bidi_level & 1 != 0 {
+                                    for cluster in self.layout.clusters
+                                        [line_run.cluster_range.clone()]
+                                    .iter_mut()
+                                    .rev()
+                                    {
+                                        if applied == line.num_spaces {
+                                            break;
+                                        }
+                                        if cluster.info.whitespace().is_space_or_nbsp() {
+                                            cluster.advance += adjustment;
+                                            applied += 1;
+                                        }
+                                    }
+                                } else {
+                                    for cluster in self.layout.clusters
+                                        [line_run.cluster_range.clone()]
+                                    .iter_mut()
+                                    {
+                                        if applied == line.num_spaces {
+                                            break;
+                                        }
+                                        if cluster.info.whitespace().is_space_or_nbsp() {
+                                            cluster.advance += adjustment;
+                                            applied += 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        line.metrics.offset = offset;
+                    }
                 }
             }
             if !have_metrics {
@@ -379,12 +423,55 @@ impl<'a, B: Brush> Drop for BreakLines<'a, B> {
     }
 }
 
+/// Removes previous justification applied to clusters.
+fn unjustify<B: Brush>(layout: &mut LayoutData<B>) {
+    for line in &layout.lines {
+        if line.alignment == Alignment::Justified
+            && line.max_advance.is_finite()
+            && line.max_advance < f32::MAX
+        {
+            let extra = line.max_advance - line.metrics.advance + line.metrics.trailing_whitespace;
+            if line.break_reason != BreakReason::None && line.num_spaces != 0 {
+                let adjustment = extra / line.num_spaces as f32;
+                let mut applied = 0;
+                for line_run in &layout.line_runs[line.run_range.clone()] {
+                    if line_run.bidi_level & 1 != 0 {
+                        for cluster in layout.clusters[line_run.cluster_range.clone()]
+                            .iter_mut()
+                            .rev()
+                        {
+                            if applied == line.num_spaces {
+                                break;
+                            }
+                            if cluster.info.whitespace().is_space_or_nbsp() {
+                                cluster.advance -= adjustment;
+                                applied += 1;
+                            }
+                        }
+                    } else {
+                        for cluster in layout.clusters[line_run.cluster_range.clone()].iter_mut() {
+                            if applied == line.num_spaces {
+                                break;
+                            }
+                            if cluster.info.whitespace().is_space_or_nbsp() {
+                                cluster.advance -= adjustment;
+                                applied += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[derive(Clone, Default)]
 struct LineState {
     x: f32,
     runs: Range<usize>,
     clusters: Range<usize>,
     skip_mandatory_break: bool,
+    num_spaces: usize,
 }
 
 #[derive(Clone, Default)]
@@ -410,7 +497,7 @@ fn commit_line<B: Brush>(
     state: &mut LineState,
     max_advance: f32,
     alignment: Alignment,
-    explicit_break: bool,
+    break_reason: BreakReason,
     is_last: bool,
 ) -> bool {
     let is_empty = layout.text_len == 0;
@@ -461,11 +548,16 @@ fn commit_line<B: Brush>(
     if runs_start == runs_end {
         return false;
     }
+    let mut num_spaces = state.num_spaces;
+    if break_reason == BreakReason::Regular {
+        num_spaces = num_spaces.saturating_sub(1);
+    }
     let mut line = LineData {
         run_range: runs_start..runs_end,
         max_advance,
         alignment,
-        explicit_break,
+        break_reason,
+        num_spaces,
         ..Default::default()
     };
     line.metrics.advance = state.x;
@@ -473,6 +565,7 @@ fn commit_line<B: Brush>(
     state.clusters.start = state.clusters.end;
     state.clusters.end += 1;
     state.runs.start = state.runs.end - 1;
+    state.num_spaces = 0;
     true
 }
 

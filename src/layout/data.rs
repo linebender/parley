@@ -75,6 +75,20 @@ pub struct RunData {
     pub advance: f32,
 }
 
+#[derive(Copy, Clone, PartialEq)]
+pub enum BreakReason {
+    None,
+    Regular,
+    Explicit,
+    Emergency,
+}
+
+impl Default for BreakReason {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct LineData {
     /// Range of the source text.
@@ -83,12 +97,14 @@ pub struct LineData {
     pub run_range: Range<usize>,
     /// Metrics for the line.
     pub metrics: LineMetrics,
+    /// The cause of the line break.
+    pub break_reason: BreakReason,
     /// Alignment.
     pub alignment: Alignment,
-    /// True if the line ends with an explicit break.
-    pub explicit_break: bool,
     /// Maximum advance for the line.
     pub max_advance: f32,
+    /// Number of justified clusters on the line.
+    pub num_spaces: usize,
 }
 
 impl LineData {
