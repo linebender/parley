@@ -42,6 +42,13 @@ impl<'a, B: Brush> Run<'a, B> {
         &self.data.metrics
     }
 
+    /// Returns the advance for the run.
+    pub fn advance(&self) -> f32 {
+        self.line_data
+            .map(|d| d.advance)
+            .unwrap_or(self.data.advance)
+    }
+
     /// Returns the original text range for the run.
     pub fn text_range(&self) -> Range<usize> {
         self.line_data

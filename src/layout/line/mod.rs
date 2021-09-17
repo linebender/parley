@@ -26,6 +26,9 @@ impl<'a, B: Brush> Line<'a, B> {
     /// Returns the run at the specified index.
     pub fn get(&self, index: usize) -> Option<Run<'a, B>> {
         let index = self.data.run_range.start + index;
+        if index >= self.data.run_range.end {
+            return None;
+        }
         let line_data = self.layout.line_runs.get(index)?;
         Some(Run {
             layout: self.layout,
@@ -91,6 +94,7 @@ pub struct GlyphRun<'a, B: Brush> {
     glyph_count: usize,
     offset: f32,
     baseline: f32,
+    advance: f32,
 }
 
 impl<'a, B: Brush> GlyphRun<'a, B> {
@@ -114,16 +118,29 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
         self.offset
     }
 
-    /// Returns an iterator over fully positioned glyphs in the run.
+    /// Returns the total advance of the run.
+    pub fn advance(&self) -> f32 {
+        self.advance
+    }
+
+    /// Returns an iterator over the glyphs in the run.
     pub fn glyphs(&'a self) -> impl Iterator<Item = Glyph> + 'a + Clone {
-        let mut offset = self.offset;
-        let baseline = self.baseline;
-        let glyphs = self
-            .run
+        self.run
             .visual_clusters()
             .map(|cluster| cluster.glyphs())
-            .flatten();
-        glyphs
+            .flatten()
+            .skip(self.glyph_start)
+            .take(self.glyph_count)
+    }
+
+    /// Returns an iterator over the fully positioned glyphs in the run.
+    pub fn positioned_glyphs(&'a self) -> impl Iterator<Item = Glyph> + 'a + Clone {
+        let mut offset = self.offset;
+        let baseline = self.baseline;
+        self.run
+            .visual_clusters()
+            .map(|cluster| cluster.glyphs())
+            .flatten()
             .skip(self.glyph_start)
             .take(self.glyph_count)
             .map(move |mut g| {
@@ -174,6 +191,7 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                     glyph_count,
                     offset: offset + self.line.data.metrics.offset,
                     baseline: self.line.data.metrics.baseline,
+                    advance,
                 });
             }
             self.run_index += 1;

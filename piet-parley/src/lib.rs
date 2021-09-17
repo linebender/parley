@@ -58,15 +58,16 @@ impl TextLayout for ParleyTextLayout {
             .map(|ch| ch.len_utf8())
             .sum();
         let metrics = line.metrics();
+        let y_offset =
+            metrics.baseline as f64 - metrics.ascent as f64 - metrics.leading as f64 * 0.5;
+        let baseline = metrics.baseline as f64 - y_offset;
         Some(LineMetric {
             start_offset: range.start,
             end_offset: range.end,
             trailing_whitespace,
-            baseline: metrics.baseline as f64,
+            baseline,
             height: metrics.size() as f64,
-            y_offset: metrics.baseline as f64
-                - metrics.ascent as f64
-                - metrics.leading as f64 * 0.5,
+            y_offset,
         })
     }
 
@@ -89,7 +90,7 @@ impl TextLayout for ParleyTextLayout {
     }
 
     fn hit_test_text_position(&self, idx: usize) -> HitTestPosition {
-        let cursor = Cursor::from_position(&self.layout, idx);
+        let cursor = Cursor::from_position(&self.layout, idx, true);
         let mut result = HitTestPosition::default();
         result.point = Point::new(cursor.offset() as f64, cursor.baseline() as f64);
         result.line = cursor.path().line_index;
@@ -128,12 +129,12 @@ impl TextLayoutBuilder for ParleyTextLayoutBuilder {
         range: impl RangeBounds<usize>,
         attribute: impl Into<TextAttribute>,
     ) -> Self {
-        self.builder.push(convert_attr(&attribute.into()), range);
+        self.builder.push(&convert_attr(&attribute.into()), range);
         self
     }
 
     fn default_attribute(mut self, attribute: impl Into<TextAttribute>) -> Self {
-        self.builder.push_default(convert_attr(&attribute.into()));
+        self.builder.push_default(&convert_attr(&attribute.into()));
         self
     }
 
@@ -151,6 +152,7 @@ impl TextLayoutBuilder for ParleyTextLayoutBuilder {
 pub struct ParleyText {
     fcx: Rc<RefCell<FontContext>>,
     lcx: context::RcLayoutContext<ParleyBrush>,
+    scale: f32,
 }
 
 impl ParleyText {
@@ -162,7 +164,12 @@ impl ParleyText {
         Self {
             fcx: Rc::new(RefCell::new(fcx)),
             lcx: context::RcLayoutContext::new(),
+            scale: 1.,
         }
+    }
+
+    pub fn set_scale(&mut self, scale: f32) {
+        self.scale = scale;
     }
 }
 
@@ -194,7 +201,9 @@ impl Text for ParleyText {
 
     fn new_text_layout(&mut self, text: impl TextStorage) -> Self::TextLayoutBuilder {
         let text = ParleyTextStorage(Rc::new(text));
-        let builder = self.lcx.ranged_builder(self.fcx.clone(), text.clone());
+        let builder = self
+            .lcx
+            .ranged_builder(self.fcx.clone(), text.clone(), self.scale);
         let builder = ParleyTextLayoutBuilder {
             builder,
             text,
@@ -218,11 +227,11 @@ impl context::TextSource for ParleyTextStorage {
     }
 }
 
-fn convert_attr<'a>(attr: &'a TextAttribute) -> style::Property<'a, ParleyBrush> {
+fn convert_attr<'a>(attr: &'a TextAttribute) -> style::StyleProperty<'a, ParleyBrush> {
     use style::FontStyle as Style;
     use style::FontWeight as Weight;
     use style::GenericFamily;
-    use style::Property::*;
+    use style::StyleProperty::*;
     match attr {
         TextAttribute::FontFamily(family) => {
             use style::FontFamily::*;

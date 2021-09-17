@@ -59,6 +59,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             let cluster_end = run_data.cluster_range.end;
             while self.state.j < cluster_end {
                 let cluster = run.get(self.state.j - cluster_start).unwrap();
+                let is_ligature_continuation = cluster.is_ligature_continuation();
                 let boundary = cluster.info().boundary();
                 match boundary {
                     Boundary::Mandatory => {
@@ -85,11 +86,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         }
                     }
                     Boundary::Line => {
-                        self.state.prev_boundary = Some(PrevBoundaryState {
-                            i: self.state.i,
-                            j: self.state.j,
-                            state: self.state.line.clone(),
-                        });
+                        if !is_ligature_continuation {
+                            self.state.prev_boundary = Some(PrevBoundaryState {
+                                i: self.state.i,
+                                j: self.state.j,
+                                state: self.state.line.clone(),
+                            });
+                        }
                     }
                     _ => {}
                 }
@@ -288,7 +291,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             let mut needs_reorder = false;
             line.text_range.start = usize::MAX;
             // Compute metrics for the line, but ignore trailing whitespace.
-            for line_run in self.lines.runs[line.run_range.clone()].iter().rev() {
+            for line_run in self.lines.runs[line.run_range.clone()].iter_mut().rev() {
                 line.text_range.end = line.text_range.end.max(line_run.text_range.end);
                 line.text_range.start = line.text_range.start.min(line_run.text_range.start);
                 if line_run.bidi_level != 0 {
@@ -297,6 +300,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 if !have_metrics && line_run.is_whitespace {
                     continue;
                 }
+                line_run.advance = self.layout.clusters[line_run.cluster_range.clone()]
+                    .iter()
+                    .map(|c| c.advance)
+                    .sum();
                 let line_height = line_run.compute_line_height(&self.layout);
                 let run = &self.layout.runs[line_run.run_index];
                 line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent * line_height);
@@ -446,6 +453,7 @@ fn commit_line<B: Brush>(
             has_trailing_whitespace: false,
             cluster_range,
             text_range,
+            advance: 0.,
         };
         lines.runs.push(line_run);
     }

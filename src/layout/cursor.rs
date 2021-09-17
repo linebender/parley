@@ -52,21 +52,24 @@ impl Cursor {
                     }
                     let advance = cluster.advance();
                     if x >= last_edge {
-                        let far_edge = last_edge + advance;
-                        if x < far_edge {
+                        let next_edge = last_edge + advance;
+                        if x < next_edge {
                             result.is_leading = false;
-                            let middle = (last_edge + far_edge) * 0.5;
+                            let middle = (last_edge + next_edge) * 0.5;
                             result.advance = advance;
                             if x <= middle {
                                 result.is_leading = true;
                                 result.offset = last_edge;
                             } else {
                                 result.is_leading = false;
-                                result.offset = far_edge;
+                                result.offset = next_edge;
                             }
                             return result;
                         }
-                        last_edge = far_edge;
+                        result.advance = advance;
+                        result.is_leading = false;
+                        result.offset = next_edge;
+                        last_edge = next_edge;
                     } else {
                         result.is_inside = false;
                         result.is_leading = true;
@@ -82,7 +85,11 @@ impl Cursor {
     }
 
     /// Creates a new cursor for the specified layout and text position.
-    pub fn from_position<B: Brush>(layout: &Layout<B>, mut position: usize) -> Self {
+    pub fn from_position<B: Brush>(
+        layout: &Layout<B>,
+        mut position: usize,
+        is_leading: bool,
+    ) -> Self {
         let mut result = Self {
             is_leading: true,
             is_inside: true,
@@ -106,6 +113,8 @@ impl Cursor {
             for (run_index, run) in line.runs().enumerate() {
                 result.path.run_index = run_index;
                 if !run.text_range().contains(&position) {
+                    last_edge += run.advance();
+                    result.offset = last_edge;
                     continue;
                 }
                 let cluster_range = run.data().cluster_range.clone();
@@ -114,16 +123,18 @@ impl Cursor {
                     result.text_start = range.start;
                     result.text_end = range.end;
                     result.offset = last_edge;
-                    if run.is_rtl() {
+                    result.is_rtl = run.is_rtl();
+                    if result.is_rtl {
                         result.path.cluster_index = cluster_range.end - cluster_index - 1;
                     } else {
                         result.path.cluster_index = cluster_index;
                     }
                     let advance = cluster.advance();
                     if range.contains(&position) {
-                        if !result.is_inside {
+                        if !is_leading || !result.is_inside {
                             result.offset += advance;
                         }
+                        result.is_leading = is_leading;
                         result.advance = advance;
                         return result;
                     }

@@ -5,7 +5,7 @@ pub mod tree;
 
 use super::style::{
     Brush, FontFamily, FontFeature, FontSettings, FontStack, FontStretch, FontStyle, FontVariation,
-    FontWeight, Property,
+    FontWeight, StyleProperty,
 };
 use crate::font::*;
 use crate::util::nearly_eq;
@@ -105,30 +105,33 @@ impl ResolveContext {
     pub fn resolve<B: Brush>(
         &mut self,
         fcx: &mut FontContext,
-        property: &Property<B>,
+        property: &StyleProperty<B>,
+        scale: f32,
     ) -> ResolvedProperty<B> {
         use ResolvedProperty::*;
         match property {
-            Property::FontStack(value) => FontStack(self.resolve_stack(fcx, *value)),
-            Property::FontSize(value) => FontSize(*value),
-            Property::FontStretch(value) => FontStretch(*value),
-            Property::FontStyle(value) => FontStyle(*value),
-            Property::FontWeight(value) => FontWeight(*value),
-            Property::FontVariations(value) => FontVariations(self.resolve_variations(*value)),
-            Property::FontFeatures(value) => FontFeatures(self.resolve_features(*value)),
-            Property::Locale(value) => Locale(value.map(Language::parse).flatten()),
-            Property::Brush(value) => Brush(value.clone()),
-            Property::Underline(value) => Underline(*value),
-            Property::UnderlineOffset(value) => UnderlineOffset(*value),
-            Property::UnderlineSize(value) => UnderlineSize(*value),
-            Property::UnderlineBrush(value) => UnderlineBrush(value.clone()),
-            Property::Strikethrough(value) => Strikethrough(*value),
-            Property::StrikethroughOffset(value) => StrikethroughOffset(*value),
-            Property::StrikethroughSize(value) => StrikethroughSize(*value),
-            Property::StrikethroughBrush(value) => StrikethroughBrush(value.clone()),
-            Property::LineHeight(value) => LineHeight(*value),
-            Property::WordSpacing(value) => WordSpacing(*value),
-            Property::LetterSpacing(value) => LetterSpacing(*value),
+            StyleProperty::FontStack(value) => FontStack(self.resolve_stack(fcx, *value)),
+            StyleProperty::FontSize(value) => FontSize(*value * scale),
+            StyleProperty::FontStretch(value) => FontStretch(*value),
+            StyleProperty::FontStyle(value) => FontStyle(*value),
+            StyleProperty::FontWeight(value) => FontWeight(*value),
+            StyleProperty::FontVariations(value) => FontVariations(self.resolve_variations(*value)),
+            StyleProperty::FontFeatures(value) => FontFeatures(self.resolve_features(*value)),
+            StyleProperty::Locale(value) => Locale(value.map(Language::parse).flatten()),
+            StyleProperty::Brush(value) => Brush(value.clone()),
+            StyleProperty::Underline(value) => Underline(*value),
+            StyleProperty::UnderlineOffset(value) => UnderlineOffset(value.map(|x| x * scale)),
+            StyleProperty::UnderlineSize(value) => UnderlineSize(value.map(|x| x * scale)),
+            StyleProperty::UnderlineBrush(value) => UnderlineBrush(value.clone()),
+            StyleProperty::Strikethrough(value) => Strikethrough(*value),
+            StyleProperty::StrikethroughOffset(value) => {
+                StrikethroughOffset(value.map(|x| x * scale))
+            }
+            StyleProperty::StrikethroughSize(value) => StrikethroughSize(value.map(|x| x * scale)),
+            StyleProperty::StrikethroughBrush(value) => StrikethroughBrush(value.clone()),
+            StyleProperty::LineHeight(value) => LineHeight(*value),
+            StyleProperty::WordSpacing(value) => WordSpacing(*value * scale),
+            StyleProperty::LetterSpacing(value) => LetterSpacing(*value * scale),
         }
     }
 

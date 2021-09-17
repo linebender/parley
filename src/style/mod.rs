@@ -11,7 +11,7 @@ pub use font::{
 
 /// Properties that define a style.
 #[derive(Clone, PartialEq, Debug)]
-pub enum Property<'a, B: Brush> {
+pub enum StyleProperty<'a, B: Brush> {
     /// Font family stack.
     FontStack(FontStack<'a>),
     /// Font size.

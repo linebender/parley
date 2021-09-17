@@ -48,6 +48,11 @@ impl<B: Brush> Layout<B> {
         Self::default()
     }
 
+    /// Returns the scale factor provided when creating the layout.
+    pub fn scale(&self) -> f32 {
+        self.data.scale
+    }
+
     /// Returns the style collection for the layout.
     pub fn styles(&self) -> &[Style<B>] {
         &self.data.styles

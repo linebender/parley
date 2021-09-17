@@ -111,6 +111,8 @@ pub struct LineRunData {
     pub text_range: Range<usize>,
     /// Range of clusters.
     pub cluster_range: Range<usize>,
+    /// Advance for the run.
+    pub advance: f32,
 }
 
 impl LineRunData {
@@ -142,6 +144,7 @@ pub struct StyleData<B: Brush> {
 
 #[derive(Clone)]
 pub struct LayoutData<B: Brush> {
+    pub scale: f32,
     pub has_bidi: bool,
     pub base_level: u8,
     pub text_len: usize,
@@ -161,6 +164,7 @@ pub struct LayoutData<B: Brush> {
 impl<B: Brush> Default for LayoutData<B> {
     fn default() -> Self {
         Self {
+            scale: 1.,
             has_bidi: false,
             base_level: 0,
             text_len: 0,
@@ -181,6 +185,7 @@ impl<B: Brush> Default for LayoutData<B> {
 
 impl<B: Brush> LayoutData<B> {
     pub fn clear(&mut self) {
+        self.scale = 1.;
         self.has_bidi = false;
         self.base_level = 0;
         self.text_len = 0;
@@ -323,7 +328,7 @@ impl<B: Brush> LayoutData<B> {
             run.cluster_range.end += 1;
             run.text_range.end += text_len;
             text_offset += text_len;
-            if glyph_len == 1 {
+            if glyph_len == 1 && num_components == 1 {
                 let g = &cluster.glyphs[0];
                 if nearly_zero(g.x) && nearly_zero(g.y) {
                     // Handle the case with a single glyph with zero'd offset.

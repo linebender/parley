@@ -40,11 +40,13 @@ impl<B: Brush> LayoutContext<B> {
         &'a mut self,
         fcx: &'a mut FontContext,
         text: &'a str,
+        scale: f32,
     ) -> RangedBuilder<B, &'a str> {
         self.begin(text);
         fcx.cache.reset();
         RangedBuilder {
             text,
+            scale,
             lcx: MaybeShared::Borrowed(self),
             fcx: MaybeShared::Borrowed(fcx),
         }
@@ -65,7 +67,7 @@ impl<B: Brush> LayoutContext<B> {
             self.bidi.resolve(
                 text.chars()
                     .zip(self.info.iter().map(|info| info.0.bidi_class())),
-                None,
+                Some(0),
             );
         }
     }
@@ -101,10 +103,12 @@ impl<B: Brush> RcLayoutContext<B> {
         &mut self,
         fcx: Rc<RefCell<FontContext>>,
         text: T,
+        scale: f32,
     ) -> RangedBuilder<'static, B, T> {
         self.lcx.borrow_mut().begin(text.as_str());
         RangedBuilder {
             text,
+            scale,
             lcx: MaybeShared::Shared(self.lcx.clone()),
             fcx: MaybeShared::Shared(fcx),
         }
@@ -114,27 +118,29 @@ impl<B: Brush> RcLayoutContext<B> {
 /// Builder for constructing a text layout with ranged attributes.
 pub struct RangedBuilder<'a, B: Brush, T: TextSource> {
     text: T,
+    scale: f32,
     lcx: MaybeShared<'a, LayoutContext<B>>,
     fcx: MaybeShared<'a, FontContext>,
 }
 
 impl<'a, B: Brush, T: TextSource> RangedBuilder<'a, B, T> {
-    pub fn push_default(&mut self, property: Property<B>) {
+    pub fn push_default(&mut self, property: &StyleProperty<B>) {
         let mut lcx = self.lcx.borrow_mut();
         let mut fcx = self.fcx.borrow_mut();
-        let resolved = lcx.rcx.resolve(&mut fcx, &property);
+        let resolved = lcx.rcx.resolve(&mut fcx, &property, self.scale);
         lcx.rsb.push_default(resolved);
     }
 
-    pub fn push(&mut self, property: Property<B>, range: impl RangeBounds<usize>) {
+    pub fn push(&mut self, property: &StyleProperty<B>, range: impl RangeBounds<usize>) {
         let mut lcx = self.lcx.borrow_mut();
         let mut fcx = self.fcx.borrow_mut();
-        let resolved = lcx.rcx.resolve(&mut fcx, &property);
+        let resolved = lcx.rcx.resolve(&mut fcx, &property, self.scale);
         lcx.rsb.push(resolved, range);
     }
 
     pub fn build_into(&mut self, layout: &mut Layout<B>) {
         layout.data.clear();
+        layout.data.scale = self.scale;
         let mut lcx = self.lcx.borrow_mut();
         let lcx = &mut *lcx;
         let mut text = self.text.as_str();
