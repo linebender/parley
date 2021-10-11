@@ -180,7 +180,7 @@ impl Cursor {
         self.is_leading
     }
 
-    /// Returns true if the cursor is on the leading edge of the target
+    /// Returns true if the cursor is on the trailing edge of the target
     /// cluster.
     pub fn is_trailing(&self) -> bool {
         !self.is_leading

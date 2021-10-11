@@ -166,8 +166,8 @@ pub struct RunMetrics {
     pub underline_offset: f32,
     /// Thickness of the underline decoration.
     pub underline_size: f32,
-    /// Offset of the top of underline decoration from the baseline.
+    /// Offset of the top of strikethrough decoration from the baseline.
     pub strikethrough_offset: f32,
-    /// Thickness of the underline decoration.
+    /// Thickness of the strikethrough decoration.
     pub strikethrough_size: f32,
 }
