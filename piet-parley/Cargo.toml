@@ -6,4 +6,4 @@ edition = "2018"
 
 [dependencies]
 parley = { path = "../" }
-piet = "0.2.0"
+piet = "0.5.0"

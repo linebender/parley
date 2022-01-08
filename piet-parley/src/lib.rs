@@ -19,7 +19,7 @@ pub struct ParleyBrush(pub Color);
 
 impl Default for ParleyBrush {
     fn default() -> Self {
-        Self(Color::grey(0))
+        Self(Color::grey(0.0))
     }
 }
 
@@ -95,6 +95,11 @@ impl TextLayout for ParleyTextLayout {
         result.point = Point::new(cursor.offset() as f64, cursor.baseline() as f64);
         result.line = cursor.path().line_index;
         result
+    }
+
+    fn trailing_whitespace_width(&self) -> f64 {
+        // TODO:
+        0.0
     }
 }
 
