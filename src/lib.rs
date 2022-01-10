@@ -1,3 +1,4 @@
+pub use fount;
 pub use swash;
 
 mod bidi;

@@ -161,13 +161,9 @@ pub struct ParleyText {
 }
 
 impl ParleyText {
-    pub fn new() -> Self {
-        Self::with_font_context(FontContext::new())
-    }
-
-    pub fn with_font_context(fcx: FontContext) -> Self {
+    pub fn new(library: &Library) -> Self {
         Self {
-            fcx: Rc::new(RefCell::new(fcx)),
+            fcx: Rc::new(RefCell::new(FontContext::new(library))),
             lcx: context::RcLayoutContext::new(),
             scale: 1.,
         }
@@ -175,12 +171,6 @@ impl ParleyText {
 
     pub fn set_scale(&mut self, scale: f32) {
         self.scale = scale;
-    }
-}
-
-impl Default for ParleyText {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

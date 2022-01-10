@@ -42,9 +42,9 @@ pub struct FontContext {
 }
 
 impl FontContext {
-    pub fn new() -> Self {
+    pub fn new(library: &Library) -> Self {
         Self {
-            cache: FontCache::new(),
+            cache: FontCache::new(library),
         }
     }
 
@@ -79,9 +79,9 @@ pub(crate) struct FontCache {
 }
 
 impl FontCache {
-    pub fn new() -> Self {
+    pub fn new(library: &Library) -> Self {
         Self {
-            context: fount::FontContext::new(&Library::default()),
+            context: fount::FontContext::new(library),
             sources: SourceCache::default(),
             selected_params: None,
             selected_fonts: vec![],
