@@ -14,6 +14,7 @@ const RETAINED_SOURCE_COUNT: usize = 12;
 #[derive(Clone)]
 pub struct Font {
     data: FontData,
+    index: u32,
     offset: u32,
     key: CacheKey,
 }
@@ -26,6 +27,11 @@ impl Font {
             offset: self.offset,
             key: self.key,
         }
+    }
+
+    /// Returns the index of a font in a collection file.
+    pub fn index(&self) -> u32 {
+        self.index
     }
 }
 
@@ -234,6 +240,7 @@ impl SourceCache {
         Some((
             Font {
                 data,
+                index: entry.index(),
                 offset,
                 key: entry.cache_key(),
             },
