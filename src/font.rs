@@ -32,6 +32,10 @@ impl Font {
         }
     }
 
+    pub fn data(&self) -> &FontData {
+        &self.data
+    }
+
     /// Returns the index of a font in a collection file.
     pub fn index(&self) -> u32 {
         self.index
