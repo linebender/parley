@@ -1,6 +1,6 @@
 use super::data::*;
 use super::id::*;
-use swash::{Stretch, Weight, Style, Attributes};
+use swash::{Attributes, Stretch, Style, Weight};
 
 #[rustfmt::skip]
 pub const STATIC_DATA: StaticCollectionData = StaticCollectionData {

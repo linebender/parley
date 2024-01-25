@@ -1,6 +1,9 @@
 //! Font management.
 
-use super::fount::{FamilyId, FontData, FontId, GenericFamily, Library, Locale, SourceId, FontContext as FountContext};
+use super::fount::{
+    FamilyId, FontContext as FountContext, FontData, FontId, GenericFamily, Library, Locale,
+    SourceId,
+};
 use std::collections::HashMap;
 use swash::proxy::CharmapProxy;
 use swash::text::cluster::*;
@@ -224,7 +227,11 @@ impl SourceCache {
         }
     }
 
-    fn get(&mut self, context: &crate::fount::FontContext, id: FontId) -> Option<(Font, Attributes)> {
+    fn get(
+        &mut self,
+        context: &crate::fount::FontContext,
+        id: FontId,
+    ) -> Option<(Font, Attributes)> {
         let entry = context.font(id)?;
         let source_id = entry.source();
         let data = if let Some(cached_source) = self.sources.get_mut(&source_id) {

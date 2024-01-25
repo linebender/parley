@@ -180,10 +180,7 @@ impl CollectionData {
                         }
                     } else {
                         let tag = super::script_tags::script_tag(*script);
-                        let entry = fallback
-                            .script_fallbacks
-                            .entry(tag)
-                            .or_default();
+                        let entry = fallback.script_fallbacks.entry(tag).or_default();
                         if !entry.contains(&family_id) {
                             entry.push(family_id);
                         }
