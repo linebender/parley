@@ -9,7 +9,7 @@ use super::style::{
 };
 use crate::font::*;
 use crate::util::nearly_eq;
-use fount::FamilyId;
+use crate::fount::FamilyId;
 use swash::text::Language;
 use swash::Setting;
 
