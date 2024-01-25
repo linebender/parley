@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 swash = "0.1.8"
-peniko = { git = "https://github.com/linebender/peniko", rev = "9e4c1bfccc96e3dc52e3886b31d3af734aa8bdf9" }
+peniko = { git = "https://github.com/linebender/peniko", rev = "df3a16e4f5dd8a179410a61056e40a6643ea094e" }
 
 [workspace]
 members = ["piet-parley"]
