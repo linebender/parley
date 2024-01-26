@@ -9,3 +9,5 @@ impl Brush for [u8; 4] {}
 
 /// Brush for a 3-byte color value.
 impl Brush for [u8; 3] {}
+
+impl Brush for peniko::Brush {}

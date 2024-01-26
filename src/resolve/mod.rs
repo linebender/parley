@@ -8,8 +8,8 @@ use super::style::{
     FontWeight, StyleProperty,
 };
 use crate::font::*;
+use crate::fount::FamilyId;
 use crate::util::nearly_eq;
-use fount::FamilyId;
 use swash::text::Language;
 use swash::Setting;
 

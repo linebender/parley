@@ -1,6 +1,7 @@
 pub use swash;
 
 mod bidi;
+mod fount;
 mod resolve;
 mod shape;
 mod util;

@@ -1,6 +1,9 @@
 //! Font management.
 
-use fount::{FamilyId, FontData, FontId, GenericFamily, Library, Locale, SourceId};
+use super::fount::{
+    FamilyId, FontContext as FountContext, FontData, FontId, GenericFamily, Library, Locale,
+    SourceId,
+};
 use std::collections::HashMap;
 use swash::proxy::CharmapProxy;
 use swash::text::cluster::*;
@@ -27,6 +30,10 @@ impl Font {
             offset: self.offset,
             key: self.key,
         }
+    }
+
+    pub fn data(&self) -> &FontData {
+        &self.data
     }
 
     /// Returns the index of a font in a collection file.
@@ -74,7 +81,7 @@ impl FontContext {
 
 #[derive(Clone)]
 pub(crate) struct FontCache {
-    pub context: fount::FontContext,
+    pub context: FountContext,
     sources: SourceCache,
     selected_params: Option<(usize, Attributes)>,
     selected_fonts: Vec<CachedFont>,
@@ -87,7 +94,7 @@ pub(crate) struct FontCache {
 impl FontCache {
     pub fn new() -> Self {
         Self {
-            context: fount::FontContext::new(&Library::default()),
+            context: FountContext::new(&Library::default()),
             sources: SourceCache::default(),
             selected_params: None,
             selected_fonts: vec![],
@@ -187,7 +194,7 @@ impl FontCache {
 }
 
 fn map_cluster(
-    context: &fount::FontContext,
+    context: &FountContext,
     sources: &mut SourceCache,
     fonts: &mut [CachedFont],
     cluster: &mut CharCluster,
@@ -224,7 +231,11 @@ impl SourceCache {
         }
     }
 
-    fn get(&mut self, context: &fount::FontContext, id: FontId) -> Option<(Font, Attributes)> {
+    fn get(
+        &mut self,
+        context: &crate::fount::FontContext,
+        id: FontId,
+    ) -> Option<(Font, Attributes)> {
         let entry = context.font(id)?;
         let source_id = entry.source();
         let data = if let Some(cached_source) = self.sources.get_mut(&source_id) {
@@ -269,7 +280,7 @@ impl CachedFont {
 
     fn map_cluster(
         &mut self,
-        context: &fount::FontContext,
+        context: &crate::fount::FontContext,
         sources: &mut SourceCache,
         cluster: &mut CharCluster,
         best: &mut Option<(Font, Attributes)>,

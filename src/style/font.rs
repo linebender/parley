@@ -1,6 +1,6 @@
 use core::fmt;
 
-pub use fount::GenericFamily;
+pub use crate::fount::GenericFamily;
 pub use swash::{ObliqueAngle, Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
 
 /// Setting for a font variation.
