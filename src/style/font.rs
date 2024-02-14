@@ -38,8 +38,8 @@ impl<'a> FontFamily<'a> {
     ///
     /// # Example
     /// ```
-    /// use font_types::FontFamily::{self, *};
-    /// use font_types::GenericFamily::*;
+    /// use parley::style::FontFamily::{self, *};
+    /// use parley::style::GenericFamily::*;
     ///
     /// assert_eq!(FontFamily::parse("Palatino Linotype"), Some(Named("Palatino Linotype")));
     /// assert_eq!(FontFamily::parse("monospace"), Some(Generic(Monospace)));
@@ -47,7 +47,7 @@ impl<'a> FontFamily<'a> {
     /// // Note that you can quote a generic family to capture it as a named family:
     ///
     /// assert_eq!(FontFamily::parse("'monospace'"), Some(Named("monospace")));
-    /// ```    
+    /// ```
     pub fn parse(s: &'a str) -> Option<Self> {
         Self::parse_list(s).next()
     }
@@ -56,8 +56,8 @@ impl<'a> FontFamily<'a> {
     ///
     /// # Example
     /// ```
-    /// use font_types::FontFamily::{self, *};
-    /// use font_types::GenericFamily::*;
+    /// use parley::style::FontFamily::{self, *};
+    /// use parley::style::GenericFamily::*;
     ///
     /// let source = "Arial, 'Times New Roman', serif";
     ///

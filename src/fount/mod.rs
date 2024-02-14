@@ -17,10 +17,9 @@ mod scan;
 mod script_tags;
 
 pub use context::FontContext;
-pub use data::SourcePaths;
 pub use font::FontData;
 pub use id::{FamilyId, FontId, SourceId};
-pub use library::{Library, LibraryBuilder};
+pub use library::Library;
 
 pub use swash::text::Language as Locale;
 
@@ -47,7 +46,7 @@ impl GenericFamily {
     ///
     /// # Example
     /// ```
-    /// use font_types::GenericFamily;
+    /// use parley::style::GenericFamily;
     ///
     /// assert_eq!(GenericFamily::parse("sans-serif"), Some(GenericFamily::SansSerif));
     /// assert_eq!(GenericFamily::parse("Arial"), None);
