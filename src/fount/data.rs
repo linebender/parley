@@ -515,8 +515,8 @@ impl StaticCollectionData {
 
 /// Iterator over file system paths that contain fonts.
 ///
-/// This iterator is returned by the [`source_paths`](super::FontContext::source_paths) method
-/// of [`FontContext`](super::FontContext).
+/// This iterator is returned by the [`source_paths`](FontContext::source_paths) method
+/// of [`FontContext`].
 #[derive(Copy, Clone)]
 pub struct SourcePaths<'a> {
     inner: SourcePathsInner<'a>,
