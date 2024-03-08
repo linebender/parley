@@ -5,15 +5,24 @@ use super::*;
 /// Represents a position within a layout.
 #[derive(Copy, Clone, Default, Debug)]
 pub struct Cursor {
-    path: CursorPath,
-    baseline: f32,
-    offset: f32,
-    advance: f32,
-    text_start: usize,
-    text_end: usize,
-    is_rtl: bool,
-    is_leading: bool,
-    is_inside: bool,
+    /// Path to the target cluster.
+    pub path: CursorPath,
+    /// Offset to the baseline.
+    pub baseline: f32,
+    /// Offset to the target cluster along the baseline.
+    pub offset: f32,
+    /// Advance of the target cluster.
+    pub advance: f32,
+    /// Start of the target cluster.
+    pub text_start: usize,
+    /// End of the target cluster.
+    pub text_end: usize,
+    /// Insert point of the cursor (leading or trailing).
+    pub insert_point: usize,
+    /// `true` if the target cluster is in a right-to-left run.
+    pub is_rtl: bool,
+    /// `true` if the cursor was created from a point or position inside the layout
+    pub is_inside: bool,
 }
 
 impl Cursor {
@@ -45,37 +54,32 @@ impl Cursor {
                     let range = cluster.text_range();
                     result.text_start = range.start;
                     result.text_end = range.end;
-                    if run.is_rtl() {
-                        result.path.cluster_index = cluster_range.end - cluster_index - 1;
+                    result.is_rtl = run.is_rtl();
+                    result.path.cluster_index = if result.is_rtl {
+                        cluster_range.end - cluster_index - 1
                     } else {
-                        result.path.cluster_index = cluster_index;
-                    }
-                    let advance = cluster.advance();
+                        cluster_index
+                    };
                     if x >= last_edge {
+                        let advance = cluster.advance();
                         let next_edge = last_edge + advance;
-                        if x < next_edge {
-                            result.is_leading = false;
-                            let middle = (last_edge + next_edge) * 0.5;
-                            result.advance = advance;
-                            if x <= middle {
-                                result.is_leading = true;
-                                result.offset = last_edge;
-                            } else {
-                                result.is_leading = false;
-                                result.offset = next_edge;
-                            }
-                            return result;
+                        result.offset = next_edge;
+                        result.insert_point = range.end;
+                        if x >= next_edge {
+                            last_edge = next_edge;
+                            continue;
                         }
                         result.advance = advance;
-                        result.is_leading = false;
-                        result.offset = next_edge;
-                        last_edge = next_edge;
+                        if x <= (last_edge + next_edge) * 0.5 {
+                            result.insert_point = range.start;
+                            result.offset = last_edge;
+                        }
                     } else {
                         result.is_inside = false;
-                        result.is_leading = true;
+                        result.insert_point = range.start;
                         result.offset = line_metrics.offset;
-                        return result;
                     }
+                    return result;
                 }
             }
             break;
@@ -91,13 +95,11 @@ impl Cursor {
         is_leading: bool,
     ) -> Self {
         let mut result = Self {
-            is_leading: true,
             is_inside: true,
             ..Default::default()
         };
         if position >= layout.data.text_len {
             result.is_inside = false;
-            result.is_leading = false;
             position = layout.data.text_len.saturating_sub(1);
         }
         let last_line = layout.data.lines.len().saturating_sub(1);
@@ -124,17 +126,17 @@ impl Cursor {
                     result.text_end = range.end;
                     result.offset = last_edge;
                     result.is_rtl = run.is_rtl();
-                    if result.is_rtl {
-                        result.path.cluster_index = cluster_range.end - cluster_index - 1;
+                    result.path.cluster_index = if result.is_rtl {
+                        cluster_range.end - cluster_index - 1
                     } else {
-                        result.path.cluster_index = cluster_index;
-                    }
+                        cluster_index
+                    };
                     let advance = cluster.advance();
                     if range.contains(&position) {
                         if !is_leading || !result.is_inside {
                             result.offset += advance;
                         }
-                        result.is_leading = is_leading;
+                        result.insert_point = if is_leading { range.start } else { range.end };
                         result.advance = advance;
                         return result;
                     }
@@ -144,57 +146,21 @@ impl Cursor {
             result.offset = last_edge;
             break;
         }
-        result.is_leading = false;
+        result.insert_point = result.text_end;
         result.is_inside = false;
         result
-    }
-
-    /// Returns the path to the target cluster.
-    pub fn path(&self) -> &CursorPath {
-        &self.path
-    }
-
-    /// Returns the offset to the baseline.
-    pub fn baseline(&self) -> f32 {
-        self.baseline
-    }
-
-    /// Returns the offset to the target cluster along the baseline.
-    pub fn offset(&self) -> f32 {
-        self.offset
-    }
-
-    /// Returns the advance of the target cluster.
-    pub fn advance(&self) -> f32 {
-        self.advance
-    }
-
-    /// Returns the range of source text for the target cluster.
-    pub fn text_range(&self) -> Range<usize> {
-        self.text_start..self.text_end
     }
 
     /// Returns true if the cursor is on the leading edge of the target
     /// cluster.
     pub fn is_leading(&self) -> bool {
-        self.is_leading
+        self.text_start == self.insert_point
     }
 
     /// Returns true if the cursor is on the trailing edge of the target
     /// cluster.
     pub fn is_trailing(&self) -> bool {
-        !self.is_leading
-    }
-
-    /// Returns true if the target cluster is part of a right-to-left run.
-    pub fn is_rtl(&self) -> bool {
-        self.is_rtl
-    }
-
-    /// Returns true if the cursor was created from a point or position
-    /// that is inside the layout.
-    pub fn is_inside(&self) -> bool {
-        self.is_inside
+        self.text_end == self.insert_point
     }
 }
 
