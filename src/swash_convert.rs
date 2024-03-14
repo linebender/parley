@@ -1,3 +1,33 @@
+pub fn convert_script(script: swash::text::Script) -> fontique::Script {
+    fontique::Script(*SCRIPT_TAGS.get(script as usize).unwrap_or(b"Zzzz"))
+}
+
+pub fn convert_locale(locale: swash::text::Language) -> Option<fontique::Language> {
+    let mut buf = [0u8; 16];
+    let mut len = 0;
+    for byte in locale.language().bytes() {
+        buf[len] = byte;
+        len += 1;
+    }
+    if let Some(subtag) = locale.script() {
+        buf[len] = b'-';
+        len += 1;
+        for byte in subtag.bytes() {
+            buf[len] = byte;
+            len += 1;
+        }
+    }
+    if let Some(subtag) = locale.region() {
+        buf[len] = b'-';
+        len += 1;
+        for byte in subtag.bytes() {
+            buf[len] = byte;
+            len += 1;
+        }
+    }
+    fontique::Language::try_from_bytes(&buf[..len]).ok()
+}
+
 #[cfg_attr(rustfmt, rustfmt_skip)]
 const SCRIPT_TAGS: [[u8; 4]; 157] = [
     *b"Adlm", *b"Aghb", *b"Ahom", *b"Arab", *b"Armi", *b"Armn", *b"Avst", *b"Bali", *b"Bamu", 
@@ -19,7 +49,3 @@ const SCRIPT_TAGS: [[u8; 4]; 157] = [
     *b"Tirh", *b"Ugar", *b"Vaii", *b"Wara", *b"Wcho", *b"Xpeo", *b"Xsux", *b"Yezi", *b"Yiii", 
     *b"Zanb", *b"Zinh", *b"Zyyy", *b"Zzzz", 
 ];
-
-pub fn script_tag(script: swash::text::Script) -> [u8; 4] {
-    SCRIPT_TAGS[script as usize]
-}

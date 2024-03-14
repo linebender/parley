@@ -8,6 +8,5 @@ edition = "2018"
 [dependencies]
 swash = "0.1.8"
 peniko = "0.1.0"
-
-[workspace]
-members = ["piet-parley"]
+fontique = { git = "https://github.com/dfrg/fount" }
+skrifa = "0.16.0"

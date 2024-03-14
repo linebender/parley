@@ -7,9 +7,9 @@ use super::style::{
     Brush, FontFamily, FontFeature, FontSettings, FontStack, FontStretch, FontStyle, FontVariation,
     FontWeight, StyleProperty,
 };
-use crate::font::*;
-use crate::fount::FamilyId;
+use crate::font::FontContext;
 use crate::util::nearly_eq;
+use fontique::FamilyId;
 use swash::text::Language;
 use swash::Setting;
 
@@ -136,46 +136,46 @@ impl ResolveContext {
     }
 
     /// Resolves a font stack.
-    pub fn resolve_stack(&mut self, fcx: &FontContext, stack: FontStack) -> Resolved<FamilyId> {
+    pub fn resolve_stack(&mut self, fcx: &mut FontContext, stack: FontStack) -> Resolved<FamilyId> {
         self.tmp_families.clear();
         match stack {
             FontStack::Source(source) => {
                 for family in FontFamily::parse_list(source) {
                     match family {
                         FontFamily::Named(name) => {
-                            if let Some(family) = fcx.cache.context.family_by_name(name) {
+                            if let Some(family) = fcx.collection.family_by_name(name) {
                                 self.tmp_families.push(family.id());
                             }
                         }
                         FontFamily::Generic(family) => {
                             self.tmp_families
-                                .extend_from_slice(fcx.cache.context.generic_families(family));
+                                .extend(fcx.collection.generic_families(family));
                         }
                     }
                 }
             }
             FontStack::Single(family) => match family {
                 FontFamily::Named(name) => {
-                    if let Some(family) = fcx.cache.context.family_by_name(name) {
+                    if let Some(family) = fcx.collection.family_by_name(name) {
                         self.tmp_families.push(family.id());
                     }
                 }
                 FontFamily::Generic(family) => {
                     self.tmp_families
-                        .extend_from_slice(fcx.cache.context.generic_families(family));
+                        .extend(fcx.collection.generic_families(family));
                 }
             },
             FontStack::List(families) => {
                 for family in families {
                     match family {
                         FontFamily::Named(name) => {
-                            if let Some(family) = fcx.cache.context.family_by_name(name) {
+                            if let Some(family) = fcx.collection.family_by_name(name) {
                                 self.tmp_families.push(family.id());
                             }
                         }
                         FontFamily::Generic(family) => {
                             self.tmp_families
-                                .extend_from_slice(fcx.cache.context.generic_families(*family));
+                                .extend(fcx.collection.generic_families(*family));
                         }
                     }
                 }

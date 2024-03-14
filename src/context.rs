@@ -1,18 +1,16 @@
 //! Context for layout.
 
 use super::bidi;
-use super::font::FontContext;
 use super::layout::Layout;
 use super::resolve::range::*;
 use super::resolve::*;
 use super::style::*;
+use super::FontContext;
 
 use swash::shape::ShapeContext;
 use swash::text::cluster::CharInfo;
 
-use std::cell::{RefCell, RefMut};
-use std::ops::{Deref, DerefMut, RangeBounds};
-use std::rc::Rc;
+use std::ops::RangeBounds;
 
 /// Context for building a text layout.
 pub struct LayoutContext<B: Brush = [u8; 4]> {
@@ -43,12 +41,12 @@ impl<B: Brush> LayoutContext<B> {
         scale: f32,
     ) -> RangedBuilder<B, &'a str> {
         self.begin(text);
-        fcx.cache.reset();
+        fcx.source_cache.prune(128, false);
         RangedBuilder {
             text,
             scale,
-            lcx: MaybeShared::Borrowed(self),
-            fcx: MaybeShared::Borrowed(fcx),
+            lcx: self,
+            fcx,
         }
     }
 
@@ -86,63 +84,29 @@ impl<B: Brush> Clone for LayoutContext<B> {
     }
 }
 
-#[doc(hidden)]
-#[derive(Clone)]
-pub struct RcLayoutContext<B: Brush> {
-    lcx: Rc<RefCell<LayoutContext<B>>>,
-}
-
-impl<B: Brush> RcLayoutContext<B> {
-    pub fn new() -> Self {
-        Self {
-            lcx: Rc::new(RefCell::new(LayoutContext::new())),
-        }
-    }
-
-    pub fn ranged_builder<T: TextSource>(
-        &mut self,
-        fcx: Rc<RefCell<FontContext>>,
-        text: T,
-        scale: f32,
-    ) -> RangedBuilder<'static, B, T> {
-        self.lcx.borrow_mut().begin(text.as_str());
-        RangedBuilder {
-            text,
-            scale,
-            lcx: MaybeShared::Shared(self.lcx.clone()),
-            fcx: MaybeShared::Shared(fcx),
-        }
-    }
-}
-
 /// Builder for constructing a text layout with ranged attributes.
 pub struct RangedBuilder<'a, B: Brush, T: TextSource> {
     text: T,
     scale: f32,
-    lcx: MaybeShared<'a, LayoutContext<B>>,
-    fcx: MaybeShared<'a, FontContext>,
+    lcx: &'a mut LayoutContext<B>,
+    fcx: &'a mut FontContext,
 }
 
 impl<'a, B: Brush, T: TextSource> RangedBuilder<'a, B, T> {
     pub fn push_default(&mut self, property: &StyleProperty<B>) {
-        let mut lcx = self.lcx.borrow_mut();
-        let mut fcx = self.fcx.borrow_mut();
-        let resolved = lcx.rcx.resolve(&mut fcx, &property, self.scale);
-        lcx.rsb.push_default(resolved);
+        let resolved = self.lcx.rcx.resolve(self.fcx, &property, self.scale);
+        self.lcx.rsb.push_default(resolved);
     }
 
     pub fn push(&mut self, property: &StyleProperty<B>, range: impl RangeBounds<usize>) {
-        let mut lcx = self.lcx.borrow_mut();
-        let mut fcx = self.fcx.borrow_mut();
-        let resolved = lcx.rcx.resolve(&mut fcx, &property, self.scale);
-        lcx.rsb.push(resolved, range);
+        let resolved = self.lcx.rcx.resolve(&mut self.fcx, &property, self.scale);
+        self.lcx.rsb.push(resolved, range);
     }
 
     pub fn build_into(&mut self, layout: &mut Layout<B>) {
         layout.data.clear();
         layout.data.scale = self.scale;
-        let mut lcx = self.lcx.borrow_mut();
-        let lcx = &mut *lcx;
+        let lcx = &mut self.lcx;
         let mut text = self.text.as_str();
         let is_empty = text.is_empty();
         if is_empty {
@@ -152,7 +116,7 @@ impl<'a, B: Brush, T: TextSource> RangedBuilder<'a, B, T> {
         layout.data.has_bidi = !lcx.bidi.levels().is_empty();
         layout.data.base_level = lcx.bidi.base_level();
         layout.data.text_len = text.len();
-        let mut fcx = self.fcx.borrow_mut();
+        let fcx = &mut self.fcx;
         lcx.rsb.finish(&mut lcx.styles);
         let mut char_index = 0;
         for (i, style) in lcx.styles.iter().enumerate() {
@@ -185,16 +149,19 @@ impl<'a, B: Brush, T: TextSource> RangedBuilder<'a, B, T> {
                 line_height: s.line_height,
             }
         }));
-        super::shape::shape_text(
-            &lcx.rcx,
-            &mut fcx,
-            &lcx.styles,
-            &lcx.info,
-            lcx.bidi.levels(),
-            &mut lcx.scx,
-            text,
-            layout,
-        );
+        {
+            let mut query = fcx.collection.query(&mut fcx.source_cache);
+            super::shape::shape_text(
+                &lcx.rcx,
+                query,
+                &lcx.styles,
+                &lcx.info,
+                lcx.bidi.levels(),
+                &mut lcx.scx,
+                text,
+                layout,
+            );
+        }
         layout.data.finish();
         if is_empty {
             layout.data.text_len = 0;
@@ -220,44 +187,5 @@ pub trait TextSource {
 impl<'a> TextSource for &'a str {
     fn as_str(&self) -> &str {
         *self
-    }
-}
-
-enum MaybeShared<'a, T> {
-    Shared(Rc<RefCell<T>>),
-    Borrowed(&'a mut T),
-}
-
-impl<'a, T> MaybeShared<'a, T> {
-    pub fn borrow_mut(&mut self) -> BorrowMut<T> {
-        match self {
-            Self::Shared(shared) => BorrowMut::Shared(shared.borrow_mut()),
-            Self::Borrowed(borrowed) => BorrowMut::Borrowed(borrowed),
-        }
-    }
-}
-
-enum BorrowMut<'a, T> {
-    Shared(RefMut<'a, T>),
-    Borrowed(&'a mut T),
-}
-
-impl<'a, T> Deref for BorrowMut<'a, T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Shared(shared) => shared.deref(),
-            Self::Borrowed(borrowed) => borrowed,
-        }
-    }
-}
-
-impl<'a, T> DerefMut for BorrowMut<'a, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        match self {
-            Self::Shared(shared) => shared.deref_mut(),
-            Self::Borrowed(borrowed) => borrowed,
-        }
     }
 }
