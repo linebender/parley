@@ -156,8 +156,6 @@ struct FontSelector<'a, 'b, B: Brush> {
     rcx: &'a ResolveContext,
     styles: &'a [RangedStyle<B>],
     style_index: u16,
-    script: Script,
-    locale: Option<Language>,
     attrs: Attributes,
     variations: &'a [FontVariation],
     features: &'a [FontFeature],
@@ -195,8 +193,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             rcx,
             styles,
             style_index,
-            script,
-            locale,
             attrs,
             variations,
             features,
@@ -253,7 +249,14 @@ impl<'a, 'b, B: Brush> partition::Selector for FontSelector<'a, 'b, B> {
                             synthesis: Synthesis::default(),
                         });
                     }
-                    MapStatus::Discard => {}
+                    MapStatus::Discard => {
+                        if selected_font.is_none() {
+                            selected_font = Some(SelectedFont {
+                                font: font.clone(),
+                                synthesis: Synthesis::default(),
+                            });
+                        }
+                    }
                 }
             }
             fontique::QueryStatus::Continue

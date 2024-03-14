@@ -150,7 +150,7 @@ impl<'a, B: Brush, T: TextSource> RangedBuilder<'a, B, T> {
             }
         }));
         {
-            let mut query = fcx.collection.query(&mut fcx.source_cache);
+            let query = fcx.collection.query(&mut fcx.source_cache);
             super::shape::shape_text(
                 &lcx.rcx,
                 query,
