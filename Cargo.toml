@@ -6,7 +6,7 @@ license = "MIT OR Apache-2.0"
 edition = "2018"
 
 [dependencies]
-swash = "0.1.8"
+swash = "0.1.13"
 peniko = "0.1.0"
 fontique = { git = "https://github.com/dfrg/fount" }
 skrifa = "0.16.0"
