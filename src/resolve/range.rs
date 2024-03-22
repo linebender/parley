@@ -236,7 +236,8 @@ fn split_range<B: Brush>(prop: &RangedProperty<B>, spans: &[RangedStyle<B>]) -> 
     range
 }
 
-/// Resolves a `RangeBounds` into a range in the range 0..len.
+/// Resolves an arbitary `impl RangeBounds<usize>` into a concrete `Range<usize>`
+/// Clamps the resolved range to the range 0..len.
 fn resolve_range(range: impl RangeBounds<usize>, len: usize) -> Range<usize> {
     let start = match range.start_bound() {
         Bound::Unbounded => 0,
