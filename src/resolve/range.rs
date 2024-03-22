@@ -18,7 +18,7 @@ impl<B: Brush> Default for RangedStyleBuilder<B> {
         Self {
             properties: vec![],
             default_style: Default::default(),
-            len: !0,
+            len: usize::MAX,
         }
     }
 }
@@ -34,21 +34,22 @@ impl<B: Brush> RangedStyleBuilder<B> {
 
     /// Pushes a property that covers the full range of text.
     pub fn push_default(&mut self, property: ResolvedProperty<B>) {
-        assert!(self.len != !0);
+        assert!(self.len != usize::MAX);
         self.default_style.apply(property)
     }
 
     /// Pushes a property that covers the specified range of text.
     pub fn push(&mut self, property: ResolvedProperty<B>, range: impl RangeBounds<usize>) {
         let range = resolve_range(range, self.len);
-        assert!(self.len != !0);
+        assert!(self.len != usize::MAX);
         self.properties.push(RangedProperty { property, range })
     }
 
     /// Computes the sequence of ranged styles.
     pub fn finish(&mut self, styles: &mut Vec<RangedStyle<B>>) {
-        // If text length is zero then simply return default styles as they will have no effect anyway
-        if self.len == !0 {
+        // `usize::MAX` is used as a sentinal value to represent an invalid builder state. So simply return
+        // default styles if `finish` is called on a builder in this state
+        if self.len == usize::MAX {
             self.properties.clear();
             self.default_style = ResolvedStyle::default();
             return;
@@ -147,7 +148,7 @@ impl<B: Brush> RangedStyleBuilder<B> {
 
         self.properties.clear();
         self.default_style = ResolvedStyle::default();
-        self.len = !0;
+        self.len = usize::MAX;
     }
 }
 
