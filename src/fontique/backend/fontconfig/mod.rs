@@ -292,7 +292,7 @@ struct Config {
 
 impl config::ParserSink for Config {
     fn alias(&mut self, family: &str, prefer: &[&str]) {
-        if let Some(generic) = crate::GenericFamily::parse(family) {
+        if let Some(generic) = super::GenericFamily::parse(family) {
             self.generics[generic as usize].extend(prefer.iter().map(|s| s.to_string()));
         }
     }

@@ -1,4 +1,4 @@
-use crate::{Stretch, Style, Weight};
+use super::{Stretch, Style, Weight};
 use fontconfig_cache_parser::*;
 use std::io::Read;
 use std::path::PathBuf;
