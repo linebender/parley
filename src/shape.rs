@@ -1,13 +1,14 @@
-use super::font::{Font, FontContext};
 use super::layout::Layout;
 use super::resolve::range::RangedStyle;
 use super::resolve::{ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
+use crate::fontique::{self, Attributes, Query, QueryFont};
 use crate::util::nearly_eq;
+use crate::Font;
 use swash::shape::*;
 use swash::text::cluster::{CharCluster, CharInfo, Token};
 use swash::text::{Language, Script};
-use swash::{Attributes, FontRef, Synthesis};
+use swash::{FontRef, Synthesis};
 
 struct Item {
     style_index: u16,
@@ -21,10 +22,10 @@ struct Item {
     letter_spacing: f32,
 }
 
-pub fn shape_text<B: Brush>(
-    rcx: &ResolveContext,
-    fcx: &mut FontContext,
-    styles: &[RangedStyle<B>],
+pub fn shape_text<'a, B: Brush>(
+    rcx: &'a ResolveContext,
+    mut fq: Query<'a>,
+    styles: &'a [RangedStyle<B>],
     infos: &[(CharInfo, u16)],
     levels: &[u8],
     scx: &mut ShapeContext,
@@ -58,7 +59,7 @@ pub fn shape_text<B: Brush>(
             let item_infos = &infos[char_range.start..];
             let first_style_index = item_infos[0].1;
             let mut fs = FontSelector::new(
-                fcx,
+                &mut fq,
                 rcx,
                 styles,
                 first_style_index,
@@ -93,7 +94,7 @@ pub fn shape_text<B: Brush>(
                 ),
                 |font, shaper| {
                     layout.data.push_run(
-                        font.font.clone(),
+                        Font::new(font.font.blob.clone(), font.font.index),
                         item.size,
                         font.synthesis,
                         shaper,
@@ -103,6 +104,7 @@ pub fn shape_text<B: Brush>(
                     );
                 },
             );
+            std::mem::drop(fs);
         };
     }
     for ((char_index, ch), (info, style_index)) in text.chars().enumerate().zip(infos) {
@@ -148,21 +150,20 @@ fn real_script(script: Script) -> bool {
     script != Script::Common && script != Script::Unknown && script != Script::Inherited
 }
 
-struct FontSelector<'a, B: Brush> {
-    fcx: &'a mut FontContext,
+struct FontSelector<'a, 'b, B: Brush> {
+    query: &'b mut Query<'a>,
+    fonts_id: Option<usize>,
     rcx: &'a ResolveContext,
     styles: &'a [RangedStyle<B>],
     style_index: u16,
-    script: Script,
-    locale: Option<Language>,
     attrs: Attributes,
     variations: &'a [FontVariation],
     features: &'a [FontFeature],
 }
 
-impl<'a, B: Brush> FontSelector<'a, B> {
+impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
     fn new(
-        fcx: &'a mut FontContext,
+        query: &'b mut Query<'a>,
         rcx: &'a ResolveContext,
         styles: &'a [RangedStyle<B>],
         style_index: u16,
@@ -172,18 +173,26 @@ impl<'a, B: Brush> FontSelector<'a, B> {
         let style = &styles[style_index as usize].style;
         let fonts_id = style.font_stack.id();
         let fonts = rcx.stack(style.font_stack).unwrap_or(&[]);
-        let attrs = Attributes::new(style.font_stretch, style.font_weight, style.font_style);
+        let attrs = fontique::Attributes {
+            stretch: style.font_stretch,
+            weight: style.font_weight,
+            style: style.font_style,
+        };
         let variations = rcx.variations(style.font_variations).unwrap_or(&[]);
         let features = rcx.features(style.font_features).unwrap_or(&[]);
-        fcx.cache.select_families(fonts_id, fonts, attrs);
-        fcx.cache.select_fallbacks(script, locale, attrs);
+        query.set_families(fonts.iter().copied());
+        let fb_script = crate::swash_convert::script_to_fontique(script);
+        let fb_language = locale
+            .map(|locale| crate::swash_convert::locale_to_fontique(locale))
+            .flatten();
+        query.set_fallbacks(fontique::FallbackKey::new(fb_script, fb_language.as_ref()));
+        query.set_attributes(attrs);
         Self {
-            fcx,
+            query,
+            fonts_id: Some(fonts_id),
             rcx,
             styles,
             style_index,
-            script,
-            locale,
             attrs,
             variations,
             features,
@@ -191,7 +200,7 @@ impl<'a, B: Brush> FontSelector<'a, B> {
     }
 }
 
-impl<'a, B: Brush> partition::Selector for FontSelector<'a, B> {
+impl<'a, 'b, B: Brush> partition::Selector for FontSelector<'a, 'b, B> {
     type SelectedFont = SelectedFont;
 
     fn select_font(&mut self, cluster: &mut CharCluster) -> Option<Self::SelectedFont> {
@@ -200,34 +209,81 @@ impl<'a, B: Brush> partition::Selector for FontSelector<'a, B> {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize].style;
             let fonts_id = style.font_stack.id();
-            let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
-            let attrs = Attributes::new(style.font_stretch, style.font_weight, style.font_style);
+            let attrs = fontique::Attributes {
+                stretch: style.font_stretch,
+                weight: style.font_weight,
+                style: style.font_style,
+            };
             let variations = self.rcx.variations(style.font_variations).unwrap_or(&[]);
             let features = self.rcx.features(style.font_features).unwrap_or(&[]);
-            self.fcx.cache.select_families(fonts_id, fonts, attrs);
+            if self.fonts_id != Some(fonts_id) {
+                let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
+                self.query.set_families(fonts.iter().copied());
+                self.fonts_id = Some(fonts_id);
+            }
             if self.attrs != attrs {
-                self.fcx
-                    .cache
-                    .select_fallbacks(self.script, self.locale, attrs);
+                self.query.set_attributes(attrs);
+                self.attrs = attrs;
             }
             self.attrs = attrs;
             self.variations = variations;
             self.features = features;
         }
-        let (font, synthesis) = self.fcx.cache.map_cluster(cluster)?;
-        Some(SelectedFont { font, synthesis })
+        let mut selected_font = None;
+        self.query.matches_with(|font| {
+            if let Ok(font_ref) = skrifa::FontRef::from_index(font.blob.as_ref(), font.index) {
+                use crate::swash_convert::synthesis_to_swash;
+                use skrifa::MetadataProvider;
+                use swash::text::cluster::Status as MapStatus;
+                let charmap = font_ref.charmap();
+                match cluster.map(|ch| charmap.map(ch).map(|g| g.to_u16()).unwrap_or_default()) {
+                    MapStatus::Complete => {
+                        selected_font = Some(SelectedFont {
+                            font: font.clone(),
+                            synthesis: synthesis_to_swash(font.synthesis),
+                        });
+                        return fontique::QueryStatus::Stop;
+                    }
+                    MapStatus::Keep => {
+                        selected_font = Some(SelectedFont {
+                            font: font.clone(),
+                            synthesis: synthesis_to_swash(font.synthesis),
+                        });
+                    }
+                    MapStatus::Discard => {
+                        if selected_font.is_none() {
+                            selected_font = Some(SelectedFont {
+                                font: font.clone(),
+                                synthesis: synthesis_to_swash(font.synthesis),
+                            });
+                        }
+                    }
+                }
+            }
+            fontique::QueryStatus::Continue
+        });
+        selected_font
     }
 }
 
-#[derive(PartialEq)]
 struct SelectedFont {
-    font: Font,
+    font: QueryFont,
     synthesis: Synthesis,
+}
+
+impl PartialEq for SelectedFont {
+    fn eq(&self, other: &Self) -> bool {
+        self.font.family == other.font.family && self.synthesis == other.synthesis
+    }
 }
 
 impl partition::SelectedFont for SelectedFont {
     fn font(&self) -> FontRef {
-        self.font.as_ref()
+        FontRef::from_index(self.font.blob.as_ref(), self.font.index as _).unwrap()
+    }
+
+    fn id_override(&self) -> Option<[u64; 2]> {
+        Some([self.font.blob.id(), self.font.index as _])
     }
 
     fn synthesis(&self) -> Option<Synthesis> {

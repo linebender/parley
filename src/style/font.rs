@@ -1,7 +1,8 @@
 use core::fmt;
 
-pub use crate::fount::GenericFamily;
-pub use swash::{ObliqueAngle, Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
+pub use crate::fontique::{
+    GenericFamily, Stretch as FontStretch, Style as FontStyle, Weight as FontWeight,
+};
 
 /// Setting for a font variation.
 pub type FontVariation = swash::Setting<f32>;

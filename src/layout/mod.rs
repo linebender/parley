@@ -8,8 +8,8 @@ pub(crate) mod data;
 
 pub mod cursor;
 
-use super::font::Font;
 use super::style::Brush;
+use crate::Font;
 use core::ops::Range;
 use data::*;
 use swash::text::cluster::{Boundary, ClusterInfo};
