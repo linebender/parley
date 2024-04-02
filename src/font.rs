@@ -1,4 +1,4 @@
-use fontique::{Collection, SourceCache};
+use crate::fontique::{Collection, SourceCache};
 
 #[derive(Default)]
 pub struct FontContext {

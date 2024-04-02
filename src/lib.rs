@@ -1,3 +1,5 @@
+extern crate alloc;
+
 pub use swash;
 
 mod bidi;
@@ -8,6 +10,7 @@ mod swash_convert;
 mod util;
 
 pub mod context;
+pub mod fontique;
 pub mod layout;
 pub mod style;
 

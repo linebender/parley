@@ -1,8 +1,10 @@
-pub fn convert_script(script: swash::text::Script) -> fontique::Script {
+use crate::fontique;
+
+pub fn script_to_fontique(script: swash::text::Script) -> fontique::Script {
     fontique::Script(*SCRIPT_TAGS.get(script as usize).unwrap_or(b"Zzzz"))
 }
 
-pub fn convert_locale(locale: swash::text::Language) -> Option<fontique::Language> {
+pub fn locale_to_fontique(locale: swash::text::Language) -> Option<fontique::Language> {
     let mut buf = [0u8; 16];
     let mut len = 0;
     for byte in locale.language().bytes() {
@@ -26,6 +28,20 @@ pub fn convert_locale(locale: swash::text::Language) -> Option<fontique::Languag
         }
     }
     fontique::Language::try_from_bytes(&buf[..len]).ok()
+}
+
+pub fn synthesis_to_swash(synthesis: fontique::Synthesis) -> swash::Synthesis {
+    swash::Synthesis::new(
+        synthesis
+            .variation_settings()
+            .iter()
+            .map(|setting| swash::Setting {
+                tag: swash::tag_from_bytes(&setting.0.to_be_bytes()),
+                value: setting.1,
+            }),
+        synthesis.embolden(),
+        synthesis.skew().unwrap_or_default(),
+    )
 }
 
 #[cfg_attr(rustfmt, rustfmt_skip)]

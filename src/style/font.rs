@@ -1,6 +1,6 @@
 use core::fmt;
 
-pub use fontique::{
+pub use crate::fontique::{
     GenericFamily, Stretch as FontStretch, Style as FontStyle, Weight as FontWeight,
 };
 

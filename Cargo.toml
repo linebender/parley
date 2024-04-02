@@ -3,10 +3,39 @@ name = "parley"
 version = "0.0.1"
 authors = ["Chad Brokaw <cbrokaw@gmail.com>"]
 license = "MIT OR Apache-2.0"
-edition = "2018"
+edition = "2021"
+
+[features]
+default = ["system"]
+# Enabled support for system font backends
+system = ["std"]
+std = ["dep:memmap2"]
 
 [dependencies]
-swash = "0.1.13"
-peniko = "0.1.0"
-fontique = { git = "https://github.com/dfrg/fount" }
-skrifa = "0.16.0"
+swash = "0.1.14"
+skrifa = { version = "0.18.0", default-features = false, features = ["libm"] }
+smallvec = "1.10.0"
+memmap2 = { version = "0.5", optional = true }
+unicode-script = { version = "0.5.5", optional = true }
+peniko = { version = "0.1.0", default-features = false, features = ["libm"] }
+icu_properties = "1.4.0"
+icu_locid = "1.4.0"
+hashbrown = "0.14.3"
+
+[target.'cfg(target_family="windows")'.dependencies]
+dwrote = "0.11.0"
+winapi = { version = "0.3.6", features = ["dwrite", "dwrite_1", "dwrite_3", "winnt", "unknwnbase", "libloaderapi", "winnls"] }
+wio = "0.2"
+
+[target.'cfg(any(target_os="macos", target_os="ios"))'.dependencies]
+foreign-types = "0.3.2"
+core-text = "19.0.0"
+core-foundation = "0.9"
+core-foundation-sys = "0.8"
+
+[target.'cfg(not(any(target_os="macos", target_os="ios", target_family="windows")))'.dependencies]
+anyhow = "1.0.66"
+bytemuck = { version = "1.12.2", features = ["derive"] }
+fontconfig-cache-parser = "0.1.1"
+thiserror = "1.0.37"
+roxmltree = "0.18.0"

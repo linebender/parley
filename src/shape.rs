@@ -2,9 +2,9 @@ use super::layout::Layout;
 use super::resolve::range::RangedStyle;
 use super::resolve::{ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
+use crate::fontique::{self, Attributes, Query, QueryFont};
 use crate::util::nearly_eq;
 use crate::Font;
-use fontique::{Attributes, Query, QueryFont};
 use swash::shape::*;
 use swash::text::cluster::{CharCluster, CharInfo, Token};
 use swash::text::{Language, Script};
@@ -181,9 +181,9 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         let variations = rcx.variations(style.font_variations).unwrap_or(&[]);
         let features = rcx.features(style.font_features).unwrap_or(&[]);
         query.set_families(fonts.iter().copied());
-        let fb_script = crate::swash_convert::convert_script(script);
+        let fb_script = crate::swash_convert::script_to_fontique(script);
         let fb_language = locale
-            .map(|locale| crate::swash_convert::convert_locale(locale))
+            .map(|locale| crate::swash_convert::locale_to_fontique(locale))
             .flatten();
         query.set_fallbacks(fontique::FallbackKey::new(fb_script, fb_language.as_ref()));
         query.set_attributes(attrs);
@@ -232,6 +232,7 @@ impl<'a, 'b, B: Brush> partition::Selector for FontSelector<'a, 'b, B> {
         let mut selected_font = None;
         self.query.matches_with(|font| {
             if let Ok(font_ref) = skrifa::FontRef::from_index(font.blob.as_ref(), font.index) {
+                use crate::swash_convert::synthesis_to_swash;
                 use skrifa::MetadataProvider;
                 use swash::text::cluster::Status as MapStatus;
                 let charmap = font_ref.charmap();
@@ -239,21 +240,21 @@ impl<'a, 'b, B: Brush> partition::Selector for FontSelector<'a, 'b, B> {
                     MapStatus::Complete => {
                         selected_font = Some(SelectedFont {
                             font: font.clone(),
-                            synthesis: Synthesis::default(),
+                            synthesis: synthesis_to_swash(font.synthesis),
                         });
                         return fontique::QueryStatus::Stop;
                     }
                     MapStatus::Keep => {
                         selected_font = Some(SelectedFont {
                             font: font.clone(),
-                            synthesis: Synthesis::default(),
+                            synthesis: synthesis_to_swash(font.synthesis),
                         });
                     }
                     MapStatus::Discard => {
                         if selected_font.is_none() {
                             selected_font = Some(SelectedFont {
                                 font: font.clone(),
-                                synthesis: Synthesis::default(),
+                                synthesis: synthesis_to_swash(font.synthesis),
                             });
                         }
                     }
@@ -261,7 +262,6 @@ impl<'a, 'b, B: Brush> partition::Selector for FontSelector<'a, 'b, B> {
             }
             fontique::QueryStatus::Continue
         });
-        // let (font, synthesis) = self.fcx.cache.map_cluster(cluster)?;
         selected_font
     }
 }
