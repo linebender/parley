@@ -12,6 +12,10 @@ mod system;
 #[path = "fontconfig/mod.rs"]
 mod system;
 
+#[cfg(all(feature = "system", target_os = "android"))]
+#[path = "android.rs"]
+mod system;
+
 #[allow(unused_imports)]
 use super::{
     family_name::{FamilyName, FamilyNameMap},
