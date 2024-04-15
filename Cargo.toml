@@ -28,8 +28,7 @@ winapi = { version = "0.3.6", features = ["dwrite", "dwrite_1", "dwrite_3", "win
 wio = "0.2"
 
 [target.'cfg(any(target_os="macos", target_os="ios"))'.dependencies]
-foreign-types = "0.3.2"
-core-text = "19.0.0"
+core-text = "20.0.0"
 core-foundation = "0.9"
 core-foundation-sys = "0.8"
 
