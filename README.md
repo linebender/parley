@@ -8,7 +8,7 @@
 [![Documentation build status.](https://img.shields.io/docsrs/parley.svg)](https://docs.rs/parley)
 [![Dependency staleness status.](https://deps.rs/repo/github/linebender/parley/status.svg)](https://deps.rs/repo/github/linebender/parley)
 [![Linebender Zulip chat.](https://img.shields.io/badge/Linebender-%23gpu-blue?logo=Zulip)](https://xi.zulipchat.com/#narrow/stream/205635-text)
-[![Apache 2.0 or MIT license.](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](#license)
+[![Apache 2.0 or MIT license.](https://img.shields.io/badge/license-Apache_2.0_or_MIT-blue.svg)](#license)
 
 </div>
 
