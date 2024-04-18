@@ -4,6 +4,8 @@ version = "0.0.1"
 authors = ["Chad Brokaw <cbrokaw@gmail.com>"]
 license = "Apache-2.0 OR MIT"
 edition = "2021"
+# Keep in sync with RUST_MIN_VER in .github/workflows/ci.yml and with the relevant README.md files.
+rust-version = "1.70"
 
 [features]
 default = ["system"]
@@ -14,9 +16,9 @@ std = ["dep:memmap2"]
 [dependencies]
 swash = "0.1.15"
 skrifa = { version = "0.19.0", default-features = false, features = ["libm"] }
-smallvec = "1.10.0"
-memmap2 = { version = "0.5", optional = true }
-unicode-script = { version = "0.5.5", optional = true }
+smallvec = "1.13.2"
+memmap2 = { version = "0.5.10", optional = true }
+unicode-script = { version = "0.5.6", optional = true }
 peniko = { version = "0.1.0", default-features = false, features = ["libm"] }
 icu_properties = "1.4.0"
 icu_locid = "1.4.0"
@@ -24,17 +26,17 @@ hashbrown = "0.14.3"
 
 [target.'cfg(target_family="windows")'.dependencies]
 dwrote = "0.11.0"
-winapi = { version = "0.3.6", features = ["dwrite", "dwrite_1", "dwrite_3", "winnt", "unknwnbase", "libloaderapi", "winnls"] }
-wio = "0.2"
+winapi = { version = "0.3.9", features = ["dwrite", "dwrite_1", "dwrite_3", "winnt", "unknwnbase", "libloaderapi", "winnls"] }
+wio = "0.2.2"
 
 [target.'cfg(any(target_os="macos", target_os="ios"))'.dependencies]
-core-text = "20.0.0"
-core-foundation = "0.9"
-core-foundation-sys = "0.8"
+core-text = "20.1.0"
+core-foundation = "0.9.4"
+core-foundation-sys = "0.8.6"
 
 [target.'cfg(not(any(target_os="macos", target_os="ios", target_family="windows")))'.dependencies]
-anyhow = "1.0.66"
-bytemuck = { version = "1.12.2", features = ["derive"] }
+anyhow = "1.0.82"
+bytemuck = { version = "1.15.0", features = ["derive"] }
 fontconfig-cache-parser = "0.1.1"
-thiserror = "1.0.37"
-roxmltree = "0.18.0"
+thiserror = "1.0.58"
+roxmltree = "0.18.1"
