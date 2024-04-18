@@ -2,7 +2,7 @@
 name = "parley"
 version = "0.0.1"
 authors = ["Chad Brokaw <cbrokaw@gmail.com>"]
-license = "MIT OR Apache-2.0"
+license = "Apache-2.0 OR MIT"
 edition = "2021"
 
 [features]
