@@ -7,12 +7,12 @@
 [![Latest published parley version.](https://img.shields.io/crates/v/parley.svg)](https://crates.io/crates/parley)
 [![Documentation build status.](https://img.shields.io/docsrs/parley.svg)](https://docs.rs/parley)
 [![Dependency staleness status.](https://deps.rs/repo/github/linebender/parley/status.svg)](https://deps.rs/repo/github/linebender/parley)
-[![Linebender Zulip chat.](https://img.shields.io/badge/Linebender-%23gpu-blue?logo=Zulip)](https://xi.zulipchat.com/#narrow/stream/205635-text)
+[![Linebender Zulip chat.](https://img.shields.io/badge/Linebender-%23text-blue?logo=Zulip)](https://xi.zulipchat.com/#narrow/stream/205635-text)
 [![Apache 2.0 or MIT license.](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](#license)
 
 </div>
 
-Parley provides the [Piet](https://github.com/linebender/piet) text API for implementing rich text layout.
+Parley provides an API for implementing rich text layout.
 It is backed by [Swash](https://github.com/dfrg/swash).
 
 ## Community
