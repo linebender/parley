@@ -1,6 +1,9 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+// TODO: Remove this dead code allowance and hide the offending code behind the std feature gate.
+#![cfg_attr(not(feature = "std"), allow(dead_code))]
+
 extern crate alloc;
 
 pub use swash;

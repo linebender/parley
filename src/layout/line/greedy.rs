@@ -311,7 +311,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     .iter()
                     .map(|c| c.advance)
                     .sum();
-                let line_height = line_run.compute_line_height(&self.layout);
+                let line_height = line_run.compute_line_height(self.layout);
                 let run = &self.layout.runs[line_run.run_index];
                 line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent * line_height);
                 line.metrics.descent = line.metrics.descent.max(run.metrics.descent * line_height);

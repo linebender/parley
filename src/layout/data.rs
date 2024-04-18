@@ -222,6 +222,7 @@ impl<B: Brush> LayoutData<B> {
     }
 
     #[allow(unused_assignments)]
+    #[allow(clippy::too_many_arguments)]
     pub fn push_run(
         &mut self,
         font: Font,

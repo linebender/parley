@@ -57,7 +57,7 @@ impl GenericFamily {
     ///
     /// # Example
     /// ```
-    /// # use fontique::GenericFamily;
+    /// # use parley::fontique::GenericFamily;
     /// assert_eq!(GenericFamily::parse("sans-serif"), Some(GenericFamily::SansSerif));
     /// assert_eq!(GenericFamily::parse("Arial"), None);
     /// ```

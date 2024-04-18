@@ -3,11 +3,11 @@
 
 //! Query support.
 
-use super::super::SourceCache;
+#[cfg(feature = "std")]
+use super::super::{Collection, SourceCache};
+
 use super::{
-    super::{
-        Attributes, Blob, Collection, FallbackKey, FamilyId, FamilyInfo, GenericFamily, Synthesis,
-    },
+    super::{Attributes, Blob, FallbackKey, FamilyId, FamilyInfo, GenericFamily, Synthesis},
     Inner,
 };
 
@@ -28,12 +28,14 @@ impl QueryState {
 pub struct Query<'a> {
     collection: &'a mut Inner,
     state: &'a mut QueryState,
+    #[cfg(feature = "std")]
     source_cache: &'a mut SourceCache,
     attributes: Attributes,
     fallbacks: Option<FallbackKey>,
 }
 
 impl<'a> Query<'a> {
+    #[cfg(feature = "std")]
     pub(super) fn new(collection: &'a mut Collection, source_cache: &'a mut SourceCache) -> Self {
         collection.query_state.clear();
         Self {
@@ -98,6 +100,7 @@ impl<'a> Query<'a> {
 
     /// Invokes the given callback with all fonts that match the current
     /// settings.
+    #[cfg(feature = "std")]
     pub fn matches_with(&mut self, mut f: impl FnMut(&QueryFont) -> QueryStatus) {
         for family in self
             .state
@@ -210,6 +213,7 @@ pub struct QueryFont {
     pub synthesis: Synthesis,
 }
 
+#[cfg(feature = "std")]
 fn load_font<'a>(
     family: &FamilyInfo,
     attributes: &Attributes,

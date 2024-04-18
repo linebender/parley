@@ -130,8 +130,7 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     pub fn glyphs(&'a self) -> impl Iterator<Item = Glyph> + 'a + Clone {
         self.run
             .visual_clusters()
-            .map(|cluster| cluster.glyphs())
-            .flatten()
+            .flat_map(|cluster| cluster.glyphs())
             .skip(self.glyph_start)
             .take(self.glyph_count)
     }
@@ -142,8 +141,7 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
         let baseline = self.baseline;
         self.run
             .visual_clusters()
-            .map(|cluster| cluster.glyphs())
-            .flatten()
+            .flat_map(|cluster| cluster.glyphs())
             .skip(self.glyph_start)
             .take(self.glyph_count)
             .map(move |mut g| {
@@ -171,8 +169,7 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
             let run = self.line.get(self.run_index)?;
             let mut iter = run
                 .visual_clusters()
-                .map(|c| c.glyphs())
-                .flatten()
+                .flat_map(|c| c.glyphs())
                 .skip(self.glyph_start);
             if let Some(first) = iter.next() {
                 let mut advance = first.advance;

@@ -62,7 +62,7 @@ impl<B: Brush> RangedStyleBuilder<B> {
             if prop.range.start > prop.range.end {
                 continue;
             }
-            let split_range = split_range(prop, &styles);
+            let split_range = split_range(prop, styles);
             let mut inserted = 0;
             if let Some(first) = split_range.first {
                 let original_span = &mut styles[first];
