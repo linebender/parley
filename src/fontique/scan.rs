@@ -1,3 +1,6 @@
+// Copyright 2024 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Scanning files and memory for fonts.
 
 #![allow(dead_code, unused_imports)]
