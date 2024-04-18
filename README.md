@@ -15,6 +15,13 @@
 Parley provides an API for implementing rich text layout.
 It is backed by [Swash](https://github.com/dfrg/swash).
 
+## Minimum supported Rust Version (MSRV)
+
+This version of Parley has been verified to compile with **Rust 1.70** and later.
+
+Future versions of Parley might increase the Rust version requirement.
+It will not be treated as a breaking change and as such can even happen with small patch releases.
+
 ## Community
 
 Discussion of Parley development happens in the [Linebender Zulip](https://xi.zulipchat.com/), specifically the [#text stream](https://xi.zulipchat.com/#narrow/stream/205635-text).
