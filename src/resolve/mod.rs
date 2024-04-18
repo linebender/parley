@@ -1,3 +1,6 @@
+// Copyright 2021 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Resolution of dynamic properties within a context.
 
 pub mod range;

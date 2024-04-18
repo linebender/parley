@@ -1,3 +1,6 @@
+// Copyright 2024 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Support for script/language based font fallback.
 
 use super::{family::FamilyId, script::Script};

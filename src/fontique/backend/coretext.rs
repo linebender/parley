@@ -1,3 +1,6 @@
+// Copyright 2024 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use super::{
     scan, FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily, GenericFamilyMap,
 };

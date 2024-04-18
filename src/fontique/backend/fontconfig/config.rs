@@ -1,3 +1,6 @@
+// Copyright 2024 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Extremely naive fontconfig xml parser to extract the data we need.
 
 use roxmltree::Node;

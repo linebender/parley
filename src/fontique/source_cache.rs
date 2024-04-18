@@ -1,3 +1,6 @@
+// Copyright 2024 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Cache for font data.
 
 use super::source::{SourceId, SourceInfo, SourceKind};

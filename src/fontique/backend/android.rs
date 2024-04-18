@@ -1,3 +1,6 @@
+// Copyright 2024 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use std::{path::Path, str::FromStr, sync::Arc};
 
 use hashbrown::HashMap;

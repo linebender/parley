@@ -1,3 +1,6 @@
+// Copyright 2021 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use super::layout::Layout;
 use super::resolve::range::RangedStyle;
 use super::resolve::{ResolveContext, Resolved};
