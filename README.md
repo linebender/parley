@@ -17,10 +17,22 @@ It is backed by [Swash](https://github.com/dfrg/swash).
 
 ## Minimum supported Rust Version (MSRV)
 
-This version of Parley has been verified to compile with **Rust 1.70** and later.
+This version of Parley has been verified to compile with **Rust 1.74** and later.
 
 Future versions of Parley might increase the Rust version requirement.
 It will not be treated as a breaking change and as such can even happen with small patch releases.
+
+<details>
+<summary>Click here if compiling fails.</summary>
+
+As time has passed, some of Parley's dependencies could have released versions with a higher Rust requirement.
+If you encounter a compilation issue due to a dependency and don't want to upgrade your Rust toolchain, then you could downgrade the dependency.
+
+```sh
+# Use the problematic dependency's name and version
+cargo update -p package_name --precise 0.1.1
+```
+</details>
 
 ## Community
 
