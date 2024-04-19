@@ -1,14 +1,18 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+#[cfg(feature = "std")]
 use super::layout::Layout;
 use super::resolve::range::RangedStyle;
 use super::resolve::{ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
 use crate::fontique::{self, Attributes, Query, QueryFont};
+#[cfg(feature = "std")]
 use crate::util::nearly_eq;
+#[cfg(feature = "std")]
 use crate::Font;
 use swash::shape::*;
+#[cfg(feature = "std")]
 use swash::text::cluster::{CharCluster, CharInfo, Token};
 use swash::text::{Language, Script};
 use swash::{FontRef, Synthesis};
@@ -25,6 +29,8 @@ struct Item {
     letter_spacing: f32,
 }
 
+#[cfg(feature = "std")]
+#[allow(clippy::too_many_arguments)]
 pub fn shape_text<'a, B: Brush>(
     rcx: &'a ResolveContext,
     mut fq: Query<'a>,
@@ -42,7 +48,7 @@ pub fn shape_text<'a, B: Brush>(
     let mut item = Item {
         style_index: 0,
         size: style.font_size,
-        level: levels.get(0).copied().unwrap_or(0),
+        level: levels.first().copied().unwrap_or(0),
         script: infos
             .iter()
             .map(|x| x.0.script())
@@ -107,7 +113,6 @@ pub fn shape_text<'a, B: Brush>(
                     );
                 },
             );
-            std::mem::drop(fs);
         };
     }
     for ((char_index, ch), (info, style_index)) in text.chars().enumerate().zip(infos) {
@@ -185,9 +190,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         let features = rcx.features(style.font_features).unwrap_or(&[]);
         query.set_families(fonts.iter().copied());
         let fb_script = crate::swash_convert::script_to_fontique(script);
-        let fb_language = locale
-            .map(|locale| crate::swash_convert::locale_to_fontique(locale))
-            .flatten();
+        let fb_language = locale.and_then(crate::swash_convert::locale_to_fontique);
         query.set_fallbacks(fontique::FallbackKey::new(fb_script, fb_language.as_ref()));
         query.set_attributes(attrs);
         Self {
@@ -203,6 +206,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<'a, 'b, B: Brush> partition::Selector for FontSelector<'a, 'b, B> {
     type SelectedFont = SelectedFont;
 

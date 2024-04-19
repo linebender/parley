@@ -7,6 +7,7 @@ mod query;
 
 pub use query::{Query, QueryFamily, QueryFont, QueryStatus};
 
+#[cfg(feature = "std")]
 use super::SourceCache;
 
 use super::{
@@ -156,6 +157,7 @@ impl Collection {
     }
 
     /// Returns an object for selecting fonts from this collection.
+    #[cfg(feature = "std")]
     pub fn query<'a>(&'a mut self, source_cache: &'a mut SourceCache) -> Query<'a> {
         Query::new(self, source_cache)
     }
@@ -247,7 +249,7 @@ impl Inner {
         if let Some(family) = self.data.families.get(&id) {
             family.as_ref().cloned()
         } else {
-            #[cfg(feature = "std")]
+            #[cfg(feature = "system")]
             if let Some(system) = &self.system {
                 let family = system.fonts.lock().unwrap().family(id);
                 self.data.families.insert(id, family.clone());
@@ -255,7 +257,7 @@ impl Inner {
             } else {
                 None
             }
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "system"))]
             {
                 None
             }
@@ -346,7 +348,7 @@ impl Inner {
         if self.fallback_cache.script != Some(script) || self.fallback_cache.language != lang_key {
             self.sync_shared();
             self.fallback_cache.reset();
-            #[cfg(feature = "std")]
+            #[cfg(feature = "system")]
             if let Some(families) = self.data.fallbacks.get(selector) {
                 self.fallback_cache.set(script, lang_key, families);
             } else if let Some(system) = self.system.as_ref() {
@@ -356,7 +358,7 @@ impl Inner {
                     self.fallback_cache.set(script, lang_key, &[family]);
                 }
             }
-            #[cfg(not(feature = "std"))]
+            #[cfg(not(feature = "system"))]
             if let Some(families) = self.data.fallbacks.get(selector) {
                 self.fallback_cache.set(script, lang_key, families);
             }
@@ -502,7 +504,7 @@ impl FallbackCache {
 /// Data taken from the system font collection.
 #[derive(Clone)]
 struct System {
-    #[cfg(feature = "std")]
+    #[cfg(feature = "system")]
     fonts: Arc<Mutex<SystemFonts>>,
     family_names: Arc<FamilyNameMap>,
     generic_families: Arc<GenericFamilyMap>,
@@ -513,10 +515,10 @@ impl System {
         let fonts = SystemFonts::new();
         let family_names = fonts.name_map.clone();
         let generic_families = fonts.generic_families.clone();
-        #[cfg(feature = "std")]
+        #[cfg(feature = "system")]
         let fonts = Arc::new(Mutex::new(fonts));
         Self {
-            #[cfg(feature = "std")]
+            #[cfg(feature = "system")]
             fonts,
             family_names,
             generic_families,

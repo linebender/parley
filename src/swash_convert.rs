@@ -47,7 +47,7 @@ pub fn synthesis_to_swash(synthesis: fontique::Synthesis) -> swash::Synthesis {
     )
 }
 
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#[rustfmt::skip]
 const SCRIPT_TAGS: [[u8; 4]; 157] = [
     *b"Adlm", *b"Aghb", *b"Ahom", *b"Arab", *b"Armi", *b"Armn", *b"Avst", *b"Bali", *b"Bamu", 
     *b"Bass", *b"Batk", *b"Beng", *b"Bhks", *b"Bopo", *b"Brah", *b"Brai", *b"Bugi", *b"Buhd", 

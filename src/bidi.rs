@@ -249,14 +249,10 @@ impl BidiResolver {
                         },
                         is_isolate,
                     );
-                } else {
-                    if is_isolate {
-                        overflow_isolates += 1;
-                    } else {
-                        if overflow_isolates == 0 {
-                            overflow_embedding += 1;
-                        }
-                    }
+                } else if is_isolate {
+                    overflow_isolates += 1;
+                } else if overflow_isolates == 0 {
+                    overflow_embedding += 1;
                 }
             } else if t == PDI {
                 if overflow_isolates > 0 {
@@ -384,6 +380,7 @@ impl BidiResolver {
         }
     }
 
+    #[allow(clippy::needless_range_loop)]
     fn resolve_sequence(&mut self, level: u8, sos: BidiClass, eos: BidiClass, len: usize) {
         if len == 0 {
             return;
@@ -658,9 +655,8 @@ where
 {
     let mut max_level = 0;
     let mut lowest_odd_level = 255;
-    let mut idx = 0;
-    let len = order.len();
-    for i in 0..len {
+    for (i, o) in order.iter_mut().enumerate() {
+        *o = i;
         let level = levels(i);
         if level > max_level {
             max_level = level;
@@ -668,9 +664,8 @@ where
         if level & 1 != 0 && level < lowest_odd_level {
             lowest_odd_level = level;
         }
-        order[idx] = idx;
-        idx += 1;
     }
+    let len = order.len();
     for level in (lowest_odd_level..=max_level).rev() {
         let mut i = 0;
         while i < len {

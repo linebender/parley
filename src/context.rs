@@ -4,11 +4,13 @@
 //! Context for layout.
 
 use super::bidi;
-use super::layout::Layout;
 use super::resolve::range::*;
 use super::resolve::*;
 use super::style::*;
 use super::FontContext;
+
+#[cfg(feature = "std")]
+use super::layout::Layout;
 
 use swash::shape::ShapeContext;
 use swash::text::cluster::CharInfo;
@@ -44,6 +46,7 @@ impl<B: Brush> LayoutContext<B> {
         scale: f32,
     ) -> RangedBuilder<B, &'a str> {
         self.begin(text);
+        #[cfg(feature = "std")]
         fcx.source_cache.prune(128, false);
         RangedBuilder {
             text,
@@ -97,15 +100,16 @@ pub struct RangedBuilder<'a, B: Brush, T: TextSource> {
 
 impl<'a, B: Brush, T: TextSource> RangedBuilder<'a, B, T> {
     pub fn push_default(&mut self, property: &StyleProperty<B>) {
-        let resolved = self.lcx.rcx.resolve(self.fcx, &property, self.scale);
+        let resolved = self.lcx.rcx.resolve(self.fcx, property, self.scale);
         self.lcx.rsb.push_default(resolved);
     }
 
     pub fn push(&mut self, property: &StyleProperty<B>, range: impl RangeBounds<usize>) {
-        let resolved = self.lcx.rcx.resolve(&mut self.fcx, &property, self.scale);
+        let resolved = self.lcx.rcx.resolve(self.fcx, property, self.scale);
         self.lcx.rsb.push(resolved, range);
     }
 
+    #[cfg(feature = "std")]
     pub fn build_into(&mut self, layout: &mut Layout<B>) {
         layout.data.clear();
         layout.data.scale = self.scale;
@@ -175,6 +179,7 @@ impl<'a, B: Brush, T: TextSource> RangedBuilder<'a, B, T> {
         }
     }
 
+    #[cfg(feature = "std")]
     pub fn build(&mut self) -> Layout<B> {
         let mut layout = Layout::default();
         self.build_into(&mut layout);
@@ -189,6 +194,6 @@ pub trait TextSource {
 
 impl<'a> TextSource for &'a str {
     fn as_str(&self) -> &str {
-        *self
+        self
     }
 }
