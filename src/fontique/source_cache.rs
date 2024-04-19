@@ -46,7 +46,7 @@ impl SourceCache {
         }
     }
 
-    /// Creates an emtpy cache that is suitable for multi-threaded use.
+    /// Creates an empty cache that is suitable for multi-threaded use.
     ///
     /// A cache created with this function maintains a synchronized internal
     /// store that is shared among all clones.

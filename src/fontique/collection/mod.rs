@@ -108,7 +108,7 @@ impl Collection {
         self.inner.generic_families(family)
     }
 
-    /// Replaces the set of family identifers associated with the given generic
+    /// Replaces the set of family identifiers associated with the given generic
     /// family.
     pub fn set_generic_families(
         &mut self,
@@ -118,7 +118,7 @@ impl Collection {
         self.inner.set_generic_families(generic, families)
     }
 
-    /// Appends the set of family identifers to the given generic family.
+    /// Appends the set of family identifiers to the given generic family.
     pub fn append_generic_families(
         &mut self,
         generic: GenericFamily,
@@ -136,7 +136,7 @@ impl Collection {
         self.inner.fallback_families(key)
     }
 
-    /// Replaces the set of family identifers associated with the fallback
+    /// Replaces the set of family identifiers associated with the fallback
     /// key.
     pub fn set_fallbacks(
         &mut self,
@@ -146,7 +146,7 @@ impl Collection {
         self.inner.set_fallbacks(key, families)
     }
 
-    /// Appends the set of family identifers to the given fallback key.
+    /// Appends the set of family identifiers to the given fallback key.
     pub fn append_fallbacks(
         &mut self,
         key: impl Into<FallbackKey>,
@@ -287,7 +287,7 @@ impl Inner {
         }
     }
 
-    /// Replaces the set of family identifers associated with the given generic
+    /// Replaces the set of family identifiers associated with the given generic
     /// family.
     pub fn set_generic_families(
         &mut self,
@@ -311,7 +311,7 @@ impl Inner {
         self.data.generic_families.set(generic, families)
     }
 
-    /// Appends the set of family identifers to the given generic family.
+    /// Appends the set of family identifiers to the given generic family.
     pub fn append_generic_families(
         &mut self,
         generic: GenericFamily,
@@ -364,7 +364,7 @@ impl Inner {
         self.fallback_cache.families.iter().copied()
     }
 
-    /// Replaces the set of family identifers associated with the fallback
+    /// Replaces the set of family identifiers associated with the fallback
     /// key.
     pub fn set_fallbacks(
         &mut self,
@@ -384,7 +384,7 @@ impl Inner {
         self.data.fallbacks.set(key, families)
     }
 
-    /// Appends the set of family identifers to the given fallback key.
+    /// Appends the set of family identifiers to the given fallback key.
     pub fn append_fallbacks(
         &mut self,
         key: impl Into<FallbackKey>,
