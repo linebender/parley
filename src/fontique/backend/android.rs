@@ -4,10 +4,11 @@
 use std::{path::Path, str::FromStr, sync::Arc};
 
 use hashbrown::HashMap;
-use roxmltree::Document;
+use icu_locid::LanguageIdentifier;
+use roxmltree::{Document, Node};
 
 use super::{
-    scan, FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily, GenericFamilyMap,
+    scan, FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily, GenericFamilyMap, Script,
 };
 
 // TODO: Use actual generic families here, where available, when fonts.xml is properly parsed.
@@ -33,6 +34,8 @@ pub struct SystemFonts {
     pub name_map: Arc<FamilyNameMap>,
     pub generic_families: Arc<GenericFamilyMap>,
     family_map: HashMap<FamilyId, FamilyInfo>,
+    locale_fallback: Box<[(Box<str>, FamilyId)]>,
+    script_fallback: Box<[(Script, FamilyId)]>,
 }
 
 impl SystemFonts {
@@ -42,6 +45,7 @@ impl SystemFonts {
         let scan::ScannedCollection {
             family_names: mut name_map,
             families: family_map,
+            postscript_names,
             ..
         } = scan::ScannedCollection::from_paths(Path::new(&android_root).join("fonts").to_str(), 8);
         let mut generic_families = GenericFamilyMap::default();
@@ -54,6 +58,9 @@ impl SystemFonts {
                     .map(|name| name.id()),
             );
         }
+
+        let mut locale_fallback = vec![];
+        let mut script_fallback = vec![];
 
         // Try to get generic info from fonts.xml
         if let Ok(s) = std::fs::read_to_string(Path::new(&android_root).join("etc/fonts.xml")) {
@@ -90,11 +97,62 @@ impl SystemFonts {
                                         //       smarter, or something dumb that meets expecta­
                                         //       tions on Android.
                                     }
-                                } else if let Some(_langs) = child
+                                } else if let Some(langs) = child
                                     .attribute("lang")
                                     .map(|s| s.split(',').collect::<Vec<&str>>())
                                 {
-                                    // TODO: implement language fallback "family" elements
+                                    let (_has_for, hasnt_for): (Vec<Node>, Vec<Node>) = child
+                                        .children()
+                                        .partition(|c| c.attribute("fallbackFor").is_some());
+                                    {
+                                        // general fallback families
+                                        let (ps_named, _ps_unnamed): (Vec<Node>, Vec<Node>) =
+                                            hasnt_for.iter().partition(|c| {
+                                                c.attribute("postScriptName").is_some()
+                                            });
+
+                                        if let Some(family) = ps_named.iter().find_map(|x| {
+                                            postscript_names
+                                                .get(x.attribute("postScriptName").unwrap())
+                                        }) {
+                                            for lang in langs {
+                                                if let Some(scr) = lang.strip_prefix("und-") {
+                                                    // Undefined lang for script-only fallbacks
+                                                    script_fallback.push((scr.into(), *family));
+                                                } else if let Ok(locale) =
+                                                    LanguageIdentifier::try_from_bytes(
+                                                        lang.as_bytes(),
+                                                    )
+                                                {
+                                                    if let Some(scr) = locale.script {
+                                                        // Also fallback for the script on its own
+                                                        script_fallback
+                                                            .push((scr.as_str().into(), *family));
+                                                        if "Hant" == scr.as_str() {
+                                                            // This works around ambiguous han char­
+                                                            // acters going unmapped with current
+                                                            // fallback code. This should be done in
+                                                            // a locale-dependent manner, since that
+                                                            // is the norm.
+                                                            script_fallback
+                                                                .push(("Hani".into(), *family));
+                                                        }
+                                                    }
+                                                    locale_fallback
+                                                        .push((locale.to_string().into(), *family));
+                                                }
+                                            }
+                                        }
+
+                                        // TODO: handle mapping to family names from file names
+                                        //       when postScriptName is unavailable.
+                                    }
+
+                                    // family-specific fallback families, currently unimplemented
+                                    // because it requires a GenericFamily to be plumbed through
+                                    // the `RangedStyle` `font_stack` from `resolve` where it is
+                                    // currently thrown away.
+                                    {}
                                 }
                                 // TODO: interpret variant="compact" without fallbackFor as a
                                 //       fallback for system-ui, as falling back to a
@@ -112,15 +170,37 @@ impl SystemFonts {
             name_map: Arc::new(name_map),
             generic_families: Arc::new(generic_families),
             family_map,
+            locale_fallback: locale_fallback.into(),
+            script_fallback: script_fallback.into(),
         }
     }
 
-    pub fn family(&mut self, id: FamilyId) -> Option<FamilyInfo> {
+    pub fn family(&self, id: FamilyId) -> Option<FamilyInfo> {
         self.family_map.get(&id).cloned()
     }
 
-    pub fn fallback(&mut self, _key: impl Into<FallbackKey>) -> Option<FamilyId> {
-        // FIXME: This is a stub
-        Some(self.generic_families.get(GenericFamily::SansSerif)[0])
+    pub fn fallback(&self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
+        let key: FallbackKey = key.into();
+        let script = key.script();
+
+        key.locale()
+            .and_then(|li| {
+                self.locale_fallback
+                    .iter()
+                    .find(|(lid, _)| li == lid.as_ref())
+                    .map(|(_, fid)| *fid)
+            })
+            .or_else(|| {
+                self.script_fallback
+                    .iter()
+                    .find(|(s, _)| script == *s)
+                    .map(|(_, fid)| *fid)
+            })
+            .or_else(|| {
+                self.generic_families
+                    .get(GenericFamily::SansSerif)
+                    .first()
+                    .copied()
+            })
     }
 }
