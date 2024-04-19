@@ -5,7 +5,7 @@ authors = ["Chad Brokaw <cbrokaw@gmail.com>"]
 license = "Apache-2.0 OR MIT"
 edition = "2021"
 # Keep in sync with RUST_MIN_VER in .github/workflows/ci.yml and with the relevant README.md files.
-rust-version = "1.70"
+rust-version = "1.74"
 
 [features]
 default = ["system"]
