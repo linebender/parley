@@ -655,8 +655,8 @@ where
 {
     let mut max_level = 0;
     let mut lowest_odd_level = 255;
-    let len = order.len();
-    for (idx, i) in (0..len).enumerate() {
+    for (i, o) in order.iter_mut().enumerate() {
+        *o = i;
         let level = levels(i);
         if level > max_level {
             max_level = level;
@@ -664,8 +664,8 @@ where
         if level & 1 != 0 && level < lowest_odd_level {
             lowest_odd_level = level;
         }
-        order[idx] = idx;
     }
+    let len = order.len();
     for level in (lowest_odd_level..=max_level).rev() {
         let mut i = 0;
         while i < len {
