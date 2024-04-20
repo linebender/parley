@@ -245,7 +245,10 @@ impl<B: Brush> LayoutData<B> {
         let metrics = shaper.metrics();
         let cluster_range = self.clusters.len()..self.clusters.len();
         let coords_start = self.coords.len();
-        self.coords.extend_from_slice(shaper.normalized_coords());
+        let coords = shaper.normalized_coords();
+        if coords.iter().any(|coord| *coord != 0) {
+            self.coords.extend_from_slice(coords);
+        }
         let coords_end = self.coords.len();
         let mut run = RunData {
             font_index,
