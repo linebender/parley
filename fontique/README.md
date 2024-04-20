@@ -6,7 +6,7 @@
 
 [![Latest published fontique version.](https://img.shields.io/crates/v/fontique.svg)](https://crates.io/crates/fontique)
 [![Documentation build status.](https://img.shields.io/docsrs/fontique.svg)](https://docs.rs/fontique)
-[![Dependency staleness status.](https://deps.rs/repo/github/linebender/fontique/status.svg)](https://deps.rs/repo/github/linebender/fontique)
+[![Dependency staleness status.](https://deps.rs/crate/fontique/latest/status.svg)](https://deps.rs/crate/fontique)
 [![Linebender Zulip chat.](https://img.shields.io/badge/Linebender-%23text-blue?logo=Zulip)](https://xi.zulipchat.com/#narrow/stream/205635-text)
 [![Apache 2.0 or MIT license.](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](#license)
 
