@@ -33,19 +33,19 @@ impl ClusterData {
     pub const LIGATURE_COMPONENT: u16 = 2;
     pub const DIVERGENT_STYLES: u16 = 4;
 
-    pub fn is_ligature_start(&self) -> bool {
+    pub fn is_ligature_start(self) -> bool {
         self.flags & Self::LIGATURE_START != 0
     }
 
-    pub fn is_ligature_component(&self) -> bool {
+    pub fn is_ligature_component(self) -> bool {
         self.flags & Self::LIGATURE_COMPONENT != 0
     }
 
-    pub fn has_divergent_styles(&self) -> bool {
+    pub fn has_divergent_styles(self) -> bool {
         self.flags & Self::DIVERGENT_STYLES != 0
     }
 
-    pub fn text_range(&self, run: &RunData) -> Range<usize> {
+    pub fn text_range(self, run: &RunData) -> Range<usize> {
         let start = run.text_range.start + self.text_offset as usize;
         start..start + self.text_len as usize
     }
