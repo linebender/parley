@@ -1,0 +1,48 @@
+[package]
+name = "fontique"
+version = "0.1.0" # Keep in sync with workspace dependency specification
+description = "Font enumeration and fallback."
+keywords = ["font", "text"]
+categories = ["gui", "os"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["system"]
+std = ["skrifa/std", "peniko/std", "dep:memmap2"]
+libm = ["skrifa/libm", "peniko/libm", "dep:core_maths"]
+# Enables support for system font backends
+system = ["std"]
+
+[dependencies]
+skrifa = { workspace = true }
+peniko = { workspace = true }
+smallvec = "1.13.2"
+memmap2 = { version = "0.5.10", optional = true }
+unicode-script = { version = "0.5.6", optional = true }
+core_maths = { version = "0.1.0", optional = true }
+icu_properties = "1.4.0"
+icu_locid = "1.4.0"
+hashbrown = "0.14.3"
+
+[target.'cfg(target_family="windows")'.dependencies]
+dwrote = "0.11.0"
+winapi = { version = "0.3.9", features = ["dwrite", "dwrite_1", "dwrite_3", "winnt", "unknwnbase", "libloaderapi", "winnls"] }
+wio = "0.2.2"
+
+[target.'cfg(any(target_os="macos", target_os="ios"))'.dependencies]
+core-text = "20.1.0"
+core-foundation = "0.9.4"
+core-foundation-sys = "0.8.6"
+
+[target.'cfg(not(any(target_os="macos", target_os="ios", target_family="windows")))'.dependencies]
+anyhow = "1.0.82"
+bytemuck = { version = "1.15.0", features = ["derive"] }
+fontconfig-cache-parser = "0.2.0"
+thiserror = "1.0.58"
+roxmltree = "0.18.1"

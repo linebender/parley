@@ -3,6 +3,9 @@
 
 //! Range based style application.
 
+#[cfg(not(feature = "std"))]
+use alloc::vec;
+
 use super::*;
 use core::ops::{Bound, Range, RangeBounds};
 
@@ -37,14 +40,14 @@ impl<B: Brush> RangedStyleBuilder<B> {
     /// Pushes a property that covers the full range of text.
     pub fn push_default(&mut self, property: ResolvedProperty<B>) {
         assert!(self.len != !0);
-        self.default_style.apply(property)
+        self.default_style.apply(property);
     }
 
     /// Pushes a property that covers the specified range of text.
     pub fn push(&mut self, property: ResolvedProperty<B>, range: impl RangeBounds<usize>) {
         let range = resolve_range(range, self.len);
         assert!(self.len != !0);
-        self.properties.push(RangedProperty { property, range })
+        self.properties.push(RangedProperty { property, range });
     }
 
     /// Computes the sequence of ranged styles.

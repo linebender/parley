@@ -6,6 +6,9 @@
 #[cfg(feature = "std")]
 use super::super::{Collection, SourceCache};
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 use super::{
     super::{Attributes, Blob, FallbackKey, FamilyId, FamilyInfo, GenericFamily, Synthesis},
     Inner,
@@ -126,7 +129,7 @@ impl<'a> Query<'a> {
             let mut best_index = None;
             if let Some(font) = load_font(
                 family_info,
-                &self.attributes,
+                self.attributes,
                 &mut family.best,
                 false,
                 self.source_cache,
@@ -143,7 +146,7 @@ impl<'a> Query<'a> {
             }
             if let Some(font) = load_font(
                 family_info,
-                &self.attributes,
+                self.attributes,
                 &mut family.default,
                 true,
                 self.source_cache,
@@ -216,7 +219,7 @@ pub struct QueryFont {
 #[cfg(feature = "std")]
 fn load_font<'a>(
     family: &FamilyInfo,
-    attributes: &Attributes,
+    attributes: Attributes,
     font: &'a mut Entry<QueryFont>,
     is_default: bool,
     source_cache: &mut SourceCache,

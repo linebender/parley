@@ -220,7 +220,7 @@ impl SystemFonts {
     }
 }
 
-/// FontConfig seems to force RBIZ (regular, bold, italic, bold italic) when
+/// Fontconfig seems to force RBIZ (regular, bold, italic, bold italic) when
 /// categorizing fonts. This removes those suffixes from family names so that
 /// we can match on all attributes.
 fn strip_rbiz(name: &str) -> &str {

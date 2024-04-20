@@ -1,42 +1,50 @@
-[package]
-name = "parley"
-version = "0.0.1"
-authors = ["Chad Brokaw <cbrokaw@gmail.com>"]
-license = "Apache-2.0 OR MIT"
+[workspace]
+resolver = "2"
+members = [
+	"fontique"
+]
+
+[workspace.package]
 edition = "2021"
 # Keep in sync with RUST_MIN_VER in .github/workflows/ci.yml and with the relevant README.md files.
-rust-version = "1.74"
+rust-version = "1.70"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/linebender/parley"
+
+[package]
+name = "parley"
+version = "0.1.0"
+description = "Parley provides an API for implementing rich text layout."
+keywords = ["text", "layout"]
+categories = ["gui", "graphics"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+exclude = ["/.github/", "/doc/", ".gitignore"]
+
+[workspace.lints]
+clippy.doc_markdown = "warn"
+clippy.semicolon_if_nothing_returned = "warn"
+clippy.trivially_copy_pass_by_ref = "warn"
+
+[lints]
+workspace = true
 
 [features]
 default = ["system"]
-# Enabled support for system font backends
-system = ["std"]
-std = ["dep:memmap2"]
+std = ["fontique/std", "skrifa/std", "peniko/std"]
+libm = ["fontique/libm", "skrifa/libm", "peniko/libm"]
+# Enables support for system font backends
+system = ["std", "fontique/system"]
 
 [dependencies]
 swash = "0.1.15"
-skrifa = { version = "0.19.0", default-features = false, features = ["libm"] }
-smallvec = "1.13.2"
-memmap2 = { version = "0.5.10", optional = true }
-unicode-script = { version = "0.5.6", optional = true }
-peniko = { version = "0.1.0", default-features = false, features = ["libm"] }
-icu_properties = "1.4.0"
-icu_locid = "1.4.0"
-hashbrown = "0.14.3"
+skrifa = { workspace = true }
+peniko = { workspace = true }
+fontique = { workspace = true }
 
-[target.'cfg(target_family="windows")'.dependencies]
-dwrote = "0.11.0"
-winapi = { version = "0.3.9", features = ["dwrite", "dwrite_1", "dwrite_3", "winnt", "unknwnbase", "libloaderapi", "winnls"] }
-wio = "0.2.2"
-
-[target.'cfg(any(target_os="macos", target_os="ios"))'.dependencies]
-core-text = "20.1.0"
-core-foundation = "0.9.4"
-core-foundation-sys = "0.8.6"
-
-[target.'cfg(not(any(target_os="macos", target_os="ios", target_family="windows")))'.dependencies]
-anyhow = "1.0.82"
-bytemuck = { version = "1.15.0", features = ["derive"] }
-fontconfig-cache-parser = "0.2"
-thiserror = "1.0.58"
-roxmltree = "0.18.1"
+[workspace.dependencies]
+fontique = { version = "0.1.0", default-features = false, path = "fontique" }
+skrifa = { version = "0.19.0", default-features = false }
+peniko = { version = "0.1.0", default-features = false }

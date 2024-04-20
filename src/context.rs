@@ -3,6 +3,9 @@
 
 //! Context for layout.
 
+#[cfg(not(feature = "std"))]
+use alloc::{vec, vec::Vec};
+
 use super::bidi;
 use super::resolve::range::*;
 use super::resolve::*;
@@ -15,7 +18,7 @@ use super::layout::Layout;
 use swash::shape::ShapeContext;
 use swash::text::cluster::CharInfo;
 
-use std::ops::RangeBounds;
+use core::ops::RangeBounds;
 
 /// Context for building a text layout.
 pub struct LayoutContext<B: Brush = [u8; 4]> {

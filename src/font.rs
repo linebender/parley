@@ -1,10 +1,10 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::fontique::Collection;
+use fontique::Collection;
 
 #[cfg(feature = "std")]
-use crate::fontique::SourceCache;
+use fontique::SourceCache;
 
 #[derive(Default)]
 pub struct FontContext {

@@ -6,13 +6,16 @@
 pub mod range;
 pub mod tree;
 
+#[cfg(not(feature = "std"))]
+use alloc::{vec, vec::Vec};
+
 use super::style::{
     Brush, FontFamily, FontFeature, FontSettings, FontStack, FontStretch, FontStyle, FontVariation,
     FontWeight, StyleProperty,
 };
 use crate::font::FontContext;
-use crate::fontique::FamilyId;
 use crate::util::nearly_eq;
+use fontique::FamilyId;
 use swash::text::Language;
 use swash::Setting;
 

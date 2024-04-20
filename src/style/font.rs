@@ -3,7 +3,7 @@
 
 use core::fmt;
 
-pub use crate::fontique::{
+pub use fontique::{
     GenericFamily, Stretch as FontStretch, Style as FontStyle, Weight as FontWeight,
 };
 

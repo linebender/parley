@@ -111,7 +111,7 @@ impl<B: Brush> Layout<B> {
     /// Breaks all lines with the specified maximum advance and alignment.
     pub fn break_all_lines(&mut self, max_advance: Option<f32>, alignment: Alignment) {
         self.break_lines()
-            .break_remaining(max_advance.unwrap_or(f32::MAX), alignment)
+            .break_remaining(max_advance.unwrap_or(f32::MAX), alignment);
     }
 
     /// Returns an iterator over the runs in the layout.

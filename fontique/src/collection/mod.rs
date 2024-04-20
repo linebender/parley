@@ -116,7 +116,7 @@ impl Collection {
         generic: GenericFamily,
         families: impl Iterator<Item = FamilyId>,
     ) {
-        self.inner.set_generic_families(generic, families)
+        self.inner.set_generic_families(generic, families);
     }
 
     /// Appends the set of family identifiers to the given generic family.
@@ -125,7 +125,7 @@ impl Collection {
         generic: GenericFamily,
         families: impl Iterator<Item = FamilyId>,
     ) {
-        self.inner.append_generic_families(generic, families)
+        self.inner.append_generic_families(generic, families);
     }
 
     /// Returns an iterator over the fallback families for the given
@@ -307,10 +307,10 @@ impl Inner {
                 .set(generic, families);
             shared.bump_version();
         } else {
-            self.data.generic_families.set(generic, families)
+            self.data.generic_families.set(generic, families);
         }
         #[cfg(not(feature = "std"))]
-        self.data.generic_families.set(generic, families)
+        self.data.generic_families.set(generic, families);
     }
 
     /// Appends the set of family identifiers to the given generic family.
@@ -330,10 +330,10 @@ impl Inner {
                 .append(generic, families);
             shared.bump_version();
         } else {
-            self.data.generic_families.append(generic, families)
+            self.data.generic_families.append(generic, families);
         }
         #[cfg(not(feature = "std"))]
-        self.data.generic_families.append(generic, families)
+        self.data.generic_families.append(generic, families);
     }
 
     /// Returns an iterator over the fallback families for the given

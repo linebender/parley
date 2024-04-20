@@ -3,6 +3,9 @@
 
 //! Properties for specifying font weight, stretch and style.
 
+#[cfg(not(feature = "std"))]
+use core_maths::*;
+
 use core::fmt;
 
 /// Primary attributes for font matching: stretch, style and weight.

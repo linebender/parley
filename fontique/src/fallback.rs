@@ -94,7 +94,7 @@ impl FallbackMap {
                     }
                     existing_families.extend(families);
                 } else {
-                    script_fallbacks.others.push((locale, families.collect()))
+                    script_fallbacks.others.push((locale, families.collect()));
                 }
                 true
             }

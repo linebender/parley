@@ -3,6 +3,9 @@
 
 //! Unicode bidirectional algorithm.
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 use swash::text::{BidiClass, BracketType, Codepoint as _};
 use BidiClass::*;
 
