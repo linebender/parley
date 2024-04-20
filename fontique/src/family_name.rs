@@ -107,7 +107,7 @@ impl NameKey {
         for ch in s.chars() {
             for ch in ch.to_lowercase() {
                 res.data
-                    .extend_from_slice(ch.encode_utf8(&mut buf).as_bytes())
+                    .extend_from_slice(ch.encode_utf8(&mut buf).as_bytes());
             }
         }
         res

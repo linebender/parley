@@ -3,6 +3,15 @@
 
 //! Font enumeration and fallback.
 
+// TODO: Remove this dead code allowance and hide the offending code behind the std feature gate.
+#![cfg_attr(not(feature = "std"), allow(dead_code))]
+#![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
+
+#[cfg(not(any(feature = "std", feature = "libm")))]
+compile_error!("fontique requires either the `std` or `libm` feature to be enabled");
+
+extern crate alloc;
+
 mod attributes;
 mod backend;
 mod collection;

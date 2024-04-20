@@ -241,7 +241,7 @@ fn all_family_names(family: &dwrote::FontFamily) -> Option<Vec<String>> {
                 continue;
             }
             buf.pop();
-            names.push(String::from_utf16_lossy(&buf))
+            names.push(String::from_utf16_lossy(&buf));
         }
     }
     Some(names)

@@ -3,6 +3,9 @@
 
 //! Greedy line breaking.
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 use crate::layout::*;
 use crate::style::Brush;
 

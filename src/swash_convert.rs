@@ -1,8 +1,6 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::fontique;
-
 pub fn script_to_fontique(script: swash::text::Script) -> fontique::Script {
     fontique::Script(*SCRIPT_TAGS.get(script as usize).unwrap_or(b"Zzzz"))
 }

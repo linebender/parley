@@ -6,6 +6,9 @@
 #[cfg(feature = "std")]
 use super::super::{Collection, SourceCache};
 
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
 use super::{
     super::{Attributes, Blob, FallbackKey, FamilyId, FamilyInfo, GenericFamily, Synthesis},
     Inner,

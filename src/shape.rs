@@ -6,11 +6,11 @@ use super::layout::Layout;
 use super::resolve::range::RangedStyle;
 use super::resolve::{ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
-use crate::fontique::{self, Attributes, Query, QueryFont};
 #[cfg(feature = "std")]
 use crate::util::nearly_eq;
 #[cfg(feature = "std")]
 use crate::Font;
+use fontique::{self, Attributes, Query, QueryFont};
 use swash::shape::*;
 #[cfg(feature = "std")]
 use swash::text::cluster::{CharCluster, CharInfo, Token};

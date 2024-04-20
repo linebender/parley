@@ -57,7 +57,7 @@ impl GenericFamily {
     ///
     /// # Example
     /// ```
-    /// # use parley::fontique::GenericFamily;
+    /// # use fontique::GenericFamily;
     /// assert_eq!(GenericFamily::parse("sans-serif"), Some(GenericFamily::SansSerif));
     /// assert_eq!(GenericFamily::parse("Arial"), None);
     /// ```
@@ -140,7 +140,7 @@ impl GenericFamilyMap {
     pub fn set(&mut self, generic: GenericFamily, families: impl Iterator<Item = FamilyId>) {
         let map = &mut self.map[generic as usize];
         map.clear();
-        map.extend(families)
+        map.extend(families);
     }
 
     /// Appends the family identifiers to the list for the given generic family.
