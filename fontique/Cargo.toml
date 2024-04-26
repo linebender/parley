@@ -45,4 +45,4 @@ anyhow = "1.0.82"
 bytemuck = { version = "1.15.0", features = ["derive"] }
 fontconfig-cache-parser = "0.2.0"
 thiserror = "1.0.58"
-roxmltree = "0.18.1"
+roxmltree = "0.19.0"
