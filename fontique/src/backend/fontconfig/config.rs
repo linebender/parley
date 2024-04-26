@@ -17,7 +17,13 @@ pub fn parse_config(path: &Path, sink: &mut impl ParserSink) {
     let Ok(text) = std::fs::read_to_string(path) else {
         return;
     };
-    let Ok(doc) = roxmltree::Document::parse(&text) else {
+    let Ok(doc) = roxmltree::Document::parse_with_options(
+        &text,
+        roxmltree::ParsingOptions {
+            allow_dtd: true,
+            nodes_limit: u32::MAX,
+        },
+    ) else {
         return;
     };
     let root = doc.root_element();
