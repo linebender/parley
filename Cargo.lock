@@ -176,7 +176,6 @@ dependencies = [
  "anyhow",
  "bytemuck",
  "core-foundation",
- "core-foundation-sys",
  "core-text",
  "core_maths",
  "dwrote",
