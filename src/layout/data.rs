@@ -20,7 +20,7 @@ pub struct ClusterData {
     pub style_index: u16,
     pub glyph_len: u8,
     pub text_len: u8,
-    /// If glyph_len == 0xFF, then glyph_offset is a glyph identifier,
+    /// If `glyph_len == 0xFF`, then `glyph_offset` is a glyph identifier,
     /// otherwise, it's an offset into the glyph array with the base
     /// taken from the owning run.
     pub glyph_offset: u16,
