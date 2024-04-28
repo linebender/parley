@@ -35,10 +35,10 @@ dwrote = "0.11.0"
 winapi = { version = "0.3.9", features = ["dwrite", "dwrite_1", "dwrite_3", "winnt", "unknwnbase", "libloaderapi", "winnls"] }
 wio = "0.2.2"
 
-[target.'cfg(any(target_os="macos", target_os="ios"))'.dependencies]
+[target.'cfg(target_vendor="apple")'.dependencies]
 core-text = "20.1.0"
 core-foundation = "0.9.4"
 
-[target.'cfg(not(any(target_os="macos", target_os="ios", target_family="windows")))'.dependencies]
+[target.'cfg(not(any(target_vendor="apple", target_family="windows")))'.dependencies]
 fontconfig-cache-parser = "0.2.0"
 roxmltree = "0.19.0"
