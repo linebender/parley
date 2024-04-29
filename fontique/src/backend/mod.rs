@@ -7,7 +7,7 @@
 #[path = "dwrite.rs"]
 mod system;
 
-#[cfg(all(feature = "system", target_os = "macos"))]
+#[cfg(all(feature = "system", target_vendor = "apple"))]
 #[path = "coretext.rs"]
 mod system;
 
