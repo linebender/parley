@@ -168,7 +168,6 @@ name = "fontique"
 version = "0.1.0"
 dependencies = [
  "core-foundation",
- "core-foundation-sys",
  "core-text",
  "core_maths",
  "dwrote",

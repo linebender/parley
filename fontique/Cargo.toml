@@ -38,7 +38,6 @@ wio = "0.2.2"
 [target.'cfg(any(target_os="macos", target_os="ios"))'.dependencies]
 core-text = "20.1.0"
 core-foundation = "0.9.4"
-core-foundation-sys = "0.8.6"
 
 [target.'cfg(not(any(target_os="macos", target_os="ios", target_family="windows")))'.dependencies]
 fontconfig-cache-parser = "0.2.0"

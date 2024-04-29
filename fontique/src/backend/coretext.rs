@@ -8,11 +8,10 @@ use alloc::sync::Arc;
 use hashbrown::HashMap;
 use {
     core_foundation::{
-        base::TCFType,
+        base::{CFRange, TCFType},
         dictionary::CFDictionary,
         string::{CFString, CFStringRef},
     },
-    core_foundation_sys::base::CFRange,
     core_text::{
         font::{self, kCTFontSystemFontType, CTFont, CTFontRef, CTFontUIFontType},
         font_descriptor,
