@@ -43,7 +43,7 @@ impl fmt::Debug for Script {
     }
 }
 
-impl core::fmt::Display for Script {
+impl fmt::Display for Script {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", core::str::from_utf8(&self.0).unwrap_or_default())
     }

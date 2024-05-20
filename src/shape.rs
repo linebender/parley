@@ -12,7 +12,7 @@ use crate::util::nearly_eq;
 use crate::Font;
 #[cfg(feature = "std")]
 use fontique::QueryFamily;
-use fontique::{self, Attributes, Query, QueryFont};
+use fontique::{self, Query, QueryFont};
 use swash::shape::*;
 #[cfg(feature = "std")]
 use swash::text::cluster::{CharCluster, CharInfo, Token};
@@ -166,7 +166,7 @@ struct FontSelector<'a, 'b, B: Brush> {
     rcx: &'a ResolveContext,
     styles: &'a [RangedStyle<B>],
     style_index: u16,
-    attrs: Attributes,
+    attrs: fontique::Attributes,
     variations: &'a [FontVariation],
     features: &'a [FontFeature],
 }

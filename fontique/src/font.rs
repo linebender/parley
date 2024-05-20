@@ -170,7 +170,7 @@ impl FontInfo {
     pub(crate) fn from_font_ref(font: &FontRef, source: SourceInfo, index: u32) -> Option<Self> {
         let (stretch, style, weight) = read_attributes(font);
         let (axes, attr_axes) = if let Ok(fvar_axes) = font.fvar().and_then(|fvar| fvar.axes()) {
-            let mut axes = smallvec::SmallVec::<[AxisInfo; 1]>::with_capacity(fvar_axes.len());
+            let mut axes = SmallVec::<[AxisInfo; 1]>::with_capacity(fvar_axes.len());
             let mut attrs_axes = 0u8;
             for fvar_axis in fvar_axes {
                 let axis = AxisInfo {
