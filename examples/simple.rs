@@ -16,21 +16,55 @@ use swash::scale::{Render, ScaleContext, Source, StrikeWith};
 use swash::zeno;
 use swash::{FontRef, GlyphId};
 
-// fn u8_to_float(num: u8) -> f32 {
-//     num as f32 / 255.0
-// }
+fn u8_to_float(num: u8) -> f32 {
+    num as f32 / 255.0
+}
 
-// fn float_to_u8(num: f32) -> u8 {
-//    (num * 255.0) as u8
-// }
+fn float_to_u8(num: f32) -> u8 {
+    (num * 255.0) as u8
+}
 
-// fn to_linear_rgb(srgb: f32) -> f32 {
-//     if srgb <= 0.04045 {
-//         srgb / 12.92
-//     } else {
-//         ((srgb + 0.055) / 1.055).powf(2.4)
-//     }
-// }
+fn to_linear_rgb(srgb: f32) -> f32 {
+    if srgb <= 0.04045 {
+        srgb / 12.92
+    } else {
+        ((srgb + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+fn to_srgb(linear_rgb: f32) -> f32 {
+    if linear_rgb <= 0.0031308 {
+        linear_rgb * 12.92
+    } else {
+        1.055 * linear_rgb.powf(1.0 / 2.4) - 0.055
+    }
+}
+
+fn blend_px_gamma_corrected(existing: Rgba<u8>, color: Color, alpha: u8) -> Rgba<u8> {
+    let [r1, g1, b1, _] = existing.0.map(|x| to_linear_rgb(u8_to_float(x)));
+    let [r2, g2, b2] = [color.r, color.g, color.b].map(|x| to_linear_rgb(u8_to_float(x)));
+
+    let a = u8_to_float(alpha);
+    let inv_a = 1.0 - a;
+
+    // Blend pixel with underlying color
+    let r = a * r2 + inv_a * r1;
+    let g = a * g2 + inv_a * g1;
+    let b = a * b2 + inv_a * b1;
+
+    Rgba([r, g, b, 1.0].map(|x| float_to_u8(to_srgb(x))))
+}
+
+fn blend_px_naive(existing: Rgba<u8>, color: Color, alpha: u8) -> Rgba<u8> {
+    let inv_a = (255 - alpha) as u32;
+    let [r2, g2, b2, a2] = [color.r, color.g, color.b, alpha].map(u32::from);
+    let [r1, g1, b1, _a1] = existing.0.map(u32::from);
+    let r = (a2 * r2 + inv_a * r1) >> 8;
+    let g = (a2 * g2 + inv_a * g1) >> 8;
+    let b = (a2 * b2 + inv_a * b1) >> 8;
+
+    Rgba([r as u8, g as u8, b as u8, 255])
+}
 
 fn main() {
     // The text we are going to style and lay out
@@ -168,16 +202,7 @@ fn render_glyph_run(
                         let y = (glyph_origin_y + off_y) as u32;
                         let alpha = rendered_glyph.data[i];
                         if alpha > 0 {
-                            // Blend pixel with underlying color
-                            let inv_a = (255 - alpha) as u32;
-                            let [r2, g2, b2, a2] =
-                                [color.r, color.g, color.b, alpha].map(u32::from);
-                            let [r1, g1, b1, _a1] = img.get_pixel(x, y).0.map(u32::from);
-                            let r = (a2 * r2 + inv_a * r1) >> 8;
-                            let g = (a2 * g2 + inv_a * g1) >> 8;
-                            let b = (a2 * b2 + inv_a * b1) >> 8;
-                            let color = Rgba([r as u8, g as u8, b as u8, 255]);
-
+                            let color = blend_px_naive(*img.get_pixel(x, y), color, alpha);
                             img.put_pixel(x, y, color);
                         }
                         i += 1;
