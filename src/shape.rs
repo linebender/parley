@@ -10,7 +10,7 @@ use super::style::{Brush, FontFeature, FontVariation};
 use crate::util::nearly_eq;
 #[cfg(feature = "std")]
 use crate::Font;
-use fontique::{self, Attributes, Query, QueryFont};
+use fontique::{self, Attributes, Query, QueryFamily, QueryFont};
 use swash::shape::*;
 #[cfg(feature = "std")]
 use swash::text::cluster::{CharCluster, CharInfo, Token};
@@ -223,7 +223,15 @@ impl<'a, 'b, B: Brush> partition::Selector for FontSelector<'a, 'b, B> {
             };
             let variations = self.rcx.variations(style.font_variations).unwrap_or(&[]);
             let features = self.rcx.features(style.font_features).unwrap_or(&[]);
-            if self.fonts_id != Some(fonts_id) {
+            if cluster.info().is_emoji() {
+                let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
+                let fonts = fonts.iter().map(|id| QueryFamily::Id(*id));
+                self.query
+                    .set_families(fonts.chain(core::iter::once(QueryFamily::Generic(
+                        fontique::GenericFamily::Emoji,
+                    ))));
+                self.fonts_id = None;
+            } else if self.fonts_id != Some(fonts_id) {
                 let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
                 self.query.set_families(fonts.iter().copied());
                 self.fonts_id = Some(fonts_id);
