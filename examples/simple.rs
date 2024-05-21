@@ -10,11 +10,10 @@ use parley::layout::{Alignment, GlyphRun, Layout};
 use parley::style::{FontStack, FontWeight, StyleProperty};
 use parley::{FontContext, LayoutContext};
 use peniko::Color;
-use skrifa::raw::FontRef as ReadFontsRef;
 use std::fs::File;
 use swash::scale::image::{Content, Image as SwashImage};
 use swash::scale::{Render, ScaleContext, Source, StrikeWith};
-use swash::{zeno, CacheKey};
+use swash::zeno;
 use swash::{FontRef, GlyphId};
 
 fn main() {
@@ -114,21 +113,8 @@ fn render_glyph_run(
     let font = run.font();
     let font_size = run.font_size();
 
-    // Get byte offset of font within collection (0 if font file is not a collection)
-    // TODO: expose directly in read-fonts
-    let font_collection_ref = font.data.as_ref();
-    let raw_font_ref = ReadFontsRef::from_index(font_collection_ref, font.index).unwrap();
-    let font_ref = raw_font_ref.table_directory.offset_data().as_bytes();
-    let addr_of_font_collection = font_collection_ref as *const [u8] as *const () as usize;
-    let addr_of_font = font_ref as *const [u8] as *const () as usize;
-    let offset = addr_of_font - addr_of_font_collection;
-
     // Convert from parley::Font to swash::FontRef
-    let font_ref = FontRef {
-        data: font.data.as_ref(),
-        offset: offset as u32,
-        key: CacheKey::new(), // ignored
-    };
+    let font_ref = FontRef::from_index(font.data.as_ref(), font.index as usize).unwrap();
 
     // Iterates over the glyphs in the GlyphRun
     for glyph in glyph_run.glyphs() {
