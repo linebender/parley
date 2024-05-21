@@ -16,6 +16,22 @@ use swash::scale::{Render, ScaleContext, Source, StrikeWith};
 use swash::zeno;
 use swash::{FontRef, GlyphId};
 
+// fn u8_to_float(num: u8) -> f32 {
+//     num as f32 / 255.0
+// }
+
+// fn float_to_u8(num: f32) -> u8 {
+//    (num * 255.0) as u8
+// }
+
+// fn to_linear_rgb(srgb: f32) -> f32 {
+//     if srgb <= 0.04045 {
+//         srgb / 12.92
+//     } else {
+//         ((srgb + 0.055) / 1.055).powf(2.4)
+//     }
+// }
+
 fn main() {
     // The text we are going to style and lay out
     let text = String::from(
