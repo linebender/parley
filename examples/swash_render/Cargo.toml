@@ -1,0 +1,18 @@
+[package]
+name = "swash_render"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+parley = { workspace = true, default-features = true }
+skrifa = { workspace = true }
+peniko = { workspace = true }
+image = { version = "0.25.1", default-features = false, features = ["png"] }
+swash = "0.1.16"
+
+[lints]
+workspace = true

@@ -3,7 +3,8 @@ resolver = "2"
 members = [
     "fontique",
     "parley",
-    "examples/tiny_skia_render"
+    "examples/tiny_skia_render",
+    "examples/swash_render",
 ]
 
 [workspace.package]
