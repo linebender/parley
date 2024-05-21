@@ -10,7 +10,7 @@ use super::style::{Brush, FontFeature, FontVariation};
 use crate::util::nearly_eq;
 #[cfg(feature = "std")]
 use crate::Font;
-use fontique::{self, Attributes, Query, QueryFamily, QueryFont};
+use fontique::{self, Attributes, Query, QueryFont};
 use swash::shape::*;
 #[cfg(feature = "std")]
 use swash::text::cluster::{CharCluster, CharInfo, Token};
@@ -211,6 +211,7 @@ impl<'a, 'b, B: Brush> partition::Selector for FontSelector<'a, 'b, B> {
     type SelectedFont = SelectedFont;
 
     fn select_font(&mut self, cluster: &mut CharCluster) -> Option<Self::SelectedFont> {
+        use fontique::QueryFamily;
         let style_index = cluster.user_data() as u16;
         if style_index != self.style_index {
             self.style_index = style_index;
