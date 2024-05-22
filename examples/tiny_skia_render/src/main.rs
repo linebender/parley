@@ -10,7 +10,7 @@ use parley::layout::{Alignment, GlyphRun, Layout};
 use parley::style::{FontStack, FontWeight, StyleProperty};
 use parley::{FontContext, LayoutContext};
 use peniko::Color as PenikoColor;
-use skrifa::instance::{LocationRef, Size};
+use skrifa::instance::{LocationRef, NormalizedCoord, Size};
 use skrifa::outline::{DrawSettings, OutlinePen};
 use skrifa::raw::FontRef as ReadFontsRef;
 use skrifa::{GlyphId, MetadataProvider, OutlineGlyph};
@@ -95,6 +95,7 @@ fn main() {
         let mut path = std::fs::canonicalize(path).unwrap();
         path.pop();
         path.pop();
+        path.pop();
         path.push("_output");
         let _ = std::fs::create_dir(path.clone());
         path.push("tiny_skia_render.png");
@@ -121,6 +122,12 @@ fn render_glyph_run(glyph_run: &GlyphRun<PenikoColor>, pen: &mut TinySkiaPen<'_>
     let font = run.font();
     let font_size = run.font_size();
 
+    let normalized_coords = run
+        .normalized_coords()
+        .iter()
+        .map(|coord| skrifa::instance::NormalizedCoord::from_bits(*coord))
+        .collect::<Vec<_>>();
+
     // Get glyph outlines using Skrifa. This can be cached in production code.
     let font_collection_ref = font.data.as_ref();
     let font_ref = ReadFontsRef::from_index(font_collection_ref, font.index).unwrap();
@@ -137,7 +144,7 @@ fn render_glyph_run(glyph_run: &GlyphRun<PenikoColor>, pen: &mut TinySkiaPen<'_>
 
         pen.set_origin(glyph_x, glyph_y);
         pen.set_color(to_tiny_skia(color));
-        pen.draw_glyph(&glyph_outline, font_size);
+        pen.draw_glyph(&glyph_outline, font_size, &normalized_coords);
     }
 }
 
@@ -169,8 +176,14 @@ impl TinySkiaPen<'_> {
         self.paint.set_color(color);
     }
 
-    fn draw_glyph(&mut self, glyph: &OutlineGlyph<'_>, size: f32) {
-        let settings = DrawSettings::unhinted(Size::new(size), LocationRef::default());
+    fn draw_glyph(
+        &mut self,
+        glyph: &OutlineGlyph<'_>,
+        size: f32,
+        normalized_coords: &[NormalizedCoord],
+    ) {
+        let location_ref = LocationRef::new(normalized_coords);
+        let settings = DrawSettings::unhinted(Size::new(size), location_ref);
         glyph.draw(settings, self).unwrap();
 
         let builder = core::mem::replace(&mut self.open_path, PathBuilder::new());
