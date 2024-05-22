@@ -12,6 +12,9 @@ env:
   # List of packages that will be checked with the minimum supported Rust version.
   # This should be limited to packages that are intended for publishing.
   RUST_MIN_VER_PKGS: "-p parley -p fontique"
+  # List of packages that will be checked with libm feature
+  # This should be limited to packages that have that feature
+  NO_STD_PKGS: "-p parley -p fontique"
   # List of features that depend on the standard library and will be excluded from no_std checks.
   FEATURES_DEPENDING_ON_STD: "std,default,system"
 
@@ -104,7 +107,7 @@ jobs:
 
       # TODO: Add --target x86_64-unknown-none to the no_std check once we solve the compilation issues with it
       - name: cargo clippy (no_std)
-        run: cargo hack clippy --workspace --ignore-private --locked --optional-deps --each-feature --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }} -- -D warnings
+        run: cargo hack clippy ${{ env.NO_STD_PKGS }} --locked --optional-deps --each-feature --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }} -- -D warnings
 
       - name: cargo clippy
         run: cargo hack clippy --workspace --locked --optional-deps --each-feature --features std -- -D warnings
