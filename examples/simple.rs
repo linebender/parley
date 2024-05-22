@@ -13,7 +13,7 @@ use peniko::Color;
 use std::fs::File;
 use swash::scale::image::{Content, Image as SwashImage};
 use swash::scale::{Render, ScaleContext, Source, StrikeWith};
-use swash::zeno;
+use swash::{zeno, NormalizedCoord};
 use swash::{FontRef, GlyphId};
 
 fn main() {
@@ -112,6 +112,7 @@ fn render_glyph_run(
     // Resolve properties of the Run
     let font = run.font();
     let font_size = run.font_size();
+    let normalized_coords = run.normalized_coords();
 
     // Convert from parley::Font to swash::FontRef
     let font_ref = FontRef::from_index(font.data.as_ref(), font.index as usize).unwrap();
@@ -128,6 +129,7 @@ fn render_glyph_run(
             font_size,
             true,
             glyph_id,
+            normalized_coords,
             glyph_x.fract(),
             glyph_y.fract(),
         ) else {
@@ -190,13 +192,19 @@ fn render_glyph(
     font_size: f32,
     hint: bool,
     glyph_id: GlyphId,
+    normalized_coords: &[NormalizedCoord],
     x: f32,
     y: f32,
 ) -> Option<SwashImage> {
     use zeno::{Format, Vector};
 
     // Build the scaler
-    let mut scaler = context.builder(*font).size(font_size).hint(hint).build();
+    let mut scaler = context
+        .builder(*font)
+        .size(font_size)
+        .hint(hint)
+        .normalized_coords(normalized_coords)
+        .build();
 
     // Compute the fractional offset
     // You'll likely want to quantize this in a real renderer
