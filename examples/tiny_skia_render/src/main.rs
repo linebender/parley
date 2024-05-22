@@ -3,6 +3,9 @@
 
 //! A simple example that lays out some text using Parley, extracts outlines using Skrifa and
 //! then paints those outlines using Tiny-Skia.
+//!
+//! Note: Emoji rendering is not currently implemented in this example. See the swash example
+//! if you need emoji rendering.
 
 use std::path::PathBuf;
 
