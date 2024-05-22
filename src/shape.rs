@@ -10,6 +10,8 @@ use super::style::{Brush, FontFeature, FontVariation};
 use crate::util::nearly_eq;
 #[cfg(feature = "std")]
 use crate::Font;
+#[cfg(feature = "std")]
+use fontique::QueryFamily;
 use fontique::{self, Attributes, Query, QueryFont};
 use swash::shape::*;
 #[cfg(feature = "std")]
@@ -211,10 +213,9 @@ impl<'a, 'b, B: Brush> partition::Selector for FontSelector<'a, 'b, B> {
     type SelectedFont = SelectedFont;
 
     fn select_font(&mut self, cluster: &mut CharCluster) -> Option<Self::SelectedFont> {
-        use fontique::QueryFamily;
         let style_index = cluster.user_data() as u16;
         let is_emoji = cluster.info().is_emoji();
-        if style_index != self.style_index || is_emoji {
+        if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize].style;
             let fonts_id = style.font_stack.id();
