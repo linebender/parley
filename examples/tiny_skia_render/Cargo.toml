@@ -12,9 +12,5 @@ skrifa = { workspace = true }
 peniko = { workspace = true }
 tiny-skia = "0.11"
 
-[[bin]]
-name = "tiny_skia_render"
-path = "main.rs"
-
 [lints]
 workspace = true
