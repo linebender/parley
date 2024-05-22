@@ -77,20 +77,13 @@ fn main() {
     let mut img = Pixmap::new(padded_width, padded_height).unwrap();
 
     // Fill background color
-    let mut bg_paint = Paint::default();
-    bg_paint.set_color(to_tiny_skia(background_color));
-    img.fill_rect(
-        Rect::from_xywh(0., 0., padded_width as f32, padded_height as f32).unwrap(),
-        &bg_paint,
-        Transform::identity(),
-        None,
-    );
+    img.fill(to_tiny_skia(background_color));
 
+    // Wrap Pixmap in a type that implements skrifa::OutlinePen
     let mut pen = TinySkiaPen::new(img.as_mut());
 
-    // Iterate over laid out lines
+    // Render each glyph run
     for line in layout.lines() {
-        // Iterate over GlyphRun's within each line
         for glyph_run in line.glyph_runs() {
             render_glyph_run(&glyph_run, &mut pen, padding);
         }
