@@ -106,13 +106,13 @@ jobs:
 
       # TODO: Add --target x86_64-unknown-none to the no_std check once we solve the compilation issues with it
       - name: cargo clippy (no_std)
-        run: cargo hack clippy ${{ env.PUBLIC_PKGS }} --locked --optional-deps --each-feature --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }} -- -D warnings
+        run: cargo hack clippy ${{ env.PRIMARY_PKGS }} --locked --optional-deps --each-feature --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }} -- -D warnings
 
       - name: cargo clippy
-        run: cargo hack clippy ${{ env.PUBLIC_PKGS }} --locked --optional-deps --each-feature --features std -- -D warnings
+        run: cargo hack clippy ${{ env.PRIMARY_PKGS }} --locked --optional-deps --each-feature --features std -- -D warnings
 
       - name: cargo clippy (auxiliary)
-        run: cargo hack clippy ${{ env.PUBLIC_PKGS }} --locked --optional-deps --each-feature --features std --tests --benches --examples -- -D warnings
+        run: cargo hack clippy ${{ env.PRIMARY_PKGS }} --locked --optional-deps --each-feature --features std --tests --benches --examples -- -D warnings
 
       - name: cargo clippy (examples)
         run: cargo hack clippy ${{ env.EXAMPLE_PKGS }} --locked --optional-deps --each-feature -- -D warnings
@@ -142,10 +142,10 @@ jobs:
           tool: cargo-hack
 
       - name: cargo clippy
-        run: cargo hack clippy ${{ env.PUBLIC_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature --features std -- -D warnings
+        run: cargo hack clippy ${{ env.PRIMARY_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature --features std -- -D warnings
 
       - name: cargo clippy (auxiliary)
-        run: cargo hack clippy ${{ env.PUBLIC_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature --features std --tests --benches --examples -- -D warnings
+        run: cargo hack clippy ${{ env.PRIMARY_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature --features std --tests --benches --examples -- -D warnings
 
       - name: cargo clippy (examples)
         run: cargo hack clippy ${{ env.EXAMPLE_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature -- -D warnings
@@ -168,7 +168,7 @@ jobs:
           toolchain: ${{ env.RUST_STABLE_VER }}
 
       - name: cargo test
-        run: cargo test ${{ env.PUBLIC_PKGS }} --locked --all-features
+        run: cargo test ${{ env.PRIMARY_PKGS }} --locked --all-features
 
   check-msrv:
     name: cargo check (msrv)
@@ -194,10 +194,10 @@ jobs:
 
       # TODO: Add --target x86_64-unknown-none to the no_std check once we solve the compilation issues with it
       - name: cargo check (no_std)
-        run: cargo hack check ${{ env.PUBLIC_PKGS }} --locked --optional-deps --each-feature --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }}
+        run: cargo hack check ${{ env.PRIMARY_PKGS }} --locked --optional-deps --each-feature --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }}
 
       - name: cargo check
-        run: cargo hack check ${{ env.PUBLIC_PKGS }} --locked --optional-deps --each-feature --features std
+        run: cargo hack check ${{ env.PRIMARY_PKGS }} --locked --optional-deps --each-feature --features std
 
   check-msrv-android:
     name: cargo check (msrv) (android)
@@ -223,7 +223,7 @@ jobs:
           tool: cargo-hack
 
       - name: cargo check
-        run: cargo hack check ${{ env.PUBLIC_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature --features std
+        run: cargo hack check ${{ env.PRIMARY_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature --features std
 
   doc:
     name: cargo doc
@@ -242,4 +242,4 @@ jobs:
 
       # We test documentation using nightly to match docs.rs. This prevents potential breakages
       - name: cargo doc
-        run: cargo doc ${{ env.PUBLIC_PKGS }} --locked --all-features --no-deps --document-private-items -Zunstable-options -Zrustdoc-scrape-examples
+        run: cargo doc ${{ env.PRIMARY_PKGS }} --locked --all-features --no-deps --document-private-items -Zunstable-options -Zrustdoc-scrape-examples
