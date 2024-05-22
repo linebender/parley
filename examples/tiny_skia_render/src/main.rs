@@ -15,7 +15,7 @@ use skrifa::outline::{DrawSettings, OutlinePen};
 use skrifa::raw::FontRef as ReadFontsRef;
 use skrifa::{GlyphId, MetadataProvider, OutlineGlyph};
 use tiny_skia::{
-    Color as TinySkiaColor, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Rect, Transform,
+    Color as TinySkiaColor, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Transform,
 };
 
 fn main() {
