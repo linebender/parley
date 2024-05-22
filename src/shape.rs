@@ -10,6 +10,8 @@ use super::style::{Brush, FontFeature, FontVariation};
 use crate::util::nearly_eq;
 #[cfg(feature = "std")]
 use crate::Font;
+#[cfg(feature = "std")]
+use fontique::QueryFamily;
 use fontique::{self, Attributes, Query, QueryFont};
 use swash::shape::*;
 #[cfg(feature = "std")]
@@ -212,7 +214,8 @@ impl<'a, 'b, B: Brush> partition::Selector for FontSelector<'a, 'b, B> {
 
     fn select_font(&mut self, cluster: &mut CharCluster) -> Option<Self::SelectedFont> {
         let style_index = cluster.user_data() as u16;
-        if style_index != self.style_index {
+        let is_emoji = cluster.info().is_emoji();
+        if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize].style;
             let fonts_id = style.font_stack.id();
@@ -223,7 +226,15 @@ impl<'a, 'b, B: Brush> partition::Selector for FontSelector<'a, 'b, B> {
             };
             let variations = self.rcx.variations(style.font_variations).unwrap_or(&[]);
             let features = self.rcx.features(style.font_features).unwrap_or(&[]);
-            if self.fonts_id != Some(fonts_id) {
+            if is_emoji {
+                let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
+                let fonts = fonts.iter().map(|id| QueryFamily::Id(*id));
+                self.query
+                    .set_families(fonts.chain(core::iter::once(QueryFamily::Generic(
+                        fontique::GenericFamily::Emoji,
+                    ))));
+                self.fonts_id = None;
+            } else if self.fonts_id != Some(fonts_id) {
                 let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
                 self.query.set_families(fonts.iter().copied());
                 self.fonts_id = Some(fonts_id);
