@@ -430,7 +430,6 @@ dependencies = [
  "peniko",
  "skrifa",
  "swash",
- "tiny-skia",
 ]
 
 [[package]]
@@ -622,6 +621,16 @@ dependencies = [
  "arrayref",
  "bytemuck",
  "strict-num",
+]
+
+[[package]]
+name = "tiny_skia_render"
+version = "0.1.0"
+dependencies = [
+ "parley",
+ "peniko",
+ "skrifa",
+ "tiny-skia",
 ]
 
 [[package]]

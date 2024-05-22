@@ -1,0 +1,20 @@
+[package]
+name = "tiny_skia_render"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+parley = { path = "../.." }
+skrifa = { workspace = true }
+peniko = { workspace = true }
+tiny-skia = "0.11"
+
+[[bin]]
+name = "tiny-skia"
+path = "main.rs"
+
+[lints]
+workspace = true

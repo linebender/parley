@@ -1,7 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-	"fontique"
+	"fontique",
+	"examples/tiny_skia_render",
 ]
 
 [workspace.package]
@@ -43,9 +44,6 @@ swash = "0.1.15"
 skrifa = { workspace = true }
 peniko = { workspace = true }
 fontique = { workspace = true }
-
-[dev-dependencies]
-tiny-skia = "0.11.4"
 
 [workspace.dependencies]
 fontique = { version = "0.1.0", default-features = false, path = "fontique" }
