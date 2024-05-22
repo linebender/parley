@@ -211,17 +211,22 @@ fn render_glyph_run(
             }
             Content::SubpixelMask => unimplemented!(),
             Content::Color => {
-                for (off_y, row) in rendered_glyph.data.chunks_exact(glyph_width).enumerate() {
+                for (off_y, row) in rendered_glyph
+                    .data
+                    .chunks_exact(glyph_width * 4)
+                    .enumerate()
+                {
                     for (off_x, pixel) in row.chunks_exact(4).enumerate() {
                         let &[r, g, b, a] = pixel else {
-                            panic!("Pixel doesn't have 4 components")
+                            panic!("Not RGBA")
                         };
-                        let color = Rgba([r, g, b, a]);
-                        img.put_pixel(
-                            (glyph_origin_x + off_x as i32) as u32,
-                            (glyph_origin_y + off_y as i32) as u32,
-                            color,
-                        );
+                        let x = (glyph_origin_x + off_x as i32) as u32;
+                        let y = (glyph_origin_y + off_y as i32) as u32;
+                        if a > 0 {
+                            let color =
+                                blend_px_naive(*img.get_pixel(x, y), Color::rgb8(r, g, b), a);
+                            img.put_pixel(x, y, color);
+                        }
                     }
                 }
             }
