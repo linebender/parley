@@ -213,7 +213,8 @@ impl<'a, 'b, B: Brush> partition::Selector for FontSelector<'a, 'b, B> {
     fn select_font(&mut self, cluster: &mut CharCluster) -> Option<Self::SelectedFont> {
         use fontique::QueryFamily;
         let style_index = cluster.user_data() as u16;
-        if style_index != self.style_index {
+        let is_emoji = cluster.info().is_emoji();
+        if style_index != self.style_index || is_emoji {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize].style;
             let fonts_id = style.font_stack.id();
@@ -224,7 +225,7 @@ impl<'a, 'b, B: Brush> partition::Selector for FontSelector<'a, 'b, B> {
             };
             let variations = self.rcx.variations(style.font_variations).unwrap_or(&[]);
             let features = self.rcx.features(style.font_features).unwrap_or(&[]);
-            if cluster.info().is_emoji() {
+            if is_emoji {
                 let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
                 let fonts = fonts.iter().map(|id| QueryFamily::Id(*id));
                 self.query
