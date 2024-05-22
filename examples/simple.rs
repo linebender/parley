@@ -127,7 +127,6 @@ fn render_glyph_run(
             context,
             &font_ref,
             font_size,
-            true,
             glyph_id,
             normalized_coords,
             glyph_x.fract(),
@@ -190,7 +189,6 @@ fn render_glyph(
     context: &mut ScaleContext,
     font: &FontRef,
     font_size: f32,
-    hint: bool,
     glyph_id: GlyphId,
     normalized_coords: &[NormalizedCoord],
     x: f32,
@@ -202,7 +200,7 @@ fn render_glyph(
     let mut scaler = context
         .builder(*font)
         .size(font_size)
-        .hint(hint)
+        .hint(true)
         .normalized_coords(normalized_coords)
         .build();
 
