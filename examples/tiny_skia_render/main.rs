@@ -4,6 +4,8 @@
 //! A simple example that lays out some text using Parley, extracts outlines using Skrifa and
 //! then paints those outlines using Tiny-Skia.
 
+use std::path::PathBuf;
+
 use parley::layout::{Alignment, GlyphRun, Layout};
 use parley::style::{FontStack, FontWeight, StyleProperty};
 use parley::{FontContext, LayoutContext};
@@ -94,8 +96,18 @@ fn main() {
         }
     }
 
-    // Write image to PNG file
-    img.save_png("output.png").unwrap();
+    // Write image to PNG file in examples/_output dir
+    let output_path: PathBuf = {
+        let path = std::path::PathBuf::from(file!());
+        let mut path = std::fs::canonicalize(path).unwrap();
+        path.pop();
+        path.pop();
+        path.push("_output");
+        let _ = std::fs::create_dir(path.clone());
+        path.push("tiny_skia_render.png");
+        path
+    };
+    img.save_png(output_path).unwrap();
 }
 
 fn to_tiny_skia(color: PenikoColor) -> TinySkiaColor {
