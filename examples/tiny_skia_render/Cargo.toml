@@ -8,7 +8,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-parley = { path = "../.." }
+parley = { workspace = true, default-features = true }
 skrifa = { workspace = true }
 peniko = { workspace = true }
 tiny-skia = "0.11"
