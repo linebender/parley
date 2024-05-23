@@ -28,6 +28,7 @@ exclude = ["/.github/", "/doc/", ".gitignore"]
 clippy.doc_markdown = "warn"
 clippy.semicolon_if_nothing_returned = "warn"
 clippy.trivially_copy_pass_by_ref = "warn"
+rust.unused_qualifications = "warn"
 
 [lints]
 workspace = true
