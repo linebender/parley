@@ -175,10 +175,7 @@ fn include_config(path: &Path, sink: &mut impl ParserSink) -> std::io::Result<()
     Ok(())
 }
 
-fn resolve_dir(
-    node: Node,
-    config_file_path: impl AsRef<std::path::Path>,
-) -> Option<std::path::PathBuf> {
+fn resolve_dir(node: Node, config_file_path: impl AsRef<Path>) -> Option<std::path::PathBuf> {
     let dir_path = node.text()?;
     let (xdg_env, xdg_fallback) = match node.tag_name().name() {
         "include" => ("XDG_CONFIG_HOME", "~/.config"),
