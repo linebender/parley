@@ -5,16 +5,15 @@
 //! and and then renders it into a PNG using the `image` crate.
 
 use image::codecs::png::PngEncoder;
-use image::{self, Rgba, RgbaImage, Pixel};
+use image::{self, Pixel, Rgba, RgbaImage};
 use parley::layout::{Alignment, GlyphRun, Layout};
 use parley::style::{FontStack, FontWeight, StyleProperty};
 use parley::{FontContext, LayoutContext};
 use peniko::Color;
-use skrifa::raw::FontRef as ReadFontsRef;
 use std::fs::File;
 use swash::scale::image::{Content, Image as SwashImage};
 use swash::scale::{Render, ScaleContext, Source, StrikeWith};
-use swash::{zeno, CacheKey};
+use swash::{zeno, NormalizedCoord};
 use swash::{FontRef, GlyphId};
 
 fn main() {
@@ -124,22 +123,10 @@ fn render_glyph_run(
     // Resolve properties of the Run
     let font = run.font();
     let font_size = run.font_size();
-
-    // Get byte offset of font within collection (0 if font file is not a collection)
-    // TODO: expose directly in read-fonts
-    let font_collection_ref = font.data.as_ref();
-    let raw_font_ref = ReadFontsRef::from_index(font_collection_ref, font.index).unwrap();
-    let font_ref = raw_font_ref.table_directory.offset_data().as_bytes();
-    let addr_of_font_collection = font_collection_ref as *const [u8] as *const () as usize;
-    let addr_of_font = font_ref as *const [u8] as *const () as usize;
-    let offset = addr_of_font - addr_of_font_collection;
+    let normalized_coords = run.normalized_coords();
 
     // Convert from parley::Font to swash::FontRef
-    let font_ref = FontRef {
-        data: font.data.as_ref(),
-        offset: offset as u32,
-        key: CacheKey::new(), // ignored
-    };
+    let font_ref = FontRef::from_index(font.data.as_ref(), font.index as usize).unwrap();
 
     // Iterates over the glyphs in the GlyphRun
     for glyph in glyph_run.glyphs() {
@@ -151,7 +138,7 @@ fn render_glyph_run(
             context,
             &font_ref,
             font_size,
-            true,
+            normalized_coords,
             glyph_id,
             glyph_x.fract(),
             glyph_y.fract(),
@@ -184,7 +171,11 @@ fn render_glyph_run(
             }
             Content::SubpixelMask => unimplemented!(),
             Content::Color => {
-                for (off_y, row) in rendered_glyph.data.chunks_exact(glyph_width * 4).enumerate() {
+                for (off_y, row) in rendered_glyph
+                    .data
+                    .chunks_exact(glyph_width * 4)
+                    .enumerate()
+                {
                     for (off_x, pixel) in row.chunks_exact(4).enumerate() {
                         let &[r, g, b, a] = pixel else {
                             panic!("Pixel doesn't have 4 components")
@@ -205,7 +196,7 @@ fn render_glyph(
     context: &mut ScaleContext,
     font: &FontRef,
     font_size: f32,
-    hint: bool,
+    normalized_coords: &[NormalizedCoord],
     glyph_id: GlyphId,
     x: f32,
     y: f32,
@@ -213,7 +204,12 @@ fn render_glyph(
     use zeno::{Format, Vector};
 
     // Build the scaler
-    let mut scaler = context.builder(*font).size(font_size).hint(hint).build();
+    let mut scaler = context
+        .builder(*font)
+        .size(font_size)
+        .hint(true)
+        .normalized_coords(normalized_coords)
+        .build();
 
     // Compute the fractional offset
     // You'll likely want to quantize this in a real renderer
