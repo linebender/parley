@@ -1,7 +1,7 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::layout::{Alignment, Decoration, Glyph, LineMetrics, RunMetrics, Style};
+use crate::layout::{Alignment, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::*;
 use crate::Font;
@@ -155,13 +155,6 @@ impl LineRunData {
         }
         line_height
     }
-}
-
-#[derive(Clone)]
-pub struct StyleData<B: Brush> {
-    pub brush: B,
-    pub underline: Option<Decoration<B>>,
-    pub strikethrough: Option<Decoration<B>>,
 }
 
 #[derive(Clone)]
