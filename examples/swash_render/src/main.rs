@@ -160,8 +160,8 @@ fn render_glyph_run(
                 let mut i = 0;
                 for off_y in 0..glyph_height as i32 {
                     for off_x in 0..glyph_width as i32 {
-                        let x = (glyph_origin_x + off_x as i32) as u32;
-                        let y = (glyph_origin_y + off_y as i32) as u32;
+                        let x = (glyph_origin_x + off_x) as u32;
+                        let y = (glyph_origin_y + off_y) as u32;
                         let alpha = rendered_glyph.data[i];
                         let color = Rgba([color.r, color.g, color.b, alpha]);
                         img.get_pixel_mut(x, y).blend(&color);
