@@ -29,8 +29,8 @@ fn main() {
     let max_advance = Some(200.0 * display_scale);
 
     // Colours for rendering
-    let foreground_color = Color::rgb8(0, 0, 0);
-    let background_color = Color::rgb8(255, 255, 255);
+    let text_color = Color::rgb8(0, 0, 0);
+    let bg_color = Rgba([255, 255, 255, 255]);
 
     // Padding around the output image
     let padding = 20;
@@ -47,7 +47,7 @@ fn main() {
     let mut builder = layout_cx.ranged_builder(&mut font_cx, &text, display_scale);
 
     // Set default text colour styles (set foreground text color)
-    let brush_style = StyleProperty::Brush(foreground_color);
+    let brush_style = StyleProperty::Brush(text_color);
     builder.push_default(&brush_style);
 
     // Set default font family
@@ -67,18 +67,11 @@ fn main() {
 
     // Perform layout (including bidi resolution and shaping) with start alignment
     layout.break_all_lines(max_advance, Alignment::Start);
-    let width = layout.width().ceil() as u32;
-    let height = layout.height().ceil() as u32;
 
-    let mut img = RgbaImage::new(width + (padding * 2), height + (padding * 2));
-    for pixel in img.pixels_mut() {
-        *pixel = Rgba([
-            background_color.r,
-            background_color.g,
-            background_color.b,
-            255,
-        ]);
-    }
+    // Create image to render into
+    let width = layout.width().ceil() as u32 + (padding * 2);
+    let height = layout.height().ceil() as u32 + (padding * 2);
+    let mut img = RgbaImage::from_pixel(width, height, bg_color);
 
     // Iterate over laid out lines
     for line in layout.lines() {
