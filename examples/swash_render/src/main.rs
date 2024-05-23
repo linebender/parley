@@ -5,7 +5,7 @@
 //! and and then renders it into a PNG using the `image` crate.
 
 use image::codecs::png::PngEncoder;
-use image::{self, Rgba, RgbaImage};
+use image::{self, Rgba, RgbaImage, Pixel};
 use parley::layout::{Alignment, GlyphRun, Layout};
 use parley::style::{FontStack, FontWeight, StyleProperty};
 use parley::{FontContext, LayoutContext};
@@ -89,8 +89,19 @@ fn main() {
         }
     }
 
-    // Write image to PNG file
-    let output_file = File::create("output.png").unwrap();
+    // Write image to PNG file in examples/_output dir
+    let output_path = {
+        let path = std::path::PathBuf::from(file!());
+        let mut path = std::fs::canonicalize(path).unwrap();
+        path.pop();
+        path.pop();
+        path.pop();
+        path.push("_output");
+        let _ = std::fs::create_dir(path.clone());
+        path.push("swash_render.png");
+        path
+    };
+    let output_file = File::create(output_path).unwrap();
     let png_encoder = PngEncoder::new(output_file);
     img.write_with_encoder(png_encoder).unwrap();
 }
@@ -162,39 +173,26 @@ fn render_glyph_run(
                 let mut i = 0;
                 for off_y in 0..glyph_height as i32 {
                     for off_x in 0..glyph_width as i32 {
-                        let x = (glyph_origin_x + off_x) as u32;
-                        let y = (glyph_origin_y + off_y) as u32;
+                        let x = (glyph_origin_x + off_x as i32) as u32;
+                        let y = (glyph_origin_y + off_y as i32) as u32;
                         let alpha = rendered_glyph.data[i];
-                        if alpha > 0 {
-                            // Blend pixel with underlying color
-                            let inv_a = (255 - alpha) as u32;
-                            let [r2, g2, b2, a2] =
-                                [color.r, color.g, color.b, alpha].map(u32::from);
-                            let [r1, g1, b1, _a1] = img.get_pixel(x, y).0.map(u32::from);
-                            let r = (a2 * r2 + inv_a * r1) >> 8;
-                            let g = (a2 * g2 + inv_a * g1) >> 8;
-                            let b = (a2 * b2 + inv_a * b1) >> 8;
-                            let color = Rgba([r as u8, g as u8, b as u8, 255]);
-
-                            img.put_pixel(x, y, color);
-                        }
+                        let color = Rgba([color.r, color.g, color.b, alpha]);
+                        img.get_pixel_mut(x, y).blend(&color);
                         i += 1;
                     }
                 }
             }
             Content::SubpixelMask => unimplemented!(),
             Content::Color => {
-                for (off_y, row) in rendered_glyph.data.chunks_exact(glyph_width).enumerate() {
+                for (off_y, row) in rendered_glyph.data.chunks_exact(glyph_width * 4).enumerate() {
                     for (off_x, pixel) in row.chunks_exact(4).enumerate() {
                         let &[r, g, b, a] = pixel else {
                             panic!("Pixel doesn't have 4 components")
                         };
+                        let x = (glyph_origin_x + off_x as i32) as u32;
+                        let y = (glyph_origin_y + off_y as i32) as u32;
                         let color = Rgba([r, g, b, a]);
-                        img.put_pixel(
-                            (glyph_origin_x + off_x as i32) as u32,
-                            (glyph_origin_y + off_y as i32) as u32,
-                            color,
-                        );
+                        img.get_pixel_mut(x, y).blend(&color);
                     }
                 }
             }
