@@ -7,6 +7,8 @@
 //! Note: Emoji rendering is not currently implemented in this example. See the swash example
 //! if you need emoji rendering.
 
+use std::path::PathBuf;
+
 use parley::layout::{Alignment, GlyphRun, Layout};
 use parley::style::{FontStack, FontWeight, StyleProperty};
 use parley::{FontContext, LayoutContext};
@@ -91,7 +93,7 @@ fn main() {
     }
 
     // Write image to PNG file in examples/_output dir
-    let output_path = {
+    let output_path: PathBuf = {
         let path = std::path::PathBuf::from(file!());
         let mut path = std::fs::canonicalize(path).unwrap();
         path.pop();
@@ -126,7 +128,7 @@ fn render_glyph_run(glyph_run: &GlyphRun<PenikoColor>, pen: &mut TinySkiaPen<'_>
     let normalized_coords = run
         .normalized_coords()
         .iter()
-        .map(|coord| NormalizedCoord::from_bits(*coord))
+        .map(|coord| skrifa::instance::NormalizedCoord::from_bits(*coord))
         .collect::<Vec<_>>();
 
     // Get glyph outlines using Skrifa. This can be cached in production code.

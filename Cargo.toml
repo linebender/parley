@@ -1,9 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-    "fontique",
-    "parley",
-    "examples/tiny_skia_render"
+	"fontique",
+	"examples/tiny_skia_render",
 ]
 
 [workspace.package]
@@ -13,14 +12,41 @@ rust-version = "1.70"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/linebender/parley"
 
+[package]
+name = "parley"
+version = "0.1.0"
+description = "Parley provides an API for implementing rich text layout."
+keywords = ["text", "layout"]
+categories = ["gui", "graphics"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+exclude = ["/.github/", "/doc/", ".gitignore"]
+
 [workspace.lints]
 clippy.doc_markdown = "warn"
 clippy.semicolon_if_nothing_returned = "warn"
 clippy.trivially_copy_pass_by_ref = "warn"
 rust.unused_qualifications = "warn"
 
+[lints]
+workspace = true
+
+[features]
+default = ["system"]
+std = ["fontique/std", "skrifa/std", "peniko/std"]
+libm = ["fontique/libm", "skrifa/libm", "peniko/libm"]
+# Enables support for system font backends
+system = ["std", "fontique/system"]
+
+[dependencies]
+swash = "0.1.15"
+skrifa = { workspace = true }
+peniko = { workspace = true }
+fontique = { workspace = true }
+
 [workspace.dependencies]
 fontique = { version = "0.1.0", default-features = false, path = "fontique" }
-parley = { version = "0.1.0", default-features = false, path = "parley" }
 skrifa = { version = "0.19.1", default-features = false }
 peniko = { version = "0.1.0", default-features = false }
