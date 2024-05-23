@@ -7,7 +7,6 @@ members = [
 [workspace.package]
 edition = "2021"
 # Keep in sync with RUST_MIN_VER in .github/workflows/ci.yml and with the relevant README.md files.
-# TODO: When this hits 1.74, move lint configuration into this file via a lints table.
 rust-version = "1.70"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/linebender/parley"
