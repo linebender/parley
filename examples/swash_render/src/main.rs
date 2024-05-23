@@ -11,10 +11,11 @@ use parley::style::{FontStack, FontWeight, StyleProperty};
 use parley::{FontContext, LayoutContext};
 use peniko::Color;
 use std::fs::File;
-use swash::scale::image::{Content, Image as SwashImage};
+use swash::scale::image::Content;
 use swash::scale::{Render, ScaleContext, Source, StrikeWith};
-use swash::{zeno, NormalizedCoord};
+use swash::zeno;
 use swash::{FontRef, GlyphId};
+use zeno::{Format, Vector};
 
 fn main() {
     // The text we are going to style and lay out
@@ -121,24 +122,42 @@ fn render_glyph_run(
     // Convert from parley::Font to swash::FontRef
     let font_ref = FontRef::from_index(font.data.as_ref(), font.index as usize).unwrap();
 
+    // Build a scaler. As the font properties are constant across an entire run of glyphs
+    // we can build one scaler for the run and reuse it for each glyph.
+    let mut scaler = context
+        .builder(font_ref)
+        .size(font_size)
+        .hint(true)
+        .normalized_coords(normalized_coords)
+        .build();
+
     // Iterates over the glyphs in the GlyphRun
     for glyph in glyph_run.glyphs() {
         let glyph_id: GlyphId = glyph.id;
         let glyph_x = run_x + glyph.x;
         let glyph_y = run_y - glyph.y;
         run_x += glyph.advance;
-        let Some(rendered_glyph) = render_glyph(
-            context,
-            &font_ref,
-            font_size,
-            normalized_coords,
-            glyph_id,
-            glyph_x.fract(),
-            glyph_y.fract(),
-        ) else {
-            println!("No glyph");
-            continue;
-        };
+
+        // Compute the fractional offset
+        // You'll likely want to quantize this in a real renderer
+        let offset = Vector::new(glyph_x.fract(), glyph_y.fract());
+
+        // Render the glyph using swash
+        let rendered_glyph = Render::new(
+            // Select our source order
+            &[
+                Source::ColorOutline(0),
+                Source::ColorBitmap(StrikeWith::BestFit),
+                Source::Outline,
+            ],
+        )
+        // Select the simple alpha (non-subpixel) format
+        .format(Format::Alpha)
+        // Apply the fractional offset
+        .offset(offset)
+        // Render the image
+        .render(&mut scaler, glyph_id)
+        .unwrap();
 
         let glyph_width = usize::try_from(rendered_glyph.placement.width).expect("usize < 32 bits");
         let glyph_height =
@@ -182,42 +201,4 @@ fn render_glyph_run(
             }
         };
     }
-}
-
-/// Render a glyph using Swash
-fn render_glyph(
-    context: &mut ScaleContext,
-    font: &FontRef,
-    font_size: f32,
-    normalized_coords: &[NormalizedCoord],
-    glyph_id: GlyphId,
-    x: f32,
-    y: f32,
-) -> Option<SwashImage> {
-    use zeno::{Format, Vector};
-
-    // Build the scaler
-    let mut scaler = context
-        .builder(*font)
-        .size(font_size)
-        .hint(true)
-        .normalized_coords(normalized_coords)
-        .build();
-
-    // Compute the fractional offset
-    // You'll likely want to quantize this in a real renderer
-    let offset = Vector::new(x.fract(), y.fract());
-
-    // Select our source order
-    Render::new(&[
-        Source::ColorOutline(0),
-        Source::ColorBitmap(StrikeWith::BestFit),
-        Source::Outline,
-    ])
-    // Select the simple alpha (non-subpixel) format
-    .format(Format::Alpha)
-    // Apply the fractional offset
-    .offset(offset)
-    // Render the image
-    .render(&mut scaler, glyph_id)
 }
