@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use hashbrown::HashMap;
-use std::{path::PathBuf, sync::Arc};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use super::{
     super::{Stretch, Style, Weight},
@@ -91,7 +92,7 @@ impl SystemFonts {
         config::parse_config("/etc/fonts/fonts.conf".as_ref(), &mut config);
         if let Ok(xdg_config_home) = std::env::var("XDG_CONFIG_HOME") {
             config::parse_config(
-                std::path::PathBuf::from(xdg_config_home)
+                PathBuf::from(xdg_config_home)
                     .as_path()
                     .join("fontconfig/fonts.conf")
                     .as_path(),
@@ -99,7 +100,7 @@ impl SystemFonts {
             );
         } else if let Ok(user_home) = std::env::var("HOME") {
             config::parse_config(
-                std::path::PathBuf::from(user_home)
+                PathBuf::from(user_home)
                     .as_path()
                     .join(".config/fontconfig/fonts.conf")
                     .as_path(),
@@ -300,9 +301,9 @@ impl config::ParserSink for Config {
         }
     }
 
-    fn include_path(&mut self, _path: &std::path::Path) {}
+    fn include_path(&mut self, _path: &Path) {}
 
-    fn cache_path(&mut self, path: &std::path::Path) {
+    fn cache_path(&mut self, path: &Path) {
         self.cache_dirs.push(path.into());
     }
 

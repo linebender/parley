@@ -4,7 +4,7 @@
 //! Extremely naive fontconfig xml parser to extract the data we need.
 
 use roxmltree::Node;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub trait ParserSink {
     fn include_path(&mut self, path: &Path);
@@ -175,7 +175,7 @@ fn include_config(path: &Path, sink: &mut impl ParserSink) -> std::io::Result<()
     Ok(())
 }
 
-fn resolve_dir(node: Node, config_file_path: impl AsRef<Path>) -> Option<std::path::PathBuf> {
+fn resolve_dir(node: Node, config_file_path: impl AsRef<Path>) -> Option<PathBuf> {
     let dir_path = node.text()?;
     let (xdg_env, xdg_fallback) = match node.tag_name().name() {
         "include" => ("XDG_CONFIG_HOME", "~/.config"),
@@ -184,7 +184,7 @@ fn resolve_dir(node: Node, config_file_path: impl AsRef<Path>) -> Option<std::pa
     };
     let path = match node.attribute("prefix") {
         Some("xdg") => {
-            std::path::PathBuf::from(std::env::var(xdg_env).unwrap_or_else(|_| xdg_fallback.into()))
+            PathBuf::from(std::env::var(xdg_env).unwrap_or_else(|_| xdg_fallback.into()))
                 .join(dir_path)
         }
         _ => {
@@ -193,14 +193,14 @@ fn resolve_dir(node: Node, config_file_path: impl AsRef<Path>) -> Option<std::pa
             } else {
                 match config_file_path.as_ref().parent() {
                     Some(parent) => parent.join(dir_path),
-                    None => std::path::Path::new(".").join(dir_path),
+                    None => Path::new(".").join(dir_path),
                 }
             }
         }
     };
     Some(if let Ok(stripped_path) = path.strip_prefix("~") {
         let home = config_home().unwrap_or("/".to_string());
-        std::path::Path::new(&home).join(stripped_path)
+        Path::new(&home).join(stripped_path)
     } else {
         path
     })
