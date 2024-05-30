@@ -15,6 +15,61 @@
 Parley provides an API for implementing rich text layout.
 It is backed by [Swash](https://github.com/dfrg/swash).
 
+## The Parley text stack
+
+Currently, Parley directly depends on four crates: Fontique, Swash, Skrifa, and Peniko.
+These crates cover different pieces of the text-rendering process.
+
+### Peniko
+
+Peniko builds on top of [kurbo](https://crates.io/crates/kurbo) and provides vocabulary types for 2D rendering.
+
+Peniko mostly just exports types like `Blob`, `Color`, `Gradient`, `Brush`, `Point`, `Rect`, `Vec2`, etc.
+
+### Fontique
+
+Fontique provides font enumeration and fallback.
+
+**Font enumeration** means listing (enumerating) all the fonts installed on the system.
+It also means collecting metadata about those fonts: whether they are serif, sans-serif, monospace, their weight, the code points they cover, etc.
+The library will also load the full font into memory as required using mmap.
+
+**Font fallback** is matching runs of text to a font.
+This is necessary because fonts typically don't cover the entire unicode range: you have different fonts for latin text, chinese text, arabic text, etc and also usually a separate font for emoji.
+But if you have, say arabic text or emoji embedded within latin text, you don't typically specify the font for the arabic text or the emoji, one is chosen for you.
+Font fallback is the process which makes that choice.
+
+### Skrifa
+
+Skrifa reads TrueType and OpenType fonts.
+
+It is built on top of the [read-fonts](https://github.com/googlefonts/fontations/tree/main/read-fonts) low-level parsing library and is also part of the [oxidize](https://github.com/googlefonts/oxidize) project.
+
+Skrifa provides higher level metrics on top of read-fonts.
+Notably it converts the raw glyph representations in font files into scaled, hinted vector paths suitable for rasterisation.
+
+### Swash
+
+Swash implements text shaping and [some miscellaneous unicode-related features](https://github.com/dfrg/swash#text-analysis).
+
+**Text shaping** means mapping runs of unicode codepoints to specific glyphs within fonts.
+This includes applying ligatures, resolving emoji modifiers, but also much more complex transformations for some scripts.
+
+Swash's implementation is faster but less complete and tested than Harfbuzz and Rustybuzz.
+
+Swash also implements font parsing, scaling, and hinting.
+This part of Swash is now superseeded by Skrifa: the implementation in Skrifa is directly descended from the one in Swash.
+
+### Parley
+
+Parley itself does text layout.
+
+**Text layout** means computing x/y coordinates for each glyph in a string of text.
+Besides what the other libraries do, this involves things like determining a glyph's size, line breaking, and bidi resolution.
+
+In the future, Parley will likely also implement text selection and text editing helpers.
+
+
 ## Minimum supported Rust Version (MSRV)
 
 This version of Parley has been verified to compile with **Rust 1.70** and later.
