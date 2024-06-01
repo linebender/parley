@@ -32,7 +32,7 @@ Fontique provides font enumeration and fallback.
 
 **Font enumeration** means listing (enumerating) all the fonts installed on the system.
 It also means collecting metadata about those fonts: whether they are serif, sans-serif, monospace, their weight, the code points they cover, etc.
-The library will also load the full font into memory as required using mmap.
+The library is responsible for loading fonts into memory; it will use memory-mapped IO to load portions into memory lazily and share them between processes on the system.
 
 **Font fallback** is matching runs of text to a font.
 This is necessary because fonts typically don't cover the entire unicode range: you have different fonts for latin text, chinese text, arabic text, etc and also usually a separate font for emoji.
