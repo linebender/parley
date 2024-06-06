@@ -17,6 +17,7 @@ default = ["system"]
 std = ["skrifa/std", "peniko/std", "dep:memmap2"]
 libm = ["skrifa/libm", "peniko/libm", "dep:core_maths"]
 icu_properties = ["dep:icu_properties"]
+unicode_script = ["dep:unicode-script"]
 # Enables support for system font backends
 system = ["std"]
 

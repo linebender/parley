@@ -32,7 +32,7 @@ impl Script {
     }
 
     /// Returns the associated [`unicode_script::Script`] value.
-    #[cfg(feature = "unicode-script")]
+    #[cfg(feature = "unicode_script")]
     pub fn unicode_script(self) -> Option<unicode_script::Script> {
         unicode_script::Script::from_short_name(core::str::from_utf8(&self.0).ok()?)
     }
@@ -80,7 +80,7 @@ impl From<icu_properties::Script> for Script {
     }
 }
 
-#[cfg(feature = "unicode-script")]
+#[cfg(feature = "unicode_script")]
 impl From<unicode_script::Script> for Script {
     fn from(value: unicode_script::Script) -> Self {
         Self(value.short_name().as_bytes().try_into().unwrap_or_default())
