@@ -24,7 +24,7 @@ impl Script {
     }
 
     /// Returns the associated [`icu_properties::Script`] value.
-    #[cfg(feature = "icu-properties")]
+    #[cfg(feature = "icu_properties")]
     pub fn icu_script(self) -> Option<icu_properties::Script> {
         let mapper = icu_properties::Script::name_to_enum_mapper();
         let s = core::str::from_utf8(&self.0).ok()?;
@@ -68,7 +68,7 @@ impl From<&str> for Script {
     }
 }
 
-#[cfg(feature = "icu-properties")]
+#[cfg(feature = "icu_properties")]
 impl From<icu_properties::Script> for Script {
     fn from(value: icu_properties::Script) -> Self {
         Self(
