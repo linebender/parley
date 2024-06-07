@@ -6,6 +6,10 @@ use super::{
 };
 use alloc::sync::Arc;
 use hashbrown::HashMap;
+use objc2::runtime::Bool;
+use objc2_foundation::{
+    NSSearchPathDirectory, NSSearchPathDomainMask, NSSearchPathForDirectoriesInDomains,
+};
 use {
     core_foundation::{
         base::{CFRange, TCFType},
@@ -37,7 +41,17 @@ pub struct SystemFonts {
 
 impl SystemFonts {
     pub fn new() -> Self {
-        let scanned = scan::ScannedCollection::from_paths(Some("/System/Library/Fonts"), 8);
+        let paths = unsafe {
+            NSSearchPathForDirectoriesInDomains(
+                NSSearchPathDirectory::NSLibraryDirectory,
+                NSSearchPathDomainMask::NSAllDomainsMask,
+                Bool::YES,
+            )
+            .as_ref()
+            .iter()
+            .map(|p| format!("{p}/Fonts/"))
+        };
+        let scanned = scan::ScannedCollection::from_paths(paths, 8);
         let name_map = scanned.family_names;
         let mut generic_families = GenericFamilyMap::default();
         for (family, names) in DEFAULT_GENERIC_FAMILIES {
