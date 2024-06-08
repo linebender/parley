@@ -57,7 +57,7 @@ impl Editor {
         builder.push_default(&parley::style::StyleProperty::FontStack(
             parley::style::FontStack::Source("system-ui"),
         ));
-        builder.build_into(&mut self.layout);
+        builder.build_into(&mut self.layout, &self.buffer);
         self.layout.break_all_lines(Some(width - INSET * 2.0));
         self.layout
             .align(Some(width - INSET * 2.0), parley::layout::Alignment::Start);
