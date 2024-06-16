@@ -193,9 +193,7 @@ fn parse_font(
                             .extend_from_slice(set.numbers().ok()?.as_slice().ok()?);
                         for leaf in set.leaves().ok()? {
                             let leaf = leaf.ok()?;
-                            font.coverage
-                                .leaves
-                                .push(unsafe { core::mem::transmute(leaf) });
+                            font.coverage.leaves.push(leaf);
                         }
                     }
                 }
@@ -213,7 +211,7 @@ fn parse_font(
 #[derive(Clone, Default)]
 pub struct Coverage {
     numbers: Vec<u16>,
-    leaves: Vec<[u32; 8]>,
+    leaves: Vec<CharSetLeaf>,
 }
 
 impl Coverage {
@@ -230,9 +228,7 @@ impl Coverage {
             Ok(idx) => {
                 let leaf = self.leaves.get(idx)?;
                 let lo = (ch & 0xff) as u8;
-                let map_idx = (lo >> 5) as usize;
-                let bit_idx = (lo & 0x1f) as u32;
-                Some((leaf[map_idx] >> bit_idx) & 1 != 0)
+                Some(leaf.contains_byte(lo))
             }
             Err(_) => Some(false),
         }
