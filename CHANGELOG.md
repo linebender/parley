@@ -15,14 +15,24 @@ You can find its changes [documented below](#010---2024-05-01).
 
 ### Added
 
+### Parley
+
 - Example using tiny-skia which renders into a png ([#55] by [@nicoburns])
-    - breaking: There is now a blanket implementation for `Brush`.
+    - Breaking change: There is now a blanket implementation for `Brush`.
 - A swash example which renders into a png ([#54] by [@nicoburns])
 
 ### Changed
 
-- Emoji clusters not get an Emoji family added by default ([#56] by [@dfrg])
+### General
+
 - Repository layout updated to match Linebender standard ([#59] by [@waywardmonkeys])
+
+### Parley
+
+- Emoji clusters now get an Emoji family added by default ([#56] by [@dfrg])
+
+### Fontique
+
 - Removed unsafe code from fontconfig cache ([#78] by [@waywardmonkeys])
 
 ### Fixed
@@ -31,7 +41,7 @@ You can find its changes [documented below](#010---2024-05-01).
 
 ## Removed
 
-- breaking: conversion to/from `icu_properties::Script` for `fontique::Script` ([#72] by [@waywardmonkeys])
+- Breaking change: removed conversion to/from `icu_properties::Script` for `fontique::Script` ([#72] by [@waywardmonkeys])
     - This can be restored by using the `icu_properties` feature of `fontique`.
 
 ## [0.1.0] - 2024-05-01
