@@ -13,9 +13,11 @@ You can find its changes [documented below](#010---2024-05-01).
 
 ## [Unreleased]
 
+This release has an [MSRV] of 1.70.
+
 ### Added
 
-### Parley
+#### Parley
 
 - Example using tiny-skia which renders into a png ([#55] by [@nicoburns])
     - Breaking change: There is now a blanket implementation for `Brush`.
@@ -23,23 +25,27 @@ You can find its changes [documented below](#010---2024-05-01).
 
 ### Changed
 
-### General
+#### General
 
 - Repository layout updated to match Linebender standard ([#59] by [@waywardmonkeys])
 
-### Parley
+#### Parley
 
 - Emoji clusters now get an Emoji family added by default ([#56] by [@dfrg])
 
-### Fontique
+#### Fontique
 
 - Removed unsafe code from fontconfig cache ([#78] by [@waywardmonkeys])
 
 ### Fixed
 
+#### Fontique
+
 - Search correct paths for fonts on Apple platforms ([#71] by [@waywardmonkeys])
 
-## Removed
+### Removed
+
+#### Fontique
 
 - Breaking change: removed conversion to/from `icu_properties::Script` for `fontique::Script` ([#72] by [@waywardmonkeys])
     - This can be restored by using the `icu_properties` feature of `fontique`.
