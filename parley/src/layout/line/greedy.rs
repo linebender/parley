@@ -472,6 +472,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // Default vertical alignment is to align the bottom of boxes with the text baseline.
                         // This is equivalent to the entire height of the box being "ascent"
                         line.metrics.ascent = line.metrics.ascent.max(item.height);
+                        line.metrics.line_height = line.metrics.line_height.max(item.height);
 
                         // Mark us as having seen non-whitespace content on this line
                         have_metrics = true;
@@ -504,12 +505,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // Compute the run's vertical metrics
                         let run = &self.layout.runs[line_item.index];
                         let line_height = line_item.compute_line_height(self.layout);
-                        line.metrics.ascent =
-                            line.metrics.ascent.max(run.metrics.ascent * line_height);
-                        line.metrics.descent =
-                            line.metrics.descent.max(run.metrics.descent * line_height);
-                        line.metrics.leading =
-                            line.metrics.leading.max(run.metrics.leading * line_height);
+                        line.metrics.line_height = line.metrics.line_height.max(line_height);
+                        line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent);
+                        line.metrics.descent = line.metrics.descent.max(run.metrics.descent);
+                        line.metrics.leading = line.metrics.leading.max(run.metrics.leading);
 
                         // Mark us as having seen non-whitespace content on this line
                         have_metrics = true;
@@ -559,7 +558,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             // Round block/vertical axis metrics
             line.metrics.ascent = line.metrics.ascent.round();
             line.metrics.descent = line.metrics.descent.round();
-            line.metrics.leading = (line.metrics.leading * 0.5).round() * 2.;
+            line.metrics.line_height = line.metrics.line_height.round();
+            line.metrics.leading =
+                line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
 
             // Compute
             let above = (line.metrics.ascent + line.metrics.leading * 0.5).round();

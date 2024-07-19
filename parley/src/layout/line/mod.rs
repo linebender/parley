@@ -90,6 +90,9 @@ pub struct LineMetrics {
     pub descent: f32,
     /// Typographic leading.
     pub leading: f32,
+    /// The absolute line height (in layout units).
+    /// It matches the CSS definition of line height where it is derived as a multiple of the font size.
+    pub line_height: f32,
     /// Offset to the baseline.
     pub baseline: f32,
     /// Offset for alignment.
@@ -101,9 +104,9 @@ pub struct LineMetrics {
 }
 
 impl LineMetrics {
-    /// Returns the size of the line (ascent + descent + leading).
+    /// Returns the size of the line
     pub fn size(&self) -> f32 {
-        self.ascent + self.descent + self.leading
+        self.line_height
     }
 }
 
