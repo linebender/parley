@@ -14,6 +14,7 @@ use super::style::{
     FontWeight, StyleProperty,
 };
 use crate::font::FontContext;
+use crate::layout;
 use crate::util::nearly_eq;
 use fontique::FamilyId;
 use swash::text::Language;
@@ -416,6 +417,15 @@ impl<B: Brush> ResolvedStyle<B> {
             LetterSpacing(value) => nearly_eq(self.letter_spacing, *value),
         }
     }
+
+    pub(crate) fn as_layout_style(&self) -> layout::Style<B> {
+        layout::Style {
+            brush: self.brush.clone(),
+            underline: self.underline.as_layout_decoration(&self.brush),
+            strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
+            line_height: self.line_height,
+        }
+    }
 }
 
 /// Underline or strikethrough decoration.
@@ -429,4 +439,19 @@ pub struct ResolvedDecoration<B: Brush> {
     pub size: Option<f32>,
     /// Brush for the decoration.
     pub brush: Option<B>,
+}
+
+impl<B: Brush> ResolvedDecoration<B> {
+    /// Convert into a layout Decoration (filtering out disabled decorations)
+    pub(crate) fn as_layout_decoration(&self, default_brush: &B) -> Option<layout::Decoration<B>> {
+        if self.enabled {
+            Some(layout::Decoration {
+                brush: self.brush.clone().unwrap_or_else(|| default_brush.clone()),
+                offset: self.offset,
+                size: self.size,
+            })
+        } else {
+            None
+        }
+    }
 }
