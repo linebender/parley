@@ -13,7 +13,7 @@ use super::style::*;
 use super::FontContext;
 
 #[cfg(feature = "std")]
-use super::layout::{Decoration, Layout, Style};
+use super::layout::Layout;
 
 use swash::shape::ShapeContext;
 use swash::text::cluster::CharInfo;
@@ -146,15 +146,10 @@ impl<'a, B: Brush, T: TextSource> RangedBuilder<'a, B, T> {
         }
 
         // Copy the visual styles into the layout
-        layout.data.styles.extend(lcx.styles.iter().map(|s| {
-            let s = &s.style;
-            Style {
-                brush: s.brush.clone(),
-                underline: s.underline.into_layout_decoration(&s.brush),
-                strikethrough: s.strikethrough.into_layout_decoration(&s.brush),
-                line_height: s.line_height,
-            }
-        }));
+        layout
+            .data
+            .styles
+            .extend(lcx.styles.iter().map(|s| s.style.as_layout_style()));
 
         // Sort the inline boxes as subsequent code assumes that they are in text index order.
         // Note: It's important that this is a stable sort to allow users to control the order of contiguous inline boxes

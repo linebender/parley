@@ -417,6 +417,15 @@ impl<B: Brush> ResolvedStyle<B> {
             LetterSpacing(value) => nearly_eq(self.letter_spacing, *value),
         }
     }
+
+    pub(crate) fn as_layout_style(&self) -> layout::Style<B> {
+        layout::Style {
+            brush: self.brush.clone(),
+            underline: self.underline.as_layout_decoration(&self.brush),
+            strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
+            line_height: self.line_height,
+        }
+    }
 }
 
 /// Underline or strikethrough decoration.
