@@ -145,29 +145,13 @@ impl<'a, B: Brush, T: TextSource> RangedBuilder<'a, B, T> {
             }
         }
 
-        // Define a function that converts `ResolvedDecoration` into `Decoration` (used just below)
-        fn conv_deco<B: Brush>(
-            deco: &ResolvedDecoration<B>,
-            default_brush: &B,
-        ) -> Option<Decoration<B>> {
-            if deco.enabled {
-                Some(Decoration {
-                    brush: deco.brush.clone().unwrap_or_else(|| default_brush.clone()),
-                    offset: deco.offset,
-                    size: deco.size,
-                })
-            } else {
-                None
-            }
-        }
-
         // Copy the visual styles into the layout
         layout.data.styles.extend(lcx.styles.iter().map(|s| {
             let s = &s.style;
             Style {
                 brush: s.brush.clone(),
-                underline: conv_deco(&s.underline, &s.brush),
-                strikethrough: conv_deco(&s.strikethrough, &s.brush),
+                underline: s.underline.into_layout_decoration(&s.brush),
+                strikethrough: s.strikethrough.into_layout_decoration(&s.brush),
                 line_height: s.line_height,
             }
         }));
