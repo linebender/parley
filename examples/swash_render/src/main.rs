@@ -6,9 +6,9 @@
 
 use image::codecs::png::PngEncoder;
 use image::{self, Pixel, Rgba, RgbaImage};
-use parley::layout::{Alignment, Glyph, GlyphRun, Layout};
+use parley::layout::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
 use parley::style::{FontStack, FontWeight, StyleProperty};
-use parley::{FontContext, LayoutContext};
+use parley::{FontContext, InlineBox, LayoutContext};
 use peniko::Color;
 use std::fs::File;
 use swash::scale::image::Content;
@@ -63,11 +63,25 @@ fn main() {
     let bold_style = StyleProperty::FontWeight(bold);
     builder.push(&bold_style, 0..4);
 
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        index: 40,
+        width: 50.0,
+        height: 50.0,
+    });
+    builder.push_inline_box(InlineBox {
+        id: 1,
+        index: 50,
+        width: 50.0,
+        height: 30.0,
+    });
+
     // Build the builder into a Layout
     let mut layout: Layout<Color> = builder.build();
 
     // Perform layout (including bidi resolution and shaping) with start alignment
-    layout.break_all_lines(max_advance, Alignment::Start);
+    layout.break_all_lines(max_advance);
+    layout.align(max_advance, Alignment::Start);
 
     // Create image to render into
     let width = layout.width().ceil() as u32 + (padding * 2);
@@ -77,8 +91,21 @@ fn main() {
     // Iterate over laid out lines
     for line in layout.lines() {
         // Iterate over GlyphRun's within each line
-        for glyph_run in line.glyph_runs() {
-            render_glyph_run(&mut scale_cx, &glyph_run, &mut img, padding);
+        for item in line.items() {
+            match item {
+                PositionedLayoutItem::GlyphRun(glyph_run) => {
+                    render_glyph_run(&mut scale_cx, &glyph_run, &mut img, padding);
+                }
+                PositionedLayoutItem::InlineBox(inline_box) => {
+                    for x_off in 0..(inline_box.width.floor() as u32) {
+                        for y_off in 0..(inline_box.height.floor() as u32) {
+                            let x = inline_box.x as u32 + x_off + padding;
+                            let y = inline_box.y as u32 + y_off + padding;
+                            img.put_pixel(x, y, Rgba([0, 0, 0, 255]));
+                        }
+                    }
+                }
+            };
         }
     }
 
