@@ -12,6 +12,12 @@ compile_error!("parley requires either the `std` or `libm` feature to be enabled
 
 extern crate alloc;
 
+/// A reference counted string slice.
+///
+/// This is a data-friendly way to represent strings in Masonry. Unlike `String`
+/// it cannot be mutated, but unlike `String` it can be cheaply cloned.
+pub type ArcStr = std::sync::Arc<str>;
+
 pub use fontique;
 pub use swash;
 
