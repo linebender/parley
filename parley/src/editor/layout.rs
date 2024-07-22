@@ -5,12 +5,12 @@
 
 use std::rc::Rc;
 
-use kurbo::{Affine, Line, Point, Rect, Size};
 use crate::builder::RangedBuilder;
 use crate::fontique::{Style, Weight};
 use crate::layout::{Alignment, Cursor};
 use crate::style::{Brush as BrushTrait, FontFamily, FontStack, GenericFamily, StyleProperty};
 use crate::{FontContext, Layout, LayoutContext};
+use kurbo::{Affine, Line, Point, Rect, Size};
 use peniko::{self, Color, Gradient};
 
 use super::{Link, TextStorage};

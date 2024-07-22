@@ -6,11 +6,11 @@
 use std::borrow::Cow;
 use std::ops::{Deref, DerefMut, Range};
 
-use kurbo::{Affine, Line, Point, Stroke};
 use crate::builder::RangedBuilder;
 use crate::{FontContext, LayoutContext};
-use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
+use kurbo::{Affine, Line, Point, Stroke};
 use peniko::{Brush, Color};
+use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
 use winit::keyboard::NamedKey;
 
 use crate::event::{PointerButton, PointerState};
