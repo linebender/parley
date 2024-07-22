@@ -6,11 +6,11 @@
 use std::rc::Rc;
 
 use kurbo::{Affine, Line, Point, Rect, Size};
-use parley::context::RangedBuilder;
-use parley::fontique::{Style, Weight};
-use parley::layout::{Alignment, Cursor};
-use parley::style::{Brush as BrushTrait, FontFamily, FontStack, GenericFamily, StyleProperty};
-use parley::{FontContext, Layout, LayoutContext};
+use crate::builder::RangedBuilder;
+use crate::fontique::{Style, Weight};
+use crate::layout::{Alignment, Cursor};
+use crate::style::{Brush as BrushTrait, FontFamily, FontStack, GenericFamily, StyleProperty};
+use crate::{FontContext, Layout, LayoutContext};
 use vello::peniko::{self, Color, Gradient};
 use vello::Scene;
 
