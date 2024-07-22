@@ -5,7 +5,6 @@ use std::ops::{Deref, DerefMut, Range};
 
 use crate::{style::StyleProperty, FontContext, LayoutContext};
 use kurbo::Point;
-use vello::Scene;
 use winit::{
     event::Ime,
     keyboard::{Key, NamedKey},
@@ -88,10 +87,6 @@ impl<T: EditableText> TextEditor<T> {
                 }
                 builder
             });
-    }
-
-    pub fn draw(&mut self, scene: &mut Scene, point: impl Into<Point>) {
-        self.inner.draw(scene, point);
     }
 
     pub fn pointer_down(

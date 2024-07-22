@@ -11,7 +11,6 @@ use crate::builder::RangedBuilder;
 use crate::{FontContext, LayoutContext};
 use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
 use peniko::{Brush, Color};
-use vello::Scene;
 use winit::keyboard::NamedKey;
 
 use crate::event::{PointerButton, PointerState};
@@ -251,26 +250,6 @@ impl<T: Selectable> TextWithSelection<T> {
                 });
             self.needs_selection_update = false;
         }
-    }
-
-    pub fn draw(&mut self, scene: &mut Scene, point: impl Into<Point>) {
-        // TODO: Calculate the location for this in layout lazily?
-        if let Some(selection) = self.selection {
-            self.cursor_line = Some(self.layout.cursor_line_for_text_position(selection.active));
-        } else {
-            self.cursor_line = None;
-        }
-        let point: Point = point.into();
-        if let Some(line) = self.cursor_line {
-            scene.stroke(
-                &Stroke::new(2.),
-                Affine::translate((point.x, point.y)),
-                &Brush::Solid(Color::WHITE),
-                None,
-                &line,
-            );
-        }
-        self.layout.draw(scene, point);
     }
 }
 
