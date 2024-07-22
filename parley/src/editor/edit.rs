@@ -10,10 +10,7 @@ use winit::{
     keyboard::{Key, NamedKey},
 };
 
-use crate::{
-    event::{PointerButton, PointerState},
-    Action, EventCtx, Handled, TextEvent,
-};
+use super::masonry_types::{Handled, PointerButton, PointerState, TextEvent};
 
 use super::{
     offset_for_delete_backwards,
@@ -100,7 +97,7 @@ impl<T: EditableText> TextEditor<T> {
         self.inner.pointer_down(origin, state, button)
     }
 
-    pub fn text_event(&mut self, ctx: &mut EventCtx, event: &TextEvent) -> Handled {
+    pub fn text_event(&mut self, event: &TextEvent) -> Handled {
         let inner_handled = self.inner.text_event(event);
         if inner_handled.is_handled() {
             return inner_handled;
@@ -170,12 +167,12 @@ impl<T: EditableText> TextEditor<T> {
                                 Affinity::Downstream,
                             ));
                             let contents = self.text().as_str().to_string();
-                            ctx.submit_action(Action::TextChanged(contents));
+                            // ctx.submit_action(Action::TextChanged(contents));
                             Handled::Yes
                         }
                         Key::Named(NamedKey::Enter) => {
                             let contents = self.text().as_str().to_string();
-                            ctx.submit_action(Action::TextEntered(contents));
+                            // ctx.submit_action(Action::TextEntered(contents));
                             Handled::Yes
                         }
                         Key::Named(_) => Handled::No,
@@ -193,7 +190,7 @@ impl<T: EditableText> TextEditor<T> {
                                 Affinity::Downstream,
                             ));
                             let contents = self.text().as_str().to_string();
-                            ctx.submit_action(Action::TextChanged(contents));
+                            // ctx.submit_action(Action::TextChanged(contents));
                             Handled::Yes
                         }
                         Key::Unidentified(_) => Handled::No,
@@ -220,7 +217,7 @@ impl<T: EditableText> TextEditor<T> {
                                     Some(Selection::caret(offset, Affinity::Upstream));
 
                                 let contents = self.text().as_str().to_string();
-                                ctx.submit_action(Action::TextChanged(contents));
+                                // ctx.submit_action(Action::TextChanged(contents));
                                 Handled::Yes
                             } else {
                                 Handled::No
@@ -242,7 +239,7 @@ impl<T: EditableText> TextEditor<T> {
                                         Some(Selection::caret(selection.min(), Affinity::Upstream));
                                 }
                                 let contents = self.text().as_str().to_string();
-                                ctx.submit_action(Action::TextChanged(contents));
+                                // ctx.submit_action(Action::TextChanged(contents));
                                 Handled::Yes
                             } else {
                                 Handled::No
@@ -265,7 +262,7 @@ impl<T: EditableText> TextEditor<T> {
                         ));
                     }
                     let contents = self.text().as_str().to_string();
-                    ctx.submit_action(Action::TextChanged(contents));
+                    // ctx.submit_action(Action::TextChanged(contents));
                     Handled::Yes
                 }
                 Ime::Preedit(preedit_string, preedit_sel) => {

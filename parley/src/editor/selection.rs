@@ -13,8 +13,7 @@ use peniko::{Brush, Color};
 use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
 use winit::keyboard::NamedKey;
 
-use crate::event::{PointerButton, PointerState};
-use crate::{Handled, TextEvent};
+use super::masonry_types::{Handled, PointerButton, PointerState, TextEvent};
 
 use super::{TextBrush, TextLayout, TextStorage};
 
