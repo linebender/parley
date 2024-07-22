@@ -6,6 +6,9 @@
 mod brush;
 mod font;
 
+pub(crate) const DEFAULT_FONT_SIZE: f32 = 16.0;
+pub(crate) const DEFAULT_LINE_HEIGHT: f32 = 1.2;
+
 pub use brush::*;
 pub use font::{
     FontFamily, FontFeature, FontSettings, FontStack, FontStretch, FontStyle, FontVariation,
@@ -112,7 +115,7 @@ impl<'a, B: Brush> Default for TextStyle<'a, B> {
     fn default() -> Self {
         TextStyle {
             font_stack: FontStack::Source("sans-serif"),
-            font_size: 16.0,
+            font_size: DEFAULT_FONT_SIZE,
             font_stretch: Default::default(),
             font_style: Default::default(),
             font_weight: Default::default(),
@@ -128,7 +131,7 @@ impl<'a, B: Brush> Default for TextStyle<'a, B> {
             strikethrough_offset: Default::default(),
             strikethrough_size: Default::default(),
             strikethrough_brush: Default::default(),
-            line_height: 1.2,
+            line_height: DEFAULT_LINE_HEIGHT,
             word_spacing: Default::default(),
             letter_spacing: Default::default(),
         }
