@@ -166,12 +166,12 @@ impl<T: EditableText> TextEditor<T> {
                                 // We have just added this character, so we are "affined" with it
                                 Affinity::Downstream,
                             ));
-                            let contents = self.text().as_str().to_string();
+                            // let contents = self.text().as_str().to_string();
                             // ctx.submit_action(Action::TextChanged(contents));
                             Handled::Yes
                         }
                         Key::Named(NamedKey::Enter) => {
-                            let contents = self.text().as_str().to_string();
+                            // let contents = self.text().as_str().to_string();
                             // ctx.submit_action(Action::TextEntered(contents));
                             Handled::Yes
                         }
@@ -189,7 +189,7 @@ impl<T: EditableText> TextEditor<T> {
                                 // We have just added this character, so we are "affined" with it
                                 Affinity::Downstream,
                             ));
-                            let contents = self.text().as_str().to_string();
+                            // let contents = self.text().as_str().to_string();
                             // ctx.submit_action(Action::TextChanged(contents));
                             Handled::Yes
                         }
@@ -216,7 +216,7 @@ impl<T: EditableText> TextEditor<T> {
                                 self.inner.selection =
                                     Some(Selection::caret(offset, Affinity::Upstream));
 
-                                let contents = self.text().as_str().to_string();
+                                // let contents = self.text().as_str().to_string();
                                 // ctx.submit_action(Action::TextChanged(contents));
                                 Handled::Yes
                             } else {
@@ -238,7 +238,7 @@ impl<T: EditableText> TextEditor<T> {
                                     self.inner.selection =
                                         Some(Selection::caret(selection.min(), Affinity::Upstream));
                                 }
-                                let contents = self.text().as_str().to_string();
+                                // let contents = self.text().as_str().to_string();
                                 // ctx.submit_action(Action::TextChanged(contents));
                                 Handled::Yes
                             } else {
@@ -261,7 +261,7 @@ impl<T: EditableText> TextEditor<T> {
                             Affinity::Upstream,
                         ));
                     }
-                    let contents = self.text().as_str().to_string();
+                    // let contents = self.text().as_str().to_string();
                     // ctx.submit_action(Action::TextChanged(contents));
                     Handled::Yes
                 }
