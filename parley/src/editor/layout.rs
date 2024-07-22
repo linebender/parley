@@ -70,6 +70,15 @@ pub enum TextBrush {
     },
 }
 
+impl TextBrush {
+    pub fn text_brush(&self) -> &peniko::Brush {
+        match self {
+            TextBrush::Normal(brush) => brush,
+            TextBrush::Highlight { text, .. } => text,
+        }
+    }
+}
+
 impl From<peniko::Brush> for TextBrush {
     fn from(value: peniko::Brush) -> Self {
         Self::Normal(value)
