@@ -11,7 +11,7 @@ use crate::fontique::{Style, Weight};
 use crate::layout::{Alignment, Cursor};
 use crate::style::{Brush as BrushTrait, FontFamily, FontStack, GenericFamily, StyleProperty};
 use crate::{FontContext, Layout, LayoutContext};
-use vello::peniko::{self, Color, Gradient};
+use peniko::{self, Color, Gradient};
 use vello::Scene;
 
 use super::{Link, TextStorage};
