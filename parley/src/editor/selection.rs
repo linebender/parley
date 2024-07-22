@@ -56,6 +56,10 @@ impl<T: Selectable> TextWithSelection<T> {
         self.layout.needs_rebuild() || self.needs_selection_update
     }
 
+    pub fn get_cursor_line(&self) -> Option<Line> {
+        self.cursor_line
+    }
+
     pub fn pointer_down(
         &mut self,
         origin: Point,
