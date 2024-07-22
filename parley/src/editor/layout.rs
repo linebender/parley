@@ -433,9 +433,7 @@ impl<T: TextStorage> TextLayout<T> {
         &mut self,
         font_ctx: &mut FontContext,
         layout_ctx: &mut LayoutContext<TextBrush>,
-        attributes: impl for<'b> FnOnce(
-            RangedBuilder<'b, TextBrush, &'b str>,
-        ) -> RangedBuilder<'b, TextBrush, &'b str>,
+        attributes: impl for<'b> FnOnce(RangedBuilder<'b, TextBrush>) -> RangedBuilder<'b, TextBrush>,
     ) {
         if self.needs_layout {
             self.needs_layout = false;

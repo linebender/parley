@@ -26,8 +26,8 @@ pub trait TextStorage: 'static {
     #[allow(unused_variables)]
     fn add_attributes<'b>(
         &self,
-        builder: RangedBuilder<'b, TextBrush, &'b str>,
-    ) -> RangedBuilder<'b, TextBrush, &'b str> {
+        builder: RangedBuilder<'b, TextBrush>,
+    ) -> RangedBuilder<'b, TextBrush> {
         builder
     }
 

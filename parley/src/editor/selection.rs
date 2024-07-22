@@ -226,9 +226,7 @@ impl<T: Selectable> TextWithSelection<T> {
         &mut self,
         font_ctx: &mut FontContext,
         layout_ctx: &mut LayoutContext<TextBrush>,
-        attributes: impl for<'b> FnOnce(
-            RangedBuilder<'b, TextBrush, &'b str>,
-        ) -> RangedBuilder<'b, TextBrush, &'b str>,
+        attributes: impl for<'b> FnOnce(RangedBuilder<'b, TextBrush>) -> RangedBuilder<'b, TextBrush>,
     ) {
         // In theory, we could be clever here and only rebuild the layout if the
         // selected range was previously or currently non-zero size (i.e. there is a selected range)
