@@ -58,7 +58,7 @@ This includes applying ligatures, resolving emoji modifiers, but also much more 
 Swash's implementation is faster but less complete and tested than Harfbuzz and Rustybuzz.
 
 Swash also implements font parsing, scaling, and hinting.
-This part of Swash is now superseeded by Skrifa: the implementation in Skrifa is directly descended from the one in Swash.
+This part of Swash is now superseded by Skrifa: the implementation in Skrifa is directly descended from the one in Swash.
 
 ### Parley
 
