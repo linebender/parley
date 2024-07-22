@@ -7,7 +7,7 @@ use std::ops::Range;
 
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::kurbo::Point;
+use kurbo::Point;
 
 use super::{layout::TextLayout, Selectable, TextStorage};
 

@@ -10,7 +10,7 @@ use kurbo::{Affine, Line, Point, Stroke};
 use crate::builder::RangedBuilder;
 use crate::{FontContext, LayoutContext};
 use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
-use vello::peniko::{Brush, Color};
+use peniko::{Brush, Color};
 use vello::Scene;
 use winit::keyboard::NamedKey;
 
