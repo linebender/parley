@@ -10,7 +10,7 @@ use crate::debug_panic;
 use crate::builder::RangedBuilder;
 use crate::fontique::{Style, Weight};
 use crate::layout::{Alignment, Cursor};
-use crate::style::{Brush as BrushTrait, FontFamily, FontStack, GenericFamily, StyleProperty};
+use crate::style::{FontFamily, FontStack, GenericFamily, StyleProperty};
 use crate::{FontContext, Layout, LayoutContext};
 use kurbo::{Affine, Line, Point, Rect, Size};
 use peniko::{self, Color, Gradient};
@@ -69,8 +69,6 @@ pub enum TextBrush {
         fill: peniko::Brush,
     },
 }
-
-impl BrushTrait for TextBrush {}
 
 impl From<peniko::Brush> for TextBrush {
     fn from(value: peniko::Brush) -> Self {
