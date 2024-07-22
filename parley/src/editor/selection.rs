@@ -19,6 +19,7 @@ use super::masonry_types::{Handled, PointerButton, PointerState, TextEvent};
 
 use super::{TextBrush, TextLayout, TextStorage};
 
+#[derive(Clone)]
 pub struct TextWithSelection<T: Selectable> {
     pub layout: TextLayout<T>,
     /// The current selection within this widget
