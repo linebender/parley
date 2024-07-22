@@ -10,8 +10,8 @@ use crate::debug_panic;
 
 use crate::builder::RangedBuilder;
 use crate::{style::StyleProperty, FontContext, LayoutContext};
-use kurbo::{Affine, Line, Point, Stroke};
-use peniko::{Brush, Color};
+use kurbo::{Line, Point};
+use peniko::Color;
 use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
 use winit::keyboard::NamedKey;
 
