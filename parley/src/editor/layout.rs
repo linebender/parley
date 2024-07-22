@@ -114,7 +114,7 @@ impl<T> TextLayout<T> {
             text,
             scale: 1.0,
 
-            brush: crate::theme::TEXT_COLOR.into(),
+            brush: Default::default(),
             font: FontStack::Single(FontFamily::Generic(GenericFamily::SansSerif)),
             text_size,
             weight: Weight::NORMAL,
@@ -486,6 +486,6 @@ impl<T: TextStorage> std::fmt::Debug for TextLayout<T> {
 
 impl<T: TextStorage + Default> Default for TextLayout<T> {
     fn default() -> Self {
-        Self::new(Default::default(), crate::theme::TEXT_SIZE_NORMAL as f32)
+        Self::new(Default::default(), crate::style::DEFAULT_FONT_SIZE as f32)
     }
 }
