@@ -3,8 +3,8 @@
 
 use std::ops::{Deref, DerefMut, Range};
 
+use crate::{style::StyleProperty, FontContext, LayoutContext};
 use kurbo::Point;
-use parley::{FontContext, LayoutContext};
 use vello::Scene;
 use winit::{
     event::Ime,
@@ -84,10 +84,7 @@ impl<T: EditableText> TextEditor<T> {
         self.inner
             .rebuild_with_attributes(font_ctx, layout_ctx, |mut builder| {
                 if let Some(range) = self.preedit_range.as_ref() {
-                    builder.push(
-                        &parley::style::StyleProperty::Underline(true),
-                        range.clone(),
-                    );
+                    builder.push(&StyleProperty::Underline(true), range.clone());
                 }
                 builder
             });

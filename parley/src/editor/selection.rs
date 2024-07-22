@@ -7,8 +7,8 @@ use std::borrow::Cow;
 use std::ops::{Deref, DerefMut, Range};
 
 use kurbo::{Affine, Line, Point, Stroke};
-use parley::context::RangedBuilder;
-use parley::{FontContext, LayoutContext};
+use crate::builder::RangedBuilder;
+use crate::{FontContext, LayoutContext};
 use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
 use vello::peniko::{Brush, Color};
 use vello::Scene;

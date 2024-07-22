@@ -5,7 +5,7 @@
 
 use std::{ops::Deref, sync::Arc};
 
-use parley::context::RangedBuilder;
+use crate::builder::RangedBuilder;
 
 use crate::ArcStr;
 
