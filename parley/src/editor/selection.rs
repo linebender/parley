@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use std::ops::{Deref, DerefMut, Range};
 
 use crate::builder::RangedBuilder;
-use crate::{FontContext, LayoutContext};
+use crate::{style::StyleProperty, FontContext, LayoutContext};
 use kurbo::{Affine, Line, Point, Stroke};
 use peniko::{Brush, Color};
 use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
@@ -237,10 +237,8 @@ impl<T: Selectable> TextWithSelection<T> {
                     if let Some(selection) = self.selection {
                         let range = selection.range();
                         if !range.is_empty() {
-                            builder.push(
-                                &parley::style::StyleProperty::Brush(self.highlight_brush.clone()),
-                                range,
-                            );
+                            builder
+                                .push(&StyleProperty::Brush(self.highlight_brush.clone()), range);
                         }
                     }
                     attributes(builder)
