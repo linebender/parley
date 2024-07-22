@@ -3,7 +3,7 @@
 
 //! Calc start of a backspace delete interval
 
-use xi_unicode::*;
+use xi_unicode::{is_keycap_base, is_variation_selector, EmojiExt};
 
 use super::{EditableTextCursor, Selectable};
 
