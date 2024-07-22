@@ -6,6 +6,8 @@
 use std::borrow::Cow;
 use std::ops::{Deref, DerefMut, Range};
 
+use crate::debug_panic;
+
 use crate::builder::RangedBuilder;
 use crate::{style::StyleProperty, FontContext, LayoutContext};
 use kurbo::{Affine, Line, Point, Stroke};

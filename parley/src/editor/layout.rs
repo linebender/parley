@@ -5,6 +5,8 @@
 
 use std::rc::Rc;
 
+use crate::debug_panic;
+
 use crate::builder::RangedBuilder;
 use crate::fontique::{Style, Weight};
 use crate::layout::{Alignment, Cursor};
