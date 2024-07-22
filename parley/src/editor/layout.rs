@@ -12,7 +12,6 @@ use crate::layout::{Alignment, Cursor};
 use crate::style::{Brush as BrushTrait, FontFamily, FontStack, GenericFamily, StyleProperty};
 use crate::{FontContext, Layout, LayoutContext};
 use peniko::{self, Color, Gradient};
-use vello::Scene;
 
 use super::{Link, TextStorage};
 
@@ -56,7 +55,6 @@ pub struct TextLayout<T> {
     needs_layout: bool,
     needs_line_breaks: bool,
     layout: Layout<TextBrush>,
-    scratch_scene: Scene,
 }
 
 /// A custom brush for `Parley`, enabling using Parley to pass-through
@@ -130,7 +128,6 @@ impl<T> TextLayout<T> {
             needs_layout: true,
             needs_line_breaks: true,
             layout: Layout::new(),
-            scratch_scene: Scene::new(),
         }
     }
 
@@ -467,24 +464,6 @@ impl<T: TextStorage> TextLayout<T> {
             //     .links()
             // ...
         }
-    }
-
-    /// Draw the layout at the provided `Point`.
-    ///
-    /// The origin of the layout is the top-left corner.
-    ///
-    /// You must call [`Self::rebuild`] at some point before you first
-    /// call this method.
-    pub fn draw(&mut self, scene: &mut Scene, point: impl Into<Point>) {
-        self.assert_rebuilt("draw");
-        // TODO: This translation doesn't seem great
-        let p: Point = point.into();
-        crate::text_helpers::render_text(
-            scene,
-            &mut self.scratch_scene,
-            Affine::translate((p.x, p.y)),
-            &self.layout,
-        );
     }
 }
 
