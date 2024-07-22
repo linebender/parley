@@ -24,3 +24,8 @@ swash = "0.1.16"
 skrifa = { workspace = true }
 peniko = { workspace = true }
 fontique = { workspace = true }
+winit = "0.30.4"
+xi-unicode = "0.3.0"
+kurbo = "0.11.0"
+unicode-segmentation = "1.11.0"
+dpi = "0.1.1"
