@@ -448,14 +448,14 @@ impl<T: TextStorage> TextLayout<T> {
 
             let builder = self.text.add_attributes(builder);
             let mut builder = attributes(builder);
-            builder.build_into(&mut self.layout);
+            builder.build_into(&mut self.layout, self.text.as_str());
 
             self.needs_line_breaks = true;
         }
         if self.needs_line_breaks {
             self.needs_line_breaks = false;
-            self.layout
-                .break_all_lines(self.max_advance, self.alignment);
+            self.layout.break_all_lines(self.max_advance);
+            self.layout.align(self.max_advance, self.alignment);
 
             // TODO:
             // self.links = text
