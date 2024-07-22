@@ -51,6 +51,7 @@ impl EditableText for String {
 // }
 
 /// A region of text which can support editing operations
+#[derive(Clone)]
 pub struct TextEditor<T: EditableText> {
     inner: TextWithSelection<T>,
     /// The range of the preedit region in the text
