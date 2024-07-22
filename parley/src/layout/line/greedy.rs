@@ -118,7 +118,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
     }
 
-    /// Reset state when a line has been comitted
+    /// Reset state when a line has been committed
     fn start_new_line(&mut self) -> Option<(f32, f32)> {
         self.state.items = self.lines.line_items.len();
         self.state.lines = self.lines.lines.len();
@@ -319,7 +319,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 // println!("REVERT");
                                 // debug_assert!(prev.state.x != 0.0);
 
-                                // Q: Why do we revert the line state here, but only revert the indexes if the commit suceeds?
+                                // Q: Why do we revert the line state here, but only revert the indexes if the commit succeeds?
                                 self.state.line = prev.state;
                                 if try_commit_line!(BreakReason::Regular) {
                                     // Revert boundary state to prev state
@@ -495,7 +495,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             continue;
                         }
 
-                        // Compute the run's advance by summing the advances of it's constituant clusters
+                        // Compute the run's advance by summing the advances of it's constituent clusters
                         line_item.advance = self.layout.clusters[line_item.cluster_range.clone()]
                             .iter()
                             .map(|c| c.advance)
