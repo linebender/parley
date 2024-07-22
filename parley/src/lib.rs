@@ -31,6 +31,7 @@ mod util;
 
 pub mod builder;
 pub mod context;
+pub mod editor;
 pub mod layout;
 pub mod style;
 
