@@ -387,10 +387,11 @@ impl<T: TextStorage> TextLayout<T> {
     /// This is not meaningful until [`Self::rebuild`] has been called.
     // TODO: This is too simplistic. See https://raphlinus.github.io/text/2020/10/26/text-layout.html#shaping-cluster
     // for example. This would break in a `fi` ligature
-    pub fn cursor_line_for_text_position(&self, text_pos: usize) -> Line {
+    pub fn cursor_line_for_text_position(&self, text_pos: usize) -> Option<Line> {
         let from_position = self.cursor_for_text_position(text_pos);
 
-        let line = from_position.path.line(&self.layout).unwrap();
+        // TODO: fix in case there is no text
+        let line = from_position.path.line(&self.layout)?;
         let line_metrics = line.metrics();
 
         let baseline = line_metrics.baseline + line_metrics.descent;
@@ -399,7 +400,7 @@ impl<T: TextStorage> TextLayout<T> {
             from_position.offset as f64,
             (baseline - line_metrics.size()) as f64,
         );
-        Line::new(p1, p2)
+        Some(Line::new(p1, p2))
     }
 
     /// Returns the [`Link`] at the provided point (relative to the layout's origin) if one exists.
