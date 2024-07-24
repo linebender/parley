@@ -138,6 +138,7 @@ impl<T: Selectable> TextWithSelection<T> {
                                     self.selection =
                                         Some(Selection::caret(offset, Affinity::Downstream));
                                 };
+                                self.needs_selection_update = true;
                             }
                         }
                         Handled::Yes
@@ -156,6 +157,7 @@ impl<T: Selectable> TextWithSelection<T> {
                                 } else if let Some(o) = t.next_grapheme_offset(selection.active) {
                                     self.selection = Some(Selection::caret(o, Affinity::Upstream));
                                 };
+                                self.needs_selection_update = true;
                             }
                         }
                         Handled::Yes
