@@ -30,7 +30,7 @@ pub struct TextWithSelection<T: Selectable> {
     needs_selection_update: bool,
     selecting_with_mouse: bool,
     // TODO: Cache cursor line, selection boxes
-    cursor_line: Option<Line>,
+    // cursor_line: Option<Line>,
 }
 
 impl<T: Selectable> TextWithSelection<T> {
@@ -40,7 +40,7 @@ impl<T: Selectable> TextWithSelection<T> {
             selection: None,
             needs_selection_update: false,
             selecting_with_mouse: false,
-            cursor_line: None,
+            // cursor_line: None,
             highlight_brush: TextBrush::Highlight {
                 text: Color::WHITE.into(),
                 fill: Color::LIGHT_BLUE.into(),
@@ -59,7 +59,12 @@ impl<T: Selectable> TextWithSelection<T> {
     }
 
     pub fn get_cursor_line(&self) -> Option<Line> {
-        self.cursor_line
+        // self.cursor_line
+        if let Some(selection) = self.selection {
+            self.layout.cursor_line_for_text_position(selection.active)
+        } else {
+            None
+        }
     }
 
     pub fn pointer_down(
