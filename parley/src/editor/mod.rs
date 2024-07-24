@@ -29,4 +29,5 @@ pub use edit::{EditableText, TextEditor};
 mod backspace;
 pub use backspace::offset_for_delete_backwards;
 
-mod masonry_types;
+pub mod masonry_types;
+pub use masonry_types::*;

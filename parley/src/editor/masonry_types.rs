@@ -1,7 +1,5 @@
-use dpi::{LogicalPosition, PhysicalPosition};
-use std::collections::HashSet;
 use winit::{
-    event::{Ime, KeyEvent, Modifiers},
+    event::{Ime, KeyEvent},
     keyboard::ModifiersState,
 };
 
@@ -34,16 +32,6 @@ pub enum PointerButton {
     X2,
     /// Other mouse button. This isn't fleshed out yet.
     Other,
-}
-
-#[derive(Debug, Clone)]
-pub struct PointerState {
-    pub physical_position: PhysicalPosition<f64>,
-    pub position: LogicalPosition<f64>,
-    pub buttons: HashSet<PointerButton>,
-    pub mods: Modifiers,
-    pub count: u8,
-    pub focus: bool,
 }
 
 /// An enum for specifying whether an event was handled.

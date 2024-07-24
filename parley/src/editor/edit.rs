@@ -6,11 +6,11 @@ use std::ops::{Deref, DerefMut, Range};
 use crate::{style::StyleProperty, FontContext, LayoutContext};
 use kurbo::Point;
 use winit::{
-    event::Ime,
+    event::{Ime, Modifiers},
     keyboard::{Key, NamedKey},
 };
 
-use super::masonry_types::{Handled, PointerButton, PointerState, TextEvent};
+use super::masonry_types::{Handled, PointerButton, TextEvent};
 
 use super::{
     offset_for_delete_backwards,
@@ -89,13 +89,13 @@ impl<T: EditableText> TextEditor<T> {
 
     pub fn pointer_down(
         &mut self,
-        origin: Point,
-        state: &PointerState,
+        position: Point,
+        mods: Modifiers,
         button: PointerButton,
     ) -> bool {
         // TODO: If we have a selection and we're hovering over it,
         // implement (optional?) click and drag
-        self.inner.pointer_down(origin, state, button)
+        self.inner.pointer_down(position, mods, button)
     }
 
     pub fn text_event(&mut self, event: &TextEvent) -> Handled {

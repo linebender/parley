@@ -13,9 +13,10 @@ use crate::{style::StyleProperty, FontContext, LayoutContext};
 use kurbo::{Line, Point};
 use peniko::Color;
 use unicode_segmentation::{GraphemeCursor, UnicodeSegmentation};
+use winit::event::Modifiers;
 use winit::keyboard::NamedKey;
 
-use super::masonry_types::{Handled, PointerButton, PointerState, TextEvent};
+use super::masonry_types::{Handled, PointerButton, TextEvent};
 
 use super::{TextBrush, TextLayout, TextStorage};
 
@@ -63,21 +64,17 @@ impl<T: Selectable> TextWithSelection<T> {
 
     pub fn pointer_down(
         &mut self,
-        origin: Point,
-        state: &PointerState,
+        position: Point,
+        mods: Modifiers,
         button: PointerButton,
     ) -> bool {
         // TODO: work out which button is the primary button?
         if button == PointerButton::Primary {
             self.selecting_with_mouse = true;
             self.needs_selection_update = true;
-            // TODO: Much of this juggling seems unnecessary
-            let position = Point::new(state.position.x, state.position.y) - origin;
-            let position = self
-                .layout
-                .cursor_for_point(Point::new(position.x, position.y));
+            let position = self.layout.cursor_for_point(position);
             tracing::warn!("Got cursor point without getting affinity");
-            if state.mods.state().shift_key() {
+            if mods.state().shift_key() {
                 if let Some(selection) = self.selection.as_mut() {
                     selection.active = position.insert_point;
                     selection.active_affinity = Affinity::Downstream;
@@ -94,19 +91,16 @@ impl<T: Selectable> TextWithSelection<T> {
         }
     }
 
-    pub fn pointer_up(&mut self, _origin: Point, _state: &PointerState, button: PointerButton) {
+    pub fn pointer_up(&mut self, _position: Point, _mods: Modifiers, button: PointerButton) {
         if button == PointerButton::Primary {
             self.selecting_with_mouse = false;
         }
     }
 
-    pub fn pointer_move(&mut self, origin: Point, state: &PointerState) -> bool {
+    pub fn pointer_move(&mut self, position: Point, _mods: Modifiers) -> bool {
         if self.selecting_with_mouse {
             self.needs_selection_update = true;
-            let position = Point::new(state.position.x, state.position.y) - origin;
-            let position = self
-                .layout
-                .cursor_for_point(Point::new(position.x, position.y));
+            let position = self.layout.cursor_for_point(position);
             tracing::warn!("Got cursor point without getting affinity");
             if let Some(selection) = self.selection.as_mut() {
                 selection.active = position.insert_point;
