@@ -72,7 +72,7 @@ fn main() {
     });
 
     // Build the builder into a Layout
-    let mut layout: Layout<PenikoColor> = builder.build();
+    let mut layout: Layout<PenikoColor> = builder.build(&text);
 
     // Perform layout (including bidi resolution and shaping) with start alignment
     layout.break_all_lines(max_advance);
