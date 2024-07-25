@@ -1817,7 +1817,6 @@ dependencies = [
 name = "parley"
 version = "0.1.0"
 dependencies = [
- "dpi",
  "fontique",
  "kurbo",
  "peniko",
