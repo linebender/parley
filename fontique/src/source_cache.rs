@@ -11,7 +11,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-/// Options for a source cache.
+/// Options for a [source cache].
+///
+/// [source cache]: SourceCache
 #[derive(Copy, Clone, Default, Debug)]
 pub struct SourceCacheOptions {
     /// If true, the source cache will use a secondary shared cache
@@ -20,7 +22,7 @@ pub struct SourceCacheOptions {
     /// This is useful for ensuring that only one copy of font data is
     /// loaded into memory in multi-threaded scenarios.
     ///
-    /// The default value is false.
+    /// The default value is `false`.
     pub shared: bool,
 }
 
@@ -33,7 +35,9 @@ pub struct SourceCache {
 }
 
 impl SourceCache {
-    /// Creates an empty cache with the given options.
+    /// Creates an empty cache with the given [options].
+    ///
+    /// [options]: SourceCacheOptions
     pub fn new(options: SourceCacheOptions) -> Self {
         if options.shared {
             Self {
@@ -50,6 +54,9 @@ impl SourceCache {
     ///
     /// A cache created with this function maintains a synchronized internal
     /// store that is shared among all clones.
+    ///
+    /// This is the same as calling [`SourceCache::new`] with an options
+    /// struct where `shared = true`.
     pub fn new_shared() -> Self {
         Self {
             cache: Default::default(),
@@ -58,10 +65,12 @@ impl SourceCache {
         }
     }
 
-    /// Returns the blob for the given font data, attempting to load
+    /// Returns the [blob] for the given font data, attempting to load
     /// it from the file system if not already present.
     ///
     /// Returns `None` if loading failed.
+    ///
+    /// [blob]: Blob
     pub fn get(&mut self, source: &SourceInfo) -> Option<Blob<u8>> {
         let path = match &source.kind {
             SourceKind::Memory(memory) => return Some(memory.clone()),

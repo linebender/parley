@@ -67,7 +67,7 @@ impl FontInfo {
     }
 
     /// Returns the visual width of the font-- a relative change from the normal
-    /// aspect ratio, typically in the range 0.5 to 2.0.
+    /// aspect ratio, typically in the range `0.5` to `2.0`.
     pub fn stretch(&self) -> Stretch {
         self.stretch
     }
@@ -78,7 +78,7 @@ impl FontInfo {
     }
 
     /// Returns the visual weight class of the font, typically on a scale
-    /// from 1.0 to 1000.0.
+    /// from `1.0` to `1000.0`.
     pub fn weight(&self) -> Weight {
         self.weight
     }
@@ -135,32 +135,59 @@ impl FontInfo {
         synth
     }
 
-    /// Returns the variation axes for the font.
+    /// Returns the variation [axes] for the font.
+    ///
+    /// [axes]: crate::AxisInfo
     pub fn axes(&self) -> &[AxisInfo] {
         &self.axes
     }
 
-    /// Returns true if the font has a `wght` axis.
+    /// Returns `true` if the font has a `wght` [axis].
+    ///
+    /// This is a quicker check than scanning the [axes].
+    ///
+    /// [axes]: Self::axes
+    /// [axis]: crate::AxisInfo
     pub fn has_weight_axis(&self) -> bool {
         self.attr_axes & WEIGHT_AXIS != 0
     }
 
-    /// Returns true if the font has a `wdth` axis.
+    /// Returns `true` if the font has a `wdth` [axis].
+    ///
+    /// This is a quicker check than scanning the [axes].
+    ///
+    /// [axes]: Self::axes
+    /// [axis]: crate::AxisInfo
     pub fn has_width_axis(&self) -> bool {
         self.attr_axes & WIDTH_AXIS != 0
     }
 
-    /// Returns true if the font has a `slnt` axis.
+    /// Returns `true` if the font has a `slnt` [axis].
+    ///
+    /// This is a quicker check than scanning the [axes].
+    ///
+    /// [axes]: Self::axes
+    /// [axis]: crate::AxisInfo
     pub fn has_slant_axis(&self) -> bool {
         self.attr_axes & SLANT_AXIS != 0
     }
 
-    /// Returns true if the font has an `ital` axis.
+    /// Returns `true` if the font has an `ital` [axis].
+    ///
+    /// This is a quicker check than scanning the [axes].
+    ///
+    /// [axes]: Self::axes
+    /// [axis]: crate::AxisInfo
     pub fn has_italic_axis(&self) -> bool {
         self.attr_axes & ITALIC_AXIS != 0
     }
 
-    /// Returns true if the font as an `opsz` axis.
+    /// Returns `true` if the font as an `opsz` [axis].
+    ///
+    /// This is a quicker check than scanning the [axes].
+    ///
+    /// [axes]: Self::axes
+    /// [axis]: crate::AxisInfo
     pub fn has_optical_size_axis(&self) -> bool {
         self.attr_axes & OPTICAL_SIZE_AXIS != 0
     }
@@ -230,6 +257,24 @@ const ITALIC_AXIS: u8 = 0x08;
 const OPTICAL_SIZE_AXIS: u8 = 0x10;
 
 /// An axis of variation for a variable font.
+///
+/// Instances of this can be obtained from [`FontInfo::axes`].
+///
+/// These give the [`Tag`] and range of valid values for a given font
+/// variation. In `parley`, these values are used to create a
+/// `FontVariation`.
+///
+/// OpenType defines some common axes:
+///
+/// * [Italic](https://fonts.google.com/knowledge/glossary/italic_axis) or `ital`
+/// * [Optical Size](https://fonts.google.com/knowledge/glossary/optical_size_axis) or `opsz`
+/// * [Slant](https://fonts.google.com/knowledge/glossary/slant_axis) or `slnt`
+/// * [Weight](https://fonts.google.com/knowledge/glossary/weight_axis) or `wght`
+/// * [Width](https://fonts.google.com/knowledge/glossary/width_axis) or `wdth`
+///
+/// For a broader explanation of this, see
+/// [Axis in Variable Fonts](https://fonts.google.com/knowledge/glossary/axis_in_variable_fonts)
+/// from Google Fonts.
 #[derive(Copy, Clone, Default, Debug)]
 pub struct AxisInfo {
     /// The tag that identifies the axis.
@@ -242,8 +287,13 @@ pub struct AxisInfo {
     pub default: f32,
 }
 
-/// Suggestions for sythesizing a set of font attributes for a given
+/// Suggestions for synthesizing a set of font attributes for a given
 /// font.
+///
+/// Instances of this can be obtained from [`FontInfo::synthesis`]
+/// as well as [`QueryFont::synthesis`].
+///
+/// [`QueryFont::synthesis`]: crate::QueryFont::synthesis
 #[derive(Copy, Clone, Default, Debug)]
 pub struct Synthesis {
     vars: [(Tag, f32); 3],
@@ -253,18 +303,21 @@ pub struct Synthesis {
 }
 
 impl Synthesis {
-    /// Returns true if any synthesis suggestions are available.
+    /// Returns `true` if any synthesis suggestions are available.
     pub fn any(&self) -> bool {
         self.len != 0 || self.embolden || self.skew != 0
     }
 
     /// Returns the variation settings that should be applied to match the
     /// requested attributes.
+    ///
+    /// When using `parley`, these can be used to create `FontVariation`
+    /// settings.
     pub fn variation_settings(&self) -> &[(Tag, f32)] {
         &self.vars[..self.len as usize]
     }
 
-    /// Returns true if the scaler should apply a faux bold.
+    /// Returns `true` if the scaler should apply a faux bold.
     pub fn embolden(&self) -> bool {
         self.embolden
     }

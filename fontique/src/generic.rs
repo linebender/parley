@@ -14,7 +14,7 @@ type FamilyVec = SmallVec<[FamilyId; 2]>;
 #[repr(u8)]
 pub enum GenericFamily {
     /// Glyphs have finishing strokes, flared or tapering ends, or have actual
-    ///  serifed endings.
+    /// serifed endings.
     Serif = 0,
     /// Glyphs have stroke endings that are plain.
     SansSerif = 1,
