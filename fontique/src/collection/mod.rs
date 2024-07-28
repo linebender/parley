@@ -28,7 +28,7 @@ use std::sync::{atomic::Ordering, Mutex};
 
 type FamilyMap = HashMap<FamilyId, Option<FamilyInfo>>;
 
-/// Options for a font collection.
+/// Options for a [font collection](Collection).
 #[derive(Copy, Clone, Debug)]
 pub struct CollectionOptions {
     /// If true, the font collection will use a secondary shared store
@@ -38,13 +38,13 @@ pub struct CollectionOptions {
     /// If the font collection will be used by a single thread, this is
     /// pure overhead and should be disabled.
     ///
-    /// The default value is false.
+    /// The default value is `false`.
     pub shared: bool,
 
     /// If true, the font collection will provide access to system fonts
     /// using platform specific APIs.
     ///
-    /// The default value is true.
+    /// The default value is `true`.
     pub system_fonts: bool,
 }
 
@@ -66,6 +66,14 @@ pub struct Collection {
 
 impl Collection {
     /// Creates a new collection with the given options.
+    ///
+    /// If `fontique` was compiled with the `"system"` feature and
+    /// [`CollectionOptions::system_fonts`] was set to `true` when
+    /// creating this collection, then it will register the fonts
+    /// available on the system.
+    ///
+    /// Additional fonts can be registered via [`Collection::register_fonts()`]
+    /// and providing it with the data for those fonts.
     pub fn new(options: CollectionOptions) -> Self {
         Self {
             inner: Inner::new(options),
@@ -75,12 +83,18 @@ impl Collection {
 
     /// Returns an iterator over all available family names in the collection.
     ///
-    /// This includes both system and registered fonts.
+    /// If `fontique` was compiled with the `"system"` feature, then it will
+    /// include system fonts after the registered fonts.
     pub fn family_names(&mut self) -> impl Iterator<Item = &str> + '_ + Clone {
         self.inner.family_names()
     }
 
     /// Returns the family identifier for the given family name.
+    ///
+    /// # See also
+    ///
+    /// * [`Collection::family_name()`]
+    /// * [`Collection::family_names()`]
     pub fn family_id(&mut self, name: &str) -> Option<FamilyId> {
         self.inner.family_id(name)
     }
@@ -91,11 +105,19 @@ impl Collection {
     }
 
     /// Returns the family object for the given family identifier.
+    ///
+    /// # See also
+    ///
+    /// * [`Collection::family_by_name()`]
     pub fn family(&mut self, id: FamilyId) -> Option<FamilyInfo> {
         self.inner.family(id)
     }
 
     /// Returns the family object for the given name.
+    ///
+    /// # See also
+    ///
+    /// * [`Collection::family()`]
     pub fn family_by_name(&mut self, name: &str) -> Option<FamilyInfo> {
         self.inner.family_by_name(name)
     }
@@ -130,6 +152,11 @@ impl Collection {
 
     /// Returns an iterator over the fallback families for the given
     /// key.
+    ///
+    /// # See also
+    ///
+    /// * [`Collection::append_fallbacks()`]
+    /// * [`Collection::set_fallbacks()`]
     pub fn fallback_families(
         &mut self,
         key: impl Into<FallbackKey>,
@@ -139,6 +166,11 @@ impl Collection {
 
     /// Replaces the set of family identifiers associated with the fallback
     /// key.
+    ///
+    /// # See also
+    ///
+    /// * [`Collection::append_fallbacks()`]
+    /// * [`Collection::fallback_families()`]
     pub fn set_fallbacks(
         &mut self,
         key: impl Into<FallbackKey>,
@@ -148,6 +180,11 @@ impl Collection {
     }
 
     /// Appends the set of family identifiers to the given fallback key.
+    ///
+    /// # See also
+    ///
+    /// * [`Collection::fallback_families()`]
+    /// * [`Collection::set_fallbacks()`]
     pub fn append_fallbacks(
         &mut self,
         key: impl Into<FallbackKey>,

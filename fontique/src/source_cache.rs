@@ -20,7 +20,7 @@ pub struct SourceCacheOptions {
     /// This is useful for ensuring that only one copy of font data is
     /// loaded into memory in multi-threaded scenarios.
     ///
-    /// The default value is false.
+    /// The default value is `false`.
     pub shared: bool,
 }
 

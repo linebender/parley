@@ -67,7 +67,7 @@ impl FontInfo {
     }
 
     /// Returns the visual width of the font-- a relative change from the normal
-    /// aspect ratio, typically in the range 0.5 to 2.0.
+    /// aspect ratio, typically in the range `0.5` to `2.0`.
     pub fn stretch(&self) -> Stretch {
         self.stretch
     }
@@ -78,7 +78,7 @@ impl FontInfo {
     }
 
     /// Returns the visual weight class of the font, typically on a scale
-    /// from 1.0 to 1000.0.
+    /// from `1.0` to `1000.0`.
     pub fn weight(&self) -> Weight {
         self.weight
     }
@@ -140,27 +140,27 @@ impl FontInfo {
         &self.axes
     }
 
-    /// Returns true if the font has a `wght` axis.
+    /// Returns `true` if the font has a `wght` axis.
     pub fn has_weight_axis(&self) -> bool {
         self.attr_axes & WEIGHT_AXIS != 0
     }
 
-    /// Returns true if the font has a `wdth` axis.
+    /// Returns `true` if the font has a `wdth` axis.
     pub fn has_width_axis(&self) -> bool {
         self.attr_axes & WIDTH_AXIS != 0
     }
 
-    /// Returns true if the font has a `slnt` axis.
+    /// Returns `true` if the font has a `slnt` axis.
     pub fn has_slant_axis(&self) -> bool {
         self.attr_axes & SLANT_AXIS != 0
     }
 
-    /// Returns true if the font has an `ital` axis.
+    /// Returns `true` if the font has an `ital` axis.
     pub fn has_italic_axis(&self) -> bool {
         self.attr_axes & ITALIC_AXIS != 0
     }
 
-    /// Returns true if the font as an `opsz` axis.
+    /// Returns `true` if the font as an `opsz` axis.
     pub fn has_optical_size_axis(&self) -> bool {
         self.attr_axes & OPTICAL_SIZE_AXIS != 0
     }
@@ -230,6 +230,17 @@ const ITALIC_AXIS: u8 = 0x08;
 const OPTICAL_SIZE_AXIS: u8 = 0x10;
 
 /// An axis of variation for a variable font.
+///
+/// Instances of this can be obtained from [`FontInfo::axes()`].
+///
+/// # See also
+///
+/// * [`FontInfo::axes()`]
+/// * [`FontInfo::has_italic_axis()`]
+/// * [`FontInfo::has_optical_size_axis()`]
+/// * [`FontInfo::has_slant_axis()`]
+/// * [`FontInfo::has_weight_axis()`]
+/// * [`FontInfo::has_width_axis()`]
 #[derive(Copy, Clone, Default, Debug)]
 pub struct AxisInfo {
     /// The tag that identifies the axis.
@@ -253,7 +264,7 @@ pub struct Synthesis {
 }
 
 impl Synthesis {
-    /// Returns true if any synthesis suggestions are available.
+    /// Returns `true` if any synthesis suggestions are available.
     pub fn any(&self) -> bool {
         self.len != 0 || self.embolden || self.skew != 0
     }
@@ -264,7 +275,7 @@ impl Synthesis {
         &self.vars[..self.len as usize]
     }
 
-    /// Returns true if the scaler should apply a faux bold.
+    /// Returns `true` if the scaler should apply a faux bold.
     pub fn embolden(&self) -> bool {
         self.embolden
     }
