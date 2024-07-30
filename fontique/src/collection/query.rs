@@ -28,6 +28,8 @@ impl QueryState {
 }
 
 /// State for font selection.
+///
+/// Instances of this can be obtained from [`Collection::query()`].
 pub struct Query<'a> {
     collection: &'a mut Inner,
     state: &'a mut QueryState,
@@ -103,6 +105,9 @@ impl<'a> Query<'a> {
 
     /// Invokes the given callback with all fonts that match the current
     /// settings.
+    ///
+    /// Return [`QueryStatus::Stop`] to end iterating over the matching
+    /// fonts or [`QueryStatus::Continue`] to continue iterating.
     #[cfg(feature = "std")]
     pub fn matches_with(&mut self, mut f: impl FnMut(&QueryFont) -> QueryStatus) {
         for family in self

@@ -6,6 +6,12 @@
 use core::{convert::TryInto, fmt};
 
 /// Four byte tag representing a Unicode script.
+///
+/// If the `"icu_properties"` feature is enabled, this can
+/// be created from a [`icu_properties::Script`].
+///
+/// If the `"unicode_script"` feature is enabled this can
+/// be created from a [`unicode_script::Script`].
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Script(pub [u8; 4]);
 
