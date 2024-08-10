@@ -27,19 +27,14 @@ pub use line::{GlyphRun, LineMetrics, PositionedInlineBox, PositionedLayoutItem}
 pub use run::RunMetrics;
 
 /// Alignment of a layout.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum Alignment {
+    #[default]
     Start,
     Middle,
     End,
     Justified,
-}
-
-impl Default for Alignment {
-    fn default() -> Self {
-        Self::Start
-    }
 }
 
 /// Text layout.

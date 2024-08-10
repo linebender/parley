@@ -82,18 +82,13 @@ pub struct RunData {
     pub advance: f32,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Default, PartialEq)]
 pub enum BreakReason {
+    #[default]
     None,
     Regular,
     Explicit,
     Emergency,
-}
-
-impl Default for BreakReason {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 #[derive(Clone, Default)]
