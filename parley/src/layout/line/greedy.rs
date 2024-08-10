@@ -496,7 +496,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             continue;
                         }
 
-                        // Compute the run's advance by summing the advances of it's constituent clusters
+                        // Compute the run's advance by summing the advances of its constituent clusters
                         line_item.advance = self.layout.clusters[line_item.cluster_range.clone()]
                             .iter()
                             .map(|c| c.advance)

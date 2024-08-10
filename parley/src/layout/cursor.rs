@@ -144,13 +144,13 @@ impl Cursor {
         result
     }
 
-    /// Returns true if the cursor is on the leading edge of the target
+    /// Returns `true` if the cursor is on the leading edge of the target
     /// cluster.
     pub fn is_leading(&self) -> bool {
         self.text_start == self.insert_point
     }
 
-    /// Returns true if the cursor is on the trailing edge of the target
+    /// Returns `true` if the cursor is on the trailing edge of the target
     /// cluster.
     pub fn is_trailing(&self) -> bool {
         self.text_end == self.insert_point

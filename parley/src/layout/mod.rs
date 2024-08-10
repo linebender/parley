@@ -85,7 +85,7 @@ impl<B: Brush> Layout<B> {
         self.data.lines.len()
     }
 
-    /// Returns true if the layout is empty.
+    /// Returns `true` if the layout is empty.
     pub fn is_empty(&self) -> bool {
         self.data.lines.is_empty()
     }
@@ -119,7 +119,7 @@ impl<B: Brush> Layout<B> {
         BreakLines::new(&mut self.data)
     }
 
-    /// Breaks all lines with the specified maximum advance
+    /// Breaks all lines with the specified maximum advance.
     pub fn break_all_lines(&mut self, max_advance: Option<f32>) {
         self.break_lines()
             .break_remaining(max_advance.unwrap_or(f32::MAX));
