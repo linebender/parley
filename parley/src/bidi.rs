@@ -12,7 +12,7 @@ use BidiClass::*;
 /// Type alias for a bidirectional level.
 pub type BidiLevel = u8;
 
-/// Resolver for the unicode bidirectional algorithm.
+/// Resolver for the Unicode bidirectional algorithm.
 #[derive(Clone, Default)]
 pub struct BidiResolver {
     base_level: BidiLevel,

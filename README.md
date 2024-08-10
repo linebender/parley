@@ -35,7 +35,7 @@ It also means collecting metadata about those fonts: whether they are serif, san
 The library is responsible for loading fonts into memory; it will use memory-mapped IO to load portions into memory lazily and share them between processes on the system.
 
 **Font fallback** is matching runs of text to a font.
-This is necessary because fonts typically don't cover the entire unicode range: you have different fonts for latin text, chinese text, arabic text, etc and also usually a separate font for emoji.
+This is necessary because fonts typically don't cover the entire Unicode range: you have different fonts for latin text, chinese text, arabic text, etc and also usually a separate font for emoji.
 But if you have, say arabic text or emoji embedded within latin text, you don't typically specify the font for the arabic text or the emoji, one is chosen for you.
 Font fallback is the process which makes that choice.
 
@@ -50,9 +50,9 @@ Notably it converts the raw glyph representations in font files into scaled, hin
 
 ### Swash
 
-Swash implements text shaping and [some miscellaneous unicode-related features](https://github.com/dfrg/swash#text-analysis).
+Swash implements text shaping and [some miscellaneous Unicode-related features](https://github.com/dfrg/swash#text-analysis).
 
-**Text shaping** means mapping runs of unicode codepoints to specific glyphs within fonts.
+**Text shaping** means mapping runs of Unicode codepoints to specific glyphs within fonts.
 This includes applying ligatures, resolving emoji modifiers, but also much more complex transformations for some scripts.
 
 Swash's implementation is faster but less complete and tested than Harfbuzz and Rustybuzz.

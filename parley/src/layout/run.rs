@@ -60,7 +60,7 @@ impl<'a, B: Brush> Run<'a, B> {
             .clone()
     }
 
-    /// Returns true if the run has right-to-left directionality.
+    /// Returns `true` if the run has right-to-left directionality.
     pub fn is_rtl(&self) -> bool {
         self.data.bidi_level & 1 != 0
     }
@@ -78,7 +78,7 @@ impl<'a, B: Brush> Run<'a, B> {
         self.cluster_range().len()
     }
 
-    /// Returns true if the run is empty.
+    /// Returns `true` if the run is empty.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }

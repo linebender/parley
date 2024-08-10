@@ -14,32 +14,32 @@ impl<'a, B: Brush> Cluster<'a, B> {
         self.data.advance
     }
 
-    /// Returns true if the cluster is the beginning of a ligature.
+    /// Returns `true` if the cluster is the beginning of a ligature.
     pub fn is_ligature_start(&self) -> bool {
         self.data.is_ligature_start()
     }
 
-    /// Returns true if the cluster is a ligature continuation.
+    /// Returns `true` if the cluster is a ligature continuation.
     pub fn is_ligature_continuation(&self) -> bool {
         self.data.is_ligature_component()
     }
 
-    /// Returns true if the cluster is a word boundary.
+    /// Returns `true` if the cluster is a word boundary.
     pub fn is_word_boundary(&self) -> bool {
         self.data.info.is_boundary()
     }
 
-    /// Returns true if the cluster is a soft line break.
+    /// Returns `true` if the cluster is a soft line break.
     pub fn is_soft_line_break(&self) -> bool {
         self.data.info.boundary() == Boundary::Line
     }
 
-    /// Returns true if the cluster is a hard line break.
+    /// Returns `true` if the cluster is a hard line break.
     pub fn is_hard_line_break(&self) -> bool {
         self.data.info.boundary() == Boundary::Mandatory
     }
 
-    /// Returns true if the cluster is a space or no-break space.
+    /// Returns `true` if the cluster is a space or no-break space.
     pub fn is_space_or_nbsp(&self) -> bool {
         self.data.info.whitespace().is_space_or_nbsp()
     }

@@ -21,7 +21,7 @@ impl<'a, B: Brush> Line<'a, B> {
         self.data.item_range.len()
     }
 
-    /// Returns true if the line is empty.
+    /// Returns `true` if the line is empty.
     pub fn is_empty(&self) -> bool {
         self.data.item_range.is_empty()
     }
