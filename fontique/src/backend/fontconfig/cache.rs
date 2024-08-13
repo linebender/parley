@@ -79,6 +79,9 @@ impl CachedFont {
         self.path.clear();
         self.index = 0;
         self.coverage.clear();
+        self.weight = Weight::default();
+        self.style = Style::default();
+        self.stretch = Stretch::default();
     }
 }
 
