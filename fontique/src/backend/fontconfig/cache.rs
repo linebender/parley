@@ -42,7 +42,7 @@ impl Weight {
             (700, 200),
             (800, 205),
             (900, 210),
-            (1000, 215),
+            (950, 215),
         ];
         for (i, (ot, fc)) in MAP.iter().skip(1).enumerate() {
             if weight == *fc {
@@ -58,7 +58,7 @@ impl Weight {
                 return Self::new(ot_a + (ot_b - ot_a) * t);
             }
         }
-        Self::new(1000.0)
+        Weight::EXTRA_BLACK
     }
 }
 
