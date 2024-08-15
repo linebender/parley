@@ -164,7 +164,7 @@ impl Cursor {
     ///
     /// Returns `None` if the cursor should remain in its current position.
     pub fn next_line<B: Brush>(&self, layout: &Layout<B>, h_pos: Option<f32>) -> Option<Cursor> {
-        move_to_line(layout, self, h_pos, self.path.line_index.checked_sub(1)?)
+        move_to_line(layout, self, h_pos, self.path.line_index.checked_add(1)?)
     }
 
     /// Given the layout that generated this cursor, return a new cursor
@@ -175,7 +175,7 @@ impl Cursor {
     ///
     /// Returns `None` if the cursor should remain in its current position.
     pub fn prev_line<B: Brush>(&self, layout: &Layout<B>, h_pos: Option<f32>) -> Option<Cursor> {
-        move_to_line(layout, self, h_pos, self.path.line_index.checked_add(1)?)
+        move_to_line(layout, self, h_pos, self.path.line_index.checked_sub(1)?)
     }
 }
 
