@@ -155,6 +155,44 @@ impl Cursor {
     pub fn is_trailing(&self) -> bool {
         self.text_end == self.insert_point
     }
+
+    /// Given the layout that generated this cursor, return a new cursor
+    /// for the corresponding position on the next line.
+    ///
+    /// If `h_pos` is provided, then it will be used as the horizontal offset
+    /// for computing the position on the next line.
+    ///
+    /// Returns `None` if the cursor should remain in its current position.
+    pub fn next_line<B: Brush>(&self, layout: &Layout<B>, h_pos: Option<f32>) -> Option<Cursor> {
+        move_to_line(layout, self, h_pos, self.path.line_index.checked_sub(1)?)
+    }
+
+    /// Given the layout that generated this cursor, return a new cursor
+    /// for the corresponding position on the previous line.
+    ///
+    /// If `h_pos` is provided, then it will be used as the horizontal offset
+    /// for computing the position on the previous line.
+    ///
+    /// Returns `None` if the cursor should remain in its current position.
+    pub fn prev_line<B: Brush>(&self, layout: &Layout<B>, h_pos: Option<f32>) -> Option<Cursor> {
+        move_to_line(layout, self, h_pos, self.path.line_index.checked_add(1)?)
+    }
+}
+
+fn move_to_line<B: Brush>(
+    layout: &Layout<B>,
+    cursor: &Cursor,
+    h_pos: Option<f32>,
+    line_index: usize,
+) -> Option<Cursor> {
+    let line = layout.get(line_index)?;
+    let metrics = line.metrics();
+    let y = metrics.baseline - metrics.line_height * 0.5;
+    Some(Cursor::from_point(
+        layout,
+        h_pos.unwrap_or(cursor.offset),
+        y,
+    ))
 }
 
 /// Index based path to a cluster.
