@@ -134,7 +134,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
     /// Computes the next line in the paragraph. Returns the advance and size
     /// (width and height for horizontal layouts) of the line.
-    pub fn break_next(&mut self, max_advance: f32) -> Option<(f32, f32)> {
+    pub fn break_next(&mut self, max_advance: f32, alignment: Alignment) -> Option<(f32, f32)> {
         // Maintain iterator state
         if self.done {
             return None;
@@ -151,7 +151,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     &mut self.lines,
                     &mut self.state.line,
                     max_advance,
-                    Alignment::Start,
+                    alignment,
                     $break_reason,
                 )
             };
@@ -394,7 +394,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
     /// Breaks all remaining lines with the specified maximum advance. This
     /// consumes the line breaker.
-    pub fn break_remaining(mut self, max_advance: f32) {
+    pub fn break_remaining(mut self, max_advance: f32, alignment: Alignment) {
         // println!("\nDEBUG ITEMS");
         // for item in &self.layout.items {
         //     match item.kind {
@@ -408,7 +408,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         // println!("\nBREAK ALL");
 
-        while self.break_next(max_advance).is_some() {}
+        while self.break_next(max_advance, alignment).is_some() {}
         self.finish();
     }
 

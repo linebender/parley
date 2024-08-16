@@ -115,9 +115,9 @@ impl<B: Brush> Layout<B> {
     }
 
     /// Breaks all lines with the specified maximum advance.
-    pub fn break_all_lines(&mut self, max_advance: Option<f32>) {
+    pub fn break_all_lines(&mut self, max_advance: Option<f32>, alignment: Alignment) {
         self.break_lines()
-            .break_remaining(max_advance.unwrap_or(f32::MAX));
+            .break_remaining(max_advance.unwrap_or(f32::MAX), alignment);
     }
 
     // Apply to alignment to layout relative to the specified container width. If container_width is not
