@@ -3,9 +3,9 @@
 
 //! Hit testing.
 
-use peniko::kurbo::Rect;
-
 use super::*;
+use alloc::vec::Vec;
+use peniko::kurbo::Rect;
 
 /// Represents a position within a layout.
 #[derive(Copy, Clone, PartialEq, Default, Debug)]
@@ -421,7 +421,7 @@ impl Selection {
     }
 
     pub fn visual_regions<B: Brush>(&self, layout: &Layout<B>) -> Vec<Rect> {
-        let mut rects = vec![];
+        let mut rects = Vec::new();
         self.visual_regions_with(layout, |rect| rects.push(rect));
         rects
     }
