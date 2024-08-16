@@ -51,35 +51,34 @@ impl Cursor {
             }
             result.baseline = line_metrics.baseline;
             result.path.line_index = line_index;
-            let mut last_edge = line_metrics.offset;
+            result.path.visual_line_index = line_index;
+            let mut cur_edge = line_metrics.offset;
+            let last_run_ix = line.data.item_range.len().saturating_sub(1);
             for (run_index, run) in line.runs().enumerate() {
                 result.path.run_index = run_index;
+                let last_cluster_ix = run.cluster_range().len().saturating_sub(1);
                 for (cluster_index, cluster) in run.visual_clusters().enumerate() {
                     let range = cluster.text_range();
-                    result.text_start = range.start;
-                    result.text_end = range.end;
-                    result.is_rtl = run.is_rtl();
-                    result.path.cluster_index = run.visual_to_logical(cluster_index).unwrap();
-                    if x >= last_edge {
-                        let advance = cluster.advance();
-                        let next_edge = last_edge + advance;
-                        result.offset = next_edge;
-                        result.insert_point = range.end;
-                        if x >= next_edge {
-                            last_edge = next_edge;
-                            continue;
-                        }
-                        result.advance = advance;
-                        if x <= (last_edge + next_edge) * 0.5 {
-                            result.insert_point = range.start;
-                            result.offset = last_edge;
-                        }
-                    } else {
-                        result.is_inside = false;
-                        result.insert_point = range.start;
-                        result.offset = line_metrics.offset;
+                    let advance = cluster.advance();
+                    if x <= cur_edge + advance * 0.5 {
+                        let index = if run.is_rtl() {
+                            range.end
+                        } else {
+                            range.start
+                        };
+                        return Self::from_byte_index(layout, index);
+                    } else if run.is_rtl() && x < cur_edge + advance {
+                        return Self::from_byte_index(layout, range.start);
+                    } else if cluster_index == last_cluster_ix && run_index == last_run_ix {
+                        let mut cursor = Self::from_byte_index(layout, range.start + 1);
+                        cursor.baseline = line_metrics.baseline;
+                        cursor.path.visual_line_index = line_index;
+                        cursor.offset = line_metrics.offset + line_metrics.advance;
+                        return cursor;
+                    } else if x < cur_edge + advance {
+                        return Self::from_byte_index(layout, range.end);
                     }
-                    return result;
+                    cur_edge += advance;
                 }
             }
             break;
@@ -87,87 +86,43 @@ impl Cursor {
         result.is_inside = false;
         result
     }
-
-    fn from_offset_on_line<B: Brush>(
-        layout: &Layout<B>,
-        mut x: f32,
-        line_index: usize,
-    ) -> Option<Self> {
-        let mut result = Self {
-            is_inside: x >= 0.0,
-            ..Default::default()
-        };
-        let last_line = layout.data.lines.len().saturating_sub(1);
-        let line = layout.get(line_index)?;
-        let line_metrics = line.metrics();
-        result.baseline = line_metrics.baseline;
-        result.path.line_index = line_index;
-        let mut last_edge = line_metrics.offset;
-        for (run_index, run) in line.runs().enumerate() {
-            result.path.run_index = run_index;
-            for (cluster_index, cluster) in run.visual_clusters().enumerate() {
-                let range = cluster.text_range();
-                result.text_start = range.start;
-                result.text_end = range.end;
-                result.is_rtl = run.is_rtl();
-                result.path.cluster_index = run.visual_to_logical(cluster_index).unwrap();
-                if x >= last_edge {
-                    let advance = cluster.advance();
-                    let next_edge = last_edge + advance;
-                    result.offset = next_edge;
-                    result.insert_point = range.end;
-                    if x >= next_edge {
-                        last_edge = next_edge;
-                        continue;
-                    }
-                    result.advance = advance;
-                    if x <= (last_edge + next_edge) * 0.5 {
-                        result.insert_point = range.start;
-                        result.offset = last_edge;
-                    }
-                } else {
-                    result.is_inside = false;
-                    result.insert_point = range.start;
-                    result.offset = line_metrics.offset;
-                }
-                return Some(result);
-            }
-        }
-        result.is_inside = false;
-        Some(result)
-    }
-
+ 
     /// Creates a new cursor for the specified layout and text position.
-    pub fn from_position<B: Brush>(
-        layout: &Layout<B>,
-        mut position: usize,
-        is_leading: bool,
-    ) -> Self {
+    pub fn from_byte_index<B: Brush>(layout: &Layout<B>, mut index: usize) -> Self {
         let mut result = Self {
             is_inside: true,
             ..Default::default()
         };
-        if position >= layout.data.text_len {
+        if index >= layout.data.text_len {
             result.is_inside = false;
-            position = layout.data.text_len.saturating_sub(1);
+            result.text_start = layout.data.text_len;
+            result.text_end = result.text_start;
+            index = layout.data.text_len;
         }
         let last_line = layout.data.lines.len().saturating_sub(1);
         for (line_index, line) in layout.lines().enumerate() {
             let line_metrics = line.metrics();
             result.baseline = line_metrics.baseline;
             result.path.line_index = line_index;
-            if !line.text_range().contains(&position) && line_index != last_line {
+            result.path.visual_line_index = line_index;
+            if !line.text_range().contains(&index) && line_index != last_line {
                 continue;
             }
             let mut last_edge = line_metrics.offset;
             result.offset = last_edge;
+            let mut last_is_rtl = false;
+            let mut last_run_end = 0.0;
             for (run_index, run) in line.runs().enumerate() {
+                let is_rtl = run.is_rtl();
                 result.path.run_index = run_index;
-                if !run.text_range().contains(&position) {
+                if !run.text_range().contains(&index) {
                     last_edge += run.advance();
                     result.offset = last_edge;
+                    last_is_rtl = is_rtl;
+                    last_run_end = last_edge;
                     continue;
                 }
+                let last_cluster_ix = run.cluster_range().len().saturating_sub(1);
                 for (cluster_index, cluster) in run.visual_clusters().enumerate() {
                     let range = cluster.text_range();
                     result.text_start = range.start;
@@ -175,13 +130,16 @@ impl Cursor {
                     result.offset = last_edge;
                     result.is_rtl = run.is_rtl();
                     result.path.cluster_index = run.visual_to_logical(cluster_index).unwrap();
+                    result.insert_point = range.start;
                     let advance = cluster.advance();
-                    if range.contains(&position) {
-                        if !is_leading || !result.is_inside {
+                    result.advance = advance;
+                    if range.contains(&index) {
+                        if is_rtl && cluster_index == last_cluster_ix && !last_is_rtl {
+                            result.offset = last_run_end;
+                        } else if is_rtl || !result.is_inside {
                             result.offset += advance;
+                            result.advance = -advance;
                         }
-                        result.insert_point = if is_leading { range.start } else { range.end };
-                        result.advance = advance;
                         return result;
                     }
                     last_edge += advance;
@@ -193,6 +151,10 @@ impl Cursor {
         result.insert_point = result.text_end;
         result.is_inside = false;
         result
+    }
+  
+    pub fn text_range(&self) -> Range<usize> {
+        self.text_start..self.text_end
     }
 
     /// Returns `true` if the cursor is on the leading edge of the target
@@ -206,18 +168,6 @@ impl Cursor {
     pub fn is_trailing(&self) -> bool {
         self.text_end == self.insert_point
     }
-
-    fn insertion_index(&self) -> usize {
-        if self.is_rtl {
-            if self.is_leading() {
-                self.text_end
-            } else {
-                self.text_start
-            }
-        } else {
-            self.insert_point
-        }
-    }
 }
 
 /// Index based path to a cluster.
@@ -229,6 +179,9 @@ pub struct CursorPath {
     pub run_index: usize,
     /// Index of the cluster within the containing run.
     pub cluster_index: usize,
+    /// Index of the line containing the visual representation of the
+    /// cursor.
+    pub visual_line_index: usize,
 }
 
 impl CursorPath {
@@ -246,6 +199,10 @@ impl CursorPath {
     pub fn cluster<'a, B: Brush>(&self, layout: &'a Layout<B>) -> Option<Cluster<'a, B>> {
         self.run(layout)?.get(self.cluster_index)
     }
+
+    pub fn visual_line<'a, B: Brush>(&self, layout: &'a Layout<B>) -> Option<Line<'a, B>> {
+        layout.get(self.visual_line_index)
+    }    
 }
 
 #[derive(Copy, Clone, PartialEq, Default, Debug)]
@@ -270,8 +227,8 @@ impl Selection {
         Cursor::from_point(layout, x, y).into()
     }
 
-    pub fn from_index<B: Brush>(layout: &Layout<B>, index: usize, is_leading: bool) -> Self {
-        Cursor::from_position(layout, index, is_leading).into()
+    pub fn from_byte_index<B: Brush>(layout: &Layout<B>, index: usize) -> Self {
+        Cursor::from_byte_index(layout, index).into()
     }
 
     pub fn anchor(&self) -> &Cursor {
@@ -287,19 +244,17 @@ impl Selection {
     }
 
     pub fn text_range(&self) -> Range<usize> {
-        let start = self.anchor.insertion_index();
-        let end = self.focus.insertion_index();
-        if start < end {
-            start..end
+        if self.anchor.text_start < self.focus.text_start {
+            self.anchor.text_start..self.focus.text_start
         } else {
-            end..start
+            self.focus.text_start..self.anchor.text_start
         }
     }
 
     /// Returns the index where text should be inserted based on this
     /// selection.
     pub fn insertion_index(&self) -> usize {
-        self.focus.insert_point
+        self.focus.text_start
     }
 
     pub fn collapse(&self) -> Self {
@@ -319,20 +274,11 @@ impl Selection {
     }
 
     pub fn next_logical<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
-        let new_focus = if self.focus.is_leading() && !self.focus.is_rtl {
-            let mut new_focus = self.focus;
-            new_focus.insert_point = new_focus.text_end;
-            new_focus.offset += new_focus.advance;
-            new_focus;
-            Cursor::from_position(layout, self.focus.text_end, true)
-        } else {
-            Cursor::from_position(layout, self.focus.text_end + 1, true)
-        };
-        //let new_focus = Cursor::from_position(layout, self.focus.text_end + 1, true);
+        let new_focus = Cursor::from_byte_index(layout, self.focus.text_end);
         if extend {
             Self {
-                focus: new_focus,
                 anchor: self.anchor,
+                focus: new_focus,
                 h_pos: None,
             }
         } else {
@@ -341,19 +287,11 @@ impl Selection {
     }
 
     pub fn prev_logical<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
-        let new_focus = if self.focus.is_trailing() && !self.focus.is_rtl {
-            let mut new_focus = self.focus;
-            new_focus.insert_point = new_focus.text_start;
-            new_focus.offset -= new_focus.advance;
-            new_focus;
-            Cursor::from_position(layout, self.focus.text_start, true)
-        } else {
-            Cursor::from_position(layout, self.focus.text_start.saturating_sub(1), true)
-        };
+        let new_focus = Cursor::from_byte_index(layout, self.focus.text_start.saturating_sub(1));
         if extend {
             Self {
-                focus: new_focus,
                 anchor: self.anchor,
+                focus: new_focus,
                 h_pos: None,
             }
         } else {
@@ -375,13 +313,16 @@ impl Selection {
         line_delta: isize,
         extend: bool,
     ) -> Option<Self> {
-        let line_index = self.focus.path.line_index.saturating_add_signed(line_delta);
-        let new_focus = Cursor::from_offset_on_line(
+        let line_index = self.focus.path.visual_line_index.saturating_add_signed(line_delta);
+        let line = layout.get(line_index)?;
+        let y = line.metrics().baseline - line.metrics().ascent * 0.5;
+        let h_pos = self.h_pos.unwrap_or(self.focus.offset);
+        let new_focus = Cursor::from_point(
             layout,
-            self.h_pos.unwrap_or(self.focus.offset),
-            line_index,
-        )?;
-        let h_pos = Some(self.h_pos.unwrap_or(new_focus.offset));
+            h_pos,
+            y
+        );
+        let h_pos = Some(h_pos);
         Some(if extend {
             Self {
                 anchor: self.anchor,
@@ -398,7 +339,7 @@ impl Selection {
     }
 
     pub fn visual_caret<B: Brush>(&self, layout: &Layout<B>) -> Option<peniko::kurbo::Line> {
-        self.focus.path.line(layout).map(|line| {
+        self.focus.path.visual_line(layout).map(|line| {
             let metrics = line.metrics();
             let line_min = (metrics.baseline - metrics.ascent - metrics.leading * 0.5) as f64;
             let line_max = line_min + metrics.line_height as f64;
@@ -408,7 +349,7 @@ impl Selection {
     }
 
     pub fn visual_anchor<B: Brush>(&self, layout: &Layout<B>) -> Option<peniko::kurbo::Line> {
-        self.anchor.path.line(layout).map(|line| {
+        self.anchor.path.visual_line(layout).map(|line| {
             let metrics = line.metrics();
             let line_min = (metrics.baseline - metrics.ascent - metrics.leading * 0.5) as f64;
             let line_max = line_min + metrics.line_height as f64;
@@ -432,19 +373,19 @@ impl Selection {
         }
         let mut start = self.anchor;
         let mut end = self.focus;
-        if start.insertion_index() > end.insertion_index() {
+        if start.text_start > end.text_start {
             core::mem::swap(&mut start, &mut end);
         }
-        let text_range = start.insertion_index()..end.insertion_index();
-        let line_start_ix = start.path.line_index;
-        let line_end_ix = end.path.line_index;
+        let text_range = start.text_start..end.text_start;
+        let line_start_ix = start.path.visual_line_index;
+        let line_end_ix = end.path.visual_line_index;
         for line_ix in line_start_ix..=line_end_ix {
             let Some(line) = layout.get(line_ix) else {
                 continue;
             };
             let metrics = line.metrics();
-            let line_min = (metrics.baseline - metrics.ascent - metrics.leading * 0.5) as f64;
-            let line_max = line_min + metrics.line_height as f64;
+            let line_min = (metrics.baseline - metrics.ascent) as f64;
+            let line_max = (metrics.baseline + metrics.descent) as f64;
             if line_ix == line_start_ix || line_ix == line_end_ix {
                 // We only need to run the expensive logic on the first and
                 // last lines

@@ -490,6 +490,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             needs_reorder = true;
                         }
 
+                        let run = &self.layout.runs[line_item.index];
+                        let line_height = line_item.compute_line_height(self.layout);
+                        line.metrics.line_height = line.metrics.line_height.max(line_height);
+
                         // Ignore trailing whitespace for metrics computation
                         // (we are iterating backwards so trailing whitespace comes first)
                         if !have_metrics && line_item.is_whitespace {
@@ -503,9 +507,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             .sum();
 
                         // Compute the run's vertical metrics
-                        let run = &self.layout.runs[line_item.index];
-                        let line_height = line_item.compute_line_height(self.layout);
-                        line.metrics.line_height = line.metrics.line_height.max(line_height);
                         line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent);
                         line.metrics.descent = line.metrics.descent.max(run.metrics.descent);
                         line.metrics.leading = line.metrics.leading.max(run.metrics.leading);
