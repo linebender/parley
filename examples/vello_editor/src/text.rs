@@ -20,7 +20,7 @@ const INSET: f32 = 32.0;
 #[derive(Copy, Clone, Debug)]
 pub enum ActiveText<'a> {
     FocusedCluster(&'a str),
-    Selection(&'a str)
+    Selection(&'a str),
 }
 
 #[derive(Default)]
@@ -48,7 +48,9 @@ impl Text {
             .ranged_builder(&mut self.font_cx, &self.buffer, scale);
         builder.push_default(&parley::style::StyleProperty::FontSize(32.0));
         builder.push_default(&parley::style::StyleProperty::LineHeight(1.2));
-        builder.push_default(&parley::style::StyleProperty::FontStack(parley::style::FontStack::Source("system-ui")));
+        builder.push_default(&parley::style::StyleProperty::FontStack(
+            parley::style::FontStack::Source("system-ui"),
+        ));
         builder.build_into(&mut self.layout);
         self.layout
             .break_all_lines(Some(width - INSET * 2.0), parley::layout::Alignment::Start);
@@ -57,7 +59,7 @@ impl Text {
 
     pub fn active_text(&self) -> ActiveText {
         if self.selection.is_collapsed() {
-            let range =  self.selection.focus().text_start..self.selection.focus().text_end;
+            let range = self.selection.focus().text_start..self.selection.focus().text_end;
             ActiveText::FocusedCluster(&self.buffer[range])
         } else {
             ActiveText::Selection(&self.buffer[self.selection.text_range()])
@@ -91,22 +93,62 @@ impl Text {
                         KeyCode::ArrowDown => {
                             self.selection = self.selection.next_line(&self.layout, shift);
                         }
+                        KeyCode::Home => {
+                            self.selection = self.selection.line_start(&self.layout, shift);
+                        }
+                        KeyCode::End => {
+                            self.selection = self.selection.line_end(&self.layout, shift);
+                        }
                         KeyCode::Delete => {
-                            let range = if self.selection.is_collapsed() {
-                                self.selection.focus().text_start..self.selection.focus().text_end
+                            let start = if self.selection.is_collapsed() {
+                                let range = self.selection.focus().text_start
+                                    ..self.selection.focus().text_end;
+                                let start = range.start;
+                                self.buffer.replace_range(range, "");
+                                start
                             } else {
-                                self.selection.text_range()
+                                self.delete_current_selection().unwrap()
                             };
-                            let start = range.start;
-                            self.buffer.replace_range(range, "");
-                            self.selection = self.selection.collapse();
                             self.update_layout(self.width, 1.0);
                             self.selection = Selection::from_byte_index(&self.layout, start);
                         }
-                        _ => {}
+                        KeyCode::Backspace => {
+                            let start = if self.selection.is_collapsed() {
+                                let end = self.selection.focus().text_start;
+                                if let Some((start, _)) =
+                                    self.buffer[..end].char_indices().rev().next()
+                                {
+                                    self.buffer.replace_range(start..end, "");
+                                    self.update_layout(self.width, 1.0);
+                                    self.selection =
+                                        Selection::from_byte_index(&self.layout, start);
+                                    Some(start)
+                                } else {
+                                    None
+                                }
+                            } else {
+                                self.delete_current_selection()
+                            };
+                            if let Some(start) = start {
+                                self.update_layout(self.width, 1.0);
+                                self.selection = Selection::from_byte_index(&self.layout, start);
+                            }
+                        }
+                        _ => {
+                            if let Some(text) = &event.text {
+                                let start = self
+                                    .delete_current_selection()
+                                    .unwrap_or_else(|| self.selection.focus().text_start);
+                                self.buffer.insert_str(start, text);
+                                self.update_layout(self.width, 1.0);
+                                self.selection =
+                                    Selection::from_byte_index(&self.layout, start + text.len());
+                            }
+                        }
                     },
                     _ => {}
                 }
+
                 println!("Active text: {:?}", self.active_text());
             }
             WindowEvent::MouseInput { state, button, .. } => {
@@ -134,6 +176,17 @@ impl Text {
                 }
             }
             _ => {}
+        }
+    }
+
+    fn delete_current_selection(&mut self) -> Option<usize> {
+        if !self.selection.is_collapsed() {
+            let range = self.selection.text_range();
+            let start = range.start;
+            self.buffer.replace_range(range, "");
+            Some(start)
+        } else {
+            None
         }
     }
 

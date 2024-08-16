@@ -2031,6 +2031,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "vello_editor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "parley",
+ "peniko",
+ "pollster",
+ "vello",
+ "winit",
+]
+
+[[package]]
 name = "vello_encoding"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2041,18 +2053,6 @@ dependencies = [
  "peniko",
  "skrifa",
  "smallvec",
-]
-
-[[package]]
-name = "vello_render"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "parley",
- "peniko",
- "pollster",
- "vello",
- "winit",
 ]
 
 [[package]]

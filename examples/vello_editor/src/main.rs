@@ -109,7 +109,9 @@ impl<'s> ApplicationHandler for SimpleVelloApp<'s> {
 
         self.text.handle_event(&event);
         render_state.window.request_redraw();
-        render_state.window.set_cursor(winit::window::Cursor::Icon(winit::window::CursorIcon::Text));
+        render_state
+            .window
+            .set_cursor(winit::window::Cursor::Icon(winit::window::CursorIcon::Text));
 
         match event {
             // Exit the event loop when a close is requested (e.g. window's close button is pressed)
@@ -202,7 +204,7 @@ fn create_winit_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
     let attr = Window::default_attributes()
         .with_inner_size(LogicalSize::new(1044, 800))
         .with_resizable(true)
-        .with_title("Vello Shapes");
+        .with_title("Vello Text Editor");
     Arc::new(event_loop.create_window(attr).unwrap())
 }
 
@@ -218,41 +220,4 @@ fn create_vello_renderer(render_cx: &RenderContext, surface: &RenderSurface) -> 
         },
     )
     .expect("Couldn't create renderer")
-}
-
-/// Add shapes to a vello scene. This does not actually render the shapes, but adds them
-/// to the Scene data structure which represents a set of objects to draw.
-fn add_shapes_to_scene(scene: &mut Scene) {
-    // Draw an outlined rectangle
-    let stroke = Stroke::new(6.0);
-    let rect = RoundedRect::new(10.0, 10.0, 240.0, 240.0, 20.0);
-    let rect_stroke_color = Color::rgb(0.9804, 0.702, 0.5294);
-    scene.stroke(&stroke, Affine::IDENTITY, rect_stroke_color, None, &rect);
-
-    // Draw a filled circle
-    let circle = Circle::new((420.0, 200.0), 120.0);
-    let circle_fill_color = Color::rgb(0.9529, 0.5451, 0.6588);
-    scene.fill(
-        vello::peniko::Fill::NonZero,
-        Affine::IDENTITY,
-        circle_fill_color,
-        None,
-        &circle,
-    );
-
-    // Draw a filled ellipse
-    let ellipse = Ellipse::new((250.0, 420.0), (100.0, 160.0), -90.0);
-    let ellipse_fill_color = Color::rgb(0.7961, 0.651, 0.9686);
-    scene.fill(
-        vello::peniko::Fill::NonZero,
-        Affine::IDENTITY,
-        ellipse_fill_color,
-        None,
-        &ellipse,
-    );
-
-    // Draw a straight line
-    let line = Line::new((260.0, 20.0), (620.0, 100.0));
-    let line_stroke_color = Color::rgb(0.5373, 0.7059, 0.9804);
-    scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &line);
 }

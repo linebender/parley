@@ -61,11 +61,7 @@ impl Cursor {
                     let range = cluster.text_range();
                     let advance = cluster.advance();
                     if x <= cur_edge + advance * 0.5 {
-                        let index = if run.is_rtl() {
-                            range.end
-                        } else {
-                            range.start
-                        };
+                        let index = if run.is_rtl() { range.end } else { range.start };
                         return Self::from_byte_index(layout, index);
                     } else if run.is_rtl() && x < cur_edge + advance {
                         return Self::from_byte_index(layout, range.start);
@@ -86,7 +82,7 @@ impl Cursor {
         result.is_inside = false;
         result
     }
- 
+
     /// Creates a new cursor for the specified layout and text position.
     pub fn from_byte_index<B: Brush>(layout: &Layout<B>, mut index: usize) -> Self {
         let mut result = Self {
@@ -152,7 +148,7 @@ impl Cursor {
         result.is_inside = false;
         result
     }
-  
+
     pub fn text_range(&self) -> Range<usize> {
         self.text_start..self.text_end
     }
@@ -202,7 +198,12 @@ impl CursorPath {
 
     pub fn visual_line<'a, B: Brush>(&self, layout: &'a Layout<B>) -> Option<Line<'a, B>> {
         layout.get(self.visual_line_index)
-    }    
+    }
+}
+
+/// Returns a point that is falls within the vertical bounds of the given line.
+fn line_y<B: Brush>(line: &Line<B>) -> f32 {
+    line.metrics().baseline - line.metrics().ascent * 0.5
 }
 
 #[derive(Copy, Clone, PartialEq, Default, Debug)]
@@ -274,28 +275,51 @@ impl Selection {
     }
 
     pub fn next_logical<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
-        let new_focus = Cursor::from_byte_index(layout, self.focus.text_end);
-        if extend {
-            Self {
-                anchor: self.anchor,
-                focus: new_focus,
-                h_pos: None,
-            }
-        } else {
-            new_focus.into()
-        }
+        self.maybe_extend(Cursor::from_byte_index(layout, self.focus.text_end), extend)
     }
 
     pub fn prev_logical<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
-        let new_focus = Cursor::from_byte_index(layout, self.focus.text_start.saturating_sub(1));
+        self.maybe_extend(
+            Cursor::from_byte_index(layout, self.focus.text_start.saturating_sub(1)),
+            extend,
+        )
+    }
+
+    fn maybe_extend(&self, focus: Cursor, extend: bool) -> Self {
         if extend {
             Self {
                 anchor: self.anchor,
-                focus: new_focus,
+                focus,
                 h_pos: None,
             }
         } else {
-            new_focus.into()
+            focus.into()
+        }
+    }
+
+    pub fn line_start<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
+        if let Some(y) = self
+            .focus
+            .path
+            .visual_line(layout)
+            .map(|line| line_y(&line))
+        {
+            self.maybe_extend(Cursor::from_point(layout, 0.0, y), extend)
+        } else {
+            *self
+        }
+    }
+
+    pub fn line_end<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
+        if let Some(y) = self
+            .focus
+            .path
+            .visual_line(layout)
+            .map(|line| line_y(&line))
+        {
+            self.maybe_extend(Cursor::from_point(layout, f32::MAX, y), extend)
+        } else {
+            *self
         }
     }
 
@@ -313,15 +337,15 @@ impl Selection {
         line_delta: isize,
         extend: bool,
     ) -> Option<Self> {
-        let line_index = self.focus.path.visual_line_index.saturating_add_signed(line_delta);
+        let line_index = self
+            .focus
+            .path
+            .visual_line_index
+            .saturating_add_signed(line_delta);
         let line = layout.get(line_index)?;
         let y = line.metrics().baseline - line.metrics().ascent * 0.5;
         let h_pos = self.h_pos.unwrap_or(self.focus.offset);
-        let new_focus = Cursor::from_point(
-            layout,
-            h_pos,
-            y
-        );
+        let new_focus = Cursor::from_point(layout, h_pos, y);
         let h_pos = Some(h_pos);
         Some(if extend {
             Self {

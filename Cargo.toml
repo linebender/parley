@@ -4,7 +4,8 @@ members = [
     "fontique",
     "parley",
     "examples/tiny_skia_render",
-    "examples/swash_render", "examples/vello_render",
+    "examples/swash_render",
+    "examples/vello_editor",
 ]
 
 [workspace.package]
