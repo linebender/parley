@@ -17,6 +17,7 @@ type Layout = parley::Layout<Color>;
 
 const INSET: f32 = 32.0;
 
+#[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
 pub enum ActiveText<'a> {
     FocusedCluster(&'a str),
@@ -79,8 +80,8 @@ impl Text {
                     .modifiers
                     .map(|mods| mods.state().shift_key())
                     .unwrap_or_default();
-                match event.physical_key {
-                    PhysicalKey::Code(code) => match code {
+                if let PhysicalKey::Code(code) = event.physical_key {
+                    match code {
                         KeyCode::ArrowLeft => {
                             self.selection = self.selection.prev_logical(&self.layout, shift);
                         }
@@ -116,7 +117,7 @@ impl Text {
                             let start = if self.selection.is_collapsed() {
                                 let end = self.selection.focus().text_start;
                                 if let Some((start, _)) =
-                                    self.buffer[..end].char_indices().rev().next()
+                                    self.buffer[..end].char_indices().next_back()
                                 {
                                     self.buffer.replace_range(start..end, "");
                                     self.update_layout(self.width, 1.0);
@@ -145,8 +146,7 @@ impl Text {
                                     Selection::from_byte_index(&self.layout, start + text.len());
                             }
                         }
-                    },
-                    _ => {}
+                    }
                 }
 
                 println!("Active text: {:?}", self.active_text());
@@ -212,7 +212,6 @@ impl Text {
                 let glyph_xform = synthesis
                     .skew()
                     .map(|angle| Affine::skew(angle.to_radians().tan() as f64, 0.0));
-                let style = glyph_run.style();
                 let coords = run
                     .normalized_coords()
                     .iter()
