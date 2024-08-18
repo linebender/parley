@@ -108,9 +108,9 @@ impl<'s> ApplicationHandler for SimpleVelloApp<'s> {
 
         self.text.handle_event(&event);
         render_state.window.request_redraw();
-        render_state
-            .window
-            .set_cursor(winit::window::Cursor::Icon(winit::window::CursorIcon::Text));
+        // render_state
+        //     .window
+        //     .set_cursor(winit::window::Cursor::Icon(winit::window::CursorIcon::Text));
 
         match event {
             // Exit the event loop when a close is requested (e.g. window's close button is pressed)

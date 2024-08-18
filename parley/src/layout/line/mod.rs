@@ -101,6 +101,16 @@ pub struct LineMetrics {
     pub advance: f32,
     /// Advance of trailing whitespace.
     pub trailing_whitespace: f32,
+    /// Minimum coordinate in the direction orthogonal to line
+    /// direction.
+    ///
+    /// For horizontal text, this would be the top of the line.    
+    pub min_coord: f32,
+    /// Maximum coordinate in the direction orthogonal to line
+    /// direction.
+    ///
+    /// For horizontal text, this would be the bottom of the line.     
+    pub max_coord: f32,
 }
 
 impl LineMetrics {

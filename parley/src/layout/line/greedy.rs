@@ -566,8 +566,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             // Compute
             let above = (line.metrics.ascent + line.metrics.leading * 0.5).round();
             let below = (line.metrics.descent + line.metrics.leading * 0.5).round();
+            line.metrics.min_coord = y;
             line.metrics.baseline = y + above;
             y = line.metrics.baseline + below;
+            line.metrics.max_coord = y;
         }
     }
 }

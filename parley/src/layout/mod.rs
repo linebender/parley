@@ -16,7 +16,7 @@ use self::alignment::align;
 
 use super::style::Brush;
 use crate::{Font, InlineBox};
-use core::ops::Range;
+use core::{cmp::Ordering, ops::Range};
 use data::*;
 use swash::text::cluster::{Boundary, ClusterInfo};
 use swash::{GlyphId, NormalizedCoord, Synthesis};
@@ -133,6 +133,50 @@ impl<B: Brush> Layout<B> {
             data,
             line_data: None,
         })
+    }
+
+    /// Returns the index and `Line` object for the line containing the
+    /// given byte `index` in the source text.
+    pub(crate) fn line_for_byte_index(&self, index: usize) -> Option<(usize, Line<B>)> {
+        let line_index = self
+            .data
+            .lines
+            .binary_search_by(|line| {
+                if index < line.text_range.start {
+                    Ordering::Greater
+                } else if index >= line.text_range.end {
+                    Ordering::Less
+                } else {
+                    Ordering::Equal
+                }
+            })
+            .ok()?;
+        Some((line_index, self.get(line_index)?))
+    }
+
+    /// Returns the index and `Line` object for the line containing the
+    /// given `offset`.
+    ///
+    /// The offset is specified in the direction orthogonal to line direction.
+    /// For horizontal text, this is a vertical or y offset.
+    pub(crate) fn line_for_offset(&self, offset: f32) -> Option<(usize, Line<B>)> {
+        if offset < 0.0 {
+            return Some((0, self.get(0)?));
+        }
+        let maybe_line_index = self.data.lines.binary_search_by(|line| {
+            if offset < line.metrics.min_coord {
+                Ordering::Greater
+            } else if offset > line.metrics.max_coord {
+                Ordering::Less
+            } else {
+                Ordering::Equal
+            }
+        });
+        let line_index = match maybe_line_index {
+            Ok(index) => index,
+            Err(index) => index.saturating_sub(1),
+        };
+        Some((line_index, self.get(line_index)?))
     }
 }
 

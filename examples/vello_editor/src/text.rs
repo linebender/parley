@@ -1,6 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use clipboard::ClipboardProvider;
 use parley::{layout::cursor::Selection, layout::PositionedLayoutItem, FontContext};
 use peniko::{
     kurbo::{Affine, Stroke},
@@ -60,7 +61,7 @@ impl Text {
 
     pub fn active_text(&self) -> ActiveText {
         if self.selection.is_collapsed() {
-            let range = self.selection.focus().text_start..self.selection.focus().text_end;
+            let range = self.selection.text_range();
             ActiveText::FocusedCluster(&self.buffer[range])
         } else {
             ActiveText::Selection(&self.buffer[self.selection.text_range()])
@@ -69,6 +70,10 @@ impl Text {
 
     pub fn handle_event(&mut self, event: &WindowEvent) {
         match event {
+            WindowEvent::Resized(size) => {
+                self.update_layout(size.width as f32, 1.0);
+                self.selection = self.selection.refresh(&self.layout);
+            }
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = Some(*modifiers);
             }
@@ -76,12 +81,30 @@ impl Text {
                 if !event.state.is_pressed() {
                     return;
                 }
-                let shift = self
+                let (shift, ctrl) = self
                     .modifiers
-                    .map(|mods| mods.state().shift_key())
+                    .map(|mods| (mods.state().shift_key(), mods.state().control_key()))
                     .unwrap_or_default();
                 if let PhysicalKey::Code(code) = event.physical_key {
                     match code {
+                        KeyCode::KeyC if ctrl => {
+                            let text = &self.buffer[self.selection.text_range()];
+                            let mut cb: clipboard::ClipboardContext =
+                                ClipboardProvider::new().unwrap();
+                            cb.set_contents(text.to_owned()).ok();
+                        }
+                        KeyCode::KeyV if ctrl => {
+                            let mut cb: clipboard::ClipboardContext =
+                                ClipboardProvider::new().unwrap();
+                            let text = cb.get_contents().unwrap_or_default();
+                            let start = self
+                                .delete_current_selection()
+                                .unwrap_or_else(|| self.selection.focus().text_start as usize);
+                            self.buffer.insert_str(start, &text);
+                            self.update_layout(self.width, 1.0);
+                            self.selection =
+                                Selection::from_byte_index(&self.layout, start + text.len());
+                        }
                         KeyCode::ArrowLeft => {
                             self.selection = self.selection.prev_logical(&self.layout, shift);
                         }
@@ -102,8 +125,7 @@ impl Text {
                         }
                         KeyCode::Delete => {
                             let start = if self.selection.is_collapsed() {
-                                let range = self.selection.focus().text_start
-                                    ..self.selection.focus().text_end;
+                                let range = self.selection.focus().text_range();
                                 let start = range.start;
                                 self.buffer.replace_range(range, "");
                                 start
@@ -115,7 +137,7 @@ impl Text {
                         }
                         KeyCode::Backspace => {
                             let start = if self.selection.is_collapsed() {
-                                let end = self.selection.focus().text_start;
+                                let end = self.selection.focus().text_start as usize;
                                 if let Some((start, _)) =
                                     self.buffer[..end].char_indices().next_back()
                                 {
@@ -139,7 +161,7 @@ impl Text {
                             if let Some(text) = &event.text {
                                 let start = self
                                     .delete_current_selection()
-                                    .unwrap_or_else(|| self.selection.focus().text_start);
+                                    .unwrap_or_else(|| self.selection.focus().text_start as usize);
                                 self.buffer.insert_str(start, text);
                                 self.update_layout(self.width, 1.0);
                                 self.selection =
@@ -195,8 +217,11 @@ impl Text {
         self.selection.visual_regions_with(&self.layout, |rect| {
             scene.fill(Fill::NonZero, transform, Color::STEEL_BLUE, None, &rect);
         });
-        if let Some(cursor) = self.selection.visual_caret(&self.layout) {
+        if let Some(cursor) = self.selection.visual_focus(&self.layout) {
             scene.stroke(&Stroke::new(1.5), transform, Color::WHITE, None, &cursor);
+        };
+        if let Some(alt_cursor) = self.selection.visual_alternate_focus(&self.layout) {
+            scene.stroke(&Stroke::new(1.5), transform, Color::RED, None, &alt_cursor);
         };
         for line in self.layout.lines() {
             for item in line.items() {
