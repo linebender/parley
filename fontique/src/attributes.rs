@@ -8,7 +8,12 @@ use core_maths::*;
 
 use core::fmt;
 
-/// Primary attributes for font matching: stretch, style and weight.
+/// Primary attributes for font matching: [`Stretch`], [`Style`] and [`Weight`].
+///
+/// These are used to [configure] a [`Query`].
+///
+/// [configure]: crate::Query::set_attributes
+/// [`Query`]: crate::Query
 #[derive(Copy, Clone, PartialEq, Default, Debug)]
 pub struct Attributes {
     pub stretch: Stretch,
@@ -38,11 +43,18 @@ impl fmt::Display for Attributes {
 }
 
 /// Visual width of a font-- a relative change from the normal aspect
-/// ratio, typically in the range 0.5 to 2.0.
+/// ratio, typically in the range `0.5` to `2.0`.
 ///
-/// In variable fonts, this can be controlled with the `wdth` axis.
+/// The default value is [`Stretch::NORMAL`] or `1.0`.
+///
+/// In variable fonts, this can be controlled with the `wdth` [axis].
 ///
 /// See <https://fonts.google.com/knowledge/glossary/width>
+///
+/// In CSS, this corresponds to the [`font-width`] property.
+///
+/// [axis]: crate::AxisInfo
+/// [`font-width`]: https://www.w3.org/TR/css-fonts-4/#font-width-prop
 #[derive(Copy, Clone, PartialEq, PartialOrd, Debug)]
 pub struct Stretch(f32);
 
@@ -59,7 +71,7 @@ impl Stretch {
     /// Width that is 87.5% of normal.
     pub const SEMI_CONDENSED: Self = Self(0.875);
 
-    /// Width that is 100% of normal.
+    /// Width that is 100% of normal. This is the default value.
     pub const NORMAL: Self = Self(1.0);
 
     /// Width that is 112.5% of normal.
@@ -77,18 +89,43 @@ impl Stretch {
 
 impl Stretch {
     /// Creates a new stretch attribute with the given ratio.
+    ///
+    /// This can also be created [from a percentage](Self::from_percentage).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use fontique::Stretch;
+    /// assert_eq!(Stretch::from_ratio(1.5), Stretch::EXTRA_EXPANDED);
+    /// ```
     pub fn from_ratio(ratio: f32) -> Self {
         Self(ratio)
     }
 
     /// Creates a stretch attribute from a percentage.
+    ///
+    /// This can also be created [from a ratio](Self::from_ratio).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use fontique::Stretch;
+    /// assert_eq!(Stretch::from_percentage(87.5), Stretch::SEMI_CONDENSED);
+    /// ```
     pub fn from_percentage(percentage: f32) -> Self {
         Self(percentage / 100.0)
     }
 
     /// Returns the stretch attribute as a ratio.
     ///
-    /// This is a linear scaling factor with 1.0 being "normal" width.
+    /// This is a linear scaling factor with `1.0` being "normal" width.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use fontique::Stretch;
+    /// assert_eq!(Stretch::NORMAL.ratio(), 1.0);
+    /// ```
     pub fn ratio(self) -> f32 {
         self.0
     }
@@ -100,22 +137,37 @@ impl Stretch {
         self.0 * 100.0
     }
 
-    /// Returns true if the stretch is normal.
+    /// Returns `true` if the stretch is [normal].
+    ///
+    /// [normal]: Stretch::NORMAL
     pub fn is_normal(self) -> bool {
         self == Self::NORMAL
     }
 
-    /// Returns true if the stretch is condensed (less than normal).
+    /// Returns `true` if the stretch is condensed (less than [normal]).
+    ///
+    /// [normal]: Stretch::NORMAL
     pub fn is_condensed(self) -> bool {
         self < Self::NORMAL
     }
 
-    /// Returns true if the stretch is expanded (greater than normal).
+    /// Returns `true` if the stretch is expanded (greater than [normal]).
+    ///
+    /// [normal]: Stretch::NORMAL
     pub fn is_expanded(self) -> bool {
         self > Self::NORMAL
     }
 
     /// Parses the stretch from a CSS style keyword or a percentage value.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use fontique::Stretch;
+    /// assert_eq!(Stretch::parse("semi-condensed"), Some(Stretch::SEMI_CONDENSED));
+    /// assert_eq!(Stretch::parse("80%"), Some(Stretch::from_percentage(80.0)));
+    /// assert_eq!(Stretch::parse("wideload"), None);
+    /// ```
     pub fn parse(s: &str) -> Option<Self> {
         let s = s.trim();
         Some(match s {
@@ -171,9 +223,16 @@ impl Default for Stretch {
 
 /// Visual weight class of a font, typically on a scale from 1.0 to 1000.0.
 ///
-/// In variable fonts, this can be controlled with the `wght` axis.
+/// The default value is [`Weight::NORMAL`] or `400.0`.
+///
+/// In variable fonts, this can be controlled with the `wght` [axis].
 ///
 /// See <https://fonts.google.com/knowledge/glossary/weight>
+///
+/// In CSS, this corresponds to the [`font-weight`] property.
+///
+/// [axis]: crate::AxisInfo
+/// [`font-weight`]: https://www.w3.org/TR/css-fonts-4/#font-weight-prop
 #[derive(Copy, Clone, PartialEq, PartialOrd, Debug)]
 pub struct Weight(f32);
 
@@ -190,7 +249,7 @@ impl Weight {
     /// Weight value of 350.
     pub const SEMI_LIGHT: Self = Self(350.0);
 
-    /// Weight value of 400.
+    /// Weight value of 400. This is the default value.
     pub const NORMAL: Self = Self(400.0);
 
     /// Weight value of 500.
@@ -224,6 +283,16 @@ impl Weight {
     }
 
     /// Parses a CSS style font weight attribute.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use fontique::Weight;
+    /// assert_eq!(Weight::parse("normal"), Some(Weight::NORMAL));
+    /// assert_eq!(Weight::parse("bold"), Some(Weight::BOLD));
+    /// assert_eq!(Weight::parse("850"), Some(Weight::new(850.0)));
+    /// assert_eq!(Weight::parse("invalid"), None);
+    /// ```
     pub fn parse(s: &str) -> Option<Self> {
         let s = s.trim();
         Some(match s {
@@ -265,10 +334,17 @@ impl fmt::Display for Weight {
 
 /// Visual style or 'slope' of a font.
 ///
+/// The default value is [`Style::Normal`].
+///
 /// In variable fonts, this can be controlled with the `ital`
-/// and `slnt` axes for italic and oblique styles, respectively.
+/// and `slnt` [axes] for italic and oblique styles, respectively.
 ///
 /// See <https://fonts.google.com/knowledge/glossary/style>
+///
+/// In CSS, this corresponds to the [`font-style`] property.
+///
+/// [axes]: crate::AxisInfo
+/// [`font-style`]: https://www.w3.org/TR/css-fonts-4/#font-style-prop
 #[derive(Copy, Clone, PartialEq, Default, Debug)]
 pub enum Style {
     /// An upright or "roman" style.

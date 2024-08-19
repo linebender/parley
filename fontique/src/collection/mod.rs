@@ -28,7 +28,7 @@ use std::sync::{atomic::Ordering, Mutex};
 
 type FamilyMap = HashMap<FamilyId, Option<FamilyInfo>>;
 
-/// Options for a font collection.
+/// Options for a [font collection](Collection).
 #[derive(Copy, Clone, Debug)]
 pub struct CollectionOptions {
     /// If true, the font collection will use a secondary shared store
@@ -38,13 +38,13 @@ pub struct CollectionOptions {
     /// If the font collection will be used by a single thread, this is
     /// pure overhead and should be disabled.
     ///
-    /// The default value is false.
+    /// The default value is `false`.
     pub shared: bool,
 
     /// If true, the font collection will provide access to system fonts
     /// using platform specific APIs.
     ///
-    /// The default value is true.
+    /// The default value is `true`.
     pub system_fonts: bool,
 }
 
@@ -66,6 +66,14 @@ pub struct Collection {
 
 impl Collection {
     /// Creates a new collection with the given options.
+    ///
+    /// If `fontique` was compiled with the `"system"` feature and
+    /// [`CollectionOptions::system_fonts`] was set to `true` when
+    /// creating this collection, then it will register the fonts
+    /// available on the system.
+    ///
+    /// Additional fonts can be registered via [`Collection::register_fonts`]
+    /// and providing it with the data for those fonts.
     pub fn new(options: CollectionOptions) -> Self {
         Self {
             inner: Inner::new(options),
@@ -75,7 +83,8 @@ impl Collection {
 
     /// Returns an iterator over all available family names in the collection.
     ///
-    /// This includes both system and registered fonts.
+    /// If `fontique` was compiled with the `"system"` feature, then it will
+    /// include system fonts after the registered fonts.
     pub fn family_names(&mut self) -> impl Iterator<Item = &str> + '_ + Clone {
         self.inner.family_names()
     }

@@ -36,7 +36,7 @@ impl FallbackMap {
     /// Inserts or replaces the fallback families for the given script and
     /// language.
     ///
-    /// Returns false if we don't track that particular pair of script and
+    /// Returns `false` if we don't track that particular pair of script and
     /// language.
     pub fn set(
         &mut self,
@@ -49,7 +49,7 @@ impl FallbackMap {
     /// Inserts or appends the fallback families for the given script and
     /// language.
     ///
-    /// Returns false if we don't track that particular pair of script and
+    /// Returns `false` if we don't track that particular pair of script and
     /// language.
     pub fn append(
         &mut self,
@@ -105,6 +105,12 @@ impl FallbackMap {
 }
 
 /// Describes a selector for fallback families.
+///
+/// This is a [`Script`] and optionally, a `locale`, represented
+/// as a `&'static str`.
+///
+/// It can be constructed directly via [`FallbackKey::new`] or any of
+/// a variety of `From` implementations to improve the ease of use.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct FallbackKey {
     script: Script,
@@ -139,15 +145,15 @@ impl FallbackKey {
         self.locale
     }
 
-    /// Returns true if the requested locale is considered the "default"
+    /// Returns `true` if the requested locale is considered the "default"
     /// language/region for the requested script.
     ///
-    /// Always returns `true` when `locale()` returns `None`.
+    /// Always returns `true` when [`locale`](Self::locale) returns `None`.
     pub fn is_default(&self) -> bool {
         self.is_default
     }
 
-    /// Returns true if the requested script and locale pair are actually
+    /// Returns `true` if the requested script and locale pair are actually
     /// tracked for fallback.
     pub fn is_tracked(&self) -> bool {
         self.is_tracked
