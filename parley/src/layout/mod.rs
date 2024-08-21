@@ -21,6 +21,7 @@ use data::*;
 use swash::text::cluster::{Boundary, ClusterInfo};
 use swash::{GlyphId, NormalizedCoord, Synthesis};
 
+pub use cluster::{Affinity, ClusterPath};
 pub use cursor::Cursor;
 pub use line::greedy::BreakLines;
 pub use line::{GlyphRun, LineMetrics, PositionedInlineBox, PositionedLayoutItem};
@@ -91,6 +92,11 @@ impl<B: Brush> Layout<B> {
             layout: &self.data,
             data: self.data.lines.get(index)?,
         })
+    }
+
+    /// Returns true if the dominant direction of the layout is right-to-left.
+    pub fn is_rtl(&self) -> bool {
+        self.data.base_level & 1 != 0
     }
 
     pub fn inline_boxes(&self) -> &[InlineBox] {

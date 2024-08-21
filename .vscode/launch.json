@@ -119,15 +119,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug executable 'vello_render'",
+            "name": "Debug executable 'vello_editor'",
             "cargo": {
                 "args": [
                     "build",
-                    "--bin=vello_render",
-                    "--package=vello_render"
+                    "--bin=vello_editor",
+                    "--package=vello_editor"
                 ],
                 "filter": {
-                    "name": "vello_render",
+                    "name": "vello_editor",
                     "kind": "bin"
                 }
             },

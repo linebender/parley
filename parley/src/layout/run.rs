@@ -106,6 +106,22 @@ impl<'a, B: Brush> Run<'a, B> {
         }
     }
 
+    /// Returns the visual cluster index for the specified logical cluster index.
+    pub fn logical_to_visual(&self, logical_index: usize) -> Option<usize> {
+        let num_clusters = self.len();
+        if logical_index >= num_clusters {
+            return None;
+        }
+
+        let visual_index = if self.is_rtl() {
+            num_clusters - 1 - logical_index
+        } else {
+            logical_index
+        };
+
+        Some(visual_index)
+    }
+
     /// Returns the logical cluster index for the specified visual cluster index.
     pub fn visual_to_logical(&self, visual_index: usize) -> Option<usize> {
         let num_clusters = self.len();

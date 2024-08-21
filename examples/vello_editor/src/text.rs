@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use clipboard::ClipboardProvider;
-use parley::{layout::cursor::Selection, layout::PositionedLayoutItem, FontContext};
-use peniko::{
-    kurbo::{Affine, Stroke},
-    Color, Fill,
-};
+use parley::layout::cursor::{Selection, VisualCursorMode};
+use parley::layout::Affinity;
+use parley::{layout::PositionedLayoutItem, FontContext};
+use peniko::{kurbo::Affine, Color, Fill};
+use std::time::Instant;
 use vello::Scene;
 use winit::{
     event::{Modifiers, WindowEvent},
@@ -21,24 +21,27 @@ const INSET: f32 = 32.0;
 #[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
 pub enum ActiveText<'a> {
-    FocusedCluster(&'a str),
+    FocusedCluster(Affinity, &'a str),
     Selection(&'a str),
 }
 
 #[derive(Default)]
-pub struct Text {
+pub struct Editor {
     font_cx: FontContext,
     layout_cx: LayoutContext,
     buffer: String,
     layout: Layout,
     selection: Selection,
+    cursor_mode: VisualCursorMode,
+    last_click_time: Option<Instant>,
+    click_count: u32,
     pointer_down: bool,
     cursor_pos: (f32, f32),
     modifiers: Option<Modifiers>,
     width: f32,
 }
 
-impl Text {
+impl Editor {
     pub fn set_text(&mut self, text: &str) {
         self.buffer.clear();
         self.buffer.push_str(text);
@@ -61,8 +64,14 @@ impl Text {
 
     pub fn active_text(&self) -> ActiveText {
         if self.selection.is_collapsed() {
-            let range = self.selection.text_range();
-            ActiveText::FocusedCluster(&self.buffer[range])
+            let range = self
+                .selection
+                .focus()
+                .cluster_path()
+                .cluster(&self.layout)
+                .unwrap()
+                .text_range();
+            ActiveText::FocusedCluster(self.selection.focus().affinity(), &self.buffer[range])
         } else {
             ActiveText::Selection(&self.buffer[self.selection.text_range()])
         }
@@ -99,20 +108,36 @@ impl Text {
                             let text = cb.get_contents().unwrap_or_default();
                             let start = self
                                 .delete_current_selection()
-                                .unwrap_or_else(|| self.selection.focus().text_start as usize);
+                                .unwrap_or_else(|| self.selection.focus().text_range().start);
                             self.buffer.insert_str(start, &text);
                             self.update_layout(self.width, 1.0);
-                            self.selection =
-                                Selection::from_byte_index(&self.layout, start + text.len());
+                            self.selection = Selection::from_index(
+                                &self.layout,
+                                start + text.len(),
+                                Affinity::default(),
+                            );
                         }
                         KeyCode::ArrowLeft => {
-                            self.selection = self.selection.prev_logical(&self.layout, shift);
+                            self.selection = if ctrl {
+                                self.selection.previous_word(&self.layout, shift)
+                            } else {
+                                self.selection.previous_visual(
+                                    &self.layout,
+                                    self.cursor_mode,
+                                    shift,
+                                )
+                            };
                         }
                         KeyCode::ArrowRight => {
-                            self.selection = self.selection.next_logical(&self.layout, shift);
+                            self.selection = if ctrl {
+                                self.selection.next_word(&self.layout, shift)
+                            } else {
+                                self.selection
+                                    .next_visual(&self.layout, self.cursor_mode, shift)
+                            };
                         }
                         KeyCode::ArrowUp => {
-                            self.selection = self.selection.prev_line(&self.layout, shift);
+                            self.selection = self.selection.previous_line(&self.layout, shift);
                         }
                         KeyCode::ArrowDown => {
                             self.selection = self.selection.next_line(&self.layout, shift);
@@ -124,27 +149,23 @@ impl Text {
                             self.selection = self.selection.line_end(&self.layout, shift);
                         }
                         KeyCode::Delete => {
-                            let start = if self.selection.is_collapsed() {
+                            if self.selection.is_collapsed() {
                                 let range = self.selection.focus().text_range();
-                                let start = range.start;
                                 self.buffer.replace_range(range, "");
-                                start
                             } else {
-                                self.delete_current_selection().unwrap()
+                                self.delete_current_selection();
                             };
                             self.update_layout(self.width, 1.0);
-                            self.selection = Selection::from_byte_index(&self.layout, start);
+                            self.selection = self.selection.refresh(&self.layout);
+                            // Selection::from_byte_index(&self.layout, start, Default::default());
                         }
                         KeyCode::Backspace => {
                             let start = if self.selection.is_collapsed() {
-                                let end = self.selection.focus().text_start as usize;
+                                let end = self.selection.focus().text_range().start as usize;
                                 if let Some((start, _)) =
                                     self.buffer[..end].char_indices().next_back()
                                 {
                                     self.buffer.replace_range(start..end, "");
-                                    self.update_layout(self.width, 1.0);
-                                    self.selection =
-                                        Selection::from_byte_index(&self.layout, start);
                                     Some(start)
                                 } else {
                                     None
@@ -154,18 +175,27 @@ impl Text {
                             };
                             if let Some(start) = start {
                                 self.update_layout(self.width, 1.0);
-                                self.selection = Selection::from_byte_index(&self.layout, start);
+                                let (start, affinity) = if start > 0 {
+                                    (start - 1, Affinity::Upstream)
+                                } else {
+                                    (start, Affinity::Downstream)
+                                };
+                                self.selection =
+                                    Selection::from_index(&self.layout, start, affinity);
                             }
                         }
                         _ => {
                             if let Some(text) = &event.text {
                                 let start = self
                                     .delete_current_selection()
-                                    .unwrap_or_else(|| self.selection.focus().text_start as usize);
+                                    .unwrap_or_else(|| self.selection.focus().text_range().start);
                                 self.buffer.insert_str(start, text);
                                 self.update_layout(self.width, 1.0);
-                                self.selection =
-                                    Selection::from_byte_index(&self.layout, start + text.len());
+                                self.selection = Selection::from_index(
+                                    &self.layout,
+                                    start + text.len() - 1,
+                                    Affinity::Upstream,
+                                );
                             }
                         }
                     }
@@ -177,11 +207,33 @@ impl Text {
                 if *button == winit::event::MouseButton::Left {
                     self.pointer_down = state.is_pressed();
                     if self.pointer_down {
-                        self.selection = Selection::from_point(
-                            &self.layout,
-                            self.cursor_pos.0,
-                            self.cursor_pos.1,
-                        );
+                        let now = Instant::now();
+                        if let Some(last) = self.last_click_time.take() {
+                            if now.duration_since(last).as_secs_f64() < 0.25 {
+                                self.click_count = (self.click_count + 1) % 3;
+                            } else {
+                                self.click_count = 1;
+                            }
+                        }
+                        self.last_click_time = Some(now);
+                        match self.click_count {
+                            2 => {
+                                println!("SELECTING WORD");
+                                self.selection = Selection::word_from_point(
+                                    &self.layout,
+                                    self.cursor_pos.0,
+                                    self.cursor_pos.1,
+                                );
+                            }
+                            // TODO: handle line
+                            _ => {
+                                self.selection = Selection::from_point(
+                                    &self.layout,
+                                    self.cursor_pos.0,
+                                    self.cursor_pos.1,
+                                );
+                            }
+                        }
                         println!("Active text: {:?}", self.active_text());
                     }
                 }
@@ -214,14 +266,14 @@ impl Text {
 
     pub fn draw(&self, scene: &mut Scene) {
         let transform = Affine::translate((INSET as f64, INSET as f64));
-        self.selection.visual_regions_with(&self.layout, |rect| {
+        self.selection.geometry_with(&self.layout, |rect| {
             scene.fill(Fill::NonZero, transform, Color::STEEL_BLUE, None, &rect);
         });
-        if let Some(cursor) = self.selection.visual_focus(&self.layout) {
-            scene.stroke(&Stroke::new(1.5), transform, Color::WHITE, None, &cursor);
+        if let Some(cursor) = self.selection.focus().strong_geometry(&self.layout, 1.5) {
+            scene.fill(Fill::NonZero, transform, Color::WHITE, None, &cursor);
         };
-        if let Some(alt_cursor) = self.selection.visual_alternate_focus(&self.layout) {
-            scene.stroke(&Stroke::new(1.5), transform, Color::RED, None, &alt_cursor);
+        if let Some(cursor) = self.selection.focus().weak_geometry(&self.layout, 1.5) {
+            scene.fill(Fill::NonZero, transform, Color::YELLOW, None, &cursor);
         };
         for line in self.layout.lines() {
             for item in line.items() {
@@ -268,6 +320,6 @@ impl Text {
     }
 }
 
-pub const LOREM: &str = r"Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi cursus mi sed euismod euismod. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Nullam placerat efficitur tellus at semper. Morbi ac risus magna. Donec ut cursus ex. Etiam quis posuere tellus. Mauris posuere dui et turpis mollis, vitae luctus tellus consectetur. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur eu facilisis nisl.
+pub const LOREM: &str = r" Lorem ipsum dolor sit amet, consectetur adipiscing elit. Morbi cursus mi sed euismod euismod. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Nullam placerat efficitur tellus at semper. Morbi ac risus magna. Donec ut cursus ex. Etiam quis posuere tellus. Mauris posuere dui et turpis mollis, vitae luctus tellus consectetur. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Curabitur eu facilisis nisl.
 
-Phasellus in viverra dolor, vitae facilisis est. Maecenas malesuada massa vel ultricies feugiat. Vivamus venenatis et התעשייה בנושא האינטרנט nibh nec pharetra. Phasellus vestibulum elit enim, nec scelerisque orci faucibus id. Vivamus consequat purus sit amet orci egestas, non iaculis massa porttitor. Vestibulum ut eros leo. In fermentum convallis magna in finibus. Donec justo leo, maximus ac laoreet id, volutpat ut elit. Mauris sed leo non neque laoreet faucibus. Aliquam orci arcu, faucibus in molestie eget, ornare non dui. Donec volutpat nulla in fringilla elementum. Aliquam vitae ante egestas ligula tempus vestibulum sit amet sed ante. ";
+Phasellus in viverra dolor, vitae facilisis est. Maecenas malesuada massa vel ultricies feugiat. Vivamus venenatis et gהתעשייה בנושא האינטרנטa nibh nec pharetra. Phasellus vestibulum elit enim, nec scelerisque orci faucibus id. Vivamus consequat purus sit amet orci egestas, non iaculis massa porttitor. Vestibulum ut eros leo. In fermentum convallis magna in finibus. Donec justo leo, maximus ac laoreet id, volutpat ut elit. Mauris sed leo non neque laoreet faucibus. Aliquam orci arcu, faucibus in molestie eget, ornare non dui. Donec volutpat nulla in fringilla elementum. Aliquam vitae ante egestas ligula tempus vestibulum sit amet sed ante. ";

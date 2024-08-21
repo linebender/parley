@@ -14,6 +14,7 @@ use winit::event::*;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::Window;
 
+// #[path = "text2.rs"]
 mod text;
 
 // Simple struct to hold the state of the renderer
@@ -46,7 +47,7 @@ struct SimpleVelloApp<'s> {
     scene: Scene,
 
     // Our text state object
-    text: text::Text,
+    editor: text::Editor,
 }
 
 impl<'s> ApplicationHandler for SimpleVelloApp<'s> {
@@ -69,7 +70,7 @@ impl<'s> ApplicationHandler for SimpleVelloApp<'s> {
             wgpu::PresentMode::AutoVsync,
         );
         let surface = pollster::block_on(surface_future).expect("Error creating surface");
-        self.text.update_layout(size.width as _, 1.0);
+        self.editor.update_layout(size.width as _, 1.0);
 
         // Create a vello Renderer for the surface (using its device id)
         self.renderers
@@ -106,7 +107,7 @@ impl<'s> ApplicationHandler for SimpleVelloApp<'s> {
             _ => return,
         };
 
-        self.text.handle_event(&event);
+        self.editor.handle_event(&event);
         render_state.window.request_redraw();
         // render_state
         //     .window
@@ -121,7 +122,7 @@ impl<'s> ApplicationHandler for SimpleVelloApp<'s> {
                 self.context
                     .resize_surface(&mut render_state.surface, size.width, size.height);
                 render_state.window.request_redraw();
-                self.text.update_layout(size.width as _, 1.0);
+                self.editor.update_layout(size.width as _, 1.0);
             }
 
             // This is where all the rendering happens
@@ -130,7 +131,7 @@ impl<'s> ApplicationHandler for SimpleVelloApp<'s> {
                 // the same Scene is reused so that the underlying memory allocation can also be reused.
                 self.scene.reset();
 
-                self.text.draw(&mut self.scene);
+                self.editor.draw(&mut self.scene);
                 // Re-add the objects to draw to the scene.
                 //                add_shapes_to_scene(&mut self.scene);
 
@@ -185,10 +186,10 @@ fn main() -> Result<()> {
         renderers: vec![],
         state: RenderState::Suspended(None),
         scene: Scene::new(),
-        text: text::Text::default(),
+        editor: text::Editor::default(),
     };
 
-    app.text.set_text(text::LOREM);
+    app.editor.set_text(text::LOREM);
 
     // Create and run a winit event loop
     let event_loop = EventLoop::new()?;

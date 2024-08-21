@@ -3,9 +3,10 @@
 
 //! Text selection support.
 
+use peniko::kurbo::Rect;
+
 use super::{Affinity, Brush, ClusterPath, Layout};
 use core::ops::Range;
-use peniko::kurbo::Rect;
 
 #[derive(Copy, Clone, PartialEq, Default, Debug)]
 pub enum VisualCursorMode {
