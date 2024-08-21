@@ -239,32 +239,30 @@ impl Cursor {
             // We're moving right so we want to track right-side affinity;
             // let's swap.
             Self::from_index(layout, self.index as usize, self.affinity.invert())
-        } else {
-            if let Some((next, next_cluster)) = self.path.next_visual_cluster(layout) {
-                let next_rtl = next_cluster.is_rtl();
-                // Check for directional boundary condition
-                if let Some((next_next, next_next_cluster)) = next.next_visual_cluster(layout) {
-                    if next_next_cluster.is_rtl() != next_rtl {
-                        println!("MOVING RIGHT INTO BIDI BOUNDARY 2");
-                        if let Some(prefer_rtl) = prefer_rtl {
-                            if next_rtl != prefer_rtl {
-                                return Self::from_cluster_path(layout, next_next, self.affinity);
-                            } else {
-                                return Self::from_cluster_path(layout, next, self.affinity);
-                            }
+        } else if let Some((next, next_cluster)) = self.path.next_visual_cluster(layout) {
+            let next_rtl = next_cluster.is_rtl();
+            // Check for directional boundary condition
+            if let Some((next_next, next_next_cluster)) = next.next_visual_cluster(layout) {
+                if next_next_cluster.is_rtl() != next_rtl {
+                    println!("MOVING RIGHT INTO BIDI BOUNDARY 2");
+                    if let Some(prefer_rtl) = prefer_rtl {
+                        if next_rtl != prefer_rtl {
+                            return Self::from_cluster_path(layout, next_next, self.affinity);
+                        } else {
+                            return Self::from_cluster_path(layout, next, self.affinity);
                         }
                     }
                 }
-                let affinity = if self.is_rtl != next_rtl {
-                    // println!("MOVING INTO BIDI BOUNDARY");
-                    self.affinity.invert()
-                } else {
-                    self.affinity
-                };
-                Self::from_cluster_path(layout, next, affinity)
-            } else {
-                *self
             }
+            let affinity = if self.is_rtl != next_rtl {
+                // println!("MOVING INTO BIDI BOUNDARY");
+                self.affinity.invert()
+            } else {
+                self.affinity
+            };
+            Self::from_cluster_path(layout, next, affinity)
+        } else {
+            *self
         }
     }
 
@@ -289,31 +287,29 @@ impl Cursor {
             // We're moving left so we want to track left-side affinity;
             // let's swap
             Self::from_index(layout, self.index as usize, self.affinity.invert())
-        } else {
-            if let Some((prev, prev_cluster)) = self.path.previous_visual_cluster(layout) {
-                let prev_rtl = prev_cluster.is_rtl();
-                // Check for directional boundary condition
-                if let Some((prev_prev, prev_prev_cluster)) = prev.previous_visual_cluster(layout) {
-                    if prev_prev_cluster.is_rtl() != prev_rtl {
-                        println!("MOVING LEFT INTO BIDI BOUNDARY 2");
-                        if let Some(prefer_rtl) = prefer_rtl {
-                            if prev_rtl != prefer_rtl {
-                                return Self::from_cluster_path(layout, prev_prev, self.affinity);
-                            } else {
-                                return Self::from_cluster_path(layout, prev, self.affinity);
-                            }
+        } else if let Some((prev, prev_cluster)) = self.path.previous_visual_cluster(layout) {
+            let prev_rtl = prev_cluster.is_rtl();
+            // Check for directional boundary condition
+            if let Some((prev_prev, prev_prev_cluster)) = prev.previous_visual_cluster(layout) {
+                if prev_prev_cluster.is_rtl() != prev_rtl {
+                    println!("MOVING LEFT INTO BIDI BOUNDARY 2");
+                    if let Some(prefer_rtl) = prefer_rtl {
+                        if prev_rtl != prefer_rtl {
+                            return Self::from_cluster_path(layout, prev_prev, self.affinity);
+                        } else {
+                            return Self::from_cluster_path(layout, prev, self.affinity);
                         }
                     }
                 }
-                let affinity = if self.is_rtl != prev_rtl {
-                    self.affinity.invert()
-                } else {
-                    self.affinity
-                };
-                Self::from_cluster_path(layout, prev, affinity)
-            } else {
-                *self
             }
+            let affinity = if self.is_rtl != prev_rtl {
+                self.affinity.invert()
+            } else {
+                self.affinity
+            };
+            Self::from_cluster_path(layout, prev, affinity)
+        } else {
+            *self
         }
     }
 
@@ -659,7 +655,7 @@ impl Selection {
         let line_start_ix = start.path.line_index();
         let line_end_ix = end.path.line_index();
         for line_ix in line_start_ix..=line_end_ix {
-            let Some(line) = layout.get(line_ix as usize) else {
+            let Some(line) = layout.get(line_ix) else {
                 continue;
             };
             let metrics = line.metrics();

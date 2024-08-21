@@ -278,7 +278,7 @@ impl ClusterPath {
     }
 
     /// Returns the path of the cluster that follows this one in visual order.
-    pub fn next_visual<'a, B: Brush>(&self, layout: &'a Layout<B>) -> Option<Self> {
+    pub fn next_visual<B: Brush>(&self, layout: &Layout<B>) -> Option<Self> {
         let line = self.line(layout)?;
         let run = line.run(self.run_index())?;
         let visual_index = run.logical_to_visual(self.logical_index())?;
@@ -322,7 +322,7 @@ impl ClusterPath {
     }
 
     /// Returns the path of the cluster that follows this one in logical order.
-    pub fn next_logical<'a, B: Brush>(&self, layout: &'a Layout<B>) -> Option<Self> {
+    pub fn next_logical<B: Brush>(&self, layout: &Layout<B>) -> Option<Self> {
         let line = self.line(layout)?;
         let run = line.run(self.run_index())?;
         if self.logical_index() + 1 < run.cluster_range().len() {
@@ -365,7 +365,7 @@ impl ClusterPath {
     }
 
     /// Returns the path of the cluster that precedes this one in visual order.
-    pub fn previous_visual<'a, B: Brush>(&self, layout: &'a Layout<B>) -> Option<Self> {
+    pub fn previous_visual<B: Brush>(&self, layout: &Layout<B>) -> Option<Self> {
         let line = self.line(layout)?;
         let run = line.run(self.run_index())?;
         let visual_index = run.logical_to_visual(self.logical_index())?;
@@ -415,7 +415,7 @@ impl ClusterPath {
 
     /// Returns the path of the cluster that precedes this one in logical
     /// order.
-    pub fn previous_logical<'a, B: Brush>(&self, layout: &'a Layout<B>) -> Option<Self> {
+    pub fn previous_logical<B: Brush>(&self, layout: &Layout<B>) -> Option<Self> {
         if self.logical_index > 0 {
             // Easy mode: previous cluster is in the same run
             Some(Self {
@@ -455,10 +455,6 @@ impl ClusterPath {
     ) -> Option<(Self, Cluster<'a, B>)> {
         self.previous_logical(layout)
             .and_then(|path| Some((path, path.cluster(layout)?)))
-    }
-
-    pub fn move_lines<B: Brush>(&self, layout: &Layout<B>, delta: i32) -> Self {
-        *self
     }
 
     pub fn next_word<B: Brush>(&self, layout: &Layout<B>) -> Option<Self> {

@@ -161,7 +161,7 @@ impl Editor {
                         }
                         KeyCode::Backspace => {
                             let start = if self.selection.is_collapsed() {
-                                let end = self.selection.focus().text_range().start as usize;
+                                let end = self.selection.focus().text_range().start;
                                 if let Some((start, _)) =
                                     self.buffer[..end].char_indices().next_back()
                                 {
