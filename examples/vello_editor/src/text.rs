@@ -91,19 +91,50 @@ impl Editor {
                 if !event.state.is_pressed() {
                     return;
                 }
-                let (shift, ctrl) = self
+                #[allow(unused)]
+                let (shift, ctrl, cmd) = self
                     .modifiers
-                    .map(|mods| (mods.state().shift_key(), mods.state().control_key()))
+                    .map(|mods| {
+                        (
+                            mods.state().shift_key(),
+                            mods.state().control_key(),
+                            mods.state().super_key(),
+                        )
+                    })
                     .unwrap_or_default();
+                #[cfg(target_os = "macos")]
+                let action_mod = cmd;
+                #[cfg(not(target_os = "macos"))]
+                let action_mod = ctrl;
                 if let PhysicalKey::Code(code) = event.physical_key {
                     match code {
-                        KeyCode::KeyC if ctrl => {
-                            let text = &self.buffer[self.selection.text_range()];
-                            let mut cb: clipboard::ClipboardContext =
-                                ClipboardProvider::new().unwrap();
-                            cb.set_contents(text.to_owned()).ok();
+                        KeyCode::KeyC if action_mod => {
+                            if !self.selection.is_collapsed() {
+                                let text = &self.buffer[self.selection.text_range()];
+                                let mut cb: clipboard::ClipboardContext =
+                                    ClipboardProvider::new().unwrap();
+                                cb.set_contents(text.to_owned()).ok();
+                            }
                         }
-                        KeyCode::KeyV if ctrl => {
+                        KeyCode::KeyX if action_mod => {
+                            if !self.selection.is_collapsed() {
+                                let text = &self.buffer[self.selection.text_range()];
+                                let mut cb: clipboard::ClipboardContext =
+                                    ClipboardProvider::new().unwrap();
+                                cb.set_contents(text.to_owned()).ok();
+                                if let Some(start) = self.delete_current_selection() {
+                                    self.update_layout(self.width, 1.0);
+                                    let (start, affinity) = if start > 0 {
+                                        (start - 1, Affinity::Upstream)
+                                    } else {
+                                        (start, Affinity::Downstream)
+                                    };
+                                    self.selection =
+                                        Selection::from_index(&self.layout, start, affinity);
+                                }
+                            }
+                        }
+                        KeyCode::KeyV if action_mod => {
                             let mut cb: clipboard::ClipboardContext =
                                 ClipboardProvider::new().unwrap();
                             let text = cb.get_contents().unwrap_or_default();
