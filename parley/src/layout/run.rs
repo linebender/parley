@@ -5,12 +5,16 @@ use super::*;
 
 impl<'a, B: Brush> Run<'a, B> {
     pub(crate) fn new(
-        layout: &'a LayoutData<B>,
+        layout: &'a Layout<B>,
+        line_index: u32,
+        index: u32,
         data: &'a RunData,
         line_data: Option<&'a LineItemData>,
     ) -> Self {
         Self {
             layout,
+            line_index,
+            index,
             data,
             line_data,
         }
@@ -18,7 +22,7 @@ impl<'a, B: Brush> Run<'a, B> {
 
     /// Returns the font for the run.
     pub fn font(&self) -> &Font {
-        self.layout.fonts.get(self.data.font_index).unwrap()
+        self.layout.data.fonts.get(self.data.font_index).unwrap()
     }
 
     /// Returns the font size for the run.
@@ -35,6 +39,7 @@ impl<'a, B: Brush> Run<'a, B> {
     /// with the run.
     pub fn normalized_coords(&self) -> &[NormalizedCoord] {
         self.layout
+            .data
             .coords
             .get(self.data.coords_range.clone())
             .unwrap_or(&[])
@@ -89,10 +94,12 @@ impl<'a, B: Brush> Run<'a, B> {
             .line_data
             .map(|d| &d.cluster_range)
             .unwrap_or(&self.data.cluster_range);
+        let original_index = index;
         let index = range.start + index;
         Some(Cluster {
+            path: ClusterPath::new(self.line_index, self.index, original_index as u32),
             run: self.clone(),
-            data: self.layout.clusters.get(index)?,
+            data: self.layout.data.clusters.get(index)?,
         })
     }
 
@@ -175,8 +182,13 @@ impl<'a, B: Brush> Iterator for Clusters<'a, B> {
             self.range.next()?
         };
         Some(Cluster {
+            path: ClusterPath::new(
+                self.run.line_index,
+                self.run.index,
+                (index - self.run.cluster_range().start) as u32,
+            ),
             run: self.run.clone(),
-            data: self.run.layout.clusters.get(index)?,
+            data: self.run.layout.data.clusters.get(index)?,
         })
     }
 }

@@ -75,7 +75,7 @@ fn main() {
     let mut layout: Layout<PenikoColor> = builder.build();
 
     // Perform layout (including bidi resolution and shaping) with start alignment
-    layout.break_all_lines(max_advance, Alignment::Start);
+    layout.break_all_lines(max_advance);
     layout.align(max_advance, Alignment::Start);
     let width = layout.width().ceil() as u32;
     let height = layout.height().ceil() as u32;

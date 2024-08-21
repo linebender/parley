@@ -89,7 +89,8 @@ impl<B: Brush> Layout<B> {
     /// Returns the line at the specified index.
     pub fn get(&self, index: usize) -> Option<Line<B>> {
         Some(Line {
-            layout: &self.data,
+            index: index as u32,
+            layout: self,
             data: self.data.lines.get(index)?,
         })
     }
@@ -109,36 +110,32 @@ impl<B: Brush> Layout<B> {
 
     /// Returns an iterator over the lines in the layout.
     pub fn lines(&self) -> impl Iterator<Item = Line<B>> + '_ + Clone {
-        self.data.lines.iter().map(move |data| Line {
-            layout: &self.data,
-            data,
-        })
+        self.data
+            .lines
+            .iter()
+            .enumerate()
+            .map(move |(index, data)| Line {
+                index: index as u32,
+                layout: self,
+                data,
+            })
     }
 
     /// Returns line breaker to compute lines for the layout.
     pub fn break_lines(&mut self) -> BreakLines<B> {
-        BreakLines::new(&mut self.data)
+        BreakLines::new(self)
     }
 
     /// Breaks all lines with the specified maximum advance.
-    pub fn break_all_lines(&mut self, max_advance: Option<f32>, alignment: Alignment) {
+    pub fn break_all_lines(&mut self, max_advance: Option<f32>) {
         self.break_lines()
-            .break_remaining(max_advance.unwrap_or(f32::MAX), alignment);
+            .break_remaining(max_advance.unwrap_or(f32::MAX));
     }
 
     // Apply to alignment to layout relative to the specified container width. If container_width is not
     // specified then the max line length is used.
     pub fn align(&mut self, container_width: Option<f32>, alignment: Alignment) {
         align(&mut self.data, container_width, alignment);
-    }
-
-    /// Returns an iterator over the runs in the layout.
-    pub fn runs(&self) -> impl Iterator<Item = Run<B>> + '_ + Clone {
-        self.data.runs.iter().map(move |data| Run {
-            layout: &self.data,
-            data,
-            line_data: None,
-        })
     }
 
     /// Returns the index and `Line` object for the line containing the
@@ -197,7 +194,9 @@ impl<B: Brush> Default for Layout<B> {
 /// Sequence of clusters with a single font and style.
 #[derive(Copy, Clone)]
 pub struct Run<'a, B: Brush> {
-    layout: &'a LayoutData<B>,
+    layout: &'a Layout<B>,
+    line_index: u32,
+    index: u32,
     data: &'a RunData,
     line_data: Option<&'a LineItemData>,
 }
@@ -205,6 +204,7 @@ pub struct Run<'a, B: Brush> {
 /// Atomic unit of text.
 #[derive(Copy, Clone)]
 pub struct Cluster<'a, B: Brush> {
+    path: ClusterPath,
     run: Run<'a, B>,
     data: &'a ClusterData,
 }
@@ -229,7 +229,8 @@ impl Glyph {
 /// Line in a text layout.
 #[derive(Copy, Clone)]
 pub struct Line<'a, B: Brush> {
-    layout: &'a LayoutData<B>,
+    layout: &'a Layout<B>,
+    index: u32,
     data: &'a LineData,
 }
 

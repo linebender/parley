@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use clipboard::ClipboardProvider;
-use parley::layout::cursor::{Selection, VisualCursorMode};
+use parley::layout::cursor::{Selection, VisualMode};
 use parley::layout::Affinity;
 use parley::{layout::PositionedLayoutItem, FontContext};
 use peniko::{kurbo::Affine, Color, Fill};
@@ -32,7 +32,7 @@ pub struct Editor {
     buffer: String,
     layout: Layout,
     selection: Selection,
-    cursor_mode: VisualCursorMode,
+    cursor_mode: VisualMode,
     last_click_time: Option<Instant>,
     click_count: u32,
     pointer_down: bool,
@@ -54,11 +54,12 @@ impl Editor {
         builder.push_default(&parley::style::StyleProperty::FontSize(32.0));
         builder.push_default(&parley::style::StyleProperty::LineHeight(1.2));
         builder.push_default(&parley::style::StyleProperty::FontStack(
-            parley::style::FontStack::Source("system-ui"),
+            parley::style::FontStack::Source("verdana"),
         ));
         builder.build_into(&mut self.layout);
+        self.layout.break_all_lines(Some(width - INSET * 2.0));
         self.layout
-            .break_all_lines(Some(width - INSET * 2.0), parley::layout::Alignment::Start);
+            .align(Some(width - INSET * 2.0), parley::layout::Alignment::Start);
         self.width = width;
     }
 
@@ -157,7 +158,6 @@ impl Editor {
                             };
                             self.update_layout(self.width, 1.0);
                             self.selection = self.selection.refresh(&self.layout);
-                            // Selection::from_byte_index(&self.layout, start, Default::default());
                         }
                         KeyCode::Backspace => {
                             let start = if self.selection.is_collapsed() {
@@ -214,6 +214,8 @@ impl Editor {
                             } else {
                                 self.click_count = 1;
                             }
+                        } else {
+                            self.click_count = 1;
                         }
                         self.last_click_time = Some(now);
                         match self.click_count {
@@ -273,7 +275,7 @@ impl Editor {
             scene.fill(Fill::NonZero, transform, Color::WHITE, None, &cursor);
         };
         if let Some(cursor) = self.selection.focus().weak_geometry(&self.layout, 1.5) {
-            scene.fill(Fill::NonZero, transform, Color::YELLOW, None, &cursor);
+            scene.fill(Fill::NonZero, transform, Color::LIGHT_GRAY, None, &cursor);
         };
         for line in self.layout.lines() {
             for item in line.items() {
