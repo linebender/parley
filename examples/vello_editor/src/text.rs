@@ -1,7 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use clipboard::ClipboardProvider;
+use clipboard_rs::{Clipboard, ClipboardContext};
 use parley::layout::cursor::{Selection, VisualMode};
 use parley::layout::Affinity;
 use parley::{layout::PositionedLayoutItem, FontContext};
@@ -111,17 +111,15 @@ impl Editor {
                         KeyCode::KeyC if action_mod => {
                             if !self.selection.is_collapsed() {
                                 let text = &self.buffer[self.selection.text_range()];
-                                let mut cb: clipboard::ClipboardContext =
-                                    ClipboardProvider::new().unwrap();
-                                cb.set_contents(text.to_owned()).ok();
+                                let cb = ClipboardContext::new().unwrap();
+                                cb.set_text(text.to_owned()).ok();
                             }
                         }
                         KeyCode::KeyX if action_mod => {
                             if !self.selection.is_collapsed() {
                                 let text = &self.buffer[self.selection.text_range()];
-                                let mut cb: clipboard::ClipboardContext =
-                                    ClipboardProvider::new().unwrap();
-                                cb.set_contents(text.to_owned()).ok();
+                                let cb = ClipboardContext::new().unwrap();
+                                cb.set_text(text.to_owned()).ok();
                                 if let Some(start) = self.delete_current_selection() {
                                     self.update_layout(self.width, 1.0);
                                     let (start, affinity) = if start > 0 {
@@ -135,9 +133,8 @@ impl Editor {
                             }
                         }
                         KeyCode::KeyV if action_mod => {
-                            let mut cb: clipboard::ClipboardContext =
-                                ClipboardProvider::new().unwrap();
-                            let text = cb.get_contents().unwrap_or_default();
+                            let cb = ClipboardContext::new().unwrap();
+                            let text = cb.get_text().unwrap_or_default();
                             let start = self
                                 .delete_current_selection()
                                 .unwrap_or_else(|| self.selection.focus().text_range().start);
