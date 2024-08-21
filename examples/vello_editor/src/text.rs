@@ -54,7 +54,7 @@ impl Editor {
         builder.push_default(&parley::style::StyleProperty::FontSize(32.0));
         builder.push_default(&parley::style::StyleProperty::LineHeight(1.2));
         builder.push_default(&parley::style::StyleProperty::FontStack(
-            parley::style::FontStack::Source("verdana"),
+            parley::style::FontStack::Source("system-ui"),
         ));
         builder.build_into(&mut self.layout);
         self.layout.break_all_lines(Some(width - INSET * 2.0));
