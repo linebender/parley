@@ -269,8 +269,10 @@ impl Editor {
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
+                let prev_pos = self.cursor_pos;
                 self.cursor_pos = (position.x as f32 - INSET, position.y as f32 - INSET);
-                if self.pointer_down {
+                // macOS seems to generate a spurious move after selecting word?
+                if self.pointer_down && prev_pos != self.cursor_pos {
                     self.selection = self.selection.extend_to_point(
                         &self.layout,
                         self.cursor_pos.0,
