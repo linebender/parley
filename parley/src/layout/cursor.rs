@@ -4,6 +4,7 @@
 //! Text selection support.
 
 use super::{Affinity, BreakReason, Brush, Cluster, ClusterPath, Layout};
+use alloc::vec::Vec;
 use core::ops::Range;
 use peniko::kurbo::Rect;
 
