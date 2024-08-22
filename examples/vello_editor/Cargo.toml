@@ -13,7 +13,12 @@ pollster = "0.3.0"
 winit = "0.30.3"
 parley = { workspace = true, default-features = true }
 peniko = { workspace = true }
-clipboard-rs = "0.1.11"
 
 [lints]
 workspace = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+winit = { version = "0.30.3", features = ["android-native-activity"] }
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+clipboard-rs = "0.1.11"

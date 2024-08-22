@@ -9,7 +9,7 @@ use core::ops::Range;
 use peniko::kurbo::Rect;
 
 /// Defines how a cursor will bind to a text position when moving visually.
-#[derive(Copy, Clone, PartialEq, Default, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
 pub enum VisualMode {
     /// During cursor motion, affinity is adjusted to prioritize the dominant
     /// direction of the layout.
@@ -70,13 +70,17 @@ pub struct Cursor {
 impl Cursor {
     /// Returns a new cursor for the given layout, byte index and affinity.
     pub fn from_index<B: Brush>(layout: &Layout<B>, index: usize, affinity: Affinity) -> Self {
-        let cluster = Cluster::from_index(layout, index);
+        let Some(cluster) = Cluster::from_index(layout, index) else {
+            return Self::default();
+        };
         Self::from_cluster(cluster, affinity)
     }
 
     /// Creates a new cursor for the given layout and point.
     pub fn from_point<B: Brush>(layout: &Layout<B>, x: f32, y: f32) -> Self {
-        let (cluster, affinity) = Cluster::from_point(layout, x, y);
+        let Some((cluster, affinity)) = Cluster::from_point(layout, x, y) else {
+            return Self::default();
+        };
         Self::from_cluster(cluster, affinity)
     }
 
@@ -364,6 +368,11 @@ impl Cursor {
         }
         Self::from_cluster(next, Affinity::default())
     }
+
+    /// Used for determining visual order of two cursors.
+    fn visual_order_key(&self) -> (usize, f32) {
+        (self.path.line_index(), self.visual_offset)
+    }
 }
 
 /// A range within a layout.
@@ -509,7 +518,7 @@ impl Selection {
         extend: bool,
     ) -> Self {
         if !extend && !self.is_collapsed() {
-            if self.focus.text_start > self.anchor.text_start {
+            if self.focus.visual_order_key() > self.anchor.visual_order_key() {
                 return self.focus.into();
             } else {
                 return self.anchor.into();
@@ -531,7 +540,7 @@ impl Selection {
         extend: bool,
     ) -> Self {
         if !extend && !self.is_collapsed() {
-            if self.focus.text_start < self.anchor.text_start {
+            if self.focus.visual_order_key() < self.anchor.visual_order_key() {
                 return self.focus.into();
             } else {
                 return self.anchor.into();
@@ -642,13 +651,19 @@ impl Selection {
         if delta == 0 {
             return *self;
         }
-        let line_index = self
-            .focus
-            .path
-            .line_index()
-            .saturating_add_signed(delta)
-            .min(layout.len().saturating_sub(1));
-        let Some(line) = layout.get(line_index) else {
+        let line_limit = layout.len().saturating_sub(1);
+        let line_index = self.focus.path.line_index();
+        let new_line_index = line_index.saturating_add_signed(delta);
+        if delta < 0 && line_index.checked_add_signed(delta).is_none() {
+            return self
+                .move_lines(layout, -(line_index as isize), extend)
+                .line_start(layout, extend);
+        } else if delta > 0 && new_line_index > line_limit {
+            return self
+                .move_lines(layout, (line_limit - line_index) as isize, extend)
+                .line_end(layout, extend);
+        }
+        let Some(line) = layout.get(new_line_index) else {
             return *self;
         };
         let y = line.metrics().baseline - line.metrics().ascent * 0.5;

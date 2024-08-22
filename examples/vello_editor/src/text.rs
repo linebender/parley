@@ -63,6 +63,7 @@ impl Editor {
         self.width = width;
     }
 
+    #[allow(unused)]
     pub fn active_text(&self) -> ActiveText {
         if self.selection.is_collapsed() {
             let range = self
@@ -70,12 +71,58 @@ impl Editor {
                 .focus()
                 .cluster_path()
                 .cluster(&self.layout)
-                .unwrap()
-                .text_range();
+                .map(|c| c.text_range())
+                .unwrap_or_default();
             ActiveText::FocusedCluster(self.selection.focus().affinity(), &self.buffer[range])
         } else {
             ActiveText::Selection(&self.buffer[self.selection.text_range()])
         }
+    }
+
+    #[cfg(not(target_os = "android"))]
+    fn handle_clipboard(&mut self, code: KeyCode) {
+        match code {
+            KeyCode::KeyC => {
+                if !self.selection.is_collapsed() {
+                    let text = &self.buffer[self.selection.text_range()];
+                    let cb = ClipboardContext::new().unwrap();
+                    cb.set_text(text.to_owned()).ok();
+                }
+            }
+            KeyCode::KeyX => {
+                if !self.selection.is_collapsed() {
+                    let text = &self.buffer[self.selection.text_range()];
+                    let cb = ClipboardContext::new().unwrap();
+                    cb.set_text(text.to_owned()).ok();
+                    if let Some(start) = self.delete_current_selection() {
+                        self.update_layout(self.width, 1.0);
+                        let (start, affinity) = if start > 0 {
+                            (start - 1, Affinity::Upstream)
+                        } else {
+                            (start, Affinity::Downstream)
+                        };
+                        self.selection = Selection::from_index(&self.layout, start, affinity);
+                    }
+                }
+            }
+            KeyCode::KeyV => {
+                let cb = ClipboardContext::new().unwrap();
+                let text = cb.get_text().unwrap_or_default();
+                let start = self
+                    .delete_current_selection()
+                    .unwrap_or_else(|| self.selection.focus().text_range().start);
+                self.buffer.insert_str(start, &text);
+                self.update_layout(self.width, 1.0);
+                self.selection =
+                    Selection::from_index(&self.layout, start + text.len(), Affinity::default());
+            }
+            _ => {}
+        }
+    }
+
+    #[cfg(target_os = "android")]
+    fn handle_clipboard(&mut self, _code: KeyCode) {
+        // TODO: support clipboard on Android
     }
 
     pub fn handle_event(&mut self, event: &WindowEvent) {
@@ -109,42 +156,13 @@ impl Editor {
                 if let PhysicalKey::Code(code) = event.physical_key {
                     match code {
                         KeyCode::KeyC if action_mod => {
-                            if !self.selection.is_collapsed() {
-                                let text = &self.buffer[self.selection.text_range()];
-                                let cb = ClipboardContext::new().unwrap();
-                                cb.set_text(text.to_owned()).ok();
-                            }
+                            self.handle_clipboard(code);
                         }
                         KeyCode::KeyX if action_mod => {
-                            if !self.selection.is_collapsed() {
-                                let text = &self.buffer[self.selection.text_range()];
-                                let cb = ClipboardContext::new().unwrap();
-                                cb.set_text(text.to_owned()).ok();
-                                if let Some(start) = self.delete_current_selection() {
-                                    self.update_layout(self.width, 1.0);
-                                    let (start, affinity) = if start > 0 {
-                                        (start - 1, Affinity::Upstream)
-                                    } else {
-                                        (start, Affinity::Downstream)
-                                    };
-                                    self.selection =
-                                        Selection::from_index(&self.layout, start, affinity);
-                                }
-                            }
+                            self.handle_clipboard(code);
                         }
                         KeyCode::KeyV if action_mod => {
-                            let cb = ClipboardContext::new().unwrap();
-                            let text = cb.get_text().unwrap_or_default();
-                            let start = self
-                                .delete_current_selection()
-                                .unwrap_or_else(|| self.selection.focus().text_range().start);
-                            self.buffer.insert_str(start, &text);
-                            self.update_layout(self.width, 1.0);
-                            self.selection = Selection::from_index(
-                                &self.layout,
-                                start + text.len(),
-                                Affinity::default(),
-                            );
+                            self.handle_clipboard(code);
                         }
                         KeyCode::ArrowLeft => {
                             self.selection = if ctrl {
@@ -172,20 +190,35 @@ impl Editor {
                             self.selection = self.selection.next_line(&self.layout, shift);
                         }
                         KeyCode::Home => {
-                            self.selection = self.selection.line_start(&self.layout, shift);
+                            if ctrl {
+                                self.selection =
+                                    self.selection.move_lines(&self.layout, isize::MIN, shift);
+                            } else {
+                                self.selection = self.selection.line_start(&self.layout, shift);
+                            }
                         }
                         KeyCode::End => {
-                            self.selection = self.selection.line_end(&self.layout, shift);
+                            if ctrl {
+                                self.selection =
+                                    self.selection.move_lines(&self.layout, isize::MAX, shift);
+                            } else {
+                                self.selection = self.selection.line_end(&self.layout, shift);
+                            }
                         }
                         KeyCode::Delete => {
-                            if self.selection.is_collapsed() {
+                            let start = if self.selection.is_collapsed() {
                                 let range = self.selection.focus().text_range();
+                                let start = range.start;
                                 self.buffer.replace_range(range, "");
+                                Some(start)
                             } else {
-                                self.delete_current_selection();
+                                self.delete_current_selection()
                             };
-                            self.update_layout(self.width, 1.0);
-                            self.selection = self.selection.refresh(&self.layout);
+                            if let Some(start) = start {
+                                self.update_layout(self.width, 1.0);
+                                self.selection =
+                                    Selection::from_index(&self.layout, start, Affinity::default());
+                            }
                         }
                         KeyCode::Backspace => {
                             let start = if self.selection.is_collapsed() {
@@ -229,7 +262,7 @@ impl Editor {
                     }
                 }
 
-                println!("Active text: {:?}", self.active_text());
+                // println!("Active text: {:?}", self.active_text());
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 if *button == winit::event::MouseButton::Left {
@@ -238,7 +271,7 @@ impl Editor {
                         let now = Instant::now();
                         if let Some(last) = self.last_click_time.take() {
                             if now.duration_since(last).as_secs_f64() < 0.25 {
-                                self.click_count = (self.click_count + 1) % 3;
+                                self.click_count = (self.click_count + 1) % 4;
                             } else {
                                 self.click_count = 1;
                             }
@@ -248,14 +281,23 @@ impl Editor {
                         self.last_click_time = Some(now);
                         match self.click_count {
                             2 => {
-                                println!("SELECTING WORD");
                                 self.selection = Selection::word_from_point(
                                     &self.layout,
                                     self.cursor_pos.0,
                                     self.cursor_pos.1,
                                 );
                             }
-                            // TODO: handle line
+                            3 => {
+                                let focus = *Selection::from_point(
+                                    &self.layout,
+                                    self.cursor_pos.0,
+                                    self.cursor_pos.1,
+                                )
+                                .line_start(&self.layout, true)
+                                .focus();
+                                self.selection =
+                                    Selection::from(focus).line_end(&self.layout, true);
+                            }
                             _ => {
                                 self.selection = Selection::from_point(
                                     &self.layout,
@@ -264,7 +306,7 @@ impl Editor {
                                 );
                             }
                         }
-                        println!("Active text: {:?}", self.active_text());
+                        // println!("Active text: {:?}", self.active_text());
                     }
                 }
             }
@@ -278,7 +320,7 @@ impl Editor {
                         self.cursor_pos.0,
                         self.cursor_pos.1,
                     );
-                    println!("Active text: {:?}", self.active_text());
+                    // println!("Active text: {:?}", self.active_text());
                 }
             }
             _ => {}

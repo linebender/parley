@@ -497,18 +497,18 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let line_height = line_item.compute_line_height(&self.layout.data);
                         line.metrics.line_height = line.metrics.line_height.max(line_height);
 
-                        // Ignore trailing whitespace for metrics computation
-                        // (we are iterating backwards so trailing whitespace comes first)
-                        if !have_metrics && line_item.is_whitespace {
-                            continue;
-                        }
-
                         // Compute the run's advance by summing the advances of its constituent clusters
                         line_item.advance = self.layout.data.clusters
                             [line_item.cluster_range.clone()]
                         .iter()
                         .map(|c| c.advance)
                         .sum();
+
+                        // Ignore trailing whitespace for metrics computation
+                        // (we are iterating backwards so trailing whitespace comes first)
+                        if !have_metrics && line_item.is_whitespace {
+                            continue;
+                        }
 
                         // Compute the run's vertical metrics
                         line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent);

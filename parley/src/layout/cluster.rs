@@ -5,7 +5,7 @@ use super::*;
 
 impl<'a, B: Brush> Cluster<'a, B> {
     /// Returns the cluster for the given layout and byte index.
-    pub fn from_index(layout: &'a Layout<B>, byte_index: usize) -> Self {
+    pub fn from_index(layout: &'a Layout<B>, byte_index: usize) -> Option<Self> {
         let mut path = ClusterPath::default();
         if let Some((line_index, line)) = layout.line_for_byte_index(byte_index) {
             path.line_index = line_index as u32;
@@ -17,16 +17,16 @@ impl<'a, B: Brush> Cluster<'a, B> {
                 for (cluster_index, cluster) in run.clusters().enumerate() {
                     path.logical_index = cluster_index as u32;
                     if cluster.text_range().contains(&byte_index) {
-                        return path.cluster(layout).unwrap();
+                        return path.cluster(layout);
                     }
                 }
             }
         }
-        path.cluster(layout).unwrap()
+        path.cluster(layout)
     }
 
     /// Returns the cluster and affinity for the given layout and point.
-    pub fn from_point(layout: &'a Layout<B>, x: f32, y: f32) -> (Self, Affinity) {
+    pub fn from_point(layout: &'a Layout<B>, x: f32, y: f32) -> Option<(Self, Affinity)> {
         let mut path = ClusterPath::default();
         if let Some((line_index, line)) = layout.line_for_offset(y) {
             path.line_index = line_index as u32;
@@ -54,11 +54,11 @@ impl<'a, B: Brush> Cluster<'a, B> {
                     }
                     let affinity =
                         Affinity::new(cluster.is_rtl(), x <= edge + cluster_advance * 0.5);
-                    return (path.cluster(layout).unwrap(), affinity);
+                    return Some((path.cluster(layout)?, affinity));
                 }
             }
         }
-        (path.cluster(layout).unwrap(), Affinity::default())
+        Some((path.cluster(layout)?, Affinity::default()))
     }
 
     /// Returns the line that contains the cluster.
@@ -205,7 +205,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
                 return None;
             }
             // We have to search for the cluster containing our end index
-            Some(Self::from_index(self.run.layout, index))
+            Self::from_index(self.run.layout, index)
         }
     }
 
@@ -220,10 +220,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
             }
             .cluster(self.run.layout)
         } else {
-            Some(Self::from_index(
-                self.run.layout,
-                self.text_range().start.checked_sub(1)?,
-            ))
+            Self::from_index(self.run.layout, self.text_range().start.checked_sub(1)?)
         }
     }
 
