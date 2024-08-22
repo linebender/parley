@@ -1,6 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+#[cfg(not(target_os = "android"))]
 use clipboard_rs::{Clipboard, ClipboardContext};
 use parley::layout::cursor::{Selection, VisualMode};
 use parley::layout::Affinity;
