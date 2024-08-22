@@ -32,22 +32,25 @@ impl<'a, B: Brush> Line<'a, B> {
         if index >= self.data.item_range.end {
             return None;
         }
-        let item = self.layout.line_items.get(index)?;
+        let item = self.layout.data.line_items.get(index)?;
         Some(item)
     }
 
     /// Returns the run at the specified index.
     pub fn run(&self, index: usize) -> Option<Run<'a, B>> {
+        let original_index = index;
         let index = self.data.item_range.start + index;
         if index >= self.data.item_range.end {
             return None;
         }
-        let item = self.layout.line_items.get(index)?;
+        let item = self.layout.data.line_items.get(index)?;
 
         if item.kind == LayoutItemKind::TextRun {
             Some(Run {
                 layout: self.layout,
-                data: self.layout.runs.get(item.index)?,
+                line_index: self.index,
+                index: original_index as u32,
+                data: self.layout.data.runs.get(item.index)?,
                 line_data: Some(item),
             })
         } else {
@@ -59,13 +62,16 @@ impl<'a, B: Brush> Line<'a, B> {
     // TODO: provide iterator over inline_boxes and items
     pub fn runs(&self) -> impl Iterator<Item = Run<'a, B>> + 'a + Clone {
         let copy = self.clone();
-        let line_items = &copy.layout.line_items[self.data.item_range.clone()];
+        let line_items = &copy.layout.data.line_items[self.data.item_range.clone()];
         line_items
             .iter()
-            .filter(|item| item.kind == LayoutItemKind::TextRun)
-            .map(move |line_data| Run {
+            .enumerate()
+            .filter(|(_, item)| item.kind == LayoutItemKind::TextRun)
+            .map(move |(index, line_data)| Run {
                 layout: copy.layout,
-                data: &copy.layout.runs[line_data.index],
+                line_index: copy.index,
+                index: index as u32,
+                data: &copy.layout.data.runs[line_data.index],
                 line_data: Some(line_data),
             })
     }
@@ -101,6 +107,16 @@ pub struct LineMetrics {
     pub advance: f32,
     /// Advance of trailing whitespace.
     pub trailing_whitespace: f32,
+    /// Minimum coordinate in the direction orthogonal to line
+    /// direction.
+    ///
+    /// For horizontal text, this would be the top of the line.    
+    pub min_coord: f32,
+    /// Maximum coordinate in the direction orthogonal to line
+    /// direction.
+    ///
+    /// For horizontal text, this would be the bottom of the line.     
+    pub max_coord: f32,
 }
 
 impl LineMetrics {
@@ -206,7 +222,7 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
             let item = self.line.item(self.item_index)?;
             match item.kind {
                 LayoutItemKind::InlineBox => {
-                    let inline_box = &self.line.layout.inline_boxes[item.index];
+                    let inline_box = &self.line.layout.data.inline_boxes[item.index];
 
                     let x = self.offset + self.line.data.metrics.offset;
 
@@ -237,7 +253,7 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                             glyph_count += 1;
                             advance += glyph.advance;
                         }
-                        let style = run.layout.styles.get(style_index)?;
+                        let style = run.layout.data.styles.get(style_index)?;
                         let glyph_start = self.glyph_start;
                         self.glyph_start += glyph_count;
                         let offset = self.offset;

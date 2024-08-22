@@ -93,7 +93,7 @@ impl BreakerState {
 
 /// Line breaking support for a paragraph.
 pub struct BreakLines<'a, B: Brush> {
-    layout: &'a mut LayoutData<B>,
+    layout: &'a mut Layout<B>,
     lines: LineLayout,
     state: BreakerState,
     prev_state: Option<BreakerState>,
@@ -101,12 +101,12 @@ pub struct BreakLines<'a, B: Brush> {
 }
 
 impl<'a, B: Brush> BreakLines<'a, B> {
-    pub(crate) fn new(layout: &'a mut LayoutData<B>) -> Self {
-        unjustify(layout);
-        layout.width = 0.;
-        layout.height = 0.;
+    pub(crate) fn new(layout: &'a mut Layout<B>) -> Self {
+        unjustify(&mut layout.data);
+        layout.data.width = 0.;
+        layout.data.height = 0.;
         let mut lines = LineLayout::default();
-        lines.swap(layout);
+        lines.swap(&mut layout.data);
         lines.lines.clear();
         lines.line_items.clear();
         Self {
@@ -163,9 +163,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // dbg!(&self.state.line.items);
 
         // Iterate over remaining runs in the Layout
-        let item_count = self.layout.items.len();
+        let item_count = self.layout.data.items.len();
         while self.state.item_idx < item_count {
-            let item = &self.layout.items[self.state.item_idx];
+            let item = &self.layout.data.items[self.state.item_idx];
 
             // println!(
             //     "\nitem = {} {:?}. x: {}",
@@ -175,7 +175,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
             match item.kind {
                 LayoutItemKind::InlineBox => {
-                    let inline_box = &self.layout.inline_boxes[item.index];
+                    let inline_box = &self.layout.data.inline_boxes[item.index];
 
                     // Compute the x position of the content being currently processed
                     let next_x = self.state.line.x + inline_box.width;
@@ -211,9 +211,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 }
                 LayoutItemKind::TextRun => {
                     let run_idx = item.index;
-                    let run_data = &self.layout.runs[run_idx];
+                    let run_data = &self.layout.data.runs[run_idx];
 
-                    let run = Run::new(self.layout, run_data, None);
+                    let run = Run::new(self.layout, 0, 0, run_data, None);
                     let cluster_start = run_data.cluster_range.start;
                     let cluster_end = run_data.cluster_range.end;
 
@@ -427,7 +427,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             run.is_whitespace = true;
             if run.bidi_level & 1 != 0 {
                 // RTL runs check for "trailing" whitespace at the front.
-                for cluster in self.layout.clusters[run.cluster_range.clone()].iter() {
+                for cluster in self.layout.data.clusters[run.cluster_range.clone()].iter() {
                     if cluster.info.is_whitespace() {
                         run.has_trailing_whitespace = true;
                     } else {
@@ -436,7 +436,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     }
                 }
             } else {
-                for cluster in self.layout.clusters[run.cluster_range.clone()].iter().rev() {
+                for cluster in self.layout.data.clusters[run.cluster_range.clone()]
+                    .iter()
+                    .rev()
+                {
                     if cluster.info.is_whitespace() {
                         run.has_trailing_whitespace = true;
                     } else {
@@ -465,7 +468,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             {
                 match line_item.kind {
                     LayoutItemKind::InlineBox => {
-                        let item = &self.layout.inline_boxes[line_item.index];
+                        let item = &self.layout.data.inline_boxes[line_item.index];
 
                         // Advance is already computed in "commit line" for items
 
@@ -490,22 +493,24 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             needs_reorder = true;
                         }
 
+                        let run = &self.layout.data.runs[line_item.index];
+                        let line_height = line_item.compute_line_height(&self.layout.data);
+                        line.metrics.line_height = line.metrics.line_height.max(line_height);
+
+                        // Compute the run's advance by summing the advances of its constituent clusters
+                        line_item.advance = self.layout.data.clusters
+                            [line_item.cluster_range.clone()]
+                        .iter()
+                        .map(|c| c.advance)
+                        .sum();
+
                         // Ignore trailing whitespace for metrics computation
                         // (we are iterating backwards so trailing whitespace comes first)
                         if !have_metrics && line_item.is_whitespace {
                             continue;
                         }
 
-                        // Compute the run's advance by summing the advances of its constituent clusters
-                        line_item.advance = self.layout.clusters[line_item.cluster_range.clone()]
-                            .iter()
-                            .map(|c| c.advance)
-                            .sum();
-
                         // Compute the run's vertical metrics
-                        let run = &self.layout.runs[line_item.index];
-                        let line_height = line_item.compute_line_height(self.layout);
-                        line.metrics.line_height = line.metrics.line_height.max(line_height);
                         line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent);
                         line.metrics.descent = line.metrics.descent.max(run.metrics.descent);
                         line.metrics.leading = line.metrics.leading.max(run.metrics.leading);
@@ -534,7 +539,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     .rfind(|item| item.is_text_run());
                 if let Some(last_run) = last_run {
                     if !last_run.cluster_range.is_empty() {
-                        let cluster = &self.layout.clusters[last_run.cluster_range.end - 1];
+                        let cluster = &self.layout.data.clusters[last_run.cluster_range.end - 1];
                         if cluster.info.whitespace().is_space_or_nbsp() {
                             line.metrics.trailing_whitespace = cluster.advance;
                         }
@@ -547,7 +552,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 if !line.item_range.is_empty() {
                     let line_item = &self.lines.line_items[line.item_range.start];
                     if line_item.is_text_run() {
-                        let run = &self.layout.runs[line_item.index];
+                        let run = &self.layout.data.runs[line_item.index];
                         line.metrics.ascent = run.metrics.ascent;
                         line.metrics.descent = run.metrics.descent;
                         line.metrics.leading = run.metrics.leading;
@@ -565,8 +570,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             // Compute
             let above = (line.metrics.ascent + line.metrics.leading * 0.5).round();
             let below = (line.metrics.descent + line.metrics.leading * 0.5).round();
+            line.metrics.min_coord = y;
             line.metrics.baseline = y + above;
             y = line.metrics.baseline + below;
+            line.metrics.max_coord = y;
         }
     }
 }
@@ -585,9 +592,9 @@ impl<'a, B: Brush> Drop for BreakLines<'a, B> {
         }
 
         // Save the computed widths/height to the layout
-        self.layout.width = width;
-        self.layout.full_width = full_width;
-        self.layout.height = height;
+        self.layout.data.width = width;
+        self.layout.data.full_width = full_width;
+        self.layout.data.height = height;
 
         // for (i, line) in self.lines.lines.iter().enumerate() {
         //     println!("LINE {i}");
@@ -598,7 +605,7 @@ impl<'a, B: Brush> Drop for BreakLines<'a, B> {
         // }
 
         // Save the computed lines to the layout
-        self.lines.swap(self.layout);
+        self.lines.swap(&mut self.layout.data);
     }
 }
 
@@ -650,23 +657,23 @@ impl<'a, B: Brush> Drop for BreakLines<'a, B> {
 // }
 
 fn try_commit_line<B: Brush>(
-    layout: &LayoutData<B>,
+    layout: &Layout<B>,
     lines: &mut LineLayout,
     state: &mut LineState,
     max_advance: f32,
     alignment: Alignment,
     break_reason: BreakReason,
 ) -> bool {
-    let is_empty = layout.text_len == 0;
+    let is_empty = layout.data.text_len == 0;
 
     // Ensure that the cluster and item endpoints are within range
-    state.clusters.end = state.clusters.end.min(layout.clusters.len());
-    state.items.end = state.items.end.min(layout.items.len());
+    state.clusters.end = state.clusters.end.min(layout.data.clusters.len());
+    state.items.end = state.items.end.min(layout.data.items.len());
 
     let start_item_idx = lines.line_items.len();
     // let start_run_idx = lines.line_items.last().map(|item| item.index).unwrap_or(0);
 
-    let items_to_commit = &layout.items[state.items.clone()];
+    let items_to_commit = &layout.data.items[state.items.clone()];
 
     // Compute first and last run index
     let is_text_run = |item: &LayoutItem| item.kind == LayoutItemKind::TextRun;
@@ -689,7 +696,7 @@ fn try_commit_line<B: Brush>(
 
         match item.kind {
             LayoutItemKind::InlineBox => {
-                let inline_box = &layout.inline_boxes[item.index];
+                let inline_box = &layout.data.inline_boxes[item.index];
 
                 lines.line_items.push(LineItemData {
                     kind: LayoutItemKind::InlineBox,
@@ -705,7 +712,7 @@ fn try_commit_line<B: Brush>(
                 });
             }
             LayoutItemKind::TextRun => {
-                let run_data = &layout.runs[item.index];
+                let run_data = &layout.data.runs[item.index];
 
                 // Compute cluster range
                 // The first and last ranges have overrides to account for line-breaks within runs
@@ -727,7 +734,7 @@ fn try_commit_line<B: Brush>(
                 }
 
                 // Push run to line
-                let run = Run::new(layout, run_data, None);
+                let run = Run::new(layout, 0, 0, run_data, None);
                 let text_range = if run_data.cluster_range.is_empty() {
                     0..0
                 } else {

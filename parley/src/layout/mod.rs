@@ -16,11 +16,12 @@ use self::alignment::align;
 
 use super::style::Brush;
 use crate::{Font, InlineBox};
-use core::ops::Range;
+use core::{cmp::Ordering, ops::Range};
 use data::*;
 use swash::text::cluster::{Boundary, ClusterInfo};
 use swash::{GlyphId, NormalizedCoord, Synthesis};
 
+pub use cluster::{Affinity, ClusterPath};
 pub use cursor::Cursor;
 pub use line::greedy::BreakLines;
 pub use line::{GlyphRun, LineMetrics, PositionedInlineBox, PositionedLayoutItem};
@@ -88,9 +89,15 @@ impl<B: Brush> Layout<B> {
     /// Returns the line at the specified index.
     pub fn get(&self, index: usize) -> Option<Line<B>> {
         Some(Line {
-            layout: &self.data,
+            index: index as u32,
+            layout: self,
             data: self.data.lines.get(index)?,
         })
+    }
+
+    /// Returns true if the dominant direction of the layout is right-to-left.
+    pub fn is_rtl(&self) -> bool {
+        self.data.base_level & 1 != 0
     }
 
     pub fn inline_boxes(&self) -> &[InlineBox] {
@@ -103,15 +110,20 @@ impl<B: Brush> Layout<B> {
 
     /// Returns an iterator over the lines in the layout.
     pub fn lines(&self) -> impl Iterator<Item = Line<B>> + '_ + Clone {
-        self.data.lines.iter().map(move |data| Line {
-            layout: &self.data,
-            data,
-        })
+        self.data
+            .lines
+            .iter()
+            .enumerate()
+            .map(move |(index, data)| Line {
+                index: index as u32,
+                layout: self,
+                data,
+            })
     }
 
     /// Returns line breaker to compute lines for the layout.
     pub fn break_lines(&mut self) -> BreakLines<B> {
-        BreakLines::new(&mut self.data)
+        BreakLines::new(self)
     }
 
     /// Breaks all lines with the specified maximum advance.
@@ -126,13 +138,48 @@ impl<B: Brush> Layout<B> {
         align(&mut self.data, container_width, alignment);
     }
 
-    /// Returns an iterator over the runs in the layout.
-    pub fn runs(&self) -> impl Iterator<Item = Run<B>> + '_ + Clone {
-        self.data.runs.iter().map(move |data| Run {
-            layout: &self.data,
-            data,
-            line_data: None,
-        })
+    /// Returns the index and `Line` object for the line containing the
+    /// given byte `index` in the source text.
+    pub(crate) fn line_for_byte_index(&self, index: usize) -> Option<(usize, Line<B>)> {
+        let line_index = self
+            .data
+            .lines
+            .binary_search_by(|line| {
+                if index < line.text_range.start {
+                    Ordering::Greater
+                } else if index >= line.text_range.end {
+                    Ordering::Less
+                } else {
+                    Ordering::Equal
+                }
+            })
+            .ok()?;
+        Some((line_index, self.get(line_index)?))
+    }
+
+    /// Returns the index and `Line` object for the line containing the
+    /// given `offset`.
+    ///
+    /// The offset is specified in the direction orthogonal to line direction.
+    /// For horizontal text, this is a vertical or y offset.
+    pub(crate) fn line_for_offset(&self, offset: f32) -> Option<(usize, Line<B>)> {
+        if offset < 0.0 {
+            return Some((0, self.get(0)?));
+        }
+        let maybe_line_index = self.data.lines.binary_search_by(|line| {
+            if offset < line.metrics.min_coord {
+                Ordering::Greater
+            } else if offset > line.metrics.max_coord {
+                Ordering::Less
+            } else {
+                Ordering::Equal
+            }
+        });
+        let line_index = match maybe_line_index {
+            Ok(index) => index,
+            Err(index) => index.saturating_sub(1),
+        };
+        Some((line_index, self.get(line_index)?))
     }
 }
 
@@ -147,7 +194,9 @@ impl<B: Brush> Default for Layout<B> {
 /// Sequence of clusters with a single font and style.
 #[derive(Copy, Clone)]
 pub struct Run<'a, B: Brush> {
-    layout: &'a LayoutData<B>,
+    layout: &'a Layout<B>,
+    line_index: u32,
+    index: u32,
     data: &'a RunData,
     line_data: Option<&'a LineItemData>,
 }
@@ -155,6 +204,7 @@ pub struct Run<'a, B: Brush> {
 /// Atomic unit of text.
 #[derive(Copy, Clone)]
 pub struct Cluster<'a, B: Brush> {
+    path: ClusterPath,
     run: Run<'a, B>,
     data: &'a ClusterData,
 }
@@ -179,7 +229,8 @@ impl Glyph {
 /// Line in a text layout.
 #[derive(Copy, Clone)]
 pub struct Line<'a, B: Brush> {
-    layout: &'a LayoutData<B>,
+    layout: &'a Layout<B>,
+    index: u32,
     data: &'a LineData,
 }
 
