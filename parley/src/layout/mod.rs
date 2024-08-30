@@ -210,13 +210,14 @@ pub struct Cluster<'a, B: Brush> {
 }
 
 /// Glyph with an offset and advance.
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct Glyph {
     pub id: GlyphId,
     pub style_index: u16,
     pub x: f32,
     pub y: f32,
     pub advance: f32,
+    pub text_range: Range<usize>,
 }
 
 impl Glyph {

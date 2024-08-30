@@ -126,6 +126,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
     pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + 'a + Clone {
         if self.data.glyph_len == 0xFF {
             GlyphIter::Single(Some(Glyph {
+                text_range: self.text_range(),
                 id: self.data.glyph_offset,
                 style_index: self.data.style_index,
                 x: 0.,
@@ -451,7 +452,7 @@ impl<'a> Iterator for GlyphIter<'a> {
         match self {
             Self::Single(glyph) => glyph.take(),
             Self::Slice(iter) => {
-                let glyph = *iter.next()?;
+                let glyph = iter.next()?.clone();
                 Some(glyph)
             }
         }
