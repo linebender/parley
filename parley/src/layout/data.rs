@@ -435,12 +435,12 @@ impl<B: Brush> LayoutData<B> {
                     cluster_data.flags |= ClusterData::DIVERGENT_STYLES;
                 }
                 Glyph {
-                    text_range: source_range.clone(),
                     id: g.id,
                     style_index,
                     x: g.x,
                     y: g.y,
                     advance: g.advance,
+                    text_range: source_range.clone(),
                 }
             }));
             glyph_count += glyph_len;
