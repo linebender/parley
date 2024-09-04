@@ -505,6 +505,16 @@ impl Selection {
         }
     }
 
+    /// Returns a new selection with the focus extended to the given cursor.
+    #[must_use]
+    pub fn extend_to_cursor(&self, focus: Cursor) -> Self {
+        Self {
+            anchor: self.anchor,
+            focus,
+            h_pos: None,
+        }
+    }
+
     /// Returns a new selection with the focus moved to the next cluster in
     /// visual order.
     ///

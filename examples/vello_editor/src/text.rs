@@ -3,12 +3,15 @@
 
 #[cfg(not(target_os = "android"))]
 use clipboard_rs::{Clipboard, ClipboardContext};
-use parley::layout::cursor::{Selection, VisualMode};
+use parley::layout::cursor::{Cursor, Selection, VisualMode};
 use parley::layout::Affinity;
 use parley::{layout::PositionedLayoutItem, FontContext};
 use peniko::{kurbo::Affine, Color, Fill};
 use std::time::Instant;
 use vello::Scene;
+use winit::dpi::{LogicalPosition, LogicalSize};
+use winit::event::Ime;
+use winit::window::Window;
 use winit::{
     event::{Modifiers, WindowEvent},
     keyboard::{KeyCode, PhysicalKey},
@@ -27,12 +30,23 @@ pub enum ActiveText<'a> {
 }
 
 #[derive(Default)]
+enum ComposeState {
+    #[default]
+    None,
+    Preedit {
+        /// The location of the (uncommitted) preedit text
+        text_at: Selection,
+    },
+}
+
+#[derive(Default)]
 pub struct Editor {
     font_cx: FontContext,
     layout_cx: LayoutContext,
     buffer: String,
     layout: Layout,
     selection: Selection,
+    compose_state: ComposeState,
     cursor_mode: VisualMode,
     last_click_time: Option<Instant>,
     click_count: u32,
@@ -126,7 +140,28 @@ impl Editor {
         // TODO: support clipboard on Android
     }
 
-    pub fn handle_event(&mut self, event: &WindowEvent) {
+    pub fn handle_event(&mut self, window: &Window, event: &WindowEvent) {
+        if let ComposeState::Preedit { text_at } = self.compose_state {
+            // Clear old preedit state when handling events that potentially mutate text/selection.
+            // This is a bit overzealous, e.g., pressing and releasing shift probably shouldnt't
+            // clear the preedit.
+            if matches!(
+                event,
+                WindowEvent::KeyboardInput { .. }
+                    | WindowEvent::MouseInput { .. }
+                    | WindowEvent::Ime(..)
+            ) {
+                let range = text_at.text_range();
+                self.selection =
+                    Selection::from_index(&self.layout, range.start - 1, Affinity::Upstream);
+                self.buffer.replace_range(range, "");
+                self.compose_state = ComposeState::None;
+                // TODO: defer updating layout. If the event itself also causes an update, we now
+                // update twice.
+                self.update_layout(self.width, 1.0);
+            }
+        }
+
         match event {
             WindowEvent::Resized(size) => {
                 self.update_layout(size.width as f32, 1.0);
@@ -265,6 +300,87 @@ impl Editor {
 
                 // println!("Active text: {:?}", self.active_text());
             }
+            WindowEvent::Ime(ime) => {
+                match ime {
+                    Ime::Commit(text) => {
+                        let start = self
+                            .delete_current_selection()
+                            .unwrap_or_else(|| self.selection.focus().text_range().start);
+                        self.buffer.insert_str(start, text);
+                        self.update_layout(self.width, 1.0);
+                        self.selection = Selection::from_index(
+                            &self.layout,
+                            start + text.len() - 1,
+                            Affinity::Upstream,
+                        );
+                    }
+                    Ime::Preedit(text, compose_cursor) => {
+                        if text.is_empty() {
+                            // Winit sends empty preedit text to indicate the preedit was cleared.
+                            return;
+                        }
+
+                        let start = self
+                            .delete_current_selection()
+                            .unwrap_or_else(|| self.selection.focus().text_range().start);
+                        self.buffer.insert_str(start, text);
+                        self.update_layout(self.width, 1.0);
+
+                        {
+                            // winit says the cursor should be hidden when compose_cursor is None.
+                            // Do we handle that? We also don't extend the cursor to the end
+                            // indicated by winit, instead IME composing is currently indicated by
+                            // highlighting the entire preedit text. Should we even update the
+                            // selection at all?
+                            let compose_cursor = compose_cursor.unwrap_or((0, 0));
+                            self.selection = Selection::from_index(
+                                &self.layout,
+                                start - 1 + compose_cursor.0,
+                                Affinity::Upstream,
+                            );
+                        }
+
+                        {
+                            let text_end = Cursor::from_index(
+                                &self.layout,
+                                start - 1 + text.len(),
+                                Affinity::Upstream,
+                            );
+                            let ime_cursor = self.selection.extend_to_cursor(text_end);
+                            self.compose_state = ComposeState::Preedit {
+                                text_at: ime_cursor,
+                            };
+
+                            // Find the smallest rectangle that contains the entire preedit text.
+                            // Send that rectangle to the platform to suggest placement for the IME
+                            // candidate box.
+                            let mut union_rect = None;
+                            ime_cursor.geometry_with(&self.layout, |rect| {
+                                if union_rect.is_none() {
+                                    union_rect = Some(rect);
+                                }
+                                union_rect = Some(union_rect.unwrap().union(rect));
+                            });
+                            if let Some(union_rect) = union_rect {
+                                window.set_ime_cursor_area(
+                                    LogicalPosition::new(union_rect.x0, union_rect.y0),
+                                    LogicalSize::new(
+                                        union_rect.width(),
+                                        // TODO: an offset is added here to prevent the IME
+                                        // candidate box from overlapping with the IME cursor. From
+                                        // the Winit docs I would've expected the IME candidate box
+                                        // not to overlap the indicated IME cursor area, but for
+                                        // some reason it does (tested using fcitx5
+                                        // on wayland)
+                                        union_rect.height() + 40.0,
+                                    ),
+                                );
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
             WindowEvent::MouseInput { state, button, .. } => {
                 if *button == winit::event::MouseButton::Left {
                     self.pointer_down = state.is_pressed();
@@ -350,6 +466,13 @@ impl Editor {
         if let Some(cursor) = self.selection.focus().weak_geometry(&self.layout, 1.5) {
             scene.fill(Fill::NonZero, transform, Color::LIGHT_GRAY, None, &cursor);
         };
+        if let ComposeState::Preedit { text_at } = self.compose_state {
+            // TODO: underline rather than fill, requires access to underline_offset metric for
+            // each run
+            text_at.geometry_with(&self.layout, |rect| {
+                scene.fill(Fill::NonZero, transform, Color::SPRING_GREEN, None, &rect);
+            });
+        }
         for line in self.layout.lines() {
             for item in line.items() {
                 let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
