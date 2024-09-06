@@ -8,6 +8,7 @@ use parley::layout::Affinity;
 use parley::{layout::PositionedLayoutItem, FontContext};
 use peniko::{kurbo::Affine, Color, Fill};
 use std::time::Instant;
+use vello::kurbo::{Line, Stroke};
 use vello::Scene;
 use winit::dpi::{LogicalPosition, LogicalSize};
 use winit::event::Ime;
@@ -71,6 +72,14 @@ impl Editor {
         builder.push_default(&parley::style::StyleProperty::FontStack(
             parley::style::FontStack::Source("system-ui"),
         ));
+        if let ComposeState::Preedit { text_at } = self.compose_state {
+            let text_range = text_at.text_range();
+            builder.push(
+                &parley::style::StyleProperty::UnderlineBrush(Some(Color::SPRING_GREEN)),
+                text_range.clone(),
+            );
+            builder.push(&parley::style::StyleProperty::Underline(true), text_range);
+        }
         builder.build_into(&mut self.layout);
         self.layout.break_all_lines(Some(width - INSET * 2.0));
         self.layout
@@ -324,7 +333,6 @@ impl Editor {
                             .delete_current_selection()
                             .unwrap_or_else(|| self.selection.focus().text_range().start);
                         self.buffer.insert_str(start, text);
-                        self.update_layout(self.width, 1.0);
 
                         {
                             // winit says the cursor should be hidden when compose_cursor is None.
@@ -377,6 +385,8 @@ impl Editor {
                                 );
                             }
                         }
+
+                        self.update_layout(self.width, 1.0);
                     }
                     _ => {}
                 }
@@ -466,13 +476,6 @@ impl Editor {
         if let Some(cursor) = self.selection.focus().weak_geometry(&self.layout, 1.5) {
             scene.fill(Fill::NonZero, transform, Color::LIGHT_GRAY, None, &cursor);
         };
-        if let ComposeState::Preedit { text_at } = self.compose_state {
-            // TODO: underline rather than fill, requires access to underline_offset metric for
-            // each run
-            text_at.geometry_with(&self.layout, |rect| {
-                scene.fill(Fill::NonZero, transform, Color::SPRING_GREEN, None, &rect);
-            });
-        }
         for line in self.layout.lines() {
             for item in line.items() {
                 let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
@@ -487,6 +490,8 @@ impl Editor {
                 let glyph_xform = synthesis
                     .skew()
                     .map(|angle| Affine::skew(angle.to_radians().tan() as f64, 0.0));
+
+                let style = glyph_run.style();
                 let coords = run
                     .normalized_coords()
                     .iter()
@@ -513,6 +518,34 @@ impl Editor {
                             }
                         }),
                     );
+                if let Some(underline) = &style.underline {
+                    let underline_brush = &underline.brush;
+                    let run_metrics = glyph_run.run().metrics();
+                    let offset = match underline.offset {
+                        Some(offset) => offset,
+                        None => run_metrics.underline_offset,
+                    };
+                    let width = match underline.size {
+                        Some(size) => size,
+                        None => run_metrics.underline_size,
+                    };
+                    // The `offset` is the distance from the baseline to the *top* of the underline
+                    // so we move the line down by half the width
+                    // Remember that we are using a y-down coordinate system
+                    let y = glyph_run.baseline() - offset + width / 2.;
+
+                    let line = Line::new(
+                        (glyph_run.offset() as f64, y as f64),
+                        ((glyph_run.offset() + glyph_run.advance()) as f64, y as f64),
+                    );
+                    scene.stroke(
+                        &Stroke::new(width.into()),
+                        transform,
+                        underline_brush,
+                        None,
+                        &line,
+                    );
+                }
             }
         }
     }
