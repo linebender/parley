@@ -162,7 +162,7 @@ impl Editor {
             ) {
                 let range = text_at.text_range();
                 self.selection =
-                    Selection::from_index(&self.layout, range.start - 1, Affinity::Upstream);
+                    Selection::from_index(&self.layout, range.start, Affinity::Downstream);
                 self.buffer.replace_range(range, "");
                 self.compose_state = ComposeState::None;
                 // TODO: defer updating layout. If the event itself also causes an update, we now
@@ -329,41 +329,34 @@ impl Editor {
                             return;
                         }
 
-                        let start = self
-                            .delete_current_selection()
-                            .unwrap_or_else(|| self.selection.focus().text_range().start);
-                        self.buffer.insert_str(start, text);
-
-                        {
-                            // winit says the cursor should be hidden when compose_cursor is None.
-                            // Do we handle that? We also don't extend the cursor to the end
-                            // indicated by winit, instead IME composing is currently indicated by
-                            // highlighting the entire preedit text. Should we even update the
-                            // selection at all?
-                            let compose_cursor = compose_cursor.unwrap_or((0, 0));
-                            self.selection = Selection::from_index(
-                                &self.layout,
-                                start - 1 + compose_cursor.0,
-                                Affinity::Upstream,
-                            );
+                        if let Some(start) = self.delete_current_selection() {
+                            self.selection =
+                                Selection::from_index(&self.layout, start, Affinity::Downstream);
                         }
 
                         {
+                            let insertion_index = self.selection.insertion_index();
+                            self.buffer.insert_str(insertion_index, text);
+                            let text_start = Selection::from_index(
+                                &self.layout,
+                                insertion_index,
+                                Affinity::Downstream,
+                            );
                             let text_end = Cursor::from_index(
                                 &self.layout,
-                                start - 1 + text.len(),
-                                Affinity::Upstream,
+                                insertion_index + text.len(),
+                                Affinity::Downstream,
                             );
-                            let ime_cursor = self.selection.extend_to_cursor(text_end);
+                            let text_at = text_start.extend_to_cursor(text_end);
                             self.compose_state = ComposeState::Preedit {
-                                text_at: ime_cursor,
+                                text_at: text_start.extend_to_cursor(text_end),
                             };
 
                             // Find the smallest rectangle that contains the entire preedit text.
                             // Send that rectangle to the platform to suggest placement for the IME
                             // candidate box.
                             let mut union_rect = None;
-                            ime_cursor.geometry_with(&self.layout, |rect| {
+                            text_at.geometry_with(&self.layout, |rect| {
                                 if union_rect.is_none() {
                                     union_rect = Some(rect);
                                 }
@@ -384,6 +377,21 @@ impl Editor {
                                     ),
                                 );
                             }
+                        }
+
+                        {
+                            // winit says the cursor should be hidden when compose_cursor is None.
+                            // Do we handle that? We also don't extend the cursor to the end
+                            // indicated by winit, instead IME composing is currently indicated by
+                            // underlining the entire preedit text, and the IME candidate box
+                            // placement is based on the preedit text location. Should we even
+                            // update the selection based on the compose cursor at all?
+                            let compose_cursor = compose_cursor.unwrap_or((0, 0));
+                            self.selection = Selection::from_index(
+                                &self.layout,
+                                self.selection.insertion_index() + compose_cursor.0,
+                                Affinity::Downstream,
+                            );
                         }
 
                         self.update_layout(self.width, 1.0);
