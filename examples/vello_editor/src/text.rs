@@ -7,6 +7,7 @@ use parley::layout::cursor::{Cursor, Selection, VisualMode};
 use parley::layout::Affinity;
 use parley::{layout::PositionedLayoutItem, FontContext};
 use peniko::{kurbo::Affine, Color, Fill};
+use std::ops::Range;
 use std::time::Instant;
 use vello::kurbo::{Line, Stroke};
 use vello::Scene;
@@ -30,13 +31,13 @@ pub enum ActiveText<'a> {
     Selection(&'a str),
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 enum ComposeState {
     #[default]
     None,
     Preedit {
         /// The location of the (uncommitted) preedit text
-        text_at: Selection,
+        text_range: Range<usize>,
     },
 }
 
@@ -57,6 +58,33 @@ pub struct Editor {
     width: f32,
 }
 
+/// Shrink the selection by the given amount of bytes by moving the focus towards the anchor.
+fn shrink_selection(layout: &Layout, selection: Selection, bytes: usize) -> Selection {
+    let mut selection = selection;
+    let shrink = bytes.min(selection.text_range().len());
+    if shrink == 0 {
+        return selection;
+    }
+
+    let anchor = *selection.anchor();
+    let focus = *selection.focus();
+
+    let new_focus_index = if focus.text_range().start > anchor.text_range().start {
+        focus.index() - shrink
+    } else {
+        focus.index() + shrink
+    };
+
+    selection = Selection::from_index(layout, anchor.index(), anchor.affinity());
+    selection = selection.extend_to_cursor(Cursor::from_index(
+        layout,
+        new_focus_index,
+        focus.affinity(),
+    ));
+
+    selection
+}
+
 impl Editor {
     pub fn set_text(&mut self, text: &str) {
         self.buffer.clear();
@@ -72,13 +100,15 @@ impl Editor {
         builder.push_default(&parley::style::StyleProperty::FontStack(
             parley::style::FontStack::Source("system-ui"),
         ));
-        if let ComposeState::Preedit { text_at } = self.compose_state {
-            let text_range = text_at.text_range();
+        if let ComposeState::Preedit { ref text_range } = self.compose_state {
             builder.push(
                 &parley::style::StyleProperty::UnderlineBrush(Some(Color::SPRING_GREEN)),
                 text_range.clone(),
             );
-            builder.push(&parley::style::StyleProperty::Underline(true), text_range);
+            builder.push(
+                &parley::style::StyleProperty::Underline(true),
+                text_range.clone(),
+            );
         }
         builder.build_into(&mut self.layout);
         self.layout.break_all_lines(Some(width - INSET * 2.0));
@@ -149,32 +179,51 @@ impl Editor {
         // TODO: support clipboard on Android
     }
 
-    pub fn handle_event(&mut self, window: &Window, event: &WindowEvent) {
-        if let ComposeState::Preedit { text_at } = self.compose_state {
-            // Clear old preedit state when handling events that potentially mutate text/selection.
-            // This is a bit overzealous, e.g., pressing and releasing shift probably shouldnt't
-            // clear the preedit.
-            if matches!(
-                event,
-                WindowEvent::KeyboardInput { .. }
-                    | WindowEvent::MouseInput { .. }
-                    | WindowEvent::Ime(..)
-            ) {
-                let range = text_at.text_range();
-                self.selection =
-                    Selection::from_index(&self.layout, range.start, Affinity::Downstream);
-                self.buffer.replace_range(range, "");
-                self.compose_state = ComposeState::None;
-                // TODO: defer updating layout. If the event itself also causes an update, we now
-                // update twice.
-                self.update_layout(self.width, 1.0);
+    /// Suggest an area for IME candidate box placement based on the current IME state.
+    fn set_ime_cursor_area(&self, window: &Window) {
+        if let ComposeState::Preedit { ref text_range } = self.compose_state {
+            // Find the smallest rectangle that contains the entire preedit text.
+            // Send that rectangle to the platform to suggest placement for the IME
+            // candidate box.
+            let mut union_rect = None;
+            let preedit_selection =
+                Selection::from_index(&self.layout, text_range.start, Affinity::Downstream);
+            let preedit_selection = preedit_selection.extend_to_cursor(Cursor::from_index(
+                &self.layout,
+                text_range.end,
+                Affinity::Downstream,
+            ));
+
+            preedit_selection.geometry_with(&self.layout, |rect| {
+                if union_rect.is_none() {
+                    union_rect = Some(rect);
+                }
+                union_rect = Some(union_rect.unwrap().union(rect));
+            });
+            if let Some(union_rect) = union_rect {
+                window.set_ime_cursor_area(
+                    LogicalPosition::new(union_rect.x0, union_rect.y0),
+                    LogicalSize::new(
+                        union_rect.width(),
+                        // TODO: an offset is added here to prevent the IME
+                        // candidate box from overlapping with the IME cursor. From
+                        // the Winit docs I would've expected the IME candidate box
+                        // not to overlap the indicated IME cursor area, but for
+                        // some reason it does (tested using fcitx5
+                        // on wayland)
+                        union_rect.height() + 40.0,
+                    ),
+                );
             }
         }
+    }
 
+    pub fn handle_event(&mut self, window: &Window, event: &WindowEvent) {
         match event {
             WindowEvent::Resized(size) => {
                 self.update_layout(size.width as f32, 1.0);
                 self.selection = self.selection.refresh(&self.layout);
+                self.set_ime_cursor_area(window);
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = Some(*modifiers);
@@ -311,6 +360,7 @@ impl Editor {
             }
             WindowEvent::Ime(ime) => {
                 match ime {
+                    Ime::Enabled => {}
                     Ime::Commit(text) => {
                         let start = self
                             .delete_current_selection()
@@ -323,10 +373,20 @@ impl Editor {
                             Affinity::Upstream,
                         );
                     }
-                    Ime::Preedit(text, compose_cursor) => {
-                        if text.is_empty() {
-                            // Winit sends empty preedit text to indicate the preedit was cleared.
-                            return;
+                    Ime::Preedit(text, _compose_cursor) => {
+                        if let ComposeState::Preedit { text_range } = self.compose_state.clone() {
+                            self.buffer.replace_range(text_range.clone(), "");
+
+                            // Invariant: the selection anchor and start of preedit text are at the same
+                            // position.
+                            // If the focus extends into the preedit range, shrink the selection.
+                            if self.selection.focus().text_range().start > text_range.start {
+                                self.selection = shrink_selection(
+                                    &self.layout,
+                                    self.selection,
+                                    text_range.len(),
+                                );
+                            }
                         }
 
                         if let Some(start) = self.delete_current_selection() {
@@ -334,69 +394,46 @@ impl Editor {
                                 Selection::from_index(&self.layout, start, Affinity::Downstream);
                         }
 
-                        {
-                            let insertion_index = self.selection.insertion_index();
-                            self.buffer.insert_str(insertion_index, text);
-                            let text_start = Selection::from_index(
-                                &self.layout,
-                                insertion_index,
-                                Affinity::Downstream,
-                            );
-                            let text_end = Cursor::from_index(
-                                &self.layout,
-                                insertion_index + text.len(),
-                                Affinity::Downstream,
-                            );
-                            let text_at = text_start.extend_to_cursor(text_end);
-                            self.compose_state = ComposeState::Preedit {
-                                text_at: text_start.extend_to_cursor(text_end),
-                            };
-
-                            // Find the smallest rectangle that contains the entire preedit text.
-                            // Send that rectangle to the platform to suggest placement for the IME
-                            // candidate box.
-                            let mut union_rect = None;
-                            text_at.geometry_with(&self.layout, |rect| {
-                                if union_rect.is_none() {
-                                    union_rect = Some(rect);
-                                }
-                                union_rect = Some(union_rect.unwrap().union(rect));
-                            });
-                            if let Some(union_rect) = union_rect {
-                                window.set_ime_cursor_area(
-                                    LogicalPosition::new(union_rect.x0, union_rect.y0),
-                                    LogicalSize::new(
-                                        union_rect.width(),
-                                        // TODO: an offset is added here to prevent the IME
-                                        // candidate box from overlapping with the IME cursor. From
-                                        // the Winit docs I would've expected the IME candidate box
-                                        // not to overlap the indicated IME cursor area, but for
-                                        // some reason it does (tested using fcitx5
-                                        // on wayland)
-                                        union_rect.height() + 40.0,
-                                    ),
-                                );
-                            }
-                        }
-
-                        {
-                            // winit says the cursor should be hidden when compose_cursor is None.
-                            // Do we handle that? We also don't extend the cursor to the end
-                            // indicated by winit, instead IME composing is currently indicated by
-                            // underlining the entire preedit text, and the IME candidate box
-                            // placement is based on the preedit text location. Should we even
-                            // update the selection based on the compose cursor at all?
-                            let compose_cursor = compose_cursor.unwrap_or((0, 0));
-                            self.selection = Selection::from_index(
-                                &self.layout,
-                                self.selection.insertion_index() + compose_cursor.0,
-                                Affinity::Downstream,
-                            );
-                        }
+                        let insertion_index = self.selection.insertion_index();
+                        self.buffer.insert_str(insertion_index, text);
+                        self.compose_state = ComposeState::Preedit {
+                            text_range: insertion_index..insertion_index + text.len(),
+                        };
 
                         self.update_layout(self.width, 1.0);
+
+                        // winit says the cursor should be hidden when compose_cursor is None.
+                        // Do we handle that? We also don't set the cursor based on the cursor
+                        // indicated by winit, instead IME composing is currently indicated by
+                        // underlining the entire preedit text, and the IME candidate box
+                        // placement is based on the preedit text location.
+                        self.selection = Selection::from_index(
+                            &self.layout,
+                            self.selection.insertion_index(),
+                            Affinity::Downstream,
+                        );
+                        self.set_ime_cursor_area(window);
                     }
-                    _ => {}
+                    Ime::Disabled => {
+                        if let ComposeState::Preedit { text_range } = self.compose_state.clone() {
+                            self.buffer.replace_range(text_range.clone(), "");
+                            self.compose_state = ComposeState::None;
+                            self.update_layout(self.width, 1.0);
+
+                            // Invariant: the selection anchor and start of preedit text are at the same
+                            // position.
+                            // If the focus extends into the preedit range, shrink the selection.
+                            if self.selection.focus().text_range().start > text_range.start {
+                                self.selection = shrink_selection(
+                                    &self.layout,
+                                    self.selection,
+                                    text_range.len(),
+                                );
+                            } else {
+                                self.selection = self.selection.refresh(&self.layout);
+                            }
+                        }
+                    }
                 }
             }
             WindowEvent::MouseInput { state, button, .. } => {
@@ -459,6 +496,51 @@ impl Editor {
                 }
             }
             _ => {}
+        }
+
+        if let ComposeState::Preedit { text_range } = self.compose_state.clone() {
+            if text_range.start != self.selection.anchor().text_range().start {
+                // If the selection anchor is no longer at the same position as the preedit text, the
+                // selection has been moved. Move the preedit to the selection's new anchor position.
+
+                // TODO: we can be smarter here to prevent need of the String allocation
+                let text = self.buffer[text_range.clone()].to_owned();
+                self.buffer.replace_range(text_range.clone(), "");
+
+                if self.selection.anchor().text_range().start > text_range.start {
+                    // shift the selection to the left to account for the preedit text that was
+                    // just removed
+                    let anchor = *self.selection.anchor();
+                    let focus = *self.selection.focus();
+                    let shift = text_range
+                        .len()
+                        .min(anchor.text_range().start - text_range.start);
+                    self.selection = Selection::from_index(
+                        &self.layout,
+                        anchor.index() - shift,
+                        anchor.affinity(),
+                    );
+                    self.selection = self.selection.extend_to_cursor(Cursor::from_index(
+                        &self.layout,
+                        focus.index() - shift,
+                        focus.affinity(),
+                    ));
+                }
+
+                let insertion_index = self.selection.insertion_index();
+                self.buffer.insert_str(insertion_index, &text);
+                {
+                    self.compose_state = ComposeState::Preedit {
+                        text_range: insertion_index..insertion_index + text.len(),
+                    };
+                }
+                // TODO: events that caused the preedit to be moved may also have updated the
+                // layout, in that case we're now updating twice.
+                self.update_layout(self.width, 1.0);
+
+                self.set_ime_cursor_area(window);
+                self.selection = self.selection.refresh(&self.layout);
+            }
         }
     }
 
