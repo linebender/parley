@@ -529,11 +529,10 @@ impl Editor {
 
                 let insertion_index = self.selection.insertion_index();
                 self.buffer.insert_str(insertion_index, &text);
-                {
-                    self.compose_state = ComposeState::Preedit {
-                        text_range: insertion_index..insertion_index + text.len(),
-                    };
-                }
+                self.compose_state = ComposeState::Preedit {
+                    text_range: insertion_index..insertion_index + text.len(),
+                };
+
                 // TODO: events that caused the preedit to be moved may also have updated the
                 // layout, in that case we're now updating twice.
                 self.update_layout(self.width, 1.0);
