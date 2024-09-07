@@ -20,7 +20,7 @@ libm = ["fontique/libm", "skrifa/libm", "peniko/libm"]
 system = ["std", "fontique/system"]
 
 [dependencies]
-swash = "0.1.16"
+swash = { workspace = true }
 skrifa = { workspace = true }
 peniko = { workspace = true }
 fontique = { workspace = true }
