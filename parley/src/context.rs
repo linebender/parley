@@ -51,7 +51,7 @@ impl<B: Brush> LayoutContext<B> {
         fcx: &'a mut FontContext,
         text: &'a str,
         scale: f32,
-    ) -> RangedBuilder<B, &'a str> {
+    ) -> RangedBuilder<'a, B, &'a str> {
         self.begin(text);
         #[cfg(feature = "std")]
         fcx.source_cache.prune(128, false);
