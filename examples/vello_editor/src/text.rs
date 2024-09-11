@@ -204,6 +204,10 @@ impl Editor {
         }
     }
 
+    fn ime_is_composing(&self) -> bool {
+        self.preedit_range.is_some()
+    }
+
     pub fn handle_event(&mut self, window: &Window, event: &WindowEvent) {
         match event {
             WindowEvent::Resized(size) => {
@@ -236,12 +240,21 @@ impl Editor {
                 if let PhysicalKey::Code(code) = event.physical_key {
                     match code {
                         KeyCode::KeyC if action_mod => {
+                            if self.ime_is_composing() {
+                                return;
+                            }
                             self.handle_clipboard(code);
                         }
                         KeyCode::KeyX if action_mod => {
+                            if self.ime_is_composing() {
+                                return;
+                            }
                             self.handle_clipboard(code);
                         }
                         KeyCode::KeyV if action_mod => {
+                            if self.ime_is_composing() {
+                                return;
+                            }
                             self.handle_clipboard(code);
                         }
                         KeyCode::ArrowLeft => {
@@ -286,6 +299,11 @@ impl Editor {
                             }
                         }
                         KeyCode::Delete => {
+                            // The IME or Winit probably intercepts this event when composing, but
+                            // I'm not sure.
+                            if self.ime_is_composing() {
+                                return;
+                            }
                             let start = if self.selection.is_collapsed() {
                                 let range = self.selection.focus().text_range();
                                 let start = range.start;
@@ -301,6 +319,11 @@ impl Editor {
                             }
                         }
                         KeyCode::Backspace => {
+                            // The IME or Winit probably intercepts this event when composing, but
+                            // I'm not sure.
+                            if self.ime_is_composing() {
+                                return;
+                            }
                             let start = if self.selection.is_collapsed() {
                                 let end = self.selection.focus().text_range().start;
                                 if let Some((start, _)) =
@@ -326,6 +349,9 @@ impl Editor {
                             }
                         }
                         _ => {
+                            if self.ime_is_composing() {
+                                return;
+                            }
                             if let Some(text) = &event.text {
                                 let start = self
                                     .delete_current_selection()
