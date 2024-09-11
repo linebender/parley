@@ -406,7 +406,7 @@ impl Editor {
                                 &self.layout,
                                 preedit_start,
                                 Affinity::Downstream,
-                            )
+                            );
                         }
 
                         self.set_ime_cursor_area(window);
