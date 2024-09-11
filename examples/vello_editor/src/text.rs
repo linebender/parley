@@ -66,12 +66,10 @@ fn shrink_selection(layout: &Layout, selection: Selection, bytes: usize) -> Sele
         focus.index() + shrink
     };
 
-    selection = Selection::from_index(layout, anchor.index(), anchor.affinity());
-    selection = selection.extend_to_cursor(Cursor::from_index(
-        layout,
-        new_focus_index,
-        focus.affinity(),
-    ));
+    selection = Selection::from_cursors(
+        anchor,
+        Cursor::from_index(layout, new_focus_index, focus.affinity()),
+    );
 
     selection
 }
@@ -177,13 +175,10 @@ impl Editor {
             // Send that rectangle to the platform to suggest placement for the IME
             // candidate box.
             let mut union_rect = None;
-            let preedit_selection =
-                Selection::from_index(&self.layout, text_range.start, Affinity::Downstream);
-            let preedit_selection = preedit_selection.extend_to_cursor(Cursor::from_index(
-                &self.layout,
-                text_range.end,
-                Affinity::Downstream,
-            ));
+            let preedit_selection = Selection::from_cursors(
+                Cursor::from_index(&self.layout, text_range.start, Affinity::Downstream),
+                Cursor::from_index(&self.layout, text_range.end, Affinity::Downstream),
+            );
 
             preedit_selection.geometry_with(&self.layout, |rect| {
                 if union_rect.is_none() {
@@ -353,54 +348,67 @@ impl Editor {
                 match ime {
                     Ime::Enabled => {}
                     Ime::Commit(text) => {
-                        let start = self
-                            .delete_current_selection()
-                            .unwrap_or_else(|| self.selection.focus().text_range().start);
-                        self.buffer.insert_str(start, text);
+                        let commit_start = if self.selection.is_collapsed() {
+                            let start = self.selection.insertion_index();
+                            self.buffer.insert_str(start, text);
+                            start
+                        } else {
+                            let range = self.selection.text_range();
+                            self.buffer.replace_range(range.clone(), text);
+                            range.start
+                        };
+
                         self.update_layout(self.width, 1.0);
                         self.selection = Selection::from_index(
                             &self.layout,
-                            start + text.len() - 1,
-                            Affinity::Upstream,
-                        );
-                    }
-                    Ime::Preedit(text, _compose_cursor) => {
-                        if let Some(text_range) = self.preedit_range.take() {
-                            self.buffer.replace_range(text_range.clone(), "");
-
-                            // Invariant: the selection anchor and start of preedit text are at the same
-                            // position.
-                            // If the focus extends into the preedit range, shrink the selection.
-                            if self.selection.focus().text_range().start > text_range.start {
-                                self.selection = shrink_selection(
-                                    &self.layout,
-                                    self.selection,
-                                    text_range.len(),
-                                );
-                            }
-                        }
-
-                        if let Some(start) = self.delete_current_selection() {
-                            self.selection =
-                                Selection::from_index(&self.layout, start, Affinity::Downstream);
-                        }
-
-                        let insertion_index = self.selection.insertion_index();
-                        self.buffer.insert_str(insertion_index, text);
-                        self.preedit_range = Some(insertion_index..insertion_index + text.len());
-
-                        self.update_layout(self.width, 1.0);
-
-                        // winit says the cursor should be hidden when compose_cursor is None.
-                        // Do we handle that? We also don't set the cursor based on the cursor
-                        // indicated by winit, instead IME composing is currently indicated by
-                        // underlining the entire preedit text, and the IME candidate box
-                        // placement is based on the preedit text location.
-                        self.selection = Selection::from_index(
-                            &self.layout,
-                            self.selection.insertion_index(),
+                            commit_start + text.len(),
                             Affinity::Downstream,
                         );
+                    }
+                    Ime::Preedit(text, compose_cursor) => {
+                        let preedit_start = if let Some(text_range) = self.preedit_range.take() {
+                            self.buffer.replace_range(text_range.clone(), text);
+                            text_range.start
+                        } else {
+                            let insertion_idx = self
+                                .delete_current_selection()
+                                .unwrap_or(self.selection.insertion_index());
+                            self.buffer.insert_str(insertion_idx, text);
+                            insertion_idx
+                        };
+
+                        if text.is_empty() {
+                            self.preedit_range = None;
+                        } else {
+                            self.preedit_range = Some(preedit_start..preedit_start + text.len());
+                        }
+
+                        self.update_layout(self.width, 1.0);
+
+                        if let Some(compose_cursor) = compose_cursor {
+                            // Select the location indicated by the IME.
+                            self.selection = Selection::from_cursors(
+                                Cursor::from_index(
+                                    &self.layout,
+                                    preedit_start + compose_cursor.0,
+                                    Affinity::Downstream,
+                                ),
+                                Cursor::from_index(
+                                    &self.layout,
+                                    preedit_start + compose_cursor.1,
+                                    Affinity::Downstream,
+                                ),
+                            );
+                        } else {
+                            // IME indicates nothing is to be selected: collapse the selection to a
+                            // caret just in front of the preedit.
+                            self.selection = Selection::from_index(
+                                &self.layout,
+                                preedit_start,
+                                Affinity::Downstream,
+                            )
+                        }
+
                         self.set_ime_cursor_area(window);
                     }
                     Ime::Disabled => {
@@ -503,16 +511,10 @@ impl Editor {
                     let shift = text_range
                         .len()
                         .min(anchor.text_range().start - text_range.start);
-                    self.selection = Selection::from_index(
-                        &self.layout,
-                        anchor.index() - shift,
-                        anchor.affinity(),
+                    self.selection = Selection::from_cursors(
+                        Cursor::from_index(&self.layout, anchor.index() - shift, anchor.affinity()),
+                        Cursor::from_index(&self.layout, focus.index() - shift, focus.affinity()),
                     );
-                    self.selection = self.selection.extend_to_cursor(Cursor::from_index(
-                        &self.layout,
-                        focus.index() - shift,
-                        focus.affinity(),
-                    ));
                 }
 
                 let insertion_index = self.selection.insertion_index();

@@ -407,6 +407,15 @@ impl Selection {
         Cursor::from_point(layout, x, y).into()
     }
 
+    /// Creates a selection bounding the given anchor and focus cursors.
+    pub fn from_cursors(anchor: Cursor, focus: Cursor) -> Self {
+        Self {
+            anchor,
+            focus,
+            h_pos: None,
+        }
+    }
+
     /// Creates a new selection bounding the word at the given point.
     pub fn word_from_point<B: Brush>(layout: &Layout<B>, x: f32, y: f32) -> Self {
         let mut anchor = Cursor::from_point(layout, x, y);
@@ -498,16 +507,6 @@ impl Selection {
     #[must_use]
     pub fn extend_to_point<B: Brush>(&self, layout: &Layout<B>, x: f32, y: f32) -> Self {
         let focus = Cursor::from_point(layout, x, y);
-        Self {
-            anchor: self.anchor,
-            focus,
-            h_pos: None,
-        }
-    }
-
-    /// Returns a new selection with the focus extended to the given cursor.
-    #[must_use]
-    pub fn extend_to_cursor(&self, focus: Cursor) -> Self {
         Self {
             anchor: self.anchor,
             focus,
