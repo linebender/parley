@@ -31,16 +31,6 @@ pub enum ActiveText<'a> {
     Selection(&'a str),
 }
 
-#[derive(Default, Clone)]
-enum ComposeState {
-    #[default]
-    None,
-    Preedit {
-        /// The location of the (uncommitted) preedit text
-        text_range: Range<usize>,
-    },
-}
-
 #[derive(Default)]
 pub struct Editor {
     font_cx: FontContext,
@@ -48,7 +38,8 @@ pub struct Editor {
     buffer: String,
     layout: Layout,
     selection: Selection,
-    compose_state: ComposeState,
+    /// The portion of the text currently marked as preedit by the IME.
+    preedit_range: Option<Range<usize>>,
     cursor_mode: VisualMode,
     last_click_time: Option<Instant>,
     click_count: u32,
@@ -100,7 +91,7 @@ impl Editor {
         builder.push_default(&parley::style::StyleProperty::FontStack(
             parley::style::FontStack::Source("system-ui"),
         ));
-        if let ComposeState::Preedit { ref text_range } = self.compose_state {
+        if let Some(ref text_range) = self.preedit_range {
             builder.push(
                 &parley::style::StyleProperty::UnderlineBrush(Some(Color::SPRING_GREEN)),
                 text_range.clone(),
@@ -181,7 +172,7 @@ impl Editor {
 
     /// Suggest an area for IME candidate box placement based on the current IME state.
     fn set_ime_cursor_area(&self, window: &Window) {
-        if let ComposeState::Preedit { ref text_range } = self.compose_state {
+        if let Some(ref text_range) = self.preedit_range {
             // Find the smallest rectangle that contains the entire preedit text.
             // Send that rectangle to the platform to suggest placement for the IME
             // candidate box.
@@ -374,7 +365,7 @@ impl Editor {
                         );
                     }
                     Ime::Preedit(text, _compose_cursor) => {
-                        if let ComposeState::Preedit { text_range } = self.compose_state.clone() {
+                        if let Some(text_range) = self.preedit_range.take() {
                             self.buffer.replace_range(text_range.clone(), "");
 
                             // Invariant: the selection anchor and start of preedit text are at the same
@@ -396,9 +387,7 @@ impl Editor {
 
                         let insertion_index = self.selection.insertion_index();
                         self.buffer.insert_str(insertion_index, text);
-                        self.compose_state = ComposeState::Preedit {
-                            text_range: insertion_index..insertion_index + text.len(),
-                        };
+                        self.preedit_range = Some(insertion_index..insertion_index + text.len());
 
                         self.update_layout(self.width, 1.0);
 
@@ -415,9 +404,8 @@ impl Editor {
                         self.set_ime_cursor_area(window);
                     }
                     Ime::Disabled => {
-                        if let ComposeState::Preedit { text_range } = self.compose_state.clone() {
+                        if let Some(text_range) = self.preedit_range.take() {
                             self.buffer.replace_range(text_range.clone(), "");
-                            self.compose_state = ComposeState::None;
                             self.update_layout(self.width, 1.0);
 
                             // Invariant: the selection anchor and start of preedit text are at the same
@@ -498,7 +486,7 @@ impl Editor {
             _ => {}
         }
 
-        if let ComposeState::Preedit { text_range } = self.compose_state.clone() {
+        if let Some(ref text_range) = self.preedit_range {
             if text_range.start != self.selection.anchor().text_range().start {
                 // If the selection anchor is no longer at the same position as the preedit text, the
                 // selection has been moved. Move the preedit to the selection's new anchor position.
@@ -529,9 +517,7 @@ impl Editor {
 
                 let insertion_index = self.selection.insertion_index();
                 self.buffer.insert_str(insertion_index, &text);
-                self.compose_state = ComposeState::Preedit {
-                    text_range: insertion_index..insertion_index + text.len(),
-                };
+                self.preedit_range = Some(insertion_index..insertion_index + text.len());
 
                 // TODO: events that caused the preedit to be moved may also have updated the
                 // layout, in that case we're now updating twice.
