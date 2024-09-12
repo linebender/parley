@@ -80,6 +80,7 @@ fn main() {
     let mut layout: Layout<Color> = builder.build();
 
     // Perform layout (including bidi resolution and shaping) with start alignment
+    layout.break_all_lines(max_advance);
     layout.align(max_advance, Alignment::Start);
 
     // Create image to render into
