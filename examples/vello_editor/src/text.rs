@@ -175,9 +175,11 @@ impl Editor {
             // Send that rectangle to the platform to suggest placement for the IME
             // candidate box.
             let mut union_rect = None;
+
+            debug_assert!(!text_range.is_empty());
             let preedit_selection = Selection::from_cursors(
                 Cursor::from_index(&self.layout, text_range.start, Affinity::Downstream),
-                Cursor::from_index(&self.layout, text_range.end, Affinity::Downstream),
+                Cursor::from_index(&self.layout, text_range.end - 1, Affinity::Upstream),
             );
 
             preedit_selection.geometry_with(&self.layout, |rect| {
@@ -385,11 +387,21 @@ impl Editor {
                         };
 
                         self.update_layout(self.width, 1.0);
-                        self.selection = Selection::from_index(
-                            &self.layout,
-                            commit_start + text.len(),
-                            Affinity::Downstream,
-                        );
+
+                        if text.is_empty() {
+                            // is this case ever hit?
+                            self.selection = Selection::from_index(
+                                &self.layout,
+                                commit_start,
+                                Affinity::Downstream,
+                            );
+                        } else {
+                            self.selection = Selection::from_index(
+                                &self.layout,
+                                commit_start + text.len() - 1,
+                                Affinity::Upstream,
+                            );
+                        }
                     }
                     Ime::Preedit(text, compose_cursor) => {
                         let preedit_start = if let Some(text_range) = self.preedit_range.take() {
@@ -404,35 +416,56 @@ impl Editor {
                         };
 
                         if text.is_empty() {
-                            self.preedit_range = None;
+                            self.update_layout(self.width, 1.0);
+
+                            if preedit_start > 0 {
+                                self.selection = Selection::from_index(
+                                    &self.layout,
+                                    preedit_start - 1,
+                                    Affinity::Upstream,
+                                );
+                            } else {
+                                self.selection = Selection::from_index(
+                                    &self.layout,
+                                    preedit_start,
+                                    Affinity::Downstream,
+                                );
+                            }
                         } else {
                             self.preedit_range = Some(preedit_start..preedit_start + text.len());
-                        }
+                            self.update_layout(self.width, 1.0);
 
-                        self.update_layout(self.width, 1.0);
-
-                        if let Some(compose_cursor) = compose_cursor {
-                            // Select the location indicated by the IME.
-                            self.selection = Selection::from_cursors(
-                                Cursor::from_index(
+                            if let Some(compose_cursor) = compose_cursor {
+                                // Select the location indicated by the IME.
+                                if compose_cursor.0 == compose_cursor.1 {
+                                    self.selection = Selection::from_index(
+                                        &self.layout,
+                                        preedit_start + compose_cursor.0,
+                                        Affinity::Downstream,
+                                    )
+                                } else {
+                                    self.selection = Selection::from_cursors(
+                                        Cursor::from_index(
+                                            &self.layout,
+                                            preedit_start + compose_cursor.0,
+                                            Affinity::Downstream,
+                                        ),
+                                        Cursor::from_index(
+                                            &self.layout,
+                                            preedit_start + compose_cursor.1 - 1,
+                                            Affinity::Upstream,
+                                        ),
+                                    );
+                                }
+                            } else {
+                                // IME indicates nothing is to be selected: collapse the selection to a
+                                // caret just in front of the preedit.
+                                self.selection = Selection::from_index(
                                     &self.layout,
-                                    preedit_start + compose_cursor.0,
+                                    preedit_start,
                                     Affinity::Downstream,
-                                ),
-                                Cursor::from_index(
-                                    &self.layout,
-                                    preedit_start + compose_cursor.1,
-                                    Affinity::Downstream,
-                                ),
-                            );
-                        } else {
-                            // IME indicates nothing is to be selected: collapse the selection to a
-                            // caret just in front of the preedit.
-                            self.selection = Selection::from_index(
-                                &self.layout,
-                                preedit_start,
-                                Affinity::Downstream,
-                            );
+                                );
+                            }
                         }
 
                         self.set_ime_cursor_area(window);
