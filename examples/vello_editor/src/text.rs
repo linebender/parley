@@ -3,12 +3,17 @@
 
 #[cfg(not(target_os = "android"))]
 use clipboard_rs::{Clipboard, ClipboardContext};
-use parley::layout::cursor::{Selection, VisualMode};
+use parley::layout::cursor::{Cursor, Selection, VisualMode};
 use parley::layout::Affinity;
 use parley::{layout::PositionedLayoutItem, FontContext};
 use peniko::{kurbo::Affine, Color, Fill};
+use std::ops::Range;
 use std::time::Instant;
+use vello::kurbo::{Line, Stroke};
 use vello::Scene;
+use winit::dpi::{LogicalPosition, LogicalSize};
+use winit::event::Ime;
+use winit::window::Window;
 use winit::{
     event::{Modifiers, WindowEvent},
     keyboard::{KeyCode, PhysicalKey},
@@ -33,6 +38,8 @@ pub struct Editor {
     buffer: String,
     layout: Layout,
     selection: Selection,
+    /// The portion of the text currently marked as preedit by the IME.
+    preedit_range: Option<Range<usize>>,
     cursor_mode: VisualMode,
     last_click_time: Option<Instant>,
     click_count: u32,
@@ -40,6 +47,31 @@ pub struct Editor {
     cursor_pos: (f32, f32),
     modifiers: Option<Modifiers>,
     width: f32,
+}
+
+/// Shrink the selection by the given amount of bytes by moving the focus towards the anchor.
+fn shrink_selection(layout: &Layout, selection: Selection, bytes: usize) -> Selection {
+    let mut selection = selection;
+    let shrink = bytes.min(selection.text_range().len());
+    if shrink == 0 {
+        return selection;
+    }
+
+    let anchor = *selection.anchor();
+    let focus = *selection.focus();
+
+    let new_focus_index = if focus.text_range().start > anchor.text_range().start {
+        focus.index() - shrink
+    } else {
+        focus.index() + shrink
+    };
+
+    selection = Selection::from_cursors(
+        anchor,
+        Cursor::from_index(layout, new_focus_index, focus.affinity()),
+    );
+
+    selection
 }
 
 impl Editor {
@@ -57,6 +89,16 @@ impl Editor {
         builder.push_default(&parley::style::StyleProperty::FontStack(
             parley::style::FontStack::Source("system-ui"),
         ));
+        if let Some(ref text_range) = self.preedit_range {
+            builder.push(
+                &parley::style::StyleProperty::UnderlineBrush(Some(Color::SPRING_GREEN)),
+                text_range.clone(),
+            );
+            builder.push(
+                &parley::style::StyleProperty::Underline(true),
+                text_range.clone(),
+            );
+        }
         builder.build_into(&mut self.layout);
         self.layout.break_all_lines(Some(width - INSET * 2.0));
         self.layout
@@ -126,11 +168,54 @@ impl Editor {
         // TODO: support clipboard on Android
     }
 
-    pub fn handle_event(&mut self, event: &WindowEvent) {
+    /// Suggest an area for IME candidate box placement based on the current IME state.
+    fn set_ime_cursor_area(&self, window: &Window) {
+        if let Some(ref text_range) = self.preedit_range {
+            // Find the smallest rectangle that contains the entire preedit text.
+            // Send that rectangle to the platform to suggest placement for the IME
+            // candidate box.
+            let mut union_rect = None;
+
+            debug_assert!(!text_range.is_empty());
+            let preedit_selection = Selection::from_cursors(
+                Cursor::from_index(&self.layout, text_range.start, Affinity::Downstream),
+                Cursor::from_index(&self.layout, text_range.end - 1, Affinity::Upstream),
+            );
+
+            preedit_selection.geometry_with(&self.layout, |rect| {
+                if union_rect.is_none() {
+                    union_rect = Some(rect);
+                }
+                union_rect = Some(union_rect.unwrap().union(rect));
+            });
+            if let Some(union_rect) = union_rect {
+                window.set_ime_cursor_area(
+                    LogicalPosition::new(union_rect.x0, union_rect.y0),
+                    LogicalSize::new(
+                        union_rect.width(),
+                        // TODO: an offset is added here to prevent the IME
+                        // candidate box from overlapping with the IME cursor. From
+                        // the Winit docs I would've expected the IME candidate box
+                        // not to overlap the indicated IME cursor area, but for
+                        // some reason it does (tested using fcitx5
+                        // on wayland)
+                        union_rect.height() + 40.0,
+                    ),
+                );
+            }
+        }
+    }
+
+    fn ime_is_composing(&self) -> bool {
+        self.preedit_range.is_some()
+    }
+
+    pub fn handle_event(&mut self, window: &Window, event: &WindowEvent) {
         match event {
             WindowEvent::Resized(size) => {
                 self.update_layout(size.width as f32, 1.0);
                 self.selection = self.selection.refresh(&self.layout);
+                self.set_ime_cursor_area(window);
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = Some(*modifiers);
@@ -157,12 +242,21 @@ impl Editor {
                 if let PhysicalKey::Code(code) = event.physical_key {
                     match code {
                         KeyCode::KeyC if action_mod => {
+                            if self.ime_is_composing() {
+                                return;
+                            }
                             self.handle_clipboard(code);
                         }
                         KeyCode::KeyX if action_mod => {
+                            if self.ime_is_composing() {
+                                return;
+                            }
                             self.handle_clipboard(code);
                         }
                         KeyCode::KeyV if action_mod => {
+                            if self.ime_is_composing() {
+                                return;
+                            }
                             self.handle_clipboard(code);
                         }
                         KeyCode::ArrowLeft => {
@@ -207,6 +301,11 @@ impl Editor {
                             }
                         }
                         KeyCode::Delete => {
+                            // The IME or Winit probably intercepts this event when composing, but
+                            // I'm not sure.
+                            if self.ime_is_composing() {
+                                return;
+                            }
                             let start = if self.selection.is_collapsed() {
                                 let range = self.selection.focus().text_range();
                                 let start = range.start;
@@ -222,6 +321,11 @@ impl Editor {
                             }
                         }
                         KeyCode::Backspace => {
+                            // The IME or Winit probably intercepts this event when composing, but
+                            // I'm not sure.
+                            if self.ime_is_composing() {
+                                return;
+                            }
                             let start = if self.selection.is_collapsed() {
                                 let end = self.selection.focus().text_range().start;
                                 if let Some((start, _)) =
@@ -247,6 +351,9 @@ impl Editor {
                             }
                         }
                         _ => {
+                            if self.ime_is_composing() {
+                                return;
+                            }
                             if let Some(text) = &event.text {
                                 let start = self
                                     .delete_current_selection()
@@ -264,6 +371,125 @@ impl Editor {
                 }
 
                 // println!("Active text: {:?}", self.active_text());
+            }
+            WindowEvent::Ime(ime) => {
+                match ime {
+                    Ime::Enabled => {}
+                    Ime::Commit(text) => {
+                        let commit_start = if self.selection.is_collapsed() {
+                            let start = self.selection.insertion_index();
+                            self.buffer.insert_str(start, text);
+                            start
+                        } else {
+                            let range = self.selection.text_range();
+                            self.buffer.replace_range(range.clone(), text);
+                            range.start
+                        };
+
+                        self.update_layout(self.width, 1.0);
+
+                        if text.is_empty() {
+                            // is this case ever hit?
+                            self.selection = Selection::from_index(
+                                &self.layout,
+                                commit_start,
+                                Affinity::Downstream,
+                            );
+                        } else {
+                            self.selection = Selection::from_index(
+                                &self.layout,
+                                commit_start + text.len() - 1,
+                                Affinity::Upstream,
+                            );
+                        }
+                    }
+                    Ime::Preedit(text, compose_cursor) => {
+                        let preedit_start = if let Some(text_range) = self.preedit_range.take() {
+                            self.buffer.replace_range(text_range.clone(), text);
+                            text_range.start
+                        } else {
+                            let insertion_idx = self
+                                .delete_current_selection()
+                                .unwrap_or(self.selection.insertion_index());
+                            self.buffer.insert_str(insertion_idx, text);
+                            insertion_idx
+                        };
+
+                        if text.is_empty() {
+                            self.update_layout(self.width, 1.0);
+
+                            if preedit_start > 0 {
+                                self.selection = Selection::from_index(
+                                    &self.layout,
+                                    preedit_start - 1,
+                                    Affinity::Upstream,
+                                );
+                            } else {
+                                self.selection = Selection::from_index(
+                                    &self.layout,
+                                    preedit_start,
+                                    Affinity::Downstream,
+                                );
+                            }
+                        } else {
+                            self.preedit_range = Some(preedit_start..preedit_start + text.len());
+                            self.update_layout(self.width, 1.0);
+
+                            if let Some(compose_cursor) = compose_cursor {
+                                // Select the location indicated by the IME.
+                                if compose_cursor.0 == compose_cursor.1 {
+                                    self.selection = Selection::from_index(
+                                        &self.layout,
+                                        preedit_start + compose_cursor.0,
+                                        Affinity::Downstream,
+                                    );
+                                } else {
+                                    self.selection = Selection::from_cursors(
+                                        Cursor::from_index(
+                                            &self.layout,
+                                            preedit_start + compose_cursor.0,
+                                            Affinity::Downstream,
+                                        ),
+                                        Cursor::from_index(
+                                            &self.layout,
+                                            preedit_start + compose_cursor.1 - 1,
+                                            Affinity::Upstream,
+                                        ),
+                                    );
+                                }
+                            } else {
+                                // IME indicates nothing is to be selected: collapse the selection to a
+                                // caret just in front of the preedit.
+                                self.selection = Selection::from_index(
+                                    &self.layout,
+                                    preedit_start,
+                                    Affinity::Downstream,
+                                );
+                            }
+                        }
+
+                        self.set_ime_cursor_area(window);
+                    }
+                    Ime::Disabled => {
+                        if let Some(text_range) = self.preedit_range.take() {
+                            self.buffer.replace_range(text_range.clone(), "");
+                            self.update_layout(self.width, 1.0);
+
+                            // Invariant: the selection anchor and start of preedit text are at the same
+                            // position.
+                            // If the focus extends into the preedit range, shrink the selection.
+                            if self.selection.focus().text_range().start > text_range.start {
+                                self.selection = shrink_selection(
+                                    &self.layout,
+                                    self.selection,
+                                    text_range.len(),
+                                );
+                            } else {
+                                self.selection = self.selection.refresh(&self.layout);
+                            }
+                        }
+                    }
+                }
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 if *button == winit::event::MouseButton::Left {
@@ -326,6 +552,42 @@ impl Editor {
             }
             _ => {}
         }
+
+        if let Some(ref text_range) = self.preedit_range {
+            if text_range.start != self.selection.anchor().text_range().start {
+                // If the selection anchor is no longer at the same position as the preedit text, the
+                // selection has been moved. Move the preedit to the selection's new anchor position.
+
+                // TODO: we can be smarter here to prevent need of the String allocation
+                let text = self.buffer[text_range.clone()].to_owned();
+                self.buffer.replace_range(text_range.clone(), "");
+
+                if self.selection.anchor().text_range().start > text_range.start {
+                    // shift the selection to the left to account for the preedit text that was
+                    // just removed
+                    let anchor = *self.selection.anchor();
+                    let focus = *self.selection.focus();
+                    let shift = text_range
+                        .len()
+                        .min(anchor.text_range().start - text_range.start);
+                    self.selection = Selection::from_cursors(
+                        Cursor::from_index(&self.layout, anchor.index() - shift, anchor.affinity()),
+                        Cursor::from_index(&self.layout, focus.index() - shift, focus.affinity()),
+                    );
+                }
+
+                let insertion_index = self.selection.insertion_index();
+                self.buffer.insert_str(insertion_index, &text);
+                self.preedit_range = Some(insertion_index..insertion_index + text.len());
+
+                // TODO: events that caused the preedit to be moved may also have updated the
+                // layout, in that case we're now updating twice.
+                self.update_layout(self.width, 1.0);
+
+                self.set_ime_cursor_area(window);
+                self.selection = self.selection.refresh(&self.layout);
+            }
+        }
     }
 
     fn delete_current_selection(&mut self) -> Option<usize> {
@@ -364,6 +626,8 @@ impl Editor {
                 let glyph_xform = synthesis
                     .skew()
                     .map(|angle| Affine::skew(angle.to_radians().tan() as f64, 0.0));
+
+                let style = glyph_run.style();
                 let coords = run
                     .normalized_coords()
                     .iter()
@@ -390,6 +654,34 @@ impl Editor {
                             }
                         }),
                     );
+                if let Some(underline) = &style.underline {
+                    let underline_brush = &underline.brush;
+                    let run_metrics = glyph_run.run().metrics();
+                    let offset = match underline.offset {
+                        Some(offset) => offset,
+                        None => run_metrics.underline_offset,
+                    };
+                    let width = match underline.size {
+                        Some(size) => size,
+                        None => run_metrics.underline_size,
+                    };
+                    // The `offset` is the distance from the baseline to the *top* of the underline
+                    // so we move the line down by half the width
+                    // Remember that we are using a y-down coordinate system
+                    let y = glyph_run.baseline() - offset + width / 2.;
+
+                    let line = Line::new(
+                        (glyph_run.offset() as f64, y as f64),
+                        ((glyph_run.offset() + glyph_run.advance()) as f64, y as f64),
+                    );
+                    scene.stroke(
+                        &Stroke::new(width.into()),
+                        transform,
+                        underline_brush,
+                        None,
+                        &line,
+                    );
+                }
             }
         }
     }

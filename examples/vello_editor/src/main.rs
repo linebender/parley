@@ -60,6 +60,7 @@ impl<'s> ApplicationHandler for SimpleVelloApp<'s> {
         let window = cached_window
             .take()
             .unwrap_or_else(|| create_winit_window(event_loop));
+        window.set_ime_allowed(true);
 
         // Create a vello Surface
         let size = window.inner_size();
@@ -107,7 +108,7 @@ impl<'s> ApplicationHandler for SimpleVelloApp<'s> {
             _ => return,
         };
 
-        self.editor.handle_event(&event);
+        self.editor.handle_event(&render_state.window, &event);
         render_state.window.request_redraw();
         // render_state
         //     .window
