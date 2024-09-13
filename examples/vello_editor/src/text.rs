@@ -442,7 +442,7 @@ impl Editor {
                                         &self.layout,
                                         preedit_start + compose_cursor.0,
                                         Affinity::Downstream,
-                                    )
+                                    );
                                 } else {
                                     self.selection = Selection::from_cursors(
                                         Cursor::from_index(
