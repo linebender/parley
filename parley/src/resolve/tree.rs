@@ -172,17 +172,6 @@ impl<B: Brush> TreeStyleBuilder<B> {
 
         self.push_uncommitted_text(true);
 
-        // println!("FINISH TREE");
-        // dbg!(self.total_text_len);
-        // dbg!(&self.tree);
-        // for span in &self.flatted_styles {
-        //     println!("{:?} weight:{}", span.range, span.style.font_weight);
-        // }
-        // dbg!(&self.flatted_styles);
-
-        // println!("TEXT");
-        // dbg!(&self.text);
-
         styles.clear();
         styles.extend_from_slice(&self.flatted_styles);
 

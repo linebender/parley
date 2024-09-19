@@ -125,10 +125,6 @@ impl<B: Brush> RangedStyleBuilder<B> {
         }
         styles.truncate(styles.len() - merged_count);
 
-        // for span in styles.iter() {
-        //     println!("{:?} weight:{}", span.range, span.style.font_weight);
-        // }
-
         self.properties.clear();
         self.default_style = ResolvedStyle::default();
         self.len = !0;
