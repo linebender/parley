@@ -25,6 +25,6 @@ rust.unused_qualifications = "warn"
 [workspace.dependencies]
 fontique = { version = "0.1.0", default-features = false, path = "fontique" }
 parley = { version = "0.1.0", default-features = false, path = "parley" }
-peniko = { version = "0.1.0", default-features = false }
-skrifa = { version = "0.19.1", default-features = false }
+peniko = { version = "0.2.0", default-features = false }
+skrifa = { version = "0.22.0", default-features = false }
 swash = { version = "0.1.16", default-features = false }

@@ -6,7 +6,7 @@ use std::num::NonZeroUsize;
 use std::sync::Arc;
 use vello::peniko::Color;
 use vello::util::{RenderContext, RenderSurface};
-use vello::wgpu;
+use vello::{wgpu, DebugLayers};
 use vello::{AaConfig, Renderer, RendererOptions, Scene};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
@@ -165,6 +165,7 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
                             width,
                             height,
                             antialiasing_method: AaConfig::Msaa16,
+                            debug: DebugLayers::none(),
                         },
                     )
                     .expect("failed to render to surface");
