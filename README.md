@@ -72,7 +72,7 @@ In the future, Parley will likely also implement text selection and text editing
 
 ## Minimum supported Rust Version (MSRV)
 
-This version of Parley has been verified to compile with **Rust 1.70** and later.
+This version of Parley has been verified to compile with **Rust 1.75** and later.
 
 Future versions of Parley might increase the Rust version requirement.
 It will not be treated as a breaking change and as such can even happen with small patch releases.
