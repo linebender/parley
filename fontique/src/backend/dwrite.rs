@@ -1,24 +1,28 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use dwrote::{
-    Font as DFont, FontCollection, FontFallback, TextAnalysisSource, TextAnalysisSourceMethods,
-};
 use hashbrown::HashMap;
-use std::{borrow::Cow, sync::Arc};
-use winapi::{
-    ctypes::wchar_t,
-    um::dwrite::{
-        IDWriteFont, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL,
-        DWRITE_FONT_WEIGHT_REGULAR, DWRITE_READING_DIRECTION,
+use std::{
+    ffi::{c_void, OsString},
+    os::windows::ffi::OsStringExt,
+    path::PathBuf,
+    sync::Arc,
+};
+use windows::{
+    core::{implement, Interface, PCWSTR},
+    Win32::Graphics::DirectWrite::{
+        DWriteCreateFactory, IDWriteFactory, IDWriteFactory2, IDWriteFont, IDWriteFontCollection,
+        IDWriteFontFace, IDWriteFontFallback, IDWriteFontFamily, IDWriteFontFile,
+        IDWriteLocalFontFileLoader, IDWriteNumberSubstitution, IDWriteTextAnalysisSource,
+        IDWriteTextAnalysisSource_Impl, DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL,
+        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT_REGULAR, DWRITE_READING_DIRECTION,
         DWRITE_READING_DIRECTION_LEFT_TO_RIGHT,
     },
 };
-use wio::com::ComPtr;
 
 use super::{
-    FallbackKey, FamilyId, FamilyInfo, FamilyName, FamilyNameMap, FontInfo, GenericFamily,
-    GenericFamilyMap, SourcePathMap,
+    FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, FontInfo, GenericFamily, GenericFamilyMap,
+    SourcePathMap,
 };
 
 const DEFAULT_GENERIC_FAMILIES: &[(GenericFamily, &[&str])] = &[
@@ -39,21 +43,15 @@ pub struct SystemFonts {
     pub generic_families: Arc<GenericFamilyMap>,
     source_cache: SourcePathMap,
     family_map: HashMap<FamilyId, Option<FamilyInfo>>,
-    collection: FontCollection,
-    fallback: Option<FontFallback>,
-    utf16_buf: Vec<wchar_t>,
+    dwrite_fonts: DWriteSystemFonts,
 }
-
-// We're only going to access this through a mutex.
-unsafe impl Send for SystemFonts {}
-unsafe impl Sync for SystemFonts {}
 
 impl SystemFonts {
     pub fn new() -> Self {
-        let collection = FontCollection::get_system(false);
+        let dwrite_fonts = DWriteSystemFonts::new(false).unwrap();
         let mut name_map = FamilyNameMap::default();
-        for family in collection.families_iter() {
-            if let Some(names) = all_family_names(&family) {
+        for family in dwrite_fonts.families() {
+            if let Some(names) = family.names() {
                 let [first_name, other_names @ ..] = names.as_slice() else {
                     continue;
                 };
@@ -78,9 +76,7 @@ impl SystemFonts {
             generic_families: Arc::new(generic_families),
             source_cache: Default::default(),
             family_map: Default::default(),
-            collection,
-            fallback: FontFallback::get_system_fallback(),
-            utf16_buf: Default::default(),
+            dwrite_fonts,
         }
     }
 
@@ -92,12 +88,9 @@ impl SystemFonts {
         }
         let name = self.name_map.get_by_id(id)?;
         let mut fonts: smallvec::SmallVec<[FontInfo; 4]> = Default::default();
-        if let Some(family) = self.collection.get_font_family_by_name(name.name()) {
-            fonts.reserve(family.get_font_count() as usize);
-            for i in 0..family.get_font_count() {
-                if let Some(font) =
-                    FontInfo::from_dwrite(family.get_font(i), &mut self.source_cache)
-                {
+        if let Some(family) = self.dwrite_fonts.family_by_name(name.name()) {
+            for font in family.fonts() {
+                if let Some(font) = FontInfo::from_dwrite(&font, &mut self.source_cache) {
                     if !fonts
                         .iter()
                         .any(|f| f.source().id() == font.source().id() && f.index() == font.index())
@@ -117,132 +110,275 @@ impl SystemFonts {
     }
 
     pub fn fallback(&mut self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
+        // DirectWrite does not have a function to get the default font for a script and locale pair
+        // so here we provide a sample of the intended script instead.
         let key = key.into();
         let text = key.script().sample()?;
         let locale = key.locale();
-        self.fallback_for_text(text, locale, false)
-            .map(|handle| handle.id())
-    }
-}
-
-impl SystemFonts {
-    fn fallback_for_text(
-        &mut self,
-        text: &str,
-        locale: Option<&str>,
-        prefer_ui: bool,
-    ) -> Option<FamilyName> {
-        self.utf16_buf.clear();
-        for ch in text.encode_utf16() {
-            self.utf16_buf.push(ch);
-        }
-        let text_len = self.utf16_buf.len() as u32;
-        let text_source = TextAnalysisSource::from_text(
-            Box::new(TextAnalysisData {
-                locale,
-                len: text_len,
-            }),
-            Cow::Borrowed(&self.utf16_buf),
-        );
-        let mut base_family = if prefer_ui {
-            Some(smallvec::SmallVec::<[u16; 12]>::from_slice(
-                &b"Segoe UI\0".map(|ch| ch as u16),
-            ))
-        } else {
-            None
-        };
-        let fallback = self.fallback.as_ref()?;
-        let font = {
-            let mut font: *mut IDWriteFont = std::ptr::null_mut();
-            let mut i = 0u32;
-            while font.is_null() && i < text_len {
-                let mut mapped_length = 0;
-                let mut scale = 0.0;
-                let hr = unsafe {
-                    (*fallback.as_ptr()).MapCharacters(
-                        text_source.as_ptr(),
-                        i,
-                        text_len - i,
-                        core::ptr::null_mut(),
-                        // self.collection.as_ptr(),
-                        base_family
-                            .as_mut()
-                            .map(|name| name.as_mut_ptr())
-                            .unwrap_or(core::ptr::null_mut()),
-                        DWRITE_FONT_WEIGHT_REGULAR,
-                        DWRITE_FONT_STYLE_NORMAL,
-                        DWRITE_FONT_STRETCH_NORMAL,
-                        &mut mapped_length,
-                        &mut font,
-                        &mut scale,
-                    )
-                };
-                assert_eq!(hr, 0);
-                if font.is_null() {
-                    i += 1;
-                }
-            }
-            if font.is_null() {
-                None
-            } else {
-                Some(DFont::take(unsafe { ComPtr::from_raw(font) }))
-            }
-        }?;
-        self.name_map.get(font.family_name().as_str()).cloned()
+        let family_name = self.dwrite_fonts.family_name_for_text(text, locale)?;
+        self.name_map.get(&family_name).map(|name| name.id())
     }
 }
 
 impl FontInfo {
-    fn from_dwrite(font: DFont, paths: &mut SourcePathMap) -> Option<Self> {
-        let face = font.create_font_face();
-        let files = face.get_files();
-        let path = files.first()?.get_font_file_path()?;
+    fn from_dwrite(font: &DWriteFont, paths: &mut SourcePathMap) -> Option<Self> {
+        let path = font.file_path()?;
+        let index = font.index();
         let data = paths.get_or_insert(&path);
-        let index = face.get_index();
         Self::from_source(data, index)
     }
 }
 
-struct TextAnalysisData<'a> {
-    locale: Option<&'a str>,
-    len: u32,
+struct DWriteSystemFonts {
+    collection: IDWriteFontCollection,
+    fallback: IDWriteFontFallback,
+    map_buf: Vec<u16>,
 }
 
-impl TextAnalysisSourceMethods for TextAnalysisData<'_> {
-    fn get_locale_name(&self, _text_position: u32) -> (Cow<'_, str>, u32) {
-        (Cow::Borrowed(self.locale.unwrap_or("")), self.len)
+impl DWriteSystemFonts {
+    fn new(update: bool) -> Option<Self> {
+        unsafe {
+            let factory = DWriteCreateFactory::<IDWriteFactory>(DWRITE_FACTORY_TYPE_SHARED).ok()?;
+            let mut collection: Option<IDWriteFontCollection> = None;
+            factory
+                .GetSystemFontCollection(&mut collection, update)
+                .ok()?;
+            let collection = collection?;
+            let factory2: IDWriteFactory2 = factory.cast().ok()?;
+            let fallback = factory2.GetSystemFontFallback().ok()?;
+            Some(Self {
+                collection,
+                fallback,
+                map_buf: vec![],
+            })
+        }
     }
 
-    /// Get the text direction for the paragraph.
-    fn get_paragraph_reading_direction(&self) -> DWRITE_READING_DIRECTION {
+    fn get(&self, index: u32) -> Option<DWriteFontFamily> {
+        unsafe {
+            self.collection
+                .GetFontFamily(index)
+                .ok()
+                .map(DWriteFontFamily)
+        }
+    }
+
+    fn family_by_name(&self, name: &str) -> Option<DWriteFontFamily> {
+        let mut index = 0;
+        let mut exists = Default::default();
+        let mut name_buf: smallvec::SmallVec<[u16; 128]> = Default::default();
+        name_buf.extend(name.encode_utf16());
+        name_buf.push(0);
+        unsafe {
+            self.collection
+                .FindFamilyName(PCWSTR::from_raw(name_buf.as_ptr()), &mut index, &mut exists)
+                .ok()?;
+        }
+        self.get(index as _)
+    }
+
+    fn families(&self) -> impl Iterator<Item = DWriteFontFamily> {
+        let this = self.collection.clone();
+        unsafe {
+            let count = this.GetFontFamilyCount();
+            (0..count).filter_map(move |index| this.GetFontFamily(index).ok().map(DWriteFontFamily))
+        }
+    }
+
+    fn family_name_for_text(&mut self, text: &str, locale: Option<&str>) -> Option<String> {
+        self.map_buf.clear();
+        self.map_buf.extend(text.encode_utf16());
+        let text_len = self.map_buf.len();
+        if let Some(locale) = locale {
+            self.map_buf.extend(locale.encode_utf16());
+        }
+        self.map_buf.push(0);
+        let (text, locale) = self.map_buf.split_at(text_len);
+        let source: IDWriteTextAnalysisSource = TextSource { text, locale }.into();
+        unsafe {
+            let mut cur_offset = 0;
+            while cur_offset < text_len {
+                let mut mapped_len = 0;
+                let mut mapped_font = None;
+                if self
+                    .fallback
+                    .MapCharacters(
+                        &source,
+                        cur_offset as u32,
+                        (text_len - cur_offset) as u32,
+                        &self.collection,
+                        None,
+                        DWRITE_FONT_WEIGHT_REGULAR,
+                        DWRITE_FONT_STYLE_NORMAL,
+                        DWRITE_FONT_STRETCH_NORMAL,
+                        &mut mapped_len,
+                        &mut mapped_font,
+                        &mut 1.0,
+                    )
+                    .is_ok()
+                {
+                    if let Some(font) = mapped_font {
+                        let family = font.GetFontFamily().ok()?;
+                        let names = family.GetFamilyNames().ok()?;
+                        let name_len = names.GetStringLength(0).ok()? as usize;
+                        let mut name_buf: smallvec::SmallVec<[u16; 128]> = Default::default();
+                        name_buf.resize(name_len + 1, 0);
+                        names.GetString(0, &mut name_buf).ok()?;
+                        name_buf.pop();
+                        return Some(String::from_utf16_lossy(&name_buf));
+                    }
+                }
+                cur_offset += 1;
+            }
+        }
+        None
+    }
+}
+
+#[derive(Clone)]
+struct DWriteFontFamily(IDWriteFontFamily);
+
+impl DWriteFontFamily {
+    fn names(&self) -> Option<Vec<String>> {
+        let mut names = vec![];
+        unsafe {
+            let family_names = self.0.GetFamilyNames().ok()?;
+            let count = family_names.GetCount();
+            let mut buf = vec![];
+            for i in 0..count {
+                let Ok(len) = family_names.GetStringLength(i) else {
+                    continue;
+                };
+                buf.clear();
+                buf.resize(len as usize + 1, 0);
+                if family_names.GetString(i, &mut buf).is_err() {
+                    continue;
+                }
+                buf.pop();
+                names.push(String::from_utf16_lossy(&buf));
+            }
+        }
+        Some(names)
+    }
+
+    fn fonts(&self) -> impl Iterator<Item = DWriteFont> {
+        let this = self.0.clone();
+        unsafe {
+            let count = self.0.GetFontCount();
+            (0..count).filter_map(move |index| {
+                let font = this.GetFont(index).ok()?;
+                // We don't want fonts with simulations
+                if font.GetSimulations().0 != 0 {
+                    return None;
+                }
+                DWriteFont::new(&font)
+            })
+        }
+    }
+}
+
+// Note, this is a font face. We don't care about the font.
+#[derive(Clone)]
+struct DWriteFont(IDWriteFontFace);
+
+impl DWriteFont {
+    fn new(font: &IDWriteFont) -> Option<Self> {
+        unsafe { Some(Self(font.CreateFontFace().ok()?)) }
+    }
+
+    fn file_path(&self) -> Option<PathBuf> {
+        unsafe {
+            // We only care about fonts with a single file.
+            let mut file: Option<IDWriteFontFile> = None;
+            self.0.GetFiles(&mut 1, Some(&mut file)).ok()?;
+            let file = file?;
+            // Now the ugly stuff...
+            let mut ref_key: *mut c_void = core::ptr::null_mut();
+            let mut ref_key_size: u32 = 0;
+            file.GetReferenceKey(&mut ref_key, &mut ref_key_size).ok()?;
+            let loader = file.GetLoader().ok()?;
+            let local_loader: IDWriteLocalFontFileLoader = loader.cast().ok()?;
+            let file_path_len = local_loader
+                .GetFilePathLengthFromKey(ref_key, ref_key_size)
+                .ok()?;
+            let mut file_path_buf = vec![0; file_path_len as usize + 1];
+            local_loader
+                .GetFilePathFromKey(ref_key, ref_key_size, &mut file_path_buf)
+                .ok()?;
+            if let Some(&0) = file_path_buf.last() {
+                file_path_buf.pop();
+            }
+            Some(PathBuf::from(OsString::from_wide(&file_path_buf)))
+        }
+    }
+
+    fn index(&self) -> u32 {
+        unsafe { self.0.GetIndex() }
+    }
+}
+
+#[implement(IDWriteTextAnalysisSource)]
+struct TextSource<'a> {
+    text: &'a [u16],
+    locale: &'a [u16],
+}
+
+impl IDWriteTextAnalysisSource_Impl for TextSource_Impl<'_> {
+    fn GetLocaleName(
+        &self,
+        textposition: u32,
+        textlength: *mut u32,
+        localename: *mut *mut u16,
+    ) -> windows::core::Result<()> {
+        unsafe {
+            *textlength = (self.text.len() as u32).saturating_sub(textposition);
+            *localename = core::mem::transmute::<*const u16, *mut u16>(self.locale.as_ptr());
+        }
+        Ok(())
+    }
+
+    fn GetNumberSubstitution(
+        &self,
+        textposition: u32,
+        textlength: *mut u32,
+        numbersubstitution: *mut Option<IDWriteNumberSubstitution>,
+    ) -> windows::core::Result<()> {
+        unsafe {
+            *numbersubstitution = None;
+            *textlength = (self.text.len() as u32).saturating_sub(textposition);
+        }
+        Ok(())
+    }
+
+    fn GetParagraphReadingDirection(&self) -> DWRITE_READING_DIRECTION {
         DWRITE_READING_DIRECTION_LEFT_TO_RIGHT
     }
-}
 
-fn all_family_names(family: &dwrote::FontFamily) -> Option<Vec<String>> {
-    use winapi::um::dwrite::IDWriteLocalizedStrings;
-    let mut names = vec![];
-    unsafe {
-        let mut family_names: *mut IDWriteLocalizedStrings = std::ptr::null_mut();
-        if (*family.as_ptr()).GetFamilyNames(&mut family_names) != 0 {
-            return None;
+    fn GetTextAtPosition(
+        &self,
+        textposition: u32,
+        textstring: *mut *mut u16,
+        textlength: *mut u32,
+    ) -> windows::core::Result<()> {
+        unsafe {
+            let text = self.text.get(textposition as usize..).unwrap_or_default();
+            *textlength = text.len() as _;
+            *textstring = core::mem::transmute::<*const u16, *mut u16>(text.as_ptr());
         }
-        let family_names = ComPtr::from_raw(family_names);
-        let count = family_names.GetCount();
-        let mut buf = vec![];
-        for i in 0..count {
-            let mut len = 0u32;
-            if family_names.GetStringLength(i, &mut len) != 0 {
-                continue;
-            }
-            buf.clear();
-            buf.resize(len as usize + 1, 0);
-            if family_names.GetString(i, buf.as_mut_ptr(), len + 1) != 0 {
-                continue;
-            }
-            buf.pop();
-            names.push(String::from_utf16_lossy(&buf));
-        }
+        Ok(())
     }
-    Some(names)
+
+    fn GetTextBeforePosition(
+        &self,
+        textposition: u32,
+        textstring: *mut *mut u16,
+        textlength: *mut u32,
+    ) -> windows::core::Result<()> {
+        unsafe {
+            let text = self.text.get(..textposition as usize).unwrap_or_default();
+            *textlength = text.len() as _;
+            *textstring = core::mem::transmute::<*const u16, *mut u16>(text.as_ptr());
+        }
+        Ok(())
+    }
 }
