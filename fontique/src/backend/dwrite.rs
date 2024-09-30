@@ -110,6 +110,8 @@ impl SystemFonts {
     }
 
     pub fn fallback(&mut self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
+        // DirectWrite does not have a function to get the default font for a script and locale pair
+        // so here we provide a sample of the intended script instead.
         let key = key.into();
         let text = key.script().sample()?;
         let locale = key.locale();
