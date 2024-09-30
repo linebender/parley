@@ -36,6 +36,7 @@ This release has an [MSRV] of 1.70.
 #### Fontique
 
 - Removed unsafe code from fontconfig cache ([#78] by [@waywardmonkeys])
+- Switched to `windows-rs` for `dwrite` backend ([#85] by [@dfrg])
 
 ### Fixed
 
@@ -69,6 +70,7 @@ This release has an [MSRV] of 1.70.
 [#78]: https://github.com/linebender/parley/pull/78
 [#71]: https://github.com/linebender/parley/pull/71
 [#72]: https://github.com/linebender/parley/pull/72
+[#85]: https://github.com/linebender/parley/pull/85
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/linebender/parley/releases/tag/v0.1.0
