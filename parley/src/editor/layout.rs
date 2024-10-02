@@ -404,12 +404,10 @@ impl<T: TextStorage> TextLayout<T> {
         let line = from_position.path.line(&self.layout)?;
         let line_metrics = line.metrics();
 
-        let baseline = line_metrics.baseline + line_metrics.descent;
-        let p1 = (from_position.offset as f64, baseline as f64);
-        let p2 = (
-            from_position.offset as f64,
-            (baseline - line_metrics.size()) as f64,
-        );
+        let top = (line_metrics.baseline - line_metrics.ascent) as f64;
+        let bottom = (line_metrics.baseline + line_metrics.descent) as f64;
+        let p1 = (from_position.offset as f64, top);
+        let p2 = (from_position.offset as f64, bottom);
         Some(Line::new(p1, p2))
     }
 
