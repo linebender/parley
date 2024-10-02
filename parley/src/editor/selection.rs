@@ -81,13 +81,13 @@ impl<T: Selectable> TextWithSelection<T> {
             tracing::warn!("Got cursor point without getting affinity");
             if mods.state().shift_key() {
                 if let Some(selection) = self.selection.as_mut() {
-                    selection.active = position.insert_point;
+                    selection.active = position.index();
                     selection.active_affinity = Affinity::Downstream;
                     return true;
                 }
             }
             self.selection = Some(Selection::caret(
-                position.insert_point,
+                position.index(),
                 Affinity::Downstream,
             ));
             true
@@ -108,7 +108,7 @@ impl<T: Selectable> TextWithSelection<T> {
             let position = self.layout.cursor_for_point(position);
             tracing::warn!("Got cursor point without getting affinity");
             if let Some(selection) = self.selection.as_mut() {
-                selection.active = position.insert_point;
+                selection.active = position.index();
                 selection.active_affinity = Affinity::Downstream;
             } else {
                 debug_panic!("No selection set whilst still dragging");

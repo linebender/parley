@@ -9,7 +9,7 @@ use crate::debug_panic;
 
 use crate::builder::RangedBuilder;
 use crate::fontique::{Style, Weight};
-use crate::layout::{Alignment, Cursor};
+use crate::layout::{Alignment, Cursor, Affinity};
 use crate::style::{FontFamily, FontStack, GenericFamily, StyleProperty};
 use crate::{FontContext, Layout, LayoutContext};
 use kurbo::{Line, Point, Rect, Size};
@@ -350,25 +350,27 @@ impl<T: TextStorage> TextLayout<T> {
         // https://raphlinus.github.io/text/2020/10/26/text-layout.html#shaping-cluster
         // But we're choosing to defer this work
         // This also needs to handle affinity.
-        Cursor::from_position(&self.layout, text_pos, true)
+        Cursor::from_index(&self.layout, text_pos, Affinity::Upstream)
     }
 
-    /// Given the utf-8 position of a character boundary in the underlying text,
-    /// return the `Point` (relative to this object's origin) representing the
-    /// boundary of the containing grapheme.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `text_pos` is not a character boundary.
-    ///
-    /// This is not meaningful until [`Self::rebuild`] has been called.
-    pub fn point_for_text_position(&self, text_pos: usize) -> Point {
-        let cursor = self.cursor_for_text_position(text_pos);
-        Point::new(
-            cursor.advance as f64,
-            (cursor.baseline + cursor.offset) as f64,
-        )
-    }
+    // /// Given the utf-8 position of a character boundary in the underlying text,
+    // /// return the `Point` (relative to this object's origin) representing the
+    // /// boundary of the containing grapheme.
+    // ///
+    // /// # Panics
+    // ///
+    // /// Panics if `text_pos` is not a character boundary.
+    // ///
+    // /// This is not meaningful until [`Self::rebuild`] has been called.
+    // pub fn point_for_text_position(&self, text_pos: usize) -> Point {
+    //     let cursor = self.cursor_for_text_position(text_pos);
+
+    //     let geom = cursor.strong_geometry(&self.layout, 0.0);
+    //     Point::new(
+    //         cursor.visual_offset() as f64,
+    //         (cursor.baseline + cursor.offset) as f64,
+    //     )
+    // }
 
     // TODO: needed for text selection
     // /// Given a utf-8 range in the underlying text, return a `Vec` of `Rect`s
@@ -391,13 +393,13 @@ impl<T: TextStorage> TextLayout<T> {
         let from_position = self.cursor_for_text_position(text_pos);
 
         // TODO: fix in case there is no text
-        let line = from_position.path.line(&self.layout)?;
+        let line = from_position.cluster_path().line(&self.layout)?;
         let line_metrics = line.metrics();
 
         let baseline = line_metrics.baseline + line_metrics.descent;
-        let p1 = (from_position.offset as f64, baseline as f64);
+        let p1 = (from_position.visual_offset() as f64, baseline as f64);
         let p2 = (
-            from_position.offset as f64,
+            from_position.visual_offset() as f64,
             (baseline - line_metrics.size()) as f64,
         );
         Some(Line::new(p1, p2))
