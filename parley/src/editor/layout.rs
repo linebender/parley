@@ -46,6 +46,7 @@ pub struct TextLayout<T> {
     brush: TextBrush,
     font: FontStack<'static>,
     text_size: f32,
+    line_height: f32,
     weight: Weight,
     style: Style,
 
@@ -126,6 +127,7 @@ impl<T> TextLayout<T> {
             brush: Default::default(),
             font: FontStack::Single(FontFamily::Generic(GenericFamily::SansSerif)),
             text_size,
+            line_height: 1.2,
             weight: Weight::NORMAL,
             style: Style::Normal,
 
@@ -182,6 +184,14 @@ impl<T> TextLayout<T> {
     pub fn set_text_size(&mut self, size: f32) {
         if size != self.text_size {
             self.text_size = size;
+            self.invalidate();
+        }
+    }
+
+    /// Set the line height.
+    pub fn set_line_height(&mut self, line_height: f32) {
+        if line_height != self.line_height {
+            self.line_height = line_height;
             self.invalidate();
         }
     }
@@ -451,6 +461,7 @@ impl<T: TextStorage> TextLayout<T> {
             let mut builder = layout_ctx.ranged_builder(font_ctx, self.text.as_str(), self.scale);
             builder.push_default(&StyleProperty::Brush(self.brush.clone()));
             builder.push_default(&StyleProperty::FontSize(self.text_size));
+            builder.push_default(&StyleProperty::LineHeight(self.line_height));
             builder.push_default(&StyleProperty::FontStack(self.font));
             builder.push_default(&StyleProperty::FontWeight(self.weight));
             builder.push_default(&StyleProperty::FontStyle(self.style));
