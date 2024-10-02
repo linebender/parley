@@ -7,6 +7,7 @@ use parley::layout::cursor::{Selection, VisualMode};
 use parley::layout::Affinity;
 use parley::{layout::PositionedLayoutItem, FontContext};
 use peniko::{kurbo::Affine, Color, Fill};
+use winit::keyboard::SmolStr;
 use std::time::Instant;
 use vello::Scene;
 use winit::{
@@ -248,15 +249,41 @@ impl Editor {
                         }
                         _ => {
                             if let Some(text) = &event.text {
+                                let text = if text == "\r" || text == "\r\n" {
+                                    &SmolStr::new_inline("\n")
+                                } else {
+                                    text
+                                };
+
+                                let affinity = if code == KeyCode::Enter {
+                                    Affinity::Downstream
+                                } else {
+                                    Affinity::Upstream
+                                };
+
+
+                                dbg!(code);
+                                dbg!(affinity);
+                                dbg!(text);
+                                dbg!(text.len());
+
                                 let start = self
                                     .delete_current_selection()
                                     .unwrap_or_else(|| self.selection.focus().text_range().start);
                                 self.buffer.insert_str(start, text);
+
+
+                                let index = if code == KeyCode::Enter {
+                                    start + text.len()
+                                } else {
+                                    start + text.len()
+                                };
+
                                 self.update_layout(self.width, 1.0);
                                 self.selection = Selection::from_index(
                                     &self.layout,
-                                    start + text.len() - 1,
-                                    Affinity::Upstream,
+                                    index,
+                                    affinity,
                                 );
                             }
                         }
