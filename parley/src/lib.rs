@@ -16,21 +16,26 @@ pub use fontique;
 pub use swash;
 
 mod bidi;
-pub mod font;
+mod builder;
+mod context;
+mod font;
 mod inline_box;
 mod resolve;
 mod shape;
 mod swash_convert;
 mod util;
 
-pub mod builder;
-pub mod context;
 pub mod layout;
 pub mod style;
 
 pub use peniko::Font;
 
+pub use builder::{RangedBuilder, TreeBuilder};
 pub use context::LayoutContext;
 pub use font::FontContext;
 pub use inline_box::InlineBox;
+#[doc(inline)]
 pub use layout::Layout;
+
+pub use layout::*;
+pub use style::*;

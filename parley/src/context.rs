@@ -20,7 +20,7 @@ use swash::text::cluster::CharInfo;
 use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
 
-/// Context for building a text layout.
+/// Shared scratch space used when constructing text layouts
 pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) bidi: bidi::BidiResolver,
     pub(crate) rcx: ResolveContext,

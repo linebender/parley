@@ -42,7 +42,7 @@ fn main() {
     //
     // These are both intended to be constructed rarely (perhaps even once per app (or once per thread))
     // and provide caches and scratch space to avoid allocations
-    let mut font_cx = FontContext::default();
+    let mut font_cx = FontContext::new();
     let mut layout_cx = LayoutContext::new();
 
     // Create a RangedBuilder
