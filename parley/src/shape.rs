@@ -266,7 +266,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
 }
 
 #[cfg(feature = "std")]
-impl<'a, 'b, B: Brush> partition::Selector for FontSelector<'a, 'b, B> {
+impl<B: Brush> partition::Selector for FontSelector<'_, '_, B> {
     type SelectedFont = SelectedFont;
 
     fn select_font(&mut self, cluster: &mut CharCluster) -> Option<Self::SelectedFont> {

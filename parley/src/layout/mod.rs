@@ -22,7 +22,7 @@ use swash::text::cluster::{Boundary, ClusterInfo};
 use swash::{GlyphId, NormalizedCoord, Synthesis};
 
 pub use cluster::{Affinity, ClusterPath};
-pub use cursor::Cursor;
+pub use cursor::{Cursor, Selection, VisualMode};
 pub use line::greedy::BreakLines;
 pub use line::{GlyphRun, LineMetrics, PositionedInlineBox, PositionedLayoutItem};
 pub use run::RunMetrics;

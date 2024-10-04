@@ -20,7 +20,9 @@ use swash::text::cluster::CharInfo;
 use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
 
-/// Context for building a text layout.
+/// Shared scratch space used when constructing text layouts.
+///
+/// This type is designed to be a global resource with only one per-application (or per-thread).
 pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) bidi: bidi::BidiResolver,
     pub(crate) rcx: ResolveContext,

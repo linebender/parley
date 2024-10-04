@@ -126,12 +126,14 @@ impl LineMetrics {
     }
 }
 
+/// The computed result of an item (glyph run or inline box) within a layout
 #[derive(Clone)]
 pub enum PositionedLayoutItem<'a, B: Brush> {
     GlyphRun(GlyphRun<'a, B>),
     InlineBox(PositionedInlineBox),
 }
 
+/// The computed position of an inline box within a layout
 #[derive(Debug, Clone)]
 pub struct PositionedInlineBox {
     pub x: f32,
