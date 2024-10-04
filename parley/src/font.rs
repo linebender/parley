@@ -6,9 +6,9 @@ use fontique::Collection;
 #[cfg(feature = "std")]
 use fontique::SourceCache;
 
-/// A font database/cache (wrapper around a the [fontique] crate)
+/// A font database/cache (wrapper around a Fontique [`Collection`] and [`SourceCache`]).
 ///
-/// This type is designed to be a global resource with only one per-application (or per-thread)
+/// This type is designed to be a global resource with only one per-application (or per-thread).
 #[derive(Default)]
 pub struct FontContext {
     pub collection: Collection,
@@ -17,6 +17,7 @@ pub struct FontContext {
 }
 
 impl FontContext {
+    /// Create a new `FontContext`, discovering system fonts if available.
     pub fn new() -> Self {
         Default::default()
     }

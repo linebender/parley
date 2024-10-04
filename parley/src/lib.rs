@@ -1,9 +1,9 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Parley is library for rich text layout.
+//! Parley is a library for rich text layout.
 //!
-//! Key types are:
+//! Some key types are:
 //! - [`FontContext`] and [`LayoutContext`] are resources which should be shared globally (or at coarse-grained boundaries).
 //!   - [`FontContext`] is database of fonts.
 //!   - [`LayoutContext`] is scratch space that allows for reuse of allocations between layouts.
@@ -11,8 +11,8 @@
 //!     - [`RangedBuilder`] allows styles to be specified as a flat `Vec` of spans
 //!     - [`TreeBuilder`] allows styles to be specified as a tree of spans
 //!   
-//!   They are constructed using the [`ranged_builder`](LayoutContext::ranged_builder) and [`tree_builder`](LayoutContext::ranged_builder) on [`LayoutContext`].
-//! - [Layout] which represents styled paragraph(s) of text and can perform shaping, line-breaking, bidi-reordering, and alignment of that text.
+//!   They are constructed using the [`ranged_builder`](LayoutContext::ranged_builder) and [`tree_builder`](LayoutContext::ranged_builder) methods on [`LayoutContext`].
+//! - [`Layout`] which represents styled paragraph(s) of text and can perform shaping, line-breaking, bidi-reordering, and alignment of that text.
 //!   
 //!   `Layout` supports re-linebreaking and re-aligning many times (in case the width at which wrapping should occur changes). But if the text content or
 //!   the styles applied to that content change then a new `Layout` must be created using a new `RangedBuilder` or `TreeBuilder`.
@@ -62,10 +62,10 @@
 //!     for item in line.items() {
 //!         match item {
 //!             PositionedLayoutItem::GlyphRun(glyph_run) => {
-//!                 // Do something with  glyph run
+//!                 // Render the glyph run
 //!             }
 //!             PositionedLayoutItem::InlineBox(inline_box) => {
-//!                 // So something with inline box
+//!                 // Render the inline box
 //!             }
 //!         };
 //!     }
