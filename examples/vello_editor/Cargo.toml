@@ -7,10 +7,10 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-vello = { git = "https://github.com/linebender/vello/", rev = "28cddb933bc80148734beb90c879646ec323d708" }
-anyhow = "1.0.86"
+vello = { git = "https://github.com/linebender/vello/", rev = "fc451dcac317fc6c37c336a2ea30c20003708f0d" }
+anyhow = "1.0.89"
 pollster = "0.3.0"
-winit = "0.30.3"
+winit = "0.30.5"
 parley = { workspace = true, default-features = true }
 peniko = { workspace = true }
 
@@ -18,7 +18,7 @@ peniko = { workspace = true }
 workspace = true
 
 [target.'cfg(target_os = "android")'.dependencies]
-winit = { version = "0.30.3", features = ["android-native-activity"] }
+winit = { version = "0.30.5", features = ["android-native-activity"] }
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
 clipboard-rs = "0.1.11"

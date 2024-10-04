@@ -11,7 +11,7 @@ publish = false
 parley = { workspace = true, default-features = true }
 skrifa = { workspace = true }
 peniko = { workspace = true }
-image = { version = "0.25.1", default-features = false, features = ["png"] }
+image = { version = "0.25.2", default-features = false, features = ["png"] }
 swash = { workspace = true, default-features = true }
 
 [lints]
