@@ -404,6 +404,8 @@ impl Editor {
                         }
                     }
                     Ime::Preedit(text, compose_cursor) => {
+                        let old_selection = self.selection;
+
                         let preedit_start = if let Some(text_range) = self.preedit_range.take() {
                             self.buffer.replace_range(text_range.clone(), text);
                             text_range.start
@@ -468,7 +470,9 @@ impl Editor {
                             }
                         }
 
-                        self.set_ime_cursor_area(window);
+                        if self.selection != old_selection {
+                            self.set_ime_cursor_area(window);
+                        }
                     }
                     Ime::Disabled => {
                         if let Some(text_range) = self.preedit_range.take() {
