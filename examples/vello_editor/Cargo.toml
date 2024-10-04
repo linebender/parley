@@ -7,7 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-vello = { git = "https://github.com/linebender/vello/", rev = "fc451dcac317fc6c37c336a2ea30c20003708f0d" }
+vello = "0.3.0"
 anyhow = "1.0.89"
 pollster = "0.3.0"
 winit = "0.30.5"
