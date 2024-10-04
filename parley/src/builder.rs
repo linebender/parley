@@ -21,7 +21,7 @@ pub struct RangedBuilder<'a, B: Brush> {
     pub(crate) fcx: &'a mut FontContext,
 }
 
-impl<'a, B: Brush> RangedBuilder<'a, B> {
+impl<B: Brush> RangedBuilder<'_, B> {
     pub fn push_default(&mut self, property: &StyleProperty<B>) {
         let resolved = self
             .lcx
@@ -66,7 +66,7 @@ pub struct TreeBuilder<'a, B: Brush> {
     pub(crate) fcx: &'a mut FontContext,
 }
 
-impl<'a, B: Brush> TreeBuilder<'a, B> {
+impl<B: Brush> TreeBuilder<'_, B> {
     pub fn push_style_span(&mut self, style: TextStyle<B>) {
         let resolved = self
             .lcx

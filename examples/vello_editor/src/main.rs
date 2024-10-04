@@ -50,7 +50,7 @@ struct SimpleVelloApp<'s> {
     editor: text::Editor,
 }
 
-impl<'s> ApplicationHandler for SimpleVelloApp<'s> {
+impl ApplicationHandler for SimpleVelloApp<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let RenderState::Suspended(cached_window) = &mut self.state else {
             return;

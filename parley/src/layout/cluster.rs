@@ -444,7 +444,7 @@ enum GlyphIter<'a> {
     Slice(core::slice::Iter<'a, Glyph>),
 }
 
-impl<'a> Iterator for GlyphIter<'a> {
+impl Iterator for GlyphIter<'_> {
     type Item = Glyph;
 
     fn next(&mut self) -> Option<Self::Item> {

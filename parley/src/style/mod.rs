@@ -108,7 +108,7 @@ pub struct TextStyle<'a, B: Brush> {
     pub letter_spacing: f32,
 }
 
-impl<'a, B: Brush> Default for TextStyle<'a, B> {
+impl<B: Brush> Default for TextStyle<'_, B> {
     fn default() -> Self {
         TextStyle {
             font_stack: FontStack::Source("sans-serif"),

@@ -162,7 +162,7 @@ struct Clusters<'a, B: Brush> {
     rev: bool,
 }
 
-impl<'a, B: Brush> Clone for Clusters<'a, B> {
+impl<B: Brush> Clone for Clusters<'_, B> {
     fn clone(&self) -> Self {
         Self {
             run: self.run,

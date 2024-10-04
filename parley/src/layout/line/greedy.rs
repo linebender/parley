@@ -578,7 +578,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     }
 }
 
-impl<'a, B: Brush> Drop for BreakLines<'a, B> {
+impl<B: Brush> Drop for BreakLines<'_, B> {
     fn drop(&mut self) {
         // Compute the overall width and height of the entire layout
         // The "width" excludes trailing whitespace. The "full_width" includes it.

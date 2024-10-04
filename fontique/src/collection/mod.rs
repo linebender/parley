@@ -476,9 +476,9 @@ struct GenericFamilies<I> {
     system: Option<I>,
 }
 
-impl<'a, I> Iterator for GenericFamilies<I>
+impl<I> Iterator for GenericFamilies<I>
 where
-    I: Iterator<Item = FamilyId> + 'a,
+    I: Iterator<Item = FamilyId>,
 {
     type Item = FamilyId;
 
