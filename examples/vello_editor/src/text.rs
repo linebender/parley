@@ -9,7 +9,7 @@ use parley::{layout::PositionedLayoutItem, FontContext};
 use peniko::{kurbo::Affine, Color, Fill};
 use std::ops::Range;
 use std::time::Instant;
-use vello::kurbo::{Line, Stroke};
+use vello::kurbo::{Line, Rect, Stroke};
 use vello::Scene;
 use winit::dpi::{LogicalPosition, LogicalSize};
 use winit::event::Ime;
@@ -31,6 +31,22 @@ pub enum ActiveText<'a> {
     Selection(&'a str),
 }
 
+/// The input method state of the text editor.
+///
+/// If `Enabled` or `Preedit`, the editor should send appropriate
+/// [IME candidate box areas](`Window::set_ime_cursor_area`) to the platform.
+#[derive(Default, PartialEq, Eq)]
+enum ImeState {
+    /// The IME is disabled.
+    #[default]
+    Disabled,
+    /// The IME is enabled.
+    Enabled,
+    /// The IME is enabled and is composing text. The range is non-empty, encoding the byte offsets
+    /// of the text currently marked as preedit by the IME.
+    Preedit(Range<usize>),
+}
+
 #[derive(Default)]
 pub struct Editor {
     font_cx: FontContext,
@@ -38,8 +54,10 @@ pub struct Editor {
     buffer: String,
     layout: Layout,
     selection: Selection,
-    /// The portion of the text currently marked as preedit by the IME.
-    preedit_range: Option<Range<usize>>,
+    ime: ImeState,
+    /// The IME candidate area last sent to the platform (through [`Self::set_ime_cursor_area`]).
+    /// Cached to avoid repeatedly sending unchanged areas.
+    last_sent_ime_candidate_area: Rect,
     cursor_mode: VisualMode,
     last_click_time: Option<Instant>,
     click_count: u32,
@@ -90,7 +108,7 @@ impl Editor {
         builder.push_default(&parley::style::StyleProperty::FontStack(
             parley::style::FontStack::Source("system-ui"),
         ));
-        if let Some(ref text_range) = self.preedit_range {
+        if let ImeState::Preedit(ref text_range) = self.ime {
             builder.push(
                 &parley::style::StyleProperty::UnderlineBrush(Some(Color::SPRING_GREEN)),
                 text_range.clone(),
@@ -170,37 +188,45 @@ impl Editor {
     }
 
     /// Suggest an area for IME candidate box placement based on the current IME state.
-    fn set_ime_cursor_area(&self, window: &Window) {
-        if let Some(ref text_range) = self.preedit_range {
-            // Find the smallest rectangle that contains the entire preedit text.
-            // Send that rectangle to the platform to suggest placement for the IME
-            // candidate box.
+    fn set_ime_cursor_area(&mut self, window: &Window) {
+        let selection = match self.ime {
+            ImeState::Preedit(ref text_range) => {
+                debug_assert!(!text_range.is_empty());
+                Selection::from_cursors(
+                    Cursor::from_index(&self.layout, text_range.start, Affinity::Downstream),
+                    Cursor::from_index(&self.layout, text_range.end - 1, Affinity::Upstream),
+                )
+            }
+            _ => self.selection,
+        };
+
+        let area = if selection.is_collapsed() {
+            selection.focus().strong_geometry(&self.layout, 1.5)
+        } else {
+            // Find the smallest rectangle that contains the entire selection.
             let mut union_rect = None;
-
-            debug_assert!(!text_range.is_empty());
-            let preedit_selection = Selection::from_cursors(
-                Cursor::from_index(&self.layout, text_range.start, Affinity::Downstream),
-                Cursor::from_index(&self.layout, text_range.end - 1, Affinity::Upstream),
-            );
-
-            preedit_selection.geometry_with(&self.layout, |rect| {
+            selection.geometry_with(&self.layout, |rect| {
                 if union_rect.is_none() {
                     union_rect = Some(rect);
                 }
                 union_rect = Some(union_rect.unwrap().union(rect));
             });
-            if let Some(union_rect) = union_rect {
+            union_rect
+        };
+
+        if let Some(area) = area {
+            if area != self.last_sent_ime_candidate_area {
+                self.last_sent_ime_candidate_area = area;
+
                 window.set_ime_cursor_area(
-                    LogicalPosition::new(union_rect.x0, union_rect.y0),
+                    LogicalPosition::new(area.x0, area.y0),
                     LogicalSize::new(
-                        union_rect.width(),
-                        // TODO: an offset is added here to prevent the IME
-                        // candidate box from overlapping with the IME cursor. From
-                        // the Winit docs I would've expected the IME candidate box
-                        // not to overlap the indicated IME cursor area, but for
-                        // some reason it does (tested using fcitx5
-                        // on wayland)
-                        union_rect.height() + 40.0,
+                        area.width(),
+                        // TODO: an offset is added here to prevent the IME candidate box from
+                        // overlapping with the IME cursor. From the Winit docs I would've expected the
+                        // IME candidate box not to overlap the indicated IME cursor area, but for some
+                        // reason it does (tested using fcitx5 on wayland)
+                        area.height() + 40.0,
                     ),
                 );
             }
@@ -208,7 +234,7 @@ impl Editor {
     }
 
     fn ime_is_composing(&self) -> bool {
-        self.preedit_range.is_some()
+        matches!(&self.ime, ImeState::Preedit(_))
     }
 
     pub fn handle_event(&mut self, window: &Window, event: &WindowEvent) {
@@ -216,7 +242,6 @@ impl Editor {
             WindowEvent::Resized(size) => {
                 self.update_layout(size.width as f32, 1.0);
                 self.selection = self.selection.refresh(&self.layout);
-                self.set_ime_cursor_area(window);
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = Some(*modifiers);
@@ -375,8 +400,13 @@ impl Editor {
             }
             WindowEvent::Ime(ime) => {
                 match ime {
-                    Ime::Enabled => {}
+                    Ime::Enabled => {
+                        debug_assert!(self.ime == ImeState::Disabled);
+                        self.ime = ImeState::Enabled;
+                    }
                     Ime::Commit(text) => {
+                        debug_assert!(self.ime != ImeState::Disabled);
+
                         let commit_start = if self.selection.is_collapsed() {
                             let start = self.selection.insertion_index();
                             self.buffer.insert_str(start, text);
@@ -405,20 +435,24 @@ impl Editor {
                         }
                     }
                     Ime::Preedit(text, compose_cursor) => {
-                        let old_selection = self.selection;
+                        debug_assert!(self.ime != ImeState::Disabled);
 
-                        let preedit_start = if let Some(text_range) = self.preedit_range.take() {
-                            self.buffer.replace_range(text_range.clone(), text);
-                            text_range.start
-                        } else {
-                            let insertion_idx = self
-                                .delete_current_selection()
-                                .unwrap_or(self.selection.insertion_index());
-                            self.buffer.insert_str(insertion_idx, text);
-                            insertion_idx
+                        let preedit_start = match self.ime {
+                            ImeState::Preedit(ref text_range) => {
+                                self.buffer.replace_range(text_range.clone(), text);
+                                text_range.start
+                            }
+                            _ => {
+                                let insertion_idx = self
+                                    .delete_current_selection()
+                                    .unwrap_or(self.selection.insertion_index());
+                                self.buffer.insert_str(insertion_idx, text);
+                                insertion_idx
+                            }
                         };
 
                         if text.is_empty() {
+                            self.ime = ImeState::Enabled;
                             self.update_layout(self.width, 1.0);
 
                             if preedit_start > 0 {
@@ -435,7 +469,7 @@ impl Editor {
                                 );
                             }
                         } else {
-                            self.preedit_range = Some(preedit_start..preedit_start + text.len());
+                            self.ime = ImeState::Preedit(preedit_start..preedit_start + text.len());
                             self.update_layout(self.width, 1.0);
 
                             if let Some(compose_cursor) = compose_cursor {
@@ -470,27 +504,30 @@ impl Editor {
                                 );
                             }
                         }
-
-                        if self.selection != old_selection {
-                            self.set_ime_cursor_area(window);
-                        }
                     }
                     Ime::Disabled => {
-                        if let Some(text_range) = self.preedit_range.take() {
-                            self.buffer.replace_range(text_range.clone(), "");
-                            self.update_layout(self.width, 1.0);
+                        debug_assert!(matches!(self.ime, ImeState::Enabled | ImeState::Preedit(_)));
 
-                            // Invariant: the selection anchor and start of preedit text are at the same
-                            // position.
-                            // If the focus extends into the preedit range, shrink the selection.
-                            if self.selection.focus().text_range().start > text_range.start {
-                                self.selection = shrink_selection(
-                                    &self.layout,
-                                    self.selection,
-                                    text_range.len(),
-                                );
-                            } else {
-                                self.selection = self.selection.refresh(&self.layout);
+                        self.last_sent_ime_candidate_area = Rect::default();
+                        if let ImeState::Preedit(text_range) =
+                            std::mem::replace(&mut self.ime, ImeState::Disabled)
+                        {
+                            if !text_range.is_empty() {
+                                self.buffer.replace_range(text_range.clone(), "");
+                                self.update_layout(self.width, 1.0);
+
+                                // Invariant: the selection anchor and start of preedit text are at the same
+                                // position.
+                                // If the focus extends into the preedit range, shrink the selection.
+                                if self.selection.focus().text_range().start > text_range.start {
+                                    self.selection = shrink_selection(
+                                        &self.layout,
+                                        self.selection,
+                                        text_range.len(),
+                                    );
+                                } else {
+                                    self.selection = self.selection.refresh(&self.layout);
+                                }
                             }
                         }
                     }
@@ -558,7 +595,7 @@ impl Editor {
             _ => {}
         }
 
-        if let Some(ref text_range) = self.preedit_range {
+        if let ImeState::Preedit(ref text_range) = self.ime {
             if text_range.start != self.selection.anchor().text_range().start {
                 // If the selection anchor is no longer at the same position as the preedit text, the
                 // selection has been moved. Move the preedit to the selection's new anchor position.
@@ -583,15 +620,29 @@ impl Editor {
 
                 let insertion_index = self.selection.insertion_index();
                 self.buffer.insert_str(insertion_index, &text);
-                self.preedit_range = Some(insertion_index..insertion_index + text.len());
+                self.ime = ImeState::Preedit(insertion_index..insertion_index + text.len());
 
                 // TODO: events that caused the preedit to be moved may also have updated the
                 // layout, in that case we're now updating twice.
                 self.update_layout(self.width, 1.0);
 
-                self.set_ime_cursor_area(window);
                 self.selection = self.selection.refresh(&self.layout);
             }
+        }
+
+        if self.ime != ImeState::Disabled
+            && !matches!(
+                event,
+                WindowEvent::RedrawRequested | WindowEvent::CursorMoved { .. }
+            )
+        {
+            // TODO: this is a bit overzealous in recalculating the IME cursor area: there are
+            // cases where it can cheaply be known the area is unchanged. (If the calculated area
+            // is unchanged from the previous one sent, it is not re-sent to the platform, though).
+            //
+            // Ideally this is called only when the layout, selection, or preedit has changed, or
+            // if the IME has just been enabled.
+            self.set_ime_cursor_area(window);
         }
     }
 
