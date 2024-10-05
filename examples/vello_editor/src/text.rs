@@ -50,6 +50,7 @@ pub struct Editor {
 }
 
 /// Shrink the selection by the given amount of bytes by moving the focus towards the anchor.
+#[must_use]
 fn shrink_selection(layout: &Layout, selection: Selection, bytes: usize) -> Selection {
     let mut selection = selection;
     let shrink = bytes.min(selection.text_range().len());
