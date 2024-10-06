@@ -36,9 +36,8 @@ icu_locid = "1.5.0"
 hashbrown = "0.14.5"
 
 [target.'cfg(target_family="windows")'.dependencies]
-dwrote = "0.11.1"
-winapi = { version = "0.3.9", features = ["dwrite", "dwrite_1", "dwrite_3", "winnt", "unknwnbase", "libloaderapi", "winnls"] }
-wio = "0.2.2"
+windows = { version = "0.58.0", features = ["implement", "Win32_Graphics_DirectWrite"] }
+windows-core = { version = "0.58" }
 
 [target.'cfg(target_vendor="apple")'.dependencies]
 core-text = "20.1.0"
