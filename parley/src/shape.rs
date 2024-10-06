@@ -311,7 +311,16 @@ impl<B: Brush> partition::Selector for FontSelector<'_, '_, B> {
                 use skrifa::MetadataProvider;
                 use swash::text::cluster::Status as MapStatus;
                 let charmap = font_ref.charmap();
-                match cluster.map(|ch| charmap.map(ch).map(|g| g.to_u16()).unwrap_or_default()) {
+                match cluster.map(|ch| {
+                    charmap
+                        .map(ch)
+                        .map(|g| {
+                            g.to_u32()
+                                .try_into()
+                                .expect("Swash requires u16 glyph, so we hope that the glyph fits")
+                        })
+                        .unwrap_or_default()
+                }) {
                     MapStatus::Complete => {
                         selected_font = Some(SelectedFont {
                             font: font.clone(),

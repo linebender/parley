@@ -12,7 +12,7 @@ members = [
 edition = "2021"
 # Keep in sync with RUST_MIN_VER in .github/workflows/ci.yml, with the relevant README.md files
 # and with the MSRV in the `Unreleased` section of CHANGELOG.md.
-rust-version = "1.70"
+rust-version = "1.75"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/linebender/parley"
 
@@ -25,6 +25,6 @@ rust.unused_qualifications = "warn"
 [workspace.dependencies]
 fontique = { version = "0.1.0", default-features = false, path = "fontique" }
 parley = { version = "0.1.0", default-features = false, path = "parley" }
-peniko = { version = "0.1.0", default-features = false }
-skrifa = { version = "0.19.1", default-features = false }
-swash = { version = "0.1.16", default-features = false }
+peniko = { version = "0.2.0", default-features = false }
+skrifa = { version = "0.22.3", default-features = false }
+swash = { version = "0.1.18", default-features = false }
