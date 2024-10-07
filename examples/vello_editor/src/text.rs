@@ -1,11 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-#[cfg(not(target_os = "android"))]
-use clipboard_rs::{Clipboard, ClipboardContext};
-use parley::layout::cursor::{Selection, VisualMode};
-use parley::layout::Affinity;
-use parley::{layout::PositionedLayoutItem, FontContext};
+use parley::layout::PositionedLayoutItem;
 use peniko::{kurbo::Affine, Color, Fill};
 use std::time::Instant;
 use vello::Scene;
@@ -14,126 +10,48 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
 };
 
-type LayoutContext = parley::LayoutContext<Color>;
-type Layout = parley::Layout<Color>;
+extern crate alloc;
+use alloc::{sync::Arc, vec};
 
-const INSET: f32 = 32.0;
+use core::{default::Default, iter::IntoIterator};
 
-#[allow(dead_code)]
-#[derive(Copy, Clone, Debug)]
-pub enum ActiveText<'a> {
-    FocusedCluster(Affinity, &'a str),
-    Selection(&'a str),
-}
+use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorOp};
+
+pub const INSET: f32 = 32.0;
 
 #[derive(Default)]
-pub struct Editor {
+pub struct Editor<'a> {
     font_cx: FontContext,
-    layout_cx: LayoutContext,
-    buffer: String,
-    layout: Layout,
-    selection: Selection,
-    cursor_mode: VisualMode,
+    layout_cx: LayoutContext<Color>,
+    editor: PlainEditor<'a, Color>,
     last_click_time: Option<Instant>,
     click_count: u32,
     pointer_down: bool,
     cursor_pos: (f32, f32),
     modifiers: Option<Modifiers>,
-    width: f32,
 }
 
-impl Editor {
-    pub fn set_text(&mut self, text: &str) {
-        self.buffer.clear();
-        self.buffer.push_str(text);
+impl<'a> Editor<'a> {
+    pub fn transact(&mut self, t: impl IntoIterator<Item = PlainEditorOp<'a, Color>>) {
+        self.editor
+            .transact(&mut self.font_cx, &mut self.layout_cx, t);
     }
 
-    pub fn update_layout(&mut self, width: f32, scale: f32) {
-        let mut builder = self
-            .layout_cx
-            .ranged_builder(&mut self.font_cx, &self.buffer, scale);
-        builder.push_default(&parley::style::StyleProperty::FontSize(32.0));
-        builder.push_default(&parley::style::StyleProperty::LineHeight(1.2));
-        builder.push_default(&parley::style::StyleProperty::FontStack(
-            parley::style::FontStack::Source("system-ui"),
-        ));
-        builder.build_into(&mut self.layout, &self.buffer);
-        self.layout.break_all_lines(Some(width - INSET * 2.0));
-        self.layout
-            .align(Some(width - INSET * 2.0), parley::layout::Alignment::Start);
-        self.width = width;
+    pub fn text(&self) -> Arc<str> {
+        self.editor.text()
     }
 
-    #[allow(unused)]
-    pub fn active_text(&self) -> ActiveText {
-        if self.selection.is_collapsed() {
-            let range = self
-                .selection
-                .focus()
-                .cluster_path()
-                .cluster(&self.layout)
-                .map(|c| c.text_range())
-                .unwrap_or_default();
-            ActiveText::FocusedCluster(self.selection.focus().affinity(), &self.buffer[range])
-        } else {
-            ActiveText::Selection(&self.buffer[self.selection.text_range()])
-        }
-    }
-
-    #[cfg(not(target_os = "android"))]
-    fn handle_clipboard(&mut self, code: KeyCode) {
-        match code {
-            KeyCode::KeyC => {
-                if !self.selection.is_collapsed() {
-                    let text = &self.buffer[self.selection.text_range()];
-                    let cb = ClipboardContext::new().unwrap();
-                    cb.set_text(text.to_owned()).ok();
-                }
-            }
-            KeyCode::KeyX => {
-                if !self.selection.is_collapsed() {
-                    let text = &self.buffer[self.selection.text_range()];
-                    let cb = ClipboardContext::new().unwrap();
-                    cb.set_text(text.to_owned()).ok();
-                    if let Some(start) = self.delete_current_selection() {
-                        self.update_layout(self.width, 1.0);
-                        let (start, affinity) = if start > 0 {
-                            (start - 1, Affinity::Upstream)
-                        } else {
-                            (start, Affinity::Downstream)
-                        };
-                        self.selection = Selection::from_index(&self.layout, start, affinity);
-                    }
-                }
-            }
-            KeyCode::KeyV => {
-                let cb = ClipboardContext::new().unwrap();
-                let text = cb.get_text().unwrap_or_default();
-                let start = self
-                    .delete_current_selection()
-                    .unwrap_or_else(|| self.selection.focus().text_range().start);
-                self.buffer.insert_str(start, &text);
-                self.update_layout(self.width, 1.0);
-                self.selection =
-                    Selection::from_index(&self.layout, start + text.len(), Affinity::default());
-            }
-            _ => {}
-        }
-    }
-
-    #[cfg(target_os = "android")]
-    fn handle_clipboard(&mut self, _code: KeyCode) {
-        // TODO: support clipboard on Android
-    }
-
-    pub fn handle_event(&mut self, event: &WindowEvent) {
+    pub fn handle_event(&mut self, event: WindowEvent) {
         match event {
             WindowEvent::Resized(size) => {
-                self.update_layout(size.width as f32, 1.0);
-                self.selection = self.selection.refresh(&self.layout);
+                self.editor.transact(
+                    &mut self.font_cx,
+                    &mut self.layout_cx,
+                    [PlainEditorOp::SetWidth(size.width as f32 - 2f32 * INSET)],
+                );
             }
             WindowEvent::ModifiersChanged(modifiers) => {
-                self.modifiers = Some(*modifiers);
+                self.modifiers = Some(modifiers);
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 if !event.state.is_pressed() {
@@ -150,123 +68,131 @@ impl Editor {
                         )
                     })
                     .unwrap_or_default();
+
                 #[cfg(target_os = "macos")]
                 let action_mod = cmd;
                 #[cfg(not(target_os = "macos"))]
                 let action_mod = ctrl;
                 if let PhysicalKey::Code(code) = event.physical_key {
-                    match code {
-                        KeyCode::KeyC if action_mod => {
-                            self.handle_clipboard(code);
-                        }
-                        KeyCode::KeyX if action_mod => {
-                            self.handle_clipboard(code);
-                        }
-                        KeyCode::KeyV if action_mod => {
-                            self.handle_clipboard(code);
-                        }
-                        KeyCode::ArrowLeft => {
-                            self.selection = if ctrl {
-                                self.selection.previous_word(&self.layout, shift)
-                            } else {
-                                self.selection.previous_visual(
-                                    &self.layout,
-                                    self.cursor_mode,
-                                    shift,
-                                )
-                            };
-                        }
-                        KeyCode::ArrowRight => {
-                            self.selection = if ctrl {
-                                self.selection.next_word(&self.layout, shift)
-                            } else {
-                                self.selection
-                                    .next_visual(&self.layout, self.cursor_mode, shift)
-                            };
-                        }
-                        KeyCode::ArrowUp => {
-                            self.selection = self.selection.previous_line(&self.layout, shift);
-                        }
-                        KeyCode::ArrowDown => {
-                            self.selection = self.selection.next_line(&self.layout, shift);
-                        }
-                        KeyCode::Home => {
-                            if ctrl {
-                                self.selection =
-                                    self.selection.move_lines(&self.layout, isize::MIN, shift);
-                            } else {
-                                self.selection = self.selection.line_start(&self.layout, shift);
-                            }
-                        }
-                        KeyCode::End => {
-                            if ctrl {
-                                self.selection =
-                                    self.selection.move_lines(&self.layout, isize::MAX, shift);
-                            } else {
-                                self.selection = self.selection.line_end(&self.layout, shift);
-                            }
-                        }
-                        KeyCode::Delete => {
-                            let start = if self.selection.is_collapsed() {
-                                let range = self.selection.focus().text_range();
-                                let start = range.start;
-                                self.buffer.replace_range(range, "");
-                                Some(start)
-                            } else {
-                                self.delete_current_selection()
-                            };
-                            if let Some(start) = start {
-                                self.update_layout(self.width, 1.0);
-                                self.selection =
-                                    Selection::from_index(&self.layout, start, Affinity::default());
-                            }
-                        }
-                        KeyCode::Backspace => {
-                            let start = if self.selection.is_collapsed() {
-                                let end = self.selection.focus().text_range().start;
-                                if let Some((start, _)) =
-                                    self.buffer[..end].char_indices().next_back()
-                                {
-                                    self.buffer.replace_range(start..end, "");
-                                    Some(start)
-                                } else {
-                                    None
+                    self.editor.transact(
+                        &mut self.font_cx,
+                        &mut self.layout_cx,
+                        match code {
+                            KeyCode::KeyA if action_mod => vec![PlainEditorOp::SelectAll],
+                            #[cfg(not(target_os = "android"))]
+                            KeyCode::KeyC | KeyCode::KeyX | KeyCode::KeyX if action_mod => {
+                                use clipboard_rs::{Clipboard, ClipboardContext};
+                                use parley::layout::editor::ActiveText;
+
+                                match code {
+                                    KeyCode::KeyC => {
+                                        if let ActiveText::Selection(text) =
+                                            self.editor.active_text()
+                                        {
+                                            let cb = ClipboardContext::new().unwrap();
+                                            cb.set_text(text.to_owned()).ok();
+                                        }
+                                        vec![]
+                                    }
+                                    KeyCode::KeyX => {
+                                        if let ActiveText::Selection(text) =
+                                            self.editor.active_text()
+                                        {
+                                            let cb = ClipboardContext::new().unwrap();
+                                            cb.set_text(text.to_owned()).ok();
+                                            vec![PlainEditorOp::DeleteSelection]
+                                        } else {
+                                            vec![]
+                                        }
+                                    }
+                                    KeyCode::KeyV => {
+                                        let cb = ClipboardContext::new().unwrap();
+                                        let text = cb.get_text().unwrap_or_default();
+                                        vec![PlainEditorOp::InsertOrReplaceSelection(text.into())]
+                                    }
+                                    _ => vec![],
                                 }
-                            } else {
-                                self.delete_current_selection()
-                            };
-                            if let Some(start) = start {
-                                self.update_layout(self.width, 1.0);
-                                let (start, affinity) = if start > 0 {
-                                    (start - 1, Affinity::Upstream)
+                            }
+                            KeyCode::ArrowLeft => vec![if ctrl {
+                                if shift {
+                                    PlainEditorOp::SelectWordLeft
                                 } else {
-                                    (start, Affinity::Downstream)
-                                };
-                                self.selection =
-                                    Selection::from_index(&self.layout, start, affinity);
-                            }
-                        }
-                        _ => {
-                            if let Some(text) = &event.text {
-                                let start = self
-                                    .delete_current_selection()
-                                    .unwrap_or_else(|| self.selection.focus().text_range().start);
-                                self.buffer.insert_str(start, text);
-                                self.update_layout(self.width, 1.0);
-                                self.selection = Selection::from_index(
-                                    &self.layout,
-                                    start + text.len() - 1,
-                                    Affinity::Upstream,
-                                );
-                            }
-                        }
-                    }
+                                    PlainEditorOp::MoveWordLeft
+                                }
+                            } else if shift {
+                                PlainEditorOp::SelectLeft
+                            } else {
+                                PlainEditorOp::MoveLeft
+                            }],
+                            KeyCode::ArrowRight => vec![if ctrl {
+                                if shift {
+                                    PlainEditorOp::SelectWordRight
+                                } else {
+                                    PlainEditorOp::MoveWordRight
+                                }
+                            } else if shift {
+                                PlainEditorOp::SelectRight
+                            } else {
+                                PlainEditorOp::MoveRight
+                            }],
+                            KeyCode::ArrowUp => vec![if shift {
+                                PlainEditorOp::SelectUp
+                            } else {
+                                PlainEditorOp::MoveUp
+                            }],
+                            KeyCode::ArrowDown => vec![if shift {
+                                PlainEditorOp::SelectDown
+                            } else {
+                                PlainEditorOp::MoveDown
+                            }],
+                            KeyCode::Home => vec![if ctrl {
+                                if shift {
+                                    PlainEditorOp::SelectToTextStart
+                                } else {
+                                    PlainEditorOp::MoveToTextStart
+                                }
+                            } else if shift {
+                                PlainEditorOp::SelectToLineStart
+                            } else {
+                                PlainEditorOp::MoveToLineStart
+                            }],
+                            KeyCode::End => vec![if ctrl {
+                                if shift {
+                                    PlainEditorOp::SelectToTextEnd
+                                } else {
+                                    PlainEditorOp::MoveToTextEnd
+                                }
+                            } else if shift {
+                                PlainEditorOp::SelectToLineEnd
+                            } else {
+                                PlainEditorOp::MoveToLineEnd
+                            }],
+                            KeyCode::Delete => vec![if action_mod {
+                                PlainEditorOp::DeleteWord
+                            } else {
+                                PlainEditorOp::Delete
+                            }],
+                            KeyCode::Backspace => vec![if action_mod {
+                                PlainEditorOp::BackdeleteWord
+                            } else {
+                                PlainEditorOp::Backdelete
+                            }],
+                            _ => event
+                                .text
+                                .map(|text| {
+                                    vec![PlainEditorOp::InsertOrReplaceSelection(
+                                        text.as_str().into(),
+                                    )]
+                                })
+                                .unwrap_or(vec![]),
+                        },
+                    );
                 }
 
                 // println!("Active text: {:?}", self.active_text());
             }
             WindowEvent::MouseInput { state, button, .. } => {
-                if *button == winit::event::MouseButton::Left {
+                if button == winit::event::MouseButton::Left {
                     self.pointer_down = state.is_pressed();
                     if self.pointer_down {
                         let now = Instant::now();
@@ -280,33 +206,25 @@ impl Editor {
                             self.click_count = 1;
                         }
                         self.last_click_time = Some(now);
-                        match self.click_count {
-                            2 => {
-                                self.selection = Selection::word_from_point(
-                                    &self.layout,
+                        self.editor.transact(
+                            &mut self.font_cx,
+                            &mut self.layout_cx,
+                            match self.click_count {
+                                2 => [PlainEditorOp::SelectWordAtPoint(
                                     self.cursor_pos.0,
                                     self.cursor_pos.1,
-                                );
-                            }
-                            3 => {
-                                let focus = *Selection::from_point(
-                                    &self.layout,
+                                )],
+                                3 => [PlainEditorOp::SelectLineAtPoint(
                                     self.cursor_pos.0,
                                     self.cursor_pos.1,
-                                )
-                                .line_start(&self.layout, true)
-                                .focus();
-                                self.selection =
-                                    Selection::from(focus).line_end(&self.layout, true);
-                            }
-                            _ => {
-                                self.selection = Selection::from_point(
-                                    &self.layout,
+                                )],
+                                _ => [PlainEditorOp::MoveToPoint(
                                     self.cursor_pos.0,
                                     self.cursor_pos.1,
-                                );
-                            }
-                        }
+                                )],
+                            },
+                        );
+
                         // println!("Active text: {:?}", self.active_text());
                     }
                 }
@@ -316,10 +234,13 @@ impl Editor {
                 self.cursor_pos = (position.x as f32 - INSET, position.y as f32 - INSET);
                 // macOS seems to generate a spurious move after selecting word?
                 if self.pointer_down && prev_pos != self.cursor_pos {
-                    self.selection = self.selection.extend_to_point(
-                        &self.layout,
-                        self.cursor_pos.0,
-                        self.cursor_pos.1,
+                    self.editor.transact(
+                        &mut self.font_cx,
+                        &mut self.layout_cx,
+                        [PlainEditorOp::ExtendSelectionToPoint(
+                            self.cursor_pos.0,
+                            self.cursor_pos.1,
+                        )],
                     );
                     // println!("Active text: {:?}", self.active_text());
                 }
@@ -328,29 +249,18 @@ impl Editor {
         }
     }
 
-    fn delete_current_selection(&mut self) -> Option<usize> {
-        if !self.selection.is_collapsed() {
-            let range = self.selection.text_range();
-            let start = range.start;
-            self.buffer.replace_range(range, "");
-            Some(start)
-        } else {
-            None
-        }
-    }
-
     pub fn draw(&self, scene: &mut Scene) {
         let transform = Affine::translate((INSET as f64, INSET as f64));
-        self.selection.geometry_with(&self.layout, |rect| {
+        for rect in self.editor.selection_geometry().iter() {
             scene.fill(Fill::NonZero, transform, Color::STEEL_BLUE, None, &rect);
-        });
-        if let Some(cursor) = self.selection.focus().strong_geometry(&self.layout, 1.5) {
+        }
+        if let Some(cursor) = self.editor.selection_strong_geometry(1.5) {
             scene.fill(Fill::NonZero, transform, Color::WHITE, None, &cursor);
         };
-        if let Some(cursor) = self.selection.focus().weak_geometry(&self.layout, 1.5) {
+        if let Some(cursor) = self.editor.selection_weak_geometry(1.5) {
             scene.fill(Fill::NonZero, transform, Color::LIGHT_GRAY, None, &cursor);
         };
-        for line in self.layout.lines() {
+        for line in self.editor.lines() {
             for item in line.items() {
                 let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
                     continue;

@@ -16,6 +16,7 @@ use winit::window::Window;
 
 // #[path = "text2.rs"]
 mod text;
+use parley::layout::editor::PlainEditorOp;
 
 // Simple struct to hold the state of the renderer
 pub struct ActiveRenderState<'s> {
@@ -47,7 +48,7 @@ struct SimpleVelloApp<'s> {
     scene: Scene,
 
     // Our text state object
-    editor: text::Editor,
+    editor: text::Editor<'s>,
 }
 
 impl ApplicationHandler for SimpleVelloApp<'_> {
@@ -70,7 +71,12 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
             wgpu::PresentMode::AutoVsync,
         );
         let surface = pollster::block_on(surface_future).expect("Error creating surface");
-        self.editor.update_layout(size.width as _, 1.0);
+
+        self.editor.transact([
+            PlainEditorOp::SetScale(1.0),
+            PlainEditorOp::SetWidth(size.width as f32 - 2f32 * text::INSET),
+            PlainEditorOp::SetText(text::LOREM.into()),
+        ]);
 
         // Create a vello Renderer for the surface (using its device id)
         self.renderers
@@ -107,7 +113,7 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
             _ => return,
         };
 
-        self.editor.handle_event(&event);
+        self.editor.handle_event(event.clone());
         render_state.window.request_redraw();
         // render_state
         //     .window
@@ -122,7 +128,17 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
                 self.context
                     .resize_surface(&mut render_state.surface, size.width, size.height);
                 render_state.window.request_redraw();
-                self.editor.update_layout(size.width as _, 1.0);
+                self.editor.transact([
+                    PlainEditorOp::SetScale(1.0),
+                    PlainEditorOp::SetWidth(size.width as f32 - 2f32 * text::INSET),
+                    PlainEditorOp::SetDefaultStyle(Arc::new([
+                        parley::style::StyleProperty::FontSize(32.0),
+                        parley::style::StyleProperty::LineHeight(1.2),
+                        parley::style::StyleProperty::FontStack(parley::style::FontStack::Source(
+                            "system-ui",
+                        )),
+                    ])),
+                ]);
             }
 
             // This is where all the rendering happens
@@ -189,13 +205,12 @@ fn main() -> Result<()> {
         editor: text::Editor::default(),
     };
 
-    app.editor.set_text(text::LOREM);
-
     // Create and run a winit event loop
     let event_loop = EventLoop::new()?;
     event_loop
         .run_app(&mut app)
         .expect("Couldn't run event loop");
+    print!("{}", app.editor.text());
     Ok(())
 }
 
