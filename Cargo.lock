@@ -717,15 +717,6 @@ dependencies = [
 
 [[package]]
 name = "font-types"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f0189ccb084f77c5523e08288d418cbaa09c451a08515678a0aa265df9a8b60"
-dependencies = [
- "bytemuck",
-]
-
-[[package]]
-name = "font-types"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dda6e36206148f69fc6ecb1bb6c0dedd7ee469f3db1d0dc2045beea28430ca43"
@@ -759,7 +750,7 @@ dependencies = [
  "objc2-foundation",
  "peniko",
  "roxmltree",
- "skrifa 0.22.3",
+ "skrifa",
  "smallvec",
  "unicode-script",
  "windows 0.58.0",
@@ -1815,7 +1806,7 @@ version = "0.1.0"
 dependencies = [
  "fontique",
  "peniko",
- "skrifa 0.22.3",
+ "skrifa",
  "swash",
 ]
 
@@ -2105,23 +2096,13 @@ dependencies = [
 
 [[package]]
 name = "read-fonts"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c141b9980e1150201b2a3a32879001c8f975fe313ec3df5471a9b5c79a880cd"
-dependencies = [
- "bytemuck",
- "font-types 0.6.0",
-]
-
-[[package]]
-name = "read-fonts"
 version = "0.22.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fb94d9ac780fdcf9b6b252253f7d8f221379b84bd3573131139b383df69f85e1"
 dependencies = [
  "bytemuck",
  "core_maths",
- "font-types 0.7.2",
+ "font-types",
 ]
 
 [[package]]
@@ -2268,23 +2249,13 @@ dependencies = [
 
 [[package]]
 name = "skrifa"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "abea4738067b1e628c6ce28b2c216c19e9ea95715cdb332680e821c3bec2ef23"
-dependencies = [
- "bytemuck",
- "read-fonts 0.20.0",
-]
-
-[[package]]
-name = "skrifa"
 version = "0.22.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8e1c44ad1f6c5bdd4eefed8326711b7dbda9ea45dfd36068c427d332aa382cbe"
 dependencies = [
  "bytemuck",
  "core_maths",
- "read-fonts 0.22.3",
+ "read-fonts",
 ]
 
 [[package]]
@@ -2389,11 +2360,11 @@ checksum = "20e16a0f46cf5fd675563ef54f26e83e20f2366bcf027bcb3cc3ed2b98aaf2ca"
 
 [[package]]
 name = "swash"
-version = "0.1.18"
+version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93cdc334a50fcc2aa3f04761af3b28196280a6aaadb1ef11215c478ae32615ac"
+checksum = "cbd59f3f359ddd2c95af4758c18270eddd9c730dde98598023cdabff472c2ca2"
 dependencies = [
- "skrifa 0.20.0",
+ "skrifa",
  "yazi",
  "zeno",
 ]
@@ -2405,7 +2376,7 @@ dependencies = [
  "image",
  "parley",
  "peniko",
- "skrifa 0.22.3",
+ "skrifa",
  "swash",
 ]
 
@@ -2533,7 +2504,7 @@ version = "0.1.0"
 dependencies = [
  "parley",
  "peniko",
- "skrifa 0.22.3",
+ "skrifa",
  "tiny-skia",
 ]
 
@@ -2656,7 +2627,7 @@ dependencies = [
  "peniko",
  "png",
  "raw-window-handle",
- "skrifa 0.22.3",
+ "skrifa",
  "static_assertions",
  "thiserror",
  "vello_encoding",
@@ -2686,7 +2657,7 @@ dependencies = [
  "bytemuck",
  "guillotiere",
  "peniko",
- "skrifa 0.22.3",
+ "skrifa",
  "smallvec",
 ]
 
