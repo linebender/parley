@@ -7,7 +7,7 @@ use std::time::Instant;
 use vello::Scene;
 use winit::{
     event::{Modifiers, WindowEvent},
-    keyboard::{KeyCode, PhysicalKey},
+    keyboard::{Key, NamedKey},
 };
 
 extern crate alloc;
@@ -58,136 +58,141 @@ impl<'a> Editor<'a> {
                     return;
                 }
                 #[allow(unused)]
-                let (shift, ctrl, cmd) = self
+                let (shift, action_mod) = self
                     .modifiers
                     .map(|mods| {
                         (
                             mods.state().shift_key(),
-                            mods.state().control_key(),
-                            mods.state().super_key(),
+                            if cfg!(target_os = "macos") {
+                                mods.state().super_key()
+                            } else {
+                                mods.state().control_key()
+                            },
                         )
                     })
                     .unwrap_or_default();
 
-                #[cfg(target_os = "macos")]
-                let action_mod = cmd;
-                #[cfg(not(target_os = "macos"))]
-                let action_mod = ctrl;
-                if let PhysicalKey::Code(code) = event.physical_key {
-                    self.editor.transact(
-                        &mut self.font_cx,
-                        &mut self.layout_cx,
-                        match code {
-                            KeyCode::KeyA if action_mod => vec![PlainEditorOp::SelectAll],
-                            #[cfg(not(target_os = "android"))]
-                            KeyCode::KeyC | KeyCode::KeyX | KeyCode::KeyX if action_mod => {
-                                use clipboard_rs::{Clipboard, ClipboardContext};
-                                use parley::layout::editor::ActiveText;
+                self.editor.transact(
+                    &mut self.font_cx,
+                    &mut self.layout_cx,
+                    match event.logical_key {
+                        #[cfg(not(target_os = "android"))]
+                        Key::Character(c)
+                            if action_mod && matches!(c.as_str(), "c" | "x" | "v") =>
+                        {
+                            use clipboard_rs::{Clipboard, ClipboardContext};
+                            use parley::layout::editor::ActiveText;
 
-                                match code {
-                                    KeyCode::KeyC => {
-                                        if let ActiveText::Selection(text) =
-                                            self.editor.active_text()
-                                        {
-                                            let cb = ClipboardContext::new().unwrap();
-                                            cb.set_text(text.to_owned()).ok();
-                                        }
+                            match c.to_lowercase().as_str() {
+                                "c" => {
+                                    if let ActiveText::Selection(text) = self.editor.active_text() {
+                                        let cb = ClipboardContext::new().unwrap();
+                                        cb.set_text(text.to_owned()).ok();
+                                    }
+                                    vec![]
+                                }
+                                "x" => {
+                                    if let ActiveText::Selection(text) = self.editor.active_text() {
+                                        let cb = ClipboardContext::new().unwrap();
+                                        cb.set_text(text.to_owned()).ok();
+                                        vec![PlainEditorOp::DeleteSelection]
+                                    } else {
                                         vec![]
                                     }
-                                    KeyCode::KeyX => {
-                                        if let ActiveText::Selection(text) =
-                                            self.editor.active_text()
-                                        {
-                                            let cb = ClipboardContext::new().unwrap();
-                                            cb.set_text(text.to_owned()).ok();
-                                            vec![PlainEditorOp::DeleteSelection]
-                                        } else {
-                                            vec![]
-                                        }
-                                    }
-                                    KeyCode::KeyV => {
-                                        let cb = ClipboardContext::new().unwrap();
-                                        let text = cb.get_text().unwrap_or_default();
-                                        vec![PlainEditorOp::InsertOrReplaceSelection(text.into())]
-                                    }
-                                    _ => vec![],
                                 }
+                                "v" => {
+                                    let cb = ClipboardContext::new().unwrap();
+                                    let text = cb.get_text().unwrap_or_default();
+                                    vec![PlainEditorOp::InsertOrReplaceSelection(text.into())]
+                                }
+                                _ => vec![],
                             }
-                            KeyCode::ArrowLeft => vec![if ctrl {
-                                if shift {
-                                    PlainEditorOp::SelectWordLeft
-                                } else {
-                                    PlainEditorOp::MoveWordLeft
-                                }
-                            } else if shift {
-                                PlainEditorOp::SelectLeft
+                        }
+                        Key::Character(c)
+                            if action_mod && matches!(c.to_lowercase().as_str(), "a") =>
+                        {
+                            vec![if shift {
+                                PlainEditorOp::CollapseSelection
                             } else {
-                                PlainEditorOp::MoveLeft
-                            }],
-                            KeyCode::ArrowRight => vec![if ctrl {
-                                if shift {
-                                    PlainEditorOp::SelectWordRight
-                                } else {
-                                    PlainEditorOp::MoveWordRight
-                                }
-                            } else if shift {
-                                PlainEditorOp::SelectRight
+                                PlainEditorOp::SelectAll
+                            }]
+                        }
+                        Key::Named(NamedKey::ArrowLeft) => vec![if action_mod {
+                            if shift {
+                                PlainEditorOp::SelectWordLeft
                             } else {
-                                PlainEditorOp::MoveRight
-                            }],
-                            KeyCode::ArrowUp => vec![if shift {
-                                PlainEditorOp::SelectUp
+                                PlainEditorOp::MoveWordLeft
+                            }
+                        } else if shift {
+                            PlainEditorOp::SelectLeft
+                        } else {
+                            PlainEditorOp::MoveLeft
+                        }],
+                        Key::Named(NamedKey::ArrowRight) => vec![if action_mod {
+                            if shift {
+                                PlainEditorOp::SelectWordRight
                             } else {
-                                PlainEditorOp::MoveUp
-                            }],
-                            KeyCode::ArrowDown => vec![if shift {
-                                PlainEditorOp::SelectDown
+                                PlainEditorOp::MoveWordRight
+                            }
+                        } else if shift {
+                            PlainEditorOp::SelectRight
+                        } else {
+                            PlainEditorOp::MoveRight
+                        }],
+                        Key::Named(NamedKey::ArrowUp) => vec![if shift {
+                            PlainEditorOp::SelectUp
+                        } else {
+                            PlainEditorOp::MoveUp
+                        }],
+                        Key::Named(NamedKey::ArrowDown) => vec![if shift {
+                            PlainEditorOp::SelectDown
+                        } else {
+                            PlainEditorOp::MoveDown
+                        }],
+                        Key::Named(NamedKey::Home) => vec![if action_mod {
+                            if shift {
+                                PlainEditorOp::SelectToTextStart
                             } else {
-                                PlainEditorOp::MoveDown
-                            }],
-                            KeyCode::Home => vec![if ctrl {
-                                if shift {
-                                    PlainEditorOp::SelectToTextStart
-                                } else {
-                                    PlainEditorOp::MoveToTextStart
-                                }
-                            } else if shift {
-                                PlainEditorOp::SelectToLineStart
+                                PlainEditorOp::MoveToTextStart
+                            }
+                        } else if shift {
+                            PlainEditorOp::SelectToLineStart
+                        } else {
+                            PlainEditorOp::MoveToLineStart
+                        }],
+                        Key::Named(NamedKey::End) => vec![if action_mod {
+                            if shift {
+                                PlainEditorOp::SelectToTextEnd
                             } else {
-                                PlainEditorOp::MoveToLineStart
-                            }],
-                            KeyCode::End => vec![if ctrl {
-                                if shift {
-                                    PlainEditorOp::SelectToTextEnd
-                                } else {
-                                    PlainEditorOp::MoveToTextEnd
-                                }
-                            } else if shift {
-                                PlainEditorOp::SelectToLineEnd
-                            } else {
-                                PlainEditorOp::MoveToLineEnd
-                            }],
-                            KeyCode::Delete => vec![if action_mod {
-                                PlainEditorOp::DeleteWord
-                            } else {
-                                PlainEditorOp::Delete
-                            }],
-                            KeyCode::Backspace => vec![if action_mod {
-                                PlainEditorOp::BackdeleteWord
-                            } else {
-                                PlainEditorOp::Backdelete
-                            }],
-                            _ => event
-                                .text
-                                .map(|text| {
-                                    vec![PlainEditorOp::InsertOrReplaceSelection(
-                                        text.as_str().into(),
-                                    )]
-                                })
-                                .unwrap_or(vec![]),
-                        },
-                    );
-                }
+                                PlainEditorOp::MoveToTextEnd
+                            }
+                        } else if shift {
+                            PlainEditorOp::SelectToLineEnd
+                        } else {
+                            PlainEditorOp::MoveToLineEnd
+                        }],
+                        Key::Named(NamedKey::Delete) => vec![if action_mod {
+                            PlainEditorOp::DeleteWord
+                        } else {
+                            PlainEditorOp::Delete
+                        }],
+                        Key::Named(NamedKey::Backspace) => vec![if action_mod {
+                            PlainEditorOp::BackdeleteWord
+                        } else {
+                            PlainEditorOp::Backdelete
+                        }],
+                        Key::Named(NamedKey::Enter) => {
+                            vec![PlainEditorOp::InsertOrReplaceSelection("\n".into())]
+                        }
+                        Key::Named(NamedKey::Space) => {
+                            vec![PlainEditorOp::InsertOrReplaceSelection(" ".into())]
+                        }
+                        Key::Character(s) => {
+                            vec![PlainEditorOp::InsertOrReplaceSelection(s.into())]
+                        }
+                        _ => vec![],
+                    },
+                );
 
                 // println!("Active text: {:?}", self.active_text());
             }

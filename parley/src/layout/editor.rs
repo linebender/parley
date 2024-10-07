@@ -103,6 +103,8 @@ where
     MoveWordRight,
     /// Select the whole buffer
     SelectAll,
+    /// Collapse selection into caret
+    CollapseSelection,
     /// Move the selection focus point to the start of the buffer
     SelectToTextStart,
     /// Move the selection focus point to the start of the physical line
@@ -309,6 +311,9 @@ where
                     self.selection =
                         Selection::from_index(&self.layout, 0usize, Affinity::default())
                             .move_lines(&self.layout, isize::MAX, true);
+                }
+                PlainEditorOp::CollapseSelection => {
+                    self.selection = self.selection.collapse();
                 }
                 PlainEditorOp::SelectToTextStart => {
                     self.selection = self.selection.move_lines(&self.layout, isize::MIN, true);
