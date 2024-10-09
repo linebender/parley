@@ -22,6 +22,9 @@ This release has an [MSRV] of 1.75.
 - Example using tiny-skia which renders into a png ([#55] by [@nicoburns])
     - Breaking change: There is now a blanket implementation for `Brush`.
 - A swash example which renders into a png ([#54] by [@nicoburns])
+- An example with Vello on Winit which shows a basic text editor ([#106] by [@dfrg])
+- `PlainEditor`, a basic action-based text editor based on Parley `Selection` and `Cursor` ([#126] by [@xorgy])
+- Tree style builder ([#76] by [@nicoburns])
 
 ### Changed
 
@@ -59,18 +62,22 @@ This release has an [MSRV] of 1.70.
 
 [MSRV]: README.md#minimum-supported-rust-version-msrv
 
-[@nicoburns]: https://github.com/nicoburns
 [@dfrg]: https://github.com/dfrg
+[@nicoburns]: https://github.com/nicoburns
 [@waywardmonkeys]: https://github.com/waywardmonkeys
+[@xorgy]: https://github.com/xorgy
 
 [#54]: https://github.com/linebender/parley/pull/54
 [#55]: https://github.com/linebender/parley/pull/55
 [#56]: https://github.com/linebender/parley/pull/56
 [#59]: https://github.com/linebender/parley/pull/59
-[#78]: https://github.com/linebender/parley/pull/78
 [#71]: https://github.com/linebender/parley/pull/71
 [#72]: https://github.com/linebender/parley/pull/72
+[#76]: https://github.com/linebender/parley/pull/76
+[#78]: https://github.com/linebender/parley/pull/78
 [#85]: https://github.com/linebender/parley/pull/85
+[#106]: https://github.com/linebender/parley/pull/106
+[#126]: https://github.com/linebender/parley/pull/126
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/linebender/parley/releases/tag/v0.1.0
