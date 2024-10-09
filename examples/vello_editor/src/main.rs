@@ -49,7 +49,7 @@ struct SimpleVelloApp<'s> {
     scene: Scene,
 
     // Our text state object
-    editor: text::Editor<'s>,
+    editor: text::Editor,
 }
 
 impl ApplicationHandler for SimpleVelloApp<'_> {

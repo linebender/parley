@@ -22,11 +22,11 @@ pub enum ActiveText<'a> {
 }
 
 /// Basic plain text editor with a single default style.
-pub struct PlainEditor<'a, T>
+pub struct PlainEditor<T>
 where
     T: Brush + Clone + Debug + PartialEq + Default,
 {
-    default_style: Arc<[StyleProperty<'a, T>]>,
+    default_style: Arc<[StyleProperty<'static, T>]>,
     buffer: String,
     layout: Layout<T>,
     selection: Selection,
@@ -36,7 +36,7 @@ where
 }
 
 // TODO: When MSRV >= 1.80 we can remove this. Default was not implemented for Arc<[T]> where T: !Default until 1.80
-impl<'a, T> Default for PlainEditor<'a, T>
+impl<T> Default for PlainEditor<T>
 where
     T: Brush + Clone + Debug + PartialEq + Default,
 {
@@ -55,7 +55,7 @@ where
 
 /// Operations on a `PlainEditor` for `PlainEditor::transact`
 #[non_exhaustive]
-pub enum PlainEditorOp<'a, T>
+pub enum PlainEditorOp<T>
 where
     T: Brush + Clone + Debug + PartialEq + Default,
 {
@@ -66,7 +66,7 @@ where
     /// Set the scale for the layout
     SetScale(f32),
     /// Set the default style for the layout
-    SetDefaultStyle(Arc<[StyleProperty<'a, T>]>),
+    SetDefaultStyle(Arc<[StyleProperty<'static, T>]>),
     /// Insert at cursor, or replace selection
     InsertOrReplaceSelection(Arc<str>),
     /// Delete the selection
@@ -133,7 +133,7 @@ where
     ExtendSelectionToPoint(f32, f32),
 }
 
-impl<'a, T> PlainEditor<'a, T>
+impl<T> PlainEditor<T>
 where
     T: Brush + Clone + Debug + PartialEq + Default,
 {
@@ -142,7 +142,7 @@ where
         &mut self,
         font_cx: &mut FontContext,
         layout_cx: &mut LayoutContext<T>,
-        t: impl IntoIterator<Item = PlainEditorOp<'a, T>>,
+        t: impl IntoIterator<Item = PlainEditorOp<T>>,
     ) {
         let mut layout_after = false;
 
