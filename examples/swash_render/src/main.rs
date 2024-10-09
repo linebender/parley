@@ -10,6 +10,7 @@ use parley::layout::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
 use parley::style::{FontStack, FontWeight, StyleProperty, TextStyle};
 use parley::{FontContext, InlineBox, LayoutContext};
 use peniko::Color;
+use std::borrow::Cow;
 use std::fs::File;
 use swash::scale::image::Content;
 use swash::scale::{Render, ScaleContext, Scaler, Source, StrikeWith};
@@ -46,8 +47,8 @@ fn main() {
 
     // Setup some Parley text styles
     let brush_style = StyleProperty::Brush(text_color);
-    let font_stack = FontStack::Source("system-ui");
-    let font_stack_style: StyleProperty<Color> = StyleProperty::FontStack(font_stack);
+    let font_stack = FontStack::Source(Cow::Borrowed("system-ui"));
+    let font_stack_style: StyleProperty<Color> = StyleProperty::FontStack(font_stack.clone());
     let bold = FontWeight::new(600.0);
     let bold_style = StyleProperty::FontWeight(bold);
 

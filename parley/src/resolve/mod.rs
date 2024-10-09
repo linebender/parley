@@ -19,6 +19,7 @@ use crate::font::FontContext;
 use crate::layout;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
+use core::borrow::Borrow;
 use core::ops::Range;
 use fontique::FamilyId;
 use swash::text::Language;
@@ -134,13 +135,13 @@ impl ResolveContext {
     ) -> ResolvedProperty<B> {
         use ResolvedProperty::*;
         match property {
-            StyleProperty::FontStack(value) => FontStack(self.resolve_stack(fcx, *value)),
+            StyleProperty::FontStack(value) => FontStack(self.resolve_stack(fcx, value)),
             StyleProperty::FontSize(value) => FontSize(*value * scale),
             StyleProperty::FontStretch(value) => FontStretch(*value),
             StyleProperty::FontStyle(value) => FontStyle(*value),
             StyleProperty::FontWeight(value) => FontWeight(*value),
-            StyleProperty::FontVariations(value) => FontVariations(self.resolve_variations(*value)),
-            StyleProperty::FontFeatures(value) => FontFeatures(self.resolve_features(*value)),
+            StyleProperty::FontVariations(value) => FontVariations(self.resolve_variations(value)),
+            StyleProperty::FontFeatures(value) => FontFeatures(self.resolve_features(value)),
             StyleProperty::Locale(value) => Locale(value.map(Language::parse).flatten()),
             StyleProperty::Brush(value) => Brush(value.clone()),
             StyleProperty::Underline(value) => Underline(*value),
@@ -166,13 +167,13 @@ impl ResolveContext {
         scale: f32,
     ) -> ResolvedStyle<B> {
         ResolvedStyle {
-            font_stack: self.resolve_stack(fcx, raw_style.font_stack),
+            font_stack: self.resolve_stack(fcx, &raw_style.font_stack),
             font_size: raw_style.font_size * scale,
             font_stretch: raw_style.font_stretch,
             font_style: raw_style.font_style,
             font_weight: raw_style.font_weight,
-            font_variations: self.resolve_variations(raw_style.font_variations),
-            font_features: self.resolve_features(raw_style.font_features),
+            font_variations: self.resolve_variations(&raw_style.font_variations),
+            font_features: self.resolve_features(&raw_style.font_features),
             locale: raw_style.locale.and_then(Language::parse),
             brush: raw_style.brush.clone(),
             underline: ResolvedDecoration {
@@ -194,14 +195,18 @@ impl ResolveContext {
     }
 
     /// Resolves a font stack.
-    pub fn resolve_stack(&mut self, fcx: &mut FontContext, stack: FontStack) -> Resolved<FamilyId> {
+    pub fn resolve_stack(
+        &mut self,
+        fcx: &mut FontContext,
+        stack: &FontStack,
+    ) -> Resolved<FamilyId> {
         self.tmp_families.clear();
         match stack {
             FontStack::Source(source) => {
                 for family in FontFamily::parse_list(source) {
                     match family {
                         FontFamily::Named(name) => {
-                            if let Some(family) = fcx.collection.family_by_name(name) {
+                            if let Some(family) = fcx.collection.family_by_name(&name) {
                                 self.tmp_families.push(family.id());
                             }
                         }
@@ -220,10 +225,11 @@ impl ResolveContext {
                 }
                 FontFamily::Generic(family) => {
                     self.tmp_families
-                        .extend(fcx.collection.generic_families(family));
+                        .extend(fcx.collection.generic_families(*family));
                 }
             },
             FontStack::List(families) => {
+                let families: &[FontFamily<'_>] = families.borrow();
                 for family in families {
                     match family {
                         FontFamily::Named(name) => {
@@ -247,7 +253,7 @@ impl ResolveContext {
     /// Resolves font variation settings.
     pub fn resolve_variations(
         &mut self,
-        variations: FontSettings<FontVariation>,
+        variations: &FontSettings<FontVariation>,
     ) -> Resolved<Setting<f32>> {
         match variations {
             FontSettings::Source(source) => {
@@ -272,7 +278,7 @@ impl ResolveContext {
     /// Resolves font feature settings.
     pub fn resolve_features(
         &mut self,
-        features: FontSettings<FontFeature>,
+        features: &FontSettings<FontFeature>,
     ) -> Resolved<Setting<u16>> {
         match features {
             FontSettings::Source(source) => {
