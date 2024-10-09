@@ -97,6 +97,7 @@ mod util;
 pub mod layout;
 pub mod style;
 
+pub use peniko::kurbo::Rect;
 pub use peniko::Font;
 
 pub use builder::{RangedBuilder, TreeBuilder};
@@ -105,6 +106,9 @@ pub use font::FontContext;
 pub use inline_box::InlineBox;
 #[doc(inline)]
 pub use layout::Layout;
+
+#[cfg(feature = "std")]
+pub use layout::editor::{PlainEditor, PlainEditorOp};
 
 pub use layout::*;
 pub use style::*;

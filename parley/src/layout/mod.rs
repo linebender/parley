@@ -12,6 +12,11 @@ pub(crate) mod data;
 
 pub mod cursor;
 
+// TODO: make editor `no_std` capable.
+//       `std` required only because of `RangedEditor::build_into`.
+#[cfg(feature = "std")]
+pub mod editor;
+
 use self::alignment::align;
 
 use super::style::Brush;
