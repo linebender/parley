@@ -20,10 +20,10 @@ use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorOp};
 pub const INSET: f32 = 32.0;
 
 #[derive(Default)]
-pub struct Editor<'a> {
+pub struct Editor {
     font_cx: FontContext,
     layout_cx: LayoutContext<Color>,
-    editor: PlainEditor<'a, Color>,
+    editor: PlainEditor<Color>,
     last_click_time: Option<Instant>,
     click_count: u32,
     pointer_down: bool,
@@ -31,8 +31,8 @@ pub struct Editor<'a> {
     modifiers: Option<Modifiers>,
 }
 
-impl<'a> Editor<'a> {
-    pub fn transact(&mut self, t: impl IntoIterator<Item = PlainEditorOp<'a, Color>>) {
+impl Editor {
+    pub fn transact(&mut self, t: impl IntoIterator<Item = PlainEditorOp<Color>>) {
         self.editor
             .transact(&mut self.font_cx, &mut self.layout_cx, t);
     }

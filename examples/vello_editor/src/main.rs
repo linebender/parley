@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use anyhow::Result;
+use std::borrow::Cow;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use vello::peniko::Color;
@@ -48,7 +49,7 @@ struct SimpleVelloApp<'s> {
     scene: Scene,
 
     // Our text state object
-    editor: text::Editor<'s>,
+    editor: text::Editor,
 }
 
 impl ApplicationHandler for SimpleVelloApp<'_> {
@@ -135,7 +136,7 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
                         parley::style::StyleProperty::FontSize(32.0),
                         parley::style::StyleProperty::LineHeight(1.2),
                         parley::style::StyleProperty::FontStack(parley::style::FontStack::Source(
-                            "system-ui",
+                            Cow::Borrowed("system-ui"),
                         )),
                     ])),
                 ]);

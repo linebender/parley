@@ -7,6 +7,8 @@
 //! Note: Emoji rendering is not currently implemented in this example. See the swash example
 //! if you need emoji rendering.
 
+use std::borrow::Cow;
+
 use parley::layout::{Alignment, GlyphRun, Layout, PositionedLayoutItem};
 use parley::style::{FontStack, FontWeight, StyleProperty};
 use parley::{FontContext, InlineBox, LayoutContext};
@@ -53,7 +55,7 @@ fn main() {
     builder.push_default(&brush_style);
 
     // Set default font family
-    let font_stack = FontStack::Source("system-ui");
+    let font_stack = FontStack::Source(Cow::Borrowed("system-ui"));
     let font_stack_style = StyleProperty::FontStack(font_stack);
     builder.push_default(&font_stack_style);
     builder.push_default(&StyleProperty::LineHeight(1.3));

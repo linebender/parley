@@ -1,6 +1,8 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use alloc::borrow::Cow;
+use alloc::borrow::ToOwned;
 use core::fmt;
 
 pub use fontique::{
@@ -16,23 +18,23 @@ pub type FontFeature = swash::Setting<u16>;
 /// Prioritized sequence of font families.
 ///
 /// <https://developer.mozilla.org/en-US/docs/Web/CSS/font-family>
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum FontStack<'a> {
     /// Font family list in CSS format.
-    Source(&'a str),
+    Source(Cow<'a, str>),
     /// Single font family.
     Single(FontFamily<'a>),
     /// Ordered list of font families.
-    List(&'a [FontFamily<'a>]),
+    List(Cow<'a, [FontFamily<'a>]>),
 }
 
 /// Named or generic font family.
 ///
 /// <https://developer.mozilla.org/en-US/docs/Web/CSS/font-family>
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum FontFamily<'a> {
     /// Named font family.
-    Named(&'a str),
+    Named(Cow<'a, str>),
     /// Generic font family.
     Generic(GenericFamily),
 }
@@ -44,13 +46,14 @@ impl<'a> FontFamily<'a> {
     /// ```
     /// use parley::style::FontFamily::{self, *};
     /// use parley::style::GenericFamily::*;
+    /// use std::borrow::Cow;
     ///
-    /// assert_eq!(FontFamily::parse("Palatino Linotype"), Some(Named("Palatino Linotype")));
+    /// assert_eq!(FontFamily::parse("Palatino Linotype"), Some(Named(Cow::Borrowed("Palatino Linotype"))));
     /// assert_eq!(FontFamily::parse("monospace"), Some(Generic(Monospace)));
     ///
     /// // Note that you can quote a generic family to capture it as a named family:
     ///
-    /// assert_eq!(FontFamily::parse("'monospace'"), Some(Named("monospace")));
+    /// assert_eq!(FontFamily::parse("'monospace'"), Some(Named(Cow::Borrowed("monospace"))));
     /// ```
     pub fn parse(s: &'a str) -> Option<Self> {
         Self::parse_list(s).next()
@@ -62,11 +65,12 @@ impl<'a> FontFamily<'a> {
     /// ```
     /// use parley::style::FontFamily::{self, *};
     /// use parley::style::GenericFamily::*;
+    /// use std::borrow::Cow;
     ///
     /// let source = "Arial, 'Times New Roman', serif";
     ///
     /// let parsed_families = FontFamily::parse_list(source).collect::<Vec<_>>();
-    /// let families = vec![Named("Arial"), Named("Times New Roman"), Generic(Serif)];
+    /// let families = vec![Named(Cow::Borrowed("Arial")), Named(Cow::Borrowed("Times New Roman")), Generic(Serif)];
     ///
     /// assert_eq!(parsed_families, families);
     /// ```
@@ -125,20 +129,20 @@ impl<'a> Iterator for ParseList<'a> {
             while pos < self.len {
                 if self.source[pos] == quote {
                     self.pos = pos + 1;
-                    return Some(FontFamily::Named(
+                    return Some(FontFamily::Named(Cow::Borrowed(
                         core::str::from_utf8(self.source.get(start..pos)?)
                             .ok()?
                             .trim(),
-                    ));
+                    )));
                 }
                 pos += 1;
             }
             self.pos = pos;
-            return Some(FontFamily::Named(
+            return Some(FontFamily::Named(Cow::Borrowed(
                 core::str::from_utf8(self.source.get(start..pos)?)
                     .ok()?
                     .trim(),
-            ));
+            )));
         }
         let mut end = start;
         while pos < self.len {
@@ -155,29 +159,41 @@ impl<'a> Iterator for ParseList<'a> {
             .trim();
         Some(match GenericFamily::parse(name) {
             Some(family) => FontFamily::Generic(family),
-            _ => FontFamily::Named(name),
+            _ => FontFamily::Named(Cow::Borrowed(name)),
         })
     }
 }
 
 /// Font settings that can be supplied as a raw source string or
 /// a parsed slice.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum FontSettings<'a, T> {
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum FontSettings<'a, T>
+where
+    [T]: ToOwned,
+    <[T] as ToOwned>::Owned: fmt::Debug + Eq + Clone,
+{
     /// Setting source in CSS format.
-    Source(&'a str),
+    Source(Cow<'a, str>),
     /// List of settings.
-    List(&'a [T]),
+    List(Cow<'a, [T]>),
 }
 
-impl<'a, T> From<&'a str> for FontSettings<'a, T> {
+impl<'a, T> From<&'a str> for FontSettings<'a, T>
+where
+    [T]: ToOwned,
+    <[T] as ToOwned>::Owned: fmt::Debug + Eq + Clone,
+{
     fn from(value: &'a str) -> Self {
-        Self::Source(value)
+        Self::Source(Cow::Borrowed(value))
     }
 }
 
-impl<'a, T> From<&'a [T]> for FontSettings<'a, T> {
+impl<'a, T> From<&'a [T]> for FontSettings<'a, T>
+where
+    [T]: ToOwned,
+    <[T] as ToOwned>::Owned: fmt::Debug + Eq + Clone,
+{
     fn from(value: &'a [T]) -> Self {
-        Self::List(value)
+        Self::List(Cow::Borrowed(value))
     }
 }

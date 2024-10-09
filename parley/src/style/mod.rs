@@ -6,6 +6,8 @@
 mod brush;
 mod font;
 
+use alloc::borrow::Cow;
+
 pub use brush::*;
 pub use font::{
     FontFamily, FontFeature, FontSettings, FontStack, FontStretch, FontStyle, FontVariation,
@@ -111,13 +113,13 @@ pub struct TextStyle<'a, B: Brush> {
 impl<B: Brush> Default for TextStyle<'_, B> {
     fn default() -> Self {
         TextStyle {
-            font_stack: FontStack::Source("sans-serif"),
+            font_stack: FontStack::Source(Cow::Borrowed("sans-serif")),
             font_size: 16.0,
             font_stretch: Default::default(),
             font_style: Default::default(),
             font_weight: Default::default(),
-            font_variations: FontSettings::List(&[]),
-            font_features: FontSettings::List(&[]),
+            font_variations: FontSettings::List(Cow::Borrowed(&[])),
+            font_features: FontSettings::List(Cow::Borrowed(&[])),
             locale: Default::default(),
             brush: Default::default(),
             has_underline: Default::default(),
