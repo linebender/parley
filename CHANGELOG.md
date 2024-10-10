@@ -25,6 +25,7 @@ This release has an [MSRV] of 1.75.
 - An example with Vello on Winit which shows a basic text editor ([#106] by [@dfrg])
 - `PlainEditor`, a basic action-based text editor based on Parley `Selection` and `Cursor` ([#126] by [@xorgy])
 - Tree style builder ([#76] by [@nicoburns])
+- Conversions for `FontFamily`, `FontStack`, and `StyleProperty` to make styling more ergonomic ([#129] by [@xorgy])
 
 ### Changed
 
@@ -35,6 +36,7 @@ This release has an [MSRV] of 1.75.
 #### Parley
 
 - Emoji clusters now get an Emoji family added by default ([#56] by [@dfrg])
+- Style builders now accept `Into<StyleProperty<'a, B: Brush>>` so you can push a `GenericFamily` or `FontStack` directly. ([#129] by [@xorgy])
 
 #### Fontique
 
@@ -78,6 +80,7 @@ This release has an [MSRV] of 1.70.
 [#85]: https://github.com/linebender/parley/pull/85
 [#106]: https://github.com/linebender/parley/pull/106
 [#126]: https://github.com/linebender/parley/pull/126
+[#129]: https://github.com/linebender/parley/pull/129
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/linebender/parley/releases/tag/v0.1.0

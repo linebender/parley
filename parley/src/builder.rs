@@ -22,19 +22,23 @@ pub struct RangedBuilder<'a, B: Brush> {
 }
 
 impl<B: Brush> RangedBuilder<'_, B> {
-    pub fn push_default(&mut self, property: &StyleProperty<B>) {
+    pub fn push_default<'a>(&mut self, property: impl Into<StyleProperty<'a, B>>) {
         let resolved = self
             .lcx
             .rcx
-            .resolve_property(self.fcx, property, self.scale);
+            .resolve_property(self.fcx, &property.into(), self.scale);
         self.lcx.ranged_style_builder.push_default(resolved);
     }
 
-    pub fn push(&mut self, property: &StyleProperty<B>, range: impl RangeBounds<usize>) {
+    pub fn push<'a>(
+        &mut self,
+        property: impl Into<StyleProperty<'a, B>>,
+        range: impl RangeBounds<usize>,
+    ) {
         let resolved = self
             .lcx
             .rcx
-            .resolve_property(self.fcx, property, self.scale);
+            .resolve_property(self.fcx, &property.into(), self.scale);
         self.lcx.ranged_style_builder.push(resolved, range);
     }
 

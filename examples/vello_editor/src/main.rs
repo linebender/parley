@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use anyhow::Result;
-use std::borrow::Cow;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use vello::peniko::Color;
@@ -17,7 +16,7 @@ use winit::window::Window;
 
 // #[path = "text2.rs"]
 mod text;
-use parley::layout::editor::PlainEditorOp;
+use parley::{GenericFamily, PlainEditorOp, StyleProperty};
 
 // Simple struct to hold the state of the renderer
 pub struct ActiveRenderState<'s> {
@@ -133,11 +132,9 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
                     PlainEditorOp::SetScale(1.0),
                     PlainEditorOp::SetWidth(size.width as f32 - 2f32 * text::INSET),
                     PlainEditorOp::SetDefaultStyle(Arc::new([
-                        parley::style::StyleProperty::FontSize(32.0),
-                        parley::style::StyleProperty::LineHeight(1.2),
-                        parley::style::StyleProperty::FontStack(parley::style::FontStack::Source(
-                            Cow::Borrowed("system-ui"),
-                        )),
+                        StyleProperty::FontSize(32.0),
+                        StyleProperty::LineHeight(1.2),
+                        GenericFamily::SystemUi.into(),
                     ])),
                 ]);
             }
