@@ -83,6 +83,36 @@ impl<'a> FontFamily<'a> {
     }
 }
 
+impl<'a> From<GenericFamily> for FontFamily<'a> {
+    fn from(f: GenericFamily) -> Self {
+        FontFamily::Generic(f)
+    }
+}
+
+impl<'a> From<GenericFamily> for FontStack<'a> {
+    fn from(f: GenericFamily) -> Self {
+        FontStack::Single(f.into())
+    }
+}
+
+impl<'a> From<FontFamily<'a>> for FontStack<'a> {
+    fn from(f: FontFamily<'a>) -> Self {
+        FontStack::Single(f)
+    }
+}
+
+impl<'a> From<&'a str> for FontStack<'a> {
+    fn from(s: &'a str) -> Self {
+        FontStack::Source(Cow::Borrowed(s))
+    }
+}
+
+impl<'a> From<&'a [FontFamily<'a>]> for FontStack<'a> {
+    fn from(fs: &'a [FontFamily<'a>]) -> Self {
+        FontStack::List(Cow::Borrowed(fs))
+    }
+}
+
 impl fmt::Display for FontFamily<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

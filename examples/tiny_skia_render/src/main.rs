@@ -7,16 +7,17 @@
 //! Note: Emoji rendering is not currently implemented in this example. See the swash example
 //! if you need emoji rendering.
 
-use std::borrow::Cow;
-
-use parley::layout::{Alignment, GlyphRun, Layout, PositionedLayoutItem};
-use parley::style::{FontStack, FontWeight, StyleProperty};
-use parley::{FontContext, InlineBox, LayoutContext};
+use parley::{
+    Alignment, FontContext, FontWeight, GenericFamily, GlyphRun, InlineBox, Layout, LayoutContext,
+    PositionedLayoutItem, StyleProperty,
+};
 use peniko::Color as PenikoColor;
-use skrifa::instance::{LocationRef, NormalizedCoord, Size};
-use skrifa::outline::{DrawSettings, OutlinePen};
-use skrifa::raw::FontRef as ReadFontsRef;
-use skrifa::{GlyphId, MetadataProvider, OutlineGlyph};
+use skrifa::{
+    instance::{LocationRef, NormalizedCoord, Size},
+    outline::{DrawSettings, OutlinePen},
+    raw::FontRef as ReadFontsRef,
+    GlyphId, MetadataProvider, OutlineGlyph,
+};
 use tiny_skia::{
     Color as TinySkiaColor, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Rect, Transform,
 };
@@ -52,19 +53,16 @@ fn main() {
 
     // Set default text colour styles (set foreground text color)
     let brush_style = StyleProperty::Brush(foreground_color);
-    builder.push_default(&brush_style);
+    builder.push_default(brush_style);
 
     // Set default font family
-    let font_stack = FontStack::Source(Cow::Borrowed("system-ui"));
-    let font_stack_style = StyleProperty::FontStack(font_stack);
-    builder.push_default(&font_stack_style);
-    builder.push_default(&StyleProperty::LineHeight(1.3));
-    builder.push_default(&StyleProperty::FontSize(16.0));
+    builder.push_default(GenericFamily::SystemUi);
+    builder.push_default(StyleProperty::LineHeight(1.3));
+    builder.push_default(StyleProperty::FontSize(16.0));
 
     // Set the first 4 characters to bold
     let bold = FontWeight::new(600.0);
-    let bold_style = StyleProperty::FontWeight(bold);
-    builder.push(&bold_style, 0..4);
+    builder.push(StyleProperty::FontWeight(bold), 0..4);
 
     builder.push_inline_box(InlineBox {
         id: 0,

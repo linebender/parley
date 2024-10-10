@@ -10,10 +10,10 @@
 //! - [`RangedBuilder`] and [`TreeBuilder`] which are builders for creating a [`Layout`].
 //!     - [`RangedBuilder`] allows styles to be specified as a flat `Vec` of spans
 //!     - [`TreeBuilder`] allows styles to be specified as a tree of spans
-//!   
+//!
 //!   They are constructed using the [`ranged_builder`](LayoutContext::ranged_builder) and [`tree_builder`](LayoutContext::ranged_builder) methods on [`LayoutContext`].
 //! - [`Layout`] which represents styled paragraph(s) of text and can perform shaping, line-breaking, bidi-reordering, and alignment of that text.
-//!   
+//!
 //!   `Layout` supports re-linebreaking and re-aligning many times (in case the width at which wrapping should occur changes). But if the text content or
 //!   the styles applied to that content change then a new `Layout` must be created using a new `RangedBuilder` or `TreeBuilder`.
 //!
@@ -38,11 +38,11 @@
 //! let mut builder = layout_cx.ranged_builder(&mut font_cx, &TEXT, DISPLAY_SCALE);
 //!
 //! // Set default styles that apply to the entire layout
-//! builder.push_default(&StyleProperty::LineHeight(1.3));
-//! builder.push_default(&StyleProperty::FontSize(16.0));
+//! builder.push_default(StyleProperty::LineHeight(1.3));
+//! builder.push_default(StyleProperty::FontSize(16.0));
 //!
 //! // Set a style that applies to the first 4 characters
-//! builder.push(&StyleProperty::FontWeight(FontWeight::new(600.0)), 0..4);
+//! builder.push(StyleProperty::FontWeight(FontWeight::new(600.0)), 0..4);
 //!
 //! // Add a box to be laid out inline with the text
 //! builder.push_inline_box(InlineBox { id: 0, index: 5, width: 50.0, height: 50.0 });

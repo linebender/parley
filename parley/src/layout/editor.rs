@@ -445,7 +445,7 @@ where
     fn update_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
         let mut builder = layout_cx.ranged_builder(font_cx, &self.buffer, self.scale);
         for prop in self.default_style.iter() {
-            builder.push_default(prop);
+            builder.push_default(prop.to_owned());
         }
         builder.build_into(&mut self.layout, &self.buffer);
         self.layout.break_all_lines(Some(self.width));

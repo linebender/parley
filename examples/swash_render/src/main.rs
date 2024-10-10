@@ -10,7 +10,6 @@ use parley::layout::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
 use parley::style::{FontStack, FontWeight, StyleProperty, TextStyle};
 use parley::{FontContext, InlineBox, LayoutContext};
 use peniko::Color;
-use std::borrow::Cow;
 use std::fs::File;
 use swash::scale::image::Content;
 use swash::scale::{Render, ScaleContext, Scaler, Source, StrikeWith};
@@ -47,10 +46,8 @@ fn main() {
 
     // Setup some Parley text styles
     let brush_style = StyleProperty::Brush(text_color);
-    let font_stack = FontStack::Source(Cow::Borrowed("system-ui"));
-    let font_stack_style: StyleProperty<Color> = StyleProperty::FontStack(font_stack.clone());
-    let bold = FontWeight::new(600.0);
-    let bold_style = StyleProperty::FontWeight(bold);
+    let font_stack = FontStack::from("system-ui");
+    let bold_style = StyleProperty::FontWeight(FontWeight::new(600.0));
 
     let mut layout = if std::env::args().any(|arg| arg == "--tree") {
         // TREE BUILDER
@@ -104,15 +101,15 @@ fn main() {
         let mut builder = layout_cx.ranged_builder(&mut font_cx, &text, display_scale);
 
         // Set default text colour styles (set foreground text color)
-        builder.push_default(&brush_style);
+        builder.push_default(brush_style);
 
         // Set default font family
-        builder.push_default(&font_stack_style);
-        builder.push_default(&StyleProperty::LineHeight(1.3));
-        builder.push_default(&StyleProperty::FontSize(16.0));
+        builder.push_default(font_stack);
+        builder.push_default(StyleProperty::LineHeight(1.3));
+        builder.push_default(StyleProperty::FontSize(16.0));
 
         // Set the first 4 characters to bold
-        builder.push(&bold_style, 0..4);
+        builder.push(bold_style, 0..4);
 
         builder.push_inline_box(InlineBox {
             id: 0,

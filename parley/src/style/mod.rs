@@ -136,3 +136,27 @@ impl<B: Brush> Default for TextStyle<'_, B> {
         }
     }
 }
+
+impl<'a, B: Brush> From<FontStack<'a>> for StyleProperty<'a, B> {
+    fn from(fs: FontStack<'a>) -> Self {
+        StyleProperty::FontStack(fs)
+    }
+}
+
+impl<'a, B: Brush> From<&'a [FontFamily<'a>]> for StyleProperty<'a, B> {
+    fn from(fs: &'a [FontFamily<'a>]) -> Self {
+        StyleProperty::FontStack(fs.into())
+    }
+}
+
+impl<'a, B: Brush> From<FontFamily<'a>> for StyleProperty<'a, B> {
+    fn from(f: FontFamily<'a>) -> Self {
+        StyleProperty::FontStack(FontStack::from(f))
+    }
+}
+
+impl<'a, B: Brush> From<GenericFamily> for StyleProperty<'a, B> {
+    fn from(f: GenericFamily) -> Self {
+        StyleProperty::FontStack(f.into())
+    }
+}
