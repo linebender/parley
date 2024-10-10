@@ -1,6 +1,6 @@
 [package]
 name = "parley"
-version = "0.1.0"
+version = "0.2.0"
 description = "Parley provides an API for implementing rich text layout."
 keywords = ["text", "layout"]
 categories = ["gui", "graphics"]
