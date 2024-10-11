@@ -31,7 +31,7 @@ where
     layout: Layout<T>,
     selection: Selection,
     cursor_mode: VisualMode,
-    width: f32,
+    width: Option<f32>,
     scale: f32,
 }
 
@@ -62,7 +62,7 @@ where
     /// Replace the whole text buffer
     SetText(Arc<str>),
     /// Set the width of the layout
-    SetWidth(f32),
+    SetWidth(Option<f32>),
     /// Set the scale for the layout
     SetScale(f32),
     /// Set the default style for the layout
@@ -448,8 +448,8 @@ where
             builder.push_default(prop.to_owned());
         }
         builder.build_into(&mut self.layout, &self.buffer);
-        self.layout.break_all_lines(Some(self.width));
-        self.layout.align(Some(self.width), Alignment::Start);
+        self.layout.break_all_lines(self.width);
+        self.layout.align(self.width, Alignment::Start);
         self.selection = self.selection.refresh(&self.layout);
     }
 }

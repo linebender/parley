@@ -74,7 +74,7 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
 
         self.editor.transact([
             PlainEditorOp::SetScale(1.0),
-            PlainEditorOp::SetWidth(size.width as f32 - 2f32 * text::INSET),
+            PlainEditorOp::SetWidth(Some(size.width as f32 - 2f32 * text::INSET)),
             PlainEditorOp::SetText(text::LOREM.into()),
         ]);
 
@@ -130,7 +130,7 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
                 render_state.window.request_redraw();
                 self.editor.transact([
                     PlainEditorOp::SetScale(1.0),
-                    PlainEditorOp::SetWidth(size.width as f32 - 2f32 * text::INSET),
+                    PlainEditorOp::SetWidth(Some(size.width as f32 - 2f32 * text::INSET)),
                     PlainEditorOp::SetDefaultStyle(Arc::new([
                         StyleProperty::FontSize(32.0),
                         StyleProperty::LineHeight(1.2),
