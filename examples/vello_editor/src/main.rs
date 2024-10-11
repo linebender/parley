@@ -9,7 +9,7 @@ use vello::util::{RenderContext, RenderSurface};
 use vello::wgpu;
 use vello::{AaConfig, Renderer, RendererOptions, Scene};
 use winit::application::ApplicationHandler;
-use winit::dpi::LogicalSize;
+use winit::dpi::{LogicalPosition, LogicalSize};
 use winit::event::*;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::Window;
@@ -84,6 +84,8 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
         self.renderers[surface.dev_id]
             .get_or_insert_with(|| create_vello_renderer(&self.context, &surface));
 
+        window.set_ime_allowed(true);
+
         // Save the Window and Surface to a state variable
         self.state = RenderState::Active(ActiveRenderState { window, surface });
 
@@ -114,6 +116,14 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
         };
 
         self.editor.handle_event(event.clone());
+        if let Some(parley::Rect { x0, y0, x1, y1 }) = self.editor.preedit_area() {
+            println!("{x0} : {y0}");
+            println!("{x1} : {y1}");
+            render_state.window.set_ime_cursor_area(
+                LogicalPosition::new(x0, y0),
+                LogicalSize::new(x1 - x0, y1 - y0),
+            );
+        }
         render_state.window.request_redraw();
         // render_state
         //     .window
