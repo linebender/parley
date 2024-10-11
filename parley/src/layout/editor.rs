@@ -22,6 +22,7 @@ pub enum ActiveText<'a> {
 }
 
 /// Basic plain text editor with a single default style.
+#[derive(Clone)]
 pub struct PlainEditor<T>
 where
     T: Brush + Clone + Debug + PartialEq + Default,
