@@ -47,7 +47,9 @@ impl Editor {
                 self.editor.transact(
                     &mut self.font_cx,
                     &mut self.layout_cx,
-                    [PlainEditorOp::SetWidth(size.width as f32 - 2f32 * INSET)],
+                    [PlainEditorOp::SetWidth(Some(
+                        size.width as f32 - 2f32 * INSET,
+                    ))],
                 );
             }
             WindowEvent::ModifiersChanged(modifiers) => {
