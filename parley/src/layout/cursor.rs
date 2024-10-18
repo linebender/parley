@@ -567,7 +567,11 @@ impl Selection {
         self.maybe_extend(self.focus.previous_word(layout), extend)
     }
 
-    fn maybe_extend(&self, focus: Cursor, extend: bool) -> Self {
+    /// Returns a new selection with the focus moved to a cursor.
+    ///
+    /// If `extend` is `true` then the current anchor will be retained,
+    /// otherwise the new selection will be collapsed.
+    pub fn maybe_extend(&self, focus: Cursor, extend: bool) -> Self {
         if extend {
             Self {
                 anchor: self.anchor,

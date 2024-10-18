@@ -6,7 +6,7 @@ use peniko::{kurbo::Affine, Color, Fill};
 use std::time::Instant;
 use vello::Scene;
 use winit::{
-    event::{Modifiers, WindowEvent},
+    event::{Ime, Modifiers, WindowEvent},
     keyboard::{Key, NamedKey},
 };
 
@@ -15,7 +15,7 @@ use alloc::{sync::Arc, vec};
 
 use core::{default::Default, iter::IntoIterator};
 
-use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorOp};
+use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorOp, Rect};
 
 pub const INSET: f32 = 32.0;
 
@@ -41,6 +41,17 @@ impl Editor {
         self.editor.text()
     }
 
+    pub fn preedit_area(&self) -> Option<Rect> {
+        self.editor.preedit_area().map(|r| {
+            Rect::new(
+                r.x0 + INSET as f64,
+                r.y0 + INSET as f64,
+                r.x1 + INSET as f64,
+                r.y1 + INSET as f64,
+            )
+        })
+    }
+
     pub fn handle_event(&mut self, event: WindowEvent) {
         match event {
             WindowEvent::Resized(size) => {
@@ -54,6 +65,32 @@ impl Editor {
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = Some(modifiers);
+            }
+            WindowEvent::Ime(ime) => {
+                self.editor.transact(
+                    &mut self.font_cx,
+                    &mut self.layout_cx,
+                    match ime {
+                        Ime::Enabled => vec![],
+                        Ime::Disabled => vec![
+                            PlainEditorOp::SetCompose("".into(), None),
+                            PlainEditorOp::CommitCompose,
+                        ],
+                        // Winit on some platforms delivers an empty Preedit after Commit
+                        // so don't lock into compose when preedit is empty.
+                        Ime::Preedit(text, None) if text.is_empty() => vec![
+                            PlainEditorOp::SetCompose("".into(), None),
+                            PlainEditorOp::CommitCompose,
+                        ],
+                        Ime::Preedit(text, sel) => {
+                            vec![PlainEditorOp::SetCompose(text.into(), sel)]
+                        }
+                        Ime::Commit(text) => vec![
+                            PlainEditorOp::SetCompose(text.into(), None),
+                            PlainEditorOp::CommitCompose,
+                        ],
+                    },
+                );
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 if !event.state.is_pressed() {
@@ -267,6 +304,9 @@ impl Editor {
         if let Some(cursor) = self.editor.selection_weak_geometry(1.5) {
             scene.fill(Fill::NonZero, transform, Color::LIGHT_GRAY, None, &cursor);
         };
+        for rect in self.editor.preedit_underline_geometry(1.5).iter() {
+            scene.fill(Fill::NonZero, transform, Color::WHITE, None, &rect);
+        }
         for line in self.editor.lines() {
             for item in line.items() {
                 let PositionedLayoutItem::GlyphRun(glyph_run) = item else {

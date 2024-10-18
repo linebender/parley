@@ -11,6 +11,7 @@ use crate::{
     style::{Brush, StyleProperty},
     FontContext, LayoutContext, Rect,
 };
+
 use alloc::{sync::Arc, vec::Vec};
 
 #[derive(Copy, Clone, Debug)]
@@ -19,6 +20,12 @@ pub enum ActiveText<'a> {
     FocusedCluster(Affinity, &'a str),
     /// The selection contains this text
     Selection(&'a str),
+}
+
+#[derive(Clone)]
+struct ComposeState {
+    selection: Option<(usize, usize)>,
+    text: Arc<str>,
 }
 
 /// Basic plain text editor with a single default style.
@@ -34,6 +41,7 @@ where
     cursor_mode: VisualMode,
     width: Option<f32>,
     scale: f32,
+    compose: Option<ComposeState>,
 }
 
 // TODO: When MSRV >= 1.80 we can remove this. Default was not implemented for Arc<[T]> where T: !Default until 1.80
@@ -50,11 +58,13 @@ where
             cursor_mode: Default::default(),
             width: Default::default(),
             scale: Default::default(),
+            compose: Default::default(),
         }
     }
 }
 
 /// Operations on a `PlainEditor` for `PlainEditor::transact`
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum PlainEditorOp<T>
 where
@@ -132,6 +142,10 @@ where
     SelectLineAtPoint(f32, f32),
     /// Move the selection focus point to the cluster boundary closest to point
     ExtendSelectionToPoint(f32, f32),
+    /// Commit the composing state and finish composing
+    CommitCompose,
+    /// Configure the composing region
+    SetCompose(Arc<str>, Option<(usize, usize)>),
 }
 
 impl<T> PlainEditor<T>
@@ -148,28 +162,78 @@ where
         let mut layout_after = false;
 
         for op in t.into_iter() {
+            use PlainEditorOp::*;
+
+            // only allow some operations during composing
+            if self.compose.is_some()
+                && !matches!(
+                    op,
+                    CommitCompose
+                        | SetCompose(..)
+                        | SetWidth(..)
+                        | SetScale(..)
+                        | SetDefaultStyle(..)
+                        | MoveToPoint(..),
+                )
+            {
+                continue;
+            }
+
             match op {
-                PlainEditorOp::SetText(is) => {
+                CommitCompose => {
+                    if let Some(ComposeState { text, .. }) = self.compose.clone() {
+                        let new_insert = self.selection.insertion_index() + text.len();
+                        self.selection = if new_insert == self.buffer.len() {
+                            Selection::from_index(
+                                &self.layout,
+                                new_insert.saturating_sub(1),
+                                Affinity::Upstream,
+                            )
+                        } else {
+                            Selection::from_index(&self.layout, new_insert, Affinity::Downstream)
+                        };
+                    }
+                    self.compose = None;
+                    layout_after = true;
+                }
+                SetCompose(s, c) => {
+                    let new_compose = ComposeState {
+                        text: s.clone(),
+                        selection: c,
+                    };
+                    if let Some(ComposeState { text: oldtext, .. }) = self.compose.clone() {
+                        let start = self.selection.insertion_index();
+                        let end = start + oldtext.len();
+                        self.buffer.replace_range(start..end, &s);
+                    } else {
+                        self.replace_selection(font_cx, layout_cx, "");
+                        let start = self.selection.insertion_index();
+                        self.buffer.insert_str(start, &s);
+                    }
+                    self.compose = Some(new_compose);
+                    self.update_layout(font_cx, layout_cx);
+                }
+                SetText(is) => {
                     self.buffer.clear();
                     self.buffer.push_str(&is);
                     layout_after = true;
                 }
-                PlainEditorOp::SetWidth(width) => {
+                SetWidth(width) => {
                     self.width = width;
                     layout_after = true;
                 }
-                PlainEditorOp::SetScale(scale) => {
+                SetScale(scale) => {
                     self.scale = scale;
                     layout_after = true;
                 }
-                PlainEditorOp::SetDefaultStyle(style) => {
+                SetDefaultStyle(style) => {
                     self.default_style = style.clone();
                     layout_after = true;
                 }
-                PlainEditorOp::DeleteSelection => {
+                DeleteSelection => {
                     self.replace_selection(font_cx, layout_cx, "");
                 }
-                PlainEditorOp::Delete => {
+                Delete => {
                     if self.selection.is_collapsed() {
                         let range = self.selection.focus().text_range();
                         if !range.is_empty() {
@@ -194,7 +258,7 @@ where
                         self.replace_selection(font_cx, layout_cx, "");
                     }
                 }
-                PlainEditorOp::DeleteWord => {
+                DeleteWord => {
                     let start = self.selection.insertion_index();
                     if self.selection.is_collapsed() {
                         let end = self
@@ -216,7 +280,7 @@ where
                         self.replace_selection(font_cx, layout_cx, "");
                     }
                 }
-                PlainEditorOp::Backdelete => {
+                Backdelete => {
                     let end = self.selection.focus().text_range().start;
                     if self.selection.is_collapsed() {
                         if let Some(start) = self
@@ -246,7 +310,7 @@ where
                         self.replace_selection(font_cx, layout_cx, "");
                     }
                 }
-                PlainEditorOp::BackdeleteWord => {
+                BackdeleteWord => {
                     let end = self.selection.focus().text_range().start;
                     if self.selection.is_collapsed() {
                         let start = self
@@ -268,98 +332,106 @@ where
                         self.replace_selection(font_cx, layout_cx, "");
                     }
                 }
-                PlainEditorOp::InsertOrReplaceSelection(s) => {
+                InsertOrReplaceSelection(s) => {
                     self.replace_selection(font_cx, layout_cx, &s);
                 }
-                PlainEditorOp::MoveToPoint(x, y) => {
-                    self.selection = Selection::from_point(&self.layout, x, y);
+                MoveToPoint(x, y) => {
+                    // FIXME: breaks when insertion point is inside or after composing region
+                    let new_cur = Selection::from_point(&self.layout, x, y);
+                    if let Some(ComposeState { text, .. }) = self.compose.clone() {
+                        let start = self.selection.insertion_index();
+                        self.buffer.replace_range(start..(start + text.len()), "");
+                        self.buffer.insert_str(new_cur.insertion_index(), &text);
+                    }
+                    self.selection = new_cur;
+                    layout_after = true;
                 }
-                PlainEditorOp::MoveToTextStart => {
+                MoveToTextStart => {
                     self.selection = self.selection.move_lines(&self.layout, isize::MIN, false);
                 }
-                PlainEditorOp::MoveToLineStart => {
+                MoveToLineStart => {
                     self.selection = self.selection.line_start(&self.layout, false);
                 }
-                PlainEditorOp::MoveToTextEnd => {
+                MoveToTextEnd => {
                     self.selection = self.selection.move_lines(&self.layout, isize::MAX, false);
                 }
-                PlainEditorOp::MoveToLineEnd => {
+                MoveToLineEnd => {
                     self.selection = self.selection.line_end(&self.layout, false);
                 }
-                PlainEditorOp::MoveUp => {
+                MoveUp => {
                     self.selection = self.selection.previous_line(&self.layout, false);
                 }
-                PlainEditorOp::MoveDown => {
+                MoveDown => {
                     self.selection = self.selection.next_line(&self.layout, false);
                 }
-                PlainEditorOp::MoveLeft => {
+                MoveLeft => {
                     self.selection =
                         self.selection
                             .previous_visual(&self.layout, self.cursor_mode, false);
                 }
-                PlainEditorOp::MoveRight => {
+                MoveRight => {
                     self.selection =
                         self.selection
                             .next_visual(&self.layout, self.cursor_mode, false);
                 }
-                PlainEditorOp::MoveWordLeft => {
+                MoveWordLeft => {
                     self.selection = self.selection.previous_word(&self.layout, false);
                 }
-                PlainEditorOp::MoveWordRight => {
+                MoveWordRight => {
                     self.selection = self.selection.next_word(&self.layout, false);
                 }
-                PlainEditorOp::SelectAll => {
+                SelectAll => {
                     self.selection =
                         Selection::from_index(&self.layout, 0usize, Affinity::default())
                             .move_lines(&self.layout, isize::MAX, true);
                 }
-                PlainEditorOp::CollapseSelection => {
+                CollapseSelection => {
                     self.selection = self.selection.collapse();
                 }
-                PlainEditorOp::SelectToTextStart => {
+                SelectToTextStart => {
                     self.selection = self.selection.move_lines(&self.layout, isize::MIN, true);
                 }
-                PlainEditorOp::SelectToLineStart => {
+                SelectToLineStart => {
                     self.selection = self.selection.line_start(&self.layout, true);
                 }
-                PlainEditorOp::SelectToTextEnd => {
+                SelectToTextEnd => {
                     self.selection = self.selection.move_lines(&self.layout, isize::MAX, true);
                 }
-                PlainEditorOp::SelectToLineEnd => {
+                SelectToLineEnd => {
                     self.selection = self.selection.line_end(&self.layout, true);
                 }
-                PlainEditorOp::SelectUp => {
+                SelectUp => {
                     self.selection = self.selection.previous_line(&self.layout, true);
                 }
-                PlainEditorOp::SelectDown => {
+                SelectDown => {
                     self.selection = self.selection.next_line(&self.layout, true);
                 }
-                PlainEditorOp::SelectLeft => {
+                SelectLeft => {
                     self.selection =
                         self.selection
                             .previous_visual(&self.layout, self.cursor_mode, true);
                 }
-                PlainEditorOp::SelectRight => {
+                SelectRight => {
                     self.selection =
                         self.selection
                             .next_visual(&self.layout, self.cursor_mode, true);
                 }
-                PlainEditorOp::SelectWordLeft => {
+                SelectWordLeft => {
                     self.selection = self.selection.previous_word(&self.layout, true);
                 }
-                PlainEditorOp::SelectWordRight => {
+                SelectWordRight => {
                     self.selection = self.selection.next_word(&self.layout, true);
                 }
-                PlainEditorOp::SelectWordAtPoint(x, y) => {
+                SelectWordAtPoint(x, y) => {
                     self.selection = Selection::word_from_point(&self.layout, x, y);
                 }
-                PlainEditorOp::SelectLineAtPoint(x, y) => {
+                SelectLineAtPoint(x, y) => {
                     let focus = *Selection::from_point(&self.layout, x, y)
                         .line_start(&self.layout, true)
                         .focus();
                     self.selection = Selection::from(focus).line_end(&self.layout, true);
                 }
-                PlainEditorOp::ExtendSelectionToPoint(x, y) => {
+                ExtendSelectionToPoint(x, y) => {
                     // FIXME: This is usually the wrong way to handle selection extension for mouse moves, but not a regression.
                     self.selection = self.selection.extend_to_point(&self.layout, x, y);
                 }
@@ -418,18 +490,112 @@ where
         }
     }
 
+    fn sel_at_index(&self, index: usize) -> Selection {
+        if index == self.buffer.len() {
+            Selection::from_index(&self.layout, index.saturating_sub(1), Affinity::Upstream)
+        } else {
+            Selection::from_index(&self.layout, index, Affinity::Downstream)
+        }
+    }
+
+    fn sel_between_indices(&self, from: usize, to: usize) -> Selection {
+        self.sel_at_index(from)
+            .maybe_extend(*self.sel_at_index(to).focus(), true)
+    }
+
+    fn selection_or_preedit_selection(&self) -> Selection {
+        if let Some(ComposeState { selection, .. }) = self.compose {
+            if let Some((s, e)) = selection {
+                self.sel_at_index(self.selection.insertion_index() + s)
+                    .maybe_extend(
+                        *self
+                            .sel_at_index(self.selection.insertion_index() + e)
+                            .focus(),
+                        true,
+                    )
+            } else {
+                Selection::default()
+            }
+        } else {
+            self.selection
+        }
+    }
+
+    pub fn preedit_area(&self) -> Option<Rect> {
+        // FIXME: Busted
+        self.compose
+            .clone()
+            .and_then(|ComposeState { selection, text }| {
+                if selection.map(|(s, e)| s == e).unwrap_or(false) {
+                    println!("yes a caret");
+                    // otherwise the whole preedit area is the whole composing text region
+                    let geom = self
+                        .sel_between_indices(
+                            self.selection.insertion_index(),
+                            self.selection.insertion_index() + text.len(),
+                        )
+                        .geometry(&self.layout);
+                    if geom.is_empty() {
+                        None
+                    } else {
+                        let mut r = Rect::new(0f64, 0f64, f64::INFINITY, f64::INFINITY);
+                        for rect in geom {
+                            r.x0 = r.x0.min(rect.x0);
+                            r.y0 = r.y0.min(rect.y0);
+                            r.x1 = r.x1.min(rect.x1);
+                            r.y1 = r.y1.min(rect.y1);
+                        }
+                        Some(r)
+                    }
+                } else {
+                    println!("not a caret");
+                    // compose selection is not a caret, so preedit area is the selection
+                    self.selection_or_preedit_selection()
+                        .focus()
+                        .strong_geometry(&self.layout, 1.0)
+                }
+            })
+    }
+
+    pub fn preedit_underline_geometry(&self, size: f32) -> Vec<Rect> {
+        self.compose
+            .clone()
+            .map(|ComposeState { text, .. }| {
+                self.sel_at_index(self.selection.insertion_index())
+                    .maybe_extend(
+                        *self
+                            .sel_at_index(self.selection.insertion_index() + text.len())
+                            .focus(),
+                        true,
+                    )
+                    .geometry(&self.layout)
+                    .iter()
+                    .map(|r| Rect::new(r.x0, r.y1 - size as f64, r.x1, r.y1))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Get rectangles representing the selected portions of text
     pub fn selection_geometry(&self) -> Vec<Rect> {
-        self.selection.geometry(&self.layout)
+        self.selection_or_preedit_selection().geometry(&self.layout)
     }
 
     /// Get a rectangle representing the current caret cursor position
     pub fn selection_strong_geometry(&self, size: f32) -> Option<Rect> {
-        self.selection.focus().strong_geometry(&self.layout, size)
+        let sops = self.selection_or_preedit_selection();
+        if self.compose.is_some() && !sops.is_collapsed() {
+            return None;
+        }
+        sops.focus().strong_geometry(&self.layout, size)
     }
 
     pub fn selection_weak_geometry(&self, size: f32) -> Option<Rect> {
-        self.selection.focus().weak_geometry(&self.layout, size)
+        let sops = self.selection_or_preedit_selection();
+        if self.compose.is_some() && !sops.is_collapsed() {
+            return None;
+        }
+        sops.focus().weak_geometry(&self.layout, size)
     }
 
     /// Get the lines from the `Layout`
