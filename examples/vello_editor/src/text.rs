@@ -6,7 +6,7 @@ use peniko::{kurbo::Affine, Color, Fill};
 use std::time::Instant;
 use vello::Scene;
 use winit::{
-    event::{Modifiers, WindowEvent},
+    event::{Modifiers, Touch, WindowEvent},
     keyboard::{Key, NamedKey},
 };
 
@@ -197,6 +197,35 @@ impl Editor {
                 );
 
                 // println!("Active text: {:?}", self.active_text());
+            }
+            WindowEvent::Touch(Touch {
+                phase, location, ..
+            }) => {
+                use winit::event::TouchPhase::*;
+                self.editor.transact(
+                    &mut self.font_cx,
+                    &mut self.layout_cx,
+                    match phase {
+                        Started => {
+                            // TODO: start a timer to convert to a SelectWordAtPoint
+                            vec![PlainEditorOp::MoveToPoint(
+                                location.x as f32 - INSET,
+                                location.y as f32 - INSET,
+                            )]
+                        }
+                        Cancelled => {
+                            vec![PlainEditorOp::CollapseSelection]
+                        }
+                        Moved => {
+                            // TODO: cancel SelectWordAtPoint timer
+                            vec![PlainEditorOp::ExtendSelectionToPoint(
+                                location.x as f32 - INSET,
+                                location.y as f32 - INSET,
+                            )]
+                        }
+                        Ended => vec![],
+                    },
+                );
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 if button == winit::event::MouseButton::Left {
