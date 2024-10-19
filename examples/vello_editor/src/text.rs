@@ -78,7 +78,7 @@ impl Editor {
                     &mut self.font_cx,
                     &mut self.layout_cx,
                     match event.logical_key {
-                        #[cfg(not(target_os = "android"))]
+                        #[cfg(not(any(target_os = "android", target_os = "ios")))]
                         Key::Character(c)
                             if action_mod && matches!(c.as_str(), "c" | "x" | "v") =>
                         {
