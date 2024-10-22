@@ -285,7 +285,15 @@ impl Editor {
         }
     }
 
-    pub fn draw(&self, scene: &mut Scene) {
+    /// Return the current generation of the layout.
+    pub fn generation(&self) -> usize {
+        self.editor.generation()
+    }
+
+    /// Draw into scene.
+    ///
+    /// Returns drawn generation.
+    pub fn draw(&self, scene: &mut Scene) -> usize {
         let transform = Affine::translate((INSET as f64, INSET as f64));
         for rect in self.editor.selection_geometry().iter() {
             scene.fill(Fill::NonZero, transform, Color::STEEL_BLUE, None, &rect);
@@ -338,6 +346,7 @@ impl Editor {
                     );
             }
         }
+        self.editor.generation()
     }
 }
 

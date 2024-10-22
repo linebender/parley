@@ -34,6 +34,13 @@ where
     cursor_mode: VisualMode,
     width: Option<f32>,
     scale: f32,
+    // Simple tracking of when the layout needs to be updated
+    // before it can be used for `Selection` calculations or
+    // for drawing.
+    // Not all operations on `PlainEditor` need to operate on a
+    // clean layout, and not all operations trigger a layout.
+    layout_dirty: bool,
+    generation: usize,
 }
 
 // TODO: When MSRV >= 1.80 we can remove this. Default was not implemented for Arc<[T]> where T: !Default until 1.80
@@ -49,7 +56,9 @@ where
             selection: Default::default(),
             cursor_mode: Default::default(),
             width: Default::default(),
-            scale: Default::default(),
+            scale: 1.0,
+            layout_dirty: Default::default(),
+            generation: Default::default(),
         }
     }
 }
@@ -145,26 +154,24 @@ where
         layout_cx: &mut LayoutContext<T>,
         t: impl IntoIterator<Item = PlainEditorOp<T>>,
     ) {
-        let mut layout_after = false;
-
         for op in t.into_iter() {
             match op {
                 PlainEditorOp::SetText(is) => {
                     self.buffer.clear();
                     self.buffer.push_str(&is);
-                    layout_after = true;
+                    self.layout_dirty = true;
                 }
                 PlainEditorOp::SetWidth(width) => {
                     self.width = width;
-                    layout_after = true;
+                    self.layout_dirty = true;
                 }
                 PlainEditorOp::SetScale(scale) => {
                     self.scale = scale;
-                    layout_after = true;
+                    self.layout_dirty = true;
                 }
                 PlainEditorOp::SetDefaultStyle(style) => {
                     self.default_style = style.clone();
-                    layout_after = true;
+                    self.layout_dirty = true;
                 }
                 PlainEditorOp::DeleteSelection => {
                     self.replace_selection(font_cx, layout_cx, "");
@@ -272,103 +279,113 @@ where
                     self.replace_selection(font_cx, layout_cx, &s);
                 }
                 PlainEditorOp::MoveToPoint(x, y) => {
-                    self.selection = Selection::from_point(&self.layout, x, y);
+                    self.refresh_layout(font_cx, layout_cx);
+                    self.set_selection(Selection::from_point(&self.layout, x, y));
                 }
                 PlainEditorOp::MoveToTextStart => {
-                    self.selection = self.selection.move_lines(&self.layout, isize::MIN, false);
+                    self.set_selection(self.selection.move_lines(&self.layout, isize::MIN, false));
                 }
                 PlainEditorOp::MoveToLineStart => {
-                    self.selection = self.selection.line_start(&self.layout, false);
+                    self.set_selection(self.selection.line_start(&self.layout, false));
                 }
                 PlainEditorOp::MoveToTextEnd => {
-                    self.selection = self.selection.move_lines(&self.layout, isize::MAX, false);
+                    self.set_selection(self.selection.move_lines(&self.layout, isize::MAX, false));
                 }
                 PlainEditorOp::MoveToLineEnd => {
-                    self.selection = self.selection.line_end(&self.layout, false);
+                    self.set_selection(self.selection.line_end(&self.layout, false));
                 }
                 PlainEditorOp::MoveUp => {
-                    self.selection = self.selection.previous_line(&self.layout, false);
+                    self.set_selection(self.selection.previous_line(&self.layout, false));
                 }
                 PlainEditorOp::MoveDown => {
-                    self.selection = self.selection.next_line(&self.layout, false);
+                    self.set_selection(self.selection.next_line(&self.layout, false));
                 }
                 PlainEditorOp::MoveLeft => {
-                    self.selection =
-                        self.selection
-                            .previous_visual(&self.layout, self.cursor_mode, false);
+                    self.set_selection(self.selection.previous_visual(
+                        &self.layout,
+                        self.cursor_mode,
+                        false,
+                    ));
                 }
                 PlainEditorOp::MoveRight => {
-                    self.selection =
-                        self.selection
-                            .next_visual(&self.layout, self.cursor_mode, false);
+                    self.set_selection(self.selection.next_visual(
+                        &self.layout,
+                        self.cursor_mode,
+                        false,
+                    ));
                 }
                 PlainEditorOp::MoveWordLeft => {
-                    self.selection = self.selection.previous_word(&self.layout, false);
+                    self.set_selection(self.selection.previous_word(&self.layout, false));
                 }
                 PlainEditorOp::MoveWordRight => {
-                    self.selection = self.selection.next_word(&self.layout, false);
+                    self.set_selection(self.selection.next_word(&self.layout, false));
                 }
                 PlainEditorOp::SelectAll => {
-                    self.selection =
+                    self.set_selection(
                         Selection::from_index(&self.layout, 0usize, Affinity::default())
-                            .move_lines(&self.layout, isize::MAX, true);
+                            .move_lines(&self.layout, isize::MAX, true),
+                    );
                 }
                 PlainEditorOp::CollapseSelection => {
-                    self.selection = self.selection.collapse();
+                    self.set_selection(self.selection.collapse());
                 }
                 PlainEditorOp::SelectToTextStart => {
-                    self.selection = self.selection.move_lines(&self.layout, isize::MIN, true);
+                    self.set_selection(self.selection.move_lines(&self.layout, isize::MIN, true));
                 }
                 PlainEditorOp::SelectToLineStart => {
-                    self.selection = self.selection.line_start(&self.layout, true);
+                    self.set_selection(self.selection.line_start(&self.layout, true));
                 }
                 PlainEditorOp::SelectToTextEnd => {
-                    self.selection = self.selection.move_lines(&self.layout, isize::MAX, true);
+                    self.set_selection(self.selection.move_lines(&self.layout, isize::MAX, true));
                 }
                 PlainEditorOp::SelectToLineEnd => {
-                    self.selection = self.selection.line_end(&self.layout, true);
+                    self.set_selection(self.selection.line_end(&self.layout, true));
                 }
                 PlainEditorOp::SelectUp => {
-                    self.selection = self.selection.previous_line(&self.layout, true);
+                    self.set_selection(self.selection.previous_line(&self.layout, true));
                 }
                 PlainEditorOp::SelectDown => {
-                    self.selection = self.selection.next_line(&self.layout, true);
+                    self.set_selection(self.selection.next_line(&self.layout, true));
                 }
                 PlainEditorOp::SelectLeft => {
-                    self.selection =
-                        self.selection
-                            .previous_visual(&self.layout, self.cursor_mode, true);
+                    self.set_selection(self.selection.previous_visual(
+                        &self.layout,
+                        self.cursor_mode,
+                        true,
+                    ));
                 }
                 PlainEditorOp::SelectRight => {
-                    self.selection =
-                        self.selection
-                            .next_visual(&self.layout, self.cursor_mode, true);
+                    self.set_selection(self.selection.next_visual(
+                        &self.layout,
+                        self.cursor_mode,
+                        true,
+                    ));
                 }
                 PlainEditorOp::SelectWordLeft => {
-                    self.selection = self.selection.previous_word(&self.layout, true);
+                    self.set_selection(self.selection.previous_word(&self.layout, true));
                 }
                 PlainEditorOp::SelectWordRight => {
-                    self.selection = self.selection.next_word(&self.layout, true);
+                    self.set_selection(self.selection.next_word(&self.layout, true));
                 }
                 PlainEditorOp::SelectWordAtPoint(x, y) => {
-                    self.selection = Selection::word_from_point(&self.layout, x, y);
+                    self.refresh_layout(font_cx, layout_cx);
+                    self.set_selection(Selection::word_from_point(&self.layout, x, y));
                 }
                 PlainEditorOp::SelectLineAtPoint(x, y) => {
+                    self.refresh_layout(font_cx, layout_cx);
                     let focus = *Selection::from_point(&self.layout, x, y)
                         .line_start(&self.layout, true)
                         .focus();
-                    self.selection = Selection::from(focus).line_end(&self.layout, true);
+                    self.set_selection(Selection::from(focus).line_end(&self.layout, true));
                 }
                 PlainEditorOp::ExtendSelectionToPoint(x, y) => {
+                    self.refresh_layout(font_cx, layout_cx);
                     // FIXME: This is usually the wrong way to handle selection extension for mouse moves, but not a regression.
-                    self.selection = self.selection.extend_to_point(&self.layout, x, y);
+                    self.set_selection(self.selection.extend_to_point(&self.layout, x, y));
                 }
             }
         }
-
-        if layout_after {
-            self.update_layout(font_cx, layout_cx);
-        }
+        self.refresh_layout(font_cx, layout_cx);
     }
 
     fn replace_selection(
@@ -400,6 +417,16 @@ where
                 Affinity::Downstream,
             )
         };
+    }
+
+    /// Update the selection, and bump the generation if something other than `h_pos` changed.
+    fn set_selection(&mut self, new_sel: Selection) {
+        if new_sel.focus() != self.selection.focus() || new_sel.anchor() != self.selection.anchor()
+        {
+            self.generation += 1;
+        }
+
+        self.selection = new_sel;
     }
 
     /// Get either the contents of the current selection, or the text of the cluster at the caret
@@ -442,6 +469,18 @@ where
         self.buffer.clone().into()
     }
 
+    /// Get the current generation of the layout, to decide whether to draw.
+    pub fn generation(&self) -> usize {
+        self.generation
+    }
+
+    /// Update the layout if it is dirty.
+    fn refresh_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
+        if self.layout_dirty {
+            self.update_layout(font_cx, layout_cx);
+        }
+    }
+
     /// Update the layout
     fn update_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
         let mut builder = layout_cx.ranged_builder(font_cx, &self.buffer, self.scale);
@@ -452,5 +491,7 @@ where
         self.layout.break_all_lines(self.width);
         self.layout.align(self.width, Alignment::Start);
         self.selection = self.selection.refresh(&self.layout);
+        self.layout_dirty = false;
+        self.generation += 1;
     }
 }
