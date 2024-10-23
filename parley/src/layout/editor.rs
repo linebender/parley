@@ -21,6 +21,21 @@ pub enum ActiveText<'a> {
     Selection(&'a str),
 }
 
+/// Opaque representation of a generation.
+// Overflow handling: the generations are only compared,
+// so wrapping is usually fine, except that in the unlikely
+// event that exactly `u32::MAX` generations happen before the
+// application gets around to drawing `Generation(0)`.
+#[derive(PartialEq, Default, Clone, Copy)]
+pub struct Generation(u32);
+
+impl Generation {
+    /// Make it not what it currently is.
+    pub(crate) fn nudge(&mut self) {
+        self.0 = self.0.wrapping_add(1);
+    }
+}
+
 /// Basic plain text editor with a single default style.
 #[derive(Clone)]
 pub struct PlainEditor<T>
@@ -40,7 +55,7 @@ where
     // Not all operations on `PlainEditor` need to operate on a
     // clean layout, and not all operations trigger a layout.
     layout_dirty: bool,
-    generation: usize,
+    generation: Generation,
 }
 
 // TODO: When MSRV >= 1.80 we can remove this. Default was not implemented for Arc<[T]> where T: !Default until 1.80
@@ -419,11 +434,11 @@ where
         };
     }
 
-    /// Update the selection, and bump the generation if something other than `h_pos` changed.
+    /// Update the selection, and nudge the `Generation` if something other than `h_pos` changed.
     fn set_selection(&mut self, new_sel: Selection) {
         if new_sel.focus() != self.selection.focus() || new_sel.anchor() != self.selection.anchor()
         {
-            self.generation += 1;
+            self.generation.nudge();
         }
 
         self.selection = new_sel;
@@ -469,8 +484,8 @@ where
         self.buffer.clone().into()
     }
 
-    /// Get the current generation of the layout, to decide whether to draw.
-    pub fn generation(&self) -> usize {
+    /// Get the current `Generation` of the layout, to decide whether to draw.
+    pub fn generation(&self) -> Generation {
         self.generation
     }
 
@@ -492,9 +507,6 @@ where
         self.layout.align(self.width, Alignment::Start);
         self.selection = self.selection.refresh(&self.layout);
         self.layout_dirty = false;
-        // Overflow handling: the generations should be compared only by value, so wrapping is fine.
-        // This could break if the check happens to be performed exactly `2^32` generations later (2^64
-        // on 64 bit), but that's sufficiently unlikely in practise.
-        self.generation = self.generation.wrapping_add(1);
+        self.generation.nudge();
     }
 }

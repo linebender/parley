@@ -49,7 +49,7 @@ struct SimpleVelloApp<'s> {
     editor: text::Editor,
 
     /// The last generation of the editor layout that we drew.
-    last_drawn_generation: usize,
+    last_drawn_generation: text::Generation,
 }
 
 impl ApplicationHandler for SimpleVelloApp<'_> {
