@@ -22,11 +22,13 @@ pub enum ActiveText<'a> {
 }
 
 /// Opaque representation of a generation.
+///
+/// Obtained from [`PlainEditor::generation`].
 // Overflow handling: the generations are only compared,
-// so wrapping is usually fine, except that in the unlikely
-// event that exactly `u32::MAX` generations happen before the
-// application gets around to drawing `Generation(0)`.
-#[derive(PartialEq, Default, Clone, Copy)]
+// so wrapping is fine. This could only fail if exactly
+// `u32::MAX` generations happen between drawing
+// operations. This is implausible and so can be ignored.
+#[derive(PartialEq, Eq, Default, Clone, Copy)]
 pub struct Generation(u32);
 
 impl Generation {
@@ -73,7 +75,10 @@ where
             width: Default::default(),
             scale: 1.0,
             layout_dirty: Default::default(),
-            generation: Default::default(),
+            // We don't use the `default` value to start with, as our consumers
+            // will choose to use that as their initial value, but will probably need
+            // to redraw if they haven't already.
+            generation: Generation(1),
         }
     }
 }
@@ -485,6 +490,9 @@ where
     }
 
     /// Get the current `Generation` of the layout, to decide whether to draw.
+    ///
+    /// You should store the generation the editor was at when you last drew it, and then redraw
+    /// when the generation is different (`Generation` is [`PartialEq`], so supports the equality `==` operation).
     pub fn generation(&self) -> Generation {
         self.generation
     }
