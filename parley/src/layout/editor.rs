@@ -38,6 +38,13 @@ impl Generation {
     }
 }
 
+/// Composing state during compose.
+#[derive(Clone)]
+struct ComposeState {
+    text: Arc<str>,
+    cursor: Option<(usize, usize)>,
+}
+
 /// Basic plain text editor with a single default style.
 #[derive(Clone)]
 pub struct PlainEditor<T>
@@ -58,6 +65,7 @@ where
     // clean layout, and not all operations trigger a layout.
     layout_dirty: bool,
     generation: Generation,
+    compose: Option<ComposeState>,
 }
 
 // TODO: When MSRV >= 1.80 we can remove this. Default was not implemented for Arc<[T]> where T: !Default until 1.80
@@ -79,6 +87,7 @@ where
             // will choose to use that as their initial value, but will probably need
             // to redraw if they haven't already.
             generation: Generation(1),
+            compose: Default::default(),
         }
     }
 }
@@ -97,8 +106,33 @@ where
     SetScale(f32),
     /// Set the default style for the layout.
     SetDefaultStyle(Arc<[StyleProperty<'static, T>]>),
-    /// Insert at cursor, or replace selection.
+    /// Insert at cursor or replace selection.
+    ///
+    /// In composing mode will collapse the composing region and commit the text.
     InsertOrReplaceSelection(Arc<str>),
+    /// Set content of composing region at cursor (often called ‘preedit’ text);
+    /// erasing the selection and entering composing mode.
+    ///
+    /// `cursor` is an optional cursor/selection expressed as byte offsets relative
+    /// to the start of  the composing text.
+    /// It will be rendered as the primary selection/cursor during composing.
+    ///
+    /// During composing, the only supported operations are:
+    /// - [`PlainEditorOp::SetCompose`]
+    /// - [`PlainEditorOp::ClearCompose`]
+    /// - [`PlainEditorOp::InsertOrReplaceSelection`]
+    /// - [`PlainEditorOp::SetWidth`]
+    /// - [`PlainEditorOp::SetScale`],
+    /// - [`PlainEditorOp::SetDefaultStyle`]
+    ///
+    /// Issuing either [`PlainEditorOp::InsertOrReplaceSelection`] or
+    /// [`PlainEditorOp::ClearCompose`] will exit composing.
+    SetCompose {
+        text: Arc<str>,
+        cursor: Option<(usize, usize)>,
+    },
+    /// Clear composing region and exit composing.
+    ClearCompose,
     /// Delete the selection.
     DeleteSelection,
     /// Delete the selection or the next cluster (typical ‘delete’ behavior).
@@ -175,6 +209,24 @@ where
         t: impl IntoIterator<Item = PlainEditorOp<T>>,
     ) {
         for op in t.into_iter() {
+            {
+                use PlainEditorOp::*;
+
+                // Only allow some operations during composing.
+                if self.compose.is_some()
+                    && !matches!(
+                        op,
+                        InsertOrReplaceSelection(..)
+                            | SetCompose { .. }
+                            | SetWidth(..)
+                            | SetScale(..)
+                            | SetDefaultStyle(..)
+                    )
+                {
+                    continue;
+                }
+            }
+
             match op {
                 PlainEditorOp::SetText(is) => {
                     self.buffer.clear();
@@ -222,6 +274,7 @@ where
                     }
                 }
                 PlainEditorOp::DeleteWord => {
+                    self.refresh_layout(font_cx, layout_cx);
                     let start = self.selection.insertion_index();
                     if self.selection.is_collapsed() {
                         let end = self
@@ -244,6 +297,7 @@ where
                     }
                 }
                 PlainEditorOp::Backdelete => {
+                    self.refresh_layout(font_cx, layout_cx);
                     let end = self.selection.focus().text_range().start;
                     if self.selection.is_collapsed() {
                         if let Some(start) = self
@@ -274,6 +328,7 @@ where
                     }
                 }
                 PlainEditorOp::BackdeleteWord => {
+                    self.refresh_layout(font_cx, layout_cx);
                     let end = self.selection.focus().text_range().start;
                     if self.selection.is_collapsed() {
                         let start = self
@@ -296,7 +351,53 @@ where
                     }
                 }
                 PlainEditorOp::InsertOrReplaceSelection(s) => {
-                    self.replace_selection(font_cx, layout_cx, &s);
+                    if let Some(ComposeState { text, .. }) = self.compose.clone() {
+                        self.buffer.replace_range(
+                            self.selection.insertion_index()
+                                ..(self.selection.insertion_index() + text.len()),
+                            &s,
+                        );
+                        self.update_layout(font_cx, layout_cx);
+                        self.insert_cursor(self.selection.insertion_index() + s.len());
+                        self.compose = None;
+                        self.layout_dirty = true;
+                    } else {
+                        self.replace_selection(font_cx, layout_cx, &s);
+                    }
+                }
+                PlainEditorOp::SetCompose { text, cursor } => {
+                    if let Some(ComposeState { text: oldtext, .. }) = self.compose.clone() {
+                        self.buffer.replace_range(
+                            self.selection.insertion_index()
+                                ..(self.selection.insertion_index() + oldtext.len()),
+                            &text,
+                        );
+                        self.layout_dirty = true;
+                    } else {
+                        if !self.selection.is_collapsed() {
+                            self.buffer
+                                .replace_range(self.selection.text_range(), &text);
+                        } else {
+                            self.buffer
+                                .insert_str(self.selection.insertion_index(), &text);
+                        }
+                        self.layout_dirty = true;
+                    }
+                    self.compose = Some(ComposeState {
+                        text: text.clone(),
+                        cursor,
+                    });
+                }
+                PlainEditorOp::ClearCompose => {
+                    if let Some(ComposeState { text, .. }) = self.compose.clone() {
+                        self.buffer.replace_range(
+                            self.selection.insertion_index()
+                                ..(self.selection.insertion_index() + text.len()),
+                            "",
+                        );
+                    }
+                    self.compose = None;
+                    self.layout_dirty = true;
                 }
                 PlainEditorOp::MoveToPoint(x, y) => {
                     self.refresh_layout(font_cx, layout_cx);
@@ -423,20 +524,7 @@ where
         }
 
         self.update_layout(font_cx, layout_cx);
-        let new_start = start.saturating_add(s.len());
-        self.selection = if new_start == self.buffer.len() {
-            Selection::from_index(
-                &self.layout,
-                new_start.saturating_sub(1),
-                Affinity::Upstream,
-            )
-        } else {
-            Selection::from_index(
-                &self.layout,
-                new_start.min(self.buffer.len()),
-                Affinity::Downstream,
-            )
-        };
+        self.insert_cursor(start.saturating_add(s.len()));
     }
 
     /// Update the selection, and nudge the `Generation` if something other than `h_pos` changed.
@@ -447,6 +535,26 @@ where
         }
 
         self.selection = new_sel;
+    }
+
+    /// Caret `Selection` at index.
+    fn caret_at_index(&self, index: usize) -> Selection {
+        if index == self.buffer.len() {
+            Selection::from_index(&self.layout, index.saturating_sub(1), Affinity::Upstream)
+        } else {
+            Selection::from_index(&self.layout, index, Affinity::Downstream)
+        }
+    }
+
+    /// Selection between two indices.
+    fn sel_between_indices(&self, from: usize, to: usize) -> Selection {
+        self.caret_at_index(from)
+            .maybe_extend(*self.caret_at_index(to).focus(), true)
+    }
+
+    /// Insert cursor at index.
+    fn insert_cursor(&mut self, index: usize) {
+        self.set_selection(self.caret_at_index(index));
     }
 
     /// Get either the contents of the current selection, or the text of the cluster at the caret.
@@ -465,18 +573,93 @@ where
         }
     }
 
+    /// Get a selection representing either the actual selection, or the preedit cursor.
+    fn selection_or_preedit_selection(&self) -> Selection {
+        self.compose
+            .clone()
+            .and_then(|s| {
+                s.cursor.map(|(s, e)| {
+                    self.sel_between_indices(
+                        self.selection.insertion_index().saturating_add(s),
+                        self.selection.insertion_index().saturating_add(e),
+                    )
+                })
+            })
+            .unwrap_or(self.selection)
+    }
+
+    pub fn preedit_area(&self) -> Option<Rect> {
+        self.compose
+            .clone()
+            .and_then(|ComposeState { cursor, text }| {
+                if cursor.map(|(s, e)| s == e).unwrap_or(false) {
+                    println!("yes a caret");
+                    // otherwise the whole preedit area is the whole composing text region
+                    let geom = self
+                        .sel_between_indices(
+                            self.selection.insertion_index(),
+                            self.selection.insertion_index() + text.len(),
+                        )
+                        .geometry(&self.layout);
+                    if geom.is_empty() {
+                        None
+                    } else {
+                        let mut r = Rect::new(
+                            f64::INFINITY,
+                            f64::INFINITY,
+                            f64::NEG_INFINITY,
+                            f64::NEG_INFINITY,
+                        );
+                        for rect in geom {
+                            r.x0 = r.x0.min(rect.x0);
+                            r.y0 = r.y0.min(rect.y0);
+                            r.x1 = r.x1.max(rect.x1);
+                            r.y1 = r.y1.max(rect.y1);
+                        }
+                        Some(r)
+                    }
+                } else {
+                    println!("not a caret");
+                    // compose selection is not a caret, so preedit area is the selection
+                    self.selection_or_preedit_selection()
+                        .focus()
+                        .strong_geometry(&self.layout, 1.0)
+                }
+            })
+    }
+
+    pub fn preedit_underline_geometry(&self, size: f32) -> Vec<Rect> {
+        self.compose
+            .clone()
+            .map(|ComposeState { text, .. }| {
+                self.sel_between_indices(
+                    self.selection.insertion_index(),
+                    self.selection.insertion_index().saturating_add(text.len()),
+                )
+                .geometry(&self.layout)
+                .iter()
+                .map(|r| Rect::new(r.x0, r.y1 - size as f64, r.x1, r.y1))
+                .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Get rectangles representing the selected portions of text.
     pub fn selection_geometry(&self) -> Vec<Rect> {
-        self.selection.geometry(&self.layout)
+        self.selection_or_preedit_selection().geometry(&self.layout)
     }
 
     /// Get a rectangle representing the current caret cursor position.
     pub fn selection_strong_geometry(&self, size: f32) -> Option<Rect> {
-        self.selection.focus().strong_geometry(&self.layout, size)
+        self.selection_or_preedit_selection()
+            .focus()
+            .strong_geometry(&self.layout, size)
     }
 
     pub fn selection_weak_geometry(&self, size: f32) -> Option<Rect> {
-        self.selection.focus().weak_geometry(&self.layout, size)
+        self.selection_or_preedit_selection()
+            .focus()
+            .weak_geometry(&self.layout, size)
     }
 
     /// Get the lines from the `Layout`.

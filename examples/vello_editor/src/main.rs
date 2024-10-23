@@ -9,14 +9,14 @@ use vello::util::{RenderContext, RenderSurface};
 use vello::wgpu;
 use vello::{AaConfig, Renderer, RendererOptions, Scene};
 use winit::application::ApplicationHandler;
-use winit::dpi::LogicalSize;
+use winit::dpi::{LogicalSize, PhysicalPosition, PhysicalSize};
 use winit::event::*;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::Window;
 
 // #[path = "text2.rs"]
 mod text;
-use parley::{GenericFamily, PlainEditorOp, StyleProperty};
+use parley::{GenericFamily, PlainEditorOp, Rect, StyleProperty};
 
 // Simple struct to hold the state of the renderer
 pub struct ActiveRenderState<'s> {
@@ -85,6 +85,8 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
         self.renderers[surface.dev_id]
             .get_or_insert_with(|| create_vello_renderer(&self.context, &surface));
 
+        window.set_ime_allowed(true);
+
         // Save the Window and Surface to a state variable
         self.state = RenderState::Active(ActiveRenderState { window, surface });
 
@@ -116,6 +118,21 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
 
         self.editor.handle_event(event.clone());
         if self.last_drawn_generation != self.editor.generation() {
+            if let Some(Rect { x0, y0, x1, y1 }) = self.editor.preedit_area() {
+                // `Window::set_ime_cursor_area` is broken on X11 as of winit 0.30.5
+                // see <https://github.com/rust-windowing/winit/issues/3965>.
+                //
+                // render_state.window.set_ime_cursor_area(
+                //     PhysicalPosition::new(x0, y0),
+                //     PhysicalSize::new(x1 - x0, y1 - y0),
+                // );
+
+                // Not providing a size, and putting the position at the bottom left corner
+                // instead of the top left corner (as docs suggest) works around this for now.
+                render_state
+                    .window
+                    .set_ime_cursor_area(PhysicalPosition::new(x0, y1), PhysicalSize::new(0, 0));
+            }
             render_state.window.request_redraw();
         }
         // render_state
