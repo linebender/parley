@@ -277,45 +277,50 @@ impl Cursor {
     }
 
     pub fn previous_visual<B: Brush>(&self, layout: &Layout<B>, mode: VisualMode) -> Self {
+        // Mirrors the behavior of next_visual.
+
         let prefer_rtl = mode.prefer_rtl(layout);
         let Some(cluster) = self.path.cluster(layout) else {
             return *self;
         };
         if !self.affinity.is_visually_leading(self.is_rtl) {
-            // Handle hard line breaks
-            if cluster.is_hard_line_break() {
-                // If we're at the back of a hard line break and moving
-                // left, skip directly to the trailing edge of the next cluster
-                if let Some(next) = cluster.previous_logical() {
-                    return Self::from_cluster(next, self.affinity);
+            if let Some(prev_cluster) = cluster.previous_visual() {
+                // Handle hard line breaks
+                if cluster.is_line_break() == Some(BreakReason::Explicit) {
+                    // If we're at the back of a hard line break and moving
+                    // left, skip directly to the trailing edge of the previous cluster
+                    return Self::from_cluster(prev_cluster, self.affinity);
                 }
-            }
-            // Check for directional boundary condition
-            if let Some(prev) = cluster.previous_visual() {
-                if prev.is_rtl() != self.is_rtl {
+                // Handle text direction boundaries
+                if prev_cluster.is_rtl() != self.is_rtl {
                     if let Some(prefer_rtl) = prefer_rtl {
                         if self.is_rtl != prefer_rtl {
-                            return Self::from_cluster(prev, self.affinity.invert());
+                            return Self::from_cluster(prev_cluster, self.affinity.invert());
                         }
                     }
                 }
             }
             // We're moving left so we want to track left-side affinity;
-            // let's swap
+            // let's swap.
             Self::from_index(layout, self.index as usize, self.affinity.invert())
         } else if let Some(prev) = cluster.previous_visual() {
             // Handle soft line breaks
             if matches!(
-                prev.is_line_break(),
+                cluster.is_line_break(),
                 Some(BreakReason::Regular) | Some(BreakReason::Emergency)
             ) {
-                // Match the behavior of next_visual: move to the end of the soft line
-                // break
+                // Match the behavior of next_visual: move to the end of the soft line break
                 return Self::from_cluster(prev, self.affinity.invert());
             }
+            // And hard line breaks
+            if prev.is_line_break() == Some(BreakReason::Explicit) {
+                if let Some(prev_prev) = prev.previous_visual() {
+                    return Self::from_cluster(prev_prev, self.affinity.invert());
+                }
+            }
             let prev_rtl = prev.is_rtl();
-            // Check for directional boundary condition
             if let Some(prev_prev) = prev.previous_visual() {
+                // Check for directional boundary condition
                 if prev_prev.is_rtl() != prev_rtl {
                     if let Some(prefer_rtl) = prefer_rtl {
                         if prev_rtl != prefer_rtl {
