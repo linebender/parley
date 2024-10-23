@@ -63,15 +63,7 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
             .take()
             .unwrap_or_else(|| create_winit_window(event_loop));
 
-        // Create a vello Surface
         let size = window.inner_size();
-        let surface_future = self.context.create_surface(
-            window.clone(),
-            size.width,
-            size.height,
-            wgpu::PresentMode::AutoVsync,
-        );
-        let surface = pollster::block_on(surface_future).expect("Error creating surface");
 
         self.editor.transact([
             PlainEditorOp::SetScale(1.0),
@@ -79,9 +71,35 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
             PlainEditorOp::SetText(text::LOREM.into()),
         ]);
 
+        // Create a vello Surface
+        let surface_future = {
+            let surface = self
+                .context
+                .instance
+                .create_surface(wgpu::SurfaceTarget::from(window.clone()))
+                .expect("Error creating surface");
+            let dev_id = pollster::block_on(self.context.device(Some(&surface)))
+                .expect("No compatible device");
+            let device_handle = &self.context.devices[dev_id];
+            let capabilities = surface.get_capabilities(device_handle.adapter());
+            let present_mode = if capabilities
+                .present_modes
+                .contains(&wgpu::PresentMode::Mailbox)
+            {
+                wgpu::PresentMode::Mailbox
+            } else {
+                wgpu::PresentMode::AutoVsync
+            };
+
+            self.context
+                .create_render_surface(surface, size.width, size.height, present_mode)
+        };
+        let surface = pollster::block_on(surface_future).expect("Error creating surface");
+
         // Create a vello Renderer for the surface (using its device id)
         self.renderers
             .resize_with(self.context.devices.len(), || None);
+
         self.renderers[surface.dev_id]
             .get_or_insert_with(|| create_vello_renderer(&self.context, &surface));
 
