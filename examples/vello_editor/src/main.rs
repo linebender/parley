@@ -144,56 +144,53 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
 
             // This is where all the rendering happens
             WindowEvent::RedrawRequested => {
+                // Get the RenderSurface (surface + config).
+                let surface = &render_state.surface;
+
+                // Get the window size.
+                let width = surface.config.width;
+                let height = surface.config.height;
+
+                // Get a handle to the device.
+                let device_handle = &self.context.devices[surface.dev_id];
+
+                // Get the surface's texture.
+                let surface_texture = surface
+                    .surface
+                    .get_current_texture()
+                    .expect("failed to get surface texture");
+
+                // Sometimes `Scene` is stale and needs to be redrawn.
                 if self.last_drawn_generation != self.editor.generation() {
                     // Empty the scene of objects to draw. You could create a new Scene each time, but in this case
                     // the same Scene is reused so that the underlying memory allocation can also be reused.
                     self.scene.reset();
 
-                    let generation = self.editor.draw(&mut self.scene);
-                    // Re-add the objects to draw to the scene.
-                    //                add_shapes_to_scene(&mut self.scene);
-
-                    // Get the RenderSurface (surface + config)
-                    let surface = &render_state.surface;
-
-                    // Get the window size
-                    let width = surface.config.width;
-                    let height = surface.config.height;
-
-                    // Get a handle to the device
-                    let device_handle = &self.context.devices[surface.dev_id];
-
-                    // Get the surface's texture
-                    let surface_texture = surface
-                        .surface
-                        .get_current_texture()
-                        .expect("failed to get surface texture");
-
-                    // Render to the surface's texture
-                    self.renderers[surface.dev_id]
-                        .as_mut()
-                        .unwrap()
-                        .render_to_surface(
-                            &device_handle.device,
-                            &device_handle.queue,
-                            &self.scene,
-                            &surface_texture,
-                            &vello::RenderParams {
-                                base_color: Color::rgb8(30, 30, 30), // Background color
-                                width,
-                                height,
-                                antialiasing_method: AaConfig::Msaa16,
-                            },
-                        )
-                        .expect("failed to render to surface");
-
-                    // Queue the texture to be presented on the surface
-                    surface_texture.present();
-
-                    device_handle.device.poll(wgpu::Maintain::Poll);
-
-                    self.last_drawn_generation = generation;
+                    self.last_drawn_generation = self.editor.draw(&mut self.scene);
                 }
+
+                // Render to the surface's texture.
+                self.renderers[surface.dev_id]
+                    .as_mut()
+                    .unwrap()
+                    .render_to_surface(
+                        &device_handle.device,
+                        &device_handle.queue,
+                        &self.scene,
+                        &surface_texture,
+                        &vello::RenderParams {
+                            base_color: Color::rgb8(30, 30, 30), // Background color
+                            width,
+                            height,
+                            antialiasing_method: AaConfig::Msaa16,
+                        },
+                    )
+                    .expect("failed to render to surface");
+
+                // Queue the texture to be presented on the surface.
+                surface_texture.present();
+
+                device_handle.device.poll(wgpu::Maintain::Poll);
             }
             _ => {}
         }
