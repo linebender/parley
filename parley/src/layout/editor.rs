@@ -492,6 +492,9 @@ where
         self.layout.align(self.width, Alignment::Start);
         self.selection = self.selection.refresh(&self.layout);
         self.layout_dirty = false;
-        self.generation += 1;
+        // Overflow handling: the generations should be compared only by value, so wrapping is fine.
+        // This could break if the check happens to be performed exactly `2^32` generations later (2^64
+        // on 64 bit), but that's sufficiently unlikely in practise.
+        self.generation = self.generation.wrapping_add(1);
     }
 }
