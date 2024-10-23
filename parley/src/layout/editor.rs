@@ -15,10 +15,27 @@ use alloc::{sync::Arc, vec::Vec};
 
 #[derive(Copy, Clone, Debug)]
 pub enum ActiveText<'a> {
-    /// The selection is empty and the cursor is a caret; this is the text of the cluster it is on
+    /// The selection is empty and the cursor is a caret; this is the text of the cluster it is on.
     FocusedCluster(Affinity, &'a str),
-    /// The selection contains this text
+    /// The selection contains this text.
     Selection(&'a str),
+}
+
+/// Opaque representation of a generation.
+///
+/// Obtained from [`PlainEditor::generation`].
+// Overflow handling: the generations are only compared,
+// so wrapping is fine. This could only fail if exactly
+// `u32::MAX` generations happen between drawing
+// operations. This is implausible and so can be ignored.
+#[derive(PartialEq, Eq, Default, Clone, Copy)]
+pub struct Generation(u32);
+
+impl Generation {
+    /// Make it not what it currently is.
+    pub(crate) fn nudge(&mut self) {
+        self.0 = self.0.wrapping_add(1);
+    }
 }
 
 /// Basic plain text editor with a single default style.
@@ -34,6 +51,13 @@ where
     cursor_mode: VisualMode,
     width: Option<f32>,
     scale: f32,
+    // Simple tracking of when the layout needs to be updated
+    // before it can be used for `Selection` calculations or
+    // for drawing.
+    // Not all operations on `PlainEditor` need to operate on a
+    // clean layout, and not all operations trigger a layout.
+    layout_dirty: bool,
+    generation: Generation,
 }
 
 // TODO: When MSRV >= 1.80 we can remove this. Default was not implemented for Arc<[T]> where T: !Default until 1.80
@@ -49,88 +73,93 @@ where
             selection: Default::default(),
             cursor_mode: Default::default(),
             width: Default::default(),
-            scale: Default::default(),
+            scale: 1.0,
+            layout_dirty: Default::default(),
+            // We don't use the `default` value to start with, as our consumers
+            // will choose to use that as their initial value, but will probably need
+            // to redraw if they haven't already.
+            generation: Generation(1),
         }
     }
 }
 
-/// Operations on a `PlainEditor` for `PlainEditor::transact`
+/// Operations on a `PlainEditor` for `PlainEditor::transact`.
 #[non_exhaustive]
 pub enum PlainEditorOp<T>
 where
     T: Brush + Clone + Debug + PartialEq + Default,
 {
-    /// Replace the whole text buffer
+    /// Replace the whole text buffer.
     SetText(Arc<str>),
-    /// Set the width of the layout
+    /// Set the width of the layout.
     SetWidth(Option<f32>),
-    /// Set the scale for the layout
+    /// Set the scale for the layout.
     SetScale(f32),
-    /// Set the default style for the layout
+    /// Set the default style for the layout.
     SetDefaultStyle(Arc<[StyleProperty<'static, T>]>),
-    /// Insert at cursor, or replace selection
+    /// Insert at cursor, or replace selection.
     InsertOrReplaceSelection(Arc<str>),
-    /// Delete the selection
+    /// Delete the selection.
     DeleteSelection,
-    /// Delete the selection or the next cluster (typical ‘delete’ behavior)
+    /// Delete the selection or the next cluster (typical ‘delete’ behavior).
     Delete,
-    /// Delete the selection or up to the next word boundary (typical ‘ctrl + delete’ behavior)
+    /// Delete the selection or up to the next word boundary (typical ‘ctrl + delete’ behavior).
     DeleteWord,
-    /// Delete the selection or the previous cluster (typical ‘backspace’ behavior)
+    /// Delete the selection or the previous cluster (typical ‘backspace’ behavior).
     Backdelete,
-    /// Delete the selection or back to the previous word boundary (typical ‘ctrl + backspace’ behavior)
+    /// Delete the selection or back to the previous word boundary (typical ‘ctrl + backspace’ behavior).
     BackdeleteWord,
-    /// Move the cursor to the cluster boundary nearest this point in the layout
+    /// Move the cursor to the cluster boundary nearest this point in the layout.
     MoveToPoint(f32, f32),
-    /// Move the cursor to the start of the buffer
+    /// Move the cursor to the start of the buffer.
     MoveToTextStart,
-    /// Move the cursor to the start of the physical line
+    /// Move the cursor to the start of the physical line.
     MoveToLineStart,
-    /// Move the cursor to the end of the buffer
+    /// Move the cursor to the end of the buffer.
     MoveToTextEnd,
-    /// Move the cursor to the end of the physical line
+    /// Move the cursor to the end of the physical line.
     MoveToLineEnd,
-    /// Move up to the closest physical cluster boundary on the previous line, preserving the horizontal position for repeated movements
+    /// Move up to the closest physical cluster boundary on the previous line, preserving the horizontal position for repeated movements.
     MoveUp,
-    /// Move down to the closest physical cluster boundary on the next line, preserving the horizontal position for repeated movements
+    /// Move down to the closest physical cluster boundary on the next line, preserving the horizontal position for repeated movements.
     MoveDown,
-    /// Move to the next cluster left in visual order
+    /// Move to the next cluster left in visual order.
     MoveLeft,
-    /// Move to the next cluster right in visual order
+    /// Move to the next cluster right in visual order.
     MoveRight,
-    /// Move to the next word boundary left
+    /// Move to the next word boundary left.
     MoveWordLeft,
-    /// Move to the next word boundary right
+    /// Move to the next word boundary right.
     MoveWordRight,
-    /// Select the whole buffer
+    /// Select the whole buffer.
     SelectAll,
-    /// Collapse selection into caret
+    /// Collapse selection into caret.
     CollapseSelection,
-    /// Move the selection focus point to the start of the buffer
+    /// Move the selection focus point to the start of the buffer.
     SelectToTextStart,
-    /// Move the selection focus point to the start of the physical line
+    /// Move the selection focus point to the start of the physical line.
     SelectToLineStart,
-    /// Move the selection focus point to the end of the buffer
+    /// Move the selection focus point to the end of the buffer.
     SelectToTextEnd,
-    /// Move the selection focus point to the end of the physical line
+    /// Move the selection focus point to the end of the physical line.
     SelectToLineEnd,
-    /// Move the selection focus point up to the nearest cluster boundary on the previous line, preserving the horizontal position for repeated movements
+    /// Move the selection focus point up to the nearest cluster boundary on the previous line, preserving the horizontal position for repeated movements.
     SelectUp,
-    /// Move the selection focus point down to the nearest cluster boundary on the next line, preserving the horizontal position for repeated movements
+    /// Move the selection focus point down to the nearest cluster boundary on the next line, preserving the horizontal position for repeated movements.
     SelectDown,
-    /// Move the selection focus point to the next cluster left in visual order
+    /// Move the selection focus point to the next cluster left in visual order.
     SelectLeft,
-    /// Move the selection focus point to the next cluster right in visual order
+    /// Move the selection focus point to the next cluster right in visual order.
     SelectRight,
-    /// Move the selection focus point to the next word boundary left
+    /// Move the selection focus point to the next word boundary left.
     SelectWordLeft,
-    /// Move the selection focus point to the next word boundary right
+    /// Move the selection focus point to the next word boundary right.
     SelectWordRight,
-    /// Select the word at the point
+    /// Select the word at the point.
     SelectWordAtPoint(f32, f32),
-    /// Select the physical line at the point
+    /// Select the physical line at the point.
     SelectLineAtPoint(f32, f32),
-    /// Move the selection focus point to the cluster boundary closest to point
+    /// Move the selection focus point to the cluster boundary closest to point.
     ExtendSelectionToPoint(f32, f32),
 }
 
@@ -138,33 +167,31 @@ impl<T> PlainEditor<T>
 where
     T: Brush + Clone + Debug + PartialEq + Default,
 {
-    /// Run a series of `PlainEditorOp`s, updating the layout if necessary
+    /// Run a series of `PlainEditorOp`s, updating the layout if necessary.
     pub fn transact(
         &mut self,
         font_cx: &mut FontContext,
         layout_cx: &mut LayoutContext<T>,
         t: impl IntoIterator<Item = PlainEditorOp<T>>,
     ) {
-        let mut layout_after = false;
-
         for op in t.into_iter() {
             match op {
                 PlainEditorOp::SetText(is) => {
                     self.buffer.clear();
                     self.buffer.push_str(&is);
-                    layout_after = true;
+                    self.layout_dirty = true;
                 }
                 PlainEditorOp::SetWidth(width) => {
                     self.width = width;
-                    layout_after = true;
+                    self.layout_dirty = true;
                 }
                 PlainEditorOp::SetScale(scale) => {
                     self.scale = scale;
-                    layout_after = true;
+                    self.layout_dirty = true;
                 }
                 PlainEditorOp::SetDefaultStyle(style) => {
                     self.default_style = style.clone();
-                    layout_after = true;
+                    self.layout_dirty = true;
                 }
                 PlainEditorOp::DeleteSelection => {
                     self.replace_selection(font_cx, layout_cx, "");
@@ -272,103 +299,113 @@ where
                     self.replace_selection(font_cx, layout_cx, &s);
                 }
                 PlainEditorOp::MoveToPoint(x, y) => {
-                    self.selection = Selection::from_point(&self.layout, x, y);
+                    self.refresh_layout(font_cx, layout_cx);
+                    self.set_selection(Selection::from_point(&self.layout, x, y));
                 }
                 PlainEditorOp::MoveToTextStart => {
-                    self.selection = self.selection.move_lines(&self.layout, isize::MIN, false);
+                    self.set_selection(self.selection.move_lines(&self.layout, isize::MIN, false));
                 }
                 PlainEditorOp::MoveToLineStart => {
-                    self.selection = self.selection.line_start(&self.layout, false);
+                    self.set_selection(self.selection.line_start(&self.layout, false));
                 }
                 PlainEditorOp::MoveToTextEnd => {
-                    self.selection = self.selection.move_lines(&self.layout, isize::MAX, false);
+                    self.set_selection(self.selection.move_lines(&self.layout, isize::MAX, false));
                 }
                 PlainEditorOp::MoveToLineEnd => {
-                    self.selection = self.selection.line_end(&self.layout, false);
+                    self.set_selection(self.selection.line_end(&self.layout, false));
                 }
                 PlainEditorOp::MoveUp => {
-                    self.selection = self.selection.previous_line(&self.layout, false);
+                    self.set_selection(self.selection.previous_line(&self.layout, false));
                 }
                 PlainEditorOp::MoveDown => {
-                    self.selection = self.selection.next_line(&self.layout, false);
+                    self.set_selection(self.selection.next_line(&self.layout, false));
                 }
                 PlainEditorOp::MoveLeft => {
-                    self.selection =
-                        self.selection
-                            .previous_visual(&self.layout, self.cursor_mode, false);
+                    self.set_selection(self.selection.previous_visual(
+                        &self.layout,
+                        self.cursor_mode,
+                        false,
+                    ));
                 }
                 PlainEditorOp::MoveRight => {
-                    self.selection =
-                        self.selection
-                            .next_visual(&self.layout, self.cursor_mode, false);
+                    self.set_selection(self.selection.next_visual(
+                        &self.layout,
+                        self.cursor_mode,
+                        false,
+                    ));
                 }
                 PlainEditorOp::MoveWordLeft => {
-                    self.selection = self.selection.previous_word(&self.layout, false);
+                    self.set_selection(self.selection.previous_word(&self.layout, false));
                 }
                 PlainEditorOp::MoveWordRight => {
-                    self.selection = self.selection.next_word(&self.layout, false);
+                    self.set_selection(self.selection.next_word(&self.layout, false));
                 }
                 PlainEditorOp::SelectAll => {
-                    self.selection =
+                    self.set_selection(
                         Selection::from_index(&self.layout, 0usize, Affinity::default())
-                            .move_lines(&self.layout, isize::MAX, true);
+                            .move_lines(&self.layout, isize::MAX, true),
+                    );
                 }
                 PlainEditorOp::CollapseSelection => {
-                    self.selection = self.selection.collapse();
+                    self.set_selection(self.selection.collapse());
                 }
                 PlainEditorOp::SelectToTextStart => {
-                    self.selection = self.selection.move_lines(&self.layout, isize::MIN, true);
+                    self.set_selection(self.selection.move_lines(&self.layout, isize::MIN, true));
                 }
                 PlainEditorOp::SelectToLineStart => {
-                    self.selection = self.selection.line_start(&self.layout, true);
+                    self.set_selection(self.selection.line_start(&self.layout, true));
                 }
                 PlainEditorOp::SelectToTextEnd => {
-                    self.selection = self.selection.move_lines(&self.layout, isize::MAX, true);
+                    self.set_selection(self.selection.move_lines(&self.layout, isize::MAX, true));
                 }
                 PlainEditorOp::SelectToLineEnd => {
-                    self.selection = self.selection.line_end(&self.layout, true);
+                    self.set_selection(self.selection.line_end(&self.layout, true));
                 }
                 PlainEditorOp::SelectUp => {
-                    self.selection = self.selection.previous_line(&self.layout, true);
+                    self.set_selection(self.selection.previous_line(&self.layout, true));
                 }
                 PlainEditorOp::SelectDown => {
-                    self.selection = self.selection.next_line(&self.layout, true);
+                    self.set_selection(self.selection.next_line(&self.layout, true));
                 }
                 PlainEditorOp::SelectLeft => {
-                    self.selection =
-                        self.selection
-                            .previous_visual(&self.layout, self.cursor_mode, true);
+                    self.set_selection(self.selection.previous_visual(
+                        &self.layout,
+                        self.cursor_mode,
+                        true,
+                    ));
                 }
                 PlainEditorOp::SelectRight => {
-                    self.selection =
-                        self.selection
-                            .next_visual(&self.layout, self.cursor_mode, true);
+                    self.set_selection(self.selection.next_visual(
+                        &self.layout,
+                        self.cursor_mode,
+                        true,
+                    ));
                 }
                 PlainEditorOp::SelectWordLeft => {
-                    self.selection = self.selection.previous_word(&self.layout, true);
+                    self.set_selection(self.selection.previous_word(&self.layout, true));
                 }
                 PlainEditorOp::SelectWordRight => {
-                    self.selection = self.selection.next_word(&self.layout, true);
+                    self.set_selection(self.selection.next_word(&self.layout, true));
                 }
                 PlainEditorOp::SelectWordAtPoint(x, y) => {
-                    self.selection = Selection::word_from_point(&self.layout, x, y);
+                    self.refresh_layout(font_cx, layout_cx);
+                    self.set_selection(Selection::word_from_point(&self.layout, x, y));
                 }
                 PlainEditorOp::SelectLineAtPoint(x, y) => {
+                    self.refresh_layout(font_cx, layout_cx);
                     let focus = *Selection::from_point(&self.layout, x, y)
                         .line_start(&self.layout, true)
                         .focus();
-                    self.selection = Selection::from(focus).line_end(&self.layout, true);
+                    self.set_selection(Selection::from(focus).line_end(&self.layout, true));
                 }
                 PlainEditorOp::ExtendSelectionToPoint(x, y) => {
+                    self.refresh_layout(font_cx, layout_cx);
                     // FIXME: This is usually the wrong way to handle selection extension for mouse moves, but not a regression.
-                    self.selection = self.selection.extend_to_point(&self.layout, x, y);
+                    self.set_selection(self.selection.extend_to_point(&self.layout, x, y));
                 }
             }
         }
-
-        if layout_after {
-            self.update_layout(font_cx, layout_cx);
-        }
+        self.refresh_layout(font_cx, layout_cx);
     }
 
     fn replace_selection(
@@ -402,7 +439,17 @@ where
         };
     }
 
-    /// Get either the contents of the current selection, or the text of the cluster at the caret
+    /// Update the selection, and nudge the `Generation` if something other than `h_pos` changed.
+    fn set_selection(&mut self, new_sel: Selection) {
+        if new_sel.focus() != self.selection.focus() || new_sel.anchor() != self.selection.anchor()
+        {
+            self.generation.nudge();
+        }
+
+        self.selection = new_sel;
+    }
+
+    /// Get either the contents of the current selection, or the text of the cluster at the caret.
     pub fn active_text(&self) -> ActiveText {
         if self.selection.is_collapsed() {
             let range = self
@@ -418,12 +465,12 @@ where
         }
     }
 
-    /// Get rectangles representing the selected portions of text
+    /// Get rectangles representing the selected portions of text.
     pub fn selection_geometry(&self) -> Vec<Rect> {
         self.selection.geometry(&self.layout)
     }
 
-    /// Get a rectangle representing the current caret cursor position
+    /// Get a rectangle representing the current caret cursor position.
     pub fn selection_strong_geometry(&self, size: f32) -> Option<Rect> {
         self.selection.focus().strong_geometry(&self.layout, size)
     }
@@ -432,17 +479,32 @@ where
         self.selection.focus().weak_geometry(&self.layout, size)
     }
 
-    /// Get the lines from the `Layout`
+    /// Get the lines from the `Layout`.
     pub fn lines(&self) -> impl Iterator<Item = Line<T>> + '_ + Clone {
         self.layout.lines()
     }
 
-    /// Get a copy of the text content of the buffer
+    /// Get a copy of the text content of the buffer.
     pub fn text(&self) -> Arc<str> {
         self.buffer.clone().into()
     }
 
-    /// Update the layout
+    /// Get the current `Generation` of the layout, to decide whether to draw.
+    ///
+    /// You should store the generation the editor was at when you last drew it, and then redraw
+    /// when the generation is different (`Generation` is [`PartialEq`], so supports the equality `==` operation).
+    pub fn generation(&self) -> Generation {
+        self.generation
+    }
+
+    /// Update the layout if it is dirty.
+    fn refresh_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
+        if self.layout_dirty {
+            self.update_layout(font_cx, layout_cx);
+        }
+    }
+
+    /// Update the layout.
     fn update_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
         let mut builder = layout_cx.ranged_builder(font_cx, &self.buffer, self.scale);
         for prop in self.default_style.iter() {
@@ -452,5 +514,7 @@ where
         self.layout.break_all_lines(self.width);
         self.layout.align(self.width, Alignment::Start);
         self.selection = self.selection.refresh(&self.layout);
+        self.layout_dirty = false;
+        self.generation.nudge();
     }
 }

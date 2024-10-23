@@ -32,23 +32,24 @@ enum RenderState<'s> {
 }
 
 struct SimpleVelloApp<'s> {
-    // The vello RenderContext which is a global context that lasts for the
-    // lifetime of the application
+    /// The vello `RenderContext` which is a global context that lasts for the
+    /// lifetime of the application.
     context: RenderContext,
 
-    // An array of renderers, one per wgpu device
+    /// An array of renderers, one per wgpu device.
     renderers: Vec<Option<Renderer>>,
 
-    // State for our example where we store the winit Window and the wgpu Surface
+    /// State for our example where we store the winit Window and the wgpu Surface.
     state: RenderState<'s>,
 
-    // A vello Scene which is a data structure which allows one to build up a
-    // description a scene to be drawn (with paths, fills, images, text, etc)
-    // which is then passed to a renderer for rendering
+    /// A `vello::Scene` where the editor layout will be drawn.
     scene: Scene,
 
-    // Our text state object
+    /// Our `Editor`, which owns a `parley::PlainEditor`.
     editor: text::Editor,
+
+    /// The last generation of the editor layout that we drew.
+    last_drawn_generation: text::Generation,
 }
 
 impl ApplicationHandler for SimpleVelloApp<'_> {
@@ -87,7 +88,7 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
         // Save the Window and Surface to a state variable
         self.state = RenderState::Active(ActiveRenderState { window, surface });
 
-        event_loop.set_control_flow(ControlFlow::Poll);
+        event_loop.set_control_flow(ControlFlow::Wait);
     }
 
     fn suspended(&mut self, event_loop: &ActiveEventLoop) {
@@ -114,7 +115,9 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
         };
 
         self.editor.handle_event(event.clone());
-        render_state.window.request_redraw();
+        if self.last_drawn_generation != self.editor.generation() {
+            render_state.window.request_redraw();
+        }
         // render_state
         //     .window
         //     .set_cursor(winit::window::Cursor::Icon(winit::window::CursorIcon::Text));
@@ -127,7 +130,6 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
             WindowEvent::Resized(size) => {
                 self.context
                     .resize_surface(&mut render_state.surface, size.width, size.height);
-                render_state.window.request_redraw();
                 self.editor.transact([
                     PlainEditorOp::SetScale(1.0),
                     PlainEditorOp::SetWidth(Some(size.width as f32 - 2f32 * text::INSET)),
@@ -137,56 +139,61 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
                         GenericFamily::SystemUi.into(),
                     ])),
                 ]);
+                render_state.window.request_redraw();
             }
 
             // This is where all the rendering happens
             WindowEvent::RedrawRequested => {
-                // Empty the scene of objects to draw. You could create a new Scene each time, but in this case
-                // the same Scene is reused so that the underlying memory allocation can also be reused.
-                self.scene.reset();
+                if self.last_drawn_generation != self.editor.generation() {
+                    // Empty the scene of objects to draw. You could create a new Scene each time, but in this case
+                    // the same Scene is reused so that the underlying memory allocation can also be reused.
+                    self.scene.reset();
 
-                self.editor.draw(&mut self.scene);
-                // Re-add the objects to draw to the scene.
-                //                add_shapes_to_scene(&mut self.scene);
+                    let generation = self.editor.draw(&mut self.scene);
+                    // Re-add the objects to draw to the scene.
+                    //                add_shapes_to_scene(&mut self.scene);
 
-                // Get the RenderSurface (surface + config)
-                let surface = &render_state.surface;
+                    // Get the RenderSurface (surface + config)
+                    let surface = &render_state.surface;
 
-                // Get the window size
-                let width = surface.config.width;
-                let height = surface.config.height;
+                    // Get the window size
+                    let width = surface.config.width;
+                    let height = surface.config.height;
 
-                // Get a handle to the device
-                let device_handle = &self.context.devices[surface.dev_id];
+                    // Get a handle to the device
+                    let device_handle = &self.context.devices[surface.dev_id];
 
-                // Get the surface's texture
-                let surface_texture = surface
-                    .surface
-                    .get_current_texture()
-                    .expect("failed to get surface texture");
+                    // Get the surface's texture
+                    let surface_texture = surface
+                        .surface
+                        .get_current_texture()
+                        .expect("failed to get surface texture");
 
-                // Render to the surface's texture
-                self.renderers[surface.dev_id]
-                    .as_mut()
-                    .unwrap()
-                    .render_to_surface(
-                        &device_handle.device,
-                        &device_handle.queue,
-                        &self.scene,
-                        &surface_texture,
-                        &vello::RenderParams {
-                            base_color: Color::rgb8(30, 30, 30), // Background color
-                            width,
-                            height,
-                            antialiasing_method: AaConfig::Msaa16,
-                        },
-                    )
-                    .expect("failed to render to surface");
+                    // Render to the surface's texture
+                    self.renderers[surface.dev_id]
+                        .as_mut()
+                        .unwrap()
+                        .render_to_surface(
+                            &device_handle.device,
+                            &device_handle.queue,
+                            &self.scene,
+                            &surface_texture,
+                            &vello::RenderParams {
+                                base_color: Color::rgb8(30, 30, 30), // Background color
+                                width,
+                                height,
+                                antialiasing_method: AaConfig::Msaa16,
+                            },
+                        )
+                        .expect("failed to render to surface");
 
-                // Queue the texture to be presented on the surface
-                surface_texture.present();
+                    // Queue the texture to be presented on the surface
+                    surface_texture.present();
 
-                device_handle.device.poll(wgpu::Maintain::Poll);
+                    device_handle.device.poll(wgpu::Maintain::Poll);
+
+                    self.last_drawn_generation = generation;
+                }
             }
             _ => {}
         }
@@ -201,6 +208,7 @@ fn main() -> Result<()> {
         state: RenderState::Suspended(None),
         scene: Scene::new(),
         editor: text::Editor::default(),
+        last_drawn_generation: Default::default(),
     };
 
     // Create and run a winit event loop

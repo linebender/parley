@@ -15,6 +15,12 @@ You can find its changes [documented below](#020---2024-10-10).
 
 This release has an [MSRV] of 1.75.
 
+### Added
+
+#### Parley
+
+- `Generation` on `PlainEditor` to help implement lazy drawing. ([#143] by [@xorgy])
+
 
 ## [0.2.0] - 2024-10-10
 
@@ -86,6 +92,7 @@ This release has an [MSRV] of 1.70.
 [#106]: https://github.com/linebender/parley/pull/106
 [#126]: https://github.com/linebender/parley/pull/126
 [#129]: https://github.com/linebender/parley/pull/129
+[#143]: https://github.com/linebender/parley/pull/143
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/linebender/parley/releases/tag/v0.2.0

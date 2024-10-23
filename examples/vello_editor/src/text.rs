@@ -15,6 +15,7 @@ use alloc::{sync::Arc, vec};
 
 use core::{default::Default, iter::IntoIterator};
 
+pub use parley::layout::editor::Generation;
 use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorOp};
 
 pub const INSET: f32 = 32.0;
@@ -285,7 +286,15 @@ impl Editor {
         }
     }
 
-    pub fn draw(&self, scene: &mut Scene) {
+    /// Return the current `Generation` of the layout.
+    pub fn generation(&self) -> Generation {
+        self.editor.generation()
+    }
+
+    /// Draw into scene.
+    ///
+    /// Returns drawn `Generation`.
+    pub fn draw(&self, scene: &mut Scene) -> Generation {
         let transform = Affine::translate((INSET as f64, INSET as f64));
         for rect in self.editor.selection_geometry().iter() {
             scene.fill(Fill::NonZero, transform, Color::STEEL_BLUE, None, &rect);
@@ -338,6 +347,7 @@ impl Editor {
                     );
             }
         }
+        self.editor.generation()
     }
 }
 
