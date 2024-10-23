@@ -15,9 +15,9 @@ use alloc::{sync::Arc, vec::Vec};
 
 #[derive(Copy, Clone, Debug)]
 pub enum ActiveText<'a> {
-    /// The selection is empty and the cursor is a caret; this is the text of the cluster it is on
+    /// The selection is empty and the cursor is a caret; this is the text of the cluster it is on.
     FocusedCluster(Affinity, &'a str),
-    /// The selection contains this text
+    /// The selection contains this text.
     Selection(&'a str),
 }
 
@@ -78,83 +78,83 @@ where
     }
 }
 
-/// Operations on a `PlainEditor` for `PlainEditor::transact`
+/// Operations on a `PlainEditor` for `PlainEditor::transact`.
 #[non_exhaustive]
 pub enum PlainEditorOp<T>
 where
     T: Brush + Clone + Debug + PartialEq + Default,
 {
-    /// Replace the whole text buffer
+    /// Replace the whole text buffer.
     SetText(Arc<str>),
-    /// Set the width of the layout
+    /// Set the width of the layout.
     SetWidth(Option<f32>),
-    /// Set the scale for the layout
+    /// Set the scale for the layout.
     SetScale(f32),
-    /// Set the default style for the layout
+    /// Set the default style for the layout.
     SetDefaultStyle(Arc<[StyleProperty<'static, T>]>),
-    /// Insert at cursor, or replace selection
+    /// Insert at cursor, or replace selection.
     InsertOrReplaceSelection(Arc<str>),
-    /// Delete the selection
+    /// Delete the selection.
     DeleteSelection,
-    /// Delete the selection or the next cluster (typical ‘delete’ behavior)
+    /// Delete the selection or the next cluster (typical ‘delete’ behavior).
     Delete,
-    /// Delete the selection or up to the next word boundary (typical ‘ctrl + delete’ behavior)
+    /// Delete the selection or up to the next word boundary (typical ‘ctrl + delete’ behavior).
     DeleteWord,
-    /// Delete the selection or the previous cluster (typical ‘backspace’ behavior)
+    /// Delete the selection or the previous cluster (typical ‘backspace’ behavior).
     Backdelete,
-    /// Delete the selection or back to the previous word boundary (typical ‘ctrl + backspace’ behavior)
+    /// Delete the selection or back to the previous word boundary (typical ‘ctrl + backspace’ behavior).
     BackdeleteWord,
-    /// Move the cursor to the cluster boundary nearest this point in the layout
+    /// Move the cursor to the cluster boundary nearest this point in the layout.
     MoveToPoint(f32, f32),
-    /// Move the cursor to the start of the buffer
+    /// Move the cursor to the start of the buffer.
     MoveToTextStart,
-    /// Move the cursor to the start of the physical line
+    /// Move the cursor to the start of the physical line.
     MoveToLineStart,
-    /// Move the cursor to the end of the buffer
+    /// Move the cursor to the end of the buffer.
     MoveToTextEnd,
-    /// Move the cursor to the end of the physical line
+    /// Move the cursor to the end of the physical line.
     MoveToLineEnd,
-    /// Move up to the closest physical cluster boundary on the previous line, preserving the horizontal position for repeated movements
+    /// Move up to the closest physical cluster boundary on the previous line, preserving the horizontal position for repeated movements.
     MoveUp,
-    /// Move down to the closest physical cluster boundary on the next line, preserving the horizontal position for repeated movements
+    /// Move down to the closest physical cluster boundary on the next line, preserving the horizontal position for repeated movements.
     MoveDown,
-    /// Move to the next cluster left in visual order
+    /// Move to the next cluster left in visual order.
     MoveLeft,
-    /// Move to the next cluster right in visual order
+    /// Move to the next cluster right in visual order.
     MoveRight,
-    /// Move to the next word boundary left
+    /// Move to the next word boundary left.
     MoveWordLeft,
-    /// Move to the next word boundary right
+    /// Move to the next word boundary right.
     MoveWordRight,
-    /// Select the whole buffer
+    /// Select the whole buffer.
     SelectAll,
-    /// Collapse selection into caret
+    /// Collapse selection into caret.
     CollapseSelection,
-    /// Move the selection focus point to the start of the buffer
+    /// Move the selection focus point to the start of the buffer.
     SelectToTextStart,
-    /// Move the selection focus point to the start of the physical line
+    /// Move the selection focus point to the start of the physical line.
     SelectToLineStart,
-    /// Move the selection focus point to the end of the buffer
+    /// Move the selection focus point to the end of the buffer.
     SelectToTextEnd,
-    /// Move the selection focus point to the end of the physical line
+    /// Move the selection focus point to the end of the physical line.
     SelectToLineEnd,
-    /// Move the selection focus point up to the nearest cluster boundary on the previous line, preserving the horizontal position for repeated movements
+    /// Move the selection focus point up to the nearest cluster boundary on the previous line, preserving the horizontal position for repeated movements.
     SelectUp,
-    /// Move the selection focus point down to the nearest cluster boundary on the next line, preserving the horizontal position for repeated movements
+    /// Move the selection focus point down to the nearest cluster boundary on the next line, preserving the horizontal position for repeated movements.
     SelectDown,
-    /// Move the selection focus point to the next cluster left in visual order
+    /// Move the selection focus point to the next cluster left in visual order.
     SelectLeft,
-    /// Move the selection focus point to the next cluster right in visual order
+    /// Move the selection focus point to the next cluster right in visual order.
     SelectRight,
-    /// Move the selection focus point to the next word boundary left
+    /// Move the selection focus point to the next word boundary left.
     SelectWordLeft,
-    /// Move the selection focus point to the next word boundary right
+    /// Move the selection focus point to the next word boundary right.
     SelectWordRight,
-    /// Select the word at the point
+    /// Select the word at the point.
     SelectWordAtPoint(f32, f32),
-    /// Select the physical line at the point
+    /// Select the physical line at the point.
     SelectLineAtPoint(f32, f32),
-    /// Move the selection focus point to the cluster boundary closest to point
+    /// Move the selection focus point to the cluster boundary closest to point.
     ExtendSelectionToPoint(f32, f32),
 }
 
@@ -162,7 +162,7 @@ impl<T> PlainEditor<T>
 where
     T: Brush + Clone + Debug + PartialEq + Default,
 {
-    /// Run a series of `PlainEditorOp`s, updating the layout if necessary
+    /// Run a series of `PlainEditorOp`s, updating the layout if necessary.
     pub fn transact(
         &mut self,
         font_cx: &mut FontContext,
@@ -444,7 +444,7 @@ where
         self.selection = new_sel;
     }
 
-    /// Get either the contents of the current selection, or the text of the cluster at the caret
+    /// Get either the contents of the current selection, or the text of the cluster at the caret.
     pub fn active_text(&self) -> ActiveText {
         if self.selection.is_collapsed() {
             let range = self
@@ -460,12 +460,12 @@ where
         }
     }
 
-    /// Get rectangles representing the selected portions of text
+    /// Get rectangles representing the selected portions of text.
     pub fn selection_geometry(&self) -> Vec<Rect> {
         self.selection.geometry(&self.layout)
     }
 
-    /// Get a rectangle representing the current caret cursor position
+    /// Get a rectangle representing the current caret cursor position.
     pub fn selection_strong_geometry(&self, size: f32) -> Option<Rect> {
         self.selection.focus().strong_geometry(&self.layout, size)
     }
@@ -474,12 +474,12 @@ where
         self.selection.focus().weak_geometry(&self.layout, size)
     }
 
-    /// Get the lines from the `Layout`
+    /// Get the lines from the `Layout`.
     pub fn lines(&self) -> impl Iterator<Item = Line<T>> + '_ + Clone {
         self.layout.lines()
     }
 
-    /// Get a copy of the text content of the buffer
+    /// Get a copy of the text content of the buffer.
     pub fn text(&self) -> Arc<str> {
         self.buffer.clone().into()
     }
@@ -496,7 +496,7 @@ where
         }
     }
 
-    /// Update the layout
+    /// Update the layout.
     fn update_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
         let mut builder = layout_cx.ranged_builder(font_cx, &self.buffer, self.scale);
         for prop in self.default_style.iter() {
