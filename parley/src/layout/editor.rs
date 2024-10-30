@@ -175,28 +175,29 @@ where
         t: impl IntoIterator<Item = PlainEditorOp<T>>,
     ) {
         for op in t.into_iter() {
+            use PlainEditorOp::*;
             match op {
-                PlainEditorOp::SetText(is) => {
+                SetText(is) => {
                     self.buffer.clear();
                     self.buffer.push_str(&is);
                     self.layout_dirty = true;
                 }
-                PlainEditorOp::SetWidth(width) => {
+                SetWidth(width) => {
                     self.width = width;
                     self.layout_dirty = true;
                 }
-                PlainEditorOp::SetScale(scale) => {
+                SetScale(scale) => {
                     self.scale = scale;
                     self.layout_dirty = true;
                 }
-                PlainEditorOp::SetDefaultStyle(style) => {
+                SetDefaultStyle(style) => {
                     self.default_style = style.clone();
                     self.layout_dirty = true;
                 }
-                PlainEditorOp::DeleteSelection => {
+                DeleteSelection => {
                     self.replace_selection(font_cx, layout_cx, "");
                 }
-                PlainEditorOp::Delete => {
+                Delete => {
                     if self.selection.is_collapsed() {
                         let range = self.selection.focus().text_range();
                         if !range.is_empty() {
@@ -221,7 +222,7 @@ where
                         self.replace_selection(font_cx, layout_cx, "");
                     }
                 }
-                PlainEditorOp::DeleteWord => {
+                DeleteWord => {
                     let start = self.selection.insertion_index();
                     if self.selection.is_collapsed() {
                         let end = self
@@ -243,7 +244,7 @@ where
                         self.replace_selection(font_cx, layout_cx, "");
                     }
                 }
-                PlainEditorOp::Backdelete => {
+                Backdelete => {
                     let end = self.selection.focus().text_range().start;
                     if self.selection.is_collapsed() {
                         if let Some(start) = self
@@ -273,7 +274,7 @@ where
                         self.replace_selection(font_cx, layout_cx, "");
                     }
                 }
-                PlainEditorOp::BackdeleteWord => {
+                BackdeleteWord => {
                     let end = self.selection.focus().text_range().start;
                     if self.selection.is_collapsed() {
                         let start = self
@@ -295,110 +296,110 @@ where
                         self.replace_selection(font_cx, layout_cx, "");
                     }
                 }
-                PlainEditorOp::InsertOrReplaceSelection(s) => {
+                InsertOrReplaceSelection(s) => {
                     self.replace_selection(font_cx, layout_cx, &s);
                 }
-                PlainEditorOp::MoveToPoint(x, y) => {
+                MoveToPoint(x, y) => {
                     self.refresh_layout(font_cx, layout_cx);
                     self.set_selection(Selection::from_point(&self.layout, x, y));
                 }
-                PlainEditorOp::MoveToTextStart => {
+                MoveToTextStart => {
                     self.set_selection(self.selection.move_lines(&self.layout, isize::MIN, false));
                 }
-                PlainEditorOp::MoveToLineStart => {
+                MoveToLineStart => {
                     self.set_selection(self.selection.line_start(&self.layout, false));
                 }
-                PlainEditorOp::MoveToTextEnd => {
+                MoveToTextEnd => {
                     self.set_selection(self.selection.move_lines(&self.layout, isize::MAX, false));
                 }
-                PlainEditorOp::MoveToLineEnd => {
+                MoveToLineEnd => {
                     self.set_selection(self.selection.line_end(&self.layout, false));
                 }
-                PlainEditorOp::MoveUp => {
+                MoveUp => {
                     self.set_selection(self.selection.previous_line(&self.layout, false));
                 }
-                PlainEditorOp::MoveDown => {
+                MoveDown => {
                     self.set_selection(self.selection.next_line(&self.layout, false));
                 }
-                PlainEditorOp::MoveLeft => {
+                MoveLeft => {
                     self.set_selection(self.selection.previous_visual(
                         &self.layout,
                         self.cursor_mode,
                         false,
                     ));
                 }
-                PlainEditorOp::MoveRight => {
+                MoveRight => {
                     self.set_selection(self.selection.next_visual(
                         &self.layout,
                         self.cursor_mode,
                         false,
                     ));
                 }
-                PlainEditorOp::MoveWordLeft => {
+                MoveWordLeft => {
                     self.set_selection(self.selection.previous_word(&self.layout, false));
                 }
-                PlainEditorOp::MoveWordRight => {
+                MoveWordRight => {
                     self.set_selection(self.selection.next_word(&self.layout, false));
                 }
-                PlainEditorOp::SelectAll => {
+                SelectAll => {
                     self.set_selection(
                         Selection::from_index(&self.layout, 0usize, Affinity::default())
                             .move_lines(&self.layout, isize::MAX, true),
                     );
                 }
-                PlainEditorOp::CollapseSelection => {
+                CollapseSelection => {
                     self.set_selection(self.selection.collapse());
                 }
-                PlainEditorOp::SelectToTextStart => {
+                SelectToTextStart => {
                     self.set_selection(self.selection.move_lines(&self.layout, isize::MIN, true));
                 }
-                PlainEditorOp::SelectToLineStart => {
+                SelectToLineStart => {
                     self.set_selection(self.selection.line_start(&self.layout, true));
                 }
-                PlainEditorOp::SelectToTextEnd => {
+                SelectToTextEnd => {
                     self.set_selection(self.selection.move_lines(&self.layout, isize::MAX, true));
                 }
-                PlainEditorOp::SelectToLineEnd => {
+                SelectToLineEnd => {
                     self.set_selection(self.selection.line_end(&self.layout, true));
                 }
-                PlainEditorOp::SelectUp => {
+                SelectUp => {
                     self.set_selection(self.selection.previous_line(&self.layout, true));
                 }
-                PlainEditorOp::SelectDown => {
+                SelectDown => {
                     self.set_selection(self.selection.next_line(&self.layout, true));
                 }
-                PlainEditorOp::SelectLeft => {
+                SelectLeft => {
                     self.set_selection(self.selection.previous_visual(
                         &self.layout,
                         self.cursor_mode,
                         true,
                     ));
                 }
-                PlainEditorOp::SelectRight => {
+                SelectRight => {
                     self.set_selection(self.selection.next_visual(
                         &self.layout,
                         self.cursor_mode,
                         true,
                     ));
                 }
-                PlainEditorOp::SelectWordLeft => {
+                SelectWordLeft => {
                     self.set_selection(self.selection.previous_word(&self.layout, true));
                 }
-                PlainEditorOp::SelectWordRight => {
+                SelectWordRight => {
                     self.set_selection(self.selection.next_word(&self.layout, true));
                 }
-                PlainEditorOp::SelectWordAtPoint(x, y) => {
+                SelectWordAtPoint(x, y) => {
                     self.refresh_layout(font_cx, layout_cx);
                     self.set_selection(Selection::word_from_point(&self.layout, x, y));
                 }
-                PlainEditorOp::SelectLineAtPoint(x, y) => {
+                SelectLineAtPoint(x, y) => {
                     self.refresh_layout(font_cx, layout_cx);
                     let focus = *Selection::from_point(&self.layout, x, y)
                         .line_start(&self.layout, true)
                         .focus();
                     self.set_selection(Selection::from(focus).line_end(&self.layout, true));
                 }
-                PlainEditorOp::ExtendSelectionToPoint(x, y) => {
+                ExtendSelectionToPoint(x, y) => {
                     self.refresh_layout(font_cx, layout_cx);
                     // FIXME: This is usually the wrong way to handle selection extension for mouse moves, but not a regression.
                     self.set_selection(self.selection.extend_to_point(&self.layout, x, y));
