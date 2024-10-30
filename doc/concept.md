@@ -613,7 +613,7 @@ A truncated table describing style properties applied to the desired ranges is s
 
 ## Itemization
 
-This stage breaks the paragraph into runs that are suitable for shaping, selects appropriate fonts and maps each character to its nominal glyph identifier. 
+This stage breaks the paragraph into runs that are suitable for shaping, selects appropriate fonts and maps each character to its nominal glyph identifier.
 
 The following table shows the sample text broken into items with assigned fonts and nominal glyph identifiers. Each item is identified by a number.
 
@@ -1048,7 +1048,7 @@ The following table shows the sample text broken into items with assigned fonts 
 
 ## Shaping
 
-This stage applies font, script and language specific processing rules, transforming each glyph run using substitutions and positioning adjustments. 
+This stage applies font, script and language specific processing rules, transforming each glyph run using substitutions and positioning adjustments.
 
 The following table shows the results of shaping, including substitutions and computed advances. Substituted glyphs are underlined. These substitutions provide the appropriate
 forms for Arabic cursive joining.

@@ -1,14 +1,14 @@
 ## Typography is the new black
 
 High quality typography, once the domain of static layout generators such as TeX
-and derivatives, has commanded increasing significance in the last decade among 
-real time text engines and as such has received long needed resources and 
+and derivatives, has commanded increasing significance in the last decade among
+real time text engines and as such has received long needed resources and
 attention from specification groups, web browser developers and platform
-vendors. These efforts have reinvigorated the landscape, producing more 
+vendors. These efforts have reinvigorated the landscape, producing more
 sophisticated text APIs, new OpenType specifications, increased investment
 in font production technologies and a wide corpus of beautiful, comprehensive fonts
 supporting modern features. Perhaps more importantly, there has been a strong
-focus on extending global access to computing through both more robust font 
+focus on extending global access to computing through both more robust font
 fallback systems and Google's ever-expanding collection of Noto fonts supporting
 world-wide scripts and languages.
 
@@ -19,17 +19,17 @@ limited to platform specific applications, requiring cross-platform code (or eve
 cross-platform toolkits) to specialize their text rendering implementations for
 each supported operating system. An increasingly popular option to side-step this problem
 is to use an abstraction wrapping an embedded web browser such as Electron. This
-has advantages if your application is already using a wide range of web technologies, 
+has advantages if your application is already using a wide range of web technologies,
 but becomes a large, complicated, overbearing dependency otherwise.
 
 In addition, while platform specific text engines and web browsers consist of high quality,
-well-tested code produced by incredibly talented developers, they are all ultimately large 
+well-tested code produced by incredibly talented developers, they are all ultimately large
 and complex codebases implemented in C++ which is a fundamentally unsafe language. The Rust
 language has proven to be a high performance, safe alternative to C++.
 
 Given the platform specific nature of current text engines, and the unsafe implementation
 language, the obvious course of action is to build a new, cross-platform, open source text
-layout engine in Rust. 
+layout engine in Rust.
 
 ## Design overview
 
@@ -43,8 +43,8 @@ domain. As the author of swash, a new crate providing font parsing and complex t
 my goal is to bridge the two, building a text layout engine that is based on the swash
 primitives and exposes the piet text API.
 
-Rich text layout is a complex process involving cross-cutting concerns across a wide 
-swath of both the Unicode and OpenType specifications interleaved with design intent, 
+Rich text layout is a complex process involving cross-cutting concerns across a wide
+swath of both the Unicode and OpenType specifications interleaved with design intent,
 available resources, internationalization considerations, and performance. Broadly, the
 process can be represented by a pipeline consisting of the following phases:
 
@@ -56,16 +56,16 @@ runs later in the pipeline.
 * Itemization: splits a paragraph into runs that are appropriate for shaping. This takes
 Unicode scripts, locales, BiDi levels, fonts and other text attributes into account.
 
-* Font selection/fallback: selects an appropriate font for each run based on desired 
+* Font selection/fallback: selects an appropriate font for each run based on desired
 font attributes, script, locale and character coverage. Ideally, this will select the
 font specified by the user, but will prioritize selecting for appropriate coverage and
 readable text (no tofu). This stage can break runs produced by itemization if necessary.
 
-* Shaping: converts each run of characters into a sequence of positioned glyphs using 
+* Shaping: converts each run of characters into a sequence of positioned glyphs using
 the selected font and based on writing system rules and selected features. This will be
 provided by the swash crate.
 
-* Line breaking: breaks runs to fit within some desired maximum extent based on the 
+* Line breaking: breaks runs to fit within some desired maximum extent based on the
 Unicode Line Breaking Algorithm (UAX #14). Reorders glyph runs per-line according to the
 previously computed BiDi levels. Computes final layout of lines and glyphs.
 
@@ -96,7 +96,7 @@ colors for underline and strikeout strokes.
 ## Further considerations
 
 There exist some nice-to-have layout features that are out of scope for the current development
-cycle of this project-- specifically, more sophisticated segmentation using a 
+cycle of this project-- specifically, more sophisticated segmentation using a
 dictionary based approach for languages such as Thai and shaper/dictionary driven
 hyphenation and justification.
 

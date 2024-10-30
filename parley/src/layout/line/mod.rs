@@ -110,12 +110,12 @@ pub struct LineMetrics {
     /// Minimum coordinate in the direction orthogonal to line
     /// direction.
     ///
-    /// For horizontal text, this would be the top of the line.    
+    /// For horizontal text, this would be the top of the line.
     pub min_coord: f32,
     /// Maximum coordinate in the direction orthogonal to line
     /// direction.
     ///
-    /// For horizontal text, this would be the bottom of the line.     
+    /// For horizontal text, this would be the bottom of the line.
     pub max_coord: f32,
 }
 
