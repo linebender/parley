@@ -18,6 +18,10 @@ use self::alignment::align;
 
 use super::style::Brush;
 use crate::{Font, InlineBox};
+#[cfg(feature = "accesskit")]
+use accesskit::{NodeBuilder, NodeId, Role, TextPosition, TreeUpdate};
+#[cfg(feature = "accesskit")]
+use alloc::collections::{BTreeMap, BTreeSet};
 use core::{cmp::Ordering, ops::Range};
 use data::*;
 use swash::text::cluster::{Boundary, ClusterInfo};
@@ -260,4 +264,207 @@ pub struct Decoration<B: Brush> {
     /// Thickness of the decoration. If `None`, use the metrics of the
     /// containing run.
     pub size: Option<f32>,
+}
+
+#[cfg(feature = "accesskit")]
+#[derive(Clone, Default)]
+pub struct LayoutAccessibility {
+    // The following two fields maintain a two-way mapping between runs
+    // and AccessKit node IDs, where each run is identified by its line index
+    // and run index within that line, or a run path for short. These maps
+    // are maintained by `TextLayout::accessibility`, which ensures that removed
+    // runs are removed from the maps on the next accessibility pass.
+    access_ids_by_run_path: BTreeMap<(usize, usize), NodeId>,
+    run_paths_by_access_id: BTreeMap<NodeId, (usize, usize)>,
+
+    // This map duplicates the character lengths stored in the run nodes.
+    // This is necessary because this information is needed during the
+    // access event pass, after the previous tree update has already been
+    // pushed to AccessKit. AccessKit deliberately doesn't let toolkits access
+    // the current tree state, because the ideal AccessKit backend would push
+    // tree updates to assistive technologies and not retain a tree in memory.
+    character_lengths_by_access_id: BTreeMap<NodeId, Box<[u8]>>,
+}
+
+#[cfg(feature = "accesskit")]
+impl LayoutAccessibility {
+    pub fn build_nodes<B: Brush>(
+        &mut self,
+        text: &str,
+        layout: &Layout<B>,
+        update: &mut TreeUpdate,
+        parent_node: &mut NodeBuilder,
+        mut next_node_id: impl FnMut() -> NodeId,
+    ) {
+        // Build a set of node IDs for the runs encountered in this pass.
+        let mut ids = BTreeSet::<NodeId>::new();
+
+        for (line_index, line) in layout.lines().enumerate() {
+            // Defer adding each run node until we reach either the next run
+            // or the end of the line. That way, we can set relations between
+            // runs in a line and do anything special that might be required
+            // for the last run in a line.
+            let mut last_node: Option<(NodeId, NodeBuilder)> = None;
+
+            for (run_index, run) in line.runs().enumerate() {
+                let run_path = (line_index, run_index);
+                // If we encountered this same run path in the previous
+                // accessibility pass, reuse the same AccessKit ID. Otherwise,
+                // allocate a new one. This enables stable node IDs when merely
+                // updating the content of existing runs.
+                let id = self
+                    .access_ids_by_run_path
+                    .get(&run_path)
+                    .copied()
+                    .unwrap_or_else(|| {
+                        let id = next_node_id();
+                        self.access_ids_by_run_path.insert(run_path, id);
+                        self.run_paths_by_access_id.insert(id, run_path);
+                        id
+                    });
+                ids.insert(id);
+                let mut node = NodeBuilder::new(Role::InlineTextBox);
+
+                if let Some((last_id, mut last_node)) = last_node.take() {
+                    last_node.set_next_on_line(id);
+                    node.set_previous_on_line(last_id);
+                    update.nodes.push((last_id, last_node.build()));
+                    parent_node.push_child(last_id);
+                }
+
+                // TODO: bounding rectangle and character position/width
+                let run_text = &text[run.text_range()];
+                node.set_value(run_text);
+
+                let mut character_lengths = Vec::new();
+                let mut word_lengths = Vec::new();
+                let mut last_word_start = 0;
+
+                for cluster in run.clusters() {
+                    let cluster_text = &text[cluster.text_range()];
+                    if cluster.is_word_boundary() && !character_lengths.is_empty() {
+                        word_lengths.push((character_lengths.len() - last_word_start) as _);
+                        last_word_start = character_lengths.len();
+                    }
+                    character_lengths.push(cluster_text.len() as _);
+                }
+
+                word_lengths.push((character_lengths.len() - last_word_start) as _);
+                self.character_lengths_by_access_id
+                    .insert(id, character_lengths.clone().into());
+                node.set_character_lengths(character_lengths);
+                node.set_word_lengths(word_lengths);
+
+                last_node = Some((id, node));
+            }
+
+            if let Some((id, node)) = last_node {
+                update.nodes.push((id, node.build()));
+                parent_node.push_child(id);
+            }
+        }
+
+        // Remove mappings for runs that no longer exist.
+        let mut ids_to_remove = Vec::<NodeId>::new();
+        let mut run_paths_to_remove = Vec::<(usize, usize)>::new();
+        for (access_id, run_path) in self.run_paths_by_access_id.iter() {
+            if !ids.contains(access_id) {
+                ids_to_remove.push(*access_id);
+                run_paths_to_remove.push(*run_path);
+            }
+        }
+        for id in ids_to_remove {
+            self.run_paths_by_access_id.remove(&id);
+            self.character_lengths_by_access_id.remove(&id);
+        }
+        for run_path in run_paths_to_remove {
+            self.access_ids_by_run_path.remove(&run_path);
+        }
+    }
+
+    pub fn access_position_from_offset<B: Brush>(
+        &self,
+        text: &str,
+        layout: &Layout<B>,
+        offset: usize,
+        affinity: Affinity,
+    ) -> Option<TextPosition> {
+        debug_assert!(offset <= text.len(), "offset out of range");
+
+        for (line_index, line) in layout.lines().enumerate() {
+            let range = line.text_range();
+            if !(range.contains(&offset)
+                || (offset == range.end
+                    && (affinity == Affinity::Upstream || line_index == layout.len() - 1)))
+            {
+                continue;
+            }
+
+            for (run_index, run) in line.runs().enumerate() {
+                let range = run.text_range();
+                if !(range.contains(&offset)
+                    || (offset == range.end
+                        && (affinity == Affinity::Upstream
+                            || (line_index == layout.len() - 1 && run_index == line.len() - 1))))
+                {
+                    continue;
+                }
+
+                let run_offset = offset - range.start;
+                let run_path = (line_index, run_index);
+                let id = *self.access_ids_by_run_path.get(&run_path).unwrap();
+                let character_lengths = self.character_lengths_by_access_id.get(&id).unwrap();
+                let mut length_sum = 0_usize;
+                for (character_index, length) in character_lengths.iter().copied().enumerate() {
+                    if run_offset == length_sum {
+                        return Some(TextPosition {
+                            node: id,
+                            character_index,
+                        });
+                    }
+                    length_sum += length as usize;
+                }
+                return Some(TextPosition {
+                    node: id,
+                    character_index: character_lengths.len(),
+                });
+            }
+        }
+
+        if cfg!(debug_assertions) {
+            panic!(
+                "offset {} not within the range of any run; text length: {}",
+                offset,
+                text.len()
+            );
+        }
+        None
+    }
+
+    pub fn offset_from_access_position<B: Brush>(
+        &self,
+        layout: &Layout<B>,
+        pos: TextPosition,
+    ) -> Option<(usize, Affinity)> {
+        let character_lengths = self.character_lengths_by_access_id.get(&pos.node)?;
+        if pos.character_index > character_lengths.len() {
+            return None;
+        }
+        let run_path = *self.run_paths_by_access_id.get(&pos.node)?;
+        let (line_index, run_index) = run_path;
+        let line = layout.get(line_index)?;
+        let run = line.run(run_index)?;
+        let offset = run.text_range().start
+            + character_lengths[..pos.character_index]
+                .iter()
+                .copied()
+                .map(usize::from)
+                .sum::<usize>();
+        let affinity = if pos.character_index == character_lengths.len() && line_index < run.len() {
+            Affinity::Upstream
+        } else {
+            Affinity::Downstream
+        };
+        Some((offset, affinity))
+    }
 }
