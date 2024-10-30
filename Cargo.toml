@@ -23,6 +23,7 @@ clippy.trivially_copy_pass_by_ref = "warn"
 rust.unused_qualifications = "warn"
 
 [workspace.dependencies]
+accesskit = "0.16.3"
 fontique = { version = "0.2.0", default-features = false, path = "fontique" }
 parley = { version = "0.2.0", default-features = false, path = "parley" }
 peniko = { version = "0.2.0", default-features = false }

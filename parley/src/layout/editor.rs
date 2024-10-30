@@ -3,6 +3,8 @@
 
 use core::{cmp::PartialEq, default::Default, fmt::Debug};
 
+#[cfg(feature = "accesskit")]
+use crate::layout::LayoutAccessibility;
 use crate::{
     layout::{
         cursor::{Cursor, Selection, VisualMode},
@@ -11,6 +13,8 @@ use crate::{
     style::{Brush, StyleProperty},
     FontContext, LayoutContext, Rect,
 };
+#[cfg(feature = "accesskit")]
+use accesskit::{NodeBuilder, NodeId, TextSelection, TreeUpdate};
 use alloc::{borrow::ToOwned, string::String, sync::Arc, vec::Vec};
 
 #[derive(Copy, Clone, Debug)]
@@ -47,6 +51,8 @@ where
     default_style: Arc<[StyleProperty<'static, T>]>,
     buffer: String,
     layout: Layout<T>,
+    #[cfg(feature = "accesskit")]
+    layout_access: LayoutAccessibility,
     selection: Selection,
     cursor_mode: VisualMode,
     width: Option<f32>,
@@ -70,6 +76,8 @@ where
             default_style: Arc::new([]),
             buffer: Default::default(),
             layout: Default::default(),
+            #[cfg(feature = "accesskit")]
+            layout_access: Default::default(),
             selection: Default::default(),
             cursor_mode: Default::default(),
             width: Default::default(),
@@ -605,5 +613,39 @@ where
         self.selection = self.selection.refresh(&self.layout);
         self.layout_dirty = false;
         self.generation.nudge();
+    }
+
+    #[cfg(feature = "accesskit")]
+    pub fn accessibility(
+        &mut self,
+        update: &mut TreeUpdate,
+        parent_node: &mut NodeBuilder,
+        next_node_id: impl FnMut() -> NodeId,
+    ) {
+        self.layout_access.build_nodes(
+            &self.buffer,
+            &self.layout,
+            update,
+            parent_node,
+            next_node_id,
+        );
+        let anchor = self.selection.anchor();
+        let anchor = self.layout_access.access_position_from_offset(
+            &self.buffer,
+            &self.layout,
+            anchor.index(),
+            anchor.affinity(),
+        );
+        let focus = self.selection.focus();
+        let focus = self.layout_access.access_position_from_offset(
+            &self.buffer,
+            &self.layout,
+            focus.index(),
+            focus.affinity(),
+        );
+        if let (Some(anchor), Some(focus)) = (anchor, focus) {
+            parent_node.set_text_selection(TextSelection { anchor, focus });
+        }
+        parent_node.add_action(accesskit::Action::SetTextSelection);
     }
 }
