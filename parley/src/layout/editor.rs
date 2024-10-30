@@ -5,7 +5,7 @@ use core::{cmp::PartialEq, default::Default, fmt::Debug, iter::IntoIterator};
 
 use crate::{
     layout::{
-        cursor::{Selection, VisualMode},
+        cursor::{Cursor, Selection, VisualMode},
         Affinity, Alignment, Layout, Line,
     },
     style::{Brush, StyleProperty},
@@ -111,6 +111,10 @@ where
     BackdeleteWord,
     /// Move the cursor to the cluster boundary nearest this point in the layout.
     MoveToPoint(f32, f32),
+    /// Move the cursor to a byte index.
+    ///
+    /// No-op if index is not a char boundary.
+    MoveToByte(usize),
     /// Move the cursor to the start of the buffer.
     MoveToTextStart,
     /// Move the cursor to the start of the physical line.
@@ -161,6 +165,14 @@ where
     SelectLineAtPoint(f32, f32),
     /// Move the selection focus point to the cluster boundary closest to point.
     ExtendSelectionToPoint(f32, f32),
+    /// Move the selection focus point to a byte index.
+    ///
+    /// No-op if index is not a char boundary.
+    ExtendSelectionToByte(usize),
+    /// Select a range of byte indices
+    ///
+    /// No-op if either index is not a char boundary.
+    SelectByteRange(usize, usize),
 }
 
 impl<T> PlainEditor<T>
@@ -204,42 +216,20 @@ where
                             let start = range.start;
                             self.buffer.replace_range(range, "");
                             self.update_layout(font_cx, layout_cx);
-                            self.selection = if start == self.buffer.len() {
-                                Selection::from_index(
-                                    &self.layout,
-                                    start.saturating_sub(1),
-                                    Affinity::Upstream,
-                                )
-                            } else {
-                                Selection::from_index(
-                                    &self.layout,
-                                    start.min(self.buffer.len()),
-                                    Affinity::Downstream,
-                                )
-                            };
+                            self.set_selection(self.cursor_at(start).into());
                         }
                     } else {
                         self.replace_selection(font_cx, layout_cx, "");
                     }
                 }
                 DeleteWord => {
-                    let start = self.selection.insertion_index();
+                    let start = self.selection.focus().text_range().start;
                     if self.selection.is_collapsed() {
-                        let end = self
-                            .selection
-                            .focus()
-                            .next_word(&self.layout)
-                            .text_range()
-                            .end;
+                        let end = self.cursor_at(start).next_word(&self.layout).index();
 
                         self.buffer.replace_range(start..end, "");
                         self.update_layout(font_cx, layout_cx);
-                        let (start, affinity) = if start > 0 {
-                            (start - 1, Affinity::Upstream)
-                        } else {
-                            (start, Affinity::Downstream)
-                        };
-                        self.selection = Selection::from_index(&self.layout, start, affinity);
+                        self.set_selection(self.cursor_at(start).into());
                     } else {
                         self.replace_selection(font_cx, layout_cx, "");
                     }
@@ -263,12 +253,7 @@ where
                         {
                             self.buffer.replace_range(start..end, "");
                             self.update_layout(font_cx, layout_cx);
-                            let (start, affinity) = if start > 0 {
-                                (start - 1, Affinity::Upstream)
-                            } else {
-                                (start, Affinity::Downstream)
-                            };
-                            self.selection = Selection::from_index(&self.layout, start, affinity);
+                            self.set_selection(self.cursor_at(start).into());
                         }
                     } else {
                         self.replace_selection(font_cx, layout_cx, "");
@@ -286,12 +271,7 @@ where
 
                         self.buffer.replace_range(start..end, "");
                         self.update_layout(font_cx, layout_cx);
-                        let (start, affinity) = if start > 0 {
-                            (start - 1, Affinity::Upstream)
-                        } else {
-                            (start, Affinity::Downstream)
-                        };
-                        self.selection = Selection::from_index(&self.layout, start, affinity);
+                        self.set_selection(self.cursor_at(start).into());
                     } else {
                         self.replace_selection(font_cx, layout_cx, "");
                     }
@@ -302,6 +282,12 @@ where
                 MoveToPoint(x, y) => {
                     self.refresh_layout(font_cx, layout_cx);
                     self.set_selection(Selection::from_point(&self.layout, x, y));
+                }
+                MoveToByte(index) => {
+                    if self.buffer.is_char_boundary(index) {
+                        self.refresh_layout(font_cx, layout_cx);
+                        self.set_selection(self.cursor_at(index).into());
+                    }
                 }
                 MoveToTextStart => {
                     self.set_selection(self.selection.move_lines(&self.layout, isize::MIN, false));
@@ -404,9 +390,40 @@ where
                     // FIXME: This is usually the wrong way to handle selection extension for mouse moves, but not a regression.
                     self.set_selection(self.selection.extend_to_point(&self.layout, x, y));
                 }
+                ExtendSelectionToByte(index) => {
+                    if self.buffer.is_char_boundary(index) {
+                        self.refresh_layout(font_cx, layout_cx);
+                        self.set_selection(
+                            self.selection.maybe_extend(self.cursor_at(index), true),
+                        );
+                    }
+                }
+                SelectByteRange(start, end) => {
+                    if self.buffer.is_char_boundary(end) && self.buffer.is_char_boundary(end) {
+                        self.refresh_layout(font_cx, layout_cx);
+                        self.set_selection(
+                            Selection::from(self.cursor_at(start))
+                                .maybe_extend(self.cursor_at(end), true),
+                        );
+                    }
+                }
             }
         }
         self.refresh_layout(font_cx, layout_cx);
+    }
+
+    /// Make a cursor at a given byte index
+    fn cursor_at(&self, index: usize) -> Cursor {
+        // FIXME: `Selection` should make this easier
+        if index >= self.buffer.len() {
+            Cursor::from_index(
+                &self.layout,
+                self.buffer.len().saturating_sub(1),
+                Affinity::Upstream,
+            )
+        } else {
+            Cursor::from_index(&self.layout, index, Affinity::Downstream)
+        }
     }
 
     fn replace_selection(
@@ -424,20 +441,7 @@ where
         }
 
         self.update_layout(font_cx, layout_cx);
-        let new_start = start.saturating_add(s.len());
-        self.selection = if new_start == self.buffer.len() {
-            Selection::from_index(
-                &self.layout,
-                new_start.saturating_sub(1),
-                Affinity::Upstream,
-            )
-        } else {
-            Selection::from_index(
-                &self.layout,
-                new_start.min(self.buffer.len()),
-                Affinity::Downstream,
-            )
-        };
+        self.set_selection(self.cursor_at(start.saturating_add(s.len())).into());
     }
 
     /// Update the selection, and nudge the `Generation` if something other than `h_pos` changed.
