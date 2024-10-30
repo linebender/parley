@@ -531,7 +531,7 @@ impl Selection {
     /// visual order.
     ///
     /// If `extend` is `true` then the current anchor will be retained,
-    /// otherwise the new selection will be collapsed.    
+    /// otherwise the new selection will be collapsed.
     #[must_use]
     pub fn previous_visual<B: Brush>(
         &self,
@@ -552,7 +552,7 @@ impl Selection {
     /// Returns a new selection with the focus moved to the next word.
     ///
     /// If `extend` is `true` then the current anchor will be retained,
-    /// otherwise the new selection will be collapsed.    
+    /// otherwise the new selection will be collapsed.
     #[must_use]
     pub fn next_word<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
         self.maybe_extend(self.focus.next_word(layout), extend)
@@ -561,7 +561,7 @@ impl Selection {
     /// Returns a new selection with the focus moved to the previous word.
     ///
     /// If `extend` is `true` then the current anchor will be retained,
-    /// otherwise the new selection will be collapsed.     
+    /// otherwise the new selection will be collapsed.
     #[must_use]
     pub fn previous_word<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
         self.maybe_extend(self.focus.previous_word(layout), extend)
@@ -583,7 +583,7 @@ impl Selection {
     /// current line.
     ///
     /// If `extend` is `true` then the current anchor will be retained,
-    /// otherwise the new selection will be collapsed.    
+    /// otherwise the new selection will be collapsed.
     #[must_use]
     pub fn line_start<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
         if let Some(line) = self.focus.path.line(layout) {
@@ -600,7 +600,7 @@ impl Selection {
     /// current line.
     ///
     /// If `extend` is `true` then the current anchor will be retained,
-    /// otherwise the new selection will be collapsed.     
+    /// otherwise the new selection will be collapsed.
     #[must_use]
     pub fn line_end<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
         if let Some(line) = self.focus.path.line(layout) {
@@ -621,7 +621,7 @@ impl Selection {
     /// current horizontal position will be maintained.
     ///
     /// If `extend` is `true` then the current anchor will be retained,
-    /// otherwise the new selection will be collapsed.     
+    /// otherwise the new selection will be collapsed.
     #[must_use]
     pub fn next_line<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
         self.move_lines(layout, 1, extend)
@@ -631,7 +631,7 @@ impl Selection {
     /// current horizontal position will be maintained.
     ///
     /// If `extend` is `true` then the current anchor will be retained,
-    /// otherwise the new selection will be collapsed.     
+    /// otherwise the new selection will be collapsed.
     #[must_use]
     pub fn previous_line<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
         self.move_lines(layout, -1, extend)
@@ -645,7 +645,7 @@ impl Selection {
     /// toward next lines.
     ///
     /// If `extend` is `true` then the current anchor will be retained,
-    /// otherwise the new selection will be collapsed.  
+    /// otherwise the new selection will be collapsed.
     #[must_use]
     pub fn move_lines<B: Brush>(&self, layout: &Layout<B>, delta: isize, extend: bool) -> Self {
         if delta == 0 {
