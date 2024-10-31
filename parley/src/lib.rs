@@ -108,7 +108,7 @@ pub use inline_box::InlineBox;
 pub use layout::Layout;
 
 #[cfg(feature = "std")]
-pub use layout::editor::{PlainEditor, PlainEditorOp};
+pub use layout::editor::{PlainEditor, PlainEditorTxn};
 
 pub use layout::*;
 pub use style::*;

@@ -16,7 +16,7 @@ use winit::window::Window;
 
 // #[path = "text2.rs"]
 mod text;
-use parley::{GenericFamily, PlainEditorOp, StyleProperty};
+use parley::{GenericFamily, StyleProperty};
 
 // Simple struct to hold the state of the renderer
 pub struct ActiveRenderState<'s> {
@@ -65,11 +65,11 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
 
         let size = window.inner_size();
 
-        self.editor.transact([
-            PlainEditorOp::SetScale(1.0),
-            PlainEditorOp::SetWidth(Some(size.width as f32 - 2f32 * text::INSET)),
-            PlainEditorOp::SetText(text::LOREM.into()),
-        ]);
+        self.editor.transact(|txn| {
+            txn.set_scale(1.0);
+            txn.set_width(Some(size.width as f32 - 2f32 * text::INSET));
+            txn.set_text(text::LOREM);
+        });
 
         // Create a vello Surface
         let surface_future = {
@@ -148,15 +148,15 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
             WindowEvent::Resized(size) => {
                 self.context
                     .resize_surface(&mut render_state.surface, size.width, size.height);
-                self.editor.transact([
-                    PlainEditorOp::SetScale(1.0),
-                    PlainEditorOp::SetWidth(Some(size.width as f32 - 2f32 * text::INSET)),
-                    PlainEditorOp::SetDefaultStyle(Arc::new([
+                self.editor.transact(|txn| {
+                    txn.set_scale(1.0);
+                    txn.set_width(Some(size.width as f32 - 2f32 * text::INSET));
+                    txn.set_default_style(Arc::new([
                         StyleProperty::FontSize(32.0),
                         StyleProperty::LineHeight(1.2),
                         GenericFamily::SystemUi.into(),
-                    ])),
-                ]);
+                    ]));
+                });
                 render_state.window.request_redraw();
             }
 

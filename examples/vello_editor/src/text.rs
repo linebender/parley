@@ -10,13 +10,10 @@ use winit::{
     keyboard::{Key, NamedKey},
 };
 
-extern crate alloc;
-use alloc::{sync::Arc, vec};
-
-use core::{default::Default, iter::IntoIterator};
+use core::default::Default;
 
 pub use parley::layout::editor::Generation;
-use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorOp};
+use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorTxn};
 
 pub const INSET: f32 = 32.0;
 
@@ -33,25 +30,19 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn transact(&mut self, t: impl IntoIterator<Item = PlainEditorOp<Color>>) {
+    pub fn transact(&mut self, callback: impl FnOnce(&mut PlainEditorTxn<'_, Color>)) {
         self.editor
-            .transact(&mut self.font_cx, &mut self.layout_cx, t);
+            .transact(&mut self.font_cx, &mut self.layout_cx, callback);
     }
 
-    pub fn text(&self) -> Arc<str> {
+    pub fn text(&self) -> &str {
         self.editor.text()
     }
 
     pub fn handle_event(&mut self, event: WindowEvent) {
         match event {
             WindowEvent::Resized(size) => {
-                self.editor.transact(
-                    &mut self.font_cx,
-                    &mut self.layout_cx,
-                    [PlainEditorOp::SetWidth(Some(
-                        size.width as f32 - 2f32 * INSET,
-                    ))],
-                );
+                self.transact(|txn| txn.set_width(Some(size.width as f32 - 2f32 * INSET)));
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = Some(modifiers);
@@ -75,127 +66,134 @@ impl Editor {
                     })
                     .unwrap_or_default();
 
-                self.editor.transact(
-                    &mut self.font_cx,
-                    &mut self.layout_cx,
-                    match event.logical_key {
-                        #[cfg(not(any(target_os = "android", target_os = "ios")))]
-                        Key::Character(c)
-                            if action_mod && matches!(c.as_str(), "c" | "x" | "v") =>
-                        {
-                            use clipboard_rs::{Clipboard, ClipboardContext};
-                            use parley::layout::editor::ActiveText;
+                match event.logical_key {
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                    Key::Character(c) if action_mod && matches!(c.as_str(), "c" | "x" | "v") => {
+                        use clipboard_rs::{Clipboard, ClipboardContext};
+                        use parley::layout::editor::ActiveText;
 
-                            match c.to_lowercase().as_str() {
-                                "c" => {
-                                    if let ActiveText::Selection(text) = self.editor.active_text() {
-                                        let cb = ClipboardContext::new().unwrap();
-                                        cb.set_text(text.to_owned()).ok();
-                                    }
-                                    vec![]
-                                }
-                                "x" => {
-                                    if let ActiveText::Selection(text) = self.editor.active_text() {
-                                        let cb = ClipboardContext::new().unwrap();
-                                        cb.set_text(text.to_owned()).ok();
-                                        vec![PlainEditorOp::DeleteSelection]
-                                    } else {
-                                        vec![]
-                                    }
-                                }
-                                "v" => {
+                        match c.to_lowercase().as_str() {
+                            "c" => {
+                                if let ActiveText::Selection(text) = self.editor.active_text() {
                                     let cb = ClipboardContext::new().unwrap();
-                                    let text = cb.get_text().unwrap_or_default();
-                                    vec![PlainEditorOp::InsertOrReplaceSelection(text.into())]
+                                    cb.set_text(text.to_owned()).ok();
                                 }
-                                _ => vec![],
                             }
+                            "x" => {
+                                if let ActiveText::Selection(text) = self.editor.active_text() {
+                                    let cb = ClipboardContext::new().unwrap();
+                                    cb.set_text(text.to_owned()).ok();
+                                    self.transact(|txn| txn.delete_selection());
+                                }
+                            }
+                            "v" => {
+                                let cb = ClipboardContext::new().unwrap();
+                                let text = cb.get_text().unwrap_or_default();
+                                self.transact(|txn| txn.insert_or_replace_selection(&text));
+                            }
+                            _ => (),
                         }
-                        Key::Character(c)
-                            if action_mod && matches!(c.to_lowercase().as_str(), "a") =>
-                        {
-                            vec![if shift {
-                                PlainEditorOp::CollapseSelection
-                            } else {
-                                PlainEditorOp::SelectAll
-                            }]
-                        }
-                        Key::Named(NamedKey::ArrowLeft) => vec![if action_mod {
+                    }
+                    Key::Character(c) if action_mod && matches!(c.to_lowercase().as_str(), "a") => {
+                        self.transact(|txn| {
                             if shift {
-                                PlainEditorOp::SelectWordLeft
+                                txn.collapse_selection();
                             } else {
-                                PlainEditorOp::MoveWordLeft
+                                txn.select_all();
+                            }
+                        });
+                    }
+                    Key::Named(NamedKey::ArrowLeft) => self.transact(|txn| {
+                        if action_mod {
+                            if shift {
+                                txn.select_word_left();
+                            } else {
+                                txn.move_word_left();
                             }
                         } else if shift {
-                            PlainEditorOp::SelectLeft
+                            txn.select_left();
                         } else {
-                            PlainEditorOp::MoveLeft
-                        }],
-                        Key::Named(NamedKey::ArrowRight) => vec![if action_mod {
+                            txn.move_left();
+                        }
+                    }),
+                    Key::Named(NamedKey::ArrowRight) => self.transact(|txn| {
+                        if action_mod {
                             if shift {
-                                PlainEditorOp::SelectWordRight
+                                txn.select_word_right();
                             } else {
-                                PlainEditorOp::MoveWordRight
+                                txn.move_word_right();
                             }
                         } else if shift {
-                            PlainEditorOp::SelectRight
+                            txn.select_right();
                         } else {
-                            PlainEditorOp::MoveRight
-                        }],
-                        Key::Named(NamedKey::ArrowUp) => vec![if shift {
-                            PlainEditorOp::SelectUp
+                            txn.move_right();
+                        }
+                    }),
+                    Key::Named(NamedKey::ArrowUp) => self.transact(|txn| {
+                        if shift {
+                            txn.select_up();
                         } else {
-                            PlainEditorOp::MoveUp
-                        }],
-                        Key::Named(NamedKey::ArrowDown) => vec![if shift {
-                            PlainEditorOp::SelectDown
+                            txn.move_up();
+                        }
+                    }),
+                    Key::Named(NamedKey::ArrowDown) => self.transact(|txn| {
+                        if shift {
+                            txn.select_down();
                         } else {
-                            PlainEditorOp::MoveDown
-                        }],
-                        Key::Named(NamedKey::Home) => vec![if action_mod {
+                            txn.move_down();
+                        }
+                    }),
+                    Key::Named(NamedKey::Home) => self.transact(|txn| {
+                        if action_mod {
                             if shift {
-                                PlainEditorOp::SelectToTextStart
+                                txn.select_to_text_start();
                             } else {
-                                PlainEditorOp::MoveToTextStart
+                                txn.move_to_text_start();
                             }
                         } else if shift {
-                            PlainEditorOp::SelectToLineStart
+                            txn.select_to_line_start();
                         } else {
-                            PlainEditorOp::MoveToLineStart
-                        }],
-                        Key::Named(NamedKey::End) => vec![if action_mod {
+                            txn.move_to_line_start();
+                        }
+                    }),
+                    Key::Named(NamedKey::End) => self.transact(|txn| {
+                        if action_mod {
                             if shift {
-                                PlainEditorOp::SelectToTextEnd
+                                txn.select_to_text_end();
                             } else {
-                                PlainEditorOp::MoveToTextEnd
+                                txn.move_to_text_end();
                             }
                         } else if shift {
-                            PlainEditorOp::SelectToLineEnd
+                            txn.select_to_line_end();
                         } else {
-                            PlainEditorOp::MoveToLineEnd
-                        }],
-                        Key::Named(NamedKey::Delete) => vec![if action_mod {
-                            PlainEditorOp::DeleteWord
+                            txn.move_to_line_end();
+                        }
+                    }),
+                    Key::Named(NamedKey::Delete) => self.transact(|txn| {
+                        if action_mod {
+                            txn.delete_word();
                         } else {
-                            PlainEditorOp::Delete
-                        }],
-                        Key::Named(NamedKey::Backspace) => vec![if action_mod {
-                            PlainEditorOp::BackdeleteWord
+                            txn.delete();
+                        }
+                    }),
+                    Key::Named(NamedKey::Backspace) => self.transact(|txn| {
+                        if action_mod {
+                            txn.backdelete_word();
                         } else {
-                            PlainEditorOp::Backdelete
-                        }],
-                        Key::Named(NamedKey::Enter) => {
-                            vec![PlainEditorOp::InsertOrReplaceSelection("\n".into())]
+                            txn.backdelete();
                         }
-                        Key::Named(NamedKey::Space) => {
-                            vec![PlainEditorOp::InsertOrReplaceSelection(" ".into())]
-                        }
-                        Key::Character(s) => {
-                            vec![PlainEditorOp::InsertOrReplaceSelection(s.into())]
-                        }
-                        _ => vec![],
-                    },
-                );
+                    }),
+                    Key::Named(NamedKey::Enter) => {
+                        self.transact(|txn| txn.insert_or_replace_selection("\n"));
+                    }
+                    Key::Named(NamedKey::Space) => {
+                        self.transact(|txn| txn.insert_or_replace_selection(" "));
+                    }
+                    Key::Character(s) => {
+                        self.transact(|txn| txn.insert_or_replace_selection(&s));
+                    }
+                    _ => (),
+                }
 
                 // println!("Active text: {:?}", self.active_text());
             }
@@ -203,30 +201,27 @@ impl Editor {
                 phase, location, ..
             }) => {
                 use winit::event::TouchPhase::*;
-                self.editor.transact(
-                    &mut self.font_cx,
-                    &mut self.layout_cx,
-                    match phase {
-                        Started => {
-                            // TODO: start a timer to convert to a SelectWordAtPoint
-                            vec![PlainEditorOp::MoveToPoint(
+                match phase {
+                    Started => {
+                        // TODO: start a timer to convert to a SelectWordAtPoint
+                        self.transact(|txn| {
+                            txn.move_to_point(location.x as f32 - INSET, location.y as f32 - INSET);
+                        });
+                    }
+                    Cancelled => {
+                        self.transact(|txn| txn.collapse_selection());
+                    }
+                    Moved => {
+                        // TODO: cancel SelectWordAtPoint timer
+                        self.transact(|txn| {
+                            txn.extend_selection_to_point(
                                 location.x as f32 - INSET,
                                 location.y as f32 - INSET,
-                            )]
-                        }
-                        Cancelled => {
-                            vec![PlainEditorOp::CollapseSelection]
-                        }
-                        Moved => {
-                            // TODO: cancel SelectWordAtPoint timer
-                            vec![PlainEditorOp::ExtendSelectionToPoint(
-                                location.x as f32 - INSET,
-                                location.y as f32 - INSET,
-                            )]
-                        }
-                        Ended => vec![],
-                    },
-                );
+                            );
+                        });
+                    }
+                    Ended => (),
+                }
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 if button == winit::event::MouseButton::Left {
@@ -243,24 +238,13 @@ impl Editor {
                             self.click_count = 1;
                         }
                         self.last_click_time = Some(now);
-                        self.editor.transact(
-                            &mut self.font_cx,
-                            &mut self.layout_cx,
-                            match self.click_count {
-                                2 => [PlainEditorOp::SelectWordAtPoint(
-                                    self.cursor_pos.0,
-                                    self.cursor_pos.1,
-                                )],
-                                3 => [PlainEditorOp::SelectLineAtPoint(
-                                    self.cursor_pos.0,
-                                    self.cursor_pos.1,
-                                )],
-                                _ => [PlainEditorOp::MoveToPoint(
-                                    self.cursor_pos.0,
-                                    self.cursor_pos.1,
-                                )],
-                            },
-                        );
+                        let click_count = self.click_count;
+                        let cursor_pos = self.cursor_pos;
+                        self.transact(|txn| match click_count {
+                            2 => txn.select_word_at_point(cursor_pos.0, cursor_pos.1),
+                            3 => txn.select_line_at_point(cursor_pos.0, cursor_pos.1),
+                            _ => txn.move_to_point(cursor_pos.0, cursor_pos.1),
+                        });
 
                         // println!("Active text: {:?}", self.active_text());
                     }
@@ -271,14 +255,8 @@ impl Editor {
                 self.cursor_pos = (position.x as f32 - INSET, position.y as f32 - INSET);
                 // macOS seems to generate a spurious move after selecting word?
                 if self.pointer_down && prev_pos != self.cursor_pos {
-                    self.editor.transact(
-                        &mut self.font_cx,
-                        &mut self.layout_cx,
-                        [PlainEditorOp::ExtendSelectionToPoint(
-                            self.cursor_pos.0,
-                            self.cursor_pos.1,
-                        )],
-                    );
+                    let cursor_pos = self.cursor_pos;
+                    self.transact(|txn| txn.extend_selection_to_point(cursor_pos.0, cursor_pos.1));
                     // println!("Active text: {:?}", self.active_text());
                 }
             }
