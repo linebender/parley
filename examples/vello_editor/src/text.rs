@@ -9,7 +9,6 @@ use winit::{
     event::{Modifiers, Touch, WindowEvent},
     keyboard::{Key, NamedKey},
 };
-
 use core::default::Default;
 
 pub use parley::layout::editor::Generation;
@@ -26,6 +25,7 @@ pub struct Editor {
     click_count: u32,
     pointer_down: bool,
     cursor_pos: (f32, f32),
+    cursor_blink: bool,
     modifiers: Option<Modifiers>,
 }
 
@@ -37,6 +37,10 @@ impl Editor {
 
     pub fn text(&self) -> &str {
         self.editor.text()
+    }
+
+    pub fn cursor_blink(&mut self) {
+        self.cursor_blink = !self.cursor_blink;
     }
 
     pub fn handle_event(&mut self, event: WindowEvent) {
@@ -278,10 +282,10 @@ impl Editor {
             scene.fill(Fill::NonZero, transform, Color::STEEL_BLUE, None, &rect);
         }
         if let Some(cursor) = self.editor.selection_strong_geometry(1.5) {
-            scene.fill(Fill::NonZero, transform, Color::WHITE, None, &cursor);
+            scene.fill(Fill::NonZero, transform, if self.cursor_blink {Color::TRANSPARENT} else {Color::WHITE}, None, &cursor);
         };
         if let Some(cursor) = self.editor.selection_weak_geometry(1.5) {
-            scene.fill(Fill::NonZero, transform, Color::LIGHT_GRAY, None, &cursor);
+            scene.fill(Fill::NonZero, transform, if self.cursor_blink { Color::TRANSPARENT } else {Color::LIGHT_GRAY}, None, &cursor);
         };
         for line in self.editor.lines() {
             for item in line.items() {

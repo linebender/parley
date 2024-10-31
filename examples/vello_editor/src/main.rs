@@ -4,6 +4,7 @@
 use anyhow::Result;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use vello::peniko::Color;
 use vello::util::{RenderContext, RenderSurface};
 use vello::wgpu;
@@ -50,6 +51,8 @@ struct SimpleVelloApp<'s> {
 
     /// The last generation of the editor layout that we drew.
     last_drawn_generation: text::Generation,
+
+    last_blink_time: Instant
 }
 
 impl ApplicationHandler for SimpleVelloApp<'_> {
@@ -106,7 +109,10 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
         // Save the Window and Surface to a state variable
         self.state = RenderState::Active(ActiveRenderState { window, surface });
 
-        event_loop.set_control_flow(ControlFlow::Wait);
+        let now = Instant::now();
+        let next_blink_time = now + Duration::from_secs_f32(0.5);
+        self.last_blink_time = now;
+        event_loop.set_control_flow(ControlFlow::WaitUntil(next_blink_time));
     }
 
     fn suspended(&mut self, event_loop: &ActiveEventLoop) {
@@ -116,6 +122,31 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
         event_loop.set_control_flow(ControlFlow::Wait);
     }
 
+    fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
+        let now: Instant = Instant::now();
+    
+        match cause {
+            StartCause::Init => {
+                let next_blink_time = now + Duration::from_secs_f32(0.5);
+                self.last_blink_time = now;
+                event_loop.set_control_flow(ControlFlow::WaitUntil(next_blink_time));
+            }
+            StartCause::ResumeTimeReached { .. } => {
+                self.editor.cursor_blink();
+                // redraw
+                self.last_drawn_generation = text::Generation::default();
+                
+                self.last_blink_time = now;
+                let next_blink_time = now + Duration::from_secs_f32(0.5);
+                event_loop.set_control_flow(ControlFlow::WaitUntil(next_blink_time));
+                
+                if let RenderState::Active(state) = &self.state {
+                    state.window.request_redraw();
+                }
+            }
+            _ => {}
+        }
+    }
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
@@ -224,6 +255,7 @@ fn main() -> Result<()> {
         scene: Scene::new(),
         editor: text::Editor::default(),
         last_drawn_generation: Default::default(),
+        last_blink_time: Instant::now(),
     };
 
     // Create and run a winit event loop
