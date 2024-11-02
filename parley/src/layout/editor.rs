@@ -1,7 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use core::{cmp::PartialEq, default::Default, fmt::Debug, iter::IntoIterator};
+use core::{cmp::PartialEq, default::Default, fmt::Debug};
 
 use crate::{
     layout::{
@@ -83,333 +83,417 @@ where
     }
 }
 
-/// Operations on a `PlainEditor` for `PlainEditor::transact`.
-#[non_exhaustive]
-pub enum PlainEditorOp<T>
+/// The argument passed to the callback of [`PlainEditor::transact`],
+/// on which the caller performs operations.
+pub struct PlainEditorTxn<'a, T>
+where
+    T: Brush + Clone + Debug + PartialEq + Default,
+{
+    editor: &'a mut PlainEditor<T>,
+    font_cx: &'a mut FontContext,
+    layout_cx: &'a mut LayoutContext<T>,
+}
+
+impl<T> PlainEditorTxn<'_, T>
 where
     T: Brush + Clone + Debug + PartialEq + Default,
 {
     /// Replace the whole text buffer.
-    SetText(Arc<str>),
+    pub fn set_text(&mut self, is: &str) {
+        self.editor.buffer.clear();
+        self.editor.buffer.push_str(is);
+        self.editor.layout_dirty = true;
+    }
+
     /// Set the width of the layout.
-    SetWidth(Option<f32>),
+    pub fn set_width(&mut self, width: Option<f32>) {
+        self.editor.width = width;
+        self.editor.layout_dirty = true;
+    }
+
     /// Set the scale for the layout.
-    SetScale(f32),
+    pub fn set_scale(&mut self, scale: f32) {
+        self.editor.scale = scale;
+        self.editor.layout_dirty = true;
+    }
+
     /// Set the default style for the layout.
-    SetDefaultStyle(Arc<[StyleProperty<'static, T>]>),
+    pub fn set_default_style(&mut self, style: Arc<[StyleProperty<'static, T>]>) {
+        self.editor.default_style = style;
+        self.editor.layout_dirty = true;
+    }
+
     /// Insert at cursor, or replace selection.
-    InsertOrReplaceSelection(Arc<str>),
+    pub fn insert_or_replace_selection(&mut self, s: &str) {
+        self.editor
+            .replace_selection(self.font_cx, self.layout_cx, s);
+    }
+
     /// Delete the selection.
-    DeleteSelection,
+    pub fn delete_selection(&mut self) {
+        self.insert_or_replace_selection("");
+    }
+
     /// Delete the selection or the next cluster (typical ‘delete’ behavior).
-    Delete,
+    pub fn delete(&mut self) {
+        if self.editor.selection.is_collapsed() {
+            let range = self.editor.selection.focus().text_range();
+            if !range.is_empty() {
+                let start = range.start;
+                self.editor.buffer.replace_range(range, "");
+                self.update_layout();
+                self.editor
+                    .set_selection(self.editor.cursor_at(start).into());
+            }
+        } else {
+            self.delete_selection();
+        }
+    }
+
     /// Delete the selection or up to the next word boundary (typical ‘ctrl + delete’ behavior).
-    DeleteWord,
+    pub fn delete_word(&mut self) {
+        let start = self.editor.selection.focus().text_range().start;
+        if self.editor.selection.is_collapsed() {
+            let end = self
+                .editor
+                .cursor_at(start)
+                .next_word(&self.editor.layout)
+                .index();
+
+            self.editor.buffer.replace_range(start..end, "");
+            self.update_layout();
+            self.editor
+                .set_selection(self.editor.cursor_at(start).into());
+        } else {
+            self.delete_selection();
+        }
+    }
+
     /// Delete the selection or the previous cluster (typical ‘backspace’ behavior).
-    Backdelete,
+    pub fn backdelete(&mut self) {
+        let end = self.editor.selection.focus().text_range().start;
+        if self.editor.selection.is_collapsed() {
+            if let Some(start) = self
+                .editor
+                .selection
+                .focus()
+                .cluster_path()
+                .cluster(&self.editor.layout)
+                .map(|x| {
+                    if self.editor.selection.focus().affinity() == Affinity::Upstream {
+                        Some(x)
+                    } else {
+                        x.previous_logical()
+                    }
+                })
+                .and_then(|c| c.map(|x| x.text_range().start))
+            {
+                self.editor.buffer.replace_range(start..end, "");
+                self.update_layout();
+                self.editor
+                    .set_selection(self.editor.cursor_at(start).into());
+            }
+        } else {
+            self.delete_selection();
+        }
+    }
+
     /// Delete the selection or back to the previous word boundary (typical ‘ctrl + backspace’ behavior).
-    BackdeleteWord,
+    pub fn backdelete_word(&mut self) {
+        let end = self.editor.selection.focus().text_range().start;
+        if self.editor.selection.is_collapsed() {
+            let start = self
+                .editor
+                .selection
+                .focus()
+                .previous_word(&self.editor.layout)
+                .text_range()
+                .start;
+
+            self.editor.buffer.replace_range(start..end, "");
+            self.update_layout();
+            self.editor
+                .set_selection(self.editor.cursor_at(start).into());
+        } else {
+            self.delete_selection();
+        }
+    }
+
     /// Move the cursor to the cluster boundary nearest this point in the layout.
-    MoveToPoint(f32, f32),
+    pub fn move_to_point(&mut self, x: f32, y: f32) {
+        self.refresh_layout();
+        self.editor
+            .set_selection(Selection::from_point(&self.editor.layout, x, y));
+    }
+
     /// Move the cursor to a byte index.
     ///
     /// No-op if index is not a char boundary.
-    MoveToByte(usize),
+    pub fn move_to_byte(&mut self, index: usize) {
+        if self.editor.buffer.is_char_boundary(index) {
+            self.refresh_layout();
+            self.editor
+                .set_selection(self.editor.cursor_at(index).into());
+        }
+    }
+
     /// Move the cursor to the start of the buffer.
-    MoveToTextStart,
+    pub fn move_to_text_start(&mut self) {
+        self.editor.set_selection(self.editor.selection.move_lines(
+            &self.editor.layout,
+            isize::MIN,
+            false,
+        ));
+    }
+
     /// Move the cursor to the start of the physical line.
-    MoveToLineStart,
+    pub fn move_to_line_start(&mut self) {
+        self.editor
+            .set_selection(self.editor.selection.line_start(&self.editor.layout, false));
+    }
+
     /// Move the cursor to the end of the buffer.
-    MoveToTextEnd,
+    pub fn move_to_text_end(&mut self) {
+        self.editor.set_selection(self.editor.selection.move_lines(
+            &self.editor.layout,
+            isize::MAX,
+            false,
+        ));
+    }
+
     /// Move the cursor to the end of the physical line.
-    MoveToLineEnd,
+    pub fn move_to_line_end(&mut self) {
+        self.editor
+            .set_selection(self.editor.selection.line_end(&self.editor.layout, false));
+    }
+
     /// Move up to the closest physical cluster boundary on the previous line, preserving the horizontal position for repeated movements.
-    MoveUp,
+    pub fn move_up(&mut self) {
+        self.editor.set_selection(
+            self.editor
+                .selection
+                .previous_line(&self.editor.layout, false),
+        );
+    }
+
     /// Move down to the closest physical cluster boundary on the next line, preserving the horizontal position for repeated movements.
-    MoveDown,
+    pub fn move_down(&mut self) {
+        self.editor
+            .set_selection(self.editor.selection.next_line(&self.editor.layout, false));
+    }
+
     /// Move to the next cluster left in visual order.
-    MoveLeft,
+    pub fn move_left(&mut self) {
+        self.editor
+            .set_selection(self.editor.selection.previous_visual(
+                &self.editor.layout,
+                self.editor.cursor_mode,
+                false,
+            ));
+    }
+
     /// Move to the next cluster right in visual order.
-    MoveRight,
+    pub fn move_right(&mut self) {
+        self.editor.set_selection(self.editor.selection.next_visual(
+            &self.editor.layout,
+            self.editor.cursor_mode,
+            false,
+        ));
+    }
+
     /// Move to the next word boundary left.
-    MoveWordLeft,
+    pub fn move_word_left(&mut self) {
+        self.editor.set_selection(
+            self.editor
+                .selection
+                .previous_word(&self.editor.layout, false),
+        );
+    }
+
     /// Move to the next word boundary right.
-    MoveWordRight,
+    pub fn move_word_right(&mut self) {
+        self.editor
+            .set_selection(self.editor.selection.next_word(&self.editor.layout, false));
+    }
+
     /// Select the whole buffer.
-    SelectAll,
+    pub fn select_all(&mut self) {
+        self.editor.set_selection(
+            Selection::from_index(&self.editor.layout, 0usize, Affinity::default()).move_lines(
+                &self.editor.layout,
+                isize::MAX,
+                true,
+            ),
+        );
+    }
+
     /// Collapse selection into caret.
-    CollapseSelection,
+    pub fn collapse_selection(&mut self) {
+        self.editor.set_selection(self.editor.selection.collapse());
+    }
+
     /// Move the selection focus point to the start of the buffer.
-    SelectToTextStart,
+    pub fn select_to_text_start(&mut self) {
+        self.editor.set_selection(self.editor.selection.move_lines(
+            &self.editor.layout,
+            isize::MIN,
+            true,
+        ));
+    }
+
     /// Move the selection focus point to the start of the physical line.
-    SelectToLineStart,
+    pub fn select_to_line_start(&mut self) {
+        self.editor
+            .set_selection(self.editor.selection.line_start(&self.editor.layout, true));
+    }
+
     /// Move the selection focus point to the end of the buffer.
-    SelectToTextEnd,
+    pub fn select_to_text_end(&mut self) {
+        self.editor.set_selection(self.editor.selection.move_lines(
+            &self.editor.layout,
+            isize::MAX,
+            true,
+        ));
+    }
+
     /// Move the selection focus point to the end of the physical line.
-    SelectToLineEnd,
+    pub fn select_to_line_end(&mut self) {
+        self.editor
+            .set_selection(self.editor.selection.line_end(&self.editor.layout, true));
+    }
+
     /// Move the selection focus point up to the nearest cluster boundary on the previous line, preserving the horizontal position for repeated movements.
-    SelectUp,
+    pub fn select_up(&mut self) {
+        self.editor.set_selection(
+            self.editor
+                .selection
+                .previous_line(&self.editor.layout, true),
+        );
+    }
+
     /// Move the selection focus point down to the nearest cluster boundary on the next line, preserving the horizontal position for repeated movements.
-    SelectDown,
+    pub fn select_down(&mut self) {
+        self.editor
+            .set_selection(self.editor.selection.next_line(&self.editor.layout, true));
+    }
+
     /// Move the selection focus point to the next cluster left in visual order.
-    SelectLeft,
+    pub fn select_left(&mut self) {
+        self.editor
+            .set_selection(self.editor.selection.previous_visual(
+                &self.editor.layout,
+                self.editor.cursor_mode,
+                true,
+            ));
+    }
+
     /// Move the selection focus point to the next cluster right in visual order.
-    SelectRight,
+    pub fn select_right(&mut self) {
+        self.editor.set_selection(self.editor.selection.next_visual(
+            &self.editor.layout,
+            self.editor.cursor_mode,
+            true,
+        ));
+    }
+
     /// Move the selection focus point to the next word boundary left.
-    SelectWordLeft,
+    pub fn select_word_left(&mut self) {
+        self.editor.set_selection(
+            self.editor
+                .selection
+                .previous_word(&self.editor.layout, true),
+        );
+    }
+
     /// Move the selection focus point to the next word boundary right.
-    SelectWordRight,
+    pub fn select_word_right(&mut self) {
+        self.editor
+            .set_selection(self.editor.selection.next_word(&self.editor.layout, true));
+    }
+
     /// Select the word at the point.
-    SelectWordAtPoint(f32, f32),
+    pub fn select_word_at_point(&mut self, x: f32, y: f32) {
+        self.refresh_layout();
+        self.editor
+            .set_selection(Selection::word_from_point(&self.editor.layout, x, y));
+    }
+
     /// Select the physical line at the point.
-    SelectLineAtPoint(f32, f32),
+    pub fn select_line_at_point(&mut self, x: f32, y: f32) {
+        self.refresh_layout();
+        let focus = *Selection::from_point(&self.editor.layout, x, y)
+            .line_start(&self.editor.layout, true)
+            .focus();
+        self.editor
+            .set_selection(Selection::from(focus).line_end(&self.editor.layout, true));
+    }
+
     /// Move the selection focus point to the cluster boundary closest to point.
-    ExtendSelectionToPoint(f32, f32),
+    pub fn extend_selection_to_point(&mut self, x: f32, y: f32) {
+        self.refresh_layout();
+        // FIXME: This is usually the wrong way to handle selection extension for mouse moves, but not a regression.
+        self.editor.set_selection(
+            self.editor
+                .selection
+                .extend_to_point(&self.editor.layout, x, y),
+        );
+    }
+
     /// Move the selection focus point to a byte index.
     ///
     /// No-op if index is not a char boundary.
-    ExtendSelectionToByte(usize),
+    pub fn extend_selection_to_byte(&mut self, index: usize) {
+        if self.editor.buffer.is_char_boundary(index) {
+            self.refresh_layout();
+            self.editor.set_selection(
+                self.editor
+                    .selection
+                    .maybe_extend(self.editor.cursor_at(index), true),
+            );
+        }
+    }
+
     /// Select a range of byte indices
     ///
     /// No-op if either index is not a char boundary.
-    SelectByteRange(usize, usize),
+    pub fn select_byte_range(&mut self, start: usize, end: usize) {
+        if self.editor.buffer.is_char_boundary(start) && self.editor.buffer.is_char_boundary(end) {
+            self.refresh_layout();
+            self.editor.set_selection(
+                Selection::from(self.editor.cursor_at(start))
+                    .maybe_extend(self.editor.cursor_at(end), true),
+            );
+        }
+    }
+
+    fn update_layout(&mut self) {
+        self.editor.update_layout(self.font_cx, self.layout_cx);
+    }
+
+    fn refresh_layout(&mut self) {
+        self.editor.refresh_layout(self.font_cx, self.layout_cx);
+    }
 }
 
 impl<T> PlainEditor<T>
 where
     T: Brush + Clone + Debug + PartialEq + Default,
 {
-    /// Run a series of `PlainEditorOp`s, updating the layout if necessary.
+    /// Run a series of [`PlainEditorTxn`] methods, updating the layout
+    /// if necessary.
     pub fn transact(
         &mut self,
         font_cx: &mut FontContext,
         layout_cx: &mut LayoutContext<T>,
-        t: impl IntoIterator<Item = PlainEditorOp<T>>,
+        callback: impl FnOnce(&mut PlainEditorTxn<'_, T>),
     ) {
-        for op in t.into_iter() {
-            use PlainEditorOp::*;
-            match op {
-                SetText(is) => {
-                    self.buffer.clear();
-                    self.buffer.push_str(&is);
-                    self.layout_dirty = true;
-                }
-                SetWidth(width) => {
-                    self.width = width;
-                    self.layout_dirty = true;
-                }
-                SetScale(scale) => {
-                    self.scale = scale;
-                    self.layout_dirty = true;
-                }
-                SetDefaultStyle(style) => {
-                    self.default_style = style.clone();
-                    self.layout_dirty = true;
-                }
-                DeleteSelection => {
-                    self.replace_selection(font_cx, layout_cx, "");
-                }
-                Delete => {
-                    if self.selection.is_collapsed() {
-                        let range = self.selection.focus().text_range();
-                        if !range.is_empty() {
-                            let start = range.start;
-                            self.buffer.replace_range(range, "");
-                            self.update_layout(font_cx, layout_cx);
-                            self.set_selection(self.cursor_at(start).into());
-                        }
-                    } else {
-                        self.replace_selection(font_cx, layout_cx, "");
-                    }
-                }
-                DeleteWord => {
-                    let start = self.selection.focus().text_range().start;
-                    if self.selection.is_collapsed() {
-                        let end = self.cursor_at(start).next_word(&self.layout).index();
-
-                        self.buffer.replace_range(start..end, "");
-                        self.update_layout(font_cx, layout_cx);
-                        self.set_selection(self.cursor_at(start).into());
-                    } else {
-                        self.replace_selection(font_cx, layout_cx, "");
-                    }
-                }
-                Backdelete => {
-                    let end = self.selection.focus().text_range().start;
-                    if self.selection.is_collapsed() {
-                        if let Some(start) = self
-                            .selection
-                            .focus()
-                            .cluster_path()
-                            .cluster(&self.layout)
-                            .map(|x| {
-                                if self.selection.focus().affinity() == Affinity::Upstream {
-                                    Some(x)
-                                } else {
-                                    x.previous_logical()
-                                }
-                            })
-                            .and_then(|c| c.map(|x| x.text_range().start))
-                        {
-                            self.buffer.replace_range(start..end, "");
-                            self.update_layout(font_cx, layout_cx);
-                            self.set_selection(self.cursor_at(start).into());
-                        }
-                    } else {
-                        self.replace_selection(font_cx, layout_cx, "");
-                    }
-                }
-                BackdeleteWord => {
-                    let end = self.selection.focus().text_range().start;
-                    if self.selection.is_collapsed() {
-                        let start = self
-                            .selection
-                            .focus()
-                            .previous_word(&self.layout)
-                            .text_range()
-                            .start;
-
-                        self.buffer.replace_range(start..end, "");
-                        self.update_layout(font_cx, layout_cx);
-                        self.set_selection(self.cursor_at(start).into());
-                    } else {
-                        self.replace_selection(font_cx, layout_cx, "");
-                    }
-                }
-                InsertOrReplaceSelection(s) => {
-                    self.replace_selection(font_cx, layout_cx, &s);
-                }
-                MoveToPoint(x, y) => {
-                    self.refresh_layout(font_cx, layout_cx);
-                    self.set_selection(Selection::from_point(&self.layout, x, y));
-                }
-                MoveToByte(index) => {
-                    if self.buffer.is_char_boundary(index) {
-                        self.refresh_layout(font_cx, layout_cx);
-                        self.set_selection(self.cursor_at(index).into());
-                    }
-                }
-                MoveToTextStart => {
-                    self.set_selection(self.selection.move_lines(&self.layout, isize::MIN, false));
-                }
-                MoveToLineStart => {
-                    self.set_selection(self.selection.line_start(&self.layout, false));
-                }
-                MoveToTextEnd => {
-                    self.set_selection(self.selection.move_lines(&self.layout, isize::MAX, false));
-                }
-                MoveToLineEnd => {
-                    self.set_selection(self.selection.line_end(&self.layout, false));
-                }
-                MoveUp => {
-                    self.set_selection(self.selection.previous_line(&self.layout, false));
-                }
-                MoveDown => {
-                    self.set_selection(self.selection.next_line(&self.layout, false));
-                }
-                MoveLeft => {
-                    self.set_selection(self.selection.previous_visual(
-                        &self.layout,
-                        self.cursor_mode,
-                        false,
-                    ));
-                }
-                MoveRight => {
-                    self.set_selection(self.selection.next_visual(
-                        &self.layout,
-                        self.cursor_mode,
-                        false,
-                    ));
-                }
-                MoveWordLeft => {
-                    self.set_selection(self.selection.previous_word(&self.layout, false));
-                }
-                MoveWordRight => {
-                    self.set_selection(self.selection.next_word(&self.layout, false));
-                }
-                SelectAll => {
-                    self.set_selection(
-                        Selection::from_index(&self.layout, 0usize, Affinity::default())
-                            .move_lines(&self.layout, isize::MAX, true),
-                    );
-                }
-                CollapseSelection => {
-                    self.set_selection(self.selection.collapse());
-                }
-                SelectToTextStart => {
-                    self.set_selection(self.selection.move_lines(&self.layout, isize::MIN, true));
-                }
-                SelectToLineStart => {
-                    self.set_selection(self.selection.line_start(&self.layout, true));
-                }
-                SelectToTextEnd => {
-                    self.set_selection(self.selection.move_lines(&self.layout, isize::MAX, true));
-                }
-                SelectToLineEnd => {
-                    self.set_selection(self.selection.line_end(&self.layout, true));
-                }
-                SelectUp => {
-                    self.set_selection(self.selection.previous_line(&self.layout, true));
-                }
-                SelectDown => {
-                    self.set_selection(self.selection.next_line(&self.layout, true));
-                }
-                SelectLeft => {
-                    self.set_selection(self.selection.previous_visual(
-                        &self.layout,
-                        self.cursor_mode,
-                        true,
-                    ));
-                }
-                SelectRight => {
-                    self.set_selection(self.selection.next_visual(
-                        &self.layout,
-                        self.cursor_mode,
-                        true,
-                    ));
-                }
-                SelectWordLeft => {
-                    self.set_selection(self.selection.previous_word(&self.layout, true));
-                }
-                SelectWordRight => {
-                    self.set_selection(self.selection.next_word(&self.layout, true));
-                }
-                SelectWordAtPoint(x, y) => {
-                    self.refresh_layout(font_cx, layout_cx);
-                    self.set_selection(Selection::word_from_point(&self.layout, x, y));
-                }
-                SelectLineAtPoint(x, y) => {
-                    self.refresh_layout(font_cx, layout_cx);
-                    let focus = *Selection::from_point(&self.layout, x, y)
-                        .line_start(&self.layout, true)
-                        .focus();
-                    self.set_selection(Selection::from(focus).line_end(&self.layout, true));
-                }
-                ExtendSelectionToPoint(x, y) => {
-                    self.refresh_layout(font_cx, layout_cx);
-                    // FIXME: This is usually the wrong way to handle selection extension for mouse moves, but not a regression.
-                    self.set_selection(self.selection.extend_to_point(&self.layout, x, y));
-                }
-                ExtendSelectionToByte(index) => {
-                    if self.buffer.is_char_boundary(index) {
-                        self.refresh_layout(font_cx, layout_cx);
-                        self.set_selection(
-                            self.selection.maybe_extend(self.cursor_at(index), true),
-                        );
-                    }
-                }
-                SelectByteRange(start, end) => {
-                    if self.buffer.is_char_boundary(end) && self.buffer.is_char_boundary(end) {
-                        self.refresh_layout(font_cx, layout_cx);
-                        self.set_selection(
-                            Selection::from(self.cursor_at(start))
-                                .maybe_extend(self.cursor_at(end), true),
-                        );
-                    }
-                }
-            }
-        }
-        self.refresh_layout(font_cx, layout_cx);
+        let mut txn = PlainEditorTxn {
+            editor: self,
+            font_cx,
+            layout_cx,
+        };
+        callback(&mut txn);
+        txn.update_layout();
     }
 
     /// Make a cursor at a given byte index
@@ -489,9 +573,9 @@ where
         self.layout.lines()
     }
 
-    /// Get a copy of the text content of the buffer.
-    pub fn text(&self) -> Arc<str> {
-        self.buffer.clone().into()
+    /// Borrow the text content of the buffer.
+    pub fn text(&self) -> &str {
+        &self.buffer
     }
 
     /// Get the current `Generation` of the layout, to decide whether to draw.
