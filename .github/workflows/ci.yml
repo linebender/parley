@@ -90,11 +90,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: restore cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.event_name != 'merge_group' }}
-
       - name: install stable toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -106,6 +101,11 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-hack
+
+      - name: restore cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name != 'merge_group' }}
 
       # TODO: Add --target x86_64-unknown-none to the no_std check once we solve the compilation issues with it
       - name: cargo clippy (no_std)
@@ -126,11 +126,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: restore cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.event_name != 'merge_group' }}
-
       - name: install stable toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -142,6 +137,11 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-hack
+
+      - name: restore cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name != 'merge_group' }}
 
       - name: cargo clippy
         run: cargo hack clippy --workspace --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std -- -D warnings
@@ -158,15 +158,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: restore cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.event_name != 'merge_group' }}
-
       - name: install stable toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_STABLE_VER }}
+
+      - name: restore cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name != 'merge_group' }}
 
       - name: cargo test
         run: cargo test --workspace --locked --all-features
@@ -180,11 +180,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: restore cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.event_name != 'merge_group' }}
-
       - name: install msrv toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -194,6 +189,11 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-hack
+
+      - name: restore cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name != 'merge_group' }}
 
       # TODO: Add --target x86_64-unknown-none to the no_std check once we solve the compilation issues with it
       - name: cargo check (no_std)
@@ -211,11 +211,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: restore cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.event_name != 'merge_group' }}
-
       - name: install msrv toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -226,6 +221,11 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-hack
+
+      - name: restore cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name != 'merge_group' }}
 
       - name: cargo check
         run: cargo hack check ${{ env.RUST_MIN_VER_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std
@@ -239,13 +239,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: install nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
       - name: restore cache
         uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.event_name != 'merge_group' }}
-
-      - name: install nightly toolchain
-        uses: dtolnay/rust-toolchain@nightly
 
       # We test documentation using nightly to match docs.rs. This prevents potential breakages
       - name: cargo doc
