@@ -8,7 +8,6 @@ pub mod tree;
 
 pub use range::RangedStyleBuilder;
 
-#[cfg(not(feature = "std"))]
 use alloc::{vec, vec::Vec};
 
 use super::style::{

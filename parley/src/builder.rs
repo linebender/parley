@@ -7,9 +7,9 @@ use super::context::*;
 use super::style::*;
 use super::FontContext;
 
-#[cfg(feature = "std")]
 use super::layout::Layout;
 
+use alloc::string::String;
 use core::ops::RangeBounds;
 
 use crate::inline_box::InlineBox;
@@ -46,7 +46,6 @@ impl<B: Brush> RangedBuilder<'_, B> {
         self.lcx.inline_boxes.push(inline_box);
     }
 
-    #[cfg(feature = "std")]
     pub fn build_into(&mut self, layout: &mut Layout<B>, text: impl AsRef<str>) {
         // Apply RangedStyleBuilder styles to LayoutContext
         self.lcx.ranged_style_builder.finish(&mut self.lcx.styles);
@@ -55,7 +54,6 @@ impl<B: Brush> RangedBuilder<'_, B> {
         build_into_layout(layout, self.scale, text.as_ref(), self.lcx, self.fcx);
     }
 
-    #[cfg(feature = "std")]
     pub fn build(&mut self, text: impl AsRef<str>) -> Layout<B> {
         let mut layout = Layout::default();
         self.build_into(&mut layout, text);
@@ -114,7 +112,6 @@ impl<B: Brush> TreeBuilder<'_, B> {
             .set_white_space_mode(white_space_collapse);
     }
 
-    #[cfg(feature = "std")]
     pub fn build_into(&mut self, layout: &mut Layout<B>) -> String {
         // Apply TreeStyleBuilder styles to LayoutContext
         let text = self.lcx.tree_style_builder.finish(&mut self.lcx.styles);
@@ -127,7 +124,6 @@ impl<B: Brush> TreeBuilder<'_, B> {
         text
     }
 
-    #[cfg(feature = "std")]
     pub fn build(&mut self) -> (Layout<B>, String) {
         let mut layout = Layout::default();
         let text = self.build_into(&mut layout);
@@ -135,7 +131,6 @@ impl<B: Brush> TreeBuilder<'_, B> {
     }
 }
 
-#[cfg(feature = "std")]
 fn build_into_layout<B: Brush>(
     layout: &mut Layout<B>,
     scale: f32,

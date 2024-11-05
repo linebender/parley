@@ -3,7 +3,6 @@
 
 //! Range based style application.
 
-#[cfg(not(feature = "std"))]
 use alloc::vec;
 
 use super::*;

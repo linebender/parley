@@ -1815,6 +1815,7 @@ dependencies = [
 name = "parley"
 version = "0.2.0"
 dependencies = [
+ "core_maths",
  "fontique",
  "peniko",
  "skrifa",

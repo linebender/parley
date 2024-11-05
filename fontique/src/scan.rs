@@ -17,7 +17,6 @@ use smallvec::SmallVec;
 #[cfg(feature = "std")]
 use {super::source::SourcePathMap, std::path::Path};
 
-#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
 #[cfg(feature = "std")]

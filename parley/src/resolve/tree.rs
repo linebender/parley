@@ -3,7 +3,6 @@
 
 //! Hierarchical tree based style application.
 use alloc::borrow::Cow;
-#[cfg(not(feature = "std"))]
 use alloc::{string::String, vec::Vec};
 
 use crate::style::WhiteSpaceCollapse;

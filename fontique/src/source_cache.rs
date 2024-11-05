@@ -3,9 +3,15 @@
 
 //! Cache for font data.
 
-use super::source::{SourceId, SourceInfo, SourceKind};
+#[cfg(feature = "std")]
+use super::source::SourceId;
+use super::source::{SourceInfo, SourceKind};
+#[cfg(feature = "std")]
 use hashbrown::HashMap;
-use peniko::{Blob, WeakBlob};
+use peniko::Blob;
+#[cfg(feature = "std")]
+use peniko::WeakBlob;
+#[cfg(feature = "std")]
 use std::{
     path::Path,
     sync::{Arc, Mutex},
@@ -16,6 +22,7 @@ use std::{
 /// [source cache]: SourceCache
 #[derive(Copy, Clone, Default, Debug)]
 pub struct SourceCacheOptions {
+    #[cfg(feature = "std")]
     /// If true, the source cache will use a secondary shared cache
     /// guaranteeing that all clones will use the same backing store.
     ///
@@ -29,8 +36,11 @@ pub struct SourceCacheOptions {
 /// Cache for font data loaded from the file system.
 #[derive(Clone, Default)]
 pub struct SourceCache {
+    #[cfg(feature = "std")]
     cache: HashMap<SourceId, Entry<Blob<u8>>>,
+    #[cfg(feature = "std")]
     serial: u64,
+    #[cfg(feature = "std")]
     shared: Option<Arc<Mutex<Shared>>>,
 }
 
@@ -38,16 +48,17 @@ impl SourceCache {
     /// Creates an empty cache with the given [options].
     ///
     /// [options]: SourceCacheOptions
+    #[cfg_attr(not(feature = "std"), allow(unused))]
     pub fn new(options: SourceCacheOptions) -> Self {
+        #[cfg(feature = "std")]
         if options.shared {
-            Self {
+            return Self {
                 cache: Default::default(),
                 serial: 0,
                 shared: Some(Arc::new(Mutex::new(Shared::default()))),
-            }
-        } else {
-            Self::default()
+            };
         }
+        Self::default()
     }
 
     /// Creates an empty cache that is suitable for multi-threaded use.
@@ -57,6 +68,7 @@ impl SourceCache {
     ///
     /// This is the same as calling [`SourceCache::new`] with an options
     /// struct where `shared = true`.
+    #[cfg(feature = "std")]
     pub fn new_shared() -> Self {
         Self {
             cache: Default::default(),
@@ -72,49 +84,52 @@ impl SourceCache {
     ///
     /// [blob]: Blob
     pub fn get(&mut self, source: &SourceInfo) -> Option<Blob<u8>> {
-        let path = match &source.kind {
-            SourceKind::Memory(memory) => return Some(memory.clone()),
-            SourceKind::Path(path) => &**path,
-        };
-        use hashbrown::hash_map::Entry as HashEntry;
-        match self.cache.entry(source.id()) {
-            HashEntry::Vacant(vacant) => {
-                if let Some(mut shared) = self.shared.as_ref().and_then(|shared| shared.lock().ok())
-                {
-                    // If we have a backing cache, try to load it there first
-                    // and then propagate the result here.
-                    if let Some(blob) = shared.get(source.id(), path) {
-                        vacant.insert(Entry::Loaded(EntryData {
-                            font_data: blob.clone(),
-                            serial: self.serial,
-                        }));
-                        Some(blob)
-                    } else {
-                        vacant.insert(Entry::Failed);
-                        None
+        match &source.kind {
+            SourceKind::Memory(memory) => Some(memory.clone()),
+            #[cfg(feature = "std")]
+            SourceKind::Path(path) => {
+                use hashbrown::hash_map::Entry as HashEntry;
+                match self.cache.entry(source.id()) {
+                    HashEntry::Vacant(vacant) => {
+                        if let Some(mut shared) =
+                            self.shared.as_ref().and_then(|shared| shared.lock().ok())
+                        {
+                            // If we have a backing cache, try to load it there first
+                            // and then propagate the result here.
+                            if let Some(blob) = shared.get(source.id(), path) {
+                                vacant.insert(Entry::Loaded(EntryData {
+                                    font_data: blob.clone(),
+                                    serial: self.serial,
+                                }));
+                                Some(blob)
+                            } else {
+                                vacant.insert(Entry::Failed);
+                                None
+                            }
+                        } else {
+                            // Otherwise, load it ourselves.
+                            if let Some(blob) = load_blob(path) {
+                                vacant.insert(Entry::Loaded(EntryData {
+                                    font_data: blob.clone(),
+                                    serial: self.serial,
+                                }));
+                                Some(blob)
+                            } else {
+                                vacant.insert(Entry::Failed);
+                                None
+                            }
+                        }
                     }
-                } else {
-                    // Otherwise, load it ourselves.
-                    if let Some(blob) = load_blob(path) {
-                        vacant.insert(Entry::Loaded(EntryData {
-                            font_data: blob.clone(),
-                            serial: self.serial,
-                        }));
-                        Some(blob)
-                    } else {
-                        vacant.insert(Entry::Failed);
-                        None
+                    HashEntry::Occupied(mut occupied) => {
+                        let entry = occupied.get_mut();
+                        match entry {
+                            Entry::Loaded(data) => {
+                                data.serial = self.serial;
+                                Some(data.font_data.clone())
+                            }
+                            Entry::Failed => None,
+                        }
                     }
-                }
-            }
-            HashEntry::Occupied(mut occupied) => {
-                let entry = occupied.get_mut();
-                match entry {
-                    Entry::Loaded(data) => {
-                        data.serial = self.serial;
-                        Some(data.font_data.clone())
-                    }
-                    Entry::Failed => None,
                 }
             }
         }
@@ -122,21 +137,27 @@ impl SourceCache {
 
     /// Removes all cached blobs that have not been accessed in the last
     /// `max_age` times `prune` has been called.
+    #[cfg_attr(not(feature = "std"), allow(unused))]
     pub fn prune(&mut self, max_age: u64, prune_failed: bool) {
-        self.cache.retain(|_, entry| match entry {
-            Entry::Failed => !prune_failed,
-            Entry::Loaded(data) => self.serial.saturating_sub(data.serial) < max_age,
-        });
-        self.serial = self.serial.saturating_add(1);
+        #[cfg(feature = "std")]
+        {
+            self.cache.retain(|_, entry| match entry {
+                Entry::Failed => !prune_failed,
+                Entry::Loaded(data) => self.serial.saturating_sub(data.serial) < max_age,
+            });
+            self.serial = self.serial.saturating_add(1);
+        }
     }
 }
 
 /// Shared backing store for a font data cache.
+#[cfg(feature = "std")]
 #[derive(Default)]
 struct Shared {
     cache: HashMap<SourceId, Entry<WeakBlob<u8>>>,
 }
 
+#[cfg(feature = "std")]
 impl Shared {
     pub fn get(&mut self, id: SourceId, path: &Path) -> Option<Blob<u8>> {
         use hashbrown::hash_map::Entry as HashEntry;
@@ -177,6 +198,7 @@ impl Shared {
     }
 }
 
+#[cfg(feature = "std")]
 #[derive(Clone, Default)]
 enum Entry<T> {
     Loaded(EntryData<T>),
@@ -184,12 +206,14 @@ enum Entry<T> {
     Failed,
 }
 
+#[cfg(feature = "std")]
 #[derive(Clone)]
 struct EntryData<T> {
     font_data: T,
     serial: u64,
 }
 
+#[cfg(feature = "std")]
 pub(crate) fn load_blob(path: &Path) -> Option<Blob<u8>> {
     let file = std::fs::File::open(path).ok()?;
     let mapped = unsafe { memmap2::Mmap::map(&file).ok()? };
