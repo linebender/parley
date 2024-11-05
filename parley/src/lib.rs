@@ -72,6 +72,7 @@
 //! }
 //! ```
 
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 // TODO: Remove this dead code allowance and hide the offending code behind the std feature gate.
 #![cfg_attr(not(feature = "std"), allow(dead_code))]
 #![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
