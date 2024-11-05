@@ -21,5 +21,5 @@ workspace = true
 [target.'cfg(target_os = "android")'.dependencies]
 winit = { version = "0.30.5", features = ["android-native-activity"] }
 
-[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 clipboard-rs = "0.1.11"

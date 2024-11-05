@@ -67,7 +67,7 @@ impl Editor {
                     .unwrap_or_default();
 
                 match event.logical_key {
-                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
                     Key::Character(c) if action_mod && matches!(c.as_str(), "c" | "x" | "v") => {
                         use clipboard_rs::{Clipboard, ClipboardContext};
                         use parley::layout::editor::ActiveText;
