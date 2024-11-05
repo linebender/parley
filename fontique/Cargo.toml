@@ -35,16 +35,16 @@ icu_properties = { version = "1.5.1", optional = true }
 icu_locid = "1.5.0"
 hashbrown = "0.15.0"
 
-[target.'cfg(target_family="windows")'.dependencies]
+[target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.58.0", features = ["implement", "Win32_Graphics_DirectWrite"] }
 windows-core = { version = "0.58" }
 
-[target.'cfg(target_vendor="apple")'.dependencies]
+[target.'cfg(target_vendor = "apple")'.dependencies]
 core-text = "20.1.0"
 core-foundation = "0.9.4"
 objc2 = { version = "0.5.2" }
 objc2-foundation = { version = "0.2.2", features = ["NSArray", "NSEnumerator", "NSPathUtilities", "NSString"] }
 
-[target.'cfg(not(any(target_vendor="apple", target_family="windows")))'.dependencies]
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 fontconfig-cache-parser = "0.2.0"
 roxmltree = "0.19.0"
