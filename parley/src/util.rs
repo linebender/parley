@@ -3,7 +3,8 @@
 
 //! Misc helpers.
 
-#[cfg(all(feature = "libm", not(test)))]
+#[cfg(feature = "libm")]
+#[allow(unused_imports)]
 use core_maths::*;
 
 pub fn nearly_eq(x: f32, y: f32) -> bool {

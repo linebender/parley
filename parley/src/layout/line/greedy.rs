@@ -5,7 +5,8 @@
 
 use alloc::vec::Vec;
 
-#[cfg(all(feature = "libm", not(test)))]
+#[cfg(feature = "libm")]
+#[allow(unused_imports)]
 use core_maths::*;
 
 use crate::layout::alignment::unjustify;

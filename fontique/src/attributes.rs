@@ -3,7 +3,8 @@
 
 //! Properties for specifying font weight, stretch and style.
 
-#[cfg(all(feature = "libm", not(test)))]
+#[cfg(feature = "libm")]
+#[allow(unused_imports)]
 use core_maths::*;
 
 use core::fmt;
