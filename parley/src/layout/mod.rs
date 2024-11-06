@@ -19,10 +19,10 @@ use self::alignment::align;
 use super::style::Brush;
 use crate::{Font, InlineBox};
 #[cfg(feature = "accesskit")]
-use accesskit::{NodeBuilder, NodeId, Role, TextPosition, TreeUpdate};
-#[cfg(feature = "accesskit")]
-use alloc::collections::{BTreeMap, BTreeSet};
+use accesskit::{Node, NodeId, Role, TextPosition, TreeUpdate};
 use core::{cmp::Ordering, ops::Range};
+#[cfg(feature = "accesskit")]
+use hashbrown::{HashMap, HashSet};
 use data::*;
 use swash::text::cluster::{Boundary, ClusterInfo};
 use swash::{GlyphId, NormalizedCoord, Synthesis};
@@ -274,8 +274,8 @@ pub struct LayoutAccessibility {
     // and run index within that line, or a run path for short. These maps
     // are maintained by `TextLayout::accessibility`, which ensures that removed
     // runs are removed from the maps on the next accessibility pass.
-    access_ids_by_run_path: BTreeMap<(usize, usize), NodeId>,
-    run_paths_by_access_id: BTreeMap<NodeId, (usize, usize)>,
+    access_ids_by_run_path: HashMap<(usize, usize), NodeId>,
+    run_paths_by_access_id: HashMap<NodeId, (usize, usize)>,
 
     // This map duplicates the character lengths stored in the run nodes.
     // This is necessary because this information is needed during the
@@ -283,7 +283,7 @@ pub struct LayoutAccessibility {
     // pushed to AccessKit. AccessKit deliberately doesn't let toolkits access
     // the current tree state, because the ideal AccessKit backend would push
     // tree updates to assistive technologies and not retain a tree in memory.
-    character_lengths_by_access_id: BTreeMap<NodeId, Box<[u8]>>,
+    character_lengths_by_access_id: HashMap<NodeId, Box<[u8]>>,
 }
 
 #[cfg(feature = "accesskit")]
@@ -293,18 +293,18 @@ impl LayoutAccessibility {
         text: &str,
         layout: &Layout<B>,
         update: &mut TreeUpdate,
-        parent_node: &mut NodeBuilder,
+        parent_node: &mut Node,
         mut next_node_id: impl FnMut() -> NodeId,
     ) {
         // Build a set of node IDs for the runs encountered in this pass.
-        let mut ids = BTreeSet::<NodeId>::new();
+        let mut ids = HashSet::<NodeId>::new();
 
         for (line_index, line) in layout.lines().enumerate() {
             // Defer adding each run node until we reach either the next run
             // or the end of the line. That way, we can set relations between
             // runs in a line and do anything special that might be required
             // for the last run in a line.
-            let mut last_node: Option<(NodeId, NodeBuilder)> = None;
+            let mut last_node: Option<(NodeId, Node)> = None;
 
             for (run_index, run) in line.runs().enumerate() {
                 let run_path = (line_index, run_index);
@@ -323,12 +323,12 @@ impl LayoutAccessibility {
                         id
                     });
                 ids.insert(id);
-                let mut node = NodeBuilder::new(Role::InlineTextBox);
+                let mut node = Node::new(Role::TextRun);
 
                 if let Some((last_id, mut last_node)) = last_node.take() {
                     last_node.set_next_on_line(id);
                     node.set_previous_on_line(last_id);
-                    update.nodes.push((last_id, last_node.build()));
+                    update.nodes.push((last_id, last_node));
                     parent_node.push_child(last_id);
                 }
 
@@ -359,7 +359,7 @@ impl LayoutAccessibility {
             }
 
             if let Some((id, node)) = last_node {
-                update.nodes.push((id, node.build()));
+                update.nodes.push((id, node));
                 parent_node.push_child(id);
             }
         }
