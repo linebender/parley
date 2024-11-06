@@ -9,7 +9,7 @@ use fontique::SourceCache;
 /// A font database/cache (wrapper around a Fontique [`Collection`] and [`SourceCache`]).
 ///
 /// This type is designed to be a global resource with only one per-application (or per-thread).
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct FontContext {
     pub collection: Collection,
     #[cfg(feature = "std")]
