@@ -14,7 +14,7 @@ use crate::{
     FontContext, LayoutContext, Rect,
 };
 #[cfg(feature = "accesskit")]
-use accesskit::{NodeBuilder, NodeId, TextSelection, TreeUpdate};
+use accesskit::{Node, NodeId, TextSelection, TreeUpdate};
 use alloc::{borrow::ToOwned, string::String, sync::Arc, vec::Vec};
 
 #[derive(Copy, Clone, Debug)]
@@ -619,16 +619,11 @@ where
     pub fn accessibility(
         &mut self,
         update: &mut TreeUpdate,
-        parent_node: &mut NodeBuilder,
+        node: &mut Node,
         next_node_id: impl FnMut() -> NodeId,
     ) {
-        self.layout_access.build_nodes(
-            &self.buffer,
-            &self.layout,
-            update,
-            parent_node,
-            next_node_id,
-        );
+        self.layout_access
+            .build_nodes(&self.buffer, &self.layout, update, node, next_node_id);
         let anchor = self.selection.anchor();
         let anchor = self.layout_access.access_position_from_offset(
             &self.buffer,
@@ -644,8 +639,8 @@ where
             focus.affinity(),
         );
         if let (Some(anchor), Some(focus)) = (anchor, focus) {
-            parent_node.set_text_selection(TextSelection { anchor, focus });
+            node.set_text_selection(TextSelection { anchor, focus });
         }
-        parent_node.add_action(accesskit::Action::SetTextSelection);
+        node.add_action(accesskit::Action::SetTextSelection);
     }
 }
