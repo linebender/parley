@@ -11,7 +11,6 @@ use swash::shape::Shaper;
 use swash::text::cluster::{Boundary, ClusterInfo};
 use swash::Synthesis;
 
-#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
 #[derive(Copy, Clone)]

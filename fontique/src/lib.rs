@@ -4,9 +4,7 @@
 //! Font enumeration and fallback.
 
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
-// TODO: Remove this dead code allowance and hide the offending code behind the std feature gate.
-#![cfg_attr(not(feature = "std"), allow(dead_code))]
-#![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(not(any(feature = "std", feature = "libm")))]
 compile_error!("fontique requires either the `std` or `libm` feature to be enabled");
@@ -26,7 +24,6 @@ mod scan;
 mod script;
 mod source;
 
-#[cfg(feature = "std")]
 mod source_cache;
 
 pub use icu_locid::LanguageIdentifier as Language;
@@ -41,5 +38,4 @@ pub use generic::GenericFamily;
 pub use script::Script;
 pub use source::{SourceId, SourceInfo, SourceKind};
 
-#[cfg(feature = "std")]
 pub use source_cache::{SourceCache, SourceCacheOptions};

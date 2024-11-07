@@ -7,7 +7,6 @@ mod query;
 
 pub use query::{Query, QueryFamily, QueryFont, QueryStatus};
 
-#[cfg(feature = "std")]
 use super::SourceCache;
 
 use super::{
@@ -166,7 +165,6 @@ impl Collection {
     }
 
     /// Returns an object for selecting fonts from this collection.
-    #[cfg(feature = "std")]
     pub fn query<'a>(&'a mut self, source_cache: &'a mut SourceCache) -> Query<'a> {
         Query::new(self, source_cache)
     }

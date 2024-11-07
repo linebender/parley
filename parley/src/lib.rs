@@ -73,9 +73,7 @@
 //! ```
 
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
-// TODO: Remove this dead code allowance and hide the offending code behind the std feature gate.
-#![cfg_attr(not(feature = "std"), allow(dead_code))]
-#![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(not(any(feature = "std", feature = "libm")))]
 compile_error!("parley requires either the `std` or `libm` feature to be enabled");
@@ -108,7 +106,6 @@ pub use inline_box::InlineBox;
 #[doc(inline)]
 pub use layout::Layout;
 
-#[cfg(feature = "std")]
 pub use layout::editor::{PlainEditor, PlainEditorTxn};
 
 pub use layout::*;

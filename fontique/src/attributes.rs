@@ -3,10 +3,7 @@
 
 //! Properties for specifying font weight, stretch and style.
 
-// This is unused due to an issue in CI and the fact that our
-// no_std support doesn't really work correctly yet.
-// See https://github.com/linebender/parley/issues/86
-#[cfg(not(feature = "std"))]
+#[cfg(feature = "libm")]
 #[allow(unused_imports)]
 use core_maths::*;
 

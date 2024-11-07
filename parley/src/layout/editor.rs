@@ -11,7 +11,7 @@ use crate::{
     style::{Brush, StyleProperty},
     FontContext, LayoutContext, Rect,
 };
-use alloc::{sync::Arc, vec::Vec};
+use alloc::{borrow::ToOwned, string::String, sync::Arc, vec::Vec};
 
 #[derive(Copy, Clone, Debug)]
 pub enum ActiveText<'a> {

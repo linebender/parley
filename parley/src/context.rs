@@ -3,7 +3,6 @@
 
 //! Context for layout.
 
-#[cfg(not(feature = "std"))]
 use alloc::{vec, vec::Vec};
 
 use self::tree::TreeStyleBuilder;
@@ -80,7 +79,6 @@ impl<B: Brush> LayoutContext<B> {
         self.analyze_text(text);
         self.ranged_style_builder.begin(text.len());
 
-        #[cfg(feature = "std")]
         fcx.source_cache.prune(128, false);
 
         RangedBuilder {
@@ -101,7 +99,6 @@ impl<B: Brush> LayoutContext<B> {
         let resolved_root_style = self.resolve_style_set(fcx, scale, raw_style);
         self.tree_style_builder.begin(resolved_root_style);
 
-        #[cfg(feature = "std")]
         fcx.source_cache.prune(128, false);
 
         TreeBuilder {

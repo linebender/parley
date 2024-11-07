@@ -3,7 +3,6 @@
 
 use fontique::Collection;
 
-#[cfg(feature = "std")]
 use fontique::SourceCache;
 
 /// A font database/cache (wrapper around a Fontique [`Collection`] and [`SourceCache`]).
@@ -12,7 +11,6 @@ use fontique::SourceCache;
 #[derive(Default, Clone)]
 pub struct FontContext {
     pub collection: Collection,
-    #[cfg(feature = "std")]
     pub source_cache: SourceCache,
 }
 

@@ -5,7 +5,6 @@
 
 use super::attributes::{Stretch, Style, Weight};
 use super::source::{SourceInfo, SourceKind};
-#[cfg(feature = "std")]
 use super::{source_cache::SourceCache, Blob};
 use skrifa::raw::{types::Tag, FontRef, TableProvider as _};
 use smallvec::SmallVec;
@@ -54,13 +53,13 @@ impl FontInfo {
     }
 
     /// Attempts to load the font, optionally from a source cache.
-    #[cfg(feature = "std")]
     pub fn load(&self, source_cache: Option<&mut SourceCache>) -> Option<Blob<u8>> {
         if let Some(source_cache) = source_cache {
             source_cache.get(&self.source)
         } else {
             match &self.source.kind {
                 SourceKind::Memory(blob) => Some(blob.clone()),
+                #[cfg(feature = "std")]
                 SourceKind::Path(path) => super::source_cache::load_blob(path),
             }
         }

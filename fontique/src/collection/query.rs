@@ -3,10 +3,8 @@
 
 //! Query support.
 
-#[cfg(feature = "std")]
 use super::super::{Collection, SourceCache};
 
-#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
 use super::{
@@ -33,14 +31,12 @@ impl QueryState {
 pub struct Query<'a> {
     collection: &'a mut Inner,
     state: &'a mut QueryState,
-    #[cfg(feature = "std")]
     source_cache: &'a mut SourceCache,
     attributes: Attributes,
     fallbacks: Option<FallbackKey>,
 }
 
 impl<'a> Query<'a> {
-    #[cfg(feature = "std")]
     pub(super) fn new(collection: &'a mut Collection, source_cache: &'a mut SourceCache) -> Self {
         collection.query_state.clear();
         Self {
@@ -108,7 +104,6 @@ impl<'a> Query<'a> {
     ///
     /// Return [`QueryStatus::Stop`] to end iterating over the matching
     /// fonts or [`QueryStatus::Continue`] to continue iterating.
-    #[cfg(feature = "std")]
     pub fn matches_with(&mut self, mut f: impl FnMut(&QueryFont) -> QueryStatus) {
         for family in self
             .state
@@ -226,7 +221,6 @@ pub struct QueryFont {
     pub synthesis: Synthesis,
 }
 
-#[cfg(feature = "std")]
 fn load_font<'a>(
     family: &FamilyInfo,
     attributes: Attributes,

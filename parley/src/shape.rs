@@ -1,24 +1,20 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-#[cfg(feature = "std")]
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
-#[cfg(feature = "std")]
 use crate::util::nearly_eq;
-#[cfg(feature = "std")]
 use crate::Font;
-#[cfg(feature = "std")]
 use fontique::QueryFamily;
 use fontique::{self, Query, QueryFont};
 use swash::shape::*;
-#[cfg(feature = "std")]
 use swash::text::cluster::{CharCluster, CharInfo, Token};
 use swash::text::{Language, Script};
 use swash::{FontRef, Synthesis};
 
-#[cfg(feature = "std")]
+use alloc::vec::Vec;
+
 use crate::inline_box::InlineBox;
 
 struct Item {
@@ -33,7 +29,6 @@ struct Item {
     letter_spacing: f32,
 }
 
-#[cfg(feature = "std")]
 #[allow(clippy::too_many_arguments)]
 pub fn shape_text<'a, B: Brush>(
     rcx: &'a ResolveContext,
@@ -265,7 +260,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
     }
 }
 
-#[cfg(feature = "std")]
 impl<B: Brush> partition::Selector for FontSelector<'_, '_, B> {
     type SelectedFont = SelectedFont;
 

@@ -3,8 +3,11 @@
 
 //! Greedy line breaking.
 
-#[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
+
+#[cfg(feature = "libm")]
+#[allow(unused_imports)]
+use core_maths::*;
 
 use crate::layout::alignment::unjustify;
 use crate::layout::*;
