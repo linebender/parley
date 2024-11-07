@@ -7,7 +7,7 @@ use super::attributes::{Stretch, Style, Weight};
 use super::source::{SourceInfo, SourceKind};
 #[cfg(feature = "std")]
 use super::{source_cache::SourceCache, Blob};
-use skrifa::raw::{types::Tag, FontRef, TableProvider as _};
+use read_fonts::{types::Tag, FontRef, TableProvider as _};
 use smallvec::SmallVec;
 
 type AxisVec = SmallVec<[AxisInfo; 1]>;
@@ -333,7 +333,7 @@ impl Synthesis {
 }
 
 fn read_attributes(font: &FontRef) -> (Stretch, Style, Weight) {
-    use skrifa::raw::{
+    use read_fonts::{
         tables::{
             head::{Head, MacStyle},
             os2::{Os2, SelectionFlags},

@@ -23,6 +23,7 @@ use super::{
 use alloc::{string::String, sync::Arc, vec::Vec};
 use core::sync::atomic::AtomicU64;
 use hashbrown::HashMap;
+use read_fonts::types::NameId;
 #[cfg(feature = "std")]
 use std::sync::{atomic::Ordering, Mutex};
 
@@ -553,7 +554,6 @@ impl CommonData {
         let mut family_name = String::default();
         let data_id = SourceId::new();
         super::scan::scan_memory(blob.as_ref(), |scanned_font| {
-            use skrifa::raw::types::NameId;
             family_name.clear();
             let family_chars = scanned_font
                 .english_or_first_name(NameId::TYPOGRAPHIC_FAMILY_NAME)
