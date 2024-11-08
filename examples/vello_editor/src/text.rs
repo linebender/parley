@@ -1,18 +1,14 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
-
+use core::default::Default;
 use parley::layout::PositionedLayoutItem;
 use peniko::{kurbo::Affine, Color, Fill};
-use std::{
-    thread::sleep,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 use vello::Scene;
 use winit::{
     event::{Modifiers, Touch, WindowEvent},
     keyboard::{Key, NamedKey},
 };
-use core::default::Default;
 
 pub use parley::layout::editor::Generation;
 use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorTxn};
