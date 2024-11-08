@@ -3,7 +3,10 @@
 
 use parley::layout::PositionedLayoutItem;
 use peniko::{kurbo::Affine, Color, Fill};
-use std::time::Instant;
+use std::{
+    thread::sleep,
+    time::{Duration, Instant},
+};
 use vello::Scene;
 use winit::{
     event::{Modifiers, Touch, WindowEvent},
@@ -27,6 +30,8 @@ pub struct Editor {
     cursor_pos: (f32, f32),
     cursor_blink: bool,
     modifiers: Option<Modifiers>,
+    start_time: Option<Instant>,
+    blink_period: Duration,
 }
 
 impl Editor {
@@ -37,6 +42,23 @@ impl Editor {
 
     pub fn text(&self) -> &str {
         self.editor.text()
+    }
+
+    pub fn init(&mut self) {
+        self.start_time = Some(Instant::now());
+        self.blink_period = Duration::from_millis(500);
+    }
+
+    pub fn next_blink_time(&self) -> Option<Instant> {
+        self.start_time.map(|start_time| {
+            let phase = Instant::now().duration_since(start_time);
+            let next = start_time
+                + Duration::from_nanos(
+                    ((phase.as_nanos() / self.blink_period.as_nanos() + 1)
+                        * self.blink_period.as_nanos()) as u64,
+                );
+            next
+        })
     }
 
     pub fn cursor_blink(&mut self) {
@@ -281,12 +303,14 @@ impl Editor {
         for rect in self.editor.selection_geometry().iter() {
             scene.fill(Fill::NonZero, transform, Color::STEEL_BLUE, None, &rect);
         }
-        if let Some(cursor) = self.editor.selection_strong_geometry(1.5) {
-            scene.fill(Fill::NonZero, transform, if self.cursor_blink {Color::TRANSPARENT} else {Color::WHITE}, None, &cursor);
-        };
-        if let Some(cursor) = self.editor.selection_weak_geometry(1.5) {
-            scene.fill(Fill::NonZero, transform, if self.cursor_blink { Color::TRANSPARENT } else {Color::LIGHT_GRAY}, None, &cursor);
-        };
+        if !self.cursor_blink {
+            if let Some(cursor) = self.editor.selection_strong_geometry(1.5) {
+                scene.fill(Fill::NonZero, transform, Color::WHITE, None, &cursor);
+            };
+            if let Some(cursor) = self.editor.selection_weak_geometry(1.5) {
+                scene.fill(Fill::NonZero, transform, Color::LIGHT_GRAY, None, &cursor);
+            };
+        }
         for line in self.editor.lines() {
             for item in line.items() {
                 let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
