@@ -105,6 +105,8 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
 
         // Save the Window and Surface to a state variable
         self.state = RenderState::Active(ActiveRenderState { window, surface });
+
+        event_loop.set_control_flow(ControlFlow::Wait);
     }
 
     fn suspended(&mut self, event_loop: &ActiveEventLoop) {

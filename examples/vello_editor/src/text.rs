@@ -1,5 +1,6 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use core::default::Default;
 use parley::layout::PositionedLayoutItem;
 use peniko::{kurbo::Affine, Color, Fill};
@@ -48,12 +49,12 @@ impl Editor {
     pub fn next_blink_time(&self) -> Option<Instant> {
         self.start_time.map(|start_time| {
             let phase = Instant::now().duration_since(start_time);
-            let next = start_time
+
+            start_time
                 + Duration::from_nanos(
                     ((phase.as_nanos() / self.blink_period.as_nanos() + 1)
                         * self.blink_period.as_nanos()) as u64,
-                );
-            next
+                )
         })
     }
 
