@@ -282,14 +282,6 @@ impl Cursor {
             return *self;
         };
         if !self.affinity.is_visually_leading(self.is_rtl) {
-            // Handle hard line breaks
-            if cluster.is_hard_line_break() {
-                // If we're at the back of a hard line break and moving
-                // left, skip directly to the trailing edge of the next cluster
-                if let Some(next) = cluster.previous_logical() {
-                    return Self::from_cluster(next, self.affinity);
-                }
-            }
             // Check for directional boundary condition
             if let Some(prev) = cluster.previous_visual() {
                 if prev.is_rtl() != self.is_rtl {
