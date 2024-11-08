@@ -1,6 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use accesskit::{Node, Rect, Role, Tree, TreeUpdate};
 use anyhow::Result;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
@@ -11,18 +12,55 @@ use vello::{AaConfig, Renderer, RendererOptions, Scene};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::*;
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::window::Window;
+
+mod access_ids;
+use access_ids::{TEXT_INPUT_ID, WINDOW_ID};
 
 // #[path = "text2.rs"]
 mod text;
 use parley::{GenericFamily, StyleProperty};
 
+const WINDOW_TITLE: &str = "Vello Text Editor";
+
 // Simple struct to hold the state of the renderer
 pub struct ActiveRenderState<'s> {
-    // The fields MUST be in this order, so that the surface is dropped before the window
+    // The fields MUST be in this order, so that the surface and AccessKit adapter are dropped before the window
     surface: RenderSurface<'s>,
+    access_adapter: accesskit_winit::Adapter,
     window: Arc<Window>,
+    sent_initial_access_update: bool,
+}
+
+impl ActiveRenderState<'_> {
+    fn access_update(&mut self, editor: &mut text::Editor) {
+        self.access_adapter.update_if_active(|| {
+            let mut update = TreeUpdate {
+                nodes: vec![],
+                tree: (!self.sent_initial_access_update).then(|| Tree::new(WINDOW_ID)),
+                focus: TEXT_INPUT_ID,
+            };
+            if !self.sent_initial_access_update {
+                let mut node = Node::new(Role::Window);
+                node.set_label(WINDOW_TITLE);
+                node.push_child(TEXT_INPUT_ID);
+                update.nodes.push((WINDOW_ID, node));
+                self.sent_initial_access_update = true;
+            }
+            let mut node = Node::new(Role::TextInput);
+            let size = self.window.inner_size();
+            node.set_bounds(Rect {
+                x0: 0.0,
+                y0: 0.0,
+                x1: size.width as _,
+                y1: size.height as _,
+            });
+            editor.accessibility(&mut update, &mut node);
+            update.nodes.push((TEXT_INPUT_ID, node));
+            update
+        });
+    }
 }
 
 enum RenderState<'s> {
@@ -50,9 +88,12 @@ struct SimpleVelloApp<'s> {
 
     /// The last generation of the editor layout that we drew.
     last_drawn_generation: text::Generation,
+
+    /// The event loop proxy required by the AccessKit winit adapter.
+    event_loop_proxy: EventLoopProxy<accesskit_winit::Event>,
 }
 
-impl ApplicationHandler for SimpleVelloApp<'_> {
+impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let RenderState::Suspended(cached_window) = &mut self.state else {
             return;
@@ -62,6 +103,11 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
         let window = cached_window
             .take()
             .unwrap_or_else(|| create_winit_window(event_loop));
+        let access_adapter = accesskit_winit::Adapter::with_event_loop_proxy(
+            &*window,
+            self.event_loop_proxy.clone(),
+        );
+        window.set_visible(true);
 
         let size = window.inner_size();
 
@@ -104,7 +150,12 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
             .get_or_insert_with(|| create_vello_renderer(&self.context, &surface));
 
         // Save the Window and Surface to a state variable
-        self.state = RenderState::Active(ActiveRenderState { window, surface });
+        self.state = RenderState::Active(ActiveRenderState {
+            window,
+            surface,
+            access_adapter,
+            sent_initial_access_update: false,
+        });
 
         event_loop.set_control_flow(ControlFlow::Wait);
     }
@@ -159,6 +210,9 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
             _ => return,
         };
 
+        render_state
+            .access_adapter
+            .process_event(&*render_state.window, &event);
         self.editor.handle_event(event.clone());
         if self.last_drawn_generation != self.editor.generation() {
             render_state.window.request_redraw();
@@ -189,6 +243,9 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
 
             // This is where all the rendering happens
             WindowEvent::RedrawRequested => {
+                // Send an accessibility update if accessibility is active.
+                render_state.access_update(&mut self.editor);
+
                 // Get the RenderSurface (surface + config).
                 let surface = &render_state.surface;
 
@@ -240,9 +297,31 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
             _ => {}
         }
     }
+
+    fn user_event(&mut self, _: &ActiveEventLoop, event: accesskit_winit::Event) {
+        let render_state = match &mut self.state {
+            RenderState::Active(state) if state.window.id() == event.window_id => state,
+            _ => return,
+        };
+
+        match event.window_event {
+            accesskit_winit::WindowEvent::InitialTreeRequested => {
+                render_state.access_update(&mut self.editor);
+            }
+            accesskit_winit::WindowEvent::ActionRequested(request) => {
+                // TODO
+            }
+            accesskit_winit::WindowEvent::AccessibilityDeactivated => {
+                render_state.sent_initial_access_update = false;
+            }
+        }
+    }
 }
 
 fn main() -> Result<()> {
+    // Create a winit event loop:
+    let event_loop = EventLoop::with_user_event().build()?;
+
     // Setup a bunch of state:
     let mut app = SimpleVelloApp {
         context: RenderContext::new(),
@@ -251,10 +330,10 @@ fn main() -> Result<()> {
         scene: Scene::new(),
         editor: text::Editor::default(),
         last_drawn_generation: Default::default(),
+        event_loop_proxy: event_loop.create_proxy(),
     };
 
-    // Create and run a winit event loop
-    let event_loop = EventLoop::new()?;
+    // Run the winit event loop
     event_loop
         .run_app(&mut app)
         .expect("Couldn't run event loop");
@@ -267,7 +346,8 @@ fn create_winit_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
     let attr = Window::default_attributes()
         .with_inner_size(LogicalSize::new(1044, 800))
         .with_resizable(true)
-        .with_title("Vello Text Editor");
+        .with_title(WINDOW_TITLE)
+        .with_visible(false);
     Arc::new(event_loop.create_window(attr).unwrap())
 }
 
