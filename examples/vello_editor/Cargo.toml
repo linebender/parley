@@ -12,8 +12,10 @@ vello = "0.3.0"
 anyhow = "1.0.89"
 pollster = "0.3.0"
 winit = "0.30.5"
-parley = { workspace = true, default-features = true }
+parley = { workspace = true, default-features = true, features = ["accesskit"] }
 peniko = { workspace = true }
+accesskit = { workspace = true }
+accesskit_winit = "0.23"
 
 [lints]
 workspace = true

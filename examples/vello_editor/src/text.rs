@@ -1,6 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use accesskit::{Node, TreeUpdate};
 use parley::layout::PositionedLayoutItem;
 use peniko::{kurbo::Affine, Color, Fill};
 use std::time::Instant;
@@ -14,6 +15,8 @@ use core::default::Default;
 
 pub use parley::layout::editor::Generation;
 use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorTxn};
+
+use crate::access_ids::next_node_id;
 
 pub const INSET: f32 = 32.0;
 
@@ -326,6 +329,10 @@ impl Editor {
             }
         }
         self.editor.generation()
+    }
+
+    pub fn accessibility(&mut self, update: &mut TreeUpdate, node: &mut Node) {
+        self.editor.accessibility(update, node, next_node_id);
     }
 }
 
