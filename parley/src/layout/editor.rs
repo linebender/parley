@@ -475,7 +475,7 @@ where
     }
 
     #[cfg(feature = "accesskit")]
-    pub fn select_from_accesskit(&mut self, selection: accesskit::TextSelection) {
+    pub fn select_from_accesskit(&mut self, selection: &accesskit::TextSelection) {
         self.refresh_layout();
         if let Some(selection) = Selection::from_access_selection(
             selection,
