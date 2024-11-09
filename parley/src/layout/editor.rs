@@ -14,7 +14,7 @@ use crate::{
     FontContext, LayoutContext, Rect,
 };
 #[cfg(feature = "accesskit")]
-use accesskit::{Node, NodeId, TextSelection, TreeUpdate};
+use accesskit::{Node, NodeId, TreeUpdate};
 use alloc::{borrow::ToOwned, string::String, sync::Arc, vec::Vec};
 
 #[derive(Copy, Clone, Debug)]
@@ -624,22 +624,11 @@ where
     ) {
         self.layout_access
             .build_nodes(&self.buffer, &self.layout, update, node, next_node_id);
-        let anchor = self.selection.anchor();
-        let anchor = self.layout_access.access_position_from_offset(
-            &self.buffer,
-            &self.layout,
-            anchor.index(),
-            anchor.affinity(),
-        );
-        let focus = self.selection.focus();
-        let focus = self.layout_access.access_position_from_offset(
-            &self.buffer,
-            &self.layout,
-            focus.index(),
-            focus.affinity(),
-        );
-        if let (Some(anchor), Some(focus)) = (anchor, focus) {
-            node.set_text_selection(TextSelection { anchor, focus });
+        if let Some(selection) = self
+            .selection
+            .to_access_selection(&self.layout, &self.layout_access)
+        {
+            node.set_text_selection(selection);
         }
         node.add_action(accesskit::Action::SetTextSelection);
     }

@@ -21,9 +21,9 @@ use crate::{Font, InlineBox};
 #[cfg(feature = "accesskit")]
 use accesskit::{Node, NodeId, Role, TextPosition, TreeUpdate};
 use core::{cmp::Ordering, ops::Range};
+use data::*;
 #[cfg(feature = "accesskit")]
 use hashbrown::{HashMap, HashSet};
-use data::*;
 use swash::text::cluster::{Boundary, ClusterInfo};
 use swash::{GlyphId, NormalizedCoord, Synthesis};
 
@@ -272,10 +272,10 @@ pub struct LayoutAccessibility {
     // The following two fields maintain a two-way mapping between runs
     // and AccessKit node IDs, where each run is identified by its line index
     // and run index within that line, or a run path for short. These maps
-    // are maintained by `TextLayout::accessibility`, which ensures that removed
+    // are maintained by `LayoutAccess::build_nodes`, which ensures that removed
     // runs are removed from the maps on the next accessibility pass.
-    access_ids_by_run_path: HashMap<(usize, usize), NodeId>,
-    run_paths_by_access_id: HashMap<NodeId, (usize, usize)>,
+    pub(crate) access_ids_by_run_path: HashMap<(usize, usize), NodeId>,
+    pub(crate) run_paths_by_access_id: HashMap<NodeId, (usize, usize)>,
 
     // This map duplicates the character lengths stored in the run nodes.
     // This is necessary because this information is needed during the
@@ -380,65 +380,6 @@ impl LayoutAccessibility {
         for run_path in run_paths_to_remove {
             self.access_ids_by_run_path.remove(&run_path);
         }
-    }
-
-    pub fn access_position_from_offset<B: Brush>(
-        &self,
-        text: &str,
-        layout: &Layout<B>,
-        offset: usize,
-        affinity: Affinity,
-    ) -> Option<TextPosition> {
-        debug_assert!(offset <= text.len(), "offset out of range");
-
-        for (line_index, line) in layout.lines().enumerate() {
-            let range = line.text_range();
-            if !(range.contains(&offset)
-                || (offset == range.end
-                    && (affinity == Affinity::Upstream || line_index == layout.len() - 1)))
-            {
-                continue;
-            }
-
-            for (run_index, run) in line.runs().enumerate() {
-                let range = run.text_range();
-                if !(range.contains(&offset)
-                    || (offset == range.end
-                        && (affinity == Affinity::Upstream
-                            || (line_index == layout.len() - 1 && run_index == line.len() - 1))))
-                {
-                    continue;
-                }
-
-                let run_offset = offset - range.start;
-                let run_path = (line_index, run_index);
-                let id = *self.access_ids_by_run_path.get(&run_path).unwrap();
-                let character_lengths = self.character_lengths_by_access_id.get(&id).unwrap();
-                let mut length_sum = 0_usize;
-                for (character_index, length) in character_lengths.iter().copied().enumerate() {
-                    if run_offset == length_sum {
-                        return Some(TextPosition {
-                            node: id,
-                            character_index,
-                        });
-                    }
-                    length_sum += length as usize;
-                }
-                return Some(TextPosition {
-                    node: id,
-                    character_index: character_lengths.len(),
-                });
-            }
-        }
-
-        if cfg!(debug_assertions) {
-            panic!(
-                "offset {} not within the range of any run; text length: {}",
-                offset,
-                text.len()
-            );
-        }
-        None
     }
 
     pub fn offset_from_access_position<B: Brush>(
