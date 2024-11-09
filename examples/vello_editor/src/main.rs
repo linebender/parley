@@ -308,8 +308,13 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
             accesskit_winit::WindowEvent::InitialTreeRequested => {
                 render_state.access_update(&mut self.editor);
             }
-            accesskit_winit::WindowEvent::ActionRequested(request) => {
-                // TODO
+            accesskit_winit::WindowEvent::ActionRequested(req) => {
+                if req.target == TEXT_INPUT_ID {
+                    self.editor.handle_accesskit_action_request(&req);
+                    if self.last_drawn_generation != self.editor.generation() {
+                        render_state.window.request_redraw();
+                    }
+                }
             }
             accesskit_winit::WindowEvent::AccessibilityDeactivated => {
                 render_state.sent_initial_access_update = false;
