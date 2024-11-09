@@ -119,7 +119,7 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
     fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
         match cause {
             StartCause::Init => {
-                self.editor.init();
+                self.editor.cursor_reset();
                 if let Some(next_time) = self.editor.next_blink_time() {
                     event_loop.set_control_flow(ControlFlow::WaitUntil(next_time));
                 }

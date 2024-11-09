@@ -25,7 +25,7 @@ pub struct Editor {
     click_count: u32,
     pointer_down: bool,
     cursor_pos: (f32, f32),
-    cursor_blink: bool,
+    cursor_visible: bool,
     modifiers: Option<Modifiers>,
     start_time: Option<Instant>,
     blink_period: Duration,
@@ -41,9 +41,11 @@ impl Editor {
         self.editor.text()
     }
 
-    pub fn init(&mut self) {
+    pub fn cursor_reset(&mut self) {
         self.start_time = Some(Instant::now());
+        // TODO: for real world use, this should be reading from the system settings
         self.blink_period = Duration::from_millis(500);
+        self.cursor_visible = true;
     }
 
     pub fn next_blink_time(&self) -> Option<Instant> {
@@ -59,7 +61,10 @@ impl Editor {
     }
 
     pub fn cursor_blink(&mut self) {
-        self.cursor_blink = !self.cursor_blink;
+        if let Some(start_time) = self.start_time {
+            let elapsed = Instant::now().duration_since(start_time);
+            self.cursor_visible = (elapsed.as_millis() / self.blink_period.as_millis()) % 2 == 0;
+        }
     }
 
     pub fn handle_event(&mut self, event: WindowEvent) {
@@ -74,6 +79,7 @@ impl Editor {
                 if !event.state.is_pressed() {
                     return;
                 }
+                self.cursor_reset();
                 #[allow(unused)]
                 let (shift, action_mod) = self
                     .modifiers
@@ -300,7 +306,7 @@ impl Editor {
         for rect in self.editor.selection_geometry().iter() {
             scene.fill(Fill::NonZero, transform, Color::STEEL_BLUE, None, &rect);
         }
-        if !self.cursor_blink {
+        if self.cursor_visible {
             if let Some(cursor) = self.editor.selection_strong_geometry(1.5) {
                 scene.fill(Fill::NonZero, transform, Color::WHITE, None, &cursor);
             };
