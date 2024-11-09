@@ -90,7 +90,7 @@ impl Cursor {
 
     #[cfg(feature = "accesskit")]
     pub fn from_access_position<B: Brush>(
-        pos: TextPosition,
+        pos: &TextPosition,
         layout: &Layout<B>,
         layout_access: &LayoutAccessibility,
     ) -> Option<Self> {
@@ -453,12 +453,12 @@ impl Selection {
 
     #[cfg(feature = "accesskit")]
     pub fn from_access_selection<B: Brush>(
-        selection: accesskit::TextSelection,
+        selection: &accesskit::TextSelection,
         layout: &Layout<B>,
         layout_access: &LayoutAccessibility,
     ) -> Option<Self> {
-        let anchor = Cursor::from_access_position(selection.anchor, layout, layout_access)?;
-        let focus = Cursor::from_access_position(selection.focus, layout, layout_access)?;
+        let anchor = Cursor::from_access_position(&selection.anchor, layout, layout_access)?;
+        let focus = Cursor::from_access_position(&selection.focus, layout, layout_access)?;
         Some(Self {
             anchor,
             focus,
