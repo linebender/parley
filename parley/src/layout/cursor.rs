@@ -7,7 +7,7 @@
 use super::LayoutAccessibility;
 use super::{Affinity, BreakReason, Brush, Cluster, ClusterPath, Layout};
 #[cfg(feature = "accesskit")]
-use accesskit::{TextPosition, TextSelection};
+use accesskit::TextPosition;
 use alloc::vec::Vec;
 use core::ops::Range;
 use peniko::kurbo::Rect;
@@ -453,7 +453,7 @@ impl Selection {
 
     #[cfg(feature = "accesskit")]
     pub fn from_access_selection<B: Brush>(
-        selection: TextSelection,
+        selection: accesskit::TextSelection,
         layout: &Layout<B>,
         layout_access: &LayoutAccessibility,
     ) -> Option<Self> {
@@ -824,9 +824,9 @@ impl Selection {
         &self,
         layout: &Layout<B>,
         layout_access: &LayoutAccessibility,
-    ) -> Option<TextSelection> {
+    ) -> Option<accesskit::TextSelection> {
         let anchor = self.anchor.to_access_position(layout, layout_access)?;
         let focus = self.focus.to_access_position(layout, layout_access)?;
-        Some(TextSelection { anchor, focus })
+        Some(accesskit::TextSelection { anchor, focus })
     }
 }
