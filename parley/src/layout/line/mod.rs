@@ -194,17 +194,12 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     pub fn positioned_glyphs(&'a self) -> impl Iterator<Item = Glyph> + 'a + Clone {
         let mut offset = self.offset;
         let baseline = self.baseline;
-        self.run
-            .visual_clusters()
-            .flat_map(|cluster| cluster.glyphs())
-            .skip(self.glyph_start)
-            .take(self.glyph_count)
-            .map(move |mut g| {
-                g.x += offset;
-                g.y += baseline;
-                offset += g.advance;
-                g
-            })
+        self.glyphs().map(move |mut g| {
+            g.x += offset;
+            g.y += baseline;
+            offset += g.advance;
+            g
+        })
     }
 }
 
