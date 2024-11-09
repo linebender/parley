@@ -19,7 +19,7 @@ use self::alignment::align;
 use super::style::Brush;
 use crate::{Font, InlineBox};
 #[cfg(feature = "accesskit")]
-use accesskit::{Node, NodeId, Role, TextPosition, TreeUpdate};
+use accesskit::{Node, NodeId, Role, TreeUpdate};
 use core::{cmp::Ordering, ops::Range};
 use data::*;
 #[cfg(feature = "accesskit")]
@@ -276,14 +276,6 @@ pub struct LayoutAccessibility {
     // runs are removed from the maps on the next accessibility pass.
     pub(crate) access_ids_by_run_path: HashMap<(usize, usize), NodeId>,
     pub(crate) run_paths_by_access_id: HashMap<NodeId, (usize, usize)>,
-
-    // This map duplicates the character lengths stored in the run nodes.
-    // This is necessary because this information is needed during the
-    // access event pass, after the previous tree update has already been
-    // pushed to AccessKit. AccessKit deliberately doesn't let toolkits access
-    // the current tree state, because the ideal AccessKit backend would push
-    // tree updates to assistive technologies and not retain a tree in memory.
-    character_lengths_by_access_id: HashMap<NodeId, Box<[u8]>>,
 }
 
 #[cfg(feature = "accesskit")]
@@ -350,8 +342,6 @@ impl LayoutAccessibility {
                 }
 
                 word_lengths.push((character_lengths.len() - last_word_start) as _);
-                self.character_lengths_by_access_id
-                    .insert(id, character_lengths.clone().into());
                 node.set_character_lengths(character_lengths);
                 node.set_word_lengths(word_lengths);
 
@@ -375,37 +365,9 @@ impl LayoutAccessibility {
         }
         for id in ids_to_remove {
             self.run_paths_by_access_id.remove(&id);
-            self.character_lengths_by_access_id.remove(&id);
         }
         for run_path in run_paths_to_remove {
             self.access_ids_by_run_path.remove(&run_path);
         }
-    }
-
-    pub fn offset_from_access_position<B: Brush>(
-        &self,
-        layout: &Layout<B>,
-        pos: TextPosition,
-    ) -> Option<(usize, Affinity)> {
-        let character_lengths = self.character_lengths_by_access_id.get(&pos.node)?;
-        if pos.character_index > character_lengths.len() {
-            return None;
-        }
-        let run_path = *self.run_paths_by_access_id.get(&pos.node)?;
-        let (line_index, run_index) = run_path;
-        let line = layout.get(line_index)?;
-        let run = line.run(run_index)?;
-        let offset = run.text_range().start
-            + character_lengths[..pos.character_index]
-                .iter()
-                .copied()
-                .map(usize::from)
-                .sum::<usize>();
-        let affinity = if pos.character_index == character_lengths.len() && line_index < run.len() {
-            Affinity::Upstream
-        } else {
-            Affinity::Downstream
-        };
-        Some((offset, affinity))
     }
 }
