@@ -104,7 +104,7 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
             .take()
             .unwrap_or_else(|| create_winit_window(event_loop));
         let access_adapter = accesskit_winit::Adapter::with_event_loop_proxy(
-            &*window,
+            &window,
             self.event_loop_proxy.clone(),
         );
         window.set_visible(true);
@@ -212,7 +212,7 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
 
         render_state
             .access_adapter
-            .process_event(&*render_state.window, &event);
+            .process_event(&render_state.window, &event);
         self.editor.handle_event(event.clone());
         if self.last_drawn_generation != self.editor.generation() {
             render_state.window.request_redraw();
