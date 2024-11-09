@@ -342,7 +342,8 @@ impl Editor {
     }
 
     pub fn accessibility(&mut self, update: &mut TreeUpdate, node: &mut Node) {
-        self.editor.accessibility(update, node, next_node_id);
+        self.editor
+            .accessibility(update, node, next_node_id, INSET as _, INSET as _);
     }
 }
 

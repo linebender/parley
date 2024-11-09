@@ -103,10 +103,8 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
         let window = cached_window
             .take()
             .unwrap_or_else(|| create_winit_window(event_loop));
-        let access_adapter = accesskit_winit::Adapter::with_event_loop_proxy(
-            &window,
-            self.event_loop_proxy.clone(),
-        );
+        let access_adapter =
+            accesskit_winit::Adapter::with_event_loop_proxy(&window, self.event_loop_proxy.clone());
         window.set_visible(true);
 
         let size = window.inner_size();
