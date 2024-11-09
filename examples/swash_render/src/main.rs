@@ -20,7 +20,7 @@ use zeno::{Format, Vector};
 fn main() {
     // The text we are going to style and lay out
     let text = String::from(
-        "Some text here. Let's make it a bit longer so that line wrapping kicks in 😊. And also some اللغة العربية arabic text.",
+        "Some text here. Let's make it a bit longer so that line wrapping kicks in 😊. And also some اللغة العربية arabic text.\nThis is underline and strikethrough text",
     );
 
     // The display scale for HiDPI rendering
@@ -48,6 +48,8 @@ fn main() {
     let brush_style = StyleProperty::Brush(text_color);
     let font_stack = FontStack::from("system-ui");
     let bold_style = StyleProperty::FontWeight(FontWeight::new(600.0));
+    let underline_style = StyleProperty::Underline(true);
+    let strikethrough_style = StyleProperty::Strikethrough(true);
 
     let mut layout = if std::env::args().any(|arg| arg == "--tree") {
         // TREE BUILDER
@@ -87,7 +89,18 @@ fn main() {
             height: 30.0,
         });
 
-        builder.push_text(&text[50..]);
+        builder.push_text(&text[50..141]);
+
+        // Set the underline style
+        builder.push_style_modification_span(&[underline_style]);
+        builder.push_text(&text[141..150]);
+
+        builder.pop_style_span();
+        builder.push_text(&text[150..155]);
+
+        // Set the strikethrough style
+        builder.push_style_modification_span(&[strikethrough_style]);
+        builder.push_text(&text[155..168]);
 
         // Build the builder into a Layout
         // let mut layout: Layout<Color> = builder.build(&text);
@@ -110,6 +123,10 @@ fn main() {
 
         // Set the first 4 characters to bold
         builder.push(bold_style, 0..4);
+
+        // Set the underline & stoked style
+        builder.push(underline_style, 141..150);
+        builder.push(strikethrough_style, 155..168);
 
         builder.push_inline_box(InlineBox {
             id: 0,
@@ -216,6 +233,41 @@ fn render_glyph_run(
         run_x += glyph.advance;
 
         render_glyph(img, &mut scaler, color, glyph, glyph_x, glyph_y);
+    }
+
+    // Draw decorations: underline & strikethrough
+    let style = glyph_run.style();
+    let run_metrics = run.metrics();
+    if let Some(decoration) = &style.underline {
+        let offset = decoration.offset.unwrap_or(run_metrics.underline_offset);
+        let size = decoration.size.unwrap_or(run_metrics.underline_size);
+        render_decoration(img, glyph_run, decoration.brush, offset, size, padding);
+    }
+    if let Some(decoration) = &style.strikethrough {
+        let offset = decoration
+            .offset
+            .unwrap_or(run_metrics.strikethrough_offset);
+        let size = decoration.size.unwrap_or(run_metrics.strikethrough_size);
+        render_decoration(img, glyph_run, decoration.brush, offset, size, padding);
+    }
+}
+
+fn render_decoration(
+    img: &mut RgbaImage,
+    glyph_run: &GlyphRun<Color>,
+    color: Color,
+    offset: f32,
+    width: f32,
+    padding: u32,
+) {
+    let y = glyph_run.baseline() - offset;
+    let color = Rgba([color.r, color.g, color.b, color.a]);
+    for pixel_y in y as u32..(y + width) as u32 {
+        for pixel_x in glyph_run.offset() as u32..(glyph_run.offset() + glyph_run.advance()) as u32
+        {
+            img.get_pixel_mut(pixel_x + padding, pixel_y + padding)
+                .blend(&color);
+        }
     }
 }
 
