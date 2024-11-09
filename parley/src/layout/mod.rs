@@ -19,7 +19,7 @@ use self::alignment::align;
 use super::style::Brush;
 use crate::{Font, InlineBox};
 #[cfg(feature = "accesskit")]
-use accesskit::{Node, NodeId, Role, TreeUpdate};
+use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
 use core::{cmp::Ordering, ops::Range};
 use data::*;
 #[cfg(feature = "accesskit")]
@@ -280,6 +280,7 @@ pub struct LayoutAccessibility {
 
 #[cfg(feature = "accesskit")]
 impl LayoutAccessibility {
+    #[allow(clippy::too_many_arguments)]
     pub fn build_nodes<B: Brush>(
         &mut self,
         text: &str,
@@ -287,11 +288,15 @@ impl LayoutAccessibility {
         update: &mut TreeUpdate,
         parent_node: &mut Node,
         mut next_node_id: impl FnMut() -> NodeId,
+        x_offset: f64,
+        y_offset: f64,
     ) {
         // Build a set of node IDs for the runs encountered in this pass.
         let mut ids = HashSet::<NodeId>::new();
 
         for (line_index, line) in layout.lines().enumerate() {
+            let metrics = line.metrics();
+            let mut line_x = x_offset + metrics.offset as f64;
             // Defer adding each run node until we reach either the next run
             // or the end of the line. That way, we can set relations between
             // runs in a line and do anything special that might be required
@@ -324,11 +329,25 @@ impl LayoutAccessibility {
                     parent_node.push_child(last_id);
                 }
 
-                // TODO: bounding rectangle and character position/width
+                node.set_bounds(accesskit::Rect {
+                    x0: line_x,
+                    y0: y_offset + metrics.min_coord as f64,
+                    x1: line_x + run.advance() as f64,
+                    y1: y_offset + metrics.max_coord as f64,
+                });
+                node.set_text_direction(if run.is_rtl() {
+                    TextDirection::RightToLeft
+                } else {
+                    TextDirection::LeftToRight
+                });
+
                 let run_text = &text[run.text_range()];
                 node.set_value(run_text);
 
                 let mut character_lengths = Vec::new();
+                let mut run_x = 0.0;
+                let mut character_positions = Vec::new();
+                let mut character_widths = Vec::new();
                 let mut word_lengths = Vec::new();
                 let mut last_word_start = 0;
 
@@ -342,13 +361,19 @@ impl LayoutAccessibility {
                         last_word_start = character_lengths.len();
                     }
                     character_lengths.push(cluster_text.len() as _);
+                    character_positions.push(run_x);
+                    character_widths.push(cluster.advance());
+                    run_x += cluster.advance();
                 }
 
                 word_lengths.push((character_lengths.len() - last_word_start) as _);
                 node.set_character_lengths(character_lengths);
+                node.set_character_positions(character_positions);
+                node.set_character_widths(character_widths);
                 node.set_word_lengths(word_lengths);
 
                 last_node = Some((id, node));
+                line_x += run.advance() as f64;
             }
 
             if let Some((id, node)) = last_node {

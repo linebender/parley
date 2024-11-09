@@ -633,9 +633,18 @@ where
         update: &mut TreeUpdate,
         node: &mut Node,
         next_node_id: impl FnMut() -> NodeId,
+        x_offset: f64,
+        y_offset: f64,
     ) {
-        self.layout_access
-            .build_nodes(&self.buffer, &self.layout, update, node, next_node_id);
+        self.layout_access.build_nodes(
+            &self.buffer,
+            &self.layout,
+            update,
+            node,
+            next_node_id,
+            x_offset,
+            y_offset,
+        );
         if let Some(selection) = self
             .selection
             .to_access_selection(&self.layout, &self.layout_access)
