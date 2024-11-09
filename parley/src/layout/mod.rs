@@ -20,6 +20,8 @@ use super::style::Brush;
 use crate::{Font, InlineBox};
 #[cfg(feature = "accesskit")]
 use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
+#[cfg(feature = "accesskit")]
+use alloc::vec::Vec;
 use core::{cmp::Ordering, ops::Range};
 use data::*;
 #[cfg(feature = "accesskit")]
