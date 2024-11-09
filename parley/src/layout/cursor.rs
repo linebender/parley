@@ -3,7 +3,11 @@
 
 //! Text selection support.
 
+#[cfg(feature = "accesskit")]
+use super::LayoutAccessibility;
 use super::{Affinity, BreakReason, Brush, Cluster, ClusterPath, Layout};
+#[cfg(feature = "accesskit")]
+use accesskit::{TextPosition, TextSelection};
 use alloc::vec::Vec;
 use core::ops::Range;
 use peniko::kurbo::Rect;
@@ -372,6 +376,27 @@ impl Cursor {
     /// Used for determining visual order of two cursors.
     fn visual_order_key(&self) -> (usize, f32) {
         (self.path.line_index(), self.visual_offset)
+    }
+
+    #[cfg(feature = "accesskit")]
+    pub fn to_access_position<B: Brush>(
+        &self,
+        layout: &Layout<B>,
+        layout_access: &LayoutAccessibility,
+    ) -> Option<TextPosition> {
+        let run_path = (self.path.line_index(), self.path.run_index());
+        let id = layout_access.access_ids_by_run_path.get(&run_path)?;
+        let mut character_index = self.path.logical_index();
+        if self.affinity == Affinity::Upstream {
+            let run = self.path.run(layout)?;
+            if character_index < run.len() {
+                character_index += 1;
+            }
+        }
+        Some(TextPosition {
+            node: *id,
+            character_index,
+        })
     }
 }
 
@@ -758,5 +783,16 @@ impl Selection {
                 f(Rect::new(x, line_min, x + width, line_max));
             }
         }
+    }
+
+    #[cfg(feature = "accesskit")]
+    pub fn to_access_selection<B: Brush>(
+        &self,
+        layout: &Layout<B>,
+        layout_access: &LayoutAccessibility,
+    ) -> Option<TextSelection> {
+        let anchor = self.anchor.to_access_position(layout, layout_access)?;
+        let focus = self.focus.to_access_position(layout, layout_access)?;
+        Some(TextSelection { anchor, focus })
     }
 }
