@@ -88,6 +88,24 @@ impl Cursor {
         Self::from_cluster(cluster, affinity)
     }
 
+    #[cfg(feature = "accesskit")]
+    pub fn from_access_position<B: Brush>(
+        pos: TextPosition,
+        layout: &Layout<B>,
+        layout_access: &LayoutAccessibility,
+    ) -> Option<Self> {
+        let (line_index, run_index) = *layout_access.run_paths_by_access_id.get(&pos.node)?;
+        let line = layout.get(line_index)?;
+        let run = line.run(run_index)?;
+        let (logical_index, affinity) = if pos.character_index == run.len() {
+            (pos.character_index - 1, Affinity::Upstream)
+        } else {
+            (pos.character_index, Affinity::Downstream)
+        };
+        let cluster = run.get(logical_index)?;
+        Some(Self::from_cluster(cluster, affinity))
+    }
+
     fn from_cluster<B: Brush>(cluster: Cluster<B>, mut affinity: Affinity) -> Self {
         let mut range = cluster.text_range();
         let index = range.start as u32;
@@ -430,6 +448,21 @@ impl Selection {
     /// position associated with the given point.
     pub fn from_point<B: Brush>(layout: &Layout<B>, x: f32, y: f32) -> Self {
         Cursor::from_point(layout, x, y).into()
+    }
+
+    #[cfg(feature = "accesskit")]
+    pub fn from_access_selection<B: Brush>(
+        selection: TextSelection,
+        layout: &Layout<B>,
+        layout_access: &LayoutAccessibility,
+    ) -> Option<Self> {
+        let anchor = Cursor::from_access_position(selection.anchor, layout, layout_access)?;
+        let focus = Cursor::from_access_position(selection.focus, layout, layout_access)?;
+        Some(Self {
+            anchor,
+            focus,
+            h_pos: None,
+        })
     }
 
     /// Creates a new selection bounding the word at the given point.
