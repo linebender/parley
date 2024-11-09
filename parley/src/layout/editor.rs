@@ -474,6 +474,18 @@ where
         }
     }
 
+    #[cfg(feature = "accesskit")]
+    pub fn select_from_accesskit(&mut self, selection: accesskit::TextSelection) {
+        self.refresh_layout();
+        if let Some(selection) = Selection::from_access_selection(
+            selection,
+            &self.editor.layout,
+            &self.editor.layout_access,
+        ) {
+            self.editor.set_selection(selection);
+        }
+    }
+
     fn update_layout(&mut self) {
         self.editor.update_layout(self.font_cx, self.layout_cx);
     }
