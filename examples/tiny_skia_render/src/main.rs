@@ -25,7 +25,7 @@ use tiny_skia::{
 fn main() {
     // The text we are going to style and lay out
     let text = String::from(
-        "Some text here. Let's make it a bit longer so that line wrapping kicks in 😊. And also some اللغة العربية arabic text.",
+        "Some text here. Let's make it a bit longer so that line wrapping kicks in 😊. And also some اللغة العربية arabic text.\nThis is underline and strikethrough text",
     );
 
     // The display scale for HiDPI rendering
@@ -63,6 +63,10 @@ fn main() {
     // Set the first 4 characters to bold
     let bold = FontWeight::new(600.0);
     builder.push(StyleProperty::FontWeight(bold), 0..4);
+
+    // Set the underline & stoked style
+    builder.push(StyleProperty::Underline(true), 141..150);
+    builder.push(StyleProperty::Strikethrough(true), 155..168);
 
     builder.push_inline_box(InlineBox {
         id: 0,
@@ -158,12 +162,43 @@ fn render_glyph_run(glyph_run: &GlyphRun<PenikoColor>, pen: &mut TinySkiaPen<'_>
         run_x += glyph.advance;
 
         let glyph_id = GlyphId::from(glyph.id);
-        let glyph_outline = outlines.get(glyph_id).unwrap();
-
-        pen.set_origin(glyph_x, glyph_y);
-        pen.set_color(to_tiny_skia(color));
-        pen.draw_glyph(&glyph_outline, font_size, &normalized_coords);
+        if let Some(glyph_outline) = outlines.get(glyph_id) {
+            pen.set_origin(glyph_x, glyph_y);
+            pen.set_color(to_tiny_skia(color));
+            pen.draw_glyph(&glyph_outline, font_size, &normalized_coords);
+        }
     }
+
+    // Draw decorations: underline & strikethrough
+    let style = glyph_run.style();
+    let run_metrics = run.metrics();
+    if let Some(decoration) = &style.underline {
+        let offset = decoration.offset.unwrap_or(run_metrics.underline_offset);
+        let size = decoration.size.unwrap_or(run_metrics.underline_size);
+        render_decoration(pen, glyph_run, decoration.brush, offset, size, padding);
+    }
+    if let Some(decoration) = &style.strikethrough {
+        let offset = decoration
+            .offset
+            .unwrap_or(run_metrics.strikethrough_offset);
+        let size = decoration.size.unwrap_or(run_metrics.strikethrough_size);
+        render_decoration(pen, glyph_run, decoration.brush, offset, size, padding);
+    }
+}
+
+fn render_decoration(
+    pen: &mut TinySkiaPen<'_>,
+    glyph_run: &GlyphRun<PenikoColor>,
+    color: PenikoColor,
+    offset: f32,
+    width: f32,
+    padding: u32,
+) {
+    let y = glyph_run.baseline() - offset + padding as f32;
+    let x = glyph_run.offset() + padding as f32;
+    pen.set_color(to_tiny_skia(color));
+    pen.set_origin(x, y);
+    pen.fill_rect(glyph_run.advance(), width);
 }
 
 struct TinySkiaPen<'a> {
