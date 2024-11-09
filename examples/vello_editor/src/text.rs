@@ -267,6 +267,16 @@ impl Editor {
         }
     }
 
+    pub fn handle_accesskit_action_request(&mut self, req: &accesskit::ActionRequest) {
+        if req.action == accesskit::Action::SetTextSelection {
+            if let Some(accesskit::ActionData::SetTextSelection(selection)) = &req.data {
+                self.transact(|txn| {
+                    txn.select_from_accesskit(selection);
+                });
+            }
+        }
+    }
+
     /// Return the current `Generation` of the layout.
     pub fn generation(&self) -> Generation {
         self.editor.generation()
