@@ -334,7 +334,10 @@ impl LayoutAccessibility {
 
                 for cluster in run.clusters() {
                     let cluster_text = &text[cluster.text_range()];
-                    if cluster.is_word_boundary() && !character_lengths.is_empty() {
+                    if cluster.is_word_boundary()
+                        && !cluster.is_space_or_nbsp()
+                        && !character_lengths.is_empty()
+                    {
                         word_lengths.push((character_lengths.len() - last_word_start) as _);
                         last_word_start = character_lengths.len();
                     }
