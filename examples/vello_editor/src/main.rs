@@ -116,6 +116,33 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
         event_loop.set_control_flow(ControlFlow::Wait);
     }
 
+    fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: StartCause) {
+        match cause {
+            StartCause::Init => {
+                self.editor.cursor_reset();
+                if let Some(next_time) = self.editor.next_blink_time() {
+                    event_loop.set_control_flow(ControlFlow::WaitUntil(next_time));
+                }
+            }
+            StartCause::ResumeTimeReached { .. } => {
+                self.editor.cursor_blink();
+
+                if let Some(next_time) = self.editor.next_blink_time() {
+                    self.last_drawn_generation = text::Generation::default();
+                    if let RenderState::Active(state) = &self.state {
+                        state.window.request_redraw();
+                    }
+                    event_loop.set_control_flow(ControlFlow::WaitUntil(next_time));
+                }
+            }
+            StartCause::WaitCancelled { .. } => {
+                if let Some(next_time) = self.editor.next_blink_time() {
+                    event_loop.set_control_flow(ControlFlow::WaitUntil(next_time));
+                }
+            }
+            _ => {}
+        }
+    }
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
