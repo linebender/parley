@@ -185,7 +185,7 @@ impl Cursor {
 
     fn geometry<B: Brush>(&self, layout: &Layout<B>, size: f32) -> Option<Rect> {
         let metrics = *self.path.line(layout)?.metrics();
-        let line_x = self.visual_offset as f64;
+        let line_x = (metrics.offset + self.visual_offset) as f64;
         Some(Rect::new(
             line_x,
             metrics.min_coord as f64,
@@ -203,6 +203,7 @@ impl Cursor {
             line_x += cluster.advance() as f64;
         }
         let metrics = *path.line(layout)?.metrics();
+        line_x += metrics.offset as f64;
         Some(Rect::new(
             line_x,
             metrics.min_coord as f64,
