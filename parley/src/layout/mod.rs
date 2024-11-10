@@ -298,15 +298,28 @@ impl LayoutAccessibility {
 
         for (line_index, line) in layout.lines().enumerate() {
             let metrics = line.metrics();
-            let mut line_x = x_offset + metrics.offset as f64;
             // Defer adding each run node until we reach either the next run
             // or the end of the line. That way, we can set relations between
             // runs in a line and do anything special that might be required
             // for the last run in a line.
             let mut last_node: Option<(NodeId, Node)> = None;
 
-            for (run_index, run) in line.runs().enumerate() {
-                let run_path = (line_index, run_index);
+            // Iterate over the runs from left to right, computing their offsets,
+            // then sort them into text order.
+            let runs = {
+                let mut run_offset = metrics.offset;
+                let mut runs = Vec::with_capacity(line.len());
+                for run in line.runs() {
+                    let advance = run.advance();
+                    runs.push((run, run_offset));
+                    run_offset += advance;
+                }
+                runs.sort_by_key(|(r, _)| r.text_range().start);
+                runs
+            };
+
+            for (run, run_offset) in runs {
+                let run_path = (line_index, run.index());
                 // If we encountered this same run path in the previous
                 // accessibility pass, reuse the same AccessKit ID. Otherwise,
                 // allocate a new one. This enables stable node IDs when merely
@@ -332,9 +345,9 @@ impl LayoutAccessibility {
                 }
 
                 node.set_bounds(accesskit::Rect {
-                    x0: line_x,
+                    x0: x_offset + run_offset as f64,
                     y0: y_offset + metrics.min_coord as f64,
-                    x1: line_x + run.advance() as f64,
+                    x1: x_offset + (run_offset + run.advance()) as f64,
                     y1: y_offset + metrics.max_coord as f64,
                 });
                 node.set_text_direction(if run.is_rtl() {
@@ -347,7 +360,7 @@ impl LayoutAccessibility {
                 node.set_value(run_text);
 
                 let mut character_lengths = Vec::new();
-                let mut run_x = 0.0;
+                let mut cluster_offset = 0.0;
                 let mut character_positions = Vec::new();
                 let mut character_widths = Vec::new();
                 let mut word_lengths = Vec::new();
@@ -363,9 +376,9 @@ impl LayoutAccessibility {
                         last_word_start = character_lengths.len();
                     }
                     character_lengths.push(cluster_text.len() as _);
-                    character_positions.push(run_x);
+                    character_positions.push(cluster_offset);
                     character_widths.push(cluster.advance());
-                    run_x += cluster.advance();
+                    cluster_offset += cluster.advance();
                 }
 
                 word_lengths.push((character_lengths.len() - last_word_start) as _);
@@ -375,7 +388,6 @@ impl LayoutAccessibility {
                 node.set_word_lengths(word_lengths);
 
                 last_node = Some((id, node));
-                line_x += run.advance() as f64;
             }
 
             if let Some((id, node)) = last_node {
