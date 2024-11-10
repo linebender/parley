@@ -3,8 +3,13 @@
 
 use accesskit::{Node, TreeUpdate};
 use parley::layout::PositionedLayoutItem;
-use peniko::{kurbo::Affine, Color, Fill};
+use peniko::Color;
+#[cfg(feature = "vello")]
+use peniko::{kurbo::Affine, Fill};
 use std::time::Instant;
+#[cfg(feature = "tiny-skia")]
+use tiny_skia::{PixmapMut, Transform};
+#[cfg(feature = "vello")]
 use vello::Scene;
 use winit::{
     event::{Modifiers, Touch, WindowEvent},
@@ -17,6 +22,13 @@ pub use parley::layout::editor::Generation;
 use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorTxn};
 
 use crate::access_ids::next_node_id;
+#[cfg(feature = "tiny-skia")]
+use crate::tiny_skia_util::*;
+
+const SELECTION_COLOR: Color = Color::STEEL_BLUE;
+const STRONG_CURSOR_COLOR: Color = Color::WHITE;
+const WEAK_CURSOR_COLOR: Color = Color::LIGHT_GRAY;
+const TEXT_COLOR: Color = Color::WHITE;
 
 pub const INSET: f32 = 32.0;
 
@@ -285,16 +297,17 @@ impl Editor {
     /// Draw into scene.
     ///
     /// Returns drawn `Generation`.
+    #[cfg(feature = "vello")]
     pub fn draw(&self, scene: &mut Scene) -> Generation {
         let transform = Affine::translate((INSET as f64, INSET as f64));
         for rect in self.editor.selection_geometry().iter() {
-            scene.fill(Fill::NonZero, transform, Color::STEEL_BLUE, None, &rect);
+            scene.fill(Fill::NonZero, transform, SELECTION_COLOR, None, &rect);
         }
         if let Some(cursor) = self.editor.selection_strong_geometry(1.5) {
-            scene.fill(Fill::NonZero, transform, Color::WHITE, None, &cursor);
+            scene.fill(Fill::NonZero, transform, STRONG_CURSOR_COLOR, None, &cursor);
         };
         if let Some(cursor) = self.editor.selection_weak_geometry(1.5) {
-            scene.fill(Fill::NonZero, transform, Color::LIGHT_GRAY, None, &cursor);
+            scene.fill(Fill::NonZero, transform, WEAK_CURSOR_COLOR, None, &cursor);
         };
         for line in self.editor.lines() {
             for item in line.items() {
@@ -317,7 +330,7 @@ impl Editor {
                     .collect::<Vec<_>>();
                 scene
                     .draw_glyphs(font)
-                    .brush(Color::WHITE)
+                    .brush(TEXT_COLOR)
                     .hint(true)
                     .transform(transform)
                     .glyph_transform(glyph_xform)
@@ -336,6 +349,34 @@ impl Editor {
                             }
                         }),
                     );
+            }
+        }
+        self.editor.generation()
+    }
+
+    /// Draw into pixmap.
+    ///
+    /// Returns drawn `Generation`.
+    #[cfg(feature = "tiny-skia")]
+    pub fn draw(&self, pixmap: &mut PixmapMut) -> Generation {
+        let transform = Transform::from_translate(INSET, INSET);
+        for rect in self.editor.selection_geometry() {
+            fill_rect(pixmap, rect, SELECTION_COLOR, transform);
+        }
+        if let Some(cursor) = self.editor.selection_strong_geometry(1.5) {
+            fill_rect(pixmap, cursor, STRONG_CURSOR_COLOR, transform);
+        }
+        if let Some(cursor) = self.editor.selection_weak_geometry(1.5) {
+            fill_rect(pixmap, cursor, WEAK_CURSOR_COLOR, transform);
+        }
+        for line in self.editor.lines() {
+            for item in line.items() {
+                let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
+                    continue;
+                };
+                let mut pen = TinySkiaPen::new(pixmap, transform);
+                pen.set_color(TEXT_COLOR);
+                render_glyph_run(&glyph_run, &mut pen);
             }
         }
         self.editor.generation()

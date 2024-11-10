@@ -3,11 +3,23 @@
 
 use accesskit::{Node, Rect, Role, Tree, TreeUpdate};
 use anyhow::Result;
+use peniko::Color;
+#[cfg(feature = "tiny-skia")]
+use softbuffer::{Context, Surface};
+#[cfg(not(feature = "vello"))]
+use std::marker::PhantomData;
+#[cfg(feature = "tiny-skia")]
+use std::num::NonZeroU32;
+#[cfg(feature = "vello")]
 use std::num::NonZeroUsize;
 use std::sync::Arc;
-use vello::peniko::Color;
+#[cfg(feature = "tiny-skia")]
+use tiny_skia::PixmapMut;
+#[cfg(feature = "vello")]
 use vello::util::{RenderContext, RenderSurface};
+#[cfg(feature = "vello")]
 use vello::wgpu;
+#[cfg(feature = "vello")]
 use vello::{AaConfig, Renderer, RendererOptions, Scene};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
@@ -18,19 +30,30 @@ use winit::window::Window;
 mod access_ids;
 use access_ids::{TEXT_INPUT_ID, WINDOW_ID};
 
+#[cfg(feature = "tiny-skia")]
+mod tiny_skia_util;
+#[cfg(feature = "tiny-skia")]
+use tiny_skia_util::*;
+
 // #[path = "text2.rs"]
 mod text;
 use parley::{GenericFamily, StyleProperty};
 
-const WINDOW_TITLE: &str = "Vello Text Editor";
+const BACKGROUND_COLOR: Color = Color::rgb8(30, 30, 30);
+const WINDOW_TITLE: &str = "Text Editor";
 
 // Simple struct to hold the state of the renderer
 pub struct ActiveRenderState<'s> {
     // The fields MUST be in this order, so that the surface and AccessKit adapter are dropped before the window
+    #[cfg(feature = "vello")]
     surface: RenderSurface<'s>,
+    #[cfg(feature = "tiny-skia")]
+    surface: Surface<Arc<Window>, Arc<Window>>,
     access_adapter: accesskit_winit::Adapter,
     window: Arc<Window>,
     sent_initial_access_update: bool,
+    #[cfg(not(feature = "vello"))]
+    _marker: PhantomData<&'s ()>,
 }
 
 impl ActiveRenderState<'_> {
@@ -72,15 +95,18 @@ enum RenderState<'s> {
 struct SimpleVelloApp<'s> {
     /// The vello `RenderContext` which is a global context that lasts for the
     /// lifetime of the application.
+    #[cfg(feature = "vello")]
     context: RenderContext,
 
     /// An array of renderers, one per wgpu device.
+    #[cfg(feature = "vello")]
     renderers: Vec<Option<Renderer>>,
 
     /// State for our example where we store the winit Window and the wgpu Surface.
     state: RenderState<'s>,
 
     /// A `vello::Scene` where the editor layout will be drawn.
+    #[cfg(feature = "vello")]
     scene: Scene,
 
     /// Our `Editor`, which owns a `parley::PlainEditor`.
@@ -115,37 +141,49 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
             txn.set_text(text::LOREM);
         });
 
+        #[cfg(feature = "vello")]
         // Create a vello Surface
-        let surface_future = {
-            let surface = self
-                .context
-                .instance
-                .create_surface(wgpu::SurfaceTarget::from(window.clone()))
-                .expect("Error creating surface");
-            let dev_id = pollster::block_on(self.context.device(Some(&surface)))
-                .expect("No compatible device");
-            let device_handle = &self.context.devices[dev_id];
-            let capabilities = surface.get_capabilities(device_handle.adapter());
-            let present_mode = if capabilities
-                .present_modes
-                .contains(&wgpu::PresentMode::Mailbox)
-            {
-                wgpu::PresentMode::Mailbox
-            } else {
-                wgpu::PresentMode::AutoVsync
+        let surface = {
+            let surface_future = {
+                let surface = self
+                    .context
+                    .instance
+                    .create_surface(wgpu::SurfaceTarget::from(window.clone()))
+                    .expect("Error creating surface");
+                let dev_id = pollster::block_on(self.context.device(Some(&surface)))
+                    .expect("No compatible device");
+                let device_handle = &self.context.devices[dev_id];
+                let capabilities = surface.get_capabilities(device_handle.adapter());
+                let present_mode = if capabilities
+                    .present_modes
+                    .contains(&wgpu::PresentMode::Mailbox)
+                {
+                    wgpu::PresentMode::Mailbox
+                } else {
+                    wgpu::PresentMode::AutoVsync
+                };
+
+                self.context
+                    .create_render_surface(surface, size.width, size.height, present_mode)
             };
-
-            self.context
-                .create_render_surface(surface, size.width, size.height, present_mode)
+            pollster::block_on(surface_future).expect("Error creating surface")
         };
-        let surface = pollster::block_on(surface_future).expect("Error creating surface");
 
-        // Create a vello Renderer for the surface (using its device id)
-        self.renderers
-            .resize_with(self.context.devices.len(), || None);
+        #[cfg(feature = "tiny-skia")]
+        let surface = {
+            let context = Context::new(Arc::clone(&window)).unwrap();
+            Surface::new(&context, Arc::clone(&window)).unwrap()
+        };
 
-        self.renderers[surface.dev_id]
-            .get_or_insert_with(|| create_vello_renderer(&self.context, &surface));
+        #[cfg(feature = "vello")]
+        {
+            // Create a vello Renderer for the surface (using its device id)
+            self.renderers
+                .resize_with(self.context.devices.len(), || None);
+
+            self.renderers[surface.dev_id]
+                .get_or_insert_with(|| create_vello_renderer(&self.context, &surface));
+        }
 
         // Save the Window and Surface to a state variable
         self.state = RenderState::Active(ActiveRenderState {
@@ -153,6 +191,8 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
             surface,
             access_adapter,
             sent_initial_access_update: false,
+            #[cfg(not(feature = "vello"))]
+            _marker: PhantomData,
         });
 
         event_loop.set_control_flow(ControlFlow::Wait);
@@ -198,8 +238,17 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
 
             // Resize the surface when the window is resized
             WindowEvent::Resized(size) => {
+                #[cfg(feature = "vello")]
                 self.context
                     .resize_surface(&mut render_state.surface, size.width, size.height);
+                #[cfg(feature = "tiny-skia")]
+                render_state
+                    .surface
+                    .resize(
+                        NonZeroU32::new(size.width).unwrap(),
+                        NonZeroU32::new(size.height).unwrap(),
+                    )
+                    .unwrap();
                 self.editor.transact(|txn| {
                     txn.set_scale(1.0);
                     txn.set_width(Some(size.width as f32 - 2f32 * text::INSET));
@@ -217,53 +266,79 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
                 // Send an accessibility update if accessibility is active.
                 render_state.access_update(&mut self.editor);
 
-                // Get the RenderSurface (surface + config).
-                let surface = &render_state.surface;
+                #[cfg(feature = "vello")]
+                {
+                    // Get the RenderSurface (surface + config).
+                    let surface = &render_state.surface;
 
-                // Get the window size.
-                let width = surface.config.width;
-                let height = surface.config.height;
+                    // Get the window size.
+                    let width = surface.config.width;
+                    let height = surface.config.height;
 
-                // Get a handle to the device.
-                let device_handle = &self.context.devices[surface.dev_id];
+                    // Get a handle to the device.
+                    let device_handle = &self.context.devices[surface.dev_id];
 
-                // Get the surface's texture.
-                let surface_texture = surface
-                    .surface
-                    .get_current_texture()
-                    .expect("failed to get surface texture");
+                    // Get the surface's texture.
+                    let surface_texture = surface
+                        .surface
+                        .get_current_texture()
+                        .expect("failed to get surface texture");
 
-                // Sometimes `Scene` is stale and needs to be redrawn.
-                if self.last_drawn_generation != self.editor.generation() {
-                    // Empty the scene of objects to draw. You could create a new Scene each time, but in this case
-                    // the same Scene is reused so that the underlying memory allocation can also be reused.
-                    self.scene.reset();
+                    // Sometimes `Scene` is stale and needs to be redrawn.
+                    if self.last_drawn_generation != self.editor.generation() {
+                        // Empty the scene of objects to draw. You could create a new Scene each time, but in this case
+                        // the same Scene is reused so that the underlying memory allocation can also be reused.
+                        self.scene.reset();
 
-                    self.last_drawn_generation = self.editor.draw(&mut self.scene);
+                        self.last_drawn_generation = self.editor.draw(&mut self.scene);
+                    }
+
+                    // Render to the surface's texture.
+                    self.renderers[surface.dev_id]
+                        .as_mut()
+                        .unwrap()
+                        .render_to_surface(
+                            &device_handle.device,
+                            &device_handle.queue,
+                            &self.scene,
+                            &surface_texture,
+                            &vello::RenderParams {
+                                base_color: BACKGROUND_COLOR,
+                                width,
+                                height,
+                                antialiasing_method: AaConfig::Msaa16,
+                            },
+                        )
+                        .expect("failed to render to surface");
+
+                    // Queue the texture to be presented on the surface.
+                    surface_texture.present();
+
+                    device_handle.device.poll(wgpu::Maintain::Poll);
                 }
 
-                // Render to the surface's texture.
-                self.renderers[surface.dev_id]
-                    .as_mut()
-                    .unwrap()
-                    .render_to_surface(
-                        &device_handle.device,
-                        &device_handle.queue,
-                        &self.scene,
-                        &surface_texture,
-                        &vello::RenderParams {
-                            base_color: Color::rgb8(30, 30, 30), // Background color
-                            width,
-                            height,
-                            antialiasing_method: AaConfig::Msaa16,
-                        },
+                #[cfg(feature = "tiny-skia")]
+                {
+                    let mut buffer = render_state.surface.buffer_mut().unwrap();
+                    let size = render_state.window.inner_size();
+                    let mut pixmap = PixmapMut::from_bytes(
+                        bytemuck::cast_slice_mut(&mut buffer),
+                        size.width,
+                        size.height,
                     )
-                    .expect("failed to render to surface");
-
-                // Queue the texture to be presented on the surface.
-                surface_texture.present();
-
-                device_handle.device.poll(wgpu::Maintain::Poll);
+                    .unwrap();
+                    pixmap.fill(to_tiny_skia_color(BACKGROUND_COLOR));
+                    self.last_drawn_generation = self.editor.draw(&mut pixmap);
+                    // Swap the red and blue bytes, since tiny-skia and
+                    // softbuffer can't agree on a pixel format. Adapted
+                    // from iced_tiny_skia.
+                    for pixel in buffer.iter_mut() {
+                        *pixel = *pixel & 0xFF00_FF00
+                            | ((0x0000_00FF & *pixel) << 16)
+                            | ((0x00FF_0000 & *pixel) >> 16);
+                    }
+                    buffer.present().unwrap();
+                }
             }
             _ => {}
         }
@@ -300,9 +375,12 @@ fn main() -> Result<()> {
 
     // Setup a bunch of state:
     let mut app = SimpleVelloApp {
+        #[cfg(feature = "vello")]
         context: RenderContext::new(),
+        #[cfg(feature = "vello")]
         renderers: vec![],
         state: RenderState::Suspended(None),
+        #[cfg(feature = "vello")]
         scene: Scene::new(),
         editor: text::Editor::default(),
         last_drawn_generation: Default::default(),
@@ -328,6 +406,7 @@ fn create_winit_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
 }
 
 /// Helper function that creates a vello `Renderer` for a given `RenderContext` and `RenderSurface`
+#[cfg(feature = "vello")]
 fn create_vello_renderer(render_cx: &RenderContext, surface: &RenderSurface) -> Renderer {
     Renderer::new(
         &render_cx.devices[surface.dev_id].device,
