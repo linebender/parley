@@ -12,7 +12,7 @@ use super::{
 };
 use alloc::string::String;
 use hashbrown::HashMap;
-use skrifa::raw::{tables::name, types::NameId, FileRef, FontRef, TableProvider as _};
+use read_fonts::{tables::name, types::NameId, FileRef, FontRef, TableProvider as _};
 use smallvec::SmallVec;
 #[cfg(feature = "std")]
 use {super::source::SourcePathMap, std::path::Path};
