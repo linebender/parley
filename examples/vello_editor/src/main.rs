@@ -192,6 +192,7 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
             _ => {}
         }
     }
+
     fn window_event(
         &mut self,
         event_loop: &ActiveEventLoop,
@@ -238,6 +239,18 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
                 });
                 render_state.window.request_redraw();
             }
+
+            // Don't blink the cursor when we're not focused.
+            WindowEvent::Focused(false) => {
+                self.editor.disable_blink();
+                self.editor.cursor_blink();
+                self.last_drawn_generation = text::Generation::default();
+                if let RenderState::Active(state) = &self.state {
+                    state.window.request_redraw();
+                }
+            }
+            // Make sure cursor is visible when we regain focus.
+            WindowEvent::Focused(true) => self.editor.cursor_reset(),
 
             // This is where all the rendering happens
             WindowEvent::RedrawRequested => {

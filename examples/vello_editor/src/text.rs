@@ -51,6 +51,10 @@ impl Editor {
         self.cursor_visible = true;
     }
 
+    pub fn disable_blink(&mut self) {
+        self.start_time = None;
+    }
+
     pub fn next_blink_time(&self) -> Option<Instant> {
         self.start_time.map(|start_time| {
             let phase = Instant::now().duration_since(start_time);
@@ -64,10 +68,10 @@ impl Editor {
     }
 
     pub fn cursor_blink(&mut self) {
-        if let Some(start_time) = self.start_time {
+        self.cursor_visible = self.start_time.map_or(false, |start_time| {
             let elapsed = Instant::now().duration_since(start_time);
-            self.cursor_visible = (elapsed.as_millis() / self.blink_period.as_millis()) % 2 == 0;
-        }
+            (elapsed.as_millis() / self.blink_period.as_millis()) % 2 == 0
+        });
     }
 
     pub fn handle_event(&mut self, event: WindowEvent) {
