@@ -295,6 +295,8 @@ impl LayoutAccessibility {
     ) {
         // Build a set of node IDs for the runs encountered in this pass.
         let mut ids = HashSet::<NodeId>::new();
+        // Reuse scratch space for storing a sorted list of runs.
+        let mut runs = Vec::new();
 
         for (line_index, line) in layout.lines().enumerate() {
             let metrics = line.metrics();
@@ -306,19 +308,19 @@ impl LayoutAccessibility {
 
             // Iterate over the runs from left to right, computing their offsets,
             // then sort them into text order.
-            let runs = {
+            runs.clear();
+            runs.reserve(line.len());
+            {
                 let mut run_offset = metrics.offset;
-                let mut runs = Vec::with_capacity(line.len());
                 for run in line.runs() {
                     let advance = run.advance();
                     runs.push((run, run_offset));
                     run_offset += advance;
                 }
-                runs.sort_by_key(|(r, _)| r.text_range().start);
-                runs
-            };
+            }
+            runs.sort_by_key(|(r, _)| r.text_range().start);
 
-            for (run, run_offset) in runs {
+            for (run, run_offset) in runs.drain(..) {
                 let run_path = (line_index, run.index());
                 // If we encountered this same run path in the previous
                 // accessibility pass, reuse the same AccessKit ID. Otherwise,
