@@ -38,9 +38,12 @@ pub fn shape_text<'a, B: Brush>(
     infos: &[(CharInfo, u16)],
     levels: &[u8],
     scx: &mut ShapeContext,
-    text: &str,
+    mut text: &str,
     layout: &mut Layout<B>,
 ) {
+    if text.is_empty() {
+        text = " ";
+    }
     // Do nothing if there is no text or styles (there should always be a default style)
     if text.is_empty() || styles.is_empty() {
         // Process any remaining inline boxes whose index is greater than the length of the text

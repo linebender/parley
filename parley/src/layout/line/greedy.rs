@@ -4,6 +4,7 @@
 //! Greedy line breaking.
 
 use alloc::vec::Vec;
+use swash::text::cluster::Whitespace;
 
 #[cfg(feature = "libm")]
 #[allow(unused_imports)]
@@ -33,7 +34,6 @@ struct LineState {
     x: f32,
     items: Range<usize>,
     clusters: Range<usize>,
-    skip_mandatory_break: bool,
     num_spaces: usize,
 }
 
@@ -185,23 +185,24 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // We have to process line breaking right now before processing inline boxes,
                     // otherwise line break will occur in processing of the following run, and it is
                     // too late and inline box will end on the previous line.
-                    if !self.state.line.skip_mandatory_break
-                        && self
-                            .layout
-                            .data
-                            .clusters
-                            .get(self.state.cluster_idx)
-                            .map(|c| c.info.boundary() == Boundary::Mandatory)
-                            .unwrap_or(false)
-                    {
-                        self.state.prev_boundary = None;
-                        self.state.line.items.end = self.state.item_idx;
-                        self.state.line.clusters.end = self.state.cluster_idx;
-                        self.state.line.skip_mandatory_break = true;
-                        if try_commit_line!(BreakReason::Explicit) {
-                            return self.start_new_line();
-                        }
-                    }
+
+                    // if !self.state.line.skip_mandatory_break
+                    //     && self
+                    //         .layout
+                    //         .data
+                    //         .clusters
+                    //         .get(self.state.cluster_idx)
+                    //         .map(|c| c.info.boundary() == Boundary::Mandatory)
+                    //         .unwrap_or(false)
+                    // {
+                    //     self.state.prev_boundary = None;
+                    //     self.state.line.items.end = self.state.item_idx;
+                    //     self.state.line.clusters.end = self.state.cluster_idx;
+                    //     self.state.line.skip_mandatory_break = true;
+                    //     if try_commit_line!(BreakReason::Explicit) {
+                    //         return self.start_new_line();
+                    //     }
+                    // }
                     let inline_box = &self.layout.data.inline_boxes[item.index];
 
                     // Compute the x position of the content being currently processed
@@ -252,49 +253,28 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         // Retrieve metadata about the cluster
                         let is_ligature_continuation = cluster.is_ligature_continuation();
-                        let is_space = cluster.info().whitespace().is_space_or_nbsp();
+                        let whitespace = cluster.info().whitespace();
+                        let is_newline = whitespace == Whitespace::Newline;
+                        let is_space = whitespace.is_space_or_nbsp();
                         let boundary = cluster.info().boundary();
 
-                        // let mut break_opportunity = false;
-
-                        // Handle boundary clusters
-                        match boundary {
-                            // A hard line break (e.g. CRLF or similar)
-                            Boundary::Mandatory => {
-                                // println!("TextRun (Mandatory Break)");
-
-                                if !self.state.line.skip_mandatory_break {
-                                    self.state.prev_boundary = None;
-                                    self.state.line.items.end = self.state.item_idx + 1;
-                                    self.state.line.clusters.end = self.state.cluster_idx;
-
-                                    // We skip a mandatory break immediately after another mandatory break
-                                    self.state.line.skip_mandatory_break = true;
-
-                                    if try_commit_line!(BreakReason::Explicit) {
-                                        return self.start_new_line();
-                                    }
-                                }
+                        if boundary == Boundary::Line {
+                            // We do not currently handle breaking within a ligature, so we ignore boundaries in such a position.
+                            //
+                            // We also don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
+                            // line breaks. We should accept the overflowing fragment in that scenario.
+                            if !is_ligature_continuation && self.state.line.x != 0.0 {
+                                self.state.mark_line_break_opportunity();
+                                // break_opportunity = true;
                             }
-                            // A line-breaking opportunity. We save our state at this point so that we can later go back and
-                            // "take" the line-breaking opportunity.
-                            Boundary::Line => {
-                                // We do not currently handle breaking within a ligature, so we ignore boundaries in such a position.
-                                //
-                                // We also don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
-                                // line breaks. We should accept the overflowing fragment in that scenario.
-                                if !is_ligature_continuation && self.state.line.x != 0.0 {
-                                    self.state.mark_line_break_opportunity();
-                                    // break_opportunity = true;
-                                }
+                        } else if is_newline {
+                            self.state.append_cluster_to_line(0.0);
+                            if try_commit_line!(BreakReason::Explicit) {
+                                // TODO: can this be hoisted out of the conditional?
+                                self.state.cluster_idx += 1;
+                                return self.start_new_line();
                             }
-                            // Not a line boundary
-                            _ => {}
                         }
-
-                        // We only skip a mandatory break immediately after another mandatory break so if we
-                        // have got this far then we should disable mandatory break skipping
-                        self.state.line.skip_mandatory_break = false;
 
                         // If current cluster is the start of a ligature, then advance state to include
                         // the remaining clusters that make up the ligature
@@ -476,8 +456,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 }
             }
         }
-
         let mut y = 0.;
+        let mut prev_line_metrics = None;
         for line in &mut self.lines.lines {
             // Reset metrics for line
             line.metrics.ascent = 0.;
@@ -486,6 +466,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             line.metrics.offset = 0.;
             line.text_range.start = usize::MAX;
 
+            if line.item_range.is_empty() {
+                line.text_range = self.layout.data.text_len..self.layout.data.text_len;
+            }
             // Compute metrics for the line, but ignore trailing whitespace.
             let mut have_metrics = false;
             let mut needs_reorder = false;
@@ -584,6 +567,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         line.metrics.descent = run.metrics.descent;
                         line.metrics.leading = run.metrics.leading;
                     }
+                } else if let Some(metrics) = prev_line_metrics {
+                    // HACK: copy metrics from previous line if we don't have
+                    // any; this should only occur for an empty line following
+                    // a newline at the end of a layout
+                    line.metrics = metrics;
                 }
             }
 
@@ -601,6 +589,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             line.metrics.baseline = y + above;
             y = line.metrics.baseline + below;
             line.metrics.max_coord = y;
+            prev_line_metrics = Some(line.metrics);
+        }
+        if self.layout.data.text_len == 0 {
+            if let Some(line) = self.lines.line_items.first_mut() {
+                line.text_range = 0..0;
+                line.cluster_range = 0..0;
+            }
         }
     }
 }
@@ -792,10 +787,10 @@ fn try_commit_line<B: Brush>(
 
     // Return false and don't commit line if there were no items to process
     // FIXME: support lines with only inlines boxes
-    if start_item_idx == end_item_idx {
-        // } || first_run_pos == last_run_pos {
-        return false;
-    }
+    // if start_item_idx == end_item_idx {
+    //     // } || first_run_pos == last_run_pos {
+    //     return false;
+    // }
 
     // Q: why this special case?
     let mut num_spaces = state.num_spaces;
@@ -819,7 +814,7 @@ fn try_commit_line<B: Brush>(
     // Reset state for the new line
     state.clusters.start = state.clusters.end;
     state.clusters.end += 1;
-    state.items.start = state.items.end - 1;
+    state.items.start = state.items.end.saturating_sub(1);
     state.num_spaces = 0;
 
     true

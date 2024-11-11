@@ -22,7 +22,8 @@ impl<'a, B: Brush> Cluster<'a, B> {
                 }
             }
         }
-        path.cluster(layout)
+        None
+        //        path.cluster(layout)
     }
 
     /// Returns the cluster and affinity for the given layout and point.
@@ -59,6 +60,40 @@ impl<'a, B: Brush> Cluster<'a, B> {
             }
         }
         Some((path.cluster(layout)?, Affinity::default()))
+    }
+
+    /// Returns the cluster and affinity for the given layout and point.
+    pub fn from_point2(layout: &'a Layout<B>, x: f32, y: f32) -> Option<(Self, bool)> {
+        let mut path = ClusterPath::default();
+        if let Some((line_index, line)) = layout.line_for_offset(y) {
+            path.line_index = line_index as u32;
+            let mut offset = line.metrics().offset;
+            let last_run_index = line.len().saturating_sub(1);
+            for (run_index, run) in line.runs().enumerate() {
+                let is_last_run = run_index == last_run_index;
+                let run_advance = run.advance();
+                path.run_index = run_index as u32;
+                path.logical_index = 0;
+                if x > offset + run_advance && !is_last_run {
+                    offset += run_advance;
+                    continue;
+                }
+                let last_cluster_index = run.cluster_range().len().saturating_sub(1);
+                for (visual_index, cluster) in run.visual_clusters().enumerate() {
+                    let is_last_cluster = is_last_run && visual_index == last_cluster_index;
+                    path.logical_index =
+                        run.visual_to_logical(visual_index).unwrap_or_default() as u32;
+                    let cluster_advance = cluster.advance();
+                    let edge = offset;
+                    offset += cluster_advance;
+                    if x > offset && !is_last_cluster {
+                        continue;
+                    }
+                    return Some((path.cluster(layout)?, x <= edge + cluster_advance * 0.5));
+                }
+            }
+        }
+        Some((path.cluster(layout)?, true))
     }
 
     /// Returns the line that contains the cluster.
@@ -328,7 +363,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
     /// on the containing line.
     pub fn visual_offset(&self) -> Option<f32> {
         let line = self.path.line(self.run.layout)?;
-        let mut offset = 0.0;
+        let mut offset = line.metrics().offset;
         for run_index in 0..=self.path.run_index() {
             let run = line.run(run_index)?;
             if run_index != self.path.run_index() {

@@ -14,7 +14,6 @@ use winit::event::*;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::Window;
 
-// #[path = "text2.rs"]
 mod text;
 use parley::{GenericFamily, StyleProperty};
 
@@ -227,7 +226,7 @@ impl ApplicationHandler for SimpleVelloApp<'_> {
                             base_color: Color::rgb8(30, 30, 30), // Background color
                             width,
                             height,
-                            antialiasing_method: AaConfig::Msaa16,
+                            antialiasing_method: AaConfig::Area,
                         },
                     )
                     .expect("failed to render to surface");

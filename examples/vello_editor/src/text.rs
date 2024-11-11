@@ -255,6 +255,7 @@ impl Editor {
             WindowEvent::MouseInput { state, button, .. } => {
                 if button == winit::event::MouseButton::Left {
                     self.pointer_down = state.is_pressed();
+                    self.cursor_reset();
                     if self.pointer_down {
                         let now = Instant::now();
                         if let Some(last) = self.last_click_time.take() {
@@ -284,6 +285,7 @@ impl Editor {
                 self.cursor_pos = (position.x as f32 - INSET, position.y as f32 - INSET);
                 // macOS seems to generate a spurious move after selecting word?
                 if self.pointer_down && prev_pos != self.cursor_pos {
+                    self.cursor_reset();
                     let cursor_pos = self.cursor_pos;
                     self.transact(|txn| txn.extend_selection_to_point(cursor_pos.0, cursor_pos.1));
                     // println!("Active text: {:?}", self.active_text());

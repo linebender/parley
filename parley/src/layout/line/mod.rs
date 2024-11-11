@@ -11,6 +11,10 @@ impl<'a, B: Brush> Line<'a, B> {
         &self.data.metrics
     }
 
+    pub fn break_reason(&self) -> BreakReason {
+        self.data.break_reason
+    }
+
     /// Returns the range of text for the line.
     pub fn text_range(&self) -> Range<usize> {
         self.data.text_range.clone()
