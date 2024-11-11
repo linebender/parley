@@ -3,7 +3,11 @@
 
 //! Text selection support.
 
+#[cfg(feature = "accesskit")]
+use super::LayoutAccessibility;
 use super::{Affinity, BreakReason, Brush, Cluster, ClusterPath, Layout};
+#[cfg(feature = "accesskit")]
+use accesskit::TextPosition;
 use alloc::vec::Vec;
 use core::ops::Range;
 use peniko::kurbo::Rect;
@@ -82,6 +86,24 @@ impl Cursor {
             return Self::default();
         };
         Self::from_cluster(cluster, affinity)
+    }
+
+    #[cfg(feature = "accesskit")]
+    pub fn from_access_position<B: Brush>(
+        pos: &TextPosition,
+        layout: &Layout<B>,
+        layout_access: &LayoutAccessibility,
+    ) -> Option<Self> {
+        let (line_index, run_index) = *layout_access.run_paths_by_access_id.get(&pos.node)?;
+        let line = layout.get(line_index)?;
+        let run = line.run(run_index)?;
+        let (logical_index, affinity) = if pos.character_index == run.len() {
+            (pos.character_index - 1, Affinity::Upstream)
+        } else {
+            (pos.character_index, Affinity::Downstream)
+        };
+        let cluster = run.get(logical_index)?;
+        Some(Self::from_cluster(cluster, affinity))
     }
 
     fn from_cluster<B: Brush>(cluster: Cluster<B>, mut affinity: Affinity) -> Self {
@@ -374,6 +396,38 @@ impl Cursor {
     fn visual_order_key(&self) -> (usize, f32) {
         (self.path.line_index(), self.visual_offset)
     }
+
+    #[cfg(feature = "accesskit")]
+    pub fn to_access_position<B: Brush>(
+        &self,
+        layout: &Layout<B>,
+        layout_access: &LayoutAccessibility,
+    ) -> Option<TextPosition> {
+        let run_path = (self.path.line_index(), self.path.run_index());
+        let id = layout_access.access_ids_by_run_path.get(&run_path)?;
+        let mut character_index = self.path.logical_index();
+        // If the affinity is upstream, then that means that the cursor
+        // logically follows the cluster specified in its cluster path,
+        // so it's "on" the next logical cluster. AccessKit expects us to
+        // specify the character that the cursor is "on", so we need to advance
+        // to the next one in this case. As an example of when this happens
+        // in LTR text: initially the cursor is on the first character of the
+        // text with `Affinity::Downstream`. If the user presses Right Arrow,
+        // the cursor stays on the same cluster but the affinity is flipped
+        // to `Affinity::Upstream`, and now the cursor is between the first
+        // and second characters; we interpret that here as being "on"
+        // the second character.
+        if self.affinity == Affinity::Upstream {
+            let run = self.path.run(layout)?;
+            if character_index < run.len() {
+                character_index += 1;
+            }
+        }
+        Some(TextPosition {
+            node: *id,
+            character_index,
+        })
+    }
 }
 
 /// A range within a layout.
@@ -406,6 +460,21 @@ impl Selection {
     /// position associated with the given point.
     pub fn from_point<B: Brush>(layout: &Layout<B>, x: f32, y: f32) -> Self {
         Cursor::from_point(layout, x, y).into()
+    }
+
+    #[cfg(feature = "accesskit")]
+    pub fn from_access_selection<B: Brush>(
+        selection: &accesskit::TextSelection,
+        layout: &Layout<B>,
+        layout_access: &LayoutAccessibility,
+    ) -> Option<Self> {
+        let anchor = Cursor::from_access_position(&selection.anchor, layout, layout_access)?;
+        let focus = Cursor::from_access_position(&selection.focus, layout, layout_access)?;
+        Some(Self {
+            anchor,
+            focus,
+            h_pos: None,
+        })
     }
 
     /// Creates a new selection bounding the word at the given point.
@@ -759,5 +828,16 @@ impl Selection {
                 f(Rect::new(x, line_min, x + width, line_max));
             }
         }
+    }
+
+    #[cfg(feature = "accesskit")]
+    pub fn to_access_selection<B: Brush>(
+        &self,
+        layout: &Layout<B>,
+        layout_access: &LayoutAccessibility,
+    ) -> Option<accesskit::TextSelection> {
+        let anchor = self.anchor.to_access_position(layout, layout_access)?;
+        let focus = self.focus.to_access_position(layout, layout_access)?;
+        Some(accesskit::TextSelection { anchor, focus })
     }
 }

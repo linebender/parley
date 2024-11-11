@@ -20,6 +20,11 @@ impl<'a, B: Brush> Run<'a, B> {
         }
     }
 
+    /// Returns the index of the run within the line.
+    pub fn index(&self) -> usize {
+        self.index as usize
+    }
+
     /// Returns the font for the run.
     pub fn font(&self) -> &Font {
         self.layout.data.fonts.get(self.data.font_index).unwrap()

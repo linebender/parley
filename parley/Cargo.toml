@@ -21,6 +21,7 @@ std = ["fontique/std", "skrifa/std", "peniko/std"]
 libm = ["fontique/libm", "skrifa/libm", "peniko/libm", "dep:core_maths"]
 # Enables support for system font backends
 system = ["std", "fontique/system"]
+accesskit = ["dep:accesskit", "dep:hashbrown"]
 
 [dependencies]
 swash = { workspace = true }
@@ -28,3 +29,5 @@ skrifa = { workspace = true }
 peniko = { workspace = true }
 fontique = { workspace = true }
 core_maths = { version = "0.1.0", optional = true }
+accesskit = { workspace = true, optional = true }
+hashbrown = { workspace = true, optional = true }
