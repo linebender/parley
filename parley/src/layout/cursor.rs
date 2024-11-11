@@ -406,6 +406,17 @@ impl Cursor {
         let run_path = (self.path.line_index(), self.path.run_index());
         let id = layout_access.access_ids_by_run_path.get(&run_path)?;
         let mut character_index = self.path.logical_index();
+        // If the affinity is upstream, then that means that the cursor
+        // logically follows the cluster specified in its cluster path,
+        // so it's "on" the next logical cluster. AccessKit expects us to
+        // specify the character that the cursor is "on", so we need to advance
+        // to the next one in this case. As an example of when this happens
+        // in LTR text: initially the cursor is on the first character of the
+        // text with `Affinity::Downstream`. If the user presses Right Arrow,
+        // the cursor stays on the same cluster but the affinity is flipped
+        // to `Affinity::Upstream`, and now the cursor is between the first
+        // and second characters; we interpret that here as being "on"
+        // the second character.
         if self.affinity == Affinity::Upstream {
             let run = self.path.run(layout)?;
             if character_index < run.len() {
