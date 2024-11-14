@@ -96,6 +96,9 @@ mod util;
 pub mod layout;
 pub mod style;
 
+#[cfg(test)]
+mod tests;
+
 pub use peniko::kurbo::Rect;
 pub use peniko::Font;
 
