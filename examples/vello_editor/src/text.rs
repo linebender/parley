@@ -105,25 +105,25 @@ impl Editor {
                 match event.logical_key {
                     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
                     Key::Character(c) if action_mod && matches!(c.as_str(), "c" | "x" | "v") => {
-                        use clipboard_rs::{Clipboard, ClipboardContext};
+                        use arboard::Clipboard;
                         use parley::layout::editor::ActiveText;
 
                         match c.to_lowercase().as_str() {
                             "c" => {
                                 if let ActiveText::Selection(text) = self.editor.active_text() {
-                                    let cb = ClipboardContext::new().unwrap();
+                                    let mut cb = Clipboard::new().unwrap();
                                     cb.set_text(text.to_owned()).ok();
                                 }
                             }
                             "x" => {
                                 if let ActiveText::Selection(text) = self.editor.active_text() {
-                                    let cb = ClipboardContext::new().unwrap();
+                                    let mut cb = Clipboard::new().unwrap();
                                     cb.set_text(text.to_owned()).ok();
                                     self.transact(|txn| txn.delete_selection());
                                 }
                             }
                             "v" => {
-                                let cb = ClipboardContext::new().unwrap();
+                                let mut cb = Clipboard::new().unwrap();
                                 let text = cb.get_text().unwrap_or_default();
                                 self.transact(|txn| txn.insert_or_replace_selection(&text));
                             }
