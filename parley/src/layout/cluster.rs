@@ -30,7 +30,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
         let mut path = ClusterPath::default();
         if let Some((line_index, line)) = layout.line_for_offset(y) {
             path.line_index = line_index as u32;
-            let mut offset = 0.0;
+            let mut offset = line.metrics().offset;
             let last_run_index = line.len().saturating_sub(1);
             for (run_index, run) in line.runs().enumerate() {
                 let is_last_run = run_index == last_run_index;
