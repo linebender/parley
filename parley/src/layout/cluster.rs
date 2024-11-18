@@ -30,7 +30,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
         let mut path = ClusterPath::default();
         if let Some((line_index, line)) = layout.line_for_offset(y) {
             path.line_index = line_index as u32;
-            let mut offset = 0.0;
+            let mut offset = line.metrics().offset;
             let last_run_index = line.len().saturating_sub(1);
             for (run_index, run) in line.runs().enumerate() {
                 let is_last_run = run_index == last_run_index;
@@ -455,5 +455,68 @@ impl Iterator for GlyphIter<'_> {
                 Some(glyph)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Cluster, FontContext, LayoutContext, PositionedLayoutItem, StyleProperty};
+
+    use super::{Alignment, Layout};
+
+    type Brush = ();
+
+    fn create_unaligned_layout() -> Layout<Brush> {
+        let mut layout_ctx = LayoutContext::new();
+        // TODO: Use a test font
+        let mut font_ctx = FontContext::new();
+        let text = "Parley exists";
+        let mut builder = layout_ctx.ranged_builder(&mut font_ctx, text, 1.0);
+        builder.push_default(StyleProperty::FontSize(10.));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout
+    }
+
+    fn cluster_from_position_with_alignment(alignment: Alignment) {
+        let mut layout = create_unaligned_layout();
+        let width = layout.full_width();
+        layout.align(Some(width + 100.), alignment);
+        assert_eq!(
+            layout.len(),
+            1,
+            "Text doesn't contain any newlines, and there's no max advance"
+        );
+        let line = layout.get(0).unwrap();
+
+        let mut test_count = 0;
+        for item in line.items() {
+            let PositionedLayoutItem::GlyphRun(run) = item else {
+                unreachable!("No inline boxes set up");
+            };
+            for glyph in run.positioned_glyphs() {
+                test_count += 1;
+                let cluster = Cluster::from_point(&layout, glyph.x + 0.1, glyph.y).unwrap();
+                assert_eq!(cluster.0.glyphs().next().unwrap().id, glyph.id);
+            }
+        }
+        assert!(test_count > 5);
+    }
+
+    #[test]
+    fn cluster_from_position_start_alignment() {
+        cluster_from_position_with_alignment(Alignment::Start);
+    }
+    #[test]
+    fn cluster_from_position_middle_alignment() {
+        cluster_from_position_with_alignment(Alignment::Middle);
+    }
+    #[test]
+    fn cluster_from_position_end_alignment() {
+        cluster_from_position_with_alignment(Alignment::End);
+    }
+    #[test]
+    fn cluster_from_position_justified_alignment() {
+        cluster_from_position_with_alignment(Alignment::Justified);
     }
 }
