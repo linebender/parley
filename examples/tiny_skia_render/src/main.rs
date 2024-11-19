@@ -7,6 +7,9 @@
 //! Note: Emoji rendering is not currently implemented in this example. See the swash example
 //! if you need emoji rendering.
 
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::shadow_unrelated)]
+
 use parley::{
     Alignment, FontContext, FontWeight, GenericFamily, GlyphRun, InlineBox, Layout, LayoutContext,
     PositionedLayoutItem, StyleProperty,
@@ -119,7 +122,7 @@ fn main() {
         path.pop();
         path.pop();
         path.push("_output");
-        let _ = std::fs::create_dir(path.clone());
+        drop(std::fs::create_dir(path.clone()));
         path.push("tiny_skia_render.png");
         path
     };
@@ -130,7 +133,11 @@ fn to_tiny_skia(color: PenikoColor) -> TinySkiaColor {
     TinySkiaColor::from_rgba8(color.r, color.g, color.b, color.a)
 }
 
-fn render_glyph_run(glyph_run: &GlyphRun<PenikoColor>, pen: &mut TinySkiaPen<'_>, padding: u32) {
+fn render_glyph_run(
+    glyph_run: &GlyphRun<'_, PenikoColor>,
+    pen: &mut TinySkiaPen<'_>,
+    padding: u32,
+) {
     // Resolve properties of the GlyphRun
     let mut run_x = glyph_run.offset();
     let run_y = glyph_run.baseline();
@@ -188,7 +195,7 @@ fn render_glyph_run(glyph_run: &GlyphRun<PenikoColor>, pen: &mut TinySkiaPen<'_>
 
 fn render_decoration(
     pen: &mut TinySkiaPen<'_>,
-    glyph_run: &GlyphRun<PenikoColor>,
+    glyph_run: &GlyphRun<'_, PenikoColor>,
     color: PenikoColor,
     offset: f32,
     width: f32,
@@ -210,7 +217,7 @@ struct TinySkiaPen<'a> {
 }
 
 impl TinySkiaPen<'_> {
-    fn new(pixmap: PixmapMut) -> TinySkiaPen {
+    fn new(pixmap: PixmapMut<'_>) -> TinySkiaPen<'_> {
         TinySkiaPen {
             pixmap,
             x: 0.0,

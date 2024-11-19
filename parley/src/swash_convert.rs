@@ -1,11 +1,11 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-pub fn script_to_fontique(script: swash::text::Script) -> fontique::Script {
+pub(crate) fn script_to_fontique(script: swash::text::Script) -> fontique::Script {
     fontique::Script(*SCRIPT_TAGS.get(script as usize).unwrap_or(b"Zzzz"))
 }
 
-pub fn locale_to_fontique(locale: swash::text::Language) -> Option<fontique::Language> {
+pub(crate) fn locale_to_fontique(locale: swash::text::Language) -> Option<fontique::Language> {
     let mut buf = [0u8; 16];
     let mut len = 0;
     for byte in locale.language().bytes() {
@@ -31,7 +31,7 @@ pub fn locale_to_fontique(locale: swash::text::Language) -> Option<fontique::Lan
     fontique::Language::try_from_bytes(&buf[..len]).ok()
 }
 
-pub fn synthesis_to_swash(synthesis: fontique::Synthesis) -> swash::Synthesis {
+pub(crate) fn synthesis_to_swash(synthesis: fontique::Synthesis) -> swash::Synthesis {
     swash::Synthesis::new(
         synthesis
             .variation_settings()

@@ -9,11 +9,11 @@ use swash::text::{BidiClass, BracketType, Codepoint as _};
 use BidiClass::*;
 
 /// Type alias for a bidirectional level.
-pub type BidiLevel = u8;
+pub(crate) type BidiLevel = u8;
 
 /// Resolver for the Unicode bidirectional algorithm.
 #[derive(Clone, Default)]
-pub struct BidiResolver {
+pub(crate) struct BidiResolver {
     base_level: BidiLevel,
     levels: Vec<BidiLevel>,
     initial_types: Vec<BidiClass>,
@@ -27,7 +27,7 @@ pub struct BidiResolver {
 
 impl BidiResolver {
     /// Creates a new resolver.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             base_level: 0,
             levels: Vec::new(),
@@ -42,18 +42,18 @@ impl BidiResolver {
     }
 
     /// Returns the base level of the text.
-    pub fn base_level(&self) -> u8 {
+    pub(crate) fn base_level(&self) -> u8 {
         self.base_level
     }
 
     /// Returns the sequence of bidi levels corresponding to all characters in the
     /// paragraph.
-    pub fn levels(&self) -> &[BidiLevel] {
+    pub(crate) fn levels(&self) -> &[BidiLevel] {
         &self.levels
     }
 
     /// Clears the resolver state.
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.initial_types.clear();
         self.levels.clear();
         self.types.clear();
@@ -65,7 +65,7 @@ impl BidiResolver {
 
     /// Resolves a paragraph with the specified base direction and
     /// precomputed types.
-    pub fn resolve(
+    pub(crate) fn resolve(
         &mut self,
         chars: impl Iterator<Item = (char, BidiClass)>,
         base_level: Option<u8>,
@@ -642,7 +642,7 @@ impl BidiResolver {
 }
 
 /// Returns a default bidi type for a level.
-pub fn type_from_level(level: BidiLevel) -> BidiClass {
+pub(crate) fn type_from_level(level: BidiLevel) -> BidiClass {
     if level & 1 == 0 {
         L
     } else {
@@ -651,7 +651,7 @@ pub fn type_from_level(level: BidiLevel) -> BidiClass {
 }
 
 /// Computes an ordering for a sequence of bidi runs based on levels.
-pub fn _reorder<F>(order: &mut [usize], levels: F)
+pub(crate) fn _reorder<F>(order: &mut [usize], levels: F)
 where
     F: Fn(usize) -> BidiLevel,
 {
