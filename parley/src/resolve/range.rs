@@ -11,7 +11,7 @@ use core::ops::{Bound, Range, RangeBounds};
 /// Builder for constructing an ordered sequence of non-overlapping ranged
 /// styles from a collection of ranged style properties.
 #[derive(Clone)]
-pub struct RangedStyleBuilder<B: Brush> {
+pub(crate) struct RangedStyleBuilder<B: Brush> {
     properties: Vec<RangedProperty<B>>,
     default_style: ResolvedStyle<B>,
     len: usize,
@@ -30,27 +30,27 @@ impl<B: Brush> Default for RangedStyleBuilder<B> {
 impl<B: Brush> RangedStyleBuilder<B> {
     /// Prepares the builder for accepting ranged properties for text of the
     /// specified length.
-    pub fn begin(&mut self, len: usize) {
+    pub(crate) fn begin(&mut self, len: usize) {
         self.properties.clear();
         self.default_style = ResolvedStyle::default();
         self.len = len;
     }
 
     /// Pushes a property that covers the full range of text.
-    pub fn push_default(&mut self, property: ResolvedProperty<B>) {
+    pub(crate) fn push_default(&mut self, property: ResolvedProperty<B>) {
         assert!(self.len != !0);
         self.default_style.apply(property);
     }
 
     /// Pushes a property that covers the specified range of text.
-    pub fn push(&mut self, property: ResolvedProperty<B>, range: impl RangeBounds<usize>) {
+    pub(crate) fn push(&mut self, property: ResolvedProperty<B>, range: impl RangeBounds<usize>) {
         let range = resolve_range(range, self.len);
         assert!(self.len != !0);
         self.properties.push(RangedProperty { property, range });
     }
 
     /// Computes the sequence of ranged styles.
-    pub fn finish(&mut self, styles: &mut Vec<RangedStyle<B>>) {
+    pub(crate) fn finish(&mut self, styles: &mut Vec<RangedStyle<B>>) {
         if self.len == !0 {
             self.properties.clear();
             self.default_style = ResolvedStyle::default();

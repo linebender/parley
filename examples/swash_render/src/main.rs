@@ -4,6 +4,9 @@
 //! A simple example that lays out some text using Parley, rasterises the glyph using Swash
 //! and and then renders it into a PNG using the `image` crate.
 
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::shadow_unrelated)]
+
 use image::codecs::png::PngEncoder;
 use image::{self, Pixel, Rgba, RgbaImage};
 use parley::layout::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
@@ -185,7 +188,7 @@ fn main() {
         path.pop();
         path.pop();
         path.push("_output");
-        let _ = std::fs::create_dir(path.clone());
+        drop(std::fs::create_dir(path.clone()));
         path.push("swash_render.png");
         path
     };
@@ -196,7 +199,7 @@ fn main() {
 
 fn render_glyph_run(
     context: &mut ScaleContext,
-    glyph_run: &GlyphRun<Color>,
+    glyph_run: &GlyphRun<'_, Color>,
     img: &mut RgbaImage,
     padding: u32,
 ) {
@@ -254,7 +257,7 @@ fn render_glyph_run(
 
 fn render_decoration(
     img: &mut RgbaImage,
-    glyph_run: &GlyphRun<Color>,
+    glyph_run: &GlyphRun<'_, Color>,
     color: Color,
     offset: f32,
     width: f32,
@@ -273,7 +276,7 @@ fn render_decoration(
 
 fn render_glyph(
     img: &mut RgbaImage,
-    scaler: &mut Scaler,
+    scaler: &mut Scaler<'_>,
     color: Color,
     glyph: Glyph,
     glyph_x: f32,

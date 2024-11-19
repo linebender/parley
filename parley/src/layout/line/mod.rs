@@ -3,7 +3,7 @@
 
 use super::*;
 
-pub mod greedy;
+pub(crate) mod greedy;
 
 impl<'a, B: Brush> Line<'a, B> {
     /// Returns the metrics for the line.

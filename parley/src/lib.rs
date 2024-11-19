@@ -74,6 +74,21 @@
 
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(elided_lifetimes_in_paths)]
+#![allow(missing_debug_implementations)]
+#![allow(missing_docs)]
+#![allow(single_use_lifetimes)]
+#![allow(trivial_numeric_casts)]
+#![allow(unnameable_types)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::exhaustive_enums)]
+#![allow(clippy::missing_assert_message)]
+#![allow(clippy::missing_panics_doc)]
+#![allow(clippy::return_self_not_must_use)]
+#![allow(clippy::shadow_unrelated)]
+#![allow(clippy::unseparated_literal_suffix)]
+#![allow(clippy::use_self)]
+#![allow(clippy::wildcard_imports)]
 
 #[cfg(not(any(feature = "std", feature = "libm")))]
 compile_error!("parley requires either the `std` or `libm` feature to be enabled");

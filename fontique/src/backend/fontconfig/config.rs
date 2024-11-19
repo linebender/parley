@@ -69,7 +69,7 @@ pub fn parse_config(path: &Path, sink: &mut impl ParserSink) {
             }
             "include" => {
                 if let Some(path) = resolve_dir(child, path) {
-                    let _ = include_config(&path, sink);
+                    drop(include_config(&path, sink));
                 }
             }
             "match" => {
