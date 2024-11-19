@@ -24,4 +24,4 @@ workspace = true
 winit = { version = "0.30.5", features = ["android-native-activity"] }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
-clipboard-rs = "0.1.11"
+clipboard-rs = "0.2.2"
