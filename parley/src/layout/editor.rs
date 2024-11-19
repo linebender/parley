@@ -3,6 +3,8 @@
 
 use core::{cmp::PartialEq, default::Default, fmt::Debug};
 
+#[cfg(feature = "accesskit")]
+use crate::layout::LayoutAccessibility;
 use crate::{
     layout::{
         cursor::{Cursor, Selection},
@@ -11,6 +13,8 @@ use crate::{
     style::{Brush, StyleProperty},
     FontContext, LayoutContext, Rect,
 };
+#[cfg(feature = "accesskit")]
+use accesskit::{Node, NodeId, TreeUpdate};
 use alloc::{borrow::ToOwned, string::String, sync::Arc, vec::Vec};
 use swash::text::cluster::Whitespace;
 
@@ -48,6 +52,8 @@ where
     default_style: Arc<[StyleProperty<'static, T>]>,
     buffer: String,
     layout: Layout<T>,
+    #[cfg(feature = "accesskit")]
+    layout_access: LayoutAccessibility,
     selection: Selection,
     width: Option<f32>,
     scale: f32,
@@ -70,6 +76,8 @@ where
             default_style: Arc::new([]),
             buffer: Default::default(),
             layout: Default::default(),
+            #[cfg(feature = "accesskit")]
+            layout_access: Default::default(),
             selection: Default::default(),
             width: Default::default(),
             scale: 1.0,
@@ -474,6 +482,18 @@ where
         }
     }
 
+    #[cfg(feature = "accesskit")]
+    pub fn select_from_accesskit(&mut self, selection: &accesskit::TextSelection) {
+        self.refresh_layout();
+        if let Some(selection) = Selection::from_access_selection(
+            selection,
+            &self.editor.layout,
+            &self.editor.layout_access,
+        ) {
+            self.editor.set_selection(selection);
+        }
+    }
+
     fn update_layout(&mut self) {
         self.editor.update_layout(self.font_cx, self.layout_cx);
     }
@@ -619,5 +639,32 @@ where
         self.selection = self.selection.refresh(&self.layout);
         self.layout_dirty = false;
         self.generation.nudge();
+    }
+
+    #[cfg(feature = "accesskit")]
+    pub fn accessibility(
+        &mut self,
+        update: &mut TreeUpdate,
+        node: &mut Node,
+        next_node_id: impl FnMut() -> NodeId,
+        x_offset: f64,
+        y_offset: f64,
+    ) {
+        self.layout_access.build_nodes(
+            &self.buffer,
+            &self.layout,
+            update,
+            node,
+            next_node_id,
+            x_offset,
+            y_offset,
+        );
+        if let Some(selection) = self
+            .selection
+            .to_access_selection(&self.layout, &self.layout_access)
+        {
+            node.set_text_selection(selection);
+        }
+        node.add_action(accesskit::Action::SetTextSelection);
     }
 }

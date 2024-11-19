@@ -1,6 +1,10 @@
 //! Text selection support.
 
+#[cfg(feature = "accesskit")]
+use super::LayoutAccessibility;
 use super::{Affinity, BreakReason, Brush, Cluster, Layout, Line};
+#[cfg(feature = "accesskit")]
+use accesskit::TextPosition;
 use alloc::vec::Vec;
 use core::ops::Range;
 use peniko::kurbo::Rect;
@@ -52,6 +56,23 @@ impl Cursor {
                 (layout.data.text_len, Affinity::Downstream)
             };
         Self { index, affinity }
+    }
+
+    #[cfg(feature = "accesskit")]
+    pub fn from_access_position<B: Brush>(
+        pos: &TextPosition,
+        layout: &Layout<B>,
+        layout_access: &LayoutAccessibility,
+    ) -> Option<Self> {
+        let (line_index, run_index) = *layout_access.run_paths_by_access_id.get(&pos.node)?;
+        let line = layout.get(line_index)?;
+        let run = line.run(run_index)?;
+        let cluster = run.get(pos.character_index)?;
+        let index = cluster.text_range().start;
+        Some(Self {
+            index,
+            affinity: Affinity::Downstream,
+        })
     }
 
     pub fn index(&self) -> usize {
@@ -299,6 +320,22 @@ impl Cursor {
             Affinity::Downstream => self.downstream_cluster(layout),
         }
     }
+
+    #[cfg(feature = "accesskit")]
+    pub fn to_access_position<B: Brush>(
+        &self,
+        layout: &Layout<B>,
+        layout_access: &LayoutAccessibility,
+    ) -> Option<TextPosition> {
+        let path = self.downstream_cluster(layout)?.path;
+        let run_path = (path.line_index(), path.run_index());
+        let id = layout_access.access_ids_by_run_path.get(&run_path)?;
+        let character_index = path.logical_index();
+        Some(TextPosition {
+            node: *id,
+            character_index,
+        })
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Default, Debug)]
@@ -323,6 +360,21 @@ impl Selection {
 
     pub fn from_point<B: Brush>(layout: &Layout<B>, x: f32, y: f32) -> Self {
         Cursor::from_point(layout, x, y).into()
+    }
+
+    #[cfg(feature = "accesskit")]
+    pub fn from_access_selection<B: Brush>(
+        selection: &accesskit::TextSelection,
+        layout: &Layout<B>,
+        layout_access: &LayoutAccessibility,
+    ) -> Option<Self> {
+        let anchor = Cursor::from_access_position(&selection.anchor, layout, layout_access)?;
+        let focus = Cursor::from_access_position(&selection.focus, layout, layout_access)?;
+        Some(Self {
+            anchor,
+            focus,
+            h_pos: None,
+        })
     }
 
     pub fn is_collapsed(&self) -> bool {
@@ -581,6 +633,17 @@ impl Selection {
         } else {
             focus.into()
         }
+    }
+
+    #[cfg(feature = "accesskit")]
+    pub fn to_access_selection<B: Brush>(
+        &self,
+        layout: &Layout<B>,
+        layout_access: &LayoutAccessibility,
+    ) -> Option<accesskit::TextSelection> {
+        let anchor = self.anchor.to_access_position(layout, layout_access)?;
+        let focus = self.focus.to_access_position(layout, layout_access)?;
+        Some(accesskit::TextSelection { anchor, focus })
     }
 }
 

@@ -1,6 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use accesskit::{Node, TreeUpdate};
 use core::default::Default;
 use parley::layout::PositionedLayoutItem;
 use peniko::{kurbo::Affine, Color, Fill};
@@ -13,6 +14,8 @@ use winit::{
 
 pub use parley::layout::editor::Generation;
 use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorTxn};
+
+use crate::access_ids::next_node_id;
 
 pub const INSET: f32 = 32.0;
 
@@ -48,6 +51,10 @@ impl Editor {
         self.cursor_visible = true;
     }
 
+    pub fn disable_blink(&mut self) {
+        self.start_time = None;
+    }
+
     pub fn next_blink_time(&self) -> Option<Instant> {
         self.start_time.map(|start_time| {
             let phase = Instant::now().duration_since(start_time);
@@ -61,10 +68,10 @@ impl Editor {
     }
 
     pub fn cursor_blink(&mut self) {
-        if let Some(start_time) = self.start_time {
+        self.cursor_visible = self.start_time.map_or(false, |start_time| {
             let elapsed = Instant::now().duration_since(start_time);
-            self.cursor_visible = (elapsed.as_millis() / self.blink_period.as_millis()) % 2 == 0;
-        }
+            (elapsed.as_millis() / self.blink_period.as_millis()) % 2 == 0
+        });
     }
 
     pub fn handle_event(&mut self, event: WindowEvent) {
@@ -295,6 +302,16 @@ impl Editor {
         }
     }
 
+    pub fn handle_accesskit_action_request(&mut self, req: &accesskit::ActionRequest) {
+        if req.action == accesskit::Action::SetTextSelection {
+            if let Some(accesskit::ActionData::SetTextSelection(selection)) = &req.data {
+                self.transact(|txn| {
+                    txn.select_from_accesskit(selection);
+                });
+            }
+        }
+    }
+
     /// Return the current `Generation` of the layout.
     pub fn generation(&self) -> Generation {
         self.editor.generation()
@@ -359,6 +376,11 @@ impl Editor {
             }
         }
         self.editor.generation()
+    }
+
+    pub fn accessibility(&mut self, update: &mut TreeUpdate, node: &mut Node) {
+        self.editor
+            .accessibility(update, node, next_node_id, INSET.into(), INSET.into());
     }
 }
 

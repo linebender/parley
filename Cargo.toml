@@ -23,8 +23,11 @@ clippy.trivially_copy_pass_by_ref = "warn"
 rust.unused_qualifications = "warn"
 
 [workspace.dependencies]
+accesskit = "0.17"
 fontique = { version = "0.2.0", default-features = false, path = "fontique" }
+hashbrown = "0.15.0"
 parley = { version = "0.2.0", default-features = false, path = "parley" }
 peniko = { version = "0.2.0", default-features = false }
 skrifa = { version = "0.22.3", default-features = false }
+read-fonts = { version = "0.22.3", default-features = false }
 swash = { version = "0.1.19", default-features = false }
