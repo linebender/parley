@@ -158,6 +158,26 @@ impl SystemFonts {
             };
             for &script in scripts {
                 let script = Script(*script);
+
+                // check if fallback family has any coverage, if not skip adding it
+                let any_coverage = script
+                    .sample()
+                    .and_then(|sample| {
+                        raw_families.get(&family_id).map(|raw_family| {
+                            raw_family
+                                .fonts
+                                .iter()
+                                .any(|raw_font| raw_font.coverage.compute_for_str(sample) > 0)
+                        })
+                    })
+                    // if we cannot check for coverage, assume it has coverage
+                    .unwrap_or(true);
+
+                // skip adding font family only if it has zero coverage across all fonts
+                if !any_coverage {
+                    continue;
+                }
+
                 let key: FallbackKey = (script, lang.as_str()).into();
                 let families = fallback_map.entry(script).or_default();
                 if key.is_default() || key.locale().is_none() {
@@ -254,14 +274,14 @@ fn find_best_family<'a>(
     raw_families: impl Iterator<Item = &'a RawFamily>,
     text: &str,
 ) -> Option<FamilyId> {
-    let text_len = text.len();
+    let char_count = text.chars().count();
     let mut best_id = None;
     let mut best_coverage = 0;
     for family in raw_families {
         let id = family.name.id();
         for font in &family.fonts {
             let coverage = font.coverage.compute_for_str(text);
-            if coverage == text_len {
+            if coverage == char_count {
                 return Some(id);
             }
             if coverage > best_coverage {
