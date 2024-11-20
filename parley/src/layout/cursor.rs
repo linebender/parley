@@ -75,6 +75,14 @@ impl Cursor {
         })
     }
 
+    fn from_cluster<B: Brush>(layout: &Layout<B>, cluster: Cluster<B>, moving_right: bool) -> Self {
+        Self::from_index(
+            layout,
+            cluster.text_range().start,
+            affinity_for_dir(cluster.is_rtl(), moving_right),
+        )
+    }
+
     pub fn index(&self) -> usize {
         self.index
     }
@@ -109,7 +117,7 @@ impl Cursor {
                 } else {
                     right.text_range().end
                 };
-                return Self::from_index(layout, index, default_affinity(right.is_rtl(), true));
+                return Self::from_index(layout, index, affinity_for_dir(right.is_rtl(), true));
             }
             (None, Some(right)) => {
                 let index = if right.is_rtl() {
@@ -117,7 +125,7 @@ impl Cursor {
                 } else {
                     right.text_range().end
                 };
-                return Self::from_index(layout, index, default_affinity(right.is_rtl(), true));
+                return Self::from_index(layout, index, affinity_for_dir(right.is_rtl(), true));
             }
             // We can't move right here
             (Some(_left), None) => {}
@@ -153,7 +161,7 @@ impl Cursor {
             } else {
                 left.text_range().start
             };
-            return Self::from_index(layout, index, default_affinity(left.is_rtl(), false));
+            return Self::from_index(layout, index, affinity_for_dir(left.is_rtl(), false));
         }
         *self
     }
@@ -167,11 +175,7 @@ impl Cursor {
                     break;
                 }
             }
-            return Self::from_index(
-                layout,
-                cluster.text_range().start,
-                default_affinity(cluster.is_rtl(), true),
-            );
+            return Self::from_cluster(layout, cluster, true);
         }
         *self
     }
@@ -185,11 +189,35 @@ impl Cursor {
                     break;
                 }
             }
-            return Self::from_index(
-                layout,
-                cluster.text_range().start,
-                default_affinity(cluster.is_rtl(), true),
-            );
+            return Self::from_cluster(layout, cluster, false);
+        }
+        *self
+    }
+
+    pub fn next_logical_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
+        let [left, right] = self.logical_clusters(layout);
+        if let Some(mut cluster) = right.or(left) {
+            while let Some(next_word) = cluster.next_logical_word() {
+                cluster = next_word;
+                if !cluster.is_space_or_nbsp() {
+                    break;
+                }
+            }
+            return Self::from_cluster(layout, cluster, true);
+        }
+        *self
+    }
+
+    pub fn previous_logical_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
+        let [left, right] = self.logical_clusters(layout);
+        if let Some(mut cluster) = left.or(right) {
+            while let Some(next_word) = cluster.previous_logical_word() {
+                cluster = next_word;
+                if !cluster.is_space_or_nbsp() {
+                    break;
+                }
+            }
+            return Self::from_cluster(layout, cluster, false);
         }
         *self
     }
@@ -222,65 +250,12 @@ impl Cursor {
             [_, Some(right)] => (cursor_rect(&right, false, size), None),
             _ => (last_line_cursor_rect(layout, size), None),
         }
-        // let [upstream, downstream] = self.clusters(layout);
-        // match (upstream.as_ref(), downstream.as_ref()) {
-        //     (Some(upstream), Some(downstream)) => {
-        //         let upstream_rtl = upstream.is_rtl();
-        //         let downstream_rtl = downstream.is_rtl();
-        //         if upstream_rtl != downstream_rtl {
-        //             let layout_rtl = layout.is_rtl();
-        //             return if upstream_rtl == layout_rtl {
-        //                 (
-        //                     cursor_rect(
-        //                         upstream,
-        //                         !Affinity::Upstream.is_visually_leading(upstream_rtl),
-        //                         size,
-        //                     ),
-        //                     Some(cursor_rect(
-        //                         downstream,
-        //                         !Affinity::Downstream.is_visually_leading(downstream_rtl),
-        //                         size,
-        //                     )),
-        //                 )
-        //             } else {
-        //                 (
-        //                     cursor_rect(
-        //                         downstream,
-        //                         !Affinity::Downstream.is_visually_leading(downstream_rtl),
-        //                         size,
-        //                     ),
-        //                     Some(cursor_rect(
-        //                         upstream,
-        //                         !Affinity::Upstream.is_visually_leading(upstream_rtl),
-        //                         size,
-        //                     )),
-        //                 )
-        //             };
-        //         }
-        //         if upstream.is_end_of_line() {
-        //             return if self.affinity == Affinity::Upstream
-        //                 && upstream.is_line_break() != Some(BreakReason::Explicit)
-        //             {
-        //                 (cursor_rect(upstream, !upstream.is_rtl(), size), None)
-        //             } else {
-        //                 (cursor_rect(downstream, downstream.is_rtl(), size), None)
-        //             };
-        //         }
-        //         (cursor_rect(downstream, downstream_rtl, size), None)
-        //     }
-        //     (Some(upstream), None) => {
-        //         if upstream.is_line_break() == Some(BreakReason::Explicit) {
-        //             (last_line_cursor_rect(layout, size), None)
-        //         } else {
-        //             (cursor_rect(upstream, true, size), None)
-        //         }
-        //     }
-        //     (None, Some(downstream)) => (cursor_rect(downstream, downstream.is_rtl(), size), None),
-        //     _ => (last_line_cursor_rect(layout, size), None),
-        // }
     }
 
-    pub fn clusters<'a, B: Brush>(&self, layout: &'a Layout<B>) -> [Option<Cluster<'a, B>>; 2] {
+    pub fn logical_clusters<'a, B: Brush>(
+        &self,
+        layout: &'a Layout<B>,
+    ) -> [Option<Cluster<'a, B>>; 2] {
         let upstream = self
             .index
             .checked_sub(1)
@@ -308,19 +283,17 @@ impl Cursor {
                     clusters = [Some(cluster), None];
                 }
             }
-        } else {
-            if let Some(cluster) = self.downstream_cluster(layout) {
-                if cluster.is_rtl() {
-                    clusters = [Some(cluster.clone()), cluster.next_visual()];
-                } else {
-                    clusters = [cluster.previous_visual(), Some(cluster)];
-                }
-            } else if let Some(cluster) = self.upstream_cluster(layout) {
-                if cluster.is_rtl() {
-                    clusters = [None, Some(cluster)];
-                } else {
-                    clusters = [Some(cluster), None];
-                }
+        } else if let Some(cluster) = self.downstream_cluster(layout) {
+            if cluster.is_rtl() {
+                clusters = [Some(cluster.clone()), cluster.next_visual()];
+            } else {
+                clusters = [cluster.previous_visual(), Some(cluster)];
+            }
+        } else if let Some(cluster) = self.upstream_cluster(layout) {
+            if cluster.is_rtl() {
+                clusters = [None, Some(cluster)];
+            } else {
+                clusters = [Some(cluster), None];
             }
         }
         clusters
@@ -339,13 +312,6 @@ impl Cursor {
 
     fn downstream_cluster<B: Brush>(self, layout: &Layout<B>) -> Option<Cluster<'_, B>> {
         Cluster::from_index(layout, self.index)
-    }
-
-    fn cluster<B: Brush>(self, layout: &Layout<B>) -> Option<Cluster<'_, B>> {
-        match self.affinity {
-            Affinity::Upstream => self.upstream_cluster(layout),
-            Affinity::Downstream => self.downstream_cluster(layout),
-        }
     }
 
     #[cfg(feature = "accesskit")]
@@ -387,6 +353,27 @@ impl Selection {
 
     pub fn from_point<B: Brush>(layout: &Layout<B>, x: f32, y: f32) -> Self {
         Cursor::from_point(layout, x, y).into()
+    }
+
+    /// Creates a new selection bounding the word at the given point.
+    pub fn word_from_point<B: Brush>(layout: &Layout<B>, x: f32, y: f32) -> Self {
+        let [left, right] = Cursor::from_point(layout, x, y).logical_clusters(layout);
+        if let Some(mut cluster) = left.or(right) {
+            if !cluster.is_word_boundary() {
+                if let Some(prev) = cluster.previous_logical_word() {
+                    cluster = prev;
+                }
+            }
+            let anchor = Cursor::from_cluster(layout, cluster, false);
+            let focus = anchor.next_logical_word(layout);
+            Self {
+                anchor,
+                focus,
+                h_pos: None,
+            }
+        } else {
+            Self::default()
+        }
     }
 
     #[cfg(feature = "accesskit")]
@@ -757,7 +744,7 @@ fn last_line_cursor_rect<B: Brush>(layout: &Layout<B>, size: f32) -> Rect {
     }
 }
 
-fn default_affinity(is_rtl: bool, moving_right: bool) -> Affinity {
+fn affinity_for_dir(is_rtl: bool, moving_right: bool) -> Affinity {
     match (is_rtl, moving_right) {
         (true, true) | (false, false) => Affinity::Downstream,
         _ => Affinity::Upstream,

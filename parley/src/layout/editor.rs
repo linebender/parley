@@ -145,7 +145,11 @@ where
     pub fn delete(&mut self) {
         if self.editor.selection.is_collapsed() {
             // Upstream cluster range
-            if let Some(range) = self.editor.selection.focus().clusters(&self.editor.layout)[1]
+            if let Some(range) = self
+                .editor
+                .selection
+                .focus()
+                .logical_clusters(&self.editor.layout)[1]
                 .as_ref()
                 .map(|cluster| cluster.text_range())
                 .and_then(|range| (!range.is_empty()).then_some(range))
@@ -165,17 +169,16 @@ where
     /// Delete the selection or up to the next word boundary (typical ‘ctrl + delete’ behavior).
     pub fn delete_word(&mut self) {
         if self.editor.selection.is_collapsed() {
-            // let start = self.editor.selection.focus().text_range().start;
-            // let end = self
-            //     .editor
-            //     .cursor_at(start)
-            //     .next_word(&self.editor.layout)
-            //     .index();
-
-            // self.editor.buffer.replace_range(start..end, "");
-            // self.update_layout();
-            // self.editor
-            //     .set_selection(self.editor.cursor_at(start).into());
+            let focus = self.editor.selection.focus();
+            let start = focus.index();
+            let end = focus.next_logical_word(&self.editor.layout).index();
+            if self.editor.text().get(start..end).is_some() {
+                self.editor.buffer.replace_range(start..end, "");
+                self.update_layout();
+                self.editor.set_selection(
+                    Cursor::from_index(&self.editor.layout, start, Affinity::Downstream).into(),
+                );
+            }
         } else {
             self.delete_selection();
         }
@@ -185,8 +188,12 @@ where
     pub fn backdelete(&mut self) {
         if self.editor.selection.is_collapsed() {
             // Upstream cluster
-            if let Some(cluster) =
-                self.editor.selection.focus().clusters(&self.editor.layout)[0].clone()
+            if let Some(cluster) = self
+                .editor
+                .selection
+                .focus()
+                .logical_clusters(&self.editor.layout)[0]
+                .clone()
             {
                 let range = cluster.text_range();
                 let end = range.end;
@@ -221,19 +228,16 @@ where
     /// Delete the selection or back to the previous word boundary (typical ‘ctrl + backspace’ behavior).
     pub fn backdelete_word(&mut self) {
         if self.editor.selection.is_collapsed() {
-            // let end = self.editor.selection.focus().text_range().start;
-            // let start = self
-            //     .editor
-            //     .selection
-            //     .focus()
-            //     .previous_word(&self.editor.layout)
-            //     .text_range()
-            //     .start;
-
-            // self.editor.buffer.replace_range(start..end, "");
-            // self.update_layout();
-            // self.editor
-            //     .set_selection(self.editor.cursor_at(start).into());
+            let focus = self.editor.selection.focus();
+            let end = focus.index();
+            let start = focus.previous_logical_word(&self.editor.layout).index();
+            if self.editor.text().get(start..end).is_some() {
+                self.editor.buffer.replace_range(start..end, "");
+                self.update_layout();
+                self.editor.set_selection(
+                    Cursor::from_index(&self.editor.layout, start, Affinity::Downstream).into(),
+                );
+            }
         } else {
             self.delete_selection();
         }
@@ -417,34 +421,37 @@ where
 
     /// Move the selection focus point to the next word boundary left.
     pub fn select_word_left(&mut self) {
-        // self.editor.set_selection(
-        //     self.editor
-        //         .selection
-        //         .previous_word(&self.editor.layout, true),
-        // );
+        self.editor.set_selection(
+            self.editor
+                .selection
+                .previous_visual_word(&self.editor.layout, true),
+        );
     }
 
     /// Move the selection focus point to the next word boundary right.
     pub fn select_word_right(&mut self) {
-        // self.editor
-        //     .set_selection(self.editor.selection.next_word(&self.editor.layout, true));
+        self.editor.set_selection(
+            self.editor
+                .selection
+                .next_visual_word(&self.editor.layout, true),
+        );
     }
 
     /// Select the word at the point.
     pub fn select_word_at_point(&mut self, x: f32, y: f32) {
-        // self.refresh_layout();
-        // self.editor
-        //     .set_selection(Selection::word_from_point(&self.editor.layout, x, y));
+        self.refresh_layout();
+        self.editor
+            .set_selection(Selection::word_from_point(&self.editor.layout, x, y));
     }
 
     /// Select the physical line at the point.
     pub fn select_line_at_point(&mut self, x: f32, y: f32) {
-        // self.refresh_layout();
-        // let focus = *Selection::from_point(&self.editor.layout, x, y)
-        //     .line_start(&self.editor.layout, true)
-        //     .focus();
-        // self.editor
-        //     .set_selection(Selection::from(focus).line_end(&self.editor.layout, true));
+        self.refresh_layout();
+        let focus = Selection::from_point(&self.editor.layout, x, y)
+            .line_start(&self.editor.layout, true)
+            .focus();
+        self.editor
+            .set_selection(Selection::from(focus).line_end(&self.editor.layout, true));
     }
 
     /// Move the selection focus point to the cluster boundary closest to point.
@@ -572,7 +579,7 @@ where
             self.generation.nudge();
         }
         let focus = new_sel.focus();
-        let cluster = focus.clusters(&self.layout);
+        let cluster = focus.logical_clusters(&self.layout);
         let dbg = (
             cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]),
             focus.index(),

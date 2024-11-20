@@ -339,7 +339,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
     }
 
     /// Returns the next cluster that is marked as a word boundary.
-    pub fn next_word(&self) -> Option<Self> {
+    pub fn next_logical_word(&self) -> Option<Self> {
         let mut cluster = self.clone();
         while let Some(next) = cluster.next_logical() {
             if next.is_word_boundary() {
@@ -363,7 +363,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
     }
 
     /// Returns the previous cluster that is marked as a word boundary.
-    pub fn previous_word(&self) -> Option<Self> {
+    pub fn previous_logical_word(&self) -> Option<Self> {
         let mut cluster = self.clone();
         while let Some(prev) = cluster.previous_logical() {
             if prev.is_word_boundary() {
@@ -405,21 +405,6 @@ impl<'a, B: Brush> Cluster<'a, B> {
             }
         }
         Some(offset)
-    }
-
-    pub(crate) fn is_visually_before(&self, other: &Self) -> bool {
-        match (self.path.line_index(), self.path.run_index())
-            .cmp(&(other.path.line_index(), other.path.run_index()))
-        {
-            Ordering::Less => true,
-            Ordering::Greater => false,
-            Ordering::Equal => self
-                .run
-                .logical_to_visual(self.path.logical_index())
-                .zip(self.run.logical_to_visual(other.path.logical_index()))
-                .map(|(a, b)| a < b)
-                .unwrap_or_default(),
-        }
     }
 
     pub(crate) fn info(&self) -> ClusterInfo {
