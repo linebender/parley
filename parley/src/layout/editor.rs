@@ -263,7 +263,6 @@ where
 
     /// Move the cursor to the start of the buffer.
     pub fn move_to_text_start(&mut self) {
-        println!("move to text start");
         self.editor.set_selection(self.editor.selection.move_lines(
             &self.editor.layout,
             isize::MIN,
@@ -578,23 +577,26 @@ where
         {
             self.generation.nudge();
         }
-        let focus = new_sel.focus();
-        let cluster = focus.logical_clusters(&self.layout);
-        let dbg = (
-            cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]),
-            focus.index(),
-            focus.affinity(),
-            cluster[1].as_ref().map(|c| &self.buffer[c.text_range()]),
-        );
-        print!("{dbg:?}");
-        let cluster = focus.visual_clusters(&self.layout);
-        let dbg = (
-            cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]),
-            focus.index(),
-            focus.affinity(),
-            cluster[1].as_ref().map(|c| &self.buffer[c.text_range()]),
-        );
-        println!(" | visual: {dbg:?}");
+        #[cfg(feature = "std")]
+        {
+            let focus = new_sel.focus();
+            let cluster = focus.logical_clusters(&self.layout);
+            let dbg = (
+                cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]),
+                focus.index(),
+                focus.affinity(),
+                cluster[1].as_ref().map(|c| &self.buffer[c.text_range()]),
+            );
+            print!("{dbg:?}");
+            let cluster = focus.visual_clusters(&self.layout);
+            let dbg = (
+                cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]),
+                focus.index(),
+                focus.affinity(),
+                cluster[1].as_ref().map(|c| &self.buffer[c.text_range()]),
+            );
+            println!(" | visual: {dbg:?}");
+        }
         self.selection = new_sel;
     }
 

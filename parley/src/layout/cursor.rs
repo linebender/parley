@@ -524,7 +524,6 @@ impl Selection {
         }
         let line_limit = layout.len().saturating_sub(1);
         let geometry = self.focus.geometry(layout, 0.0).0;
-        println!("move lines geometry = {geometry:?}");
         let line_index = layout
             .line_for_offset(geometry.y0 as f32)
             .map(|(ix, _)| ix)
@@ -535,7 +534,6 @@ impl Selection {
                 .move_to_line(layout, 0, extend)
                 .line_start(layout, extend);
         } else if delta > 0 && new_line_index > line_limit {
-            println!("down at last line");
             return self
                 .move_to_line(layout, line_limit, extend)
                 .line_end(layout, extend);
