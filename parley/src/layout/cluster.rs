@@ -1,6 +1,7 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use swash::text::cluster::Whitespace;
 use super::*;
 
 impl<'a, B: Brush> Cluster<'a, B> {
@@ -144,12 +145,16 @@ impl<'a, B: Brush> Cluster<'a, B> {
 
     /// Returns `true` if the cluster is a soft line break.
     pub fn is_soft_line_break(&self) -> bool {
-        self.data.info.boundary() == Boundary::Line
+        self.is_end_of_line()
+            && matches!(
+                self.line().data.break_reason,
+                BreakReason::Regular | BreakReason::Emergency
+            )
     }
 
     /// Returns `true` if the cluster is a hard line break.
     pub fn is_hard_line_break(&self) -> bool {
-        self.data.info.boundary() == Boundary::Mandatory
+        self.data.info.whitespace() == Whitespace::Newline
     }
 
     /// Returns `true` if the cluster is a space or no-break space.
@@ -345,10 +350,34 @@ impl<'a, B: Brush> Cluster<'a, B> {
         None
     }
 
+    /// Returns the next cluster that is marked as a word boundary.
+    pub fn next_visual_word(&self) -> Option<Self> {
+        let mut cluster = self.clone();
+        while let Some(next) = cluster.next_visual() {
+            if next.is_word_boundary() {
+                return Some(next);
+            }
+            cluster = next;
+        }
+        None
+    }
+
     /// Returns the previous cluster that is marked as a word boundary.
     pub fn previous_word(&self) -> Option<Self> {
         let mut cluster = self.clone();
         while let Some(prev) = cluster.previous_logical() {
+            if prev.is_word_boundary() {
+                return Some(prev);
+            }
+            cluster = prev;
+        }
+        None
+    }
+
+    /// Returns the previous cluster that is marked as a word boundary.
+    pub fn previous_visual_word(&self) -> Option<Self> {
+        let mut cluster = self.clone();
+        while let Some(prev) = cluster.previous_visual() {
             if prev.is_word_boundary() {
                 return Some(prev);
             }
@@ -376,6 +405,21 @@ impl<'a, B: Brush> Cluster<'a, B> {
             }
         }
         Some(offset)
+    }
+
+    pub(crate) fn is_visually_before(&self, other: &Self) -> bool {
+        match (self.path.line_index(), self.path.run_index())
+            .cmp(&(other.path.line_index(), other.path.run_index()))
+        {
+            Ordering::Less => true,
+            Ordering::Greater => false,
+            Ordering::Equal => self
+                .run
+                .logical_to_visual(self.path.logical_index())
+                .zip(self.run.logical_to_visual(other.path.logical_index()))
+                .map(|(a, b)| a < b)
+                .unwrap_or_default(),
+        }
     }
 
     pub(crate) fn info(&self) -> ClusterInfo {

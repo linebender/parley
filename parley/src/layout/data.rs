@@ -90,6 +90,12 @@ pub enum BreakReason {
     Emergency,
 }
 
+impl BreakReason {
+    pub(crate) fn is_non_explicit_break(self) -> bool {
+        matches!(self, Self::Regular | Self::Emergency)
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct LineData {
     /// Range of the source text.

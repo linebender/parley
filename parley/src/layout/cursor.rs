@@ -28,7 +28,7 @@ impl Cursor {
         } else {
             Self {
                 index: layout.data.text_len,
-                affinity,
+                affinity: Affinity::Upstream,
             }
         }
     }
@@ -84,210 +84,200 @@ impl Cursor {
     }
 
     pub fn next_visual<B: Brush>(&self, layout: &Layout<B>) -> Self {
-        let [us, ds] = self.clusters(layout);
-        match (us, ds) {
-            (Some(us), Some(ds)) => {
-                // Special case: line break behavior
-                if self.affinity == Affinity::Upstream
-                    && matches!(
-                        us.is_line_break(),
-                        Some(BreakReason::Regular) | Some(BreakReason::Emergency)
-                    )
-                {
-                    // If we're dealing with a soft or emergency line break,
-                    // then just swap the affinity. This gives the effect
-                    // of simulating an additional cursor location between
-                    // the two clusters
-                    return Self {
-                        index: self.index,
-                        affinity: Affinity::Downstream,
-                    };
-                }
-                // Special case: moving right out of RTL->LTR boundary
-                if us.is_rtl() != ds.is_rtl() && self.affinity == Affinity::Downstream {
-                    if let Some(next) = ds.next_visual() {
-                        return Self {
-                            index: if ds.is_rtl() {
-                                next.text_range().end
-                            } else {
-                                next.text_range().start
-                            },
-                            affinity: default_affinity(next.is_rtl(), true),
+        let [left, right] = self.visual_clusters(layout);
+        match (left, right) {
+            (Some(left), Some(right)) => {
+                if left.is_soft_line_break() {
+                    if left.is_rtl() && self.affinity == Affinity::Downstream {
+                        let index = if right.is_rtl() {
+                            right.text_range().end
+                        } else {
+                            right.text_range().start
                         };
+                        return Self::from_index(layout, index, Affinity::Upstream);
+                    } else if !left.is_rtl() && self.affinity == Affinity::Upstream {
+                        let index = if right.is_rtl() {
+                            right.text_range().end
+                        } else {
+                            right.text_range().start
+                        };
+                        return Self::from_index(layout, index, Affinity::Downstream);
                     }
                 }
-                // Remaining cases are based on upstream cluster only
-                if let Some(next) = us.next_visual() {
-                    // Special case: moving right into a directional boundary
-                    if us.is_rtl() != next.is_rtl() {
-                        return Self {
-                            index: next.text_range().start,
-                            affinity: Affinity::Downstream,
-                        };
-                    }
-                    return Self {
-                        index: next.text_range().end,
-                        affinity: default_affinity(next.is_rtl(), true),
-                    };
-                }
-            }
-            (Some(us), None) => {
-                if let Some(next) = us.next_visual() {
-                    return Self {
-                        index: next.text_range().end,
-                        affinity: default_affinity(next.is_rtl(), true),
-                    };
-                }
-            }
-            (None, Some(ds)) => {
-                if let Some(next) = ds.next_visual() {
-                    return Self {
-                        index: next.text_range().start,
-                        affinity: default_affinity(next.is_rtl(), true),
-                    };
+                let index = if right.is_rtl() {
+                    right.text_range().start
                 } else {
-                    return Self {
-                        index: ds.text_range().end,
-                        affinity: default_affinity(ds.is_rtl(), true),
-                    };
-                }
+                    right.text_range().end
+                };
+                return Self::from_index(layout, index, default_affinity(right.is_rtl(), true));
             }
+            (None, Some(right)) => {
+                let index = if right.is_rtl() {
+                    right.text_range().start
+                } else {
+                    right.text_range().end
+                };
+                return Self::from_index(layout, index, default_affinity(right.is_rtl(), true));
+            }
+            // We can't move right here
+            (Some(_left), None) => {}
             _ => {}
         }
-        return *self;
+        *self
     }
 
     pub fn previous_visual<B: Brush>(&self, layout: &Layout<B>) -> Self {
-        let [us, ds] = self.clusters(layout);
-        match (us, ds) {
-            (Some(us), Some(ds)) => {
-                // Special case: line break behavior
-                if self.affinity == Affinity::Downstream
-                    && matches!(
-                        us.is_line_break(),
-                        Some(BreakReason::Regular) | Some(BreakReason::Emergency)
-                    )
-                {
-                    // If we're dealing with a soft or emergency line break,
-                    // then just swap the affinity. This gives the effect
-                    // of simulating an additional cursor location between
-                    // the two clusters
-                    return Self {
-                        index: self.index,
-                        affinity: Affinity::Upstream,
+        let [left, right] = self.visual_clusters(layout);
+        if let (Some(left), Some(right)) = (&left, &right) {
+            if left.is_soft_line_break() {
+                if left.is_rtl() && self.affinity == Affinity::Upstream {
+                    let index = if right.is_rtl() {
+                        left.text_range().start
+                    } else {
+                        left.text_range().end
                     };
-                }
-                // Special case: moving left out of RTL->LTR boundary
-                if us.is_rtl() != ds.is_rtl() && self.affinity == Affinity::Upstream {
-                    if let Some(prev) = us.previous_visual() {
-                        return Self {
-                            index: if us.is_rtl() {
-                                prev.text_range().start
-                            } else {
-                                prev.text_range().end
-                            },
-                            affinity: default_affinity(prev.is_rtl(), false),
-                        };
-                    }
-                }
-                // Remaining cases are based on downstream cluster only
-                if let Some(prev) = ds.previous_visual() {
-                    // Special cases: moving left into a directional boundary
-                    if ds.is_rtl() != prev.is_rtl() {
-                        return Self {
-                            index: prev.text_range().end,
-                            affinity: Affinity::Upstream,
-                        };
-                    }
-                    return Self {
-                        index: prev.text_range().start,
-                        affinity: default_affinity(prev.is_rtl(), false),
+                    return Self::from_index(layout, index, Affinity::Downstream);
+                } else if !left.is_rtl() && self.affinity == Affinity::Downstream {
+                    let index = if right.is_rtl() {
+                        right.text_range().end
+                    } else {
+                        right.text_range().start
                     };
+                    return Self::from_index(layout, index, Affinity::Upstream);
                 }
             }
-            (Some(us), None) => {
-                if let Some(prev) = us.previous_visual() {
-                    return Self {
-                        index: prev.text_range().end,
-                        affinity: default_affinity(prev.is_rtl(), false),
-                    };
-                } else {
-                    return Self {
-                        index: us.text_range().start,
-                        affinity: default_affinity(us.is_rtl(), false),
-                    };
-                }
-            }
-            (None, Some(ds)) => {
-                if let Some(prev) = ds.previous_visual() {
-                    return Self {
-                        index: prev.text_range().start,
-                        affinity: default_affinity(prev.is_rtl(), false),
-                    };
-                }
-            }
-            _ => {}
         }
-        return *self;
+        if let Some(left) = left {
+            let index = if left.is_rtl() {
+                left.text_range().end
+            } else {
+                left.text_range().start
+            };
+            return Self::from_index(layout, index, default_affinity(left.is_rtl(), false));
+        }
+        *self
+    }
+
+    pub fn next_visual_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
+        let [left, right] = self.visual_clusters(layout);
+        if let Some(mut cluster) = right.or(left) {
+            while let Some(next_word) = cluster.next_visual_word() {
+                cluster = next_word;
+                if !cluster.is_space_or_nbsp() {
+                    break;
+                }
+            }
+            return Self::from_index(
+                layout,
+                cluster.text_range().start,
+                default_affinity(cluster.is_rtl(), true)
+            );
+        }
+        *self
+    }
+
+    pub fn previous_visual_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
+        let [left, right] = self.visual_clusters(layout);
+        if let Some(mut cluster) = left.or(right) {
+            while let Some(next_word) = cluster.previous_visual_word() {
+                cluster = next_word;
+                if !cluster.is_space_or_nbsp() {
+                    break;
+                }
+            }
+            return Self::from_index(
+                layout,
+                cluster.text_range().start,
+                default_affinity(cluster.is_rtl(), true)
+            );
+        }
+        *self
     }
 
     pub fn geometry<B: Brush>(&self, layout: &Layout<B>, size: f32) -> (Rect, Option<Rect>) {
-        let [upstream, downstream] = self.clusters(layout);
-        match (upstream.as_ref(), downstream.as_ref()) {
-            (Some(upstream), Some(downstream)) => {
-                if upstream.is_end_of_line() {
-                    return if self.affinity == Affinity::Upstream
-                        && upstream.is_line_break() != Some(BreakReason::Explicit)
-                    {
-                        (cursor_rect(upstream, true, size), None)
+        match self.visual_clusters(layout) {
+            [Some(left), Some(right)] => {
+                if left.is_end_of_line() {
+                    if left.is_soft_line_break() {
+                        let (cluster, at_end) = if left.is_rtl()
+                            && self.affinity == Affinity::Downstream
+                            || !left.is_rtl() && self.affinity == Affinity::Upstream
+                        {
+                            (left, true)
+                        } else {
+                            (right, false)
+                        };
+                        (cursor_rect(&cluster, at_end, size), None)
                     } else {
-                        (cursor_rect(downstream, false, size), None)
-                    };
-                }
-                let upstream_rtl = upstream.is_rtl();
-                let downstream_rtl = downstream.is_rtl();
-                if upstream_rtl != downstream_rtl {
-                    let layout_rtl = layout.is_rtl();
-                    return if upstream_rtl == layout_rtl {
-                        (
-                            cursor_rect(
-                                upstream,
-                                !Affinity::Upstream.is_visually_leading(upstream_rtl),
-                                size,
-                            ),
-                            Some(cursor_rect(
-                                downstream,
-                                !Affinity::Downstream.is_visually_leading(downstream_rtl),
-                                size,
-                            )),
-                        )
-                    } else {
-                        (
-                            cursor_rect(
-                                downstream,
-                                !Affinity::Downstream.is_visually_leading(downstream_rtl),
-                                size,
-                            ),
-                            Some(cursor_rect(
-                                upstream,
-                                !Affinity::Upstream.is_visually_leading(upstream_rtl),
-                                size,
-                            )),
-                        )
-                    };
-                }
-                (cursor_rect(downstream, downstream_rtl, size), None)
-            }
-            (Some(upstream), None) => {
-                if upstream.is_line_break() == Some(BreakReason::Explicit) {
-                    (last_line_cursor_rect(layout, size), None)
+                        (cursor_rect(&right, false, size), None)
+                    }
                 } else {
-                    (cursor_rect(upstream, true, size), None)
+                    (cursor_rect(&left, true, size), None)
                 }
             }
-            (None, Some(downstream)) => (cursor_rect(downstream, downstream.is_rtl(), size), None),
+            [Some(left), None] if left.is_hard_line_break() => {
+                (last_line_cursor_rect(layout, size), None)
+            }
+            [Some(left), _] => (cursor_rect(&left, true, size), None),
+            [_, Some(right)] => (cursor_rect(&right, false, size), None),
             _ => (last_line_cursor_rect(layout, size), None),
         }
+        // let [upstream, downstream] = self.clusters(layout);
+        // match (upstream.as_ref(), downstream.as_ref()) {
+        //     (Some(upstream), Some(downstream)) => {
+        //         let upstream_rtl = upstream.is_rtl();
+        //         let downstream_rtl = downstream.is_rtl();
+        //         if upstream_rtl != downstream_rtl {
+        //             let layout_rtl = layout.is_rtl();
+        //             return if upstream_rtl == layout_rtl {
+        //                 (
+        //                     cursor_rect(
+        //                         upstream,
+        //                         !Affinity::Upstream.is_visually_leading(upstream_rtl),
+        //                         size,
+        //                     ),
+        //                     Some(cursor_rect(
+        //                         downstream,
+        //                         !Affinity::Downstream.is_visually_leading(downstream_rtl),
+        //                         size,
+        //                     )),
+        //                 )
+        //             } else {
+        //                 (
+        //                     cursor_rect(
+        //                         downstream,
+        //                         !Affinity::Downstream.is_visually_leading(downstream_rtl),
+        //                         size,
+        //                     ),
+        //                     Some(cursor_rect(
+        //                         upstream,
+        //                         !Affinity::Upstream.is_visually_leading(upstream_rtl),
+        //                         size,
+        //                     )),
+        //                 )
+        //             };
+        //         }
+        //         if upstream.is_end_of_line() {
+        //             return if self.affinity == Affinity::Upstream
+        //                 && upstream.is_line_break() != Some(BreakReason::Explicit)
+        //             {
+        //                 (cursor_rect(upstream, !upstream.is_rtl(), size), None)
+        //             } else {
+        //                 (cursor_rect(downstream, downstream.is_rtl(), size), None)
+        //             };
+        //         }
+        //         (cursor_rect(downstream, downstream_rtl, size), None)
+        //     }
+        //     (Some(upstream), None) => {
+        //         if upstream.is_line_break() == Some(BreakReason::Explicit) {
+        //             (last_line_cursor_rect(layout, size), None)
+        //         } else {
+        //             (cursor_rect(upstream, true, size), None)
+        //         }
+        //     }
+        //     (None, Some(downstream)) => (cursor_rect(downstream, downstream.is_rtl(), size), None),
+        //     _ => (last_line_cursor_rect(layout, size), None),
+        // }
     }
 
     pub fn clusters<'a, B: Brush>(&self, layout: &'a Layout<B>) -> [Option<Cluster<'a, B>>; 2] {
@@ -299,22 +289,59 @@ impl Cursor {
         [upstream, downstream]
     }
 
-    fn line<'a, B: Brush>(&self, layout: &'a Layout<B>) -> Option<(usize, Line<'a, B>)> {
+    pub fn visual_clusters<'a, B: Brush>(
+        &self,
+        layout: &'a Layout<B>,
+    ) -> [Option<Cluster<'a, B>>; 2] {
+        let mut clusters = [None, None];
+        if self.affinity == Affinity::Upstream {
+            if let Some(cluster) = self.upstream_cluster(layout) {
+                if cluster.is_rtl() {
+                    clusters = [cluster.previous_visual(), Some(cluster)];
+                } else {
+                    clusters = [Some(cluster.clone()), cluster.next_visual()];
+                }
+            } else if let Some(cluster) = self.downstream_cluster(layout) {
+                if cluster.is_rtl() {
+                    clusters = [None, Some(cluster)];
+                } else {
+                    clusters = [Some(cluster), None];
+                }
+            }
+        } else {
+            if let Some(cluster) = self.downstream_cluster(layout) {
+                if cluster.is_rtl() {
+                    clusters = [Some(cluster.clone()), cluster.next_visual()];
+                } else {
+                    clusters = [cluster.previous_visual(), Some(cluster)];
+                }
+            } else if let Some(cluster) = self.upstream_cluster(layout) {
+                if cluster.is_rtl() {
+                    clusters = [None, Some(cluster)];
+                } else {
+                    clusters = [Some(cluster), None];
+                }
+            }
+        }
+        clusters
+    }
+
+    fn line<B: Brush>(self, layout: &Layout<B>) -> Option<(usize, Line<'_, B>)> {
         let geometry = self.geometry(layout, 0.0).0;
         layout.line_for_offset(geometry.y0 as f32)
     }
 
-    fn upstream_cluster<'a, B: Brush>(&self, layout: &'a Layout<B>) -> Option<Cluster<'a, B>> {
+    fn upstream_cluster<B: Brush>(self, layout: &Layout<B>) -> Option<Cluster<'_, B>> {
         self.index
             .checked_sub(1)
             .and_then(|index| Cluster::from_index(layout, index))
     }
 
-    fn downstream_cluster<'a, B: Brush>(&self, layout: &'a Layout<B>) -> Option<Cluster<'a, B>> {
+    fn downstream_cluster<B: Brush>(self, layout: &Layout<B>) -> Option<Cluster<'_, B>> {
         Cluster::from_index(layout, self.index)
     }
 
-    fn cluster<'a, B: Brush>(&self, layout: &'a Layout<B>) -> Option<Cluster<'a, B>> {
+    fn cluster<B: Brush>(self, layout: &Layout<B>) -> Option<Cluster<'_, B>> {
         match self.affinity {
             Affinity::Upstream => self.upstream_cluster(layout),
             Affinity::Downstream => self.downstream_cluster(layout),
@@ -418,11 +445,57 @@ impl Selection {
     }
 
     pub fn next_visual<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
+        if !self.is_collapsed() && !extend {
+            let anchor_geom = self.anchor.geometry(layout, 0.0).0;
+            let focus_geom = self.focus.geometry(layout, 0.0).0;
+            let new_focus = if (anchor_geom.y0, anchor_geom.x0) > (focus_geom.y0, focus_geom.x0) {
+                self.anchor
+            } else {
+                self.focus
+            };
+            return Self {
+                anchor: new_focus,
+                focus: new_focus,
+                h_pos: None,
+            };
+        }
         self.maybe_extend(self.focus.next_visual(layout), extend)
     }
 
     pub fn previous_visual<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
+        if !self.is_collapsed() && !extend {
+            let anchor_geom = self.anchor.geometry(layout, 0.0).0;
+            let focus_geom = self.focus.geometry(layout, 0.0).0;
+            let new_focus = if (anchor_geom.y0, anchor_geom.x0) < (focus_geom.y0, focus_geom.x0) {
+                self.anchor
+            } else {
+                self.focus
+            };
+            return Self {
+                anchor: new_focus,
+                focus: new_focus,
+                h_pos: None,
+            };
+        }
         self.maybe_extend(self.focus.previous_visual(layout), extend)
+    }
+
+    /// Returns a new selection with the focus moved to the next word.
+    ///
+    /// If `extend` is `true` then the current anchor will be retained,
+    /// otherwise the new selection will be collapsed.
+    #[must_use]
+    pub fn next_visual_word<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
+        self.maybe_extend(self.focus.next_visual_word(layout), extend)
+    }
+
+    /// Returns a new selection with the focus moved to the previous word.
+    ///
+    /// If `extend` is `true` then the current anchor will be retained,
+    /// otherwise the new selection will be collapsed.
+    #[must_use]
+    pub fn previous_visual_word<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
+        self.maybe_extend(self.focus.previous_visual_word(layout), extend)
     }
 
     /// Returns a new selection with the focus moved to the next line. The
@@ -531,10 +604,14 @@ impl Selection {
     #[must_use]
     pub fn line_end<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
         if let Some((_, line)) = self.focus.line(layout) {
-            self.maybe_extend(
-                Cursor::from_index(layout, line.text_range().end, Affinity::Upstream),
-                extend,
-            )
+            let (index, affinity) = (line.break_reason() == BreakReason::Explicit)
+                .then(|| {
+                    Cluster::from_index(layout, line.text_range().end - 1)
+                        .map(|cluster| (cluster.text_range().start, Affinity::Downstream))
+                })
+                .flatten()
+                .unwrap_or_else(|| (line.text_range().end, Affinity::Upstream));
+            self.maybe_extend(Cursor::from_index(layout, index, affinity), extend)
         } else {
             *self
         }

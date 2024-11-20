@@ -330,7 +330,7 @@ impl Editor {
                 scene.fill(Fill::NonZero, transform, Color::WHITE, None, &cursor);
             };
             if let Some(cursor) = self.editor.selection_weak_geometry(1.5) {
-                scene.fill(Fill::NonZero, transform, Color::LIGHT_GRAY, None, &cursor);
+                scene.fill(Fill::NonZero, transform, Color::RED, None, &cursor);
             };
         }
         for line in self.editor.lines() {
