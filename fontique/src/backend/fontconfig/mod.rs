@@ -254,14 +254,14 @@ fn find_best_family<'a>(
     raw_families: impl Iterator<Item = &'a RawFamily>,
     text: &str,
 ) -> Option<FamilyId> {
-    let text_len = text.len();
+    let char_count = text.chars().count();
     let mut best_id = None;
     let mut best_coverage = 0;
     for family in raw_families {
         let id = family.name.id();
         for font in &family.fonts {
             let coverage = font.coverage.compute_for_str(text);
-            if coverage == text_len {
+            if coverage == char_count {
                 return Some(id);
             }
             if coverage > best_coverage {
