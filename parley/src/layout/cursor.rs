@@ -96,43 +96,38 @@ impl Cursor {
 
     pub fn next_visual<B: Brush>(&self, layout: &Layout<B>) -> Self {
         let [left, right] = self.visual_clusters(layout);
-        match (left, right) {
-            (Some(left), Some(right)) => {
-                if left.is_soft_line_break() {
-                    if left.is_rtl() && self.affinity == Affinity::Downstream {
-                        let index = if right.is_rtl() {
-                            right.text_range().end
-                        } else {
-                            right.text_range().start
-                        };
-                        return Self::from_index(layout, index, Affinity::Upstream);
-                    } else if !left.is_rtl() && self.affinity == Affinity::Upstream {
-                        let index = if right.is_rtl() {
-                            right.text_range().end
-                        } else {
-                            right.text_range().start
-                        };
-                        return Self::from_index(layout, index, Affinity::Downstream);
-                    }
+        if let (Some(left), Some(right)) = (&left, &right) {
+            if left.is_soft_line_break() {
+                if left.is_rtl() && self.affinity == Affinity::Downstream {
+                    let index = if right.is_rtl() {
+                        right.text_range().end
+                    } else {
+                        right.text_range().start
+                    };
+                    return Self::from_index(layout, index, Affinity::Upstream);
+                } else if !left.is_rtl() && self.affinity == Affinity::Upstream {
+                    let index = if right.is_rtl() {
+                        right.text_range().end
+                    } else {
+                        right.text_range().start
+                    };
+                    return Self::from_index(layout, index, Affinity::Downstream);
                 }
-                let index = if right.is_rtl() {
-                    right.text_range().start
-                } else {
-                    right.text_range().end
-                };
-                return Self::from_index(layout, index, affinity_for_dir(right.is_rtl(), true));
             }
-            (None, Some(right)) => {
-                let index = if right.is_rtl() {
-                    right.text_range().start
-                } else {
-                    right.text_range().end
-                };
-                return Self::from_index(layout, index, affinity_for_dir(right.is_rtl(), true));
-            }
-            // We can't move right here
-            (Some(_left), None) => {}
-            _ => {}
+            let index = if right.is_rtl() {
+                right.text_range().start
+            } else {
+                right.text_range().end
+            };
+            return Self::from_index(layout, index, affinity_for_dir(right.is_rtl(), true));
+        }
+        if let Some(right) = right {
+            let index = if right.is_rtl() {
+                right.text_range().start
+            } else {
+                right.text_range().end
+            };
+            return Self::from_index(layout, index, affinity_for_dir(right.is_rtl(), true));
         }
         *self
     }
@@ -172,11 +167,15 @@ impl Cursor {
     pub fn next_visual_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
         let [left, right] = self.visual_clusters(layout);
         if let Some(mut cluster) = right.or(left) {
-            while let Some(next_word) = cluster.next_visual_word() {
-                cluster = next_word;
+            let start = cluster.clone();
+            while let Some(word) = cluster.next_visual_word() {
+                cluster = word;
                 if !cluster.is_space_or_nbsp() {
                     break;
                 }
+            }
+            if cluster.path == start.path {
+                return Self::from_index(layout, usize::MAX, Affinity::Downstream);
             }
             return Self::from_cluster(layout, cluster, true);
         }
@@ -186,8 +185,8 @@ impl Cursor {
     pub fn previous_visual_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
         let [left, right] = self.visual_clusters(layout);
         if let Some(mut cluster) = left.or(right) {
-            while let Some(next_word) = cluster.previous_visual_word() {
-                cluster = next_word;
+            while let Some(word) = cluster.previous_visual_word() {
+                cluster = word;
                 if !cluster.is_space_or_nbsp() {
                     break;
                 }
@@ -200,11 +199,15 @@ impl Cursor {
     pub fn next_logical_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
         let [left, right] = self.logical_clusters(layout);
         if let Some(mut cluster) = right.or(left) {
+            let start = cluster.clone();
             while let Some(next_word) = cluster.next_logical_word() {
                 cluster = next_word;
                 if !cluster.is_space_or_nbsp() {
                     break;
                 }
+            }
+            if cluster.path == start.path {
+                return Self::from_index(layout, usize::MAX, Affinity::Downstream);
             }
             return Self::from_cluster(layout, cluster, true);
         }
@@ -225,7 +228,7 @@ impl Cursor {
         *self
     }
 
-    pub fn geometry<B: Brush>(&self, layout: &Layout<B>, size: f32) -> (Rect, Option<Rect>) {
+    pub fn geometry<B: Brush>(&self, layout: &Layout<B>, size: f32) -> Rect {
         match self.visual_clusters(layout) {
             [Some(left), Some(right)] => {
                 if left.is_end_of_line() {
@@ -238,20 +241,18 @@ impl Cursor {
                         } else {
                             (right, false)
                         };
-                        (cursor_rect(&cluster, at_end, size), None)
+                        cursor_rect(&cluster, at_end, size)
                     } else {
-                        (cursor_rect(&right, false, size), None)
+                        cursor_rect(&right, false, size)
                     }
                 } else {
-                    (cursor_rect(&left, true, size), None)
+                    cursor_rect(&left, true, size)
                 }
             }
-            [Some(left), None] if left.is_hard_line_break() => {
-                (last_line_cursor_rect(layout, size), None)
-            }
-            [Some(left), _] => (cursor_rect(&left, true, size), None),
-            [_, Some(right)] => (cursor_rect(&right, false, size), None),
-            _ => (last_line_cursor_rect(layout, size), None),
+            [Some(left), None] if left.is_hard_line_break() => last_line_cursor_rect(layout, size),
+            [Some(left), _] => cursor_rect(&left, true, size),
+            [_, Some(right)] => cursor_rect(&right, false, size),
+            _ => last_line_cursor_rect(layout, size),
         }
     }
 
@@ -303,7 +304,7 @@ impl Cursor {
     }
 
     fn line<B: Brush>(self, layout: &Layout<B>) -> Option<(usize, Line<'_, B>)> {
-        let geometry = self.geometry(layout, 0.0).0;
+        let geometry = self.geometry(layout, 0.0);
         layout.line_for_offset(geometry.y0 as f32)
     }
 
@@ -436,8 +437,8 @@ impl Selection {
 
     pub fn next_visual<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
         if !self.is_collapsed() && !extend {
-            let anchor_geom = self.anchor.geometry(layout, 0.0).0;
-            let focus_geom = self.focus.geometry(layout, 0.0).0;
+            let anchor_geom = self.anchor.geometry(layout, 0.0);
+            let focus_geom = self.focus.geometry(layout, 0.0);
             let new_focus = if (anchor_geom.y0, anchor_geom.x0) > (focus_geom.y0, focus_geom.x0) {
                 self.anchor
             } else {
@@ -454,8 +455,8 @@ impl Selection {
 
     pub fn previous_visual<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
         if !self.is_collapsed() && !extend {
-            let anchor_geom = self.anchor.geometry(layout, 0.0).0;
-            let focus_geom = self.focus.geometry(layout, 0.0).0;
+            let anchor_geom = self.anchor.geometry(layout, 0.0);
+            let focus_geom = self.focus.geometry(layout, 0.0);
             let new_focus = if (anchor_geom.y0, anchor_geom.x0) < (focus_geom.y0, focus_geom.x0) {
                 self.anchor
             } else {
@@ -523,7 +524,7 @@ impl Selection {
             return *self;
         }
         let line_limit = layout.len().saturating_sub(1);
-        let geometry = self.focus.geometry(layout, 0.0).0;
+        let geometry = self.focus.geometry(layout, 0.0);
         let line_index = layout
             .line_for_offset(geometry.y0 as f32)
             .map(|(ix, _)| ix)
@@ -548,7 +549,7 @@ impl Selection {
         };
         let h_pos = self
             .h_pos
-            .unwrap_or_else(|| self.focus.geometry(layout, 0.0).0.x0 as f32);
+            .unwrap_or_else(|| self.focus.geometry(layout, 0.0).x0 as f32);
         let y = line.metrics().max_coord - line.metrics().ascent * 0.5;
         let new_focus = Cursor::from_point(layout, h_pos, y);
         let h_pos = Some(h_pos);

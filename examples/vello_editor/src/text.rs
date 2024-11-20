@@ -326,11 +326,8 @@ impl Editor {
             scene.fill(Fill::NonZero, transform, Color::STEEL_BLUE, None, &rect);
         }
         if self.cursor_visible {
-            if let Some(cursor) = self.editor.selection_strong_geometry(1.5) {
+            if let Some(cursor) = self.editor.cursor_geometry(1.5) {
                 scene.fill(Fill::NonZero, transform, Color::WHITE, None, &cursor);
-            };
-            if let Some(cursor) = self.editor.selection_weak_geometry(1.5) {
-                scene.fill(Fill::NonZero, transform, Color::RED, None, &cursor);
             };
         }
         for line in self.editor.lines() {

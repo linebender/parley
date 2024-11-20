@@ -622,12 +622,8 @@ where
     }
 
     /// Get a rectangle representing the current caret cursor position.
-    pub fn selection_strong_geometry(&self, size: f32) -> Option<Rect> {
-        Some(self.selection.focus().geometry(&self.layout, size).0)
-    }
-
-    pub fn selection_weak_geometry(&self, size: f32) -> Option<Rect> {
-        self.selection.focus().geometry(&self.layout, size).1
+    pub fn cursor_geometry(&self, size: f32) -> Option<Rect> {
+        Some(self.selection.focus().geometry(&self.layout, size))
     }
 
     /// Get the lines from the `Layout`.
