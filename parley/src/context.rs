@@ -60,15 +60,6 @@ impl<B: Brush> LayoutContext<B> {
             .resolve_entire_style_set(font_ctx, raw_style, scale)
     }
 
-    pub fn resolve_style(
-        &mut self,
-        font_ctx: &mut FontContext,
-        scale: f32,
-        raw_property: &StyleProperty<B>,
-    ) -> ResolvedProperty<B> {
-        self.rcx.resolve_property(font_ctx, raw_property, scale)
-    }
-
     pub fn ranged_builder<'a>(
         &'a mut self,
         fcx: &'a mut FontContext,

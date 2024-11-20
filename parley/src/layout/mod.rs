@@ -241,6 +241,7 @@ pub struct Line<'a, B: Brush> {
     data: &'a LineData,
 }
 
+#[allow(clippy::partial_pub_fields)]
 /// Style properties.
 #[derive(Clone, Debug)]
 pub struct Style<B: Brush> {

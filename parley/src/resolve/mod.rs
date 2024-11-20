@@ -3,10 +3,10 @@
 
 //! Resolution of dynamic properties within a context.
 
-pub mod range;
-pub mod tree;
+pub(crate) mod range;
+pub(crate) mod tree;
 
-pub use range::RangedStyleBuilder;
+pub(crate) use range::RangedStyleBuilder;
 
 use alloc::{vec, vec::Vec};
 
@@ -26,9 +26,9 @@ use swash::Setting;
 
 /// Style with an associated range.
 #[derive(Debug, Clone)]
-pub struct RangedStyle<B: Brush> {
-    pub style: ResolvedStyle<B>,
-    pub range: Range<usize>,
+pub(crate) struct RangedStyle<B: Brush> {
+    pub(crate) style: ResolvedStyle<B>,
+    pub(crate) range: Range<usize>,
 }
 
 #[derive(Clone)]
@@ -39,7 +39,7 @@ struct RangedProperty<B: Brush> {
 
 /// Handle for a managed property.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub struct Resolved<T> {
+pub(crate) struct Resolved<T> {
     index: usize,
     _phantom: core::marker::PhantomData<T>,
 }
@@ -54,7 +54,7 @@ impl<T> Default for Resolved<T> {
 }
 
 impl<T> Resolved<T> {
-    pub fn id(&self) -> usize {
+    pub(crate) fn id(&self) -> usize {
         self.index
     }
 }
@@ -77,12 +77,12 @@ impl<T> Default for Cache<T> {
 }
 
 impl<T: Clone + PartialEq> Cache<T> {
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.items.clear();
         self.entries.clear();
     }
 
-    pub fn insert(&mut self, items: &[T]) -> Resolved<T> {
+    pub(crate) fn insert(&mut self, items: &[T]) -> Resolved<T> {
         for (i, entry) in self.entries.iter().enumerate() {
             let range = entry.0..entry.1;
             if range.len() != items.len() {
@@ -108,7 +108,7 @@ impl<T: Clone + PartialEq> Cache<T> {
         }
     }
 
-    pub fn get(&self, handle: Resolved<T>) -> Option<&[T]> {
+    pub(crate) fn get(&self, handle: Resolved<T>) -> Option<&[T]> {
         let (start, end) = *self.entries.get(handle.index)?;
         self.items.get(start..end)
     }
@@ -116,7 +116,7 @@ impl<T: Clone + PartialEq> Cache<T> {
 
 /// Context for managing dynamic properties during layout.
 #[derive(Clone, Default)]
-pub struct ResolveContext {
+pub(crate) struct ResolveContext {
     families: Cache<FamilyId>,
     variations: Cache<Setting<f32>>,
     features: Cache<Setting<u16>>,
@@ -126,7 +126,7 @@ pub struct ResolveContext {
 }
 
 impl ResolveContext {
-    pub fn resolve_property<B: Brush>(
+    pub(crate) fn resolve_property<B: Brush>(
         &mut self,
         fcx: &mut FontContext,
         property: &StyleProperty<B>,
@@ -159,7 +159,7 @@ impl ResolveContext {
         }
     }
 
-    pub fn resolve_entire_style_set<B: Brush>(
+    pub(crate) fn resolve_entire_style_set<B: Brush>(
         &mut self,
         fcx: &mut FontContext,
         raw_style: &TextStyle<B>,
@@ -194,7 +194,7 @@ impl ResolveContext {
     }
 
     /// Resolves a font stack.
-    pub fn resolve_stack(
+    pub(crate) fn resolve_stack(
         &mut self,
         fcx: &mut FontContext,
         stack: &FontStack,
@@ -250,7 +250,7 @@ impl ResolveContext {
     }
 
     /// Resolves font variation settings.
-    pub fn resolve_variations(
+    pub(crate) fn resolve_variations(
         &mut self,
         variations: &FontSettings<FontVariation>,
     ) -> Resolved<Setting<f32>> {
@@ -275,7 +275,7 @@ impl ResolveContext {
     }
 
     /// Resolves font feature settings.
-    pub fn resolve_features(
+    pub(crate) fn resolve_features(
         &mut self,
         features: &FontSettings<FontFeature>,
     ) -> Resolved<Setting<u16>> {
@@ -299,22 +299,22 @@ impl ResolveContext {
     }
 
     /// Returns the list of font families for the specified handle.
-    pub fn stack(&self, stack: Resolved<FamilyId>) -> Option<&[FamilyId]> {
+    pub(crate) fn stack(&self, stack: Resolved<FamilyId>) -> Option<&[FamilyId]> {
         self.families.get(stack)
     }
 
     /// Returns the list of font variations for the specified handle.
-    pub fn variations(&self, variations: Resolved<Setting<f32>>) -> Option<&[Setting<f32>]> {
+    pub(crate) fn variations(&self, variations: Resolved<Setting<f32>>) -> Option<&[Setting<f32>]> {
         self.variations.get(variations)
     }
 
     /// Returns the list of font features for the specified handle.
-    pub fn features(&self, features: Resolved<Setting<u16>>) -> Option<&[Setting<u16>]> {
+    pub(crate) fn features(&self, features: Resolved<Setting<u16>>) -> Option<&[Setting<u16>]> {
         self.features.get(features)
     }
 
     /// Clears the resources in the context.
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.families.clear();
         self.variations.clear();
         self.features.clear();
@@ -323,7 +323,7 @@ impl ResolveContext {
 
 /// Style property with resolved resources.
 #[derive(Clone, PartialEq)]
-pub enum ResolvedProperty<B: Brush> {
+pub(crate) enum ResolvedProperty<B: Brush> {
     /// Font stack.
     FontStack(Resolved<FamilyId>),
     /// Font size.
@@ -368,35 +368,35 @@ pub enum ResolvedProperty<B: Brush> {
 
 /// Flattened group of style properties.
 #[derive(Clone, PartialEq, Debug)]
-pub struct ResolvedStyle<B: Brush> {
+pub(crate) struct ResolvedStyle<B: Brush> {
     /// Font stack.
-    pub font_stack: Resolved<FamilyId>,
+    pub(crate) font_stack: Resolved<FamilyId>,
     /// Font size.
-    pub font_size: f32,
+    pub(crate) font_size: f32,
     /// Font stretch.
-    pub font_stretch: FontStretch,
+    pub(crate) font_stretch: FontStretch,
     /// Font style.
-    pub font_style: FontStyle,
+    pub(crate) font_style: FontStyle,
     /// Font weight.
-    pub font_weight: FontWeight,
+    pub(crate) font_weight: FontWeight,
     /// Font variation settings.
-    pub font_variations: Resolved<Setting<f32>>,
+    pub(crate) font_variations: Resolved<Setting<f32>>,
     /// Font feature settings.
-    pub font_features: Resolved<Setting<u16>>,
+    pub(crate) font_features: Resolved<Setting<u16>>,
     /// Locale.
-    pub locale: Option<Language>,
+    pub(crate) locale: Option<Language>,
     /// Brush for rendering text.
-    pub brush: B,
+    pub(crate) brush: B,
     /// Underline decoration.
-    pub underline: ResolvedDecoration<B>,
+    pub(crate) underline: ResolvedDecoration<B>,
     /// Strikethrough decoration.
-    pub strikethrough: ResolvedDecoration<B>,
+    pub(crate) strikethrough: ResolvedDecoration<B>,
     /// Line height multiplier.
-    pub line_height: f32,
+    pub(crate) line_height: f32,
     /// Extra spacing between words.
-    pub word_spacing: f32,
+    pub(crate) word_spacing: f32,
     /// Extra spacing between letters.
-    pub letter_spacing: f32,
+    pub(crate) letter_spacing: f32,
 }
 
 impl<B: Brush> Default for ResolvedStyle<B> {
@@ -422,7 +422,7 @@ impl<B: Brush> Default for ResolvedStyle<B> {
 
 impl<B: Brush> ResolvedStyle<B> {
     /// Applies the specified property to this style.
-    pub fn apply(&mut self, property: ResolvedProperty<B>) {
+    pub(crate) fn apply(&mut self, property: ResolvedProperty<B>) {
         use ResolvedProperty::*;
         match property {
             FontStack(value) => self.font_stack = value,
@@ -448,7 +448,7 @@ impl<B: Brush> ResolvedStyle<B> {
         }
     }
 
-    pub fn check(&self, property: &ResolvedProperty<B>) -> bool {
+    pub(crate) fn check(&self, property: &ResolvedProperty<B>) -> bool {
         use ResolvedProperty::*;
         match property {
             FontStack(value) => self.font_stack == *value,
@@ -486,15 +486,15 @@ impl<B: Brush> ResolvedStyle<B> {
 
 /// Underline or strikethrough decoration.
 #[derive(Clone, PartialEq, Default, Debug)]
-pub struct ResolvedDecoration<B: Brush> {
+pub(crate) struct ResolvedDecoration<B: Brush> {
     /// True if the decoration is enabled.
-    pub enabled: bool,
+    pub(crate) enabled: bool,
     /// Offset of the decoration from the baseline.
-    pub offset: Option<f32>,
+    pub(crate) offset: Option<f32>,
     /// Thickness of the decoration stroke.
-    pub size: Option<f32>,
+    pub(crate) size: Option<f32>,
     /// Brush for the decoration.
-    pub brush: Option<B>,
+    pub(crate) brush: Option<B>,
 }
 
 impl<B: Brush> ResolvedDecoration<B> {

@@ -1,6 +1,15 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+#![allow(elided_lifetimes_in_paths)]
+#![allow(missing_debug_implementations)]
+#![allow(missing_docs)]
+#![allow(unreachable_pub)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::shadow_unrelated)]
+#![allow(clippy::unseparated_literal_suffix)]
+#![allow(clippy::wildcard_imports)]
+
 use accesskit::{Node, Rect, Role, Tree, TreeUpdate};
 use anyhow::Result;
 use std::num::NonZeroUsize;

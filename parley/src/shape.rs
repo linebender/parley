@@ -30,7 +30,7 @@ struct Item {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn shape_text<'a, B: Brush>(
+pub(crate) fn shape_text<'a, B: Brush>(
     rcx: &'a ResolveContext,
     mut fq: Query<'a>,
     styles: &'a [RangedStyle<B>],

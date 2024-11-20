@@ -3,7 +3,7 @@
 
 use super::*;
 
-pub mod greedy;
+pub(crate) mod greedy;
 
 impl<'a, B: Brush> Line<'a, B> {
     /// Returns the metrics for the line.
@@ -31,7 +31,7 @@ impl<'a, B: Brush> Line<'a, B> {
     }
 
     /// Returns the run at the specified index.
-    pub fn item(&self, index: usize) -> Option<&LineItemData> {
+    pub(crate) fn item(&self, index: usize) -> Option<&LineItemData> {
         let index = self.data.item_range.start + index;
         if index >= self.data.item_range.end {
             return None;

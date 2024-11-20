@@ -14,71 +14,71 @@ use swash::Synthesis;
 use alloc::vec::Vec;
 
 #[derive(Copy, Clone)]
-pub struct ClusterData {
-    pub info: ClusterInfo,
-    pub flags: u16,
-    pub style_index: u16,
-    pub glyph_len: u8,
-    pub text_len: u8,
+pub(crate) struct ClusterData {
+    pub(crate) info: ClusterInfo,
+    pub(crate) flags: u16,
+    pub(crate) style_index: u16,
+    pub(crate) glyph_len: u8,
+    pub(crate) text_len: u8,
     /// If `glyph_len == 0xFF`, then `glyph_offset` is a glyph identifier,
     /// otherwise, it's an offset into the glyph array with the base
     /// taken from the owning run.
-    pub glyph_offset: u16,
-    pub text_offset: u16,
-    pub advance: f32,
+    pub(crate) glyph_offset: u16,
+    pub(crate) text_offset: u16,
+    pub(crate) advance: f32,
 }
 
 impl ClusterData {
-    pub const LIGATURE_START: u16 = 1;
-    pub const LIGATURE_COMPONENT: u16 = 2;
-    pub const DIVERGENT_STYLES: u16 = 4;
+    pub(crate) const LIGATURE_START: u16 = 1;
+    pub(crate) const LIGATURE_COMPONENT: u16 = 2;
+    pub(crate) const DIVERGENT_STYLES: u16 = 4;
 
-    pub fn is_ligature_start(self) -> bool {
+    pub(crate) fn is_ligature_start(self) -> bool {
         self.flags & Self::LIGATURE_START != 0
     }
 
-    pub fn is_ligature_component(self) -> bool {
+    pub(crate) fn is_ligature_component(self) -> bool {
         self.flags & Self::LIGATURE_COMPONENT != 0
     }
 
-    pub fn has_divergent_styles(self) -> bool {
+    pub(crate) fn has_divergent_styles(self) -> bool {
         self.flags & Self::DIVERGENT_STYLES != 0
     }
 
-    pub fn text_range(self, run: &RunData) -> Range<usize> {
+    pub(crate) fn text_range(self, run: &RunData) -> Range<usize> {
         let start = run.text_range.start + self.text_offset as usize;
         start..start + self.text_len as usize
     }
 }
 
 #[derive(Clone)]
-pub struct RunData {
+pub(crate) struct RunData {
     /// Index of the font for the run.
-    pub font_index: usize,
+    pub(crate) font_index: usize,
     /// Font size.
-    pub font_size: f32,
+    pub(crate) font_size: f32,
     /// Synthesis information for the font.
-    pub synthesis: Synthesis,
+    pub(crate) synthesis: Synthesis,
     /// Range of normalized coordinates in the layout data.
-    pub coords_range: Range<usize>,
+    pub(crate) coords_range: Range<usize>,
     /// Range of the source text.
-    pub text_range: Range<usize>,
+    pub(crate) text_range: Range<usize>,
     /// Bidi level for the run.
-    pub bidi_level: u8,
+    pub(crate) bidi_level: u8,
     /// True if the run ends with a newline.
-    pub ends_with_newline: bool,
+    pub(crate) ends_with_newline: bool,
     /// Range of clusters.
-    pub cluster_range: Range<usize>,
+    pub(crate) cluster_range: Range<usize>,
     /// Base for glyph indices.
-    pub glyph_start: usize,
+    pub(crate) glyph_start: usize,
     /// Metrics for the run.
-    pub metrics: RunMetrics,
+    pub(crate) metrics: RunMetrics,
     /// Additional word spacing.
-    pub word_spacing: f32,
+    pub(crate) word_spacing: f32,
     /// Additional letter spacing.
-    pub letter_spacing: f32,
+    pub(crate) letter_spacing: f32,
     /// Total advance of the run.
-    pub advance: f32,
+    pub(crate) advance: f32,
 }
 
 #[derive(Copy, Clone, Default, PartialEq, Debug)]
@@ -91,62 +91,58 @@ pub enum BreakReason {
 }
 
 #[derive(Clone, Default)]
-pub struct LineData {
+pub(crate) struct LineData {
     /// Range of the source text.
-    pub text_range: Range<usize>,
+    pub(crate) text_range: Range<usize>,
     /// Range of line items.
-    pub item_range: Range<usize>,
+    pub(crate) item_range: Range<usize>,
     /// Metrics for the line.
-    pub metrics: LineMetrics,
+    pub(crate) metrics: LineMetrics,
     /// The cause of the line break.
-    pub break_reason: BreakReason,
+    pub(crate) break_reason: BreakReason,
     /// Alignment.
-    pub alignment: Alignment,
+    pub(crate) alignment: Alignment,
     /// Maximum advance for the line.
-    pub max_advance: f32,
+    pub(crate) max_advance: f32,
     /// Number of justified clusters on the line.
-    pub num_spaces: usize,
+    pub(crate) num_spaces: usize,
 }
 
 impl LineData {
-    pub fn size(&self) -> f32 {
+    pub(crate) fn size(&self) -> f32 {
         self.metrics.ascent + self.metrics.descent + self.metrics.leading
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct LineItemData {
+pub(crate) struct LineItemData {
     /// Whether the item is a run or an inline box
-    pub kind: LayoutItemKind,
+    pub(crate) kind: LayoutItemKind,
     /// The index of the run or inline box in the runs or `inline_boxes` vec
-    pub index: usize,
+    pub(crate) index: usize,
     /// Bidi level for the item (used for reordering)
-    pub bidi_level: u8,
+    pub(crate) bidi_level: u8,
     /// Advance (size in direction of text flow) for the run.
-    pub advance: f32,
+    pub(crate) advance: f32,
 
     // Fields that only apply to text runs (Ignored for boxes)
     // TODO: factor this out?
     /// True if the run is composed entirely of whitespace.
-    pub is_whitespace: bool,
+    pub(crate) is_whitespace: bool,
     /// True if the run ends in whitespace.
-    pub has_trailing_whitespace: bool,
+    pub(crate) has_trailing_whitespace: bool,
     /// Range of the source text.
-    pub text_range: Range<usize>,
+    pub(crate) text_range: Range<usize>,
     /// Range of clusters.
-    pub cluster_range: Range<usize>,
+    pub(crate) cluster_range: Range<usize>,
 }
 
 impl LineItemData {
-    pub fn is_text_run(&self) -> bool {
+    pub(crate) fn is_text_run(&self) -> bool {
         self.kind == LayoutItemKind::TextRun
     }
 
-    pub fn is_inline_box(&self) -> bool {
-        self.kind == LayoutItemKind::InlineBox
-    }
-
-    pub fn compute_line_height<B: Brush>(&self, layout: &LayoutData<B>) -> f32 {
+    pub(crate) fn compute_line_height<B: Brush>(&self, layout: &LayoutData<B>) -> f32 {
         match self.kind {
             LayoutItemKind::TextRun => {
                 let mut line_height = 0f32;
@@ -176,46 +172,46 @@ impl LineItemData {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LayoutItemKind {
+pub(crate) enum LayoutItemKind {
     TextRun,
     InlineBox,
 }
 
 #[derive(Debug, Clone)]
-pub struct LayoutItem {
+pub(crate) struct LayoutItem {
     /// Whether the item is a run or an inline box
-    pub kind: LayoutItemKind,
+    pub(crate) kind: LayoutItemKind,
     /// The index of the run or inline box in the runs or `inline_boxes` vec
-    pub index: usize,
+    pub(crate) index: usize,
     /// Bidi level for the item (used for reordering)
-    pub bidi_level: u8,
+    pub(crate) bidi_level: u8,
 }
 
 #[derive(Clone)]
-pub struct LayoutData<B: Brush> {
-    pub scale: f32,
-    pub has_bidi: bool,
-    pub base_level: u8,
-    pub text_len: usize,
-    pub width: f32,
-    pub full_width: f32,
-    pub height: f32,
-    pub fonts: Vec<Font>,
-    pub coords: Vec<i16>,
+pub(crate) struct LayoutData<B: Brush> {
+    pub(crate) scale: f32,
+    pub(crate) has_bidi: bool,
+    pub(crate) base_level: u8,
+    pub(crate) text_len: usize,
+    pub(crate) width: f32,
+    pub(crate) full_width: f32,
+    pub(crate) height: f32,
+    pub(crate) fonts: Vec<Font>,
+    pub(crate) coords: Vec<i16>,
 
     // Input (/ output of style resolution)
-    pub styles: Vec<Style<B>>,
-    pub inline_boxes: Vec<InlineBox>,
+    pub(crate) styles: Vec<Style<B>>,
+    pub(crate) inline_boxes: Vec<InlineBox>,
 
     // Output of shaping
-    pub runs: Vec<RunData>,
-    pub items: Vec<LayoutItem>,
-    pub clusters: Vec<ClusterData>,
-    pub glyphs: Vec<Glyph>,
+    pub(crate) runs: Vec<RunData>,
+    pub(crate) items: Vec<LayoutItem>,
+    pub(crate) clusters: Vec<ClusterData>,
+    pub(crate) glyphs: Vec<Glyph>,
 
     // Output of line breaking
-    pub lines: Vec<LineData>,
-    pub line_items: Vec<LineItemData>,
+    pub(crate) lines: Vec<LineData>,
+    pub(crate) line_items: Vec<LineItemData>,
 }
 
 impl<B: Brush> Default for LayoutData<B> {
@@ -243,7 +239,7 @@ impl<B: Brush> Default for LayoutData<B> {
 }
 
 impl<B: Brush> LayoutData<B> {
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.scale = 1.;
         self.has_bidi = false;
         self.base_level = 0;
@@ -264,7 +260,7 @@ impl<B: Brush> LayoutData<B> {
     }
 
     /// Push an inline box to the list of items
-    pub fn push_inline_box(&mut self, index: usize) {
+    pub(crate) fn push_inline_box(&mut self, index: usize) {
         // Give the box the same bidi level as the preceding text run
         // (or else default to 0 if there is not yet a text run)
         let bidi_level = self.runs.last().map(|r| r.bidi_level).unwrap_or(0);
@@ -278,7 +274,7 @@ impl<B: Brush> LayoutData<B> {
 
     #[allow(unused_assignments)]
     #[allow(clippy::too_many_arguments)]
-    pub fn push_run(
+    pub(crate) fn push_run(
         &mut self,
         font: Font,
         font_size: f32,
@@ -447,7 +443,7 @@ impl<B: Brush> LayoutData<B> {
         flush_run!();
     }
 
-    pub fn finish(&mut self) {
+    pub(crate) fn finish(&mut self) {
         for run in &self.runs {
             let word = run.word_spacing;
             let letter = run.letter_spacing;
