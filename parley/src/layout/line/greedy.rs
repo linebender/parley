@@ -268,7 +268,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 // break_opportunity = true;
                             }
                         } else if is_newline {
-                            self.state.append_cluster_to_line(0.0);
+                            self.state.append_cluster_to_line(state.line.x);
                             if try_commit_line!(BreakReason::Explicit) {
                                 // TODO: can this be hoisted out of the conditional?
                                 self.state.cluster_idx += 1;
