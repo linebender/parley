@@ -1,8 +1,8 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use swash::text::cluster::Whitespace;
 use super::*;
+use swash::text::cluster::Whitespace;
 
 impl<'a, B: Brush> Cluster<'a, B> {
     /// Returns the cluster for the given layout and byte index.

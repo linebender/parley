@@ -332,8 +332,11 @@ where
 
     /// Move to the next word boundary right.
     pub fn move_word_right(&mut self) {
-        self.editor
-            .set_selection(self.editor.selection.next_visual_word(&self.editor.layout, false));
+        self.editor.set_selection(
+            self.editor
+                .selection
+                .next_visual_word(&self.editor.layout, false),
+        );
     }
 
     /// Select the whole buffer.
@@ -570,10 +573,20 @@ where
         }
         let focus = new_sel.focus();
         let cluster = focus.clusters(&self.layout);
-        let dbg = (cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]), focus.index(), focus.affinity(), cluster[1].as_ref().map(|c| &self.buffer[c.text_range()]));
+        let dbg = (
+            cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]),
+            focus.index(),
+            focus.affinity(),
+            cluster[1].as_ref().map(|c| &self.buffer[c.text_range()]),
+        );
         print!("{dbg:?}");
         let cluster = focus.visual_clusters(&self.layout);
-        let dbg = (cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]), focus.index(), focus.affinity(), cluster[1].as_ref().map(|c| &self.buffer[c.text_range()]));
+        let dbg = (
+            cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]),
+            focus.index(),
+            focus.affinity(),
+            cluster[1].as_ref().map(|c| &self.buffer[c.text_range()]),
+        );
         println!(" | visual: {dbg:?}");
         self.selection = new_sel;
     }

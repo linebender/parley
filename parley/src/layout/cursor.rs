@@ -170,7 +170,7 @@ impl Cursor {
             return Self::from_index(
                 layout,
                 cluster.text_range().start,
-                default_affinity(cluster.is_rtl(), true)
+                default_affinity(cluster.is_rtl(), true),
             );
         }
         *self
@@ -188,7 +188,7 @@ impl Cursor {
             return Self::from_index(
                 layout,
                 cluster.text_range().start,
-                default_affinity(cluster.is_rtl(), true)
+                default_affinity(cluster.is_rtl(), true),
             );
         }
         *self
