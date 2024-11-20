@@ -178,31 +178,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
             match item.kind {
                 LayoutItemKind::InlineBox => {
-                    // This fixes issue #138
-                    // It fixes an inline box that starts at then beginning of a non-first line
-                    // We need to check that current cluster_idx (a first cluster of the following run)
-                    // does not contain mandatory break (it means that cluster_idx - 1 is \n)
-                    // We have to process line breaking right now before processing inline boxes,
-                    // otherwise line break will occur in processing of the following run, and it is
-                    // too late and inline box will end on the previous line.
-
-                    // if !self.state.line.skip_mandatory_break
-                    //     && self
-                    //         .layout
-                    //         .data
-                    //         .clusters
-                    //         .get(self.state.cluster_idx)
-                    //         .map(|c| c.info.boundary() == Boundary::Mandatory)
-                    //         .unwrap_or(false)
-                    // {
-                    //     self.state.prev_boundary = None;
-                    //     self.state.line.items.end = self.state.item_idx;
-                    //     self.state.line.clusters.end = self.state.cluster_idx;
-                    //     self.state.line.skip_mandatory_break = true;
-                    //     if try_commit_line!(BreakReason::Explicit) {
-                    //         return self.start_new_line();
-                    //     }
-                    // }
                     let inline_box = &self.layout.data.inline_boxes[item.index];
 
                     // Compute the x position of the content being currently processed
@@ -268,7 +243,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 // break_opportunity = true;
                             }
                         } else if is_newline {
-                            self.state.append_cluster_to_line(state.line.x);
+                            self.state.append_cluster_to_line(self.state.line.x);
                             if try_commit_line!(BreakReason::Explicit) {
                                 // TODO: can this be hoisted out of the conditional?
                                 self.state.cluster_idx += 1;
