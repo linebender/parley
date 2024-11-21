@@ -4,9 +4,20 @@
 use super::*;
 use swash::text::cluster::Whitespace;
 
+/// Defines the visual side of the cluster for hit testing.
+///
+/// See [`Cluster::from_point`].
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum ClusterSide {
+    /// Cluster was hit on the left half.
+    Left,
+    /// Cluster was hit on the right half.
+    Right,
+}
+
 impl<'a, B: Brush> Cluster<'a, B> {
     /// Returns the cluster for the given layout and byte index.
-    pub fn from_index(layout: &'a Layout<B>, byte_index: usize) -> Option<Self> {
+    pub fn from_byte_index(layout: &'a Layout<B>, byte_index: usize) -> Option<Self> {
         let mut path = ClusterPath::default();
         if let Some((line_index, line)) = layout.line_for_byte_index(byte_index) {
             path.line_index = line_index as u32;
@@ -24,11 +35,10 @@ impl<'a, B: Brush> Cluster<'a, B> {
             }
         }
         None
-        //        path.cluster(layout)
     }
 
-    /// Returns the cluster and affinity for the given layout and point.
-    pub fn from_point(layout: &'a Layout<B>, x: f32, y: f32) -> Option<(Self, Affinity)> {
+    /// Returns the cluster and side for the given layout and point.
+    pub fn from_point(layout: &'a Layout<B>, x: f32, y: f32) -> Option<(Self, ClusterSide)> {
         let mut path = ClusterPath::default();
         if let Some((line_index, line)) = layout.line_for_offset(y) {
             path.line_index = line_index as u32;
@@ -54,47 +64,16 @@ impl<'a, B: Brush> Cluster<'a, B> {
                     if x > offset && !is_last_cluster {
                         continue;
                     }
-                    let affinity =
-                        Affinity::new(cluster.is_rtl(), x <= edge + cluster_advance * 0.5);
-                    return Some((path.cluster(layout)?, affinity));
+                    let side = if x <= edge + cluster_advance * 0.5 {
+                        ClusterSide::Left
+                    } else {
+                        ClusterSide::Right
+                    };
+                    return Some((path.cluster(layout)?, side));
                 }
             }
         }
-        Some((path.cluster(layout)?, Affinity::default()))
-    }
-
-    /// Returns the cluster and affinity for the given layout and point.
-    pub fn from_point2(layout: &'a Layout<B>, x: f32, y: f32) -> Option<(Self, bool)> {
-        let mut path = ClusterPath::default();
-        if let Some((line_index, line)) = layout.line_for_offset(y) {
-            path.line_index = line_index as u32;
-            let mut offset = line.metrics().offset;
-            let last_run_index = line.len().saturating_sub(1);
-            for (run_index, run) in line.runs().enumerate() {
-                let is_last_run = run_index == last_run_index;
-                let run_advance = run.advance();
-                path.run_index = run_index as u32;
-                path.logical_index = 0;
-                if x > offset + run_advance && !is_last_run {
-                    offset += run_advance;
-                    continue;
-                }
-                let last_cluster_index = run.cluster_range().len().saturating_sub(1);
-                for (visual_index, cluster) in run.visual_clusters().enumerate() {
-                    let is_last_cluster = is_last_run && visual_index == last_cluster_index;
-                    path.logical_index =
-                        run.visual_to_logical(visual_index).unwrap_or_default() as u32;
-                    let cluster_advance = cluster.advance();
-                    let edge = offset;
-                    offset += cluster_advance;
-                    if x > offset && !is_last_cluster {
-                        continue;
-                    }
-                    return Some((path.cluster(layout)?, x <= edge + cluster_advance * 0.5));
-                }
-            }
-        }
-        Some((path.cluster(layout)?, true))
+        Some((path.cluster(layout)?, ClusterSide::Left))
     }
 
     /// Returns the line that contains the cluster.
@@ -245,7 +224,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
                 return None;
             }
             // We have to search for the cluster containing our end index
-            Self::from_index(self.run.layout, index)
+            Self::from_byte_index(self.run.layout, index)
         }
     }
 
@@ -260,7 +239,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
             }
             .cluster(self.run.layout)
         } else {
-            Self::from_index(self.run.layout, self.text_range().start.checked_sub(1)?)
+            Self::from_byte_index(self.run.layout, self.text_range().start.checked_sub(1)?)
         }
     }
 
@@ -423,15 +402,6 @@ pub enum Affinity {
 }
 
 impl Affinity {
-    pub(crate) fn new(is_rtl: bool, is_leading: bool) -> Self {
-        match (is_rtl, is_leading) {
-            // trailing edge of RTL and leading edge of LTR
-            (true, false) | (false, true) => Affinity::Downstream,
-            // leading edge of RTL and trailing edge of LTR
-            (true, true) | (false, false) => Affinity::Upstream,
-        }
-    }
-
     pub fn invert(&self) -> Self {
         match self {
             Self::Downstream => Self::Upstream,
@@ -440,16 +410,11 @@ impl Affinity {
     }
 
     /// Returns true if the cursor should be placed on the leading edge.
-    pub fn is_visually_leading(&self, is_rtl: bool) -> bool {
+    pub(crate) fn is_visually_leading(&self, is_rtl: bool) -> bool {
         match (*self, is_rtl) {
             (Self::Upstream, true) | (Self::Downstream, false) => true,
             (Self::Upstream, false) | (Self::Downstream, true) => false,
         }
-    }
-
-    /// Returns true if the cursor should be placed on the trailing edge.
-    pub fn is_visually_trailing(&self, is_rtl: bool) -> bool {
-        !self.is_visually_leading(is_rtl)
     }
 }
 

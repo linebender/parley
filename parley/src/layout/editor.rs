@@ -158,7 +158,7 @@ where
                 self.editor.buffer.replace_range(range, "");
                 self.update_layout();
                 self.editor.set_selection(
-                    Cursor::from_index(&self.editor.layout, start, Affinity::Upstream).into(),
+                    Cursor::from_byte_index(&self.editor.layout, start, Affinity::Upstream).into(),
                 );
             }
         } else {
@@ -176,7 +176,8 @@ where
                 self.editor.buffer.replace_range(start..end, "");
                 self.update_layout();
                 self.editor.set_selection(
-                    Cursor::from_index(&self.editor.layout, start, Affinity::Downstream).into(),
+                    Cursor::from_byte_index(&self.editor.layout, start, Affinity::Downstream)
+                        .into(),
                 );
             }
         } else {
@@ -217,7 +218,8 @@ where
                 self.editor.buffer.replace_range(start..end, "");
                 self.update_layout();
                 self.editor.set_selection(
-                    Cursor::from_index(&self.editor.layout, start, Affinity::Downstream).into(),
+                    Cursor::from_byte_index(&self.editor.layout, start, Affinity::Downstream)
+                        .into(),
                 );
             }
         } else {
@@ -235,7 +237,8 @@ where
                 self.editor.buffer.replace_range(start..end, "");
                 self.update_layout();
                 self.editor.set_selection(
-                    Cursor::from_index(&self.editor.layout, start, Affinity::Downstream).into(),
+                    Cursor::from_byte_index(&self.editor.layout, start, Affinity::Downstream)
+                        .into(),
                 );
             }
         } else {
@@ -345,11 +348,8 @@ where
     /// Select the whole buffer.
     pub fn select_all(&mut self) {
         self.editor.set_selection(
-            Selection::from_index(&self.editor.layout, 0usize, Affinity::default()).move_lines(
-                &self.editor.layout,
-                isize::MAX,
-                true,
-            ),
+            Selection::from_byte_index(&self.editor.layout, 0usize, Affinity::default())
+                .move_lines(&self.editor.layout, isize::MAX, true),
         );
     }
 
@@ -537,13 +537,13 @@ where
     fn cursor_at(&self, index: usize) -> Cursor {
         // FIXME: `Selection` should make this easier
         if index >= self.buffer.len() {
-            Cursor::from_index(
+            Cursor::from_byte_index(
                 &self.layout,
                 self.buffer.len().saturating_sub(1),
                 Affinity::Upstream,
             )
         } else {
-            Cursor::from_index(&self.layout, index, Affinity::Downstream)
+            Cursor::from_byte_index(&self.layout, index, Affinity::Downstream)
         }
     }
 
@@ -568,7 +568,7 @@ where
         } else {
             Affinity::Upstream
         };
-        self.set_selection(Cursor::from_index(&self.layout, new_index, affinity).into());
+        self.set_selection(Cursor::from_byte_index(&self.layout, new_index, affinity).into());
     }
 
     /// Update the selection, and nudge the `Generation` if something other than `h_pos` changed.
