@@ -626,6 +626,11 @@ where
         Some(self.selection.focus().geometry(&self.layout, size))
     }
 
+    /// Returns the underlying `Layout`.
+    pub fn layout(&self) -> &Layout<T> {
+        &self.layout
+    }
+
     /// Get the lines from the `Layout`.
     pub fn lines(&self) -> impl Iterator<Item = Line<T>> + '_ + Clone {
         self.layout.lines()

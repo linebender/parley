@@ -585,7 +585,7 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
         for line in &self.lines.lines {
             width = width.max(line.metrics.advance - line.metrics.trailing_whitespace);
             full_width = full_width.max(line.metrics.advance);
-            height += line.metrics.size();
+            height = height.max(line.metrics.max_coord);
         }
 
         // Save the computed widths/height to the layout

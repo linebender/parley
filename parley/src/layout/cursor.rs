@@ -70,8 +70,10 @@ impl Cursor {
         let (line_index, run_index) = *layout_access.run_paths_by_access_id.get(&pos.node)?;
         let line = layout.get(line_index)?;
         let run = line.run(run_index)?;
-        let cluster = run.get(pos.character_index)?;
-        let index = cluster.text_range().start;
+        let index = run
+            .get(pos.character_index)
+            .map(|cluster| cluster.text_range().start)
+            .unwrap_or(layout.data.text_len);
         Some(Self {
             index,
             affinity: Affinity::Downstream,
@@ -324,10 +326,19 @@ impl Cursor {
         layout: &Layout<B>,
         layout_access: &LayoutAccessibility,
     ) -> Option<TextPosition> {
-        let path = self.downstream_cluster(layout)?.path;
+        // Prefer the downstream cluster except at the end of the text
+        // where we'll choose the upstream cluster and add 1 to the
+        // character index.
+        let (offset, path) = self
+            .downstream_cluster(layout)
+            .map(|cluster| (0, cluster.path))
+            .or_else(|| {
+                self.upstream_cluster(layout)
+                    .map(|cluster| (1, cluster.path))
+            })?;
         let run_path = (path.line_index(), path.run_index());
         let id = layout_access.access_ids_by_run_path.get(&run_path)?;
-        let character_index = path.logical_index();
+        let character_index = path.logical_index() + offset;
         Some(TextPosition {
             node: *id,
             character_index,

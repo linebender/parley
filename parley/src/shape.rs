@@ -43,7 +43,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
 ) {
     // If we have both empty text and no inline boxes, shape with a fake space
     // to generate metrics that can be used to size a cursor.
-    if text.is_empty() && !inline_boxes.is_empty() {
+    if text.is_empty() && inline_boxes.is_empty() {
         text = " ";
     }
     // Do nothing if there is no text or styles (there should always be a default style)
