@@ -5,8 +5,10 @@ use crate::tests::utils::renderer::render_layout;
 use crate::{
     FontContext, FontFamily, FontStack, Layout, LayoutContext, RangedBuilder, StyleProperty,
 };
+use fontique::{Collection, CollectionOptions};
 use peniko::Color;
 use std::path::{Path, PathBuf};
+use tiny_skia::Pixmap;
 
 // Creates a new instance of TestEnv and put current function name in constructor
 #[macro_export]
@@ -58,31 +60,6 @@ pub(crate) struct TestEnv {
     errors: Vec<(PathBuf, String)>,
 }
 
-use fontique::{Collection, CollectionOptions};
-use std::sync::Once;
-use tiny_skia::Pixmap;
-
-static INIT: Once = Once::new();
-
-/// Initialize tests
-/// Removes all images from directory with the current test images
-pub(crate) fn initialize_tests() {
-    INIT.call_once(|| {
-        let entries = std::fs::read_dir(current_imgs_dir()).unwrap();
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path
-                .extension()
-                .and_then(|ext| ext.to_str())
-                .map(|ext| ext == "png")
-                .unwrap_or(false)
-            {
-                std::fs::remove_file(&path).unwrap();
-            }
-        }
-    });
-}
-
 fn is_accept_mode() -> bool {
     std::env::var("PARLEY_TEST")
         .map(|x| x.to_ascii_lowercase() == "accept")
@@ -113,7 +90,20 @@ pub(crate) fn load_fonts_dir(collection: &mut Collection, path: &Path) -> std::i
 
 impl TestEnv {
     pub(crate) fn new(test_name: &str) -> Self {
-        initialize_tests();
+        let file_prefix = format!("{}-", test_name);
+        let entries = std::fs::read_dir(current_imgs_dir()).unwrap();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.starts_with(&file_prefix) && name.ends_with(".png"))
+                .unwrap_or(false)
+            {
+                std::fs::remove_file(&path).unwrap();
+            }
+        }
+
         let mut collection = Collection::new(CollectionOptions {
             shared: false,
             system_fonts: false,
@@ -208,7 +198,6 @@ impl TestEnv {
 }
 
 impl Drop for TestEnv {
-
     // Dropping of TestEnv cause panic (if there is not already one)
     // We do not panic immediately when error is detected because we want to
     // generate all images in the test and do visual confirmation of the whole
