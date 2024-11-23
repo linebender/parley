@@ -208,8 +208,13 @@ impl TestEnv {
 }
 
 impl Drop for TestEnv {
+
+    // Dropping of TestEnv cause panic (if there is not already one)
+    // We do not panic immediately when error is detected because we want to
+    // generate all images in the test and do visual confirmation of the whole
+    // set and not stop at the first error.
     fn drop(&mut self) {
-        if !self.errors.is_empty() {
+        if !self.errors.is_empty() && !std::thread::panicking() {
             use std::fmt::Write;
             let mut panic_msg = String::new();
             for (path, msg) in &self.errors {
