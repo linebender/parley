@@ -4,7 +4,7 @@
 use crate::{testenv, Alignment, InlineBox};
 
 #[test]
-fn test_plain_multiline_text() {
+fn plain_multiline_text() {
     let mut env = testenv!();
 
     let text = "Hello world!\nLine 2\nLine 4";
@@ -17,7 +17,7 @@ fn test_plain_multiline_text() {
 }
 
 #[test]
-fn test_placing_inboxes() {
+fn placing_inboxes() {
     let mut env = testenv!();
 
     for position in [0, 3, 12, 13] {
