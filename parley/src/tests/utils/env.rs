@@ -136,10 +136,17 @@ impl TestEnv {
         builder
     }
 
-    fn image_name(&mut self) -> String {
-        let name = format!("{}-{}.png", self.test_name, self.check_counter);
-        self.check_counter += 1;
-        name
+    fn image_name(&mut self, test_case_name: &str) -> String {
+        if test_case_name.is_empty() {
+            let name = format!("{}-{}.png", self.test_name, self.check_counter);
+            self.check_counter += 1;
+            name
+        } else {
+            assert!(test_case_name
+                .chars()
+                .all(|c| c == '_' || char::is_alphanumeric(c)));
+            format!("{}-{}.png", self.test_name, test_case_name)
+        }
     }
 
     fn check_images(&self, current_img: &Pixmap, snapshot_path: &Path) -> Result<(), String> {
@@ -179,9 +186,13 @@ impl TestEnv {
         Ok(())
     }
 
-    pub(crate) fn check(&mut self, layout: &Layout<Color>) {
+    pub(crate) fn check_snapshot_with_name(
+        &mut self,
+        test_case_name: &str,
+        layout: &Layout<Color>,
+    ) {
         let current_img = render_layout(layout, self.background_color, self.foreground_color);
-        let image_name = self.image_name();
+        let image_name = self.image_name(test_case_name);
 
         let snapshot_path = snapshot_dir().join(&image_name);
         let comparison_path = current_imgs_dir().join(&image_name);
@@ -194,6 +205,10 @@ impl TestEnv {
                 self.errors.push((comparison_path, e));
             }
         }
+    }
+
+    pub(crate) fn check_snapshot(&mut self, layout: &Layout<Color>) {
+        self.check_snapshot_with_name("", layout);
     }
 }
 
