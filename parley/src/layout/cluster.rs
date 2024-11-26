@@ -141,6 +141,11 @@ impl<'a, B: Brush> Cluster<'a, B> {
         self.data.info.whitespace().is_space_or_nbsp()
     }
 
+    /// Returns `true` if the cluster is an emoji sequence.
+    pub fn is_emoji(&self) -> bool {
+        self.data.info.is_emoji()
+    }
+
     /// Returns an iterator over the glyphs in the cluster.
     pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + 'a + Clone {
         if self.data.glyph_len == 0xFF {
@@ -179,33 +184,6 @@ impl<'a, B: Brush> Cluster<'a, B> {
         } else {
             None
         }
-    }
-
-    /// If this cluster, combined with the given affinity, sits on a
-    /// directional boundary, returns the cluster that represents the alternate
-    /// insertion position.
-    ///
-    /// For example, if this cluster is a left-to-right cluster, then this
-    /// will return the cluster that represents the position where a
-    /// right-to-left character would be inserted, and vice versa.
-    pub fn bidi_link(&self, affinity: Affinity) -> Option<Self> {
-        let run_end = self.run.len().checked_sub(1)?;
-        let visual_index = self.run.logical_to_visual(self.path.logical_index())?;
-        let is_rtl = self.is_rtl();
-        let is_leading = affinity.is_visually_leading(is_rtl);
-        let at_start = visual_index == 0 && is_leading;
-        let at_end = visual_index == run_end && !is_leading;
-        let other = if (at_start && !is_rtl) || (at_end && is_rtl) {
-            self.previous_logical()?
-        } else if (at_end && !is_rtl) || (at_start && is_rtl) {
-            self.next_logical()?
-        } else {
-            return None;
-        };
-        if other.is_rtl() == is_rtl {
-            return None;
-        }
-        Some(other)
     }
 
     /// Returns the cluster that follows this one in logical order.
@@ -394,10 +372,12 @@ impl<'a, B: Brush> Cluster<'a, B> {
 /// Determines how a cursor attaches to a cluster.
 #[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
 pub enum Affinity {
-    /// Left side for LTR clusters and right side for RTL clusters.
+    /// Cursor is attached to the character that is logically following in the
+    /// text stream.
     #[default]
     Downstream = 0,
-    /// Right side for LTR clusters and left side for RTL clusters.
+    /// Cursor is attached to the character that is logically preceding in the
+    /// text stream.
     Upstream = 1,
 }
 
@@ -406,14 +386,6 @@ impl Affinity {
         match self {
             Self::Downstream => Self::Upstream,
             Self::Upstream => Self::Downstream,
-        }
-    }
-
-    /// Returns true if the cursor should be placed on the leading edge.
-    pub(crate) fn is_visually_leading(&self, is_rtl: bool) -> bool {
-        match (*self, is_rtl) {
-            (Self::Upstream, true) | (Self::Downstream, false) => true,
-            (Self::Upstream, false) | (Self::Downstream, true) => false,
         }
     }
 }

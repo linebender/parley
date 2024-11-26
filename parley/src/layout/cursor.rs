@@ -101,6 +101,40 @@ impl Cursor {
         self.affinity
     }
 
+    /// Returns a new cursor that is positioned at the previous cluster boundary
+    /// in visual order.    
+    pub fn previous_visual<B: Brush>(&self, layout: &Layout<B>) -> Self {
+        let [left, right] = self.visual_clusters(layout);
+        if let (Some(left), Some(right)) = (&left, &right) {
+            if left.is_soft_line_break() {
+                if left.is_rtl() && self.affinity == Affinity::Upstream {
+                    let index = if right.is_rtl() {
+                        left.text_range().start
+                    } else {
+                        left.text_range().end
+                    };
+                    return Self::from_byte_index(layout, index, Affinity::Downstream);
+                } else if !left.is_rtl() && self.affinity == Affinity::Downstream {
+                    let index = if right.is_rtl() {
+                        right.text_range().end
+                    } else {
+                        right.text_range().start
+                    };
+                    return Self::from_byte_index(layout, index, Affinity::Upstream);
+                }
+            }
+        }
+        if let Some(left) = left {
+            let index = if left.is_rtl() {
+                left.text_range().end
+            } else {
+                left.text_range().start
+            };
+            return Self::from_byte_index(layout, index, affinity_for_dir(left.is_rtl(), false));
+        }
+        *self
+    }
+
     /// Returns a new cursor that is positioned at the next cluster boundary
     /// in visual order.    
     pub fn next_visual<B: Brush>(&self, layout: &Layout<B>) -> Self {
@@ -141,88 +175,61 @@ impl Cursor {
         *self
     }
 
-    /// Returns a new cursor that is positioned at the previous cluster boundary
-    /// in visual order.    
-    pub fn previous_visual<B: Brush>(&self, layout: &Layout<B>) -> Self {
-        let [left, right] = self.visual_clusters(layout);
-        if let (Some(left), Some(right)) = (&left, &right) {
-            if left.is_soft_line_break() {
-                if left.is_rtl() && self.affinity == Affinity::Upstream {
-                    let index = if right.is_rtl() {
-                        left.text_range().start
-                    } else {
-                        left.text_range().end
-                    };
-                    return Self::from_byte_index(layout, index, Affinity::Downstream);
-                } else if !left.is_rtl() && self.affinity == Affinity::Downstream {
-                    let index = if right.is_rtl() {
-                        right.text_range().end
-                    } else {
-                        right.text_range().start
-                    };
-                    return Self::from_byte_index(layout, index, Affinity::Upstream);
-                }
-            }
-        }
-        if let Some(left) = left {
-            let index = if left.is_rtl() {
-                left.text_range().end
-            } else {
-                left.text_range().start
-            };
-            return Self::from_byte_index(layout, index, affinity_for_dir(left.is_rtl(), false));
-        }
-        *self
-    }
-
     /// Returns a new cursor that is positioned at the next word boundary
     /// in visual order.
     pub fn next_visual_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
-        let [left, right] = self.visual_clusters(layout);
-        if let Some(mut cluster) = right.or(left) {
-            let start = cluster.clone();
-            while let Some(word) = cluster.next_visual_word() {
-                cluster = word;
-                if !cluster.is_space_or_nbsp() {
+        let mut cur = *self;
+        loop {
+            let next = cur.next_visual(layout);
+            if next == cur {
+                break;
+            }
+            cur = next;
+            let [Some(left), Some(right)] = cur.visual_clusters(layout) else {
+                break;
+            };
+            if left.is_rtl() {
+                if left.is_word_boundary() && right.is_word_boundary() {
                     break;
                 }
+            } else if right.is_word_boundary() && !left.is_space_or_nbsp() {
+                break;
             }
-            if cluster.path == start.path {
-                return Self::from_byte_index(layout, usize::MAX, Affinity::Downstream);
-            }
-            return Self::from_cluster(layout, cluster, true);
         }
-        *self
+        cur
     }
 
-    /// Returns a new cursor that is positioned at the previous word boundary
+    /// Returns a new cursor that is (positioned at. the previous word boundary
     /// in visual order.
     pub fn previous_visual_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
-        let [left, right] = self.visual_clusters(layout);
-        if let Some(mut cluster) = left.or(right) {
-            while let Some(word) = cluster.previous_visual_word() {
-                cluster = word;
-                if !cluster.is_space_or_nbsp() {
+        let mut cur = *self;
+        loop {
+            let next = cur.previous_visual(layout);
+            if next == cur {
+                break;
+            }
+            cur = next;
+            let [Some(left), Some(right)] = cur.visual_clusters(layout) else {
+                break;
+            };
+            if left.is_rtl() {
+                if left.is_word_boundary() && !right.is_word_boundary() {
                     break;
                 }
+            } else if right.is_word_boundary() && !right.is_space_or_nbsp() {
+                break;
             }
-            return Self::from_cluster(layout, cluster, false);
         }
-        *self
+        cur
     }
 
     /// Returns a new cursor that is positioned at the next word boundary
     /// in logical order.
     pub fn next_logical_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
         let [left, right] = self.logical_clusters(layout);
-        if let Some(mut cluster) = right.or(left) {
+        if let Some(cluster) = right.or(left) {
             let start = cluster.clone();
-            while let Some(next_word) = cluster.next_logical_word() {
-                cluster = next_word;
-                if !cluster.is_space_or_nbsp() {
-                    break;
-                }
-            }
+            let cluster = cluster.next_logical_word().unwrap_or(cluster);
             if cluster.path == start.path {
                 return Self::from_byte_index(layout, usize::MAX, Affinity::Downstream);
             }
@@ -235,14 +242,9 @@ impl Cursor {
     /// in logical order.
     pub fn previous_logical_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
         let [left, right] = self.logical_clusters(layout);
-        if let Some(mut cluster) = left.or(right) {
-            while let Some(next_word) = cluster.previous_logical_word() {
-                cluster = next_word;
-                if !cluster.is_space_or_nbsp() {
-                    break;
-                }
-            }
-            return Self::from_cluster(layout, cluster, false);
+        if let Some(cluster) = left.or(right) {
+            let cluster = cluster.previous_logical_word().unwrap_or(cluster);
+            return Self::from_cluster(layout, cluster, true);
         }
         *self
     }
@@ -303,35 +305,37 @@ impl Cursor {
         &self,
         layout: &'a Layout<B>,
     ) -> [Option<Cluster<'a, B>>; 2] {
-        let mut clusters = [None, None];
         if self.affinity == Affinity::Upstream {
             if let Some(cluster) = self.upstream_cluster(layout) {
                 if cluster.is_rtl() {
-                    clusters = [cluster.previous_visual(), Some(cluster)];
+                    [cluster.previous_visual(), Some(cluster)]
                 } else {
-                    clusters = [Some(cluster.clone()), cluster.next_visual()];
+                    [Some(cluster.clone()), cluster.next_visual()]
                 }
             } else if let Some(cluster) = self.downstream_cluster(layout) {
                 if cluster.is_rtl() {
-                    clusters = [None, Some(cluster)];
+                    [None, Some(cluster)]
                 } else {
-                    clusters = [Some(cluster), None];
+                    [Some(cluster), None]
                 }
+            } else {
+                [None, None]
             }
         } else if let Some(cluster) = self.downstream_cluster(layout) {
             if cluster.is_rtl() {
-                clusters = [Some(cluster.clone()), cluster.next_visual()];
+                [Some(cluster.clone()), cluster.next_visual()]
             } else {
-                clusters = [cluster.previous_visual(), Some(cluster)];
+                [cluster.previous_visual(), Some(cluster)]
             }
         } else if let Some(cluster) = self.upstream_cluster(layout) {
             if cluster.is_rtl() {
-                clusters = [None, Some(cluster)];
+                [None, Some(cluster)]
             } else {
-                clusters = [Some(cluster), None];
+                [Some(cluster), None]
             }
+        } else {
+            [None, None]
         }
-        clusters
     }
 
     fn line<B: Brush>(self, layout: &Layout<B>) -> Option<(usize, Line<'_, B>)> {
@@ -376,10 +380,11 @@ impl Cursor {
 }
 
 /// Defines a range within a text layout.
-#[derive(Copy, Clone, PartialEq, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct Selection {
     anchor: Cursor,
     focus: Cursor,
+    anchor_base: AnchorBase,
     h_pos: Option<f32>,
 }
 
@@ -389,6 +394,7 @@ impl Selection {
         Self {
             anchor,
             focus,
+            anchor_base: Default::default(),
             h_pos: None,
         }
     }
@@ -406,22 +412,35 @@ impl Selection {
 
     /// Creates a new selection bounding the word at the given coordinates.
     pub fn word_from_point<B: Brush>(layout: &Layout<B>, x: f32, y: f32) -> Self {
-        let [left, right] = Cursor::from_point(layout, x, y).logical_clusters(layout);
-        if let Some(mut cluster) = left.or(right) {
+        if let Some((mut cluster, _)) = Cluster::from_point(layout, x, y) {
             if !cluster.is_word_boundary() {
                 if let Some(prev) = cluster.previous_logical_word() {
                     cluster = prev;
                 }
             }
-            let anchor = Cursor::from_cluster(layout, cluster, false);
+            let anchor = Cursor::from_cluster(layout, cluster.clone(), !cluster.is_rtl());
             let focus = anchor.next_logical_word(layout);
             Self {
                 anchor,
                 focus,
+                anchor_base: AnchorBase::Word(anchor, focus),
                 h_pos: None,
             }
         } else {
             Self::default()
+        }
+    }
+
+    /// Creates a new selection bounding the line at the given coordinates.
+    pub fn line_from_point<B: Brush>(layout: &Layout<B>, x: f32, y: f32) -> Self {
+        let Selection { anchor, focus, .. } = Self::from_point(layout, x, y)
+            .line_start(layout, false)
+            .line_end(layout, true);
+        Self {
+            anchor,
+            focus,
+            anchor_base: AnchorBase::Line(anchor, focus),
+            h_pos: None,
         }
     }
 
@@ -433,11 +452,7 @@ impl Selection {
     ) -> Option<Self> {
         let anchor = Cursor::from_access_position(&selection.anchor, layout, layout_access)?;
         let focus = Cursor::from_access_position(&selection.focus, layout, layout_access)?;
-        Some(Self {
-            anchor,
-            focus,
-            h_pos: None,
-        })
+        Some(Self::new(anchor, focus))
     }
 
     /// Returns true if the anchor and focus of the selection are the same.
@@ -467,22 +482,23 @@ impl Selection {
     /// focus.
     #[must_use]
     pub fn collapse(&self) -> Self {
-        Self {
-            anchor: self.focus,
-            focus: self.focus,
-            h_pos: self.h_pos,
-        }
+        Self::new(self.anchor, self.focus)
     }
 
     #[must_use]
-    pub fn refresh<B: Brush>(&self, layout: &Layout<B>) -> Self {
-        let anchor = Cursor::from_byte_index(layout, self.anchor.index, self.anchor.affinity);
-        let focus = Cursor::from_byte_index(layout, self.focus.index, self.focus.affinity);
-        Self {
-            anchor,
-            focus,
-            h_pos: self.h_pos,
-        }
+    pub fn refresh<B: Brush>(&self, _layout: &Layout<B>) -> Self {
+        *self
+        // let anchor = Cursor::from_byte_index(layout, self.anchor.index, self.anchor.affinity);
+        // let focus = Cursor::from_byte_index(layout, self.focus.index, self.focus.affinity);
+        // let anchor_base = match self.anchor_base {
+        //     AnchorBase::Cluster => AnchorBase::Cluster,
+        //     AnchorBase::Word(anchor, focus) => AnchorBase::Word(anchor.ref)
+        // }
+        // Self {
+        //     anchor,
+        //     focus,
+        //     h_pos: self.h_pos,
+        // }
     }
 
     /// Returns the underlying text range of the selection.
@@ -506,13 +522,10 @@ impl Selection {
             } else {
                 self.focus
             };
-            return Self {
-                anchor: new_focus,
-                focus: new_focus,
-                h_pos: None,
-            };
+            new_focus.into()
+        } else {
+            self.maybe_extend(self.focus.next_visual(layout), extend)
         }
-        self.maybe_extend(self.focus.next_visual(layout), extend)
     }
 
     /// Returns a new selection with the focus at the previous cluster in visual
@@ -529,13 +542,10 @@ impl Selection {
             } else {
                 self.focus
             };
-            return Self {
-                anchor: new_focus,
-                focus: new_focus,
-                h_pos: None,
-            };
+            new_focus.into()
+        } else {
+            self.maybe_extend(self.focus.previous_visual(layout), extend)
         }
-        self.maybe_extend(self.focus.previous_visual(layout), extend)
     }
 
     /// Returns a new selection with the focus moved to the next word in visual
@@ -562,7 +572,7 @@ impl Selection {
     /// current horizontal position will be maintained.
     ///
     /// If `extend` is `true` then the current anchor will be retained,
-    /// otherwise the new selection will be collapsed.     
+    /// otherwise the new selection will be collapsed.
     #[must_use]
     pub fn next_line<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
         self.move_lines(layout, 1, extend)
@@ -572,7 +582,7 @@ impl Selection {
     /// current horizontal position will be maintained.
     ///
     /// If `extend` is `true` then the current anchor will be retained,
-    /// otherwise the new selection will be collapsed.     
+    /// otherwise the new selection will be collapsed.
     #[must_use]
     pub fn previous_line<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
         self.move_lines(layout, -1, extend)
@@ -586,7 +596,7 @@ impl Selection {
     /// toward next lines.
     ///
     /// If `extend` is `true` then the current anchor will be retained,
-    /// otherwise the new selection will be collapsed.  
+    /// otherwise the new selection will be collapsed.
     #[must_use]
     pub fn move_lines<B: Brush>(&self, layout: &Layout<B>, delta: isize, extend: bool) -> Self {
         if delta == 0 {
@@ -627,12 +637,14 @@ impl Selection {
                 anchor: self.anchor,
                 focus: new_focus,
                 h_pos,
+                ..Default::default()
             }
         } else {
             Self {
                 anchor: new_focus,
                 focus: new_focus,
                 h_pos,
+                ..Default::default()
             }
         }
     }
@@ -678,11 +690,30 @@ impl Selection {
     /// Returns a new selection with the focus extended to the given point.
     #[must_use]
     pub fn extend_to_point<B: Brush>(&self, layout: &Layout<B>, x: f32, y: f32) -> Self {
-        let focus = Cursor::from_point(layout, x, y);
-        Self {
-            anchor: self.anchor,
-            focus,
-            h_pos: None,
+        match self.anchor_base {
+            AnchorBase::Cluster => Self::new(self.anchor, Cursor::from_point(layout, x, y)),
+            AnchorBase::Word(start, end) => {
+                let target = Self::word_from_point(layout, x, y);
+                let [anchor, focus] =
+                    cursor_min_max(layout, [target.anchor, target.focus, start, end]);
+                Self {
+                    anchor,
+                    focus,
+                    anchor_base: self.anchor_base,
+                    h_pos: None,
+                }
+            }
+            AnchorBase::Line(start, end) => {
+                let target = Self::line_from_point(layout, x, y);
+                let [anchor, focus] =
+                    cursor_min_max(layout, [target.anchor, target.focus, start, end]);
+                Self {
+                    anchor,
+                    focus,
+                    anchor_base: self.anchor_base,
+                    h_pos: None,
+                }
+            }
         }
     }
 
@@ -705,7 +736,7 @@ impl Selection {
         // Ensure we add some visual indicator for selected empty
         // lines.
         // Make this configurable?
-        const MIN_RECT_WIDTH: f64 = 4.0;
+        const MIN_RECT_WIDTH: f64 = 8.0;
         if self.is_collapsed() {
             return;
         }
@@ -715,10 +746,11 @@ impl Selection {
             core::mem::swap(&mut start, &mut end);
         }
         let text_range = start.index..end.index;
-        // let line_start_ix = start.path.line_index();
-        // let line_end_ix = end.path.line_index();
-        let line_start_ix = 0;
-        let line_end_ix = layout.len() + 1;
+        let line_start_ix = start.line(layout).map(|(ix, _)| ix).unwrap_or(0);
+        let line_end_ix = end
+            .line(layout)
+            .map(|(ix, _)| ix)
+            .unwrap_or(layout.len() + 1);
         for line_ix in line_start_ix..=line_end_ix {
             let Some(line) = layout.get(line_ix) else {
                 continue;
@@ -726,45 +758,43 @@ impl Selection {
             let metrics = line.metrics();
             let line_min = metrics.min_coord as f64;
             let line_max = metrics.max_coord as f64;
-            //if line_ix == line_start_ix || line_ix == line_end_ix {
-            // We only need to run the expensive logic on the first and
-            // last lines
-            let mut start_x = metrics.offset as f64;
-            let mut cur_x = start_x;
-            for run in line.runs() {
-                for cluster in run.visual_clusters() {
-                    let advance = cluster.advance() as f64;
-                    if text_range.contains(&cluster.text_range().start) {
-                        cur_x += advance;
-                    } else {
-                        if cur_x != start_x {
-                            let width = (cur_x - start_x).max(MIN_RECT_WIDTH);
-                            f(Rect::new(start_x as _, line_min, start_x + width, line_max));
+            if line_ix == line_start_ix || line_ix == line_end_ix {
+                // We only need to run the expensive logic on the first and
+                // last lines
+                let mut start_x = metrics.offset as f64;
+                let mut cur_x = start_x;
+                let mut cluster_count = 0;
+                for run in line.runs() {
+                    for cluster in run.visual_clusters() {
+                        let advance = cluster.advance() as f64;
+                        if text_range.contains(&cluster.text_range().start) {
+                            cluster_count += 1;
+                            cur_x += advance;
+                        } else {
+                            if cur_x != start_x {
+                                let width = (cur_x - start_x).max(MIN_RECT_WIDTH);
+                                f(Rect::new(start_x as _, line_min, start_x + width, line_max));
+                            }
+                            cur_x += advance;
+                            start_x = cur_x;
                         }
-                        cur_x += advance;
-                        start_x = cur_x;
                     }
                 }
+                if cur_x != start_x || (cluster_count != 0 && line.metrics().advance == 0.0) {
+                    let width = (cur_x - start_x).max(MIN_RECT_WIDTH);
+                    f(Rect::new(start_x, line_min, start_x + width, line_max));
+                }
+            } else {
+                let x = metrics.offset as f64;
+                let width = (metrics.advance as f64).max(MIN_RECT_WIDTH);
+                f(Rect::new(x, line_min, x + width, line_max));
             }
-            if cur_x != start_x {
-                let width = (cur_x - start_x).max(MIN_RECT_WIDTH);
-                f(Rect::new(start_x, line_min, start_x + width, line_max));
-            }
-            // } else {
-            //     let x = metrics.offset as f64;
-            //     let width = (metrics.advance as f64).max(MIN_RECT_WIDTH);
-            //     f(Rect::new(x, line_min, x + width, line_max));
-            // }
         }
     }
 
     pub(crate) fn maybe_extend(&self, focus: Cursor, extend: bool) -> Self {
         if extend {
-            Self {
-                anchor: self.anchor,
-                focus,
-                h_pos: None,
-            }
+            Self::new(self.anchor, focus)
         } else {
             focus.into()
         }
@@ -782,10 +812,26 @@ impl Selection {
     }
 }
 
+impl PartialEq for Selection {
+    fn eq(&self, other: &Self) -> bool {
+        self.anchor == other.anchor && self.focus == other.focus
+    }
+}
+
+impl Eq for Selection {}
+
 impl From<Cursor> for Selection {
     fn from(value: Cursor) -> Self {
         Self::new(value, value)
     }
+}
+
+#[derive(Copy, Clone, Default, Debug)]
+enum AnchorBase {
+    #[default]
+    Cluster,
+    Word(Cursor, Cursor),
+    Line(Cursor, Cursor),
 }
 
 fn cursor_rect<B: Brush>(cluster: &Cluster<B>, at_end: bool, size: f32) -> Rect {
@@ -820,4 +866,25 @@ fn affinity_for_dir(is_rtl: bool, moving_right: bool) -> Affinity {
         (true, true) | (false, false) => Affinity::Downstream,
         _ => Affinity::Upstream,
     }
+}
+
+/// Given four cursors, return the left-most and right-most cursors from
+/// the set.
+///
+/// Used for extending word and line selections.
+fn cursor_min_max<B: Brush>(layout: &Layout<B>, cursors: [Cursor; 4]) -> [Cursor; 2] {
+    let cursor_pos = cursors
+        .map(|cursor| (cursor, cursor.geometry(layout, 0.0)))
+        .map(|(cursor, rect)| (cursor, (rect.y0, rect.x0)));
+    let mut min = cursor_pos[0];
+    let mut max = cursor_pos[0];
+    for pos in cursor_pos {
+        if pos.1 < min.1 {
+            min = pos;
+        }
+        if pos.1 > max.1 {
+            max = pos;
+        }
+    }
+    [min.0, max.0]
 }

@@ -16,7 +16,6 @@ use crate::{
 #[cfg(feature = "accesskit")]
 use accesskit::{Node, NodeId, TreeUpdate};
 use alloc::{borrow::ToOwned, string::String, sync::Arc, vec::Vec};
-use swash::text::cluster::Whitespace;
 
 #[derive(Copy, Clone, Debug)]
 pub enum ActiveText<'a> {
@@ -154,12 +153,8 @@ where
                 .map(|cluster| cluster.text_range())
                 .and_then(|range| (!range.is_empty()).then_some(range))
             {
-                let start = range.start;
                 self.editor.buffer.replace_range(range, "");
                 self.update_layout();
-                self.editor.set_selection(
-                    Cursor::from_byte_index(&self.editor.layout, start, Affinity::Upstream).into(),
-                );
             }
         } else {
             self.delete_selection();
@@ -198,9 +193,7 @@ where
             {
                 let range = cluster.text_range();
                 let end = range.end;
-                let start = if cluster.info().whitespace() == Whitespace::Newline
-                    || cluster.info().is_emoji()
-                {
+                let start = if cluster.is_hard_line_break() || cluster.is_emoji() {
                     // For newline sequences and emoji, delete the previous cluster
                     range.start
                 } else {
@@ -446,11 +439,8 @@ where
     /// Select the physical line at the point.
     pub fn select_line_at_point(&mut self, x: f32, y: f32) {
         self.refresh_layout();
-        let focus = Selection::from_point(&self.editor.layout, x, y)
-            .line_start(&self.editor.layout, true)
-            .focus();
-        self.editor
-            .set_selection(Selection::from(focus).line_end(&self.editor.layout, true));
+        let line = Selection::line_from_point(&self.editor.layout, x, y);
+        self.editor.set_selection(line);
     }
 
     /// Move the selection focus point to the cluster boundary closest to point.
@@ -591,9 +581,17 @@ where
             let cluster = focus.visual_clusters(&self.layout);
             let dbg = (
                 cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]),
+                cluster[0]
+                    .as_ref()
+                    .map(|c| if c.is_word_boundary() { " W" } else { "" })
+                    .unwrap_or_default(),
                 focus.index(),
                 focus.affinity(),
                 cluster[1].as_ref().map(|c| &self.buffer[c.text_range()]),
+                cluster[1]
+                    .as_ref()
+                    .map(|c| if c.is_word_boundary() { " W" } else { "" })
+                    .unwrap_or_default(),
             );
             println!(" | visual: {dbg:?}");
         }
