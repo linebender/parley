@@ -106,17 +106,15 @@ impl Editor {
                     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
                     Key::Character(c) if action_mod && matches!(c.as_str(), "c" | "x" | "v") => {
                         use clipboard_rs::{Clipboard, ClipboardContext};
-                        use parley::layout::editor::ActiveText;
-
                         match c.to_lowercase().as_str() {
                             "c" => {
-                                if let ActiveText::Selection(text) = self.editor.active_text() {
+                                if let Some(text) = self.editor.selected_text() {
                                     let cb = ClipboardContext::new().unwrap();
                                     cb.set_text(text.to_owned()).ok();
                                 }
                             }
                             "x" => {
-                                if let ActiveText::Selection(text) = self.editor.active_text() {
+                                if let Some(text) = self.editor.selected_text() {
                                     let cb = ClipboardContext::new().unwrap();
                                     cb.set_text(text.to_owned()).ok();
                                     self.transact(|txn| txn.delete_selection());
@@ -230,8 +228,6 @@ impl Editor {
                     }
                     _ => (),
                 }
-
-                // println!("Active text: {:?}", self.active_text());
             }
             WindowEvent::Touch(Touch {
                 phase, location, ..
@@ -282,8 +278,6 @@ impl Editor {
                             3 => txn.select_line_at_point(cursor_pos.0, cursor_pos.1),
                             _ => txn.move_to_point(cursor_pos.0, cursor_pos.1),
                         });
-
-                        // println!("Active text: {:?}", self.active_text());
                     }
                 }
             }
@@ -295,7 +289,6 @@ impl Editor {
                     self.cursor_reset();
                     let cursor_pos = self.cursor_pos;
                     self.transact(|txn| txn.extend_selection_to_point(cursor_pos.0, cursor_pos.1));
-                    // println!("Active text: {:?}", self.active_text());
                 }
             }
             _ => {}

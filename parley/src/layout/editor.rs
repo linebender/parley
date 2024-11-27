@@ -17,14 +17,6 @@ use crate::{
 use accesskit::{Node, NodeId, TreeUpdate};
 use alloc::{borrow::ToOwned, string::String, sync::Arc, vec::Vec};
 
-#[derive(Copy, Clone, Debug)]
-pub enum ActiveText<'a> {
-    /// The selection is empty and the cursor is a caret; this is the text of the cluster it is on.
-    FocusedCluster(Affinity, &'a str),
-    /// The selection contains this text.
-    Selection(&'a str),
-}
-
 /// Opaque representation of a generation.
 ///
 /// Obtained from [`PlainEditor::generation`].
@@ -567,50 +559,47 @@ where
         {
             self.generation.nudge();
         }
-        #[cfg(feature = "std")]
-        {
-            let focus = new_sel.focus();
-            let cluster = focus.logical_clusters(&self.layout);
-            let dbg = (
-                cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]),
-                focus.index(),
-                focus.affinity(),
-                cluster[1].as_ref().map(|c| &self.buffer[c.text_range()]),
-            );
-            print!("{dbg:?}");
-            let cluster = focus.visual_clusters(&self.layout);
-            let dbg = (
-                cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]),
-                cluster[0]
-                    .as_ref()
-                    .map(|c| if c.is_word_boundary() { " W" } else { "" })
-                    .unwrap_or_default(),
-                focus.index(),
-                focus.affinity(),
-                cluster[1].as_ref().map(|c| &self.buffer[c.text_range()]),
-                cluster[1]
-                    .as_ref()
-                    .map(|c| if c.is_word_boundary() { " W" } else { "" })
-                    .unwrap_or_default(),
-            );
-            println!(" | visual: {dbg:?}");
-        }
+        // Keeping this commented debug code in for now because it's quite
+        // useful when diagnosing selection problems:
+        //----------------------------------------------------------------------
+        // #[cfg(feature = "std")]
+        // {
+        //     let focus = new_sel.focus();
+        //     let cluster = focus.logical_clusters(&self.layout);
+        //     let dbg = (
+        //         cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]),
+        //         focus.index(),
+        //         focus.affinity(),
+        //         cluster[1].as_ref().map(|c| &self.buffer[c.text_range()]),
+        //     );
+        //     print!("{dbg:?}");
+        //     let cluster = focus.visual_clusters(&self.layout);
+        //     let dbg = (
+        //         cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]),
+        //         cluster[0]
+        //             .as_ref()
+        //             .map(|c| if c.is_word_boundary() { " W" } else { "" })
+        //             .unwrap_or_default(),
+        //         focus.index(),
+        //         focus.affinity(),
+        //         cluster[1].as_ref().map(|c| &self.buffer[c.text_range()]),
+        //         cluster[1]
+        //             .as_ref()
+        //             .map(|c| if c.is_word_boundary() { " W" } else { "" })
+        //             .unwrap_or_default(),
+        //     );
+        //     println!(" | visual: {dbg:?}");
+        // }
         self.selection = new_sel;
     }
 
-    /// Get either the contents of the current selection, or the text of the cluster at the caret.
-    pub fn active_text(&self) -> ActiveText {
-        if self.selection.is_collapsed() {
-            // let range = self
-            //     .selection
-            //     .focus()
-            //     .cluster_path()
-            //     .cluster(&self.layout)
-            //     .map(|c| c.text_range())
-            //     .unwrap_or_default();
-            ActiveText::FocusedCluster(self.selection.focus().affinity(), "")
+    /// If the current selection is not collapsed, returns the text content of
+    /// that selection.
+    pub fn selected_text(&self) -> Option<&str> {
+        if !self.selection.is_collapsed() {
+            self.text().get(self.selection.text_range())
         } else {
-            ActiveText::Selection(&self.buffer[self.selection.text_range()])
+            None
         }
     }
 
