@@ -106,17 +106,15 @@ impl Editor {
                     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
                     Key::Character(c) if action_mod && matches!(c.as_str(), "c" | "x" | "v") => {
                         use clipboard_rs::{Clipboard, ClipboardContext};
-                        use parley::layout::editor::ActiveText;
-
                         match c.to_lowercase().as_str() {
                             "c" => {
-                                if let ActiveText::Selection(text) = self.editor.active_text() {
+                                if let Some(text) = self.editor.selected_text() {
                                     let cb = ClipboardContext::new().unwrap();
                                     cb.set_text(text.to_owned()).ok();
                                 }
                             }
                             "x" => {
-                                if let ActiveText::Selection(text) = self.editor.active_text() {
+                                if let Some(text) = self.editor.selected_text() {
                                     let cb = ClipboardContext::new().unwrap();
                                     cb.set_text(text.to_owned()).ok();
                                     self.transact(|txn| txn.delete_selection());
@@ -230,8 +228,6 @@ impl Editor {
                     }
                     _ => (),
                 }
-
-                // println!("Active text: {:?}", self.active_text());
             }
             WindowEvent::Touch(Touch {
                 phase, location, ..
@@ -262,6 +258,7 @@ impl Editor {
             WindowEvent::MouseInput { state, button, .. } => {
                 if button == winit::event::MouseButton::Left {
                     self.pointer_down = state.is_pressed();
+                    self.cursor_reset();
                     if self.pointer_down {
                         let now = Instant::now();
                         if let Some(last) = self.last_click_time.take() {
@@ -281,8 +278,6 @@ impl Editor {
                             3 => txn.select_line_at_point(cursor_pos.0, cursor_pos.1),
                             _ => txn.move_to_point(cursor_pos.0, cursor_pos.1),
                         });
-
-                        // println!("Active text: {:?}", self.active_text());
                     }
                 }
             }
@@ -291,9 +286,9 @@ impl Editor {
                 self.cursor_pos = (position.x as f32 - INSET, position.y as f32 - INSET);
                 // macOS seems to generate a spurious move after selecting word?
                 if self.pointer_down && prev_pos != self.cursor_pos {
+                    self.cursor_reset();
                     let cursor_pos = self.cursor_pos;
                     self.transact(|txn| txn.extend_selection_to_point(cursor_pos.0, cursor_pos.1));
-                    // println!("Active text: {:?}", self.active_text());
                 }
             }
             _ => {}
@@ -324,11 +319,8 @@ impl Editor {
             scene.fill(Fill::NonZero, transform, Color::STEEL_BLUE, None, &rect);
         }
         if self.cursor_visible {
-            if let Some(cursor) = self.editor.selection_strong_geometry(1.5) {
+            if let Some(cursor) = self.editor.cursor_geometry(1.5) {
                 scene.fill(Fill::NonZero, transform, Color::WHITE, None, &cursor);
-            };
-            if let Some(cursor) = self.editor.selection_weak_geometry(1.5) {
-                scene.fill(Fill::NonZero, transform, Color::LIGHT_GRAY, None, &cursor);
             };
         }
         for line in self.editor.lines() {

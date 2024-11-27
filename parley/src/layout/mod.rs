@@ -11,7 +11,6 @@ mod run;
 pub(crate) mod data;
 
 pub mod cursor;
-
 pub mod editor;
 
 use self::alignment::align;
@@ -29,8 +28,8 @@ use hashbrown::{HashMap, HashSet};
 use swash::text::cluster::{Boundary, ClusterInfo};
 use swash::{GlyphId, NormalizedCoord, Synthesis};
 
-pub use cluster::{Affinity, ClusterPath};
-pub use cursor::{Cursor, Selection, VisualMode};
+pub use cluster::{Affinity, ClusterPath, ClusterSide};
+pub use cursor::{Cursor, Selection};
 pub use line::greedy::BreakLines;
 pub use line::{GlyphRun, LineMetrics, PositionedInlineBox, PositionedLayoutItem};
 pub use run::RunMetrics;

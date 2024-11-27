@@ -2,10 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use super::*;
+use swash::text::cluster::Whitespace;
+
+/// Defines the visual side of the cluster for hit testing.
+///
+/// See [`Cluster::from_point`].
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub enum ClusterSide {
+    /// Cluster was hit on the left half.
+    Left,
+    /// Cluster was hit on the right half.
+    Right,
+}
 
 impl<'a, B: Brush> Cluster<'a, B> {
     /// Returns the cluster for the given layout and byte index.
-    pub fn from_index(layout: &'a Layout<B>, byte_index: usize) -> Option<Self> {
+    pub fn from_byte_index(layout: &'a Layout<B>, byte_index: usize) -> Option<Self> {
         let mut path = ClusterPath::default();
         if let Some((line_index, line)) = layout.line_for_byte_index(byte_index) {
             path.line_index = line_index as u32;
@@ -22,11 +34,11 @@ impl<'a, B: Brush> Cluster<'a, B> {
                 }
             }
         }
-        path.cluster(layout)
+        None
     }
 
-    /// Returns the cluster and affinity for the given layout and point.
-    pub fn from_point(layout: &'a Layout<B>, x: f32, y: f32) -> Option<(Self, Affinity)> {
+    /// Returns the cluster and side for the given layout and point.
+    pub fn from_point(layout: &'a Layout<B>, x: f32, y: f32) -> Option<(Self, ClusterSide)> {
         let mut path = ClusterPath::default();
         if let Some((line_index, line)) = layout.line_for_offset(y) {
             path.line_index = line_index as u32;
@@ -52,13 +64,20 @@ impl<'a, B: Brush> Cluster<'a, B> {
                     if x > offset && !is_last_cluster {
                         continue;
                     }
-                    let affinity =
-                        Affinity::new(cluster.is_rtl(), x <= edge + cluster_advance * 0.5);
-                    return Some((path.cluster(layout)?, affinity));
+                    let side = if x <= edge + cluster_advance * 0.5 {
+                        ClusterSide::Left
+                    } else {
+                        ClusterSide::Right
+                    };
+                    return Some((path.cluster(layout)?, side));
                 }
             }
         }
-        Some((path.cluster(layout)?, Affinity::default()))
+        if y <= 0.0 {
+            Some((path.cluster(layout)?, ClusterSide::Left))
+        } else {
+            None
+        }
     }
 
     /// Returns the line that contains the cluster.
@@ -109,17 +128,26 @@ impl<'a, B: Brush> Cluster<'a, B> {
 
     /// Returns `true` if the cluster is a soft line break.
     pub fn is_soft_line_break(&self) -> bool {
-        self.data.info.boundary() == Boundary::Line
+        self.is_end_of_line()
+            && matches!(
+                self.line().data.break_reason,
+                BreakReason::Regular | BreakReason::Emergency
+            )
     }
 
     /// Returns `true` if the cluster is a hard line break.
     pub fn is_hard_line_break(&self) -> bool {
-        self.data.info.boundary() == Boundary::Mandatory
+        self.data.info.whitespace() == Whitespace::Newline
     }
 
     /// Returns `true` if the cluster is a space or no-break space.
     pub fn is_space_or_nbsp(&self) -> bool {
         self.data.info.whitespace().is_space_or_nbsp()
+    }
+
+    /// Returns `true` if the cluster is an emoji sequence.
+    pub fn is_emoji(&self) -> bool {
+        self.data.info.is_emoji()
     }
 
     /// Returns an iterator over the glyphs in the cluster.
@@ -162,33 +190,6 @@ impl<'a, B: Brush> Cluster<'a, B> {
         }
     }
 
-    /// If this cluster, combined with the given affinity, sits on a
-    /// directional boundary, returns the cluster that represents the alternate
-    /// insertion position.
-    ///
-    /// For example, if this cluster is a left-to-right cluster, then this
-    /// will return the cluster that represents the position where a
-    /// right-to-left character would be inserted, and vice versa.
-    pub fn bidi_link(&self, affinity: Affinity) -> Option<Self> {
-        let run_end = self.run.len().checked_sub(1)?;
-        let visual_index = self.run.logical_to_visual(self.path.logical_index())?;
-        let is_rtl = self.is_rtl();
-        let is_leading = affinity.is_visually_leading(is_rtl);
-        let at_start = visual_index == 0 && is_leading;
-        let at_end = visual_index == run_end && !is_leading;
-        let other = if (at_start && !is_rtl) || (at_end && is_rtl) {
-            self.previous_logical()?
-        } else if (at_end && !is_rtl) || (at_start && is_rtl) {
-            self.next_logical()?
-        } else {
-            return None;
-        };
-        if other.is_rtl() == is_rtl {
-            return None;
-        }
-        Some(other)
-    }
-
     /// Returns the cluster that follows this one in logical order.
     pub fn next_logical(&self) -> Option<Self> {
         if self.path.logical_index() + 1 < self.run.cluster_range().len() {
@@ -205,7 +206,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
                 return None;
             }
             // We have to search for the cluster containing our end index
-            Self::from_index(self.run.layout, index)
+            Self::from_byte_index(self.run.layout, index)
         }
     }
 
@@ -220,7 +221,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
             }
             .cluster(self.run.layout)
         } else {
-            Self::from_index(self.run.layout, self.text_range().start.checked_sub(1)?)
+            Self::from_byte_index(self.run.layout, self.text_range().start.checked_sub(1)?)
         }
     }
 
@@ -299,7 +300,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
     }
 
     /// Returns the next cluster that is marked as a word boundary.
-    pub fn next_word(&self) -> Option<Self> {
+    pub fn next_logical_word(&self) -> Option<Self> {
         let mut cluster = self.clone();
         while let Some(next) = cluster.next_logical() {
             if next.is_word_boundary() {
@@ -310,10 +311,34 @@ impl<'a, B: Brush> Cluster<'a, B> {
         None
     }
 
+    /// Returns the next cluster that is marked as a word boundary.
+    pub fn next_visual_word(&self) -> Option<Self> {
+        let mut cluster = self.clone();
+        while let Some(next) = cluster.next_visual() {
+            if next.is_word_boundary() {
+                return Some(next);
+            }
+            cluster = next;
+        }
+        None
+    }
+
     /// Returns the previous cluster that is marked as a word boundary.
-    pub fn previous_word(&self) -> Option<Self> {
+    pub fn previous_logical_word(&self) -> Option<Self> {
         let mut cluster = self.clone();
         while let Some(prev) = cluster.previous_logical() {
+            if prev.is_word_boundary() {
+                return Some(prev);
+            }
+            cluster = prev;
+        }
+        None
+    }
+
+    /// Returns the previous cluster that is marked as a word boundary.
+    pub fn previous_visual_word(&self) -> Option<Self> {
+        let mut cluster = self.clone();
+        while let Some(prev) = cluster.previous_visual() {
             if prev.is_word_boundary() {
                 return Some(prev);
             }
@@ -328,7 +353,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
     /// on the containing line.
     pub fn visual_offset(&self) -> Option<f32> {
         let line = self.path.line(self.run.layout)?;
-        let mut offset = 0.0;
+        let mut offset = line.metrics().offset;
         for run_index in 0..=self.path.run_index() {
             let run = line.run(run_index)?;
             if run_index != self.path.run_index() {
@@ -351,41 +376,21 @@ impl<'a, B: Brush> Cluster<'a, B> {
 /// Determines how a cursor attaches to a cluster.
 #[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
 pub enum Affinity {
-    /// Left side for LTR clusters and right side for RTL clusters.
+    /// Cursor is attached to the character that is logically following in the
+    /// text stream.
     #[default]
     Downstream = 0,
-    /// Right side for LTR clusters and left side for RTL clusters.
+    /// Cursor is attached to the character that is logically preceding in the
+    /// text stream.
     Upstream = 1,
 }
 
 impl Affinity {
-    pub(crate) fn new(is_rtl: bool, is_leading: bool) -> Self {
-        match (is_rtl, is_leading) {
-            // trailing edge of RTL and leading edge of LTR
-            (true, false) | (false, true) => Affinity::Downstream,
-            // leading edge of RTL and trailing edge of LTR
-            (true, true) | (false, false) => Affinity::Upstream,
-        }
-    }
-
     pub fn invert(&self) -> Self {
         match self {
             Self::Downstream => Self::Upstream,
             Self::Upstream => Self::Downstream,
         }
-    }
-
-    /// Returns true if the cursor should be placed on the leading edge.
-    pub fn is_visually_leading(&self, is_rtl: bool) -> bool {
-        match (*self, is_rtl) {
-            (Self::Upstream, true) | (Self::Downstream, false) => true,
-            (Self::Upstream, false) | (Self::Downstream, true) => false,
-        }
-    }
-
-    /// Returns true if the cursor should be placed on the trailing edge.
-    pub fn is_visually_trailing(&self, is_rtl: bool) -> bool {
-        !self.is_visually_leading(is_rtl)
     }
 }
 

@@ -81,7 +81,7 @@ pub(crate) struct RunData {
     pub(crate) advance: f32,
 }
 
-#[derive(Copy, Clone, Default, PartialEq)]
+#[derive(Copy, Clone, Default, PartialEq, Debug)]
 pub enum BreakReason {
     #[default]
     None,
