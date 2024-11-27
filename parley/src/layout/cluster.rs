@@ -73,7 +73,11 @@ impl<'a, B: Brush> Cluster<'a, B> {
                 }
             }
         }
-        Some((path.cluster(layout)?, ClusterSide::Left))
+        if y <= 0.0 {
+            Some((path.cluster(layout)?, ClusterSide::Left))
+        } else {
+            None
+        }
     }
 
     /// Returns the line that contains the cluster.

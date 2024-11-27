@@ -547,6 +547,33 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // any; this should only occur for an empty line following
                     // a newline at the end of a layout
                     line.metrics = metrics;
+                    // If we have no items on this line, it must be the last (empty)
+                    // line in a layout following a newline. Commit an empty run so
+                    // that AccessKit has a node with which to identify the visual
+                    // cursor position
+                    if let Some((index, run)) = self
+                        .layout
+                        .data
+                        .runs
+                        .iter()
+                        .enumerate()
+                        .rfind(|(_, run)| !run.text_range.is_empty())
+                    {
+                        let run_index = self.lines.line_items.len();
+                        let cluster = run.cluster_range.end;
+                        let text = run.text_range.end;
+                        self.lines.line_items.push(LineItemData {
+                            kind: LayoutItemKind::TextRun,
+                            index,
+                            bidi_level: 0,
+                            advance: 0.,
+                            is_whitespace: false,
+                            has_trailing_whitespace: false,
+                            cluster_range: cluster..cluster,
+                            text_range: text..text,
+                        });
+                        line.item_range = run_index..run_index + 1;
+                    }
                 }
             }
 

@@ -11,6 +11,8 @@ use accesskit::TextPosition;
 use alloc::vec::Vec;
 use core::ops::Range;
 use peniko::kurbo::Rect;
+#[cfg(feature = "accesskit")]
+use swash::text::cluster::Whitespace;
 
 /// Defines a position with a text layout.
 #[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
@@ -101,8 +103,16 @@ impl Cursor {
         self.affinity
     }
 
+    /// Returns a new cursor that is guaranteed to be within the bounds of the
+    /// given layout.
+    #[must_use]
+    pub fn refresh<B: Brush>(&self, layout: &Layout<B>) -> Self {
+        Self::from_byte_index(layout, self.index, self.affinity)
+    }
+
     /// Returns a new cursor that is positioned at the previous cluster boundary
-    /// in visual order.    
+    /// in visual order.
+    #[must_use]
     pub fn previous_visual<B: Brush>(&self, layout: &Layout<B>) -> Self {
         let [left, right] = self.visual_clusters(layout);
         if let (Some(left), Some(right)) = (&left, &right) {
@@ -136,7 +146,8 @@ impl Cursor {
     }
 
     /// Returns a new cursor that is positioned at the next cluster boundary
-    /// in visual order.    
+    /// in visual order.
+    #[must_use]
     pub fn next_visual<B: Brush>(&self, layout: &Layout<B>) -> Self {
         let [left, right] = self.visual_clusters(layout);
         if let (Some(left), Some(right)) = (&left, &right) {
@@ -177,6 +188,7 @@ impl Cursor {
 
     /// Returns a new cursor that is positioned at the next word boundary
     /// in visual order.
+    #[must_use]
     pub fn next_visual_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
         let mut cur = *self;
         loop {
@@ -189,7 +201,7 @@ impl Cursor {
                 break;
             };
             if left.is_rtl() {
-                if left.is_word_boundary() && right.is_word_boundary() {
+                if left.is_word_boundary() && !left.is_space_or_nbsp() {
                     break;
                 }
             } else if right.is_word_boundary() && !left.is_space_or_nbsp() {
@@ -201,6 +213,7 @@ impl Cursor {
 
     /// Returns a new cursor that is (positioned at. the previous word boundary
     /// in visual order.
+    #[must_use]
     pub fn previous_visual_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
         let mut cur = *self;
         loop {
@@ -213,7 +226,10 @@ impl Cursor {
                 break;
             };
             if left.is_rtl() {
-                if left.is_word_boundary() && !right.is_word_boundary() {
+                if left.is_word_boundary()
+                    && (left.is_space_or_nbsp()
+                        || (right.is_word_boundary() && !right.is_space_or_nbsp()))
+                {
                     break;
                 }
             } else if right.is_word_boundary() && !right.is_space_or_nbsp() {
@@ -225,6 +241,7 @@ impl Cursor {
 
     /// Returns a new cursor that is positioned at the next word boundary
     /// in logical order.
+    #[must_use]
     pub fn next_logical_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
         let [left, right] = self.logical_clusters(layout);
         if let Some(cluster) = right.or(left) {
@@ -240,6 +257,7 @@ impl Cursor {
 
     /// Returns a new cursor that is positioned at the previous word boundary
     /// in logical order.
+    #[must_use]
     pub fn previous_logical_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
         let [left, right] = self.logical_clusters(layout);
         if let Some(cluster) = left.or(right) {
@@ -369,9 +387,25 @@ impl Cursor {
                 self.upstream_cluster(layout)
                     .map(|cluster| (1, cluster.path))
             })?;
-        let run_path = (path.line_index(), path.run_index());
+        // If we're at the end of the layout and the layout ends with a newline
+        // then make sure we use the "phantom" run at the end so that
+        // AccessKit has correct visual geometry for the cursor.
+        let (run_path, character_index) = if self.index == layout.data.text_len
+            && layout
+                .data
+                .clusters
+                .last()
+                .map(|cluster| cluster.info.whitespace() == Whitespace::Newline)
+                .unwrap_or_default()
+        {
+            ((path.line_index() + 1, 0), 0)
+        } else {
+            (
+                (path.line_index(), path.run_index()),
+                path.logical_index() + offset,
+            )
+        };
         let id = layout_access.access_ids_by_run_path.get(&run_path)?;
-        let character_index = path.logical_index() + offset;
         Some(TextPosition {
             node: *id,
             character_index,
@@ -427,7 +461,7 @@ impl Selection {
                 h_pos: None,
             }
         } else {
-            Self::default()
+            Cursor::from_byte_index(layout, layout.data.text_len, Affinity::Upstream).into()
         }
     }
 
@@ -485,20 +519,28 @@ impl Selection {
         Self::new(self.anchor, self.focus)
     }
 
+    /// Returns a new selection that is guaranteed to be within the bounds of
+    /// the given layout.
     #[must_use]
-    pub fn refresh<B: Brush>(&self, _layout: &Layout<B>) -> Self {
-        *self
-        // let anchor = Cursor::from_byte_index(layout, self.anchor.index, self.anchor.affinity);
-        // let focus = Cursor::from_byte_index(layout, self.focus.index, self.focus.affinity);
-        // let anchor_base = match self.anchor_base {
-        //     AnchorBase::Cluster => AnchorBase::Cluster,
-        //     AnchorBase::Word(anchor, focus) => AnchorBase::Word(anchor.ref)
-        // }
-        // Self {
-        //     anchor,
-        //     focus,
-        //     h_pos: self.h_pos,
-        // }
+    pub fn refresh<B: Brush>(&self, layout: &Layout<B>) -> Self {
+        let anchor = self.anchor.refresh(layout);
+        let focus = self.focus.refresh(layout);
+        let anchor_base = match self.anchor_base {
+            AnchorBase::Cluster => AnchorBase::Cluster,
+            AnchorBase::Word(start, end) => {
+                AnchorBase::Word(start.refresh(layout), end.refresh(layout))
+            }
+            AnchorBase::Line(start, end) => {
+                AnchorBase::Line(start.refresh(layout), end.refresh(layout))
+            }
+        };
+        let h_pos = self.h_pos;
+        Self {
+            anchor,
+            focus,
+            anchor_base,
+            h_pos,
+        }
     }
 
     /// Returns the underlying text range of the selection.
@@ -512,7 +554,8 @@ impl Selection {
     /// order.
     ///
     /// If `extend` is `true` then the current anchor will be retained,
-    /// otherwise the new selection will be collapsed.  
+    /// otherwise the new selection will be collapsed.
+    #[must_use]
     pub fn next_visual<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
         if !self.is_collapsed() && !extend {
             let anchor_geom = self.anchor.geometry(layout, 0.0);
@@ -532,7 +575,8 @@ impl Selection {
     /// order.
     ///
     /// If `extend` is `true` then the current anchor will be retained,
-    /// otherwise the new selection will be collapsed.  
+    /// otherwise the new selection will be collapsed.
+    #[must_use]
     pub fn previous_visual<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
         if !self.is_collapsed() && !extend {
             let anchor_geom = self.anchor.geometry(layout, 0.0);
@@ -688,6 +732,9 @@ impl Selection {
     }
 
     /// Returns a new selection with the focus extended to the given point.
+    ///
+    /// If the initial selection was created from a word or line, then the new
+    /// selection will be extended at the same granularity.
     #[must_use]
     pub fn extend_to_point<B: Brush>(&self, layout: &Layout<B>, x: f32, y: f32) -> Self {
         match self.anchor_base {
@@ -715,6 +762,13 @@ impl Selection {
                 }
             }
         }
+    }
+
+    /// Returns a new selection with the current anchor and the focus set to
+    /// the given value.
+    #[must_use]
+    pub fn extend(&self, focus: Cursor) -> Self {
+        Self::new(self.anchor, focus)
     }
 
     /// Returns a vector containing the rectangles which represent the visual
