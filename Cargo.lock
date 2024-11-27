@@ -1980,6 +1980,7 @@ dependencies = [
  "peniko",
  "skrifa",
  "swash",
+ "tiny-skia",
 ]
 
 [[package]]

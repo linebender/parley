@@ -72,6 +72,13 @@
 //! }
 //! ```
 
+// LINEBENDER LINT SET - lib.rs - v1
+// See https://linebender.org/wiki/canonical-lints/
+// These lints aren't included in Cargo.toml because they
+// shouldn't apply to examples and tests
+#![warn(unused_crate_dependencies)]
+#![warn(clippy::print_stdout, clippy::print_stderr)]
+// END LINEBENDER LINT SET
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(elided_lifetimes_in_paths)]
@@ -110,6 +117,9 @@ mod util;
 
 pub mod layout;
 pub mod style;
+
+#[cfg(test)]
+mod tests;
 
 pub use peniko::kurbo::Rect;
 pub use peniko::Font;
