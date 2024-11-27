@@ -377,6 +377,14 @@ impl Cursor {
         layout: &Layout<B>,
         layout_access: &LayoutAccessibility,
     ) -> Option<TextPosition> {
+        if layout.data.text_len == 0 {
+            // If the text is empty, just return the first node with a
+            // character index of 0.
+            return Some(TextPosition {
+                node: *layout_access.access_ids_by_run_path.get(&(0, 0))?,
+                character_index: 0,
+            });
+        }
         // Prefer the downstream cluster except at the end of the text
         // where we'll choose the upstream cluster and add 1 to the
         // character index.
