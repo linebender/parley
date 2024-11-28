@@ -519,11 +519,7 @@ where
     fn cursor_at(&self, index: usize) -> Cursor {
         // FIXME: `Selection` should make this easier
         if index >= self.buffer.len() {
-            Cursor::from_byte_index(
-                &self.layout,
-                self.buffer.len().saturating_sub(1),
-                Affinity::Upstream,
-            )
+            Cursor::from_byte_index(&self.layout, self.buffer.len(), Affinity::Upstream)
         } else {
             Cursor::from_byte_index(&self.layout, index, Affinity::Downstream)
         }
