@@ -168,7 +168,8 @@ impl<B: Brush> Layout<B> {
     /// given `offset`.
     ///
     /// The offset is specified in the direction orthogonal to line direction.
-    /// For horizontal text, this is a vertical or y offset.
+    /// For horizontal text, this is a vertical or y offset. If the offset is
+    /// on a line boundary, it is considered to be contained by the later line.
     pub(crate) fn line_for_offset(&self, offset: f32) -> Option<(usize, Line<B>)> {
         if offset < 0.0 {
             return Some((0, self.get(0)?));
