@@ -176,7 +176,7 @@ impl<B: Brush> Layout<B> {
         let maybe_line_index = self.data.lines.binary_search_by(|line| {
             if offset < line.metrics.min_coord {
                 Ordering::Greater
-            } else if offset > line.metrics.max_coord {
+            } else if offset >= line.metrics.max_coord {
                 Ordering::Less
             } else {
                 Ordering::Equal
