@@ -85,13 +85,13 @@ impl<'a> FontFamily<'a> {
     }
 }
 
-impl<'a> From<GenericFamily> for FontFamily<'a> {
+impl From<GenericFamily> for FontFamily<'_> {
     fn from(f: GenericFamily) -> Self {
         FontFamily::Generic(f)
     }
 }
 
-impl<'a> From<GenericFamily> for FontStack<'a> {
+impl From<GenericFamily> for FontStack<'_> {
     fn from(f: GenericFamily) -> Self {
         FontStack::Single(f.into())
     }

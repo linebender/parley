@@ -155,7 +155,7 @@ impl<'a, B: Brush> From<FontFamily<'a>> for StyleProperty<'a, B> {
     }
 }
 
-impl<'a, B: Brush> From<GenericFamily> for StyleProperty<'a, B> {
+impl<B: Brush> From<GenericFamily> for StyleProperty<'_, B> {
     fn from(f: GenericFamily) -> Self {
         StyleProperty::FontStack(f.into())
     }
