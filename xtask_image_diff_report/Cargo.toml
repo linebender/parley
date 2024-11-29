@@ -1,0 +1,18 @@
+[package]
+name = "xtask_image_diff_report"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+description = "Create report via image_diff_review"
+keywords = ["test"]
+categories = ["graphics"]
+readme = "README.md"
+
+[dependencies]
+image_diff_review = "0.2"
+
+[lints]
+workspace = true

@@ -1,0 +1,2 @@
+[alias]
+xtask_image_diff_report = "run --package xtask_image_diff_report --"

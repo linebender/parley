@@ -17,4 +17,8 @@ It will update snapshots of the failed tests.
 
 ## Report with diffs
 
-If you want to create a nice report with image diffs, run `make_report.sh`
+If you want to create a report with image diffs use:
+
+```bash
+$ cargo xtask_image_diff_report
+```
