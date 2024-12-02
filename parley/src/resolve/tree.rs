@@ -107,10 +107,8 @@ impl<B: Brush> TreeStyleBuilder<B> {
         };
         let span_text = span_text.as_ref();
 
-        // Nothing to do if there is no uncommitted text
+        // Nothing to do if there is no uncommitted text.
         if span_text.is_empty() {
-            // This is for the case of an inline box. This possibly ought to be made more explicit.
-            self.is_span_first = false;
             return;
         }
 
