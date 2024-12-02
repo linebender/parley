@@ -3,7 +3,7 @@
 
 use accesskit::{Node, TreeUpdate};
 use core::default::Default;
-use parley::layout::PositionedLayoutItem;
+use parley::{layout::PositionedLayoutItem, GenericFamily, StyleProperty};
 use peniko::{kurbo::Affine, Color, Fill};
 use std::time::{Duration, Instant};
 use vello::Scene;
@@ -19,7 +19,6 @@ use crate::access_ids::next_node_id;
 
 pub const INSET: f32 = 32.0;
 
-#[derive(Default)]
 pub struct Editor {
     font_cx: FontContext,
     layout_cx: LayoutContext<Color>,
@@ -35,9 +34,35 @@ pub struct Editor {
 }
 
 impl Editor {
+    pub fn new(text: &str) -> Self {
+        let mut editor = PlainEditor::new(32.0);
+        editor.set_text(text);
+        editor.set_scale(1.0);
+        let styles = editor.edit_styles();
+        styles.insert(StyleProperty::LineHeight(1.2));
+        styles.insert(GenericFamily::SystemUi.into());
+        Self {
+            font_cx: Default::default(),
+            layout_cx: Default::default(),
+            editor,
+            last_click_time: Default::default(),
+            click_count: Default::default(),
+            pointer_down: Default::default(),
+            cursor_pos: Default::default(),
+            cursor_visible: Default::default(),
+            modifiers: Default::default(),
+            start_time: Default::default(),
+            blink_period: Default::default(),
+        }
+    }
+
     pub fn transact(&mut self, callback: impl FnOnce(&mut PlainEditorTxn<'_, Color>)) {
         self.editor
             .transact(&mut self.font_cx, &mut self.layout_cx, callback);
+    }
+
+    pub fn editor(&mut self) -> &mut PlainEditor<Color> {
+        &mut self.editor
     }
 
     pub fn text(&self) -> &str {
@@ -77,7 +102,8 @@ impl Editor {
     pub fn handle_event(&mut self, event: WindowEvent) {
         match event {
             WindowEvent::Resized(size) => {
-                self.transact(|txn| txn.set_width(Some(size.width as f32 - 2f32 * INSET)));
+                self.editor
+                    .set_width(Some(size.width as f32 - 2f32 * INSET));
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = Some(modifiers);
@@ -313,7 +339,7 @@ impl Editor {
     /// Draw into scene.
     ///
     /// Returns drawn `Generation`.
-    pub fn draw(&self, scene: &mut Scene) -> Generation {
+    pub fn draw(&mut self, scene: &mut Scene) -> Generation {
         let transform = Affine::translate((INSET as f64, INSET as f64));
         for rect in self.editor.selection_geometry().iter() {
             scene.fill(Fill::NonZero, transform, Color::STEEL_BLUE, None, &rect);
@@ -323,7 +349,8 @@ impl Editor {
                 scene.fill(Fill::NonZero, transform, Color::WHITE, None, &cursor);
             };
         }
-        for line in self.editor.lines() {
+        let layout = self.editor.layout(&mut self.font_cx, &mut self.layout_cx);
+        for line in layout.lines() {
             for item in line.items() {
                 let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
                     continue;
@@ -370,7 +397,9 @@ impl Editor {
 
     pub fn accessibility(&mut self, update: &mut TreeUpdate, node: &mut Node) {
         self.editor
-            .accessibility(update, node, next_node_id, INSET.into(), INSET.into());
+            .transact(&mut self.font_cx, &mut self.layout_cx, |txn| {
+                txn.accessibility(update, node, next_node_id, INSET.into(), INSET.into());
+            });
     }
 }
 
