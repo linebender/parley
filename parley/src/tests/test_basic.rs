@@ -13,7 +13,7 @@ fn plain_multiline_text() {
     layout.break_all_lines(None);
     layout.align(None, Alignment::Start);
 
-    env.check_snapshot(&layout);
+    env.check_layout_snapshot(&layout);
 }
 
 #[test]
@@ -37,6 +37,6 @@ fn placing_inboxes() {
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
         layout.align(None, Alignment::Start);
-        env.check_snapshot_with_name(test_case_name, &layout);
+        env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }

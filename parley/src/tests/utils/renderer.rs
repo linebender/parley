@@ -23,6 +23,8 @@ pub(crate) fn render_layout(
     layout: &Layout<peniko::Color>,
     background_color: peniko::Color,
     inline_box_color: peniko::Color,
+    cursor_color: peniko::Color,
+    cursor_rect: Option<crate::Rect>,
 ) -> Pixmap {
     let padding = 20;
     let width = layout.width().ceil() as u32;
@@ -35,6 +37,15 @@ pub(crate) fn render_layout(
     img.fill(to_tiny_skia(background_color));
 
     let mut pen = TinySkiaPen::new(img.as_mut());
+
+    if let Some(rect) = cursor_rect {
+        pen.set_origin(
+            rect.x0 as f32 + padding as f32,
+            rect.y0 as f32 + padding as f32,
+        );
+        pen.set_color(to_tiny_skia(cursor_color));
+        pen.fill_rect(rect.width() as f32, rect.height() as f32);
+    }
 
     // Render each glyph run
     for line in layout.lines() {
@@ -158,7 +169,7 @@ impl TinySkiaPen<'_> {
     }
 
     fn fill_rect(&mut self, width: f32, height: f32) {
-        let rect = Rect::from_xywh(self.x, self.y, width, height).unwrap();
+        let rect = Rect::from_xywh(self.x, self.y, width, height).expect("Invalid rect");
         self.pixmap
             .fill_rect(rect, &self.paint, Transform::identity(), None);
     }
