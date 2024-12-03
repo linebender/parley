@@ -1,7 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::tests::utils::renderer::render_layout;
+use crate::tests::utils::renderer::{render_layout, RenderingConfig};
 use crate::{
     FontContext, FontFamily, FontStack, Layout, LayoutContext, PlainEditor, PlainEditorTxn,
     RangedBuilder, Rect, StyleProperty,
@@ -56,13 +56,12 @@ pub(crate) struct TestEnv {
     check_counter: u32,
     font_cx: FontContext,
     layout_cx: LayoutContext<Color>,
-    foreground_color: Color,
-    background_color: Color,
-    cursor_color: Color,
+    text_color: Color,
+    rendering_config: RenderingConfig,
     cursor_size: f32,
     tolerance: f32,
     errors: Vec<(PathBuf, String)>,
-    name: String,
+    next_test_case_name: String,
 }
 
 fn is_accept_mode() -> bool {
@@ -126,18 +125,22 @@ impl TestEnv {
             },
             tolerance: 0.0,
             layout_cx: LayoutContext::new(),
-            foreground_color: Color::rgb8(0, 0, 0),
-            background_color: Color::rgb8(255, 255, 255),
-            cursor_color: Color::rgb8(255, 0, 0),
+            text_color: Color::rgb8(0, 0, 0),
+            rendering_config: RenderingConfig {
+                background_color: Color::rgb8(255, 255, 255),
+                cursor_color: Color::rgb8(255, 0, 0),
+                selection_color: Color::rgb8(196, 196, 0),
+                inline_box_color: Color::rgb8(0, 0, 0),
+            },
             cursor_size: 2.0,
             errors: Vec::new(),
-            name: String::new(),
+            next_test_case_name: String::new(),
         }
     }
 
     fn default_style(&self) -> [StyleProperty<'static, Color>; 2] {
         [
-            StyleProperty::Brush(self.foreground_color),
+            StyleProperty::Brush(self.text_color),
             StyleProperty::FontStack(FontStack::Single(FontFamily::Named(
                 DEFAULT_FONT_NAME.into(),
             ))),
@@ -150,10 +153,6 @@ impl TestEnv {
         for style in default_style {
             builder.push_default(style);
         }
-        builder.push_default(StyleProperty::Brush(self.foreground_color));
-        builder.push_default(StyleProperty::FontStack(FontStack::Single(
-            FontFamily::Named(DEFAULT_FONT_NAME.into()),
-        )));
         builder
     }
 
@@ -226,38 +225,32 @@ impl TestEnv {
     }
 
     pub(crate) fn with_name(&mut self, test_case_name: &str) -> &mut Self {
-        self.name = test_case_name.to_string();
+        self.next_test_case_name = test_case_name.to_string();
         self
     }
 
     pub(crate) fn check_editor_snapshot(&mut self, editor: &PlainEditor<Color>) {
-        let name = std::mem::take(&mut self.name);
-        self._render_and_check_snapshot(
-            &name,
+        self.render_and_check_snapshot(
             editor.layout(),
             editor.cursor_geometry(self.cursor_size),
+            &editor.selection_geometry(),
         );
     }
 
     pub(crate) fn check_layout_snapshot(&mut self, layout: &Layout<Color>) {
-        let name = std::mem::take(&mut self.name);
-        self._render_and_check_snapshot(&name, layout, None);
+        self.render_and_check_snapshot(layout, None, &[]);
     }
 
-    pub(crate) fn _render_and_check_snapshot(
+    fn render_and_check_snapshot(
         &mut self,
-        test_case_name: &str,
         layout: &Layout<Color>,
         cursor_rect: Option<Rect>,
+        selection_rects: &[Rect],
     ) {
-        let current_img = render_layout(
-            layout,
-            self.background_color,
-            self.foreground_color,
-            self.cursor_color,
-            cursor_rect,
-        );
-        let image_name = self.image_name(test_case_name);
+        let test_case_name = std::mem::take(&mut self.next_test_case_name);
+        let current_img =
+            render_layout(&self.rendering_config, layout, cursor_rect, selection_rects);
+        let image_name = self.image_name(&test_case_name);
 
         let snapshot_path = snapshot_dir().join(&image_name);
         let comparison_path = current_imgs_dir().join(&image_name);

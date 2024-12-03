@@ -19,32 +19,58 @@ use tiny_skia::{
     Color as TinySkiaColor, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Rect, Transform,
 };
 
+pub(crate) struct RenderingConfig {
+    pub background_color: peniko::Color,
+    pub inline_box_color: peniko::Color,
+    pub cursor_color: peniko::Color,
+    pub selection_color: peniko::Color,
+}
+
+fn draw_rect(pen: &mut TinySkiaPen, x: f32, y: f32, width: f32, height: f32, color: peniko::Color) {
+    pen.set_origin(x, y);
+    pen.set_color(to_tiny_skia(color));
+    pen.fill_rect(width, height);
+}
+
 pub(crate) fn render_layout(
+    config: &RenderingConfig,
     layout: &Layout<peniko::Color>,
-    background_color: peniko::Color,
-    inline_box_color: peniko::Color,
-    cursor_color: peniko::Color,
     cursor_rect: Option<crate::Rect>,
+    selection_rects: &[crate::Rect],
 ) -> Pixmap {
     let padding = 20;
     let width = layout.width().ceil() as u32;
     let height = layout.height().ceil() as u32;
     let padded_width = width + padding * 2;
     let padded_height = height + padding * 2;
+    let fpadding = padding as f32;
 
     let mut img = Pixmap::new(padded_width, padded_height).unwrap();
 
-    img.fill(to_tiny_skia(background_color));
+    img.fill(to_tiny_skia(config.background_color));
 
     let mut pen = TinySkiaPen::new(img.as_mut());
 
-    if let Some(rect) = cursor_rect {
-        pen.set_origin(
-            rect.x0 as f32 + padding as f32,
-            rect.y0 as f32 + padding as f32,
+    for rect in selection_rects {
+        draw_rect(
+            &mut pen,
+            fpadding + rect.x0 as f32,
+            fpadding + rect.y0 as f32,
+            rect.width() as f32,
+            rect.height() as f32,
+            config.selection_color,
         );
-        pen.set_color(to_tiny_skia(cursor_color));
-        pen.fill_rect(rect.width() as f32, rect.height() as f32);
+    }
+
+    if let Some(rect) = cursor_rect {
+        draw_rect(
+            &mut pen,
+            fpadding + rect.x0 as f32,
+            fpadding + rect.y0 as f32,
+            rect.width() as f32,
+            rect.height() as f32,
+            config.cursor_color,
+        );
     }
 
     // Render each glyph run
@@ -55,9 +81,14 @@ pub(crate) fn render_layout(
                     render_glyph_run(&glyph_run, &mut pen, padding);
                 }
                 PositionedLayoutItem::InlineBox(inline_box) => {
-                    pen.set_origin(inline_box.x + padding as f32, inline_box.y + padding as f32);
-                    pen.set_color(to_tiny_skia(inline_box_color));
-                    pen.fill_rect(inline_box.width, inline_box.height);
+                    draw_rect(
+                        &mut pen,
+                        inline_box.x + fpadding,
+                        inline_box.y + fpadding,
+                        inline_box.width,
+                        inline_box.height,
+                        config.inline_box_color,
+                    );
                 }
             };
         }

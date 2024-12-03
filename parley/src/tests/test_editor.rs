@@ -21,3 +21,13 @@ fn editor_simple_move() {
     env.transact(&mut editor, |e| e.move_up());
     env.check_editor_snapshot(&editor);
 }
+
+#[test]
+fn editor_select_all() {
+    let mut env = testenv!();
+    let mut editor = env.editor("Hi, all!\nNext");
+    env.transact(&mut editor, |e| {
+        e.select_all();
+    });
+    env.check_editor_snapshot(&editor);
+}
