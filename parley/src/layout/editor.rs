@@ -36,15 +36,19 @@ impl Generation {
     }
 }
 
-/// Basic plain text editor with a single default style.
+/// Basic plain text editor with a single style applied to the entire text.
+///
+/// Internally, this is a wrapper around a string buffer and its corresponding [`Layout`],
+/// which is kept up-to-date as needed.
+/// This layout is invalidated by a number.
 #[derive(Clone)]
 pub struct PlainEditor<T>
 where
     T: Brush + Clone + Debug + PartialEq + Default,
 {
-    default_style: StyleSet<T>,
-    buffer: String,
     layout: Layout<T>,
+    buffer: String,
+    default_style: StyleSet<T>,
     #[cfg(feature = "accesskit")]
     layout_access: LayoutAccessibility,
     selection: Selection,
@@ -59,8 +63,8 @@ where
     // Not all operations on `PlainEditor` need to operate on a
     // clean layout, and not all operations trigger a layout.
     layout_dirty: bool,
-    // TODO: We could avoid redoing the full text layout if linebreaking or
-    // alignment were unchanged
+    // TODO: We could avoid redoing the full text layout if only
+    // linebreaking or alignment were changed.
     // linebreak_dirty: bool,
     // alignment_dirty: bool,
     alignment: Alignment,
@@ -71,6 +75,7 @@ impl<T> PlainEditor<T>
 where
     T: Brush,
 {
+    /// Create a new editor, with default font size `font_size`.
     pub fn new(font_size: f32) -> Self {
         Self {
             default_style: StyleSet::new(font_size),
@@ -92,9 +97,11 @@ where
     }
 }
 
-/// The argument passed to the callback of [`PlainEditor::transact`],
-/// on which the caller performs operations.
-pub struct PlainEditorTxn<'a, T>
+/// A short-lived wrapper around [`PlainEditor`].
+///
+/// This can perform operations which require the editor's layout to
+/// be up-to-date by refreshing it as necessary.
+pub struct PlainEditorDriver<'a, T>
 where
     T: Brush + Clone + Debug + PartialEq + Default,
 {
@@ -103,7 +110,7 @@ where
     pub layout_cx: &'a mut LayoutContext<T>,
 }
 
-impl<T> PlainEditorTxn<'_, T>
+impl<T> PlainEditorDriver<'_, T>
 where
     T: Brush + Clone + Debug + PartialEq + Default,
 {
@@ -233,9 +240,9 @@ where
     // --- MARK: IME ---
     /// Set the IME preedit composing text.
     ///
-    /// This starts composing. Composing is reset by calling [`PlainEditorTxn::clear_compose`].
+    /// This starts composing. Composing is reset by calling [`clear_compose`](Self::clear_compose).
     /// While composing, it is a logic error to call anything other than
-    /// [`PlainEditorTxn::set_compose`] or [`PlainEditorTxn::clear_compose`].
+    /// [`Self::set_compose`] or [`Self::clear_compose`].
     ///
     /// The preedit text replaces the current selection if this call starts composing.
     ///
@@ -577,7 +584,7 @@ where
         }
     }
 
-    /// Select a range of byte indices
+    /// Select a range of byte indices.
     ///
     /// No-op if either index is not a char boundary.
     pub fn select_byte_range(&mut self, start: usize, end: usize) {
@@ -593,6 +600,7 @@ where
     }
 
     #[cfg(feature = "accesskit")]
+    /// Select inside the editor based on the selection provided by accesskit.
     pub fn select_from_accesskit(&mut self, selection: &accesskit::TextSelection) {
         debug_assert!(!self.editor.is_composing());
 
@@ -607,6 +615,7 @@ where
     }
 
     #[cfg(feature = "accesskit")]
+    /// Perform an accessibility update.
     pub fn accessibility(
         &mut self,
         update: &mut TreeUpdate,
@@ -621,13 +630,15 @@ where
         Some(())
     }
 
-    // --- MARK: Internal helpers ---
-    fn update_layout(&mut self) {
-        self.editor.update_layout(self.font_cx, self.layout_cx);
-    }
-
+    // --- MARK: Internal helpers---
+    /// Update the layout if needed.
     fn refresh_layout(&mut self) {
         self.editor.refresh_layout(self.font_cx, self.layout_cx);
+    }
+
+    /// Update the layout unconditionally.
+    fn update_layout(&mut self) {
+        self.editor.update_layout(self.font_cx, self.layout_cx);
     }
 }
 
@@ -635,37 +646,178 @@ impl<T> PlainEditor<T>
 where
     T: Brush + Clone + Debug + PartialEq + Default,
 {
-    /// Run a series of [`PlainEditorTxn`] methods.
+    // --- MARK: PlainEditor API ---
+    /// Run a series of [`PlainEditorDriver`] methods.
     ///
-    /// This is a utility shorthand around [`transaction`](Self::transaction);
-    pub fn transact<R>(
+    /// This is a utility shorthand around [`driver`](Self::driver); it
+    /// does not have any different behaviour.
+    pub fn drive<R>(
         &mut self,
         font_cx: &mut FontContext,
         layout_cx: &mut LayoutContext<T>,
-        callback: impl FnOnce(&mut PlainEditorTxn<'_, T>) -> R,
+        callback: impl FnOnce(&mut PlainEditorDriver<'_, T>) -> R,
     ) -> R {
-        let mut txn = self.transaction(font_cx, layout_cx);
-        callback(&mut txn)
+        let mut drv = self.driver(font_cx, layout_cx);
+        callback(&mut drv)
     }
 
-    /// Run a series of [`PlainEditorTxn`] methods, updating the layout
-    /// if necessary.
+    /// Run a series of [`PlainEditorDriver`] methods.
     ///
-    /// This is a utility shorthand to simplify methods which require the editor
-    /// and the provided contexts.
-    pub fn transaction<'txn>(
-        &'txn mut self,
-        font_cx: &'txn mut FontContext,
-        layout_cx: &'txn mut LayoutContext<T>,
-    ) -> PlainEditorTxn<'txn, T> {
-        PlainEditorTxn {
+    /// This type is only used to simplify methods which require both
+    /// the editor and the provided contexts.
+    pub fn driver<'drv>(
+        &'drv mut self,
+        font_cx: &'drv mut FontContext,
+        layout_cx: &'drv mut LayoutContext<T>,
+    ) -> PlainEditorDriver<'drv, T> {
+        PlainEditorDriver {
             editor: self,
             font_cx,
             layout_cx,
         }
     }
 
-    /// Make a cursor at a given byte index
+    /// If the current selection is not collapsed, returns the text content of
+    /// that selection.
+    pub fn selected_text(&self) -> Option<&str> {
+        if !self.selection.is_collapsed() {
+            self.text().get(self.selection.text_range())
+        } else {
+            None
+        }
+    }
+
+    /// Get rectangles representing the selected portions of text.
+    pub fn selection_geometry(&self) -> Vec<Rect> {
+        self.selection.geometry(&self.layout)
+    }
+
+    /// Get a rectangle representing the current caret cursor position.
+    pub fn cursor_geometry(&self, size: f32) -> Option<Rect> {
+        Some(self.selection.focus().geometry(&self.layout, size))
+    }
+
+    /// Borrow the text content of the buffer.
+    pub fn text(&self) -> &str {
+        &self.buffer
+    }
+
+    /// Get the current `Generation` of the layout, to decide whether to draw.
+    ///
+    /// You should store the generation the editor was at when you last drew it, and then redraw
+    /// when the generation is different (`Generation` is [`PartialEq`], so supports the equality `==` operation).
+    pub fn generation(&self) -> Generation {
+        self.generation
+    }
+
+    /// Replace the whole text buffer.
+    pub fn set_text(&mut self, is: &str) {
+        debug_assert!(!self.is_composing());
+
+        self.buffer.clear();
+        self.buffer.push_str(is);
+        self.layout_dirty = true;
+    }
+
+    /// Set the width of the layout.
+    // TODO: If this is infinite, is the width used for alignnment the min width?
+    pub fn set_width(&mut self, width: Option<f32>) {
+        // Don't allow empty widths:
+        // https://github.com/linebender/parley/issues/186
+        self.width = width.map(|width| if width > 10. { width } else { 10. });
+        self.layout_dirty = true;
+    }
+
+    /// Set the alignment of the layout.
+    pub fn set_alignment(&mut self, alignment: Alignment) {
+        self.alignment = alignment;
+        self.layout_dirty = true;
+    }
+
+    /// Set the scale for the layout.
+    pub fn set_scale(&mut self, scale: f32) {
+        self.scale = scale;
+        self.layout_dirty = true;
+    }
+
+    /// Modify the styles provided for this editor.
+    pub fn edit_styles(&mut self) -> &mut StyleSet<T> {
+        self.layout_dirty = true;
+        &mut self.default_style
+    }
+
+    /// Whether the editor is currently in IME composing mode.
+    pub fn is_composing(&self) -> bool {
+        self.compose.is_some()
+    }
+
+    /// Get the full read-only details from the layout, which will be updated if necessary.
+    ///
+    /// If the required contexts are not available, then [`refresh_layout`](Self::refresh_layout) can
+    /// be called in a scope when they are available, and [`try_layout`](Self::try_layout) can
+    /// be used instead.
+    pub fn layout(
+        &mut self,
+        font_cx: &mut FontContext,
+        layout_cx: &mut LayoutContext<T>,
+    ) -> &Layout<T> {
+        self.refresh_layout(font_cx, layout_cx);
+        &self.layout
+    }
+
+    // --- MARK: Raw APIs ---
+    /// Get the full read-only details from the layout, if valid.
+    ///
+    /// Returns `None` if the layout is not up-to-date.
+    /// You can call [`refresh_layout`](Self::refresh_layout) before using this method,
+    /// to ensure that the layout is up-to-date.
+    ///
+    /// The [`layout`](Self::layout) method should generally be preferred.
+    pub fn try_layout(&self) -> Option<&Layout<T>> {
+        if self.layout_dirty {
+            None
+        } else {
+            Some(&self.layout)
+        }
+    }
+
+    #[cfg(feature = "accesskit")]
+    #[inline]
+    /// Perform an accessibility update if the layout is valid.
+    ///
+    /// Returns `None` if the layout is not up-to-date.
+    /// You can call [`refresh_layout`](Self::refresh_layout) before using this method,
+    /// to ensure that the layout is up-to-date.
+    /// The [`accessibility`](PlainEditorDriver::accessibility) method on the driver type
+    /// should be preferred if the contexts are available, which will do this automatically.
+    pub fn try_accessibility(
+        &mut self,
+        update: &mut TreeUpdate,
+        node: &mut Node,
+        next_node_id: impl FnMut() -> NodeId,
+        x_offset: f64,
+        y_offset: f64,
+    ) -> Option<()> {
+        if self.layout_dirty {
+            return None;
+        }
+        self.accessibility_raw(update, node, next_node_id, x_offset, y_offset);
+        Some(())
+    }
+
+    /// Update the layout if it is dirty.
+    ///
+    /// This should only be used alongside [`try_layout`](Self::try_layout)
+    /// or [`try_accessibility`](Self::try_accessibility), if those will be
+    /// called in a scope where the contexts are not available.
+    pub fn refresh_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
+        if self.layout_dirty {
+            self.update_layout(font_cx, layout_cx);
+        }
+    }
+
+    // --- MARK: Internal Helpers ---
+    /// Make a cursor at a given byte index.
     fn cursor_at(&self, index: usize) -> Cursor {
         // TODO: Do we need to be non-dirty?
         // FIXME: `Selection` should make this easier
@@ -709,105 +861,6 @@ where
 
         self.selection = new_sel;
     }
-
-    /// If the current selection is not collapsed, returns the text content of
-    /// that selection.
-    pub fn selected_text(&self) -> Option<&str> {
-        if !self.selection.is_collapsed() {
-            self.text().get(self.selection.text_range())
-        } else {
-            None
-        }
-    }
-
-    /// Get rectangles representing the selected portions of text.
-    pub fn selection_geometry(&self) -> Vec<Rect> {
-        self.selection.geometry(&self.layout)
-    }
-
-    /// Get a rectangle representing the current caret cursor position.
-    pub fn cursor_geometry(&self, size: f32) -> Option<Rect> {
-        Some(self.selection.focus().geometry(&self.layout, size))
-    }
-
-    /// Borrow the text content of the buffer.
-    pub fn text(&self) -> &str {
-        &self.buffer
-    }
-
-    /// Get the current `Generation` of the layout, to decide whether to draw.
-    ///
-    /// You should store the generation the editor was at when you last drew it, and then redraw
-    /// when the generation is different (`Generation` is [`PartialEq`], so supports the equality `==` operation).
-    pub fn generation(&self) -> Generation {
-        self.generation
-    }
-
-    /// Get the full read-only details from the layout
-    pub fn layout(
-        &mut self,
-        font_cx: &mut FontContext,
-        layout_cx: &mut LayoutContext<T>,
-    ) -> &Layout<T> {
-        self.refresh_layout(font_cx, layout_cx);
-        &self.layout
-    }
-
-    /// Get the full read-only details from the layout, if valid.
-    pub fn get_layout(&self) -> Option<&Layout<T>> {
-        if self.layout_dirty {
-            None
-        } else {
-            Some(&self.layout)
-        }
-    }
-
-    /// Get the (potentially invalid) details from the layout.
-    pub fn layout_raw(&self) -> &Layout<T> {
-        &self.layout
-    }
-
-    /// Replace the whole text buffer.
-    pub fn set_text(&mut self, is: &str) {
-        self.buffer.clear();
-        self.buffer.push_str(is);
-        self.layout_dirty = true;
-    }
-
-    /// Set the width of the layout.
-    // TODO: If this is infinite, is the width used for alignnment the min width?
-    pub fn set_width(&mut self, width: Option<f32>) {
-        // Don't allow empty widths:
-        // https://github.com/linebender/parley/issues/186
-        self.width = width.map(|width| if width > 10. { width } else { 10. });
-        self.layout_dirty = true;
-    }
-
-    /// Set the alignment of the layout.
-    pub fn set_alignment(&mut self, alignment: Alignment) {
-        self.alignment = alignment;
-        self.layout_dirty = true;
-    }
-
-    /// Set the scale for the layout.
-    pub fn set_scale(&mut self, scale: f32) {
-        self.scale = scale;
-        self.layout_dirty = true;
-    }
-
-    /// Set the default style for the layout.
-    pub fn edit_styles(&mut self) -> &mut StyleSet<T> {
-        self.layout_dirty = true;
-        &mut self.default_style
-    }
-
-    /// Update the layout if it is dirty.
-    fn refresh_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
-        if self.layout_dirty {
-            self.update_layout(font_cx, layout_cx);
-        }
-    }
-
     /// Update the layout.
     fn update_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
         let mut builder = layout_cx.ranged_builder(font_cx, &self.buffer, self.scale);
@@ -825,34 +878,15 @@ where
         self.generation.nudge();
     }
 
-    /// Whether the editor is currently in IME composing mode.
-    pub fn is_composing(&self) -> bool {
-        self.compose.is_some()
-    }
-
     #[cfg(feature = "accesskit")]
-    #[inline]
-    /// Perform an accessibility update if the layout is valid.
+    /// Perform an accessibility update, assuming that the layout is valid.
     ///
-    /// Returns `None` if the layout is not up-to-date.
-    pub fn try_accessibility(
-        &mut self,
-        update: &mut TreeUpdate,
-        node: &mut Node,
-        next_node_id: impl FnMut() -> NodeId,
-        x_offset: f64,
-        y_offset: f64,
-    ) -> Option<()> {
-        if self.layout_dirty {
-            return None;
-        }
-        self.accessibility_raw(update, node, next_node_id, x_offset, y_offset);
-        Some(())
-    }
-
-    #[cfg(feature = "accesskit")]
-    /// Perform an accessibility update, even if the layout isn't valid.
-    pub fn accessibility_raw(
+    /// The wrapper [`accessibility`](PlainEditorDriver::accessibility) on the driver type should
+    /// be preferred.
+    ///
+    /// You should always call [`refresh_layout`](Self::refresh_layout) before using this method,
+    /// with no other modifying method calls in between.
+    fn accessibility_raw(
         &mut self,
         update: &mut TreeUpdate,
         node: &mut Node,

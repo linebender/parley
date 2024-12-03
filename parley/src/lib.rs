@@ -131,7 +131,7 @@ pub use inline_box::InlineBox;
 #[doc(inline)]
 pub use layout::Layout;
 
-pub use layout::editor::{PlainEditor, PlainEditorTxn};
+pub use layout::editor::{PlainEditor, PlainEditorDriver};
 
 pub use layout::*;
 pub use style::*;

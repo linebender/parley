@@ -11,6 +11,8 @@ type StyleProperty<Brush> = crate::StyleProperty<'static, Brush>;
 ///
 /// This is used by [`PlainEditor`](crate::editor::PlainEditor) to provide a reasonably ergonomic
 /// mutable API for styles applied to all text managed by it.
+/// This can be accessed using [`PlainEditor::edit_styles`](crate::editor::PlainEditor::edit_styles).
+///
 /// These styles do not have a corresponding range, and are generally unsuited for rich text.
 #[derive(Clone, Debug)]
 pub struct StyleSet<Brush: crate::Brush>(

@@ -13,7 +13,7 @@ use winit::{
 };
 
 pub use parley::layout::editor::Generation;
-use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorTxn};
+use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorDriver};
 
 use crate::access_ids::next_node_id;
 
@@ -56,9 +56,9 @@ impl Editor {
         }
     }
 
-    pub fn transact(&mut self, callback: impl FnOnce(&mut PlainEditorTxn<'_, Color>)) {
+    pub fn drive(&mut self, callback: impl FnOnce(&mut PlainEditorDriver<'_, Color>)) {
         self.editor
-            .transact(&mut self.font_cx, &mut self.layout_cx, callback);
+            .drive(&mut self.font_cx, &mut self.layout_cx, callback);
     }
 
     pub fn editor(&mut self) -> &mut PlainEditor<Color> {
@@ -143,114 +143,114 @@ impl Editor {
                                 if let Some(text) = self.editor.selected_text() {
                                     let cb = ClipboardContext::new().unwrap();
                                     cb.set_text(text.to_owned()).ok();
-                                    self.transact(|txn| txn.delete_selection());
+                                    self.drive(|drv| drv.delete_selection());
                                 }
                             }
                             "v" => {
                                 let cb = ClipboardContext::new().unwrap();
                                 let text = cb.get_text().unwrap_or_default();
-                                self.transact(|txn| txn.insert_or_replace_selection(&text));
+                                self.drive(|drv| drv.insert_or_replace_selection(&text));
                             }
                             _ => (),
                         }
                     }
                     Key::Character(c) if action_mod && matches!(c.to_lowercase().as_str(), "a") => {
-                        self.transact(|txn| {
+                        self.drive(|drv| {
                             if shift {
-                                txn.collapse_selection();
+                                drv.collapse_selection();
                             } else {
-                                txn.select_all();
+                                drv.select_all();
                             }
                         });
                     }
-                    Key::Named(NamedKey::ArrowLeft) => self.transact(|txn| {
+                    Key::Named(NamedKey::ArrowLeft) => self.drive(|drv| {
                         if action_mod {
                             if shift {
-                                txn.select_word_left();
+                                drv.select_word_left();
                             } else {
-                                txn.move_word_left();
+                                drv.move_word_left();
                             }
                         } else if shift {
-                            txn.select_left();
+                            drv.select_left();
                         } else {
-                            txn.move_left();
+                            drv.move_left();
                         }
                     }),
-                    Key::Named(NamedKey::ArrowRight) => self.transact(|txn| {
+                    Key::Named(NamedKey::ArrowRight) => self.drive(|drv| {
                         if action_mod {
                             if shift {
-                                txn.select_word_right();
+                                drv.select_word_right();
                             } else {
-                                txn.move_word_right();
+                                drv.move_word_right();
                             }
                         } else if shift {
-                            txn.select_right();
+                            drv.select_right();
                         } else {
-                            txn.move_right();
+                            drv.move_right();
                         }
                     }),
-                    Key::Named(NamedKey::ArrowUp) => self.transact(|txn| {
+                    Key::Named(NamedKey::ArrowUp) => self.drive(|drv| {
                         if shift {
-                            txn.select_up();
+                            drv.select_up();
                         } else {
-                            txn.move_up();
+                            drv.move_up();
                         }
                     }),
-                    Key::Named(NamedKey::ArrowDown) => self.transact(|txn| {
+                    Key::Named(NamedKey::ArrowDown) => self.drive(|drv| {
                         if shift {
-                            txn.select_down();
+                            drv.select_down();
                         } else {
-                            txn.move_down();
+                            drv.move_down();
                         }
                     }),
-                    Key::Named(NamedKey::Home) => self.transact(|txn| {
+                    Key::Named(NamedKey::Home) => self.drive(|drv| {
                         if action_mod {
                             if shift {
-                                txn.select_to_text_start();
+                                drv.select_to_text_start();
                             } else {
-                                txn.move_to_text_start();
+                                drv.move_to_text_start();
                             }
                         } else if shift {
-                            txn.select_to_line_start();
+                            drv.select_to_line_start();
                         } else {
-                            txn.move_to_line_start();
+                            drv.move_to_line_start();
                         }
                     }),
-                    Key::Named(NamedKey::End) => self.transact(|txn| {
+                    Key::Named(NamedKey::End) => self.drive(|drv| {
                         if action_mod {
                             if shift {
-                                txn.select_to_text_end();
+                                drv.select_to_text_end();
                             } else {
-                                txn.move_to_text_end();
+                                drv.move_to_text_end();
                             }
                         } else if shift {
-                            txn.select_to_line_end();
+                            drv.select_to_line_end();
                         } else {
-                            txn.move_to_line_end();
+                            drv.move_to_line_end();
                         }
                     }),
-                    Key::Named(NamedKey::Delete) => self.transact(|txn| {
+                    Key::Named(NamedKey::Delete) => self.drive(|drv| {
                         if action_mod {
-                            txn.delete_word();
+                            drv.delete_word();
                         } else {
-                            txn.delete();
+                            drv.delete();
                         }
                     }),
-                    Key::Named(NamedKey::Backspace) => self.transact(|txn| {
+                    Key::Named(NamedKey::Backspace) => self.drive(|drv| {
                         if action_mod {
-                            txn.backdelete_word();
+                            drv.backdelete_word();
                         } else {
-                            txn.backdelete();
+                            drv.backdelete();
                         }
                     }),
                     Key::Named(NamedKey::Enter) => {
-                        self.transact(|txn| txn.insert_or_replace_selection("\n"));
+                        self.drive(|drv| drv.insert_or_replace_selection("\n"));
                     }
                     Key::Named(NamedKey::Space) => {
-                        self.transact(|txn| txn.insert_or_replace_selection(" "));
+                        self.drive(|drv| drv.insert_or_replace_selection(" "));
                     }
                     Key::Character(s) => {
-                        self.transact(|txn| txn.insert_or_replace_selection(&s));
+                        self.drive(|drv| drv.insert_or_replace_selection(&s));
                     }
                     _ => (),
                 }
@@ -262,17 +262,17 @@ impl Editor {
                 match phase {
                     Started => {
                         // TODO: start a timer to convert to a SelectWordAtPoint
-                        self.transact(|txn| {
-                            txn.move_to_point(location.x as f32 - INSET, location.y as f32 - INSET);
+                        self.drive(|drv| {
+                            drv.move_to_point(location.x as f32 - INSET, location.y as f32 - INSET);
                         });
                     }
                     Cancelled => {
-                        self.transact(|txn| txn.collapse_selection());
+                        self.drive(|drv| drv.collapse_selection());
                     }
                     Moved => {
                         // TODO: cancel SelectWordAtPoint timer
-                        self.transact(|txn| {
-                            txn.extend_selection_to_point(
+                        self.drive(|drv| {
+                            drv.extend_selection_to_point(
                                 location.x as f32 - INSET,
                                 location.y as f32 - INSET,
                             );
@@ -299,10 +299,10 @@ impl Editor {
                         self.last_click_time = Some(now);
                         let click_count = self.click_count;
                         let cursor_pos = self.cursor_pos;
-                        self.transact(|txn| match click_count {
-                            2 => txn.select_word_at_point(cursor_pos.0, cursor_pos.1),
-                            3 => txn.select_line_at_point(cursor_pos.0, cursor_pos.1),
-                            _ => txn.move_to_point(cursor_pos.0, cursor_pos.1),
+                        self.drive(|drv| match click_count {
+                            2 => drv.select_word_at_point(cursor_pos.0, cursor_pos.1),
+                            3 => drv.select_line_at_point(cursor_pos.0, cursor_pos.1),
+                            _ => drv.move_to_point(cursor_pos.0, cursor_pos.1),
                         });
                     }
                 }
@@ -314,7 +314,7 @@ impl Editor {
                 if self.pointer_down && prev_pos != self.cursor_pos {
                     self.cursor_reset();
                     let cursor_pos = self.cursor_pos;
-                    self.transact(|txn| txn.extend_selection_to_point(cursor_pos.0, cursor_pos.1));
+                    self.drive(|drv| drv.extend_selection_to_point(cursor_pos.0, cursor_pos.1));
                 }
             }
             _ => {}
@@ -324,8 +324,8 @@ impl Editor {
     pub fn handle_accesskit_action_request(&mut self, req: &accesskit::ActionRequest) {
         if req.action == accesskit::Action::SetTextSelection {
             if let Some(accesskit::ActionData::SetTextSelection(selection)) = &req.data {
-                self.transact(|txn| {
-                    txn.select_from_accesskit(selection);
+                self.drive(|drv| {
+                    drv.select_from_accesskit(selection);
                 });
             }
         }
@@ -397,8 +397,8 @@ impl Editor {
 
     pub fn accessibility(&mut self, update: &mut TreeUpdate, node: &mut Node) {
         self.editor
-            .transact(&mut self.font_cx, &mut self.layout_cx, |txn| {
-                txn.accessibility(update, node, next_node_id, INSET.into(), INSET.into());
+            .drive(&mut self.font_cx, &mut self.layout_cx, |drv| {
+                drv.accessibility(update, node, next_node_id, INSET.into(), INSET.into());
             });
     }
 }
