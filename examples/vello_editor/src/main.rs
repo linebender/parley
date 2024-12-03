@@ -113,6 +113,7 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
         let access_adapter =
             accesskit_winit::Adapter::with_event_loop_proxy(&window, self.event_loop_proxy.clone());
         window.set_visible(true);
+        window.set_ime_allowed(true);
 
         let size = window.inner_size();
 
@@ -348,7 +349,8 @@ fn main() -> Result<()> {
     event_loop
         .run_app(&mut app)
         .expect("Couldn't run event loop");
-    print!("{}", app.editor.text());
+    let [text1, text2] = app.editor.text();
+    print!("{text1}{text2}");
     Ok(())
 }
 

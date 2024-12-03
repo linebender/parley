@@ -1,7 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Import of Parley's `PlainEditor` as the version in Parley is insufficient for our needs.
+//! A simple plain text editor and related types.
 
 use crate::{
     layout::{
@@ -196,7 +196,7 @@ where
                     // Otherwise, delete the previous character
                     let Some((start, _)) = self
                         .editor
-                        .text()
+                        .buffer
                         .get(..end)
                         .and_then(|str| str.char_indices().next_back())
                     else {
@@ -626,7 +626,7 @@ where
     ) -> Option<()> {
         self.refresh_layout();
         self.editor
-            .accessibility_raw(update, node, next_node_id, x_offset, y_offset);
+            .accessibility_unchecked(update, node, next_node_id, x_offset, y_offset);
         Some(())
     }
 
@@ -680,8 +680,11 @@ where
     /// If the current selection is not collapsed, returns the text content of
     /// that selection.
     pub fn selected_text(&self) -> Option<&str> {
+        if self.is_composing() {
+            return None;
+        }
         if !self.selection.is_collapsed() {
-            self.text().get(self.selection.text_range())
+            self.buffer.get(self.selection.text_range())
         } else {
             None
         }
@@ -698,8 +701,15 @@ where
     }
 
     /// Borrow the text content of the buffer.
-    pub fn text(&self) -> &str {
-        &self.buffer
+    ///
+    /// The return values concatenated is the full text content.
+    /// This split is used when composing.
+    pub fn text(&self) -> [&str; 2] {
+        if let Some(compose) = &self.compose {
+            [&self.buffer[..compose.start], &self.buffer[compose.end..]]
+        } else {
+            [&self.buffer, ""]
+        }
     }
 
     /// Get the current `Generation` of the layout, to decide whether to draw.
@@ -720,11 +730,8 @@ where
     }
 
     /// Set the width of the layout.
-    // TODO: If this is infinite, is the width used for alignnment the min width?
     pub fn set_width(&mut self, width: Option<f32>) {
-        // Don't allow empty widths:
-        // https://github.com/linebender/parley/issues/186
-        self.width = width.map(|width| if width > 10. { width } else { 10. });
+        self.width = width;
         self.layout_dirty = true;
     }
 
@@ -801,7 +808,7 @@ where
         if self.layout_dirty {
             return None;
         }
-        self.accessibility_raw(update, node, next_node_id, x_offset, y_offset);
+        self.accessibility_unchecked(update, node, next_node_id, x_offset, y_offset);
         Some(())
     }
 
@@ -859,6 +866,36 @@ where
             self.generation.nudge();
         }
 
+        // This debug code is quite useful when diagnosing selection problems.
+        #[cfg(feature = "std")]
+        #[allow(clippy::print_stderr)] // reason = "unreachable debug code"
+        if false {
+            let focus = new_sel.focus();
+            let cluster = focus.logical_clusters(&self.layout);
+            let dbg = (
+                cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]),
+                focus.index(),
+                focus.affinity(),
+                cluster[1].as_ref().map(|c| &self.buffer[c.text_range()]),
+            );
+            eprint!("{dbg:?}");
+            let cluster = focus.visual_clusters(&self.layout);
+            let dbg = (
+                cluster[0].as_ref().map(|c| &self.buffer[c.text_range()]),
+                cluster[0]
+                    .as_ref()
+                    .map(|c| if c.is_word_boundary() { " W" } else { "" })
+                    .unwrap_or_default(),
+                focus.index(),
+                focus.affinity(),
+                cluster[1].as_ref().map(|c| &self.buffer[c.text_range()]),
+                cluster[1]
+                    .as_ref()
+                    .map(|c| if c.is_word_boundary() { " W" } else { "" })
+                    .unwrap_or_default(),
+            );
+            eprintln!(" | visual: {dbg:?}");
+        }
         self.selection = new_sel;
     }
     /// Update the layout.
@@ -886,7 +923,7 @@ where
     ///
     /// You should always call [`refresh_layout`](Self::refresh_layout) before using this method,
     /// with no other modifying method calls in between.
-    fn accessibility_raw(
+    fn accessibility_unchecked(
         &mut self,
         update: &mut TreeUpdate,
         node: &mut Node,

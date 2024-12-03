@@ -6,9 +6,12 @@ use core::default::Default;
 use parley::{layout::PositionedLayoutItem, GenericFamily, StyleProperty};
 use peniko::{kurbo::Affine, Color, Fill};
 use std::time::{Duration, Instant};
-use vello::Scene;
+use vello::{
+    kurbo::{Line, Stroke},
+    Scene,
+};
 use winit::{
-    event::{Modifiers, Touch, WindowEvent},
+    event::{Ime, Modifiers, Touch, WindowEvent},
     keyboard::{Key, NamedKey},
 };
 
@@ -41,6 +44,7 @@ impl Editor {
         let styles = editor.edit_styles();
         styles.insert(StyleProperty::LineHeight(1.2));
         styles.insert(GenericFamily::SystemUi.into());
+        styles.insert(StyleProperty::Brush(Color::WHITE));
         Self {
             font_cx: Default::default(),
             layout_cx: Default::default(),
@@ -65,7 +69,7 @@ impl Editor {
         &mut self.editor
     }
 
-    pub fn text(&self) -> &str {
+    pub fn text(&self) -> [&str; 2] {
         self.editor.text()
     }
 
@@ -108,7 +112,7 @@ impl Editor {
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = Some(modifiers);
             }
-            WindowEvent::KeyboardInput { event, .. } => {
+            WindowEvent::KeyboardInput { event, .. } if !self.editor.is_composing() => {
                 if !event.state.is_pressed() {
                     return;
                 }
@@ -257,7 +261,7 @@ impl Editor {
             }
             WindowEvent::Touch(Touch {
                 phase, location, ..
-            }) => {
+            }) if !self.editor.is_composing() => {
                 use winit::event::TouchPhase::*;
                 match phase {
                     Started => {
@@ -285,7 +289,7 @@ impl Editor {
                 if button == winit::event::MouseButton::Left {
                     self.pointer_down = state.is_pressed();
                     self.cursor_reset();
-                    if self.pointer_down {
+                    if self.pointer_down && !self.editor.is_composing() {
                         let now = Instant::now();
                         if let Some(last) = self.last_click_time.take() {
                             if now.duration_since(last).as_secs_f64() < 0.25 {
@@ -311,10 +315,23 @@ impl Editor {
                 let prev_pos = self.cursor_pos;
                 self.cursor_pos = (position.x as f32 - INSET, position.y as f32 - INSET);
                 // macOS seems to generate a spurious move after selecting word?
-                if self.pointer_down && prev_pos != self.cursor_pos {
+                if self.pointer_down && prev_pos != self.cursor_pos && !self.editor.is_composing() {
                     self.cursor_reset();
                     let cursor_pos = self.cursor_pos;
                     self.drive(|drv| drv.extend_selection_to_point(cursor_pos.0, cursor_pos.1));
+                }
+            }
+            WindowEvent::Ime(Ime::Disabled) => {
+                self.drive(|drv| drv.clear_compose());
+            }
+            WindowEvent::Ime(Ime::Commit(text)) => {
+                self.drive(|drv| drv.insert_or_replace_selection(&text));
+            }
+            WindowEvent::Ime(Ime::Preedit(text, cursor)) => {
+                if text.is_empty() {
+                    self.drive(|drv| drv.clear_compose());
+                } else {
+                    self.drive(|drv| drv.set_compose(&text, cursor));
                 }
             }
             _ => {}
@@ -355,6 +372,39 @@ impl Editor {
                 let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
                     continue;
                 };
+                let style = glyph_run.style();
+                // We draw underlines under the text, then the strikethrough on top, following:
+                // https://drafts.csswg.org/css-text-decor/#painting-order
+                if let Some(underline) = &style.underline {
+                    let underline_brush = &style.brush;
+                    let run_metrics = glyph_run.run().metrics();
+                    let offset = match underline.offset {
+                        Some(offset) => offset,
+                        None => run_metrics.underline_offset,
+                    };
+                    let width = match underline.size {
+                        Some(size) => size,
+                        None => run_metrics.underline_size,
+                    };
+                    // The `offset` is the distance from the baseline to the top of the underline
+                    // so we move the line down by half the width
+                    // Remember that we are using a y-down coordinate system
+                    // If there's a custom width, because this is an underline, we want the custom
+                    // width to go down from the default expectation
+                    let y = glyph_run.baseline() - offset + width / 2.;
+
+                    let line = Line::new(
+                        (glyph_run.offset() as f64, y as f64),
+                        ((glyph_run.offset() + glyph_run.advance()) as f64, y as f64),
+                    );
+                    scene.stroke(
+                        &Stroke::new(width.into()),
+                        transform,
+                        underline_brush,
+                        None,
+                        &line,
+                    );
+                }
                 let mut x = glyph_run.offset();
                 let y = glyph_run.baseline();
                 let run = glyph_run.run();
@@ -371,7 +421,7 @@ impl Editor {
                     .collect::<Vec<_>>();
                 scene
                     .draw_glyphs(font)
-                    .brush(Color::WHITE)
+                    .brush(style.brush)
                     .hint(true)
                     .transform(transform)
                     .glyph_transform(glyph_xform)
@@ -390,6 +440,35 @@ impl Editor {
                             }
                         }),
                     );
+                if let Some(strikethrough) = &style.strikethrough {
+                    let strikethrough_brush = &style.brush;
+                    let run_metrics = glyph_run.run().metrics();
+                    let offset = match strikethrough.offset {
+                        Some(offset) => offset,
+                        None => run_metrics.strikethrough_offset,
+                    };
+                    let width = match strikethrough.size {
+                        Some(size) => size,
+                        None => run_metrics.strikethrough_size,
+                    };
+                    // The `offset` is the distance from the baseline to the *top* of the strikethrough
+                    // so we calculate the middle y-position of the strikethrough based on the font's
+                    // standard strikethrough width.
+                    // Remember that we are using a y-down coordinate system
+                    let y = glyph_run.baseline() - offset + run_metrics.strikethrough_size / 2.;
+
+                    let line = Line::new(
+                        (glyph_run.offset() as f64, y as f64),
+                        ((glyph_run.offset() + glyph_run.advance()) as f64, y as f64),
+                    );
+                    scene.stroke(
+                        &Stroke::new(width.into()),
+                        transform,
+                        strikethrough_brush,
+                        None,
+                        &line,
+                    );
+                }
             }
         }
         self.editor.generation()
