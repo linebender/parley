@@ -144,6 +144,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
         self.prev_state = Some(self.state.clone());
 
+        // HACK: ignore max_advance for empty layouts
+        // Prevents crash when width is too small (https://github.com/linebender/parley/issues/186)
+        let max_advance = if self.layout.data.text_len == 0 {
+            f32::MAX
+        } else {
+            max_advance
+        };
+
         // This macro simply calls the `commit_line` with the provided arguments and some parts of self.
         // It exists solely to cut down on the boilerplate for accessing the self variables while
         // keeping the borrow checker happy
