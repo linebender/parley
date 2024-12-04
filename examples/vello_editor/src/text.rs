@@ -3,7 +3,7 @@
 
 use accesskit::{Node, TreeUpdate};
 use core::default::Default;
-use parley::{layout::PositionedLayoutItem, GenericFamily, StyleProperty};
+use parley::{editor::SplitString, layout::PositionedLayoutItem, GenericFamily, StyleProperty};
 use peniko::{kurbo::Affine, Color, Fill};
 use std::time::{Duration, Instant};
 use vello::{
@@ -60,16 +60,15 @@ impl Editor {
         }
     }
 
-    pub fn drive(&mut self, callback: impl FnOnce(&mut PlainEditorDriver<'_, Color>)) {
-        self.editor
-            .drive(&mut self.font_cx, &mut self.layout_cx, callback);
+    fn driver(&mut self) -> PlainEditorDriver<'_, Color> {
+        self.editor.driver(&mut self.font_cx, &mut self.layout_cx)
     }
 
     pub fn editor(&mut self) -> &mut PlainEditor<Color> {
         &mut self.editor
     }
 
-    pub fn text(&self) -> [&str; 2] {
+    pub fn text(&self) -> SplitString<'_> {
         self.editor.text()
     }
 
@@ -117,6 +116,7 @@ impl Editor {
                     return;
                 }
                 self.cursor_reset();
+                let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
                 #[allow(unused)]
                 let (shift, action_mod) = self
                     .modifiers
@@ -138,36 +138,34 @@ impl Editor {
                         use clipboard_rs::{Clipboard, ClipboardContext};
                         match c.to_lowercase().as_str() {
                             "c" => {
-                                if let Some(text) = self.editor.selected_text() {
+                                if let Some(text) = drv.editor.selected_text() {
                                     let cb = ClipboardContext::new().unwrap();
                                     cb.set_text(text.to_owned()).ok();
                                 }
                             }
                             "x" => {
-                                if let Some(text) = self.editor.selected_text() {
+                                if let Some(text) = drv.editor.selected_text() {
                                     let cb = ClipboardContext::new().unwrap();
                                     cb.set_text(text.to_owned()).ok();
-                                    self.drive(|drv| drv.delete_selection());
+                                    drv.delete_selection();
                                 }
                             }
                             "v" => {
                                 let cb = ClipboardContext::new().unwrap();
                                 let text = cb.get_text().unwrap_or_default();
-                                self.drive(|drv| drv.insert_or_replace_selection(&text));
+                                drv.insert_or_replace_selection(&text);
                             }
                             _ => (),
                         }
                     }
                     Key::Character(c) if action_mod && matches!(c.to_lowercase().as_str(), "a") => {
-                        self.drive(|drv| {
-                            if shift {
-                                drv.collapse_selection();
-                            } else {
-                                drv.select_all();
-                            }
-                        });
+                        if shift {
+                            drv.collapse_selection();
+                        } else {
+                            drv.select_all();
+                        };
                     }
-                    Key::Named(NamedKey::ArrowLeft) => self.drive(|drv| {
+                    Key::Named(NamedKey::ArrowLeft) => {
                         if action_mod {
                             if shift {
                                 drv.select_word_left();
@@ -179,8 +177,8 @@ impl Editor {
                         } else {
                             drv.move_left();
                         }
-                    }),
-                    Key::Named(NamedKey::ArrowRight) => self.drive(|drv| {
+                    }
+                    Key::Named(NamedKey::ArrowRight) => {
                         if action_mod {
                             if shift {
                                 drv.select_word_right();
@@ -192,22 +190,22 @@ impl Editor {
                         } else {
                             drv.move_right();
                         }
-                    }),
-                    Key::Named(NamedKey::ArrowUp) => self.drive(|drv| {
+                    }
+                    Key::Named(NamedKey::ArrowUp) => {
                         if shift {
                             drv.select_up();
                         } else {
                             drv.move_up();
                         }
-                    }),
-                    Key::Named(NamedKey::ArrowDown) => self.drive(|drv| {
+                    }
+                    Key::Named(NamedKey::ArrowDown) => {
                         if shift {
                             drv.select_down();
                         } else {
                             drv.move_down();
                         }
-                    }),
-                    Key::Named(NamedKey::Home) => self.drive(|drv| {
+                    }
+                    Key::Named(NamedKey::Home) => {
                         if action_mod {
                             if shift {
                                 drv.select_to_text_start();
@@ -219,8 +217,11 @@ impl Editor {
                         } else {
                             drv.move_to_line_start();
                         }
-                    }),
-                    Key::Named(NamedKey::End) => self.drive(|drv| {
+                    }
+                    Key::Named(NamedKey::End) => {
+                        let this = &mut *self;
+                        let mut drv = this.driver();
+
                         if action_mod {
                             if shift {
                                 drv.select_to_text_end();
@@ -232,29 +233,29 @@ impl Editor {
                         } else {
                             drv.move_to_line_end();
                         }
-                    }),
-                    Key::Named(NamedKey::Delete) => self.drive(|drv| {
+                    }
+                    Key::Named(NamedKey::Delete) => {
                         if action_mod {
                             drv.delete_word();
                         } else {
                             drv.delete();
                         }
-                    }),
-                    Key::Named(NamedKey::Backspace) => self.drive(|drv| {
+                    }
+                    Key::Named(NamedKey::Backspace) => {
                         if action_mod {
                             drv.backdelete_word();
                         } else {
                             drv.backdelete();
                         }
-                    }),
+                    }
                     Key::Named(NamedKey::Enter) => {
-                        self.drive(|drv| drv.insert_or_replace_selection("\n"));
+                        drv.insert_or_replace_selection("\n");
                     }
                     Key::Named(NamedKey::Space) => {
-                        self.drive(|drv| drv.insert_or_replace_selection(" "));
+                        drv.insert_or_replace_selection(" ");
                     }
                     Key::Character(s) => {
-                        self.drive(|drv| drv.insert_or_replace_selection(&s));
+                        drv.insert_or_replace_selection(&s);
                     }
                     _ => (),
                 }
@@ -262,25 +263,22 @@ impl Editor {
             WindowEvent::Touch(Touch {
                 phase, location, ..
             }) if !self.editor.is_composing() => {
+                let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
                 use winit::event::TouchPhase::*;
                 match phase {
                     Started => {
                         // TODO: start a timer to convert to a SelectWordAtPoint
-                        self.drive(|drv| {
-                            drv.move_to_point(location.x as f32 - INSET, location.y as f32 - INSET);
-                        });
+                        drv.move_to_point(location.x as f32 - INSET, location.y as f32 - INSET);
                     }
                     Cancelled => {
-                        self.drive(|drv| drv.collapse_selection());
+                        drv.collapse_selection();
                     }
                     Moved => {
                         // TODO: cancel SelectWordAtPoint timer
-                        self.drive(|drv| {
-                            drv.extend_selection_to_point(
-                                location.x as f32 - INSET,
-                                location.y as f32 - INSET,
-                            );
-                        });
+                        drv.extend_selection_to_point(
+                            location.x as f32 - INSET,
+                            location.y as f32 - INSET,
+                        );
                     }
                     Ended => (),
                 }
@@ -303,11 +301,12 @@ impl Editor {
                         self.last_click_time = Some(now);
                         let click_count = self.click_count;
                         let cursor_pos = self.cursor_pos;
-                        self.drive(|drv| match click_count {
+                        let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
+                        match click_count {
                             2 => drv.select_word_at_point(cursor_pos.0, cursor_pos.1),
                             3 => drv.select_line_at_point(cursor_pos.0, cursor_pos.1),
                             _ => drv.move_to_point(cursor_pos.0, cursor_pos.1),
-                        });
+                        };
                     }
                 }
             }
@@ -318,20 +317,21 @@ impl Editor {
                 if self.pointer_down && prev_pos != self.cursor_pos && !self.editor.is_composing() {
                     self.cursor_reset();
                     let cursor_pos = self.cursor_pos;
-                    self.drive(|drv| drv.extend_selection_to_point(cursor_pos.0, cursor_pos.1));
+                    self.driver()
+                        .extend_selection_to_point(cursor_pos.0, cursor_pos.1);
                 }
             }
             WindowEvent::Ime(Ime::Disabled) => {
-                self.drive(|drv| drv.clear_compose());
+                self.driver().clear_compose();
             }
             WindowEvent::Ime(Ime::Commit(text)) => {
-                self.drive(|drv| drv.insert_or_replace_selection(&text));
+                self.driver().insert_or_replace_selection(&text);
             }
             WindowEvent::Ime(Ime::Preedit(text, cursor)) => {
                 if text.is_empty() {
-                    self.drive(|drv| drv.clear_compose());
+                    self.driver().clear_compose();
                 } else {
-                    self.drive(|drv| drv.set_compose(&text, cursor));
+                    self.driver().set_compose(&text, cursor);
                 }
             }
             _ => {}
@@ -341,9 +341,7 @@ impl Editor {
     pub fn handle_accesskit_action_request(&mut self, req: &accesskit::ActionRequest) {
         if req.action == accesskit::Action::SetTextSelection {
             if let Some(accesskit::ActionData::SetTextSelection(selection)) = &req.data {
-                self.drive(|drv| {
-                    drv.select_from_accesskit(selection);
-                });
+                self.driver().select_from_accesskit(selection);
             }
         }
     }
@@ -475,10 +473,8 @@ impl Editor {
     }
 
     pub fn accessibility(&mut self, update: &mut TreeUpdate, node: &mut Node) {
-        self.editor
-            .drive(&mut self.font_cx, &mut self.layout_cx, |drv| {
-                drv.accessibility(update, node, next_node_id, INSET.into(), INSET.into());
-            });
+        let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
+        drv.accessibility(update, node, next_node_id, INSET.into(), INSET.into());
     }
 }
 

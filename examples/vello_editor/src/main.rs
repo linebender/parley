@@ -349,8 +349,8 @@ fn main() -> Result<()> {
     event_loop
         .run_app(&mut app)
         .expect("Couldn't run event loop");
-    let [text1, text2] = app.editor.text();
-    print!("{text1}{text2}");
+    let text = app.editor.text();
+    print!("{text}");
     Ok(())
 }
 
