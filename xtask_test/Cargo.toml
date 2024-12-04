@@ -1,5 +1,5 @@
 [package]
-name = "xtask_image_diff_report"
+name = "xtask_test"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true

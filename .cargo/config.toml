@@ -1,2 +1,2 @@
 [alias]
-xtask_image_diff_report = "run --package xtask_image_diff_report --"
+xtask-test = "run --package xtask_test --"

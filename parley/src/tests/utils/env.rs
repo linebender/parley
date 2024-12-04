@@ -70,6 +70,12 @@ fn is_accept_mode() -> bool {
         .unwrap_or(false)
 }
 
+fn is_generate_all_mode() -> bool {
+    std::env::var("PARLEY_TEST")
+        .map(|x| x.to_ascii_lowercase() == "generate-all")
+        .unwrap_or(false)
+}
+
 pub(crate) fn load_fonts_dir(collection: &mut Collection, path: &Path) -> std::io::Result<()> {
     let paths = std::fs::read_dir(path)?;
     for entry in paths {
@@ -255,6 +261,9 @@ impl TestEnv {
         let snapshot_path = snapshot_dir().join(&image_name);
         let comparison_path = current_imgs_dir().join(&image_name);
 
+        if is_generate_all_mode() {
+            current_img.save_png(&comparison_path).unwrap();
+        }
         if let Err(e) = self.check_images(&current_img, &snapshot_path) {
             if is_accept_mode() {
                 current_img.save_png(&snapshot_path).unwrap();
