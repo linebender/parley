@@ -3,13 +3,12 @@
 
 use crate::tests::utils::renderer::{render_layout, RenderingConfig};
 use crate::{
-    FontContext, FontFamily, FontStack, Layout, LayoutContext, PlainEditor, PlainEditorTxn,
+    FontContext, FontFamily, FontStack, Layout, LayoutContext, PlainEditor, PlainEditorDriver,
     RangedBuilder, Rect, StyleProperty,
 };
 use fontique::{Collection, CollectionOptions};
 use peniko::Color;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use tiny_skia::Pixmap;
 
 // Creates a new instance of TestEnv and put current function name in constructor
@@ -60,6 +59,7 @@ pub(crate) struct TestEnv {
     rendering_config: RenderingConfig,
     cursor_size: f32,
     tolerance: f32,
+    // TODO: Add core::panic::Location for case.
     errors: Vec<(PathBuf, String)>,
     next_test_case_name: String,
 }
@@ -156,21 +156,19 @@ impl TestEnv {
         builder
     }
 
-    pub(crate) fn transact(
-        &mut self,
-        editor: &mut PlainEditor<Color>,
-        callback: impl FnOnce(&mut PlainEditorTxn<'_, Color>),
-    ) {
-        editor.transact(&mut self.font_cx, &mut self.layout_cx, callback);
+    pub(crate) fn driver<'a>(
+        &'a mut self,
+        editor: &'a mut PlainEditor<Color>,
+    ) -> PlainEditorDriver<'a, Color> {
+        editor.driver(&mut self.font_cx, &mut self.layout_cx)
     }
 
     pub(crate) fn editor(&mut self, text: &str) -> PlainEditor<Color> {
-        let default_style = Arc::new(self.default_style());
-        let mut editor = PlainEditor::default();
-        self.transact(&mut editor, |editor| {
-            editor.set_default_style(default_style);
-            editor.set_text(text);
-        });
+        let mut editor = PlainEditor::new(16.);
+        for style in self.default_style() {
+            editor.edit_styles().insert(style);
+        }
+        editor.set_text(text);
         editor
     }
 
@@ -229,9 +227,10 @@ impl TestEnv {
         self
     }
 
-    pub(crate) fn check_editor_snapshot(&mut self, editor: &PlainEditor<Color>) {
+    pub(crate) fn check_editor_snapshot(&mut self, editor: &mut PlainEditor<Color>) {
+        editor.refresh_layout(&mut self.font_cx, &mut self.layout_cx);
         self.render_and_check_snapshot(
-            editor.layout(),
+            editor.try_layout().unwrap(),
             editor.cursor_geometry(self.cursor_size),
             &editor.selection_geometry(),
         );

@@ -382,6 +382,7 @@ where
     pub fn move_to_text_start(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor.set_selection(self.editor.selection.move_lines(
             &self.editor.layout,
             isize::MIN,
@@ -393,6 +394,7 @@ where
     pub fn move_to_line_start(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor
             .set_selection(self.editor.selection.line_start(&self.editor.layout, false));
     }
@@ -401,6 +403,7 @@ where
     pub fn move_to_text_end(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor.set_selection(self.editor.selection.move_lines(
             &self.editor.layout,
             isize::MAX,
@@ -412,6 +415,7 @@ where
     pub fn move_to_line_end(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor
             .set_selection(self.editor.selection.line_end(&self.editor.layout, false));
     }
@@ -420,6 +424,7 @@ where
     pub fn move_up(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
@@ -431,6 +436,7 @@ where
     pub fn move_down(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor
             .set_selection(self.editor.selection.next_line(&self.editor.layout, false));
     }
@@ -439,6 +445,7 @@ where
     pub fn move_left(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
@@ -450,6 +457,7 @@ where
     pub fn move_right(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
@@ -461,6 +469,7 @@ where
     pub fn move_word_left(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
@@ -472,6 +481,7 @@ where
     pub fn move_word_right(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
@@ -483,6 +493,7 @@ where
     pub fn select_all(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor.set_selection(
             Selection::from_byte_index(&self.editor.layout, 0_usize, Affinity::default())
                 .move_lines(&self.editor.layout, isize::MAX, true),
@@ -500,6 +511,7 @@ where
     pub fn select_to_text_start(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor.set_selection(self.editor.selection.move_lines(
             &self.editor.layout,
             isize::MIN,
@@ -511,6 +523,7 @@ where
     pub fn select_to_line_start(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor
             .set_selection(self.editor.selection.line_start(&self.editor.layout, true));
     }
@@ -519,6 +532,7 @@ where
     pub fn select_to_text_end(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor.set_selection(self.editor.selection.move_lines(
             &self.editor.layout,
             isize::MAX,
@@ -530,6 +544,7 @@ where
     pub fn select_to_line_end(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor
             .set_selection(self.editor.selection.line_end(&self.editor.layout, true));
     }
@@ -538,6 +553,7 @@ where
     pub fn select_up(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
@@ -549,6 +565,7 @@ where
     pub fn select_down(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor
             .set_selection(self.editor.selection.next_line(&self.editor.layout, true));
     }
@@ -557,6 +574,7 @@ where
     pub fn select_left(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
@@ -568,6 +586,7 @@ where
     pub fn select_right(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor
             .set_selection(self.editor.selection.next_visual(&self.editor.layout, true));
     }
@@ -576,6 +595,7 @@ where
     pub fn select_word_left(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
@@ -587,6 +607,7 @@ where
     pub fn select_word_right(&mut self) {
         assert!(!self.editor.is_composing());
 
+        self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
@@ -691,7 +712,7 @@ where
     }
     // --- MARK: Internal helpers---
     /// Update the layout if needed.
-    fn refresh_layout(&mut self) {
+    pub fn refresh_layout(&mut self) {
         self.editor.refresh_layout(self.font_cx, self.layout_cx);
     }
 
