@@ -1,13 +1,15 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::tests::utils::renderer::render_layout;
+use crate::tests::utils::renderer::{render_layout, RenderingConfig};
 use crate::{
-    FontContext, FontFamily, FontStack, Layout, LayoutContext, RangedBuilder, StyleProperty,
+    FontContext, FontFamily, FontStack, Layout, LayoutContext, PlainEditor, PlainEditorTxn,
+    RangedBuilder, Rect, StyleProperty,
 };
 use fontique::{Collection, CollectionOptions};
 use peniko::Color;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tiny_skia::Pixmap;
 
 // Creates a new instance of TestEnv and put current function name in constructor
@@ -54,10 +56,12 @@ pub(crate) struct TestEnv {
     check_counter: u32,
     font_cx: FontContext,
     layout_cx: LayoutContext<Color>,
-    foreground_color: Color,
-    background_color: Color,
+    text_color: Color,
+    rendering_config: RenderingConfig,
+    cursor_size: f32,
     tolerance: f32,
     errors: Vec<(PathBuf, String)>,
+    next_test_case_name: String,
 }
 
 fn is_accept_mode() -> bool {
@@ -121,19 +125,53 @@ impl TestEnv {
             },
             tolerance: 0.0,
             layout_cx: LayoutContext::new(),
-            foreground_color: Color::rgb8(0, 0, 0),
-            background_color: Color::rgb8(255, 255, 255),
+            text_color: Color::rgb8(0, 0, 0),
+            rendering_config: RenderingConfig {
+                background_color: Color::rgb8(255, 255, 255),
+                cursor_color: Color::rgb8(255, 0, 0),
+                selection_color: Color::rgb8(196, 196, 0),
+                inline_box_color: Color::rgb8(0, 0, 0),
+            },
+            cursor_size: 2.0,
             errors: Vec::new(),
+            next_test_case_name: String::new(),
         }
     }
 
+    fn default_style(&self) -> [StyleProperty<'static, Color>; 2] {
+        [
+            StyleProperty::Brush(self.text_color),
+            StyleProperty::FontStack(FontStack::Single(FontFamily::Named(
+                DEFAULT_FONT_NAME.into(),
+            ))),
+        ]
+    }
+
     pub(crate) fn builder<'a>(&'a mut self, text: &'a str) -> RangedBuilder<'a, Color> {
+        let default_style = self.default_style();
         let mut builder = self.layout_cx.ranged_builder(&mut self.font_cx, text, 1.0);
-        builder.push_default(StyleProperty::Brush(self.foreground_color));
-        builder.push_default(StyleProperty::FontStack(FontStack::Single(
-            FontFamily::Named(DEFAULT_FONT_NAME.into()),
-        )));
+        for style in default_style {
+            builder.push_default(style);
+        }
         builder
+    }
+
+    pub(crate) fn transact(
+        &mut self,
+        editor: &mut PlainEditor<Color>,
+        callback: impl FnOnce(&mut PlainEditorTxn<'_, Color>),
+    ) {
+        editor.transact(&mut self.font_cx, &mut self.layout_cx, callback);
+    }
+
+    pub(crate) fn editor(&mut self, text: &str) -> PlainEditor<Color> {
+        let default_style = Arc::new(self.default_style());
+        let mut editor = PlainEditor::default();
+        self.transact(&mut editor, |editor| {
+            editor.set_default_style(default_style);
+            editor.set_text(text);
+        });
+        editor
     }
 
     fn image_name(&mut self, test_case_name: &str) -> String {
@@ -186,13 +224,33 @@ impl TestEnv {
         Ok(())
     }
 
-    pub(crate) fn check_snapshot_with_name(
+    pub(crate) fn with_name(&mut self, test_case_name: &str) -> &mut Self {
+        self.next_test_case_name = test_case_name.to_string();
+        self
+    }
+
+    pub(crate) fn check_editor_snapshot(&mut self, editor: &PlainEditor<Color>) {
+        self.render_and_check_snapshot(
+            editor.layout(),
+            editor.cursor_geometry(self.cursor_size),
+            &editor.selection_geometry(),
+        );
+    }
+
+    pub(crate) fn check_layout_snapshot(&mut self, layout: &Layout<Color>) {
+        self.render_and_check_snapshot(layout, None, &[]);
+    }
+
+    fn render_and_check_snapshot(
         &mut self,
-        test_case_name: &str,
         layout: &Layout<Color>,
+        cursor_rect: Option<Rect>,
+        selection_rects: &[Rect],
     ) {
-        let current_img = render_layout(layout, self.background_color, self.foreground_color);
-        let image_name = self.image_name(test_case_name);
+        let test_case_name = std::mem::take(&mut self.next_test_case_name);
+        let current_img =
+            render_layout(&self.rendering_config, layout, cursor_rect, selection_rects);
+        let image_name = self.image_name(&test_case_name);
 
         let snapshot_path = snapshot_dir().join(&image_name);
         let comparison_path = current_imgs_dir().join(&image_name);
@@ -205,10 +263,6 @@ impl TestEnv {
                 self.errors.push((comparison_path, e));
             }
         }
-    }
-
-    pub(crate) fn check_snapshot(&mut self, layout: &Layout<Color>) {
-        self.check_snapshot_with_name("", layout);
     }
 }
 
