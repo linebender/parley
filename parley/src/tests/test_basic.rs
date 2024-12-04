@@ -40,3 +40,24 @@ fn placing_inboxes() {
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
+
+#[test]
+fn only_inboxes_wrap() {
+    let mut env = testenv!();
+
+    let text = "";
+    let mut builder = env.builder(text);
+    for id in 0..10 {
+        builder.push_inline_box(InlineBox {
+            id,
+            index: 0,
+            width: 10.0,
+            height: 10.0,
+        });
+    }
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(40.0));
+    layout.align(None, Alignment::Middle);
+
+    env.check_layout_snapshot(&layout);
+}
