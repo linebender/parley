@@ -113,7 +113,7 @@ fn main() {
         // RANGE BUILDER
         // ============
 
-        // Creatse a RangedBuilder
+        // Creates a RangedBuilder
         let mut builder = layout_cx.ranged_builder(&mut font_cx, &text, display_scale);
 
         // Set default text colour styles (set foreground text color)
@@ -127,7 +127,7 @@ fn main() {
         // Set the first 4 characters to bold
         builder.push(bold_style, 0..4);
 
-        // Set the underline & stoked style
+        // Set the underline & strikethrough style
         builder.push(underline_style, 141..150);
         builder.push(strikethrough_style, 155..168);
 
