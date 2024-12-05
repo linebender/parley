@@ -3,23 +3,25 @@
 
 use accesskit::{Node, TreeUpdate};
 use core::default::Default;
-use parley::layout::PositionedLayoutItem;
+use parley::{editor::SplitString, layout::PositionedLayoutItem, GenericFamily, StyleProperty};
 use peniko::{kurbo::Affine, Color, Fill};
 use std::time::{Duration, Instant};
-use vello::Scene;
+use vello::{
+    kurbo::{Line, Stroke},
+    Scene,
+};
 use winit::{
-    event::{Modifiers, Touch, WindowEvent},
+    event::{Ime, Modifiers, Touch, WindowEvent},
     keyboard::{Key, NamedKey},
 };
 
 pub use parley::layout::editor::Generation;
-use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorTxn};
+use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorDriver};
 
 use crate::access_ids::next_node_id;
 
 pub const INSET: f32 = 32.0;
 
-#[derive(Default)]
 pub struct Editor {
     font_cx: FontContext,
     layout_cx: LayoutContext<Color>,
@@ -35,12 +37,38 @@ pub struct Editor {
 }
 
 impl Editor {
-    pub fn transact(&mut self, callback: impl FnOnce(&mut PlainEditorTxn<'_, Color>)) {
-        self.editor
-            .transact(&mut self.font_cx, &mut self.layout_cx, callback);
+    pub fn new(text: &str) -> Self {
+        let mut editor = PlainEditor::new(32.0);
+        editor.set_text(text);
+        editor.set_scale(1.0);
+        let styles = editor.edit_styles();
+        styles.insert(StyleProperty::LineHeight(1.2));
+        styles.insert(GenericFamily::SystemUi.into());
+        styles.insert(StyleProperty::Brush(Color::WHITE));
+        Self {
+            font_cx: Default::default(),
+            layout_cx: Default::default(),
+            editor,
+            last_click_time: Default::default(),
+            click_count: Default::default(),
+            pointer_down: Default::default(),
+            cursor_pos: Default::default(),
+            cursor_visible: Default::default(),
+            modifiers: Default::default(),
+            start_time: Default::default(),
+            blink_period: Default::default(),
+        }
     }
 
-    pub fn text(&self) -> &str {
+    fn driver(&mut self) -> PlainEditorDriver<'_, Color> {
+        self.editor.driver(&mut self.font_cx, &mut self.layout_cx)
+    }
+
+    pub fn editor(&mut self) -> &mut PlainEditor<Color> {
+        &mut self.editor
+    }
+
+    pub fn text(&self) -> SplitString<'_> {
         self.editor.text()
     }
 
@@ -77,16 +105,18 @@ impl Editor {
     pub fn handle_event(&mut self, event: WindowEvent) {
         match event {
             WindowEvent::Resized(size) => {
-                self.transact(|txn| txn.set_width(Some(size.width as f32 - 2f32 * INSET)));
+                self.editor
+                    .set_width(Some(size.width as f32 - 2f32 * INSET));
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = Some(modifiers);
             }
-            WindowEvent::KeyboardInput { event, .. } => {
+            WindowEvent::KeyboardInput { event, .. } if !self.editor.is_composing() => {
                 if !event.state.is_pressed() {
                     return;
                 }
                 self.cursor_reset();
+                let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
                 #[allow(unused)]
                 let (shift, action_mod) = self
                     .modifiers
@@ -108,149 +138,147 @@ impl Editor {
                         use clipboard_rs::{Clipboard, ClipboardContext};
                         match c.to_lowercase().as_str() {
                             "c" => {
-                                if let Some(text) = self.editor.selected_text() {
+                                if let Some(text) = drv.editor.selected_text() {
                                     let cb = ClipboardContext::new().unwrap();
                                     cb.set_text(text.to_owned()).ok();
                                 }
                             }
                             "x" => {
-                                if let Some(text) = self.editor.selected_text() {
+                                if let Some(text) = drv.editor.selected_text() {
                                     let cb = ClipboardContext::new().unwrap();
                                     cb.set_text(text.to_owned()).ok();
-                                    self.transact(|txn| txn.delete_selection());
+                                    drv.delete_selection();
                                 }
                             }
                             "v" => {
                                 let cb = ClipboardContext::new().unwrap();
                                 let text = cb.get_text().unwrap_or_default();
-                                self.transact(|txn| txn.insert_or_replace_selection(&text));
+                                drv.insert_or_replace_selection(&text);
                             }
                             _ => (),
                         }
                     }
                     Key::Character(c) if action_mod && matches!(c.to_lowercase().as_str(), "a") => {
-                        self.transact(|txn| {
-                            if shift {
-                                txn.collapse_selection();
-                            } else {
-                                txn.select_all();
-                            }
-                        });
+                        if shift {
+                            drv.collapse_selection();
+                        } else {
+                            drv.select_all();
+                        };
                     }
-                    Key::Named(NamedKey::ArrowLeft) => self.transact(|txn| {
+                    Key::Named(NamedKey::ArrowLeft) => {
                         if action_mod {
                             if shift {
-                                txn.select_word_left();
+                                drv.select_word_left();
                             } else {
-                                txn.move_word_left();
+                                drv.move_word_left();
                             }
                         } else if shift {
-                            txn.select_left();
+                            drv.select_left();
                         } else {
-                            txn.move_left();
+                            drv.move_left();
                         }
-                    }),
-                    Key::Named(NamedKey::ArrowRight) => self.transact(|txn| {
+                    }
+                    Key::Named(NamedKey::ArrowRight) => {
                         if action_mod {
                             if shift {
-                                txn.select_word_right();
+                                drv.select_word_right();
                             } else {
-                                txn.move_word_right();
+                                drv.move_word_right();
                             }
                         } else if shift {
-                            txn.select_right();
+                            drv.select_right();
                         } else {
-                            txn.move_right();
+                            drv.move_right();
                         }
-                    }),
-                    Key::Named(NamedKey::ArrowUp) => self.transact(|txn| {
+                    }
+                    Key::Named(NamedKey::ArrowUp) => {
                         if shift {
-                            txn.select_up();
+                            drv.select_up();
                         } else {
-                            txn.move_up();
+                            drv.move_up();
                         }
-                    }),
-                    Key::Named(NamedKey::ArrowDown) => self.transact(|txn| {
+                    }
+                    Key::Named(NamedKey::ArrowDown) => {
                         if shift {
-                            txn.select_down();
+                            drv.select_down();
                         } else {
-                            txn.move_down();
+                            drv.move_down();
                         }
-                    }),
-                    Key::Named(NamedKey::Home) => self.transact(|txn| {
+                    }
+                    Key::Named(NamedKey::Home) => {
                         if action_mod {
                             if shift {
-                                txn.select_to_text_start();
+                                drv.select_to_text_start();
                             } else {
-                                txn.move_to_text_start();
+                                drv.move_to_text_start();
                             }
                         } else if shift {
-                            txn.select_to_line_start();
+                            drv.select_to_line_start();
                         } else {
-                            txn.move_to_line_start();
+                            drv.move_to_line_start();
                         }
-                    }),
-                    Key::Named(NamedKey::End) => self.transact(|txn| {
+                    }
+                    Key::Named(NamedKey::End) => {
+                        let this = &mut *self;
+                        let mut drv = this.driver();
+
                         if action_mod {
                             if shift {
-                                txn.select_to_text_end();
+                                drv.select_to_text_end();
                             } else {
-                                txn.move_to_text_end();
+                                drv.move_to_text_end();
                             }
                         } else if shift {
-                            txn.select_to_line_end();
+                            drv.select_to_line_end();
                         } else {
-                            txn.move_to_line_end();
+                            drv.move_to_line_end();
                         }
-                    }),
-                    Key::Named(NamedKey::Delete) => self.transact(|txn| {
+                    }
+                    Key::Named(NamedKey::Delete) => {
                         if action_mod {
-                            txn.delete_word();
+                            drv.delete_word();
                         } else {
-                            txn.delete();
+                            drv.delete();
                         }
-                    }),
-                    Key::Named(NamedKey::Backspace) => self.transact(|txn| {
+                    }
+                    Key::Named(NamedKey::Backspace) => {
                         if action_mod {
-                            txn.backdelete_word();
+                            drv.backdelete_word();
                         } else {
-                            txn.backdelete();
+                            drv.backdelete();
                         }
-                    }),
+                    }
                     Key::Named(NamedKey::Enter) => {
-                        self.transact(|txn| txn.insert_or_replace_selection("\n"));
+                        drv.insert_or_replace_selection("\n");
                     }
                     Key::Named(NamedKey::Space) => {
-                        self.transact(|txn| txn.insert_or_replace_selection(" "));
+                        drv.insert_or_replace_selection(" ");
                     }
                     Key::Character(s) => {
-                        self.transact(|txn| txn.insert_or_replace_selection(&s));
+                        drv.insert_or_replace_selection(&s);
                     }
                     _ => (),
                 }
             }
             WindowEvent::Touch(Touch {
                 phase, location, ..
-            }) => {
+            }) if !self.editor.is_composing() => {
+                let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
                 use winit::event::TouchPhase::*;
                 match phase {
                     Started => {
                         // TODO: start a timer to convert to a SelectWordAtPoint
-                        self.transact(|txn| {
-                            txn.move_to_point(location.x as f32 - INSET, location.y as f32 - INSET);
-                        });
+                        drv.move_to_point(location.x as f32 - INSET, location.y as f32 - INSET);
                     }
                     Cancelled => {
-                        self.transact(|txn| txn.collapse_selection());
+                        drv.collapse_selection();
                     }
                     Moved => {
                         // TODO: cancel SelectWordAtPoint timer
-                        self.transact(|txn| {
-                            txn.extend_selection_to_point(
-                                location.x as f32 - INSET,
-                                location.y as f32 - INSET,
-                            );
-                        });
+                        drv.extend_selection_to_point(
+                            location.x as f32 - INSET,
+                            location.y as f32 - INSET,
+                        );
                     }
                     Ended => (),
                 }
@@ -259,7 +287,7 @@ impl Editor {
                 if button == winit::event::MouseButton::Left {
                     self.pointer_down = state.is_pressed();
                     self.cursor_reset();
-                    if self.pointer_down {
+                    if self.pointer_down && !self.editor.is_composing() {
                         let now = Instant::now();
                         if let Some(last) = self.last_click_time.take() {
                             if now.duration_since(last).as_secs_f64() < 0.25 {
@@ -273,11 +301,12 @@ impl Editor {
                         self.last_click_time = Some(now);
                         let click_count = self.click_count;
                         let cursor_pos = self.cursor_pos;
-                        self.transact(|txn| match click_count {
-                            2 => txn.select_word_at_point(cursor_pos.0, cursor_pos.1),
-                            3 => txn.select_line_at_point(cursor_pos.0, cursor_pos.1),
-                            _ => txn.move_to_point(cursor_pos.0, cursor_pos.1),
-                        });
+                        let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
+                        match click_count {
+                            2 => drv.select_word_at_point(cursor_pos.0, cursor_pos.1),
+                            3 => drv.select_line_at_point(cursor_pos.0, cursor_pos.1),
+                            _ => drv.move_to_point(cursor_pos.0, cursor_pos.1),
+                        };
                     }
                 }
             }
@@ -285,10 +314,24 @@ impl Editor {
                 let prev_pos = self.cursor_pos;
                 self.cursor_pos = (position.x as f32 - INSET, position.y as f32 - INSET);
                 // macOS seems to generate a spurious move after selecting word?
-                if self.pointer_down && prev_pos != self.cursor_pos {
+                if self.pointer_down && prev_pos != self.cursor_pos && !self.editor.is_composing() {
                     self.cursor_reset();
                     let cursor_pos = self.cursor_pos;
-                    self.transact(|txn| txn.extend_selection_to_point(cursor_pos.0, cursor_pos.1));
+                    self.driver()
+                        .extend_selection_to_point(cursor_pos.0, cursor_pos.1);
+                }
+            }
+            WindowEvent::Ime(Ime::Disabled) => {
+                self.driver().clear_compose();
+            }
+            WindowEvent::Ime(Ime::Commit(text)) => {
+                self.driver().insert_or_replace_selection(&text);
+            }
+            WindowEvent::Ime(Ime::Preedit(text, cursor)) => {
+                if text.is_empty() {
+                    self.driver().clear_compose();
+                } else {
+                    self.driver().set_compose(&text, cursor);
                 }
             }
             _ => {}
@@ -298,9 +341,7 @@ impl Editor {
     pub fn handle_accesskit_action_request(&mut self, req: &accesskit::ActionRequest) {
         if req.action == accesskit::Action::SetTextSelection {
             if let Some(accesskit::ActionData::SetTextSelection(selection)) = &req.data {
-                self.transact(|txn| {
-                    txn.select_from_accesskit(selection);
-                });
+                self.driver().select_from_accesskit(selection);
             }
         }
     }
@@ -313,7 +354,7 @@ impl Editor {
     /// Draw into scene.
     ///
     /// Returns drawn `Generation`.
-    pub fn draw(&self, scene: &mut Scene) -> Generation {
+    pub fn draw(&mut self, scene: &mut Scene) -> Generation {
         let transform = Affine::translate((INSET as f64, INSET as f64));
         for rect in self.editor.selection_geometry().iter() {
             scene.fill(Fill::NonZero, transform, Color::STEEL_BLUE, None, &rect);
@@ -323,11 +364,45 @@ impl Editor {
                 scene.fill(Fill::NonZero, transform, Color::WHITE, None, &cursor);
             };
         }
-        for line in self.editor.lines() {
+        let layout = self.editor.layout(&mut self.font_cx, &mut self.layout_cx);
+        for line in layout.lines() {
             for item in line.items() {
                 let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
                     continue;
                 };
+                let style = glyph_run.style();
+                // We draw underlines under the text, then the strikethrough on top, following:
+                // https://drafts.csswg.org/css-text-decor/#painting-order
+                if let Some(underline) = &style.underline {
+                    let underline_brush = &style.brush;
+                    let run_metrics = glyph_run.run().metrics();
+                    let offset = match underline.offset {
+                        Some(offset) => offset,
+                        None => run_metrics.underline_offset,
+                    };
+                    let width = match underline.size {
+                        Some(size) => size,
+                        None => run_metrics.underline_size,
+                    };
+                    // The `offset` is the distance from the baseline to the top of the underline
+                    // so we move the line down by half the width
+                    // Remember that we are using a y-down coordinate system
+                    // If there's a custom width, because this is an underline, we want the custom
+                    // width to go down from the default expectation
+                    let y = glyph_run.baseline() - offset + width / 2.;
+
+                    let line = Line::new(
+                        (glyph_run.offset() as f64, y as f64),
+                        ((glyph_run.offset() + glyph_run.advance()) as f64, y as f64),
+                    );
+                    scene.stroke(
+                        &Stroke::new(width.into()),
+                        transform,
+                        underline_brush,
+                        None,
+                        &line,
+                    );
+                }
                 let mut x = glyph_run.offset();
                 let y = glyph_run.baseline();
                 let run = glyph_run.run();
@@ -344,7 +419,7 @@ impl Editor {
                     .collect::<Vec<_>>();
                 scene
                     .draw_glyphs(font)
-                    .brush(Color::WHITE)
+                    .brush(style.brush)
                     .hint(true)
                     .transform(transform)
                     .glyph_transform(glyph_xform)
@@ -363,14 +438,43 @@ impl Editor {
                             }
                         }),
                     );
+                if let Some(strikethrough) = &style.strikethrough {
+                    let strikethrough_brush = &style.brush;
+                    let run_metrics = glyph_run.run().metrics();
+                    let offset = match strikethrough.offset {
+                        Some(offset) => offset,
+                        None => run_metrics.strikethrough_offset,
+                    };
+                    let width = match strikethrough.size {
+                        Some(size) => size,
+                        None => run_metrics.strikethrough_size,
+                    };
+                    // The `offset` is the distance from the baseline to the *top* of the strikethrough
+                    // so we calculate the middle y-position of the strikethrough based on the font's
+                    // standard strikethrough width.
+                    // Remember that we are using a y-down coordinate system
+                    let y = glyph_run.baseline() - offset + run_metrics.strikethrough_size / 2.;
+
+                    let line = Line::new(
+                        (glyph_run.offset() as f64, y as f64),
+                        ((glyph_run.offset() + glyph_run.advance()) as f64, y as f64),
+                    );
+                    scene.stroke(
+                        &Stroke::new(width.into()),
+                        transform,
+                        strikethrough_brush,
+                        None,
+                        &line,
+                    );
+                }
             }
         }
         self.editor.generation()
     }
 
     pub fn accessibility(&mut self, update: &mut TreeUpdate, node: &mut Node) {
-        self.editor
-            .accessibility(update, node, next_node_id, INSET.into(), INSET.into());
+        let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
+        drv.accessibility(update, node, next_node_id, INSET.into(), INSET.into());
     }
 }
 

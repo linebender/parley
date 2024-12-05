@@ -28,7 +28,6 @@ mod access_ids;
 use access_ids::{TEXT_INPUT_ID, WINDOW_ID};
 
 mod text;
-use parley::{GenericFamily, StyleProperty};
 
 const WINDOW_TITLE: &str = "Vello Text Editor";
 
@@ -114,14 +113,9 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
         let access_adapter =
             accesskit_winit::Adapter::with_event_loop_proxy(&window, self.event_loop_proxy.clone());
         window.set_visible(true);
+        window.set_ime_allowed(true);
 
         let size = window.inner_size();
-
-        self.editor.transact(|txn| {
-            txn.set_scale(1.0);
-            txn.set_width(Some(size.width as f32 - 2f32 * text::INSET));
-            txn.set_text(text::LOREM);
-        });
 
         // Create a vello Surface
         let surface_future = {
@@ -236,15 +230,9 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
             WindowEvent::Resized(size) => {
                 self.context
                     .resize_surface(&mut render_state.surface, size.width, size.height);
-                self.editor.transact(|txn| {
-                    txn.set_scale(1.0);
-                    txn.set_width(Some(size.width as f32 - 2f32 * text::INSET));
-                    txn.set_default_style(Arc::new([
-                        StyleProperty::FontSize(32.0),
-                        StyleProperty::LineHeight(1.2),
-                        GenericFamily::SystemUi.into(),
-                    ]));
-                });
+                let editor = self.editor.editor();
+                editor.set_scale(1.0);
+                editor.set_width(Some(size.width as f32 - 2f32 * text::INSET));
                 render_state.window.request_redraw();
             }
 
@@ -352,7 +340,7 @@ fn main() -> Result<()> {
         renderers: vec![],
         state: RenderState::Suspended(None),
         scene: Scene::new(),
-        editor: text::Editor::default(),
+        editor: text::Editor::new(text::LOREM),
         last_drawn_generation: Default::default(),
         event_loop_proxy: event_loop.create_proxy(),
     };
@@ -361,7 +349,8 @@ fn main() -> Result<()> {
     event_loop
         .run_app(&mut app)
         .expect("Couldn't run event loop");
-    print!("{}", app.editor.text());
+    let text = app.editor.text();
+    print!("{text}");
     Ok(())
 }
 

@@ -7,27 +7,25 @@ use crate::testenv;
 fn editor_simple_move() {
     let mut env = testenv!();
     let mut editor = env.editor("Hi, all!\nNext");
-    env.check_editor_snapshot(&editor);
-    env.transact(&mut editor, |e| {
-        e.move_right();
-        e.move_right();
-        e.move_right();
-    });
-    env.check_editor_snapshot(&editor);
-    env.transact(&mut editor, |e| e.move_down());
-    env.check_editor_snapshot(&editor);
-    env.transact(&mut editor, |e| e.move_left());
-    env.check_editor_snapshot(&editor);
-    env.transact(&mut editor, |e| e.move_up());
-    env.check_editor_snapshot(&editor);
+    env.check_editor_snapshot(&mut editor);
+    let mut drv = env.driver(&mut editor);
+    drv.move_right();
+    drv.move_right();
+    drv.move_right();
+
+    env.check_editor_snapshot(&mut editor);
+    env.driver(&mut editor).move_down();
+    env.check_editor_snapshot(&mut editor);
+    env.driver(&mut editor).move_left();
+    env.check_editor_snapshot(&mut editor);
+    env.driver(&mut editor).move_up();
+    env.check_editor_snapshot(&mut editor);
 }
 
 #[test]
 fn editor_select_all() {
     let mut env = testenv!();
     let mut editor = env.editor("Hi, all!\nNext");
-    env.transact(&mut editor, |e| {
-        e.select_all();
-    });
-    env.check_editor_snapshot(&editor);
+    env.driver(&mut editor).select_all();
+    env.check_editor_snapshot(&mut editor);
 }

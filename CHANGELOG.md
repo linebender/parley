@@ -21,6 +21,11 @@ This release has an [MSRV] of 1.75.
 
 - `Generation` on `PlainEditor` to help implement lazy drawing. ([#143] by [@xorgy])
 
+### Changed
+
+### Parley
+
+- Breaking change: `PlainEditor`'s semantics are no longer transactional ([#192][] by [@DJMcNab][])
 
 ## [0.2.0] - 2024-10-10
 
@@ -76,6 +81,7 @@ This release has an [MSRV] of 1.70.
 [MSRV]: README.md#minimum-supported-rust-version-msrv
 
 [@dfrg]: https://github.com/dfrg
+[@DJMcNab]: https://github.com/DJMcNab
 [@nicoburns]: https://github.com/nicoburns
 [@waywardmonkeys]: https://github.com/waywardmonkeys
 [@xorgy]: https://github.com/xorgy
@@ -93,6 +99,7 @@ This release has an [MSRV] of 1.70.
 [#126]: https://github.com/linebender/parley/pull/126
 [#129]: https://github.com/linebender/parley/pull/129
 [#143]: https://github.com/linebender/parley/pull/143
+[#192]: https://github.com/linebender/parley/pull/192
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/linebender/parley/releases/tag/v0.2.0
