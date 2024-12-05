@@ -90,6 +90,15 @@ impl<'source> IntoIterator for SplitString<'source> {
     }
 }
 
+/// IME compose state.
+#[derive(Clone)]
+struct Compose {
+    /// Byte offsets of IME composing preedit text in the text buffer.
+    preedit_range: Range<usize>,
+    /// Whether the cursor should be shown. The IME can request to hide the cursor.
+    show_cursor: bool,
+}
+
 /// Basic plain text editor with a single style applied to the entire text.
 ///
 /// Internally, this is a wrapper around a string buffer and its corresponding [`Layout`],
@@ -106,9 +115,8 @@ where
     #[cfg(feature = "accesskit")]
     layout_access: LayoutAccessibility,
     selection: Selection,
-    /// Byte offsets of IME composing preedit text in the text buffer.
-    /// `None` if the IME is not currently composing.
-    compose: Option<Range<usize>>,
+    /// The IME compose state; `None` if the IME is not currently composing.
+    compose: Option<Compose>,
     width: Option<f32>,
     scale: f32,
     // Simple tracking of when the layout needs to be updated
@@ -301,13 +309,12 @@ where
     /// The preedit text replaces the current selection if this call starts composing.
     ///
     /// The selection is updated based on `cursor`, which contains the byte offsets relative to the
-    /// start of the preedit text. If `cursor` is `None`, the selection is collapsed to a caret in
-    /// front of the preedit text.
+    /// start of the preedit text. If `cursor` is `None`, the selection and caret are hidden.
     pub fn set_compose(&mut self, text: &str, cursor: Option<(usize, usize)>) {
         debug_assert!(!text.is_empty());
         debug_assert!(cursor.map(|cursor| cursor.1 <= text.len()).unwrap_or(true));
 
-        let start = if let Some(preedit_range) = self.editor.compose.clone() {
+        let start = if let Some(Compose { preedit_range, .. }) = &self.editor.compose {
             self.editor
                 .buffer
                 .replace_range(preedit_range.clone(), text);
@@ -324,30 +331,28 @@ where
             }
             self.editor.selection.text_range().start
         };
-        self.editor.compose = Some(start..start + text.len());
+        self.editor.compose = Some(Compose {
+            preedit_range: start..start + text.len(),
+            show_cursor: cursor.is_some(),
+        });
         self.update_layout();
 
-        if let Some(cursor) = cursor {
-            // Select the location indicated by the IME.
-            self.editor.set_selection(Selection::new(
-                self.editor.cursor_at(start + cursor.0),
-                self.editor.cursor_at(start + cursor.1),
-            ));
-        } else {
-            // IME indicates nothing is to be selected: collapse the selection to a
-            // caret just in front of the preedit.
-            self.editor
-                .set_selection(self.editor.cursor_at(start).into());
-        }
+        // Select the location indicated by the IME. If `cursor` is none, collapse the selection to
+        // a caret at the start of the preedit text. As `Compose::show_cursor` is `false`, it won't
+        // show up.
+        let cursor = cursor.unwrap_or((0, 0));
+        self.editor.set_selection(Selection::new(
+            self.editor.cursor_at(start + cursor.0),
+            self.editor.cursor_at(start + cursor.1),
+        ));
     }
 
     /// Stop IME composing.
     ///
     /// This removes the IME preedit text.
     pub fn clear_compose(&mut self) {
-        if let Some(preedit_range) = self.editor.compose.clone() {
+        if let Some(Compose { preedit_range, .. }) = self.editor.compose.take() {
             self.editor.buffer.replace_range(preedit_range.clone(), "");
-            self.editor.compose = None;
             self.update_layout();
 
             self.editor
@@ -757,12 +762,21 @@ where
 
     /// Get rectangles representing the selected portions of text.
     pub fn selection_geometry(&self) -> Vec<Rect> {
+        // We do not check the compose state's `show_cursor` here, as the IME handling code
+        // collapses the selection to a caret in that case.
         self.selection.geometry(&self.layout)
     }
 
     /// Get a rectangle representing the current caret cursor position.
+    ///
+    /// There is not always a caret. For example, the IME may have indicated the caret should be
+    /// hidden.
     pub fn cursor_geometry(&self, size: f32) -> Option<Rect> {
-        Some(self.selection.focus().geometry(&self.layout, size))
+        if self.compose.as_ref().map(|c| c.show_cursor).unwrap_or(true) {
+            Some(self.selection.focus().geometry(&self.layout, size))
+        } else {
+            None
+        }
     }
 
     /// Borrow the text content of the buffer.
@@ -770,8 +784,11 @@ where
     /// The return value is a `SplitString` because it
     /// excludes the IME preedit region.
     pub fn text(&self) -> SplitString<'_> {
-        if let Some(compose) = &self.compose {
-            SplitString([&self.buffer[..compose.start], &self.buffer[compose.end..]])
+        if let Some(Compose { preedit_range, .. }) = &self.compose {
+            SplitString([
+                &self.buffer[..preedit_range.start],
+                &self.buffer[preedit_range.end..],
+            ])
         } else {
             SplitString([&self.buffer, ""])
         }
@@ -969,7 +986,7 @@ where
         for prop in self.default_style.inner().values() {
             builder.push_default(prop.to_owned());
         }
-        if let Some(ref preedit_range) = self.compose {
+        if let Some(Compose { preedit_range, .. }) = &self.compose {
             builder.push(StyleProperty::Underline(true), preedit_range.clone());
         }
         self.layout = builder.build(&self.buffer);
@@ -1005,11 +1022,15 @@ where
             x_offset,
             y_offset,
         );
-        if let Some(selection) = self
-            .selection
-            .to_access_selection(&self.layout, &self.layout_access)
-        {
-            node.set_text_selection(selection);
+        if self.compose.as_ref().map(|c| c.show_cursor).unwrap_or(true) {
+            if let Some(selection) = self
+                .selection
+                .to_access_selection(&self.layout, &self.layout_access)
+            {
+                node.set_text_selection(selection);
+            }
+        } else {
+            node.clear_text_selection();
         }
         node.add_action(accesskit::Action::SetTextSelection);
     }
