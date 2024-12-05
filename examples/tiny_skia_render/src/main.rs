@@ -67,7 +67,7 @@ fn main() {
     let bold = FontWeight::new(600.0);
     builder.push(StyleProperty::FontWeight(bold), 0..4);
 
-    // Set the underline & stoked style
+    // Set the underline & strikethrough style
     builder.push(StyleProperty::Underline(true), 141..150);
     builder.push(StyleProperty::Strikethrough(true), 155..168);
 
