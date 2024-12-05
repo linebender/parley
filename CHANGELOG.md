@@ -20,6 +20,7 @@ This release has an [MSRV] of 1.75.
 #### Parley
 
 - `Generation` on `PlainEditor` to help implement lazy drawing. ([#143] by [@xorgy])
+- Support for preedit for input methods in `PlainEditor` ([#192][] by [@tomcur][])
 
 ### Changed
 
@@ -83,6 +84,7 @@ This release has an [MSRV] of 1.70.
 [@dfrg]: https://github.com/dfrg
 [@DJMcNab]: https://github.com/DJMcNab
 [@nicoburns]: https://github.com/nicoburns
+[@tomcur]: https://github.com/tomcur
 [@waywardmonkeys]: https://github.com/waywardmonkeys
 [@xorgy]: https://github.com/xorgy
 
