@@ -8,16 +8,17 @@
 #![allow(clippy::shadow_unrelated)]
 #![allow(clippy::unseparated_literal_suffix)]
 
-use accesskit::{Node, Rect, Role, Tree, TreeUpdate};
+use accesskit::{Node, Role, Tree, TreeUpdate};
 use anyhow::Result;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
+use vello::kurbo;
 use vello::peniko::Color;
 use vello::util::{RenderContext, RenderSurface};
 use vello::wgpu;
 use vello::{AaConfig, Renderer, RendererOptions, Scene};
 use winit::application::ApplicationHandler;
-use winit::dpi::LogicalSize;
+use winit::dpi::{LogicalSize, PhysicalPosition, PhysicalSize};
 use winit::event::{StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::window::Window;
@@ -55,7 +56,7 @@ impl ActiveRenderState<'_> {
             }
             let mut node = Node::new(Role::TextInput);
             let size = self.window.inner_size();
-            node.set_bounds(Rect {
+            node.set_bounds(accesskit::Rect {
                 x0: 0.0,
                 y0: 0.0,
                 x1: size.width as _,
@@ -93,6 +94,9 @@ struct SimpleVelloApp<'s> {
 
     /// The last generation of the editor layout that we drew.
     last_drawn_generation: text::Generation,
+
+    /// The IME cursor area we last sent to the platform.
+    last_sent_ime_cursor_area: Option<kurbo::Rect>,
 
     /// The event loop proxy required by the AccessKit winit adapter.
     event_loop_proxy: EventLoopProxy<accesskit_winit::Event>,
@@ -215,6 +219,20 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
         self.editor.handle_event(event.clone());
         if self.last_drawn_generation != self.editor.generation() {
             render_state.window.request_redraw();
+            let area = self.editor.editor().ime_cursor_area();
+            if self.last_sent_ime_cursor_area != Some(area) {
+                self.last_sent_ime_cursor_area = Some(area);
+                // Note: on X11 `set_ime_cursor_area` may cause the exclusion area to be obscured
+                // until https://github.com/rust-windowing/winit/pull/3966 is in the Winit release
+                // used by this example.
+                render_state.window.set_ime_cursor_area(
+                    PhysicalPosition::new(
+                        area.x0 + text::INSET as f64,
+                        area.y0 + text::INSET as f64,
+                    ),
+                    PhysicalSize::new(area.width(), area.height()),
+                );
+            }
         }
         // render_state
         //     .window
@@ -340,6 +358,7 @@ fn main() -> Result<()> {
         scene: Scene::new(),
         editor: text::Editor::new(text::LOREM),
         last_drawn_generation: Default::default(),
+        last_sent_ime_cursor_area: None,
         event_loop_proxy: event_loop.create_proxy(),
     };
 
