@@ -502,7 +502,7 @@ impl Selection {
     /// This means that the selection represents a single position rather than
     /// a range.
     pub fn is_collapsed(&self) -> bool {
-        self.anchor == self.focus
+        self.anchor.index == self.focus.index
     }
 
     /// Returns the anchor of the selection.
