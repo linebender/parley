@@ -101,6 +101,7 @@ impl<B: Brush> TreeBuilder<'_, B> {
 
     pub fn push_inline_box(&mut self, mut inline_box: InlineBox) {
         self.lcx.tree_style_builder.push_uncommitted_text(false);
+        self.lcx.tree_style_builder.set_is_span_first(false);
         // TODO: arrange type better here to factor out the index
         inline_box.index = self.lcx.tree_style_builder.current_text_len();
         self.lcx.inline_boxes.push(inline_box);
