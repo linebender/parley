@@ -5,7 +5,9 @@
 
 #[cfg(feature = "accesskit")]
 use super::LayoutAccessibility;
-use super::{Affinity, BreakReason, Brush, Cluster, ClusterSide, Layout, Line};
+use super::{
+    Affinity, BreakReason, Brush, Cluster, ClusterSide, Layout, Line, PositionedLayoutItem,
+};
 #[cfg(feature = "accesskit")]
 use accesskit::TextPosition;
 use alloc::vec::Vec;
@@ -826,16 +828,27 @@ impl Selection {
                 let mut start_x = metrics.offset as f64;
                 let mut cur_x = start_x;
                 let mut cluster_count = 0;
-                for run in line.runs() {
-                    for cluster in run.visual_clusters() {
+                for item in line.items() {
+                    let PositionedLayoutItem::GlyphRun(run) = item else {
+                        continue;
+                    };
+                    let offset = run.offset();
+                    let run = run.run();
+                    for (ix, cluster) in run.visual_clusters().enumerate() {
                         let advance = cluster.advance() as f64;
                         if text_range.contains(&cluster.text_range().start) {
+                            if ix == 0 {
+                                cur_x = offset as f64;
+                            }
                             cluster_count += 1;
                             cur_x += advance;
                         } else {
                             if cur_x != start_x {
                                 let width = (cur_x - start_x).max(MIN_RECT_WIDTH);
                                 f(Rect::new(start_x as _, line_min, start_x + width, line_max));
+                            }
+                            if ix == 0 {
+                                cur_x = offset as f64;
                             }
                             cur_x += advance;
                             start_x = cur_x;
