@@ -8,10 +8,13 @@ use swash::text::cluster::Whitespace;
 
 #[cfg(feature = "libm")]
 #[allow(unused_imports)]
-use core_maths::*;
+use core_maths::CoreFloat;
 
 use crate::layout::alignment::unjustify;
-use crate::layout::*;
+use crate::layout::{
+    Alignment, Boundary, BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData,
+    LineItemData, LineMetrics, Run,
+};
 use crate::style::Brush;
 
 use core::ops::Range;

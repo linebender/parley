@@ -3,8 +3,8 @@
 
 //! Context for layout.
 
-use super::context::*;
-use super::style::*;
+use super::context::LayoutContext;
+use super::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
 use super::FontContext;
 
 use super::layout::Layout;

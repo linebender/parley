@@ -5,7 +5,7 @@
 
 #[cfg(feature = "libm")]
 #[allow(unused_imports)]
-use core_maths::*;
+use core_maths::CoreFloat;
 
 use core::fmt;
 

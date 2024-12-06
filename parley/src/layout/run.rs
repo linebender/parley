@@ -1,7 +1,10 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::*;
+use super::{
+    Brush, Cluster, ClusterPath, Font, Layout, LineItemData, NormalizedCoord, Range, Run, RunData,
+    Synthesis,
+};
 
 impl<'a, B: Brush> Run<'a, B> {
     pub(crate) fn new(

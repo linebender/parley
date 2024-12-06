@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use super::{Stretch, Style, Weight};
-use fontconfig_cache_parser::*;
+use fontconfig_cache_parser::{Cache, CharSetLeaf, Object, Pattern, Value};
 use std::io::Read;
 use std::path::PathBuf;
 
