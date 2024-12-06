@@ -832,7 +832,7 @@ impl Selection {
                     let PositionedLayoutItem::GlyphRun(run) = item else {
                         continue;
                     };
-                    let offset = run.offset();
+                    let offset = run.offset() + metrics.offset;
                     let run = run.run();
                     for (ix, cluster) in run.visual_clusters().enumerate() {
                         let advance = cluster.advance() as f64;
