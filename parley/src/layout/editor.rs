@@ -90,15 +90,6 @@ impl<'source> IntoIterator for SplitString<'source> {
     }
 }
 
-/// IME compose state.
-#[derive(Clone)]
-struct Compose {
-    /// Byte offsets of IME composing preedit text in the text buffer.
-    preedit_range: Range<usize>,
-    /// Whether the cursor should be shown. The IME can request to hide the cursor.
-    show_cursor: bool,
-}
-
 /// Basic plain text editor with a single style applied to the entire text.
 ///
 /// Internally, this is a wrapper around a string buffer and its corresponding [`Layout`],
@@ -115,8 +106,11 @@ where
     #[cfg(feature = "accesskit")]
     layout_access: LayoutAccessibility,
     selection: Selection,
-    /// The IME compose state; `None` if the IME is not currently composing.
-    compose: Option<Compose>,
+    /// Byte offsets of IME composing preedit text in the text buffer.
+    /// `None` if the IME is not currently composing.
+    compose: Option<Range<usize>>,
+    /// Whether the cursor should be shown. The IME can request to hide the cursor.
+    show_cursor: bool,
     width: Option<f32>,
     scale: f32,
     // Simple tracking of when the layout needs to be updated
@@ -147,6 +141,7 @@ where
             layout_access: Default::default(),
             selection: Default::default(),
             compose: None,
+            show_cursor: true,
             width: None,
             scale: 1.0,
             layout_dirty: true,
@@ -314,7 +309,7 @@ where
         debug_assert!(!text.is_empty());
         debug_assert!(cursor.map(|cursor| cursor.1 <= text.len()).unwrap_or(true));
 
-        let start = if let Some(Compose { preedit_range, .. }) = &self.editor.compose {
+        let start = if let Some(preedit_range) = &self.editor.compose {
             self.editor
                 .buffer
                 .replace_range(preedit_range.clone(), text);
@@ -331,14 +326,12 @@ where
             }
             self.editor.selection.text_range().start
         };
-        self.editor.compose = Some(Compose {
-            preedit_range: start..start + text.len(),
-            show_cursor: cursor.is_some(),
-        });
+        self.editor.compose = Some(start..start + text.len());
+        self.editor.show_cursor = cursor.is_some();
         self.update_layout();
 
         // Select the location indicated by the IME. If `cursor` is none, collapse the selection to
-        // a caret at the start of the preedit text. As `Compose::show_cursor` is `false`, it won't
+        // a caret at the start of the preedit text. As `self.show_cursor` is `false`, it won't
         // show up.
         let cursor = cursor.unwrap_or((0, 0));
         self.editor.set_selection(Selection::new(
@@ -351,8 +344,9 @@ where
     ///
     /// This removes the IME preedit text.
     pub fn clear_compose(&mut self) {
-        if let Some(Compose { preedit_range, .. }) = self.editor.compose.take() {
+        if let Some(preedit_range) = self.editor.compose.take() {
             self.editor.buffer.replace_range(preedit_range.clone(), "");
+            self.editor.show_cursor = true;
             self.update_layout();
 
             self.editor
@@ -762,8 +756,8 @@ where
 
     /// Get rectangles representing the selected portions of text.
     pub fn selection_geometry(&self) -> Vec<Rect> {
-        // We do not check the compose state's `show_cursor` here, as the IME handling code
-        // collapses the selection to a caret in that case.
+        // We do not check `show_cursor` here, as the IME handling code collapses the selection to
+        // a caret in that case.
         self.selection.geometry(&self.layout)
     }
 
@@ -772,11 +766,8 @@ where
     /// There is not always a caret. For example, the IME may have indicated the caret should be
     /// hidden.
     pub fn cursor_geometry(&self, size: f32) -> Option<Rect> {
-        if self.compose.as_ref().map(|c| c.show_cursor).unwrap_or(true) {
-            Some(self.selection.focus().geometry(&self.layout, size))
-        } else {
-            None
-        }
+        self.show_cursor
+            .then(|| self.selection.focus().geometry(&self.layout, size))
     }
 
     /// Borrow the text content of the buffer.
@@ -784,7 +775,7 @@ where
     /// The return value is a `SplitString` because it
     /// excludes the IME preedit region.
     pub fn text(&self) -> SplitString<'_> {
-        if let Some(Compose { preedit_range, .. }) = &self.compose {
+        if let Some(preedit_range) = &self.compose {
             SplitString([
                 &self.buffer[..preedit_range.start],
                 &self.buffer[preedit_range.end..],
@@ -986,7 +977,7 @@ where
         for prop in self.default_style.inner().values() {
             builder.push_default(prop.to_owned());
         }
-        if let Some(Compose { preedit_range, .. }) = &self.compose {
+        if let Some(preedit_range) = &self.compose {
             builder.push(StyleProperty::Underline(true), preedit_range.clone());
         }
         self.layout = builder.build(&self.buffer);
@@ -1022,7 +1013,7 @@ where
             x_offset,
             y_offset,
         );
-        if self.compose.as_ref().map(|c| c.show_cursor).unwrap_or(true) {
+        if self.show_cursor {
             if let Some(selection) = self
                 .selection
                 .to_access_selection(&self.layout, &self.layout_access)
