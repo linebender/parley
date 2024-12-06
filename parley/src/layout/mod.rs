@@ -22,7 +22,10 @@ use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
 #[cfg(feature = "accesskit")]
 use alloc::vec::Vec;
 use core::{cmp::Ordering, ops::Range};
-use data::*;
+use data::{
+    BreakReason, ClusterData, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
+    RunData,
+};
 #[cfg(feature = "accesskit")]
 use hashbrown::{HashMap, HashSet};
 use swash::text::cluster::{Boundary, ClusterInfo};

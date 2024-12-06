@@ -8,7 +8,7 @@ use crate::util::nearly_eq;
 use crate::Font;
 use fontique::QueryFamily;
 use fontique::{self, Query, QueryFont};
-use swash::shape::*;
+use swash::shape::{partition, Direction, ShapeContext};
 use swash::text::cluster::{CharCluster, CharInfo, Token};
 use swash::text::{Language, Script};
 use swash::{FontRef, Synthesis};

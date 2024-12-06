@@ -1,7 +1,7 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::*;
+use super::{BreakReason, Brush, Cluster, ClusterInfo, Glyph, Layout, Line, Range, Run};
 use swash::text::cluster::Whitespace;
 
 /// Defines the visual side of the cluster for hit testing.
@@ -465,9 +465,9 @@ impl Iterator for GlyphIter<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Cluster, FontContext, LayoutContext, PositionedLayoutItem, StyleProperty};
-
-    use super::{Alignment, Layout};
+    use crate::{
+        Alignment, Cluster, FontContext, Layout, LayoutContext, PositionedLayoutItem, StyleProperty,
+    };
 
     type Brush = ();
 

@@ -5,7 +5,7 @@
 
 use alloc::vec;
 
-use super::*;
+use super::{Brush, RangedProperty, RangedStyle, ResolvedProperty, ResolvedStyle, Vec};
 use core::ops::{Bound, Range, RangeBounds};
 
 /// Builder for constructing an ordered sequence of non-overlapping ranged

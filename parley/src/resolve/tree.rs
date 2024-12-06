@@ -7,7 +7,7 @@ use alloc::{string::String, vec::Vec};
 
 use crate::style::WhiteSpaceCollapse;
 
-use super::*;
+use super::{Brush, RangedStyle, ResolvedProperty, ResolvedStyle};
 
 #[derive(Debug, Clone)]
 struct StyleTreeNode<B: Brush> {
