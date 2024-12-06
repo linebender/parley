@@ -22,7 +22,6 @@ use core::borrow::Borrow;
 use core::ops::Range;
 use fontique::FamilyId;
 use swash::text::Language;
-use swash::Setting;
 
 /// Style with an associated range.
 #[derive(Debug, Clone)]
@@ -118,11 +117,11 @@ impl<T: Clone + PartialEq> Cache<T> {
 #[derive(Clone, Default)]
 pub(crate) struct ResolveContext {
     families: Cache<FamilyId>,
-    variations: Cache<Setting<f32>>,
-    features: Cache<Setting<u16>>,
+    variations: Cache<FontVariation>,
+    features: Cache<FontFeature>,
     tmp_families: Vec<FamilyId>,
-    tmp_variations: Vec<Setting<f32>>,
-    tmp_features: Vec<Setting<u16>>,
+    tmp_variations: Vec<FontVariation>,
+    tmp_features: Vec<FontFeature>,
 }
 
 impl ResolveContext {
@@ -253,7 +252,7 @@ impl ResolveContext {
     pub(crate) fn resolve_variations(
         &mut self,
         variations: &FontSettings<FontVariation>,
-    ) -> Resolved<Setting<f32>> {
+    ) -> Resolved<FontVariation> {
         match variations {
             FontSettings::Source(source) => {
                 self.tmp_variations.clear();
@@ -278,7 +277,7 @@ impl ResolveContext {
     pub(crate) fn resolve_features(
         &mut self,
         features: &FontSettings<FontFeature>,
-    ) -> Resolved<Setting<u16>> {
+    ) -> Resolved<FontFeature> {
         match features {
             FontSettings::Source(source) => {
                 self.tmp_features.clear();
@@ -304,12 +303,15 @@ impl ResolveContext {
     }
 
     /// Returns the list of font variations for the specified handle.
-    pub(crate) fn variations(&self, variations: Resolved<Setting<f32>>) -> Option<&[Setting<f32>]> {
+    pub(crate) fn variations(
+        &self,
+        variations: Resolved<FontVariation>,
+    ) -> Option<&[FontVariation]> {
         self.variations.get(variations)
     }
 
     /// Returns the list of font features for the specified handle.
-    pub(crate) fn features(&self, features: Resolved<Setting<u16>>) -> Option<&[Setting<u16>]> {
+    pub(crate) fn features(&self, features: Resolved<FontFeature>) -> Option<&[FontFeature]> {
         self.features.get(features)
     }
 
@@ -335,9 +337,9 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     /// Font weight.
     FontWeight(FontWeight),
     /// Font variation settings.
-    FontVariations(Resolved<Setting<f32>>),
+    FontVariations(Resolved<FontVariation>),
     /// Font feature settings.
-    FontFeatures(Resolved<Setting<u16>>),
+    FontFeatures(Resolved<FontFeature>),
     /// Locale.
     Locale(Option<Language>),
     /// Brush for rendering text.
@@ -380,9 +382,9 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     /// Font weight.
     pub(crate) font_weight: FontWeight,
     /// Font variation settings.
-    pub(crate) font_variations: Resolved<Setting<f32>>,
+    pub(crate) font_variations: Resolved<FontVariation>,
     /// Font feature settings.
-    pub(crate) font_features: Resolved<Setting<u16>>,
+    pub(crate) font_features: Resolved<FontFeature>,
     /// Locale.
     pub(crate) locale: Option<Language>,
     /// Brush for rendering text.
