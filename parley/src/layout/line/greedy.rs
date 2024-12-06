@@ -727,6 +727,7 @@ fn try_commit_line<B: Brush>(
 
     // Iterate over the items to commit
     // println!("\nCOMMIT LINE");
+    let mut last_item_kind = LayoutItemKind::TextRun;
     for (i, item) in items_to_commit.iter().enumerate() {
         // println!("i = {} index = {} {:?}", i, item.index, item.kind);
 
@@ -746,6 +747,8 @@ fn try_commit_line<B: Brush>(
                     cluster_range: 0..0,
                     text_range: 0..0,
                 });
+
+                last_item_kind = item.kind;
             }
             LayoutItemKind::TextRun => {
                 let run_data = &layout.data.runs[item.index];
@@ -768,6 +771,8 @@ fn try_commit_line<B: Brush>(
                     // dbg!(cluster_range);
                     continue;
                 }
+
+                last_item_kind = item.kind;
 
                 // Push run to line
                 let run = Run::new(layout, 0, 0, run_data, None);
@@ -826,10 +831,21 @@ fn try_commit_line<B: Brush>(
     });
 
     // Reset state for the new line
+    state.num_spaces = 0;
     state.clusters.start = state.clusters.end;
     state.clusters.end += 1;
-    state.items.start = state.items.end.saturating_sub(1);
-    state.num_spaces = 0;
+
+    state.items.start = match last_item_kind {
+        // For text runs, the first item of line N+1 needs to be the SAME as
+        // the last item for line N. This is because the item (if it a text run
+        // may be split across the two lines with some clusters in line N and some
+        // in line N+1). The item is later filtered out (see `continue` in loop above)
+        // if there are not actually any clusters in line N+1.
+        LayoutItemKind::TextRun => state.items.end.saturating_sub(1),
+        // Inline boxes cannot be spread across multiple lines, so we should set
+        // the first item of line N+1 to be the item AFTER the last item in line N.
+        LayoutItemKind::InlineBox => state.items.end,
+    };
 
     true
 }
