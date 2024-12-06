@@ -524,7 +524,7 @@ impl Selection {
     /// focus.
     #[must_use]
     pub fn collapse(&self) -> Self {
-        Self::new(self.anchor, self.focus)
+        self.focus.into()
     }
 
     /// Returns a new selection that is guaranteed to be within the bounds of
