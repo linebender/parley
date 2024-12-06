@@ -529,14 +529,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             line.metrics.trailing_whitespace = 0.0;
             if !line.item_range.is_empty() {
                 // Note: there may not be a "last run" if there are no runs in the line
-                let last_run = &self
-                    .lines
-                    .line_items
-                    .iter()
-                    .rfind(|item| item.is_text_run());
-                if let Some(last_run) = last_run {
-                    if !last_run.cluster_range.is_empty() {
-                        let cluster = &self.layout.data.clusters[last_run.cluster_range.end - 1];
+                let last_item = &self.lines.line_items.last();
+                if let Some(last_item) = last_item {
+                    if last_item.is_text_run() && !last_item.cluster_range.is_empty() {
+                        let cluster = &self.layout.data.clusters[last_item.cluster_range.end - 1];
                         if cluster.info.whitespace().is_space_or_nbsp() {
                             line.metrics.trailing_whitespace = cluster.advance;
                         }
