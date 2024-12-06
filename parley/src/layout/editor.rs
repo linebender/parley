@@ -331,8 +331,8 @@ where
         self.update_layout();
 
         // Select the location indicated by the IME. If `cursor` is none, collapse the selection to
-        // a caret at the start of the preedit text. As `self.show_cursor` is `false`, it won't
-        // show up.
+        // a caret at the start of the preedit text. As `self.editor.show_cursor` is `false`, it
+        // won't show up.
         let cursor = cursor.unwrap_or((0, 0));
         self.editor.set_selection(Selection::new(
             self.editor.cursor_at(start + cursor.0),
@@ -756,8 +756,8 @@ where
 
     /// Get rectangles representing the selected portions of text.
     pub fn selection_geometry(&self) -> Vec<Rect> {
-        // We do not check `show_cursor` here, as the IME handling code collapses the selection to
-        // a caret in that case.
+        // We do not check `self.show_cursor` here, as the IME handling code collapses the
+        // selection to a caret in that case.
         self.selection.geometry(&self.layout)
     }
 
