@@ -21,11 +21,8 @@ impl<'a, B: Brush> Cluster<'a, B> {
         let mut path = ClusterPath::default();
         if let Some((line_index, line)) = layout.line_for_byte_index(byte_index) {
             path.line_index = line_index as u32;
-            for run_index in 0..line.len() {
-                let Some(run) = line.run(run_index) else {
-                    continue;
-                };
-                path.run_index = run_index as u32;
+            for run in line.runs() {
+                path.run_index = run.index;
                 if !run.text_range().contains(&byte_index) {
                     continue;
                 }
