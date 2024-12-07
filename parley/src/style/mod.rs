@@ -7,11 +7,17 @@ mod styleset;
 
 use alloc::borrow::Cow;
 pub use styled_text::{
-    Brush, FontFamily, FontFeature, FontSettings, FontStack, FontVariation, GenericFamily,
-    Stretch as FontStretch, Style as FontStyle, StyleProperty, Weight as FontWeight,
+    Brush, FontFamily, FontSettings, FontStack, GenericFamily, Stretch as FontStretch,
+    Style as FontStyle, StyleProperty, Weight as FontWeight,
 };
 
 pub use styleset::StyleSet;
+
+/// Setting for a font variation.
+pub type FontVariation = swash::Setting<f32>;
+
+/// Setting for a font feature.
+pub type FontFeature = swash::Setting<u16>;
 
 #[derive(Debug, Clone, Copy)]
 pub enum WhiteSpaceCollapse {
@@ -33,9 +39,9 @@ pub struct TextStyle<'a, B: Brush> {
     /// Font weight.
     pub font_weight: FontWeight,
     /// Font variation settings.
-    pub font_variations: FontSettings<'a, FontVariation>,
+    pub font_variations: FontSettings<'a, styled_text::FontVariation>,
     /// Font feature settings.
-    pub font_features: FontSettings<'a, FontFeature>,
+    pub font_features: FontSettings<'a, styled_text::FontFeature>,
     /// Locale.
     pub locale: Option<&'a str>,
     /// Brush for rendering text.

@@ -27,6 +27,7 @@ mod font_family;
 mod font_settings;
 mod font_stack;
 mod generic;
+pub mod setting;
 mod style_property;
 
 pub use attributes::{Stretch, Style, Weight};

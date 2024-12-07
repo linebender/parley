@@ -251,7 +251,7 @@ impl ResolveContext {
     /// Resolves font variation settings.
     pub(crate) fn resolve_variations(
         &mut self,
-        variations: &FontSettings<FontVariation>,
+        variations: &FontSettings<styled_text::FontVariation>,
     ) -> Resolved<FontVariation> {
         match variations {
             FontSettings::Source(source) => {
@@ -261,7 +261,11 @@ impl ResolveContext {
             }
             FontSettings::List(settings) => {
                 self.tmp_variations.clear();
-                self.tmp_variations.extend_from_slice(settings);
+                self.tmp_variations.extend(
+                    settings
+                        .iter()
+                        .map(|v| FontVariation::from((v.tag, v.value))),
+                );
             }
         }
         if self.tmp_variations.is_empty() {
@@ -276,7 +280,7 @@ impl ResolveContext {
     /// Resolves font feature settings.
     pub(crate) fn resolve_features(
         &mut self,
-        features: &FontSettings<FontFeature>,
+        features: &FontSettings<styled_text::FontFeature>,
     ) -> Resolved<FontFeature> {
         match features {
             FontSettings::Source(source) => {
@@ -285,7 +289,8 @@ impl ResolveContext {
             }
             FontSettings::List(settings) => {
                 self.tmp_features.clear();
-                self.tmp_features.extend_from_slice(settings);
+                self.tmp_features
+                    .extend(settings.iter().map(|f| FontFeature::from((f.tag, f.value))));
             }
         }
         if self.tmp_features.is_empty() {
