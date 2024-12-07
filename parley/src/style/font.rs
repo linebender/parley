@@ -198,11 +198,11 @@ impl<'a> Iterator for ParseList<'a> {
 
 /// Font settings that can be supplied as a raw source string or
 /// a parsed slice.
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum FontSettings<'a, T>
 where
     [T]: ToOwned,
-    <[T] as ToOwned>::Owned: fmt::Debug + Eq + Clone,
+    <[T] as ToOwned>::Owned: fmt::Debug + PartialEq + Clone,
 {
     /// Setting source in CSS format.
     Source(Cow<'a, str>),
@@ -213,7 +213,7 @@ where
 impl<'a, T> From<&'a str> for FontSettings<'a, T>
 where
     [T]: ToOwned,
-    <[T] as ToOwned>::Owned: fmt::Debug + Eq + Clone,
+    <[T] as ToOwned>::Owned: fmt::Debug + PartialEq + Clone,
 {
     fn from(value: &'a str) -> Self {
         Self::Source(Cow::Borrowed(value))
@@ -223,7 +223,7 @@ where
 impl<'a, T> From<&'a [T]> for FontSettings<'a, T>
 where
     [T]: ToOwned,
-    <[T] as ToOwned>::Owned: fmt::Debug + Eq + Clone,
+    <[T] as ToOwned>::Owned: fmt::Debug + PartialEq + Clone,
 {
     fn from(value: &'a [T]) -> Self {
         Self::List(Cow::Borrowed(value))
