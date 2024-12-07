@@ -5,9 +5,8 @@ use alloc::borrow::Cow;
 use alloc::borrow::ToOwned;
 use core::fmt;
 
-pub use fontique::{
-    GenericFamily, Stretch as FontStretch, Style as FontStyle, Weight as FontWeight,
-};
+pub use fontique::GenericFamily;
+pub use styled_text::{Stretch as FontStretch, Style as FontStyle, Weight as FontWeight};
 
 /// Setting for a font variation.
 pub type FontVariation = swash::Setting<f32>;

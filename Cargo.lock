@@ -977,6 +977,7 @@ dependencies = [
  "read-fonts",
  "roxmltree",
  "smallvec",
+ "styled_text",
  "unicode-script",
  "windows 0.58.0",
  "windows-core 0.58.0",
@@ -1979,6 +1980,7 @@ dependencies = [
  "hashbrown 0.15.2",
  "peniko",
  "skrifa",
+ "styled_text",
  "swash",
  "tiny-skia",
 ]
@@ -2449,6 +2451,13 @@ name = "strict-num"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6637bab7722d379c8b41ba849228d680cc12d0a45ba1fa2b48f2a30577a06731"
+
+[[package]]
+name = "styled_text"
+version = "0.1.0"
+dependencies = [
+ "core_maths",
+]
 
 [[package]]
 name = "svg_fmt"

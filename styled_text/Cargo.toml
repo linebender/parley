@@ -1,0 +1,23 @@
+[package]
+name = "styled_text"
+version = "0.1.0" # Keep in sync with workspace dependency specification
+description = "Styled text and text styles"
+keywords = ["font", "text"]
+categories = ["gui", "os"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
+
+[lints]
+workspace = true
+
+[features]
+std = []
+libm = ["dep:core_maths"]
+
+[dependencies]
+core_maths = { version = "0.1.0", optional = true }

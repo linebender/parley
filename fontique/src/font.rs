@@ -3,11 +3,11 @@
 
 //! Model for a font.
 
-use super::attributes::{Stretch, Style, Weight};
 use super::source::{SourceInfo, SourceKind};
 use super::{source_cache::SourceCache, Blob};
 use read_fonts::{types::Tag, FontRef, TableProvider as _};
 use smallvec::SmallVec;
+use styled_text::{Stretch, Style, Weight};
 
 type AxisVec = SmallVec<[AxisInfo; 1]>;
 

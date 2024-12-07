@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "fontique",
+    "styled_text",
     "parley",
     "examples/tiny_skia_render",
     "examples/swash_render",
@@ -84,4 +85,5 @@ parley = { version = "0.2.0", default-features = false, path = "parley" }
 peniko = { version = "0.2.0", default-features = false }
 skrifa = { version = "0.22.3", default-features = false }
 read-fonts = { version = "0.22.3", default-features = false }
+styled_text = { version = "0.1.0", default-features = false, path = "styled_text" }
 swash = { version = "0.1.19", default-features = false }

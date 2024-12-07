@@ -3,14 +3,11 @@
 
 //! Model for font families.
 
-use super::{
-    attributes::{Stretch, Style, Weight},
-    family_name::FamilyName,
-    font::FontInfo,
-};
+use super::{family_name::FamilyName, font::FontInfo};
 use alloc::sync::Arc;
 use core::sync::atomic::{AtomicU64, Ordering};
 use smallvec::SmallVec;
+use styled_text::{Stretch, Style, Weight};
 
 /// Unique identifier for a font family.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
