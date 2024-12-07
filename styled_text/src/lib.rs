@@ -17,5 +17,7 @@
 #![allow(clippy::use_self)]
 
 mod attributes;
+mod generic;
 
 pub use attributes::{Stretch, Style, Weight};
+pub use generic::GenericFamily;
