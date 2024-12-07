@@ -2457,6 +2457,7 @@ name = "styled_text"
 version = "0.1.0"
 dependencies = [
  "core_maths",
+ "swash",
 ]
 
 [[package]]
