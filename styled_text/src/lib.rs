@@ -22,12 +22,14 @@ compile_error!("parley requires either the `std` or `libm` feature to be enabled
 extern crate alloc;
 
 mod attributes;
+mod brush;
 mod font_family;
 mod font_settings;
 mod font_stack;
 mod generic;
 
 pub use attributes::{Stretch, Style, Weight};
+pub use brush::Brush;
 pub use font_family::FontFamily;
 pub use font_settings::FontSettings;
 pub use font_stack::FontStack;

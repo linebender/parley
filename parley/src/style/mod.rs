@@ -3,13 +3,12 @@
 
 //! Rich styling support.
 
-mod brush;
 mod font;
 mod styleset;
 
 use alloc::borrow::Cow;
+pub use styled_text::Brush;
 
-pub use brush::*;
 pub use font::{
     FontFamily, FontFeature, FontSettings, FontStack, FontStretch, FontStyle, FontVariation,
     FontWeight, GenericFamily,
