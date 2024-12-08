@@ -7,17 +7,33 @@ use std::io::Read;
 use std::path::PathBuf;
 
 impl Stretch {
-    fn from_fc(width: i32) -> Self {
+    /// Creates a new stretch attribute with the given value from Fontconfig.
+    ///
+    /// The values are determined based on the [fonts.conf documentation].
+    ///
+    /// [fonts.conf documentation]: https://www.freedesktop.org/software/fontconfig/fontconfig-user.html
+    pub fn from_fc(width: i32) -> Self {
         match width {
+            50 => Self::ULTRA_CONDENSED,
             63 => Self::EXTRA_CONDENSED,
+            75 => Self::CONDENSED,
             87 => Self::SEMI_CONDENSED,
+            100 => Self::NORMAL,
             113 => Self::SEMI_EXPANDED,
+            125 => Self::EXPANDED,
+            150 => Self::EXTRA_EXPANDED,
+            200 => Self::ULTRA_EXPANDED,
             _ => Self::from_ratio(width as f32 / 100.0),
         }
     }
 }
 
 impl Style {
+    /// Creates a new style attribute with the given value from Fontconfig.
+    ///
+    /// The values are determined based on the [fonts.conf documentation].
+    ///
+    /// [fonts.conf documentation]: https://www.freedesktop.org/software/fontconfig/fontconfig-user.html
     fn from_fc(slant: i32) -> Self {
         match slant {
             100 => Self::Italic,
@@ -28,6 +44,11 @@ impl Style {
 }
 
 impl Weight {
+    /// Creates a new weight attribute with the given value from Fontconfig.
+    ///
+    /// The values are determined based on the [fonts.conf documentation].
+    ///
+    /// [fonts.conf documentation]: https://www.freedesktop.org/software/fontconfig/fontconfig-user.html
     fn from_fc(weight: i32) -> Self {
         const MAP: &[(i32, i32)] = &[
             (0, 0),
