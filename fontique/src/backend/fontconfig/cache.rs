@@ -1,65 +1,62 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::{Stretch, Style, Weight};
 use fontconfig_cache_parser::{Cache, CharSetLeaf, Object, Pattern, Value};
 use std::io::Read;
 use std::path::PathBuf;
+use styled_text::{Stretch, Style, Weight};
 
-impl Stretch {
-    fn from_fc(width: i32) -> Self {
-        match width {
-            63 => Self::EXTRA_CONDENSED,
-            87 => Self::SEMI_CONDENSED,
-            113 => Self::SEMI_EXPANDED,
-            _ => Self::from_ratio(width as f32 / 100.0),
-        }
+// FIXME(style): There's an argument for putting this into styled_text
+fn stretch_from_fc(width: i32) -> Stretch {
+    match width {
+        63 => Stretch::EXTRA_CONDENSED,
+        87 => Stretch::SEMI_CONDENSED,
+        113 => Stretch::SEMI_EXPANDED,
+        _ => Stretch::from_ratio(width as f32 / 100.0),
     }
 }
 
-impl Style {
-    fn from_fc(slant: i32) -> Self {
-        match slant {
-            100 => Self::Italic,
-            110 => Self::Oblique(None),
-            _ => Self::Normal,
-        }
+// FIXME(style): There's an argument for putting this into styled_text
+fn style_from_fc(slant: i32) -> Style {
+    match slant {
+        100 => Style::Italic,
+        110 => Style::Oblique(None),
+        _ => Style::Normal,
     }
 }
 
-impl Weight {
-    fn from_fc(weight: i32) -> Self {
-        const MAP: &[(i32, i32)] = &[
-            (0, 0),
-            (100, 0),
-            (200, 40),
-            (300, 50),
-            (350, 55),
-            (380, 75),
-            (400, 80),
-            (500, 100),
-            (600, 180),
-            (700, 200),
-            (800, 205),
-            (900, 210),
-            (950, 215),
-        ];
-        for (i, (ot, fc)) in MAP.iter().skip(1).enumerate() {
-            if weight == *fc {
-                return Self::new(*ot as f32);
-            }
-            if weight < *fc {
-                let weight = weight as f32;
-                let fc_a = MAP[i - 1].1 as f32;
-                let fc_b = *fc as f32;
-                let ot_a = MAP[i - 1].1 as f32;
-                let ot_b = *ot as f32;
-                let t = (fc_a - fc_b) / (weight - fc_a);
-                return Self::new(ot_a + (ot_b - ot_a) * t);
-            }
+// FIXME(style): There's an argument for putting this into styled_text
+fn weight_from_fc(weight: i32) -> Weight {
+    const MAP: &[(i32, i32)] = &[
+        (0, 0),
+        (100, 0),
+        (200, 40),
+        (300, 50),
+        (350, 55),
+        (380, 75),
+        (400, 80),
+        (500, 100),
+        (600, 180),
+        (700, 200),
+        (800, 205),
+        (900, 210),
+        (950, 215),
+    ];
+    for (i, (ot, fc)) in MAP.iter().skip(1).enumerate() {
+        if weight == *fc {
+            return Weight::new(*ot as f32);
         }
-        Weight::EXTRA_BLACK
+        if weight < *fc {
+            let weight = weight as f32;
+            let fc_a = MAP[i - 1].1 as f32;
+            let fc_b = *fc as f32;
+            let ot_a = MAP[i - 1].1 as f32;
+            let ot_b = *ot as f32;
+            let t = (fc_a - fc_b) / (weight - fc_a);
+            return Weight::new(ot_a + (ot_b - ot_a) * t);
+        }
     }
+    Weight::EXTRA_BLACK
 }
 
 #[derive(Default)]
@@ -156,21 +153,21 @@ fn parse_font(
             Object::Slant => {
                 for val in elt.values().ok()? {
                     if let Value::Int(i) = val.ok()? {
-                        font.style = Style::from_fc(i as _);
+                        font.style = style_from_fc(i as _);
                     }
                 }
             }
             Object::Weight => {
                 for val in elt.values().ok()? {
                     if let Value::Int(i) = val.ok()? {
-                        font.weight = Weight::from_fc(i as _);
+                        font.weight = weight_from_fc(i as _);
                     }
                 }
             }
             Object::Width => {
                 for val in elt.values().ok()? {
                     if let Value::Int(i) = val.ok()? {
-                        font.stretch = Stretch::from_fc(i as _);
+                        font.stretch = stretch_from_fc(i as _);
                     }
                 }
             }
