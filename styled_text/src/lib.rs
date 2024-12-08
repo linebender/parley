@@ -27,8 +27,10 @@ mod font_family;
 mod font_settings;
 mod font_stack;
 mod generic_family;
-pub mod setting;
 mod style_property;
+mod text_style;
+
+pub mod setting;
 
 pub use attributes::{Stretch, Style, Weight};
 pub use brush::Brush;
@@ -37,3 +39,4 @@ pub use font_settings::{FontFeature, FontSettings, FontVariation};
 pub use font_stack::FontStack;
 pub use generic_family::GenericFamily;
 pub use style_property::StyleProperty;
+pub use text_style::TextStyle;
