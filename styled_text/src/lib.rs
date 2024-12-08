@@ -26,7 +26,7 @@ mod brush;
 mod font_family;
 mod font_settings;
 mod font_stack;
-mod generic;
+mod generic_family;
 pub mod setting;
 mod style_property;
 
@@ -35,5 +35,5 @@ pub use brush::Brush;
 pub use font_family::FontFamily;
 pub use font_settings::{FontFeature, FontSettings, FontVariation};
 pub use font_stack::FontStack;
-pub use generic::GenericFamily;
+pub use generic_family::GenericFamily;
 pub use style_property::StyleProperty;

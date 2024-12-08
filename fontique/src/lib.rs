@@ -48,14 +48,13 @@ mod source_cache;
 
 pub use icu_locid::LanguageIdentifier as Language;
 pub use peniko::Blob;
-pub use styled_text::{Stretch, Style, Weight};
+pub use styled_text::{GenericFamily, Stretch, Style, Weight};
 
 pub use attributes::Attributes;
 pub use collection::{Collection, CollectionOptions, Query, QueryFamily, QueryFont, QueryStatus};
 pub use fallback::FallbackKey;
 pub use family::{FamilyId, FamilyInfo};
 pub use font::{AxisInfo, FontInfo, Synthesis};
-pub use generic::GenericFamily;
 pub use script::Script;
 pub use source::{SourceId, SourceInfo, SourceKind};
 

@@ -5,9 +5,7 @@
 
 use super::FamilyId;
 use smallvec::SmallVec;
-
-// FIXME(style): Other users of this can import it from styled_text
-pub use styled_text::GenericFamily;
+use styled_text::GenericFamily;
 
 type FamilyVec = SmallVec<[FamilyId; 2]>;
 
