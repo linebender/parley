@@ -6,11 +6,9 @@ use alloc::borrow::ToOwned;
 use core::fmt;
 
 /// Setting for a font variation.
-// FIXME(style): We should copy the Setting definition from swash instead of having a dep
 pub type FontVariation = crate::setting::Setting<f32>;
 
 /// Setting for a font feature.
-// FIXME(style): We should copy the Setting definition from swash instead of having a dep
 pub type FontFeature = crate::setting::Setting<u16>;
 
 /// Font settings that can be supplied as a raw source string or
