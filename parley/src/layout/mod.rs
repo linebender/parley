@@ -15,7 +15,6 @@ pub mod editor;
 
 use self::alignment::align;
 
-use super::style::Brush;
 use crate::{Font, InlineBox};
 #[cfg(feature = "accesskit")]
 use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
@@ -28,6 +27,7 @@ use data::{
 };
 #[cfg(feature = "accesskit")]
 use hashbrown::{HashMap, HashSet};
+use styled_text::Brush;
 use swash::text::cluster::{Boundary, ClusterInfo};
 use swash::{GlyphId, NormalizedCoord, Synthesis};
 

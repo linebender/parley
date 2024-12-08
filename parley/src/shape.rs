@@ -3,11 +3,12 @@
 
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
-use super::style::{Brush, FontFeature, FontVariation};
+use crate::style::{FontFeature, FontVariation};
 use crate::util::nearly_eq;
 use crate::Font;
 use fontique::QueryFamily;
 use fontique::{self, Query, QueryFont};
+use styled_text::Brush;
 use swash::shape::{partition, Direction, ShapeContext};
 use swash::text::cluster::{CharCluster, CharInfo, Token};
 use swash::text::{Language, Script};

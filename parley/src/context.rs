@@ -10,9 +10,9 @@ use self::tree::TreeStyleBuilder;
 use super::bidi;
 use super::builder::RangedBuilder;
 use super::resolve::{tree, RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle};
-use super::style::{Brush, TextStyle};
 use super::FontContext;
 
+use styled_text::{Brush, TextStyle};
 use swash::shape::ShapeContext;
 use swash::text::cluster::CharInfo;
 

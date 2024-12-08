@@ -10,17 +10,14 @@ pub(crate) use range::RangedStyleBuilder;
 
 use alloc::{vec, vec::Vec};
 
-use super::style::{
-    Brush, FontFamily, FontFeature, FontSettings, FontStack, FontStretch, FontStyle, FontVariation,
-    FontWeight, StyleProperty,
-};
 use crate::font::FontContext;
 use crate::layout;
-use crate::style::TextStyle;
+use crate::style::{FontFeature, FontStretch, FontStyle, FontVariation, FontWeight};
 use crate::util::nearly_eq;
 use core::borrow::Borrow;
 use core::ops::Range;
 use fontique::FamilyId;
+use styled_text::{Brush, FontFamily, FontSettings, FontStack, StyleProperty, TextStyle};
 use swash::text::Language;
 
 /// Style with an associated range.

@@ -3,10 +3,10 @@
 
 use crate::inline_box::InlineBox;
 use crate::layout::{Alignment, Glyph, LineMetrics, RunMetrics, Style};
-use crate::style::Brush;
 use crate::util::nearly_zero;
 use crate::Font;
 use core::ops::Range;
+use styled_text::Brush;
 use swash::shape::Shaper;
 use swash::text::cluster::{Boundary, ClusterInfo};
 use swash::Synthesis;
