@@ -8,8 +8,8 @@ use crate::{
         cursor::{Cursor, Selection},
         Affinity, Alignment, Layout,
     },
-    style::Brush,
-    FontContext, LayoutContext, Rect, StyleProperty, StyleSet,
+    style::StyleSet,
+    FontContext, LayoutContext, Rect,
 };
 use alloc::{borrow::ToOwned, string::String, vec::Vec};
 use core::{
@@ -18,6 +18,7 @@ use core::{
     fmt::{Debug, Display},
     ops::Range,
 };
+use styled_text::{Brush, StyleProperty};
 
 #[cfg(feature = "accesskit")]
 use crate::layout::LayoutAccessibility;

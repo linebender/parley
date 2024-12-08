@@ -4,13 +4,14 @@
 //! Context for layout.
 
 use super::context::LayoutContext;
-use super::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
+use super::style::WhiteSpaceCollapse;
 use super::FontContext;
 
 use super::layout::Layout;
 
 use alloc::string::String;
 use core::ops::RangeBounds;
+use styled_text::{Brush, StyleProperty, TextStyle};
 
 use crate::inline_box::InlineBox;
 
