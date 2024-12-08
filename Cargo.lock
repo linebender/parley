@@ -480,9 +480,9 @@ checksum = "79296716171880943b8470b5f8d03aa55eb2e645a4874bdbb28adb49162e012c"
 
 [[package]]
 name = "bytemuck"
-version = "1.18.0"
+version = "1.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94bbb0ad554ad961ddc5da507a12a29b14e4ae5bda06b19f575a3e6079d2e2ae"
+checksum = "8b37c88a63ffd85d15b406896cc343916d7cf57838a847b3a6f2ca5d39a5695a"
 dependencies = [
  "bytemuck_derive",
 ]
@@ -963,6 +963,7 @@ dependencies = [
 name = "fontique"
 version = "0.2.0"
 dependencies = [
+ "bytemuck",
  "core-foundation",
  "core-text",
  "core_maths",
@@ -2456,6 +2457,7 @@ checksum = "6637bab7722d379c8b41ba849228d680cc12d0a45ba1fa2b48f2a30577a06731"
 name = "styled_text"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "core_maths",
 ]
 

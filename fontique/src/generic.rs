@@ -4,13 +4,13 @@
 //! Generic font families.
 
 use super::FamilyId;
+use bytemuck::Contiguous; // For GenericFamily::MAX_VALUE
 use smallvec::SmallVec;
 use styled_text::GenericFamily;
 
 type FamilyVec = SmallVec<[FamilyId; 2]>;
 
-// FIXME(style): This should be done better.
-const COUNT: usize = GenericFamily::FangSong as usize + 1;
+const COUNT: usize = GenericFamily::MAX_VALUE as usize + 1;
 
 /// Maps generic families to family identifiers.
 #[derive(Clone, Default, Debug)]

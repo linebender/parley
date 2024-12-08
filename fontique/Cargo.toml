@@ -30,6 +30,7 @@ system = [
 ]
 
 [dependencies]
+bytemuck = { workspace = true }
 read-fonts = { workspace = true }
 peniko = { workspace = true }
 styled_text = { workspace = true }

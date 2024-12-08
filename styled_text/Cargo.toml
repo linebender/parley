@@ -21,3 +21,4 @@ libm = ["dep:core_maths"]
 
 [dependencies]
 core_maths = { version = "0.1.0", optional = true }
+bytemuck = { workspace = true }
