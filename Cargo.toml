@@ -78,6 +78,7 @@ clippy.wildcard_dependencies = "warn"
 
 [workspace.dependencies]
 accesskit = "0.17"
+bytemuck = { version = "1.20.0", default-features = false }
 fontique = { version = "0.2.0", default-features = false, path = "fontique" }
 hashbrown = "0.15.2"
 parley = { version = "0.2.0", default-features = false, path = "parley" }
