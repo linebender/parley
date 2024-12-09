@@ -54,8 +54,14 @@ impl fmt::Display for Attributes {
 ///
 /// In CSS, this corresponds to the [`font-width`] property.
 ///
+/// This is an `f32` as this represents the same range of values as
+/// the `wdth` axis. In Open Type, the `u16` [`usWidthClass`] field
+/// has 9 values, from 1-9, which doesn't allow for the wide range
+/// of values possible with variable fonts.
+///
 /// [axis]: crate::AxisInfo
 /// [`font-width`]: https://www.w3.org/TR/css-fonts-4/#font-width-prop
+/// [`usWidthClass`]: https://learn.microsoft.com/en-us/typography/opentype/spec/os2#uswidthclass
 #[derive(Copy, Clone, PartialEq, PartialOrd, Debug)]
 pub struct FontStretch(f32);
 
@@ -254,6 +260,9 @@ impl Default for FontStretch {
 ///
 /// In CSS, this corresponds to the [`font-weight`] property.
 ///
+/// This is an `f32` as this represents the same range of values as
+/// the `wght` axis.
+///
 /// [axis]: crate::AxisInfo
 /// [`font-weight`]: https://www.w3.org/TR/css-fonts-4/#font-weight-prop
 #[derive(Copy, Clone, PartialEq, PartialOrd, Debug)]
@@ -408,6 +417,9 @@ impl fmt::Display for FontWeight {
 /// See <https://fonts.google.com/knowledge/glossary/style>
 ///
 /// In CSS, this corresponds to the [`font-style`] property.
+///
+/// This is an `f32` as this represents the same range of values as
+/// the `ital` and `slnt` axes.
 ///
 /// [axes]: crate::AxisInfo
 /// [`font-style`]: https://www.w3.org/TR/css-fonts-4/#font-style-prop
