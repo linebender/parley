@@ -4,7 +4,7 @@
 //! Model for font families.
 
 use super::{
-    attributes::{Stretch, Style, Weight},
+    attributes::{FontStretch, FontStyle, FontWeight},
     family_name::FamilyName,
     font::FontInfo,
 };
@@ -84,9 +84,9 @@ impl FamilyInfo {
     /// Returns the index of the best font from the family for the given attributes.
     pub fn match_index(
         &self,
-        stretch: Stretch,
-        style: Style,
-        weight: Weight,
+        stretch: FontStretch,
+        style: FontStyle,
+        weight: FontWeight,
         synthesize_style: bool,
     ) -> Option<usize> {
         super::matching::match_font(self.fonts(), stretch, style, weight, synthesize_style)
@@ -95,9 +95,9 @@ impl FamilyInfo {
     /// Selects the best font from the family for the given attributes.
     pub fn match_font(
         &self,
-        stretch: Stretch,
-        style: Style,
-        weight: Weight,
+        stretch: FontStretch,
+        style: FontStyle,
+        weight: FontWeight,
         synthesize_style: bool,
     ) -> Option<&FontInfo> {
         self.fonts()

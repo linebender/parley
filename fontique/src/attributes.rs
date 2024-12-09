@@ -9,7 +9,7 @@ use core_maths::CoreFloat;
 
 use core::fmt;
 
-/// Primary attributes for font matching: [`Stretch`], [`Style`] and [`Weight`].
+/// Primary attributes for font matching: [`FontStretch`], [`FontStyle`] and [`FontWeight`].
 ///
 /// These are used to [configure] a [`Query`].
 ///
@@ -17,14 +17,14 @@ use core::fmt;
 /// [`Query`]: crate::Query
 #[derive(Copy, Clone, PartialEq, Default, Debug)]
 pub struct Attributes {
-    pub stretch: Stretch,
-    pub style: Style,
-    pub weight: Weight,
+    pub stretch: FontStretch,
+    pub style: FontStyle,
+    pub weight: FontWeight,
 }
 
 impl Attributes {
     /// Creates new attributes from the given stretch, style and weight.
-    pub fn new(stretch: Stretch, style: Style, weight: Weight) -> Self {
+    pub fn new(stretch: FontStretch, style: FontStyle, weight: FontWeight) -> Self {
         Self {
             stretch,
             style,
@@ -46,7 +46,7 @@ impl fmt::Display for Attributes {
 /// Visual width of a font-- a relative change from the normal aspect
 /// ratio, typically in the range `0.5` to `2.0`.
 ///
-/// The default value is [`Stretch::NORMAL`] or `1.0`.
+/// The default value is [`FontStretch::NORMAL`] or `1.0`.
 ///
 /// In variable fonts, this can be controlled with the `wdth` [axis].
 ///
@@ -57,9 +57,9 @@ impl fmt::Display for Attributes {
 /// [axis]: crate::AxisInfo
 /// [`font-width`]: https://www.w3.org/TR/css-fonts-4/#font-width-prop
 #[derive(Copy, Clone, PartialEq, PartialOrd, Debug)]
-pub struct Stretch(f32);
+pub struct FontStretch(f32);
 
-impl Stretch {
+impl FontStretch {
     /// Width that is 50% of normal.
     pub const ULTRA_CONDENSED: Self = Self(0.5);
 
@@ -88,7 +88,7 @@ impl Stretch {
     pub const ULTRA_EXPANDED: Self = Self(2.0);
 }
 
-impl Stretch {
+impl FontStretch {
     /// Creates a new stretch attribute with the given ratio.
     ///
     /// This can also be created [from a percentage](Self::from_percentage).
@@ -96,8 +96,8 @@ impl Stretch {
     /// # Example
     ///
     /// ```
-    /// # use fontique::Stretch;
-    /// assert_eq!(Stretch::from_ratio(1.5), Stretch::EXTRA_EXPANDED);
+    /// # use fontique::FontStretch;
+    /// assert_eq!(FontStretch::from_ratio(1.5), FontStretch::EXTRA_EXPANDED);
     /// ```
     pub fn from_ratio(ratio: f32) -> Self {
         Self(ratio)
@@ -110,8 +110,8 @@ impl Stretch {
     /// # Example
     ///
     /// ```
-    /// # use fontique::Stretch;
-    /// assert_eq!(Stretch::from_percentage(87.5), Stretch::SEMI_CONDENSED);
+    /// # use fontique::FontStretch;
+    /// assert_eq!(FontStretch::from_percentage(87.5), FontStretch::SEMI_CONDENSED);
     /// ```
     pub fn from_percentage(percentage: f32) -> Self {
         Self(percentage / 100.0)
@@ -124,8 +124,8 @@ impl Stretch {
     /// # Example
     ///
     /// ```
-    /// # use fontique::Stretch;
-    /// assert_eq!(Stretch::NORMAL.ratio(), 1.0);
+    /// # use fontique::FontStretch;
+    /// assert_eq!(FontStretch::NORMAL.ratio(), 1.0);
     /// ```
     pub fn ratio(self) -> f32 {
         self.0
@@ -140,21 +140,21 @@ impl Stretch {
 
     /// Returns `true` if the stretch is [normal].
     ///
-    /// [normal]: Stretch::NORMAL
+    /// [normal]: FontStretch::NORMAL
     pub fn is_normal(self) -> bool {
         self == Self::NORMAL
     }
 
     /// Returns `true` if the stretch is condensed (less than [normal]).
     ///
-    /// [normal]: Stretch::NORMAL
+    /// [normal]: FontStretch::NORMAL
     pub fn is_condensed(self) -> bool {
         self < Self::NORMAL
     }
 
     /// Returns `true` if the stretch is expanded (greater than [normal]).
     ///
-    /// [normal]: Stretch::NORMAL
+    /// [normal]: FontStretch::NORMAL
     pub fn is_expanded(self) -> bool {
         self > Self::NORMAL
     }
@@ -164,10 +164,10 @@ impl Stretch {
     /// # Examples
     ///
     /// ```
-    /// # use fontique::Stretch;
-    /// assert_eq!(Stretch::parse("semi-condensed"), Some(Stretch::SEMI_CONDENSED));
-    /// assert_eq!(Stretch::parse("80%"), Some(Stretch::from_percentage(80.0)));
-    /// assert_eq!(Stretch::parse("wideload"), None);
+    /// # use fontique::FontStretch;
+    /// assert_eq!(FontStretch::parse("semi-condensed"), Some(FontStretch::SEMI_CONDENSED));
+    /// assert_eq!(FontStretch::parse("80%"), Some(FontStretch::from_percentage(80.0)));
+    /// assert_eq!(FontStretch::parse("wideload"), None);
     /// ```
     pub fn parse(s: &str) -> Option<Self> {
         let s = s.trim();
@@ -191,7 +191,7 @@ impl Stretch {
     }
 }
 
-impl fmt::Display for Stretch {
+impl fmt::Display for FontStretch {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let value = self.0 * 1000.0;
         if value.fract() == 0.0 {
@@ -216,7 +216,7 @@ impl fmt::Display for Stretch {
     }
 }
 
-impl Default for Stretch {
+impl Default for FontStretch {
     fn default() -> Self {
         Self::NORMAL
     }
@@ -224,7 +224,7 @@ impl Default for Stretch {
 
 /// Visual weight class of a font, typically on a scale from 1.0 to 1000.0.
 ///
-/// The default value is [`Weight::NORMAL`] or `400.0`.
+/// The default value is [`FontWeight::NORMAL`] or `400.0`.
 ///
 /// In variable fonts, this can be controlled with the `wght` [axis].
 ///
@@ -235,9 +235,9 @@ impl Default for Stretch {
 /// [axis]: crate::AxisInfo
 /// [`font-weight`]: https://www.w3.org/TR/css-fonts-4/#font-weight-prop
 #[derive(Copy, Clone, PartialEq, PartialOrd, Debug)]
-pub struct Weight(f32);
+pub struct FontWeight(f32);
 
-impl Weight {
+impl FontWeight {
     /// Weight value of 100.
     pub const THIN: Self = Self(100.0);
 
@@ -272,7 +272,7 @@ impl Weight {
     pub const EXTRA_BLACK: Self = Self(950.0);
 }
 
-impl Weight {
+impl FontWeight {
     /// Creates a new weight attribute with the given value.
     pub fn new(weight: f32) -> Self {
         Self(weight)
@@ -288,11 +288,11 @@ impl Weight {
     /// # Examples
     ///
     /// ```
-    /// # use fontique::Weight;
-    /// assert_eq!(Weight::parse("normal"), Some(Weight::NORMAL));
-    /// assert_eq!(Weight::parse("bold"), Some(Weight::BOLD));
-    /// assert_eq!(Weight::parse("850"), Some(Weight::new(850.0)));
-    /// assert_eq!(Weight::parse("invalid"), None);
+    /// # use fontique::FontWeight;
+    /// assert_eq!(FontWeight::parse("normal"), Some(FontWeight::NORMAL));
+    /// assert_eq!(FontWeight::parse("bold"), Some(FontWeight::BOLD));
+    /// assert_eq!(FontWeight::parse("850"), Some(FontWeight::new(850.0)));
+    /// assert_eq!(FontWeight::parse("invalid"), None);
     /// ```
     pub fn parse(s: &str) -> Option<Self> {
         let s = s.trim();
@@ -304,13 +304,13 @@ impl Weight {
     }
 }
 
-impl Default for Weight {
+impl Default for FontWeight {
     fn default() -> Self {
         Self::NORMAL
     }
 }
 
-impl fmt::Display for Weight {
+impl fmt::Display for FontWeight {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let value = self.0;
         if value.fract() == 0.0 {
@@ -335,7 +335,7 @@ impl fmt::Display for Weight {
 
 /// Visual style or 'slope' of a font.
 ///
-/// The default value is [`Style::Normal`].
+/// The default value is [`FontStyle::Normal`].
 ///
 /// In variable fonts, this can be controlled with the `ital`
 /// and `slnt` [axes] for italic and oblique styles, respectively.
@@ -347,7 +347,7 @@ impl fmt::Display for Weight {
 /// [axes]: crate::AxisInfo
 /// [`font-style`]: https://www.w3.org/TR/css-fonts-4/#font-style-prop
 #[derive(Copy, Clone, PartialEq, Default, Debug)]
-pub enum Style {
+pub enum FontStyle {
     /// An upright or "roman" style.
     #[default]
     Normal,
@@ -359,7 +359,7 @@ pub enum Style {
     Oblique(Option<f32>),
 }
 
-impl Style {
+impl FontStyle {
     /// Parses a font style from a CSS value.
     pub fn parse(mut s: &str) -> Option<Self> {
         s = s.trim();
@@ -399,7 +399,7 @@ impl Style {
     }
 }
 
-impl fmt::Display for Style {
+impl fmt::Display for FontStyle {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let value = match self {
             Self::Normal => "normal",
