@@ -211,7 +211,7 @@ impl Cursor {
         cur
     }
 
-    /// Returns a new cursor that is (positioned at. the previous word boundary
+    /// Returns a new cursor that is positioned at the previous word boundary
     /// in visual order.
     #[must_use]
     pub fn previous_visual_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
