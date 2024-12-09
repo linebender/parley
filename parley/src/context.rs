@@ -54,7 +54,7 @@ impl<B: Brush> LayoutContext<B> {
         &mut self,
         font_ctx: &mut FontContext,
         scale: f32,
-        raw_style: &TextStyle<B>,
+        raw_style: &TextStyle<'_, B>,
     ) -> ResolvedStyle<B> {
         self.rcx
             .resolve_entire_style_set(font_ctx, raw_style, scale)
@@ -83,7 +83,7 @@ impl<B: Brush> LayoutContext<B> {
         &'a mut self,
         fcx: &'a mut FontContext,
         scale: f32,
-        raw_style: &TextStyle<B>,
+        raw_style: &TextStyle<'_, B>,
     ) -> TreeBuilder<'a, B> {
         self.begin();
 

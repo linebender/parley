@@ -104,7 +104,7 @@ impl GenericFamily {
 }
 
 impl fmt::Display for GenericFamily {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let name = match self {
             Self::Serif => "serif",
             Self::SansSerif => "sans-serif",

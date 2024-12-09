@@ -128,7 +128,7 @@ impl ResolveContext {
     pub(crate) fn resolve_property<B: Brush>(
         &mut self,
         fcx: &mut FontContext,
-        property: &StyleProperty<B>,
+        property: &StyleProperty<'_, B>,
         scale: f32,
     ) -> ResolvedProperty<B> {
         use ResolvedProperty::*;
@@ -161,7 +161,7 @@ impl ResolveContext {
     pub(crate) fn resolve_entire_style_set<B: Brush>(
         &mut self,
         fcx: &mut FontContext,
-        raw_style: &TextStyle<B>,
+        raw_style: &TextStyle<'_, B>,
         scale: f32,
     ) -> ResolvedStyle<B> {
         ResolvedStyle {
@@ -196,7 +196,7 @@ impl ResolveContext {
     pub(crate) fn resolve_stack(
         &mut self,
         fcx: &mut FontContext,
-        stack: &FontStack,
+        stack: &FontStack<'_>,
     ) -> Resolved<FamilyId> {
         self.tmp_families.clear();
         match stack {
@@ -251,7 +251,7 @@ impl ResolveContext {
     /// Resolves font variation settings.
     pub(crate) fn resolve_variations(
         &mut self,
-        variations: &FontSettings<FontVariation>,
+        variations: &FontSettings<'_, FontVariation>,
     ) -> Resolved<FontVariation> {
         match variations {
             FontSettings::Source(source) => {
@@ -276,7 +276,7 @@ impl ResolveContext {
     /// Resolves font feature settings.
     pub(crate) fn resolve_features(
         &mut self,
-        features: &FontSettings<FontFeature>,
+        features: &FontSettings<'_, FontFeature>,
     ) -> Resolved<FontFeature> {
         match features {
             FontSettings::Source(source) => {

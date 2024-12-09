@@ -279,7 +279,7 @@ impl<B: Brush> LayoutData<B> {
         font: Font,
         font_size: f32,
         synthesis: Synthesis,
-        shaper: Shaper,
+        shaper: Shaper<'_>,
         bidi_level: u8,
         word_spacing: f32,
         letter_spacing: f32,

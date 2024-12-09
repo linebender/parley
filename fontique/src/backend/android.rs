@@ -101,15 +101,20 @@ impl SystemFonts {
                                     .attribute("lang")
                                     .map(|s| s.split(',').collect::<Vec<&str>>())
                                 {
-                                    let (_has_for, hasnt_for): (Vec<Node>, Vec<Node>) = child
+                                    let (_has_for, hasnt_for): (
+                                        Vec<Node<'_, '_>>,
+                                        Vec<Node<'_, '_>>,
+                                    ) = child
                                         .children()
                                         .partition(|c| c.attribute("fallbackFor").is_some());
                                     {
                                         // general fallback families
-                                        let (ps_named, _ps_unnamed): (Vec<Node>, Vec<Node>) =
-                                            hasnt_for.iter().partition(|c| {
-                                                c.attribute("postScriptName").is_some()
-                                            });
+                                        let (ps_named, _ps_unnamed): (
+                                            Vec<Node<'_, '_>>,
+                                            Vec<Node<'_, '_>>,
+                                        ) = hasnt_for
+                                            .iter()
+                                            .partition(|c| c.attribute("postScriptName").is_some());
 
                                         if let Some(family) = ps_named.iter().find_map(|x| {
                                             postscript_names

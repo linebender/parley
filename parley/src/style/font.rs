@@ -114,7 +114,7 @@ impl<'a> From<&'a [FontFamily<'a>]> for FontStack<'a> {
 }
 
 impl fmt::Display for FontFamily<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Named(name) => write!(f, "{:?}", name),
             Self::Generic(family) => write!(f, "{}", family),

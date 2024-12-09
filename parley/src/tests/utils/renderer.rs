@@ -26,7 +26,14 @@ pub(crate) struct RenderingConfig {
     pub selection_color: peniko::Color,
 }
 
-fn draw_rect(pen: &mut TinySkiaPen, x: f32, y: f32, width: f32, height: f32, color: peniko::Color) {
+fn draw_rect(
+    pen: &mut TinySkiaPen<'_>,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    color: peniko::Color,
+) {
     pen.set_origin(x, y);
     pen.set_color(to_tiny_skia(color));
     pen.fill_rect(width, height);
@@ -100,7 +107,11 @@ fn to_tiny_skia(color: PenikoColor) -> TinySkiaColor {
     TinySkiaColor::from_rgba8(color.r, color.g, color.b, color.a)
 }
 
-fn render_glyph_run(glyph_run: &GlyphRun<PenikoColor>, pen: &mut TinySkiaPen<'_>, padding: u32) {
+fn render_glyph_run(
+    glyph_run: &GlyphRun<'_, PenikoColor>,
+    pen: &mut TinySkiaPen<'_>,
+    padding: u32,
+) {
     // Resolve properties of the GlyphRun
     let mut run_x = glyph_run.offset();
     let run_y = glyph_run.baseline();
@@ -158,7 +169,7 @@ fn render_glyph_run(glyph_run: &GlyphRun<PenikoColor>, pen: &mut TinySkiaPen<'_>
 
 fn render_decoration(
     pen: &mut TinySkiaPen<'_>,
-    glyph_run: &GlyphRun<PenikoColor>,
+    glyph_run: &GlyphRun<'_, PenikoColor>,
     color: PenikoColor,
     offset: f32,
     width: f32,
@@ -180,7 +191,7 @@ struct TinySkiaPen<'a> {
 }
 
 impl TinySkiaPen<'_> {
-    fn new(pixmap: PixmapMut) -> TinySkiaPen {
+    fn new(pixmap: PixmapMut<'_>) -> TinySkiaPen<'_> {
         TinySkiaPen {
             pixmap,
             x: 0.0,
