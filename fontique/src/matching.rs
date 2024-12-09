@@ -3,7 +3,7 @@
 
 //! Implementation of the CSS font matching algorithm.
 
-use super::attributes::{Stretch, Style, Weight};
+use super::attributes::{FontStretch, FontStyle, FontWeight};
 use super::font::FontInfo;
 use smallvec::SmallVec;
 
@@ -11,9 +11,9 @@ const DEFAULT_OBLIQUE_ANGLE: f32 = 14.0;
 
 pub fn match_font(
     set: &[FontInfo],
-    stretch: Stretch,
-    style: Style,
-    weight: Weight,
+    stretch: FontStretch,
+    style: FontStyle,
+    weight: FontWeight,
     synthesize_style: bool,
 ) -> Option<usize> {
     const OBLIQUE_THRESHOLD: f32 = DEFAULT_OBLIQUE_ANGLE;
@@ -26,7 +26,7 @@ pub fn match_font(
     struct Candidate {
         index: usize,
         stretch: i32,
-        style: Style,
+        style: FontStyle,
         weight: f32,
         has_slnt: bool,
     }
@@ -102,7 +102,7 @@ pub fn match_font(
     let mut _use_slnt = false;
     if !set.iter().any(|f| f.style == use_style) {
         // If the value of font-style is italic:
-        if style == Style::Italic {
+        if style == FontStyle::Italic {
             // oblique values greater than or equal to 14deg are checked in
             // ascending order
             if let Some(found) = oblique_fonts
@@ -162,16 +162,16 @@ pub fn match_font(
                         if set.iter().any(|f| f.has_slnt) {
                             _use_slnt = true;
                         } else {
-                            use_style = if set.iter().any(|f| f.style == Style::Normal) {
-                                Style::Normal
+                            use_style = if set.iter().any(|f| f.style == FontStyle::Normal) {
+                                FontStyle::Normal
                             } else {
                                 set[0].style
                             };
                         }
                     } else {
                         // Choose an italic style
-                        if set.iter().any(|f| f.style == Style::Italic) {
-                            use_style = Style::Italic;
+                        if set.iter().any(|f| f.style == FontStyle::Italic) {
+                            use_style = FontStyle::Italic;
                         }
                         // oblique values less than or equal to 0deg are checked in descending order
                         else if let Some(found) = oblique_fonts
@@ -215,16 +215,16 @@ pub fn match_font(
                         if set.iter().any(|f| f.has_slnt) {
                             _use_slnt = true;
                         } else {
-                            use_style = if set.iter().any(|f| f.style == Style::Normal) {
-                                Style::Normal
+                            use_style = if set.iter().any(|f| f.style == FontStyle::Normal) {
+                                FontStyle::Normal
                             } else {
                                 set[0].style
                             };
                         }
                     } else {
                         // Choose an italic style
-                        if set.iter().any(|f| f.style == Style::Italic) {
-                            use_style = Style::Italic;
+                        if set.iter().any(|f| f.style == FontStyle::Italic) {
+                            use_style = FontStyle::Italic;
                         }
                         // oblique values less than or equal to 0deg are checked in descending order
                         else if let Some(found) = oblique_fonts
@@ -267,16 +267,16 @@ pub fn match_font(
                         if set.iter().any(|f| f.has_slnt) {
                             _use_slnt = true;
                         } else {
-                            use_style = if set.iter().any(|f| f.style == Style::Normal) {
-                                Style::Normal
+                            use_style = if set.iter().any(|f| f.style == FontStyle::Normal) {
+                                FontStyle::Normal
                             } else {
                                 set[0].style
                             };
                         }
                     } else {
                         // Choose an italic style
-                        if set.iter().any(|f| f.style == Style::Italic) {
-                            use_style = Style::Italic;
+                        if set.iter().any(|f| f.style == FontStyle::Italic) {
+                            use_style = FontStyle::Italic;
                         }
                         // oblique values greater than or equal to 0deg are checked in ascending order
                         else if let Some(found) = oblique_fonts
@@ -319,16 +319,16 @@ pub fn match_font(
                         if set.iter().any(|f| f.has_slnt) {
                             _use_slnt = true;
                         } else {
-                            use_style = if set.iter().any(|f| f.style == Style::Normal) {
-                                Style::Normal
+                            use_style = if set.iter().any(|f| f.style == FontStyle::Normal) {
+                                FontStyle::Normal
                             } else {
                                 set[0].style
                             };
                         }
                     } else {
                         // Choose an italic style
-                        if set.iter().any(|f| f.style == Style::Italic) {
-                            use_style = Style::Italic;
+                        if set.iter().any(|f| f.style == FontStyle::Italic) {
+                            use_style = FontStyle::Italic;
                         }
                         // oblique values greater than or equal to 0deg are checked in ascending order
                         else if let Some(found) = oblique_fonts
@@ -356,7 +356,7 @@ pub fn match_font(
                 use_style = found.0;
             }
             // followed by italic fonts
-            else if let Some(found) = set.iter().find(|f| f.style == Style::Italic) {
+            else if let Some(found) = set.iter().find(|f| f.style == FontStyle::Italic) {
                 use_style = found.style;
             }
             // followed by oblique values less than 0deg in descending order
@@ -449,16 +449,16 @@ pub fn match_font(
     None
 }
 
-fn oblique_angle(style: Style) -> Option<f32> {
+fn oblique_angle(style: FontStyle) -> Option<f32> {
     match style {
-        Style::Oblique(angle) => Some(angle.unwrap_or(DEFAULT_OBLIQUE_ANGLE)),
+        FontStyle::Oblique(angle) => Some(angle.unwrap_or(DEFAULT_OBLIQUE_ANGLE)),
         _ => None,
     }
 }
 
-fn oblique_style(style: Style) -> Option<(Style, f32)> {
+fn oblique_style(style: FontStyle) -> Option<(FontStyle, f32)> {
     match style {
-        Style::Oblique(angle) => Some((style, angle.unwrap_or(DEFAULT_OBLIQUE_ANGLE))),
+        FontStyle::Oblique(angle) => Some((style, angle.unwrap_or(DEFAULT_OBLIQUE_ANGLE))),
         _ => None,
     }
 }

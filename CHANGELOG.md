@@ -24,7 +24,11 @@ This release has an [MSRV] of 1.75.
 
 ### Changed
 
-### Parley
+#### Fontique
+
+- Breaking change: `Stretch`, `Style`, and `Weight` renamed to `FontStretch`, `FontStyle`, `FontWeight ([#211][] by [@waywardmonkeys][])
+
+#### Parley
 
 - Breaking change: `PlainEditor`'s semantics are no longer transactional ([#192][] by [@DJMcNab][])
 
@@ -103,6 +107,7 @@ This release has an [MSRV] of 1.70.
 [#143]: https://github.com/linebender/parley/pull/143
 [#192]: https://github.com/linebender/parley/pull/192
 [#198]: https://github.com/linebender/parley/pull/198
+[#211]: https://github.com/linebender/parley/pull/211
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/linebender/parley/releases/tag/v0.2.0

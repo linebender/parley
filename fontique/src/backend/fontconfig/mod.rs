@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::{
-    super::{Stretch, Style, Weight},
+    super::{FontStretch, FontStyle, FontWeight},
     FallbackKey, FamilyId, FamilyInfo, FamilyName, FamilyNameMap, FontInfo, GenericFamily,
     GenericFamilyMap, Script, SourceInfo, SourcePathMap,
 };
@@ -301,9 +301,9 @@ struct RawFamily {
 struct RawFont {
     source: SourceInfo,
     index: u32,
-    stretch: Stretch,
-    style: Style,
-    weight: Weight,
+    stretch: FontStretch,
+    style: FontStyle,
+    weight: FontWeight,
     coverage: cache::Coverage,
 }
 

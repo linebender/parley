@@ -1,12 +1,12 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::{Stretch, Style, Weight};
+use super::{FontStretch, FontStyle, FontWeight};
 use fontconfig_cache_parser::{Cache, CharSetLeaf, Object, Pattern, Value};
 use std::io::Read;
 use std::path::PathBuf;
 
-impl Stretch {
+impl FontStretch {
     /// Creates a new stretch attribute with the given value from Fontconfig.
     ///
     /// The values are determined based on the [fonts.conf documentation].
@@ -28,7 +28,7 @@ impl Stretch {
     }
 }
 
-impl Style {
+impl FontStyle {
     /// Creates a new style attribute with the given value from Fontconfig.
     ///
     /// The values are determined based on the [fonts.conf documentation].
@@ -43,7 +43,7 @@ impl Style {
     }
 }
 
-impl Weight {
+impl FontWeight {
     /// Creates a new weight attribute with the given value from Fontconfig.
     ///
     /// The values are determined based on the [fonts.conf documentation].
@@ -79,7 +79,7 @@ impl Weight {
                 return Self::new(ot_a + (ot_b - ot_a) * t);
             }
         }
-        Weight::EXTRA_BLACK
+        Self::EXTRA_BLACK
     }
 }
 
@@ -88,9 +88,9 @@ pub struct CachedFont {
     pub family: Vec<String>,
     pub path: PathBuf,
     pub index: u32,
-    pub stretch: Stretch,
-    pub style: Style,
-    pub weight: Weight,
+    pub stretch: FontStretch,
+    pub style: FontStyle,
+    pub weight: FontWeight,
     pub coverage: Coverage,
 }
 
@@ -100,9 +100,9 @@ impl CachedFont {
         self.path.clear();
         self.index = 0;
         self.coverage.clear();
-        self.weight = Weight::default();
-        self.style = Style::default();
-        self.stretch = Stretch::default();
+        self.weight = FontWeight::default();
+        self.style = FontStyle::default();
+        self.stretch = FontStretch::default();
     }
 }
 
@@ -177,21 +177,21 @@ fn parse_font(
             Object::Slant => {
                 for val in elt.values().ok()? {
                     if let Value::Int(i) = val.ok()? {
-                        font.style = Style::from_fc(i as _);
+                        font.style = FontStyle::from_fc(i as _);
                     }
                 }
             }
             Object::Weight => {
                 for val in elt.values().ok()? {
                     if let Value::Int(i) = val.ok()? {
-                        font.weight = Weight::from_fc(i as _);
+                        font.weight = FontWeight::from_fc(i as _);
                     }
                 }
             }
             Object::Width => {
                 for val in elt.values().ok()? {
                     if let Value::Int(i) = val.ok()? {
-                        font.stretch = Stretch::from_fc(i as _);
+                        font.stretch = FontStretch::from_fc(i as _);
                     }
                 }
             }
