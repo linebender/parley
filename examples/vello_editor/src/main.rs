@@ -8,7 +8,6 @@
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::shadow_unrelated)]
 #![allow(clippy::unseparated_literal_suffix)]
-#![allow(clippy::wildcard_imports)]
 
 use accesskit::{Node, Rect, Role, Tree, TreeUpdate};
 use anyhow::Result;
@@ -20,7 +19,7 @@ use vello::wgpu;
 use vello::{AaConfig, Renderer, RendererOptions, Scene};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
-use winit::event::*;
+use winit::event::{StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::window::Window;
 
