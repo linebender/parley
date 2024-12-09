@@ -214,7 +214,7 @@ impl FontStretch {
 }
 
 impl fmt::Display for FontStretch {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = self.0 * 1000.0;
         if value.fract() == 0.0 {
             let keyword = match value as i32 {
@@ -376,7 +376,7 @@ impl Default for FontWeight {
 }
 
 impl fmt::Display for FontWeight {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = self.0;
         if value.fract() == 0.0 {
             let keyword = match value as i32 {
@@ -480,7 +480,7 @@ impl FontStyle {
 }
 
 impl fmt::Display for FontStyle {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = match self {
             Self::Normal => "normal",
             Self::Italic => "italic",

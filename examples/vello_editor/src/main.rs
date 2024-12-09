@@ -1,7 +1,6 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-#![allow(elided_lifetimes_in_paths)]
 #![allow(missing_debug_implementations)]
 #![allow(missing_docs)]
 #![allow(unreachable_pub)]
@@ -364,7 +363,7 @@ fn create_winit_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
 }
 
 /// Helper function that creates a vello `Renderer` for a given `RenderContext` and `RenderSurface`
-fn create_vello_renderer(render_cx: &RenderContext, surface: &RenderSurface) -> Renderer {
+fn create_vello_renderer(render_cx: &RenderContext, surface: &RenderSurface<'_>) -> Renderer {
     Renderer::new(
         &render_cx.devices[surface.dev_id].device,
         RendererOptions {

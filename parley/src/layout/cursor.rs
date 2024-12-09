@@ -82,7 +82,11 @@ impl Cursor {
         Some(Self::from_byte_index(layout, index, Affinity::Downstream))
     }
 
-    fn from_cluster<B: Brush>(layout: &Layout<B>, cluster: Cluster<B>, moving_right: bool) -> Self {
+    fn from_cluster<B: Brush>(
+        layout: &Layout<B>,
+        cluster: Cluster<'_, B>,
+        moving_right: bool,
+    ) -> Self {
         Self::from_byte_index(
             layout,
             cluster.text_range().start,
@@ -896,7 +900,7 @@ enum AnchorBase {
     Line(Cursor, Cursor),
 }
 
-fn cursor_rect<B: Brush>(cluster: &Cluster<B>, at_end: bool, size: f32) -> Rect {
+fn cursor_rect<B: Brush>(cluster: &Cluster<'_, B>, at_end: bool, size: f32) -> Rect {
     let line_x = (cluster.visual_offset().unwrap_or_default()
         + at_end.then(|| cluster.advance()).unwrap_or_default()) as f64;
     let line = cluster.line();

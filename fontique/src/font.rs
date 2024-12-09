@@ -198,7 +198,11 @@ impl FontInfo {
 }
 
 impl FontInfo {
-    pub(crate) fn from_font_ref(font: &FontRef, source: SourceInfo, index: u32) -> Option<Self> {
+    pub(crate) fn from_font_ref(
+        font: &FontRef<'_>,
+        source: SourceInfo,
+        index: u32,
+    ) -> Option<Self> {
         let (stretch, style, weight) = read_attributes(font);
         let (axes, attr_axes) = if let Ok(fvar_axes) = font.fvar().and_then(|fvar| fvar.axes()) {
             let mut axes = SmallVec::<[AxisInfo; 1]>::with_capacity(fvar_axes.len());
@@ -336,7 +340,7 @@ impl Synthesis {
     }
 }
 
-fn read_attributes(font: &FontRef) -> (FontStretch, FontStyle, FontWeight) {
+fn read_attributes(font: &FontRef<'_>) -> (FontStretch, FontStyle, FontWeight) {
     use read_fonts::{
         tables::{
             head::{Head, MacStyle},
@@ -360,7 +364,7 @@ fn read_attributes(font: &FontRef) -> (FontStretch, FontStyle, FontWeight) {
         })
     }
 
-    fn from_os2_post(os2: Os2, post: Option<Post>) -> (FontStretch, FontStyle, FontWeight) {
+    fn from_os2_post(os2: Os2<'_>, post: Option<Post<'_>>) -> (FontStretch, FontStyle, FontWeight) {
         let stretch = stretch_from_width_class(os2.us_width_class());
         // Bits 1 and 9 of the fsSelection field signify italic and
         // oblique, respectively.
@@ -382,7 +386,7 @@ fn read_attributes(font: &FontRef) -> (FontStretch, FontStyle, FontWeight) {
         (stretch, style, weight)
     }
 
-    fn from_head(head: Head) -> (FontStretch, FontStyle, FontWeight) {
+    fn from_head(head: Head<'_>) -> (FontStretch, FontStyle, FontWeight) {
         let mac_style = head.mac_style();
         let style = mac_style
             .contains(MacStyle::ITALIC)

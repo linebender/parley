@@ -12,7 +12,6 @@
 // END LINEBENDER LINT SET
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
-#![allow(elided_lifetimes_in_paths)]
 #![allow(missing_debug_implementations)]
 #![allow(missing_docs)]
 #![allow(single_use_lifetimes)]

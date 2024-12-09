@@ -59,7 +59,7 @@ impl<'a> ScannedFont<'a> {
 pub fn scan_paths(
     paths: impl IntoIterator<Item = impl AsRef<Path>>,
     max_depth: u32,
-    mut f: impl FnMut(&ScannedFont),
+    mut f: impl FnMut(&ScannedFont<'_>),
 ) {
     for path in paths {
         scan_path_impl(path.as_ref(), max_depth, &mut f, 0);
@@ -143,7 +143,7 @@ fn scan_collection(
 fn scan_path_impl(
     path: &Path,
     max_depth: u32,
-    f: &mut impl FnMut(&ScannedFont),
+    f: &mut impl FnMut(&ScannedFont<'_>),
     depth: u32,
 ) -> Option<()> {
     let metadata = path.metadata().ok()?;
@@ -208,7 +208,7 @@ fn scan_font<'a>(
 }
 
 fn all_names(
-    name_table: &name::Name,
+    name_table: &name::Name<'_>,
     id: NameId,
     pool: &mut Vec<String>,
     result: &mut Vec<String>,

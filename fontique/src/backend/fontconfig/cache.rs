@@ -63,7 +63,7 @@ pub fn parse_caches(paths: &[PathBuf], mut f: impl FnMut(&CachedFont)) {
 }
 
 fn parse_font(
-    pattern: &Pattern,
+    pattern: &Pattern<'_>,
     name_free_list: &mut Vec<String>,
     font: &mut CachedFont,
 ) -> Option<()> {

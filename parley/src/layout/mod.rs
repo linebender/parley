@@ -97,7 +97,7 @@ impl<B: Brush> Layout<B> {
     }
 
     /// Returns the line at the specified index.
-    pub fn get(&self, index: usize) -> Option<Line<B>> {
+    pub fn get(&self, index: usize) -> Option<Line<'_, B>> {
         Some(Line {
             index: index as u32,
             layout: self,
@@ -119,7 +119,7 @@ impl<B: Brush> Layout<B> {
     }
 
     /// Returns an iterator over the lines in the layout.
-    pub fn lines(&self) -> impl Iterator<Item = Line<B>> + '_ + Clone {
+    pub fn lines(&self) -> impl Iterator<Item = Line<'_, B>> + '_ + Clone {
         self.data
             .lines
             .iter()
@@ -132,7 +132,7 @@ impl<B: Brush> Layout<B> {
     }
 
     /// Returns line breaker to compute lines for the layout.
-    pub fn break_lines(&mut self) -> BreakLines<B> {
+    pub fn break_lines(&mut self) -> BreakLines<'_, B> {
         BreakLines::new(self)
     }
 
@@ -150,7 +150,7 @@ impl<B: Brush> Layout<B> {
 
     /// Returns the index and `Line` object for the line containing the
     /// given byte `index` in the source text.
-    pub(crate) fn line_for_byte_index(&self, index: usize) -> Option<(usize, Line<B>)> {
+    pub(crate) fn line_for_byte_index(&self, index: usize) -> Option<(usize, Line<'_, B>)> {
         let line_index = self
             .data
             .lines
@@ -173,7 +173,7 @@ impl<B: Brush> Layout<B> {
     /// The offset is specified in the direction orthogonal to line direction.
     /// For horizontal text, this is a vertical or y offset. If the offset is
     /// on a line boundary, it is considered to be contained by the later line.
-    pub(crate) fn line_for_offset(&self, offset: f32) -> Option<(usize, Line<B>)> {
+    pub(crate) fn line_for_offset(&self, offset: f32) -> Option<(usize, Line<'_, B>)> {
         if offset < 0.0 {
             return Some((0, self.get(0)?));
         }

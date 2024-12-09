@@ -361,7 +361,7 @@ impl PartialEq for SelectedFont {
 }
 
 impl partition::SelectedFont for SelectedFont {
-    fn font(&self) -> FontRef {
+    fn font(&self) -> FontRef<'_> {
         FontRef::from_index(self.font.blob.as_ref(), self.font.index as _).unwrap()
     }
 
