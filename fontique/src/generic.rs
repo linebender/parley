@@ -51,7 +51,7 @@ pub enum GenericFamily {
     /// Song and cursive-style Kai forms. This style is often used for
     /// government documents.
     FangSong = 12,
-    // NOTICE: If a new value is added, be sure to add modify `MAX_VALUE` in the bytemuck impl.
+    // NOTICE: If a new value is added, be sure to modify `MAX_VALUE` in the bytemuck impl.
 }
 
 impl GenericFamily {
