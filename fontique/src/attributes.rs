@@ -493,3 +493,67 @@ impl fmt::Display for FontStyle {
         write!(f, "{}", value)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{FontStretch, FontStyle, FontWeight};
+
+    #[test]
+    fn fontstretch_from_fontconfig() {
+        fn check_fc(fc: i32, s: &str) {
+            let fs = FontStretch::from_fontconfig(fc);
+            assert_eq!(s, fs.to_string());
+        }
+
+        check_fc(50, "ultra-condensed");
+        check_fc(63, "extra-condensed");
+        check_fc(75, "condensed");
+        check_fc(87, "semi-condensed");
+        check_fc(100, "normal");
+        check_fc(113, "semi-expanded");
+        check_fc(125, "expanded");
+        check_fc(150, "extra-expanded");
+        check_fc(200, "ultra-expanded");
+    }
+
+    #[test]
+    fn fontstyle_from_fontconfig() {
+        fn check_fc(fc: i32, s: &str) {
+            let fs = FontStyle::from_fontconfig(fc);
+            assert_eq!(s, fs.to_string());
+        }
+
+        check_fc(0, "normal");
+        check_fc(100, "italic");
+        check_fc(110, "oblique");
+    }
+
+    #[test]
+    fn fontweight_from_fontconfig() {
+        fn check_fc(fc: i32, s: &str) {
+            let fw = FontWeight::from_fontconfig(fc);
+            assert_eq!(s, fw.to_string());
+        }
+
+        check_fc(0, "thin");
+        check_fc(40, "extra-light");
+        check_fc(50, "light");
+        check_fc(80, "normal");
+        check_fc(100, "medium");
+        check_fc(180, "semi-bold");
+        check_fc(200, "bold");
+        check_fc(205, "extra-bold");
+        check_fc(210, "black");
+
+        let demilight = FontWeight::from_fontconfig(55);
+        assert!(demilight > FontWeight::LIGHT);
+        assert!(demilight < FontWeight::NORMAL);
+
+        let book = FontWeight::from_fontconfig(75);
+        assert!(book > demilight);
+        assert!(book < FontWeight::NORMAL);
+
+        let extrablack = FontWeight::from_fontconfig(215);
+        assert!(extrablack > FontWeight::BLACK);
+    }
+}
