@@ -191,6 +191,28 @@ impl FontStretch {
     }
 }
 
+impl FontStretch {
+    /// Creates a new stretch attribute with the given value from Fontconfig.
+    ///
+    /// The values are determined based on the [fonts.conf documentation].
+    ///
+    /// [fonts.conf documentation]: https://www.freedesktop.org/software/fontconfig/fontconfig-user.html
+    pub fn from_fontconfig(width: i32) -> Self {
+        match width {
+            50 => Self::ULTRA_CONDENSED,
+            63 => Self::EXTRA_CONDENSED,
+            75 => Self::CONDENSED,
+            87 => Self::SEMI_CONDENSED,
+            100 => Self::NORMAL,
+            113 => Self::SEMI_EXPANDED,
+            125 => Self::EXPANDED,
+            150 => Self::EXTRA_EXPANDED,
+            200 => Self::ULTRA_EXPANDED,
+            _ => Self::from_ratio(width as f32 / 100.0),
+        }
+    }
+}
+
 impl fmt::Display for FontStretch {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let value = self.0 * 1000.0;
@@ -304,6 +326,46 @@ impl FontWeight {
     }
 }
 
+impl FontWeight {
+    /// Creates a new weight attribute with the given value from Fontconfig.
+    ///
+    /// The values are determined based on the [fonts.conf documentation].
+    ///
+    /// [fonts.conf documentation]: https://www.freedesktop.org/software/fontconfig/fontconfig-user.html
+    pub fn from_fontconfig(weight: i32) -> Self {
+        const MAP: &[(i32, i32)] = &[
+            (0, 0),
+            (100, 0),
+            (200, 40),
+            (300, 50),
+            (350, 55),
+            (380, 75),
+            (400, 80),
+            (500, 100),
+            (600, 180),
+            (700, 200),
+            (800, 205),
+            (900, 210),
+            (950, 215),
+        ];
+        for (i, (ot, fc)) in MAP.iter().skip(1).enumerate() {
+            if weight == *fc {
+                return Self::new(*ot as f32);
+            }
+            if weight < *fc {
+                let weight = weight as f32;
+                let fc_a = MAP[i - 1].1 as f32;
+                let fc_b = *fc as f32;
+                let ot_a = MAP[i - 1].1 as f32;
+                let ot_b = *ot as f32;
+                let t = (fc_a - fc_b) / (weight - fc_a);
+                return Self::new(ot_a + (ot_b - ot_a) * t);
+            }
+        }
+        Self::EXTRA_BLACK
+    }
+}
+
 impl Default for FontWeight {
     fn default() -> Self {
         Self::NORMAL
@@ -396,6 +458,21 @@ impl FontStyle {
                 return None;
             }
         })
+    }
+}
+
+impl FontStyle {
+    /// Creates a new style attribute with the given value from Fontconfig.
+    ///
+    /// The values are determined based on the [fonts.conf documentation].
+    ///
+    /// [fonts.conf documentation]: https://www.freedesktop.org/software/fontconfig/fontconfig-user.html
+    pub fn from_fontconfig(slant: i32) -> Self {
+        match slant {
+            100 => Self::Italic,
+            110 => Self::Oblique(None),
+            _ => Self::Normal,
+        }
     }
 }
 

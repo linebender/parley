@@ -17,6 +17,10 @@ This release has an [MSRV] of 1.75.
 
 ### Added
 
+#### Fontique
+
+- `FontStretch`, `FontStyle`, and `FontWeight` get helper functions `from_fontconfig` ([#212] by [@waywardmonkeys][])
+
 #### Parley
 
 - `Generation` on `PlainEditor` to help implement lazy drawing. ([#143] by [@xorgy])
