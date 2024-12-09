@@ -48,13 +48,20 @@ impl fmt::Display for Attributes {
 ///
 /// The default value is [`FontStretch::NORMAL`] or `1.0`.
 ///
-/// In variable fonts, this can be controlled with the `wdth` [axis].
+/// In variable fonts, this can be controlled with the `wdth` [axis]. This
+/// is an `f32` so that it can represent the same range of values as as
+/// the `wdth` axis.
+///
+/// In Open Type, the `u16` [`usWidthClass`] field has 9 values, from 1-9,
+/// which doesn't allow for the wide range of values possible with variable
+/// fonts.
 ///
 /// See <https://fonts.google.com/knowledge/glossary/width>
 ///
 /// In CSS, this corresponds to the [`font-width`] property.
 ///
 /// [axis]: crate::AxisInfo
+/// [`usWidthClass`]: https://learn.microsoft.com/en-us/typography/opentype/spec/os2#uswidthclass
 /// [`font-width`]: https://www.w3.org/TR/css-fonts-4/#font-width-prop
 #[derive(Copy, Clone, PartialEq, PartialOrd, Debug)]
 pub struct FontStretch(f32);
@@ -248,7 +255,9 @@ impl Default for FontStretch {
 ///
 /// The default value is [`FontWeight::NORMAL`] or `400.0`.
 ///
-/// In variable fonts, this can be controlled with the `wght` [axis].
+/// In variable fonts, this can be controlled with the `wght` [axis]. This
+/// is an `f32` so that it can represent the same range of values as as
+/// the `wght` axis.
 ///
 /// See <https://fonts.google.com/knowledge/glossary/weight>
 ///
@@ -404,6 +413,8 @@ impl fmt::Display for FontWeight {
 ///
 /// In variable fonts, this can be controlled with the `ital`
 /// and `slnt` [axes] for italic and oblique styles, respectively.
+/// This uses an `f32` for the `Oblique` variant so so that it
+/// can represent the same range of values as as the `slnt` axis.
 ///
 /// See <https://fonts.google.com/knowledge/glossary/style>
 ///
