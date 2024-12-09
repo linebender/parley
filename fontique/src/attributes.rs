@@ -354,6 +354,7 @@ impl FontWeight {
             if weight == *fc {
                 return Self::new(*ot as f32);
             }
+            // Linear interpolation if not an exact match
             if weight < *fc {
                 let weight = weight as f32;
                 let fc_a = MAP[i - 1].1 as f32;
