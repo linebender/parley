@@ -333,6 +333,8 @@ impl FontWeight {
     ///
     /// [fonts.conf documentation]: https://www.freedesktop.org/software/fontconfig/fontconfig-user.html
     pub fn from_fontconfig(weight: i32) -> Self {
+        // A selection of OpenType weights (first) and their corresponding fontconfig value (second)
+        // Invariant: The fontconfig values are sorted
         const MAP: &[(i32, i32)] = &[
             (0, 0),
             (100, 0),
