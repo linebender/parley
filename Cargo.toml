@@ -12,7 +12,7 @@ members = [
 edition = "2021"
 # Keep in sync with RUST_MIN_VER in .github/workflows/ci.yml, with the relevant README.md files
 # and with the MSRV in the `Unreleased` section of CHANGELOG.md.
-rust-version = "1.75"
+rust-version = "1.82"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/linebender/parley"
 
@@ -82,7 +82,7 @@ bytemuck = { version = "1.20.0", default-features = false }
 fontique = { version = "0.2.0", default-features = false, path = "fontique" }
 hashbrown = "0.15.2"
 parley = { version = "0.2.0", default-features = false, path = "parley" }
-peniko = { version = "0.2.0", default-features = false }
+peniko = { version = "0.3.0", default-features = false }
 skrifa = { version = "0.22.3", default-features = false }
 read-fonts = { version = "0.22.3", default-features = false }
 swash = { version = "0.1.19", default-features = false }
