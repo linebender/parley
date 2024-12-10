@@ -49,8 +49,8 @@ impl fmt::Display for Attributes {
 /// The default value is [`FontWidth::NORMAL`] or `1.0`.
 ///
 /// In variable fonts, this can be controlled with the `wdth` [axis]. This
-/// is an `f32` so that it can represent the same range of values as as
-/// the `wdth` axis.
+/// is an `f32` so that it can represent the same range of values as the
+/// `wdth` axis.
 ///
 /// In Open Type, the `u16` [`usWidthClass`] field has 9 values, from 1-9,
 /// which doesn't allow for the wide range of values possible with variable
@@ -260,8 +260,8 @@ impl Default for FontWidth {
 /// The default value is [`FontWeight::NORMAL`] or `400.0`.
 ///
 /// In variable fonts, this can be controlled with the `wght` [axis]. This
-/// is an `f32` so that it can represent the same range of values as as
-/// the `wght` axis.
+/// is an `f32` so that it can represent the same range of values as the
+/// `wght` axis.
 ///
 /// See <https://fonts.google.com/knowledge/glossary/weight>
 ///
@@ -418,7 +418,7 @@ impl fmt::Display for FontWeight {
 /// In variable fonts, this can be controlled with the `ital`
 /// and `slnt` [axes] for italic and oblique styles, respectively.
 /// This uses an `f32` for the `Oblique` variant so so that it
-/// can represent the same range of values as as the `slnt` axis.
+/// can represent the same range of values as the `slnt` axis.
 ///
 /// See <https://fonts.google.com/knowledge/glossary/style>
 ///
