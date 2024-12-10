@@ -25,6 +25,7 @@ This release has an [MSRV] of 1.75.
 
 - `Generation` on `PlainEditor` to help implement lazy drawing. ([#143] by [@xorgy])
 - Support for preedit for input methods in `PlainEditor` ([#192][], [#198][] by [@tomcur][])
+- `PlainEditor` method to get a cursor area for use by the platform's input method ([#224][] by [@tomcur][])
 
 ### Changed
 
@@ -113,6 +114,7 @@ This release has an [MSRV] of 1.70.
 [#198]: https://github.com/linebender/parley/pull/198
 [#211]: https://github.com/linebender/parley/pull/211
 [#223]: https://github.com/linebender/parley/pull/223
+[#224]: https://github.com/linebender/parley/pull/224
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/linebender/parley/releases/tag/v0.2.0

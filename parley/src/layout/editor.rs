@@ -8,6 +8,7 @@ use crate::{
         cursor::{Cursor, Selection},
         Affinity, Alignment, Layout,
     },
+    resolve::ResolvedStyle,
     style::Brush,
     FontContext, LayoutContext, Rect, StyleProperty, StyleSet,
 };
@@ -768,6 +769,61 @@ where
     pub fn cursor_geometry(&self, size: f32) -> Option<Rect> {
         self.show_cursor
             .then(|| self.selection.focus().geometry(&self.layout, size))
+    }
+
+    /// Get a rectangle bounding the text the user is currently editing.
+    ///
+    /// This is useful for suggesting an exclusion area to the platform for, e.g., IME candidate
+    /// box placement. This bounds the area of the preedit text if present, otherwise it bounds the
+    /// selection on the focused line.
+    pub fn ime_cursor_area(&self) -> Rect {
+        let (area, focus) = if let Some(preedit_range) = &self.compose {
+            let selection = Selection::new(
+                self.cursor_at(preedit_range.start),
+                self.cursor_at(preedit_range.end),
+            );
+
+            // Bound the entire preedit text.
+            let mut area = None;
+            selection.geometry_with(&self.layout, |rect| {
+                let area = area.get_or_insert(rect);
+                *area = area.union(rect);
+            });
+
+            (
+                area.unwrap_or_else(|| selection.focus().geometry(&self.layout, 0.)),
+                selection.focus(),
+            )
+        } else {
+            // Bound the selected parts of the focused line only.
+            let focus = self.selection.focus().geometry(&self.layout, 0.);
+            let mut area = focus;
+            self.selection.geometry_with(&self.layout, |rect| {
+                if rect.y0 == focus.y0 {
+                    area = area.union(rect);
+                }
+            });
+
+            (area, self.selection.focus())
+        };
+
+        // Ensure some context is captured even for tiny or collapsed selections by including a
+        // region surrounding the selection. Doing this unconditionally, the IME candidate box
+        // usually does not need to jump around when composing starts or the preedit is added to.
+        let [upstream, downstream] = focus.logical_clusters(&self.layout);
+        let font_size = downstream
+            .or(upstream)
+            .map(|cluster| cluster.run().font_size())
+            .unwrap_or(ResolvedStyle::<T>::default().font_size);
+        // Using 0.6 as an estimate of the average advance
+        let inflate = 3. * 0.6 * font_size as f64;
+        let editor_width = self.width.map(f64::from).unwrap_or(f64::INFINITY);
+        Rect {
+            x0: (area.x0 - inflate).max(0.),
+            x1: (area.x1 + inflate).min(editor_width),
+            y0: area.y0,
+            y1: area.y1,
+        }
     }
 
     /// Borrow the text content of the buffer.
