@@ -14,16 +14,26 @@ use parley::{
     Alignment, FontContext, FontWeight, GenericFamily, GlyphRun, InlineBox, Layout, LayoutContext,
     PositionedLayoutItem, StyleProperty,
 };
-use peniko::Color as PenikoColor;
 use skrifa::{
     instance::{LocationRef, NormalizedCoord, Size},
     outline::{DrawSettings, OutlinePen},
     raw::FontRef as ReadFontsRef,
     GlyphId, MetadataProvider, OutlineGlyph,
 };
-use tiny_skia::{
-    Color as TinySkiaColor, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Rect, Transform,
-};
+use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Rect, Transform};
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ColorBrush {
+    color: Color,
+}
+
+impl Default for ColorBrush {
+    fn default() -> Self {
+        Self {
+            color: Color::BLACK,
+        }
+    }
+}
 
 fn main() {
     // The text we are going to style and lay out
@@ -38,8 +48,8 @@ fn main() {
     let max_advance = Some(200.0 * display_scale);
 
     // Colours for rendering
-    let foreground_color = PenikoColor::rgb8(0, 0, 0);
-    let background_color = PenikoColor::rgb8(255, 255, 255);
+    let foreground_color = Color::BLACK;
+    let background_color = Color::WHITE;
 
     // Padding around the output image
     let padding = 20;
@@ -55,7 +65,10 @@ fn main() {
     let mut builder = layout_cx.ranged_builder(&mut font_cx, &text, display_scale);
 
     // Set default text colour styles (set foreground text color)
-    let brush_style = StyleProperty::Brush(foreground_color);
+    let foreground_brush = ColorBrush {
+        color: foreground_color,
+    };
+    let brush_style = StyleProperty::Brush(foreground_brush);
     builder.push_default(brush_style);
 
     // Set default font family
@@ -79,7 +92,7 @@ fn main() {
     });
 
     // Build the builder into a Layout
-    let mut layout: Layout<PenikoColor> = builder.build(&text);
+    let mut layout: Layout<ColorBrush> = builder.build(&text);
 
     // Perform layout (including bidi resolution and shaping) with start alignment
     layout.break_all_lines(max_advance);
@@ -93,7 +106,7 @@ fn main() {
     let mut img = Pixmap::new(padded_width, padded_height).unwrap();
 
     // Fill background color
-    img.fill(to_tiny_skia(background_color));
+    img.fill(background_color);
 
     // Wrap Pixmap in a type that implements skrifa::OutlinePen
     let mut pen = TinySkiaPen::new(img.as_mut());
@@ -107,7 +120,7 @@ fn main() {
                 }
                 PositionedLayoutItem::InlineBox(inline_box) => {
                     pen.set_origin(inline_box.x + padding as f32, inline_box.y + padding as f32);
-                    pen.set_color(to_tiny_skia(foreground_color));
+                    pen.set_color(foreground_color);
                     pen.fill_rect(inline_box.width, inline_box.height);
                 }
             };
@@ -129,20 +142,12 @@ fn main() {
     img.save_png(output_path).unwrap();
 }
 
-fn to_tiny_skia(color: PenikoColor) -> TinySkiaColor {
-    TinySkiaColor::from_rgba8(color.r, color.g, color.b, color.a)
-}
-
-fn render_glyph_run(
-    glyph_run: &GlyphRun<'_, PenikoColor>,
-    pen: &mut TinySkiaPen<'_>,
-    padding: u32,
-) {
+fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<'_>, padding: u32) {
     // Resolve properties of the GlyphRun
     let mut run_x = glyph_run.offset();
     let run_y = glyph_run.baseline();
     let style = glyph_run.style();
-    let color = style.brush;
+    let brush = style.brush;
 
     // Get the "Run" from the "GlyphRun"
     let run = glyph_run.run();
@@ -171,7 +176,7 @@ fn render_glyph_run(
         let glyph_id = GlyphId::from(glyph.id);
         if let Some(glyph_outline) = outlines.get(glyph_id) {
             pen.set_origin(glyph_x, glyph_y);
-            pen.set_color(to_tiny_skia(color));
+            pen.set_color(brush.color);
             pen.draw_glyph(&glyph_outline, font_size, &normalized_coords);
         }
     }
@@ -195,15 +200,15 @@ fn render_glyph_run(
 
 fn render_decoration(
     pen: &mut TinySkiaPen<'_>,
-    glyph_run: &GlyphRun<'_, PenikoColor>,
-    color: PenikoColor,
+    glyph_run: &GlyphRun<'_, ColorBrush>,
+    brush: ColorBrush,
     offset: f32,
     width: f32,
     padding: u32,
 ) {
     let y = glyph_run.baseline() - offset + padding as f32;
     let x = glyph_run.offset() + padding as f32;
-    pen.set_color(to_tiny_skia(color));
+    pen.set_color(brush.color);
     pen.set_origin(x, y);
     pen.fill_rect(glyph_run.advance(), width);
 }
@@ -232,7 +237,7 @@ impl TinySkiaPen<'_> {
         self.y = y;
     }
 
-    fn set_color(&mut self, color: TinySkiaColor) {
+    fn set_color(&mut self, color: Color) {
         self.paint.set_color(color);
     }
 

@@ -1,15 +1,14 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::tests::utils::renderer::{render_layout, RenderingConfig};
+use crate::tests::utils::renderer::{render_layout, ColorBrush, RenderingConfig};
 use crate::{
     FontContext, FontFamily, FontStack, Layout, LayoutContext, PlainEditor, PlainEditorDriver,
     RangedBuilder, Rect, StyleProperty,
 };
 use fontique::{Collection, CollectionOptions};
-use peniko::Color;
 use std::path::{Path, PathBuf};
-use tiny_skia::Pixmap;
+use tiny_skia::{Color, Pixmap};
 
 // Creates a new instance of TestEnv and put current function name in constructor
 #[macro_export]
@@ -54,7 +53,7 @@ pub(crate) struct TestEnv {
     test_name: String,
     check_counter: u32,
     font_cx: FontContext,
-    layout_cx: LayoutContext<Color>,
+    layout_cx: LayoutContext<ColorBrush>,
     text_color: Color,
     rendering_config: RenderingConfig,
     cursor_size: f32,
@@ -125,12 +124,12 @@ impl TestEnv {
             },
             tolerance: 0.0,
             layout_cx: LayoutContext::new(),
-            text_color: Color::rgb8(0, 0, 0),
+            text_color: Color::BLACK,
             rendering_config: RenderingConfig {
-                background_color: Color::rgb8(255, 255, 255),
-                cursor_color: Color::rgb8(255, 0, 0),
-                selection_color: Color::rgb8(196, 196, 0),
-                inline_box_color: Color::rgb8(0, 0, 0),
+                background_color: Color::WHITE,
+                cursor_color: Color::from_rgba8(255, 0, 0, 255),
+                selection_color: Color::from_rgba8(196, 196, 0, 255),
+                inline_box_color: Color::BLACK,
             },
             cursor_size: 2.0,
             errors: Vec::new(),
@@ -138,16 +137,18 @@ impl TestEnv {
         }
     }
 
-    fn default_style(&self) -> [StyleProperty<'static, Color>; 2] {
+    fn default_style(&self) -> [StyleProperty<'static, ColorBrush>; 2] {
         [
-            StyleProperty::Brush(self.text_color),
+            StyleProperty::Brush(ColorBrush {
+                color: self.text_color,
+            }),
             StyleProperty::FontStack(FontStack::Single(FontFamily::Named(
                 DEFAULT_FONT_NAME.into(),
             ))),
         ]
     }
 
-    pub(crate) fn builder<'a>(&'a mut self, text: &'a str) -> RangedBuilder<'a, Color> {
+    pub(crate) fn builder<'a>(&'a mut self, text: &'a str) -> RangedBuilder<'a, ColorBrush> {
         let default_style = self.default_style();
         let mut builder = self.layout_cx.ranged_builder(&mut self.font_cx, text, 1.0);
         for style in default_style {
@@ -158,12 +159,12 @@ impl TestEnv {
 
     pub(crate) fn driver<'a>(
         &'a mut self,
-        editor: &'a mut PlainEditor<Color>,
-    ) -> PlainEditorDriver<'a, Color> {
+        editor: &'a mut PlainEditor<ColorBrush>,
+    ) -> PlainEditorDriver<'a, ColorBrush> {
         editor.driver(&mut self.font_cx, &mut self.layout_cx)
     }
 
-    pub(crate) fn editor(&mut self, text: &str) -> PlainEditor<Color> {
+    pub(crate) fn editor(&mut self, text: &str) -> PlainEditor<ColorBrush> {
         let mut editor = PlainEditor::new(16.);
         for style in self.default_style() {
             editor.edit_styles().insert(style);
@@ -227,7 +228,7 @@ impl TestEnv {
         self
     }
 
-    pub(crate) fn check_editor_snapshot(&mut self, editor: &mut PlainEditor<Color>) {
+    pub(crate) fn check_editor_snapshot(&mut self, editor: &mut PlainEditor<ColorBrush>) {
         editor.refresh_layout(&mut self.font_cx, &mut self.layout_cx);
         self.render_and_check_snapshot(
             editor.try_layout().unwrap(),
@@ -236,13 +237,13 @@ impl TestEnv {
         );
     }
 
-    pub(crate) fn check_layout_snapshot(&mut self, layout: &Layout<Color>) {
+    pub(crate) fn check_layout_snapshot(&mut self, layout: &Layout<ColorBrush>) {
         self.render_and_check_snapshot(layout, None, &[]);
     }
 
     fn render_and_check_snapshot(
         &mut self,
-        layout: &Layout<Color>,
+        layout: &Layout<ColorBrush>,
         cursor_rect: Option<Rect>,
         selection_rects: &[Rect],
     ) {
