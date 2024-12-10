@@ -4,10 +4,10 @@
 use accesskit::{Node, TreeUpdate};
 use core::default::Default;
 use parley::{editor::SplitString, layout::PositionedLayoutItem, GenericFamily, StyleProperty};
-use peniko::{kurbo::Affine, Color, Fill};
 use std::time::{Duration, Instant};
 use vello::{
-    kurbo::{Line, Stroke},
+    kurbo::{Affine, Line, Stroke},
+    peniko::{Brush, Color, Fill},
     Scene,
 };
 use winit::{
@@ -24,8 +24,8 @@ pub const INSET: f32 = 32.0;
 
 pub struct Editor {
     font_cx: FontContext,
-    layout_cx: LayoutContext<Color>,
-    editor: PlainEditor<Color>,
+    layout_cx: LayoutContext<Brush>,
+    editor: PlainEditor<Brush>,
     last_click_time: Option<Instant>,
     click_count: u32,
     pointer_down: bool,
@@ -44,7 +44,7 @@ impl Editor {
         let styles = editor.edit_styles();
         styles.insert(StyleProperty::LineHeight(1.2));
         styles.insert(GenericFamily::SystemUi.into());
-        styles.insert(StyleProperty::Brush(Color::WHITE));
+        styles.insert(StyleProperty::Brush(Color::WHITE.into()));
         Self {
             font_cx: Default::default(),
             layout_cx: Default::default(),
@@ -60,11 +60,11 @@ impl Editor {
         }
     }
 
-    fn driver(&mut self) -> PlainEditorDriver<'_, Color> {
+    fn driver(&mut self) -> PlainEditorDriver<'_, Brush> {
         self.editor.driver(&mut self.font_cx, &mut self.layout_cx)
     }
 
-    pub fn editor(&mut self) -> &mut PlainEditor<Color> {
+    pub fn editor(&mut self) -> &mut PlainEditor<Brush> {
         &mut self.editor
     }
 
@@ -419,7 +419,7 @@ impl Editor {
                     .collect::<Vec<_>>();
                 scene
                     .draw_glyphs(font)
-                    .brush(style.brush)
+                    .brush(&style.brush)
                     .hint(true)
                     .transform(transform)
                     .glyph_transform(glyph_xform)
