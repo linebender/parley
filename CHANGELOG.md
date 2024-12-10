@@ -30,7 +30,7 @@ This release has an [MSRV] of 1.75.
 
 #### Fontique
 
-- Breaking change: `Stretch`, `Style`, and `Weight` renamed to `FontWidthh`, `FontStyle`, `FontWeight ([#211][], [#223][] by [@waywardmonkeys][])
+- Breaking change: `Stretch`, `Style`, and `Weight` renamed to `FontWidth`, `FontStyle`, `FontWeight` ([#211][], [#223][] by [@waywardmonkeys][])
 
 #### Parley
 
