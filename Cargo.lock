@@ -2474,7 +2474,6 @@ version = "0.1.0"
 dependencies = [
  "image",
  "parley",
- "peniko",
  "skrifa",
  "swash",
 ]
