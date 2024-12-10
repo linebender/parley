@@ -1,7 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::{FontStretch, FontStyle, FontWeight};
+use super::{FontStyle, FontWeight, FontWidth};
 use fontconfig_cache_parser::{Cache, CharSetLeaf, Object, Pattern, Value};
 use std::io::Read;
 use std::path::PathBuf;
@@ -11,7 +11,7 @@ pub struct CachedFont {
     pub family: Vec<String>,
     pub path: PathBuf,
     pub index: u32,
-    pub stretch: FontStretch,
+    pub width: FontWidth,
     pub style: FontStyle,
     pub weight: FontWeight,
     pub coverage: Coverage,
@@ -25,7 +25,7 @@ impl CachedFont {
         self.coverage.clear();
         self.weight = FontWeight::default();
         self.style = FontStyle::default();
-        self.stretch = FontStretch::default();
+        self.width = FontWidth::default();
     }
 }
 
@@ -114,7 +114,7 @@ fn parse_font(
             Object::Width => {
                 for val in elt.values().ok()? {
                     if let Value::Int(i) = val.ok()? {
-                        font.stretch = FontStretch::from_fontconfig(i as _);
+                        font.width = FontWidth::from_fontconfig(i as _);
                     }
                 }
             }

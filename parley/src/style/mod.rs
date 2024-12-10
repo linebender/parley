@@ -11,8 +11,8 @@ use alloc::borrow::Cow;
 
 pub use brush::*;
 pub use font::{
-    FontFamily, FontFeature, FontSettings, FontStack, FontStretch, FontStyle, FontVariation,
-    FontWeight, GenericFamily,
+    FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontVariation, FontWeight,
+    FontWidth, GenericFamily,
 };
 pub use styleset::StyleSet;
 
@@ -29,8 +29,8 @@ pub enum StyleProperty<'a, B: Brush> {
     FontStack(FontStack<'a>),
     /// Font size.
     FontSize(f32),
-    /// Font stretch.
-    FontStretch(FontStretch),
+    /// Font width.
+    FontWidth(FontWidth),
     /// Font style.
     FontStyle(FontStyle),
     /// Font weight.
@@ -74,8 +74,8 @@ pub struct TextStyle<'a, B: Brush> {
     pub font_stack: FontStack<'a>,
     /// Font size.
     pub font_size: f32,
-    /// Font stretch.
-    pub font_stretch: FontStretch,
+    /// Font width.
+    pub font_width: FontWidth,
     /// Font style.
     pub font_style: FontStyle,
     /// Font weight.
@@ -117,7 +117,7 @@ impl<B: Brush> Default for TextStyle<'_, B> {
         TextStyle {
             font_stack: FontStack::Source(Cow::Borrowed("sans-serif")),
             font_size: 16.0,
-            font_stretch: Default::default(),
+            font_width: Default::default(),
             font_style: Default::default(),
             font_weight: Default::default(),
             font_variations: FontSettings::List(Cow::Borrowed(&[])),

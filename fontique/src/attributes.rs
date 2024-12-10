@@ -1,7 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Properties for specifying font weight, stretch and style.
+//! Properties for specifying font weight, width and style.
 
 #[cfg(feature = "libm")]
 #[allow(unused_imports)]
@@ -9,7 +9,7 @@ use core_maths::CoreFloat;
 
 use core::fmt;
 
-/// Primary attributes for font matching: [`FontStretch`], [`FontStyle`] and [`FontWeight`].
+/// Primary attributes for font matching: [`FontWidth`], [`FontStyle`] and [`FontWeight`].
 ///
 /// These are used to [configure] a [`Query`].
 ///
@@ -17,16 +17,16 @@ use core::fmt;
 /// [`Query`]: crate::Query
 #[derive(Copy, Clone, PartialEq, Default, Debug)]
 pub struct Attributes {
-    pub stretch: FontStretch,
+    pub width: FontWidth,
     pub style: FontStyle,
     pub weight: FontWeight,
 }
 
 impl Attributes {
-    /// Creates new attributes from the given stretch, style and weight.
-    pub fn new(stretch: FontStretch, style: FontStyle, weight: FontWeight) -> Self {
+    /// Creates new attributes from the given width, style and weight.
+    pub fn new(width: FontWidth, style: FontStyle, weight: FontWeight) -> Self {
         Self {
-            stretch,
+            width,
             style,
             weight,
         }
@@ -37,8 +37,8 @@ impl fmt::Display for Attributes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "stretch: {}, style: {}, weight: {}",
-            self.stretch, self.style, self.weight
+            "width: {}, style: {}, weight: {}",
+            self.width, self.style, self.weight
         )
     }
 }
@@ -46,7 +46,7 @@ impl fmt::Display for Attributes {
 /// Visual width of a font-- a relative change from the normal aspect
 /// ratio, typically in the range `0.5` to `2.0`.
 ///
-/// The default value is [`FontStretch::NORMAL`] or `1.0`.
+/// The default value is [`FontWidth::NORMAL`] or `1.0`.
 ///
 /// In variable fonts, this can be controlled with the `wdth` [axis]. This
 /// is an `f32` so that it can represent the same range of values as as
@@ -60,13 +60,17 @@ impl fmt::Display for Attributes {
 ///
 /// In CSS, this corresponds to the [`font-width`] property.
 ///
+/// This has also been known as "stretch" and has a legacy CSS name alias,
+/// [`font-stretch`].
+///
 /// [axis]: crate::AxisInfo
 /// [`usWidthClass`]: https://learn.microsoft.com/en-us/typography/opentype/spec/os2#uswidthclass
 /// [`font-width`]: https://www.w3.org/TR/css-fonts-4/#font-width-prop
+/// [`font-stretch`]: https://www.w3.org/TR/css-fonts-4/#font-stretch-prop
 #[derive(Copy, Clone, PartialEq, PartialOrd, Debug)]
-pub struct FontStretch(f32);
+pub struct FontWidth(f32);
 
-impl FontStretch {
+impl FontWidth {
     /// Width that is 50% of normal.
     pub const ULTRA_CONDENSED: Self = Self(0.5);
 
@@ -95,86 +99,86 @@ impl FontStretch {
     pub const ULTRA_EXPANDED: Self = Self(2.0);
 }
 
-impl FontStretch {
-    /// Creates a new stretch attribute with the given ratio.
+impl FontWidth {
+    /// Creates a new width attribute with the given ratio.
     ///
     /// This can also be created [from a percentage](Self::from_percentage).
     ///
     /// # Example
     ///
     /// ```
-    /// # use fontique::FontStretch;
-    /// assert_eq!(FontStretch::from_ratio(1.5), FontStretch::EXTRA_EXPANDED);
+    /// # use fontique::FontWidth;
+    /// assert_eq!(FontWidth::from_ratio(1.5), FontWidth::EXTRA_EXPANDED);
     /// ```
     pub fn from_ratio(ratio: f32) -> Self {
         Self(ratio)
     }
 
-    /// Creates a stretch attribute from a percentage.
+    /// Creates a width attribute from a percentage.
     ///
     /// This can also be created [from a ratio](Self::from_ratio).
     ///
     /// # Example
     ///
     /// ```
-    /// # use fontique::FontStretch;
-    /// assert_eq!(FontStretch::from_percentage(87.5), FontStretch::SEMI_CONDENSED);
+    /// # use fontique::FontWidth;
+    /// assert_eq!(FontWidth::from_percentage(87.5), FontWidth::SEMI_CONDENSED);
     /// ```
     pub fn from_percentage(percentage: f32) -> Self {
         Self(percentage / 100.0)
     }
 
-    /// Returns the stretch attribute as a ratio.
+    /// Returns the width attribute as a ratio.
     ///
     /// This is a linear scaling factor with `1.0` being "normal" width.
     ///
     /// # Example
     ///
     /// ```
-    /// # use fontique::FontStretch;
-    /// assert_eq!(FontStretch::NORMAL.ratio(), 1.0);
+    /// # use fontique::FontWidth;
+    /// assert_eq!(FontWidth::NORMAL.ratio(), 1.0);
     /// ```
     pub fn ratio(self) -> f32 {
         self.0
     }
 
-    /// Returns the stretch attribute as a percentage value.
+    /// Returns the width attribute as a percentage value.
     ///
     /// This is generally the value associated with the `wdth` axis.
     pub fn percentage(self) -> f32 {
         self.0 * 100.0
     }
 
-    /// Returns `true` if the stretch is [normal].
+    /// Returns `true` if the width is [normal].
     ///
-    /// [normal]: FontStretch::NORMAL
+    /// [normal]: FontWidth::NORMAL
     pub fn is_normal(self) -> bool {
         self == Self::NORMAL
     }
 
-    /// Returns `true` if the stretch is condensed (less than [normal]).
+    /// Returns `true` if the width is condensed (less than [normal]).
     ///
-    /// [normal]: FontStretch::NORMAL
+    /// [normal]: FontWidth::NORMAL
     pub fn is_condensed(self) -> bool {
         self < Self::NORMAL
     }
 
-    /// Returns `true` if the stretch is expanded (greater than [normal]).
+    /// Returns `true` if the width is expanded (greater than [normal]).
     ///
-    /// [normal]: FontStretch::NORMAL
+    /// [normal]: FontWidth::NORMAL
     pub fn is_expanded(self) -> bool {
         self > Self::NORMAL
     }
 
-    /// Parses the stretch from a CSS style keyword or a percentage value.
+    /// Parses the width from a CSS style keyword or a percentage value.
     ///
     /// # Examples
     ///
     /// ```
-    /// # use fontique::FontStretch;
-    /// assert_eq!(FontStretch::parse("semi-condensed"), Some(FontStretch::SEMI_CONDENSED));
-    /// assert_eq!(FontStretch::parse("80%"), Some(FontStretch::from_percentage(80.0)));
-    /// assert_eq!(FontStretch::parse("wideload"), None);
+    /// # use fontique::FontWidth;
+    /// assert_eq!(FontWidth::parse("semi-condensed"), Some(FontWidth::SEMI_CONDENSED));
+    /// assert_eq!(FontWidth::parse("80%"), Some(FontWidth::from_percentage(80.0)));
+    /// assert_eq!(FontWidth::parse("wideload"), None);
     /// ```
     pub fn parse(s: &str) -> Option<Self> {
         let s = s.trim();
@@ -198,8 +202,8 @@ impl FontStretch {
     }
 }
 
-impl FontStretch {
-    /// Creates a new stretch attribute with the given value from Fontconfig.
+impl FontWidth {
+    /// Creates a new width attribute with the given value from Fontconfig.
     ///
     /// The values are determined based on the [fonts.conf documentation].
     ///
@@ -220,7 +224,7 @@ impl FontStretch {
     }
 }
 
-impl fmt::Display for FontStretch {
+impl fmt::Display for FontWidth {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = self.0 * 1000.0;
         if value.fract() == 0.0 {
@@ -245,7 +249,7 @@ impl fmt::Display for FontStretch {
     }
 }
 
-impl Default for FontStretch {
+impl Default for FontWidth {
     fn default() -> Self {
         Self::NORMAL
     }
@@ -507,12 +511,12 @@ impl fmt::Display for FontStyle {
 
 #[cfg(test)]
 mod tests {
-    use super::{FontStretch, FontStyle, FontWeight};
+    use super::{FontStyle, FontWeight, FontWidth};
 
     #[test]
-    fn fontstretch_from_fontconfig() {
+    fn fontwidth_from_fontconfig() {
         fn check_fc(fc: i32, s: &str) {
-            let fs = FontStretch::from_fontconfig(fc);
+            let fs = FontWidth::from_fontconfig(fc);
             assert_eq!(s, fs.to_string());
         }
 

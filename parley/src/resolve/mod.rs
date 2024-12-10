@@ -11,8 +11,8 @@ pub(crate) use range::RangedStyleBuilder;
 use alloc::{vec, vec::Vec};
 
 use super::style::{
-    Brush, FontFamily, FontFeature, FontSettings, FontStack, FontStretch, FontStyle, FontVariation,
-    FontWeight, StyleProperty,
+    Brush, FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontVariation, FontWeight,
+    FontWidth, StyleProperty,
 };
 use crate::font::FontContext;
 use crate::layout;
@@ -135,7 +135,7 @@ impl ResolveContext {
         match property {
             StyleProperty::FontStack(value) => FontStack(self.resolve_stack(fcx, value)),
             StyleProperty::FontSize(value) => FontSize(*value * scale),
-            StyleProperty::FontStretch(value) => FontStretch(*value),
+            StyleProperty::FontWidth(value) => FontWidth(*value),
             StyleProperty::FontStyle(value) => FontStyle(*value),
             StyleProperty::FontWeight(value) => FontWeight(*value),
             StyleProperty::FontVariations(value) => FontVariations(self.resolve_variations(value)),
@@ -167,7 +167,7 @@ impl ResolveContext {
         ResolvedStyle {
             font_stack: self.resolve_stack(fcx, &raw_style.font_stack),
             font_size: raw_style.font_size * scale,
-            font_stretch: raw_style.font_stretch,
+            font_width: raw_style.font_width,
             font_style: raw_style.font_style,
             font_weight: raw_style.font_weight,
             font_variations: self.resolve_variations(&raw_style.font_variations),
@@ -330,8 +330,8 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     FontStack(Resolved<FamilyId>),
     /// Font size.
     FontSize(f32),
-    /// Font stretch.
-    FontStretch(FontStretch),
+    /// Font width.
+    FontWidth(FontWidth),
     /// Font style.
     FontStyle(FontStyle),
     /// Font weight.
@@ -375,8 +375,8 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     pub(crate) font_stack: Resolved<FamilyId>,
     /// Font size.
     pub(crate) font_size: f32,
-    /// Font stretch.
-    pub(crate) font_stretch: FontStretch,
+    /// Font width.
+    pub(crate) font_width: FontWidth,
     /// Font style.
     pub(crate) font_style: FontStyle,
     /// Font weight.
@@ -406,7 +406,7 @@ impl<B: Brush> Default for ResolvedStyle<B> {
         Self {
             font_stack: Resolved::default(),
             font_size: 16.,
-            font_stretch: Default::default(),
+            font_width: Default::default(),
             font_style: Default::default(),
             font_weight: Default::default(),
             font_variations: Default::default(),
@@ -429,7 +429,7 @@ impl<B: Brush> ResolvedStyle<B> {
         match property {
             FontStack(value) => self.font_stack = value,
             FontSize(value) => self.font_size = value,
-            FontStretch(value) => self.font_stretch = value,
+            FontWidth(value) => self.font_width = value,
             FontStyle(value) => self.font_style = value,
             FontWeight(value) => self.font_weight = value,
             FontVariations(value) => self.font_variations = value,
@@ -455,7 +455,7 @@ impl<B: Brush> ResolvedStyle<B> {
         match property {
             FontStack(value) => self.font_stack == *value,
             FontSize(value) => nearly_eq(self.font_size, *value),
-            FontStretch(value) => self.font_stretch == *value,
+            FontWidth(value) => self.font_width == *value,
             FontStyle(value) => self.font_style == *value,
             FontWeight(value) => self.font_weight == *value,
             FontVariations(value) => self.font_variations == *value,
