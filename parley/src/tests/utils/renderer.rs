@@ -8,40 +8,43 @@
 //! if you need emoji rendering.
 
 use crate::{GlyphRun, Layout, PositionedLayoutItem};
-use peniko::Color as PenikoColor;
 use skrifa::{
     instance::{LocationRef, NormalizedCoord, Size},
     outline::{DrawSettings, OutlinePen},
     raw::FontRef as ReadFontsRef,
     GlyphId, MetadataProvider, OutlineGlyph,
 };
-use tiny_skia::{
-    Color as TinySkiaColor, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Rect, Transform,
-};
+use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Rect, Transform};
 
-pub(crate) struct RenderingConfig {
-    pub background_color: peniko::Color,
-    pub inline_box_color: peniko::Color,
-    pub cursor_color: peniko::Color,
-    pub selection_color: peniko::Color,
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct ColorBrush {
+    pub(crate) color: Color,
 }
 
-fn draw_rect(
-    pen: &mut TinySkiaPen<'_>,
-    x: f32,
-    y: f32,
-    width: f32,
-    height: f32,
-    color: peniko::Color,
-) {
+impl Default for ColorBrush {
+    fn default() -> Self {
+        Self {
+            color: Color::BLACK,
+        }
+    }
+}
+
+pub(crate) struct RenderingConfig {
+    pub background_color: Color,
+    pub inline_box_color: Color,
+    pub cursor_color: Color,
+    pub selection_color: Color,
+}
+
+fn draw_rect(pen: &mut TinySkiaPen<'_>, x: f32, y: f32, width: f32, height: f32, color: Color) {
     pen.set_origin(x, y);
-    pen.set_color(to_tiny_skia(color));
+    pen.set_color(color);
     pen.fill_rect(width, height);
 }
 
 pub(crate) fn render_layout(
     config: &RenderingConfig,
-    layout: &Layout<peniko::Color>,
+    layout: &Layout<ColorBrush>,
     cursor_rect: Option<crate::Rect>,
     selection_rects: &[crate::Rect],
 ) -> Pixmap {
@@ -54,7 +57,7 @@ pub(crate) fn render_layout(
 
     let mut img = Pixmap::new(padded_width, padded_height).unwrap();
 
-    img.fill(to_tiny_skia(config.background_color));
+    img.fill(config.background_color);
 
     let mut pen = TinySkiaPen::new(img.as_mut());
 
@@ -103,20 +106,12 @@ pub(crate) fn render_layout(
     img
 }
 
-fn to_tiny_skia(color: PenikoColor) -> TinySkiaColor {
-    TinySkiaColor::from_rgba8(color.r, color.g, color.b, color.a)
-}
-
-fn render_glyph_run(
-    glyph_run: &GlyphRun<'_, PenikoColor>,
-    pen: &mut TinySkiaPen<'_>,
-    padding: u32,
-) {
+fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<'_>, padding: u32) {
     // Resolve properties of the GlyphRun
     let mut run_x = glyph_run.offset();
     let run_y = glyph_run.baseline();
     let style = glyph_run.style();
-    let color = style.brush;
+    let brush = style.brush;
 
     // Get the "Run" from the "GlyphRun"
     let run = glyph_run.run();
@@ -145,7 +140,7 @@ fn render_glyph_run(
         let glyph_id = GlyphId::from(glyph.id);
         if let Some(glyph_outline) = outlines.get(glyph_id) {
             pen.set_origin(glyph_x, glyph_y);
-            pen.set_color(to_tiny_skia(color));
+            pen.set_color(brush.color);
             pen.draw_glyph(&glyph_outline, font_size, &normalized_coords);
         }
     }
@@ -169,15 +164,15 @@ fn render_glyph_run(
 
 fn render_decoration(
     pen: &mut TinySkiaPen<'_>,
-    glyph_run: &GlyphRun<'_, PenikoColor>,
-    color: PenikoColor,
+    glyph_run: &GlyphRun<'_, ColorBrush>,
+    brush: ColorBrush,
     offset: f32,
     width: f32,
     padding: u32,
 ) {
     let y = glyph_run.baseline() - offset + padding as f32;
     let x = glyph_run.offset() + padding as f32;
-    pen.set_color(to_tiny_skia(color));
+    pen.set_color(brush.color);
     pen.set_origin(x, y);
     pen.fill_rect(glyph_run.advance(), width);
 }
@@ -206,7 +201,7 @@ impl TinySkiaPen<'_> {
         self.y = y;
     }
 
-    fn set_color(&mut self, color: TinySkiaColor) {
+    fn set_color(&mut self, color: Color) {
         self.paint.set_color(color);
     }
 
