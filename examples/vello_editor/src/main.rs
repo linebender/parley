@@ -96,7 +96,7 @@ struct SimpleVelloApp<'s> {
     last_drawn_generation: text::Generation,
 
     /// The IME cursor area we last sent to the platform.
-    last_sent_ime_cursor_area: Option<kurbo::Rect>,
+    last_sent_ime_cursor_area: kurbo::Rect,
 
     /// The event loop proxy required by the AccessKit winit adapter.
     event_loop_proxy: EventLoopProxy<accesskit_winit::Event>,
@@ -220,8 +220,8 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
         if self.last_drawn_generation != self.editor.generation() {
             render_state.window.request_redraw();
             let area = self.editor.editor().ime_cursor_area();
-            if self.last_sent_ime_cursor_area != Some(area) {
-                self.last_sent_ime_cursor_area = Some(area);
+            if self.last_sent_ime_cursor_area != area {
+                self.last_sent_ime_cursor_area = area;
                 // Note: on X11 `set_ime_cursor_area` may cause the exclusion area to be obscured
                 // until https://github.com/rust-windowing/winit/pull/3966 is in the Winit release
                 // used by this example.
@@ -358,7 +358,7 @@ fn main() -> Result<()> {
         scene: Scene::new(),
         editor: text::Editor::new(text::LOREM),
         last_drawn_generation: Default::default(),
-        last_sent_ime_cursor_area: None,
+        last_sent_ime_cursor_area: kurbo::Rect::new(f64::NAN, f64::NAN, f64::NAN, f64::NAN),
         event_loop_proxy: event_loop.create_proxy(),
     };
 
