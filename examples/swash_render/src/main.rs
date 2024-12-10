@@ -12,13 +12,25 @@ use image::{self, Pixel, Rgba, RgbaImage};
 use parley::layout::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
 use parley::style::{FontStack, FontWeight, StyleProperty, TextStyle};
 use parley::{FontContext, InlineBox, LayoutContext};
-use peniko::Color;
 use std::fs::File;
 use swash::scale::image::Content;
 use swash::scale::{Render, ScaleContext, Scaler, Source, StrikeWith};
 use swash::zeno;
 use swash::FontRef;
 use zeno::{Format, Vector};
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ColorBrush {
+    color: Rgba<u8>,
+}
+
+impl Default for ColorBrush {
+    fn default() -> Self {
+        Self {
+            color: Rgba([0, 0, 0, 255]),
+        }
+    }
+}
 
 fn main() {
     // The text we are going to style and lay out
@@ -33,7 +45,7 @@ fn main() {
     let max_advance = Some(200.0 * display_scale);
 
     // Colours for rendering
-    let text_color = Color::rgb8(0, 0, 0);
+    let text_color = Rgba([0, 0, 0, 255]);
     let bg_color = Rgba([255, 255, 255, 255]);
 
     // Padding around the output image
@@ -48,7 +60,8 @@ fn main() {
     let mut scale_cx = ScaleContext::new();
 
     // Setup some Parley text styles
-    let brush_style = StyleProperty::Brush(text_color);
+    let text_brush = ColorBrush { color: text_color };
+    let brush_style = StyleProperty::Brush(text_brush);
     let font_stack = FontStack::from("system-ui");
     let bold_style = StyleProperty::FontWeight(FontWeight::new(600.0));
     let underline_style = StyleProperty::Underline(true);
@@ -61,7 +74,7 @@ fn main() {
         // TODO: cleanup API
 
         let root_style = TextStyle {
-            brush: text_color,
+            brush: text_brush,
             font_stack,
             line_height: 1.3,
             font_size: 16.0,
@@ -106,8 +119,8 @@ fn main() {
         builder.push_text(&text[155..168]);
 
         // Build the builder into a Layout
-        // let mut layout: Layout<Color> = builder.build(&text);
-        let (layout, _text): (Layout<Color>, String) = builder.build();
+        // let mut layout: Layout<ColorBrush> = builder.build(&text);
+        let (layout, _text): (Layout<ColorBrush>, String) = builder.build();
         layout
     } else {
         // RANGE BUILDER
@@ -145,8 +158,8 @@ fn main() {
         });
 
         // Build the builder into a Layout
-        // let mut layout: Layout<Color> = builder.build(&text);
-        let layout: Layout<Color> = builder.build(&text);
+        // let mut layout: Layout<ColorBrush> = builder.build(&text);
+        let layout: Layout<ColorBrush> = builder.build(&text);
         layout
     };
 
@@ -199,7 +212,7 @@ fn main() {
 
 fn render_glyph_run(
     context: &mut ScaleContext,
-    glyph_run: &GlyphRun<'_, Color>,
+    glyph_run: &GlyphRun<'_, ColorBrush>,
     img: &mut RgbaImage,
     padding: u32,
 ) {
@@ -257,19 +270,18 @@ fn render_glyph_run(
 
 fn render_decoration(
     img: &mut RgbaImage,
-    glyph_run: &GlyphRun<'_, Color>,
-    color: Color,
+    glyph_run: &GlyphRun<'_, ColorBrush>,
+    brush: ColorBrush,
     offset: f32,
     width: f32,
     padding: u32,
 ) {
     let y = glyph_run.baseline() - offset;
-    let color = Rgba([color.r, color.g, color.b, color.a]);
     for pixel_y in y as u32..(y + width) as u32 {
         for pixel_x in glyph_run.offset() as u32..(glyph_run.offset() + glyph_run.advance()) as u32
         {
             img.get_pixel_mut(pixel_x + padding, pixel_y + padding)
-                .blend(&color);
+                .blend(&brush.color);
         }
     }
 }
@@ -277,7 +289,7 @@ fn render_decoration(
 fn render_glyph(
     img: &mut RgbaImage,
     scaler: &mut Scaler<'_>,
-    color: Color,
+    brush: ColorBrush,
     glyph: Glyph,
     glyph_x: f32,
     glyph_y: f32,
@@ -311,12 +323,13 @@ fn render_glyph(
     match rendered_glyph.content {
         Content::Mask => {
             let mut i = 0;
+            let bc = brush.color;
             for pixel_y in 0..glyph_height {
                 for pixel_x in 0..glyph_width {
                     let x = glyph_x + pixel_x;
                     let y = glyph_y + pixel_y;
                     let alpha = rendered_glyph.data[i];
-                    let color = Rgba([color.r, color.g, color.b, alpha]);
+                    let color = Rgba([bc[0], bc[1], bc[2], alpha]);
                     img.get_pixel_mut(x, y).blend(&color);
                     i += 1;
                 }
