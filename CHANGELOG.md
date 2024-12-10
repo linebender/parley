@@ -30,7 +30,7 @@ This release has an [MSRV] of 1.75.
 
 #### Fontique
 
-- Breaking change: `Stretch`, `Style`, and `Weight` renamed to `FontStretch`, `FontStyle`, `FontWeight ([#211][] by [@waywardmonkeys][])
+- Breaking change: `Stretch`, `Style`, and `Weight` renamed to `FontWidthh`, `FontStyle`, `FontWeight ([#211][], [#223][] by [@waywardmonkeys][])
 
 #### Parley
 
@@ -112,6 +112,7 @@ This release has an [MSRV] of 1.70.
 [#192]: https://github.com/linebender/parley/pull/192
 [#198]: https://github.com/linebender/parley/pull/198
 [#211]: https://github.com/linebender/parley/pull/211
+[#223]: https://github.com/linebender/parley/pull/223
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/linebender/parley/releases/tag/v0.2.0

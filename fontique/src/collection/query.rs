@@ -238,18 +238,13 @@ fn load_font<'a>(
             let family_index = if is_default {
                 family.default_font_index()
             } else {
-                family.match_index(
-                    attributes.stretch,
-                    attributes.style,
-                    attributes.weight,
-                    true,
-                )?
+                family.match_index(attributes.width, attributes.style, attributes.weight, true)?
             };
             let font_info = family.fonts().get(family_index)?;
             let blob = font_info.load(Some(source_cache))?;
             let blob_index = font_info.index();
             let synthesis =
-                font_info.synthesis(attributes.stretch, attributes.style, attributes.weight);
+                font_info.synthesis(attributes.width, attributes.style, attributes.weight);
             *status = Entry::Ok(QueryFont {
                 family: (family.id(), family_index),
                 blob: blob.clone(),

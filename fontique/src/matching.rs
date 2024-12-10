@@ -3,7 +3,7 @@
 
 //! Implementation of the CSS font matching algorithm.
 
-use super::attributes::{FontStretch, FontStyle, FontWeight};
+use super::attributes::{FontStyle, FontWeight, FontWidth};
 use super::font::FontInfo;
 use smallvec::SmallVec;
 
@@ -11,7 +11,7 @@ const DEFAULT_OBLIQUE_ANGLE: f32 = 14.0;
 
 pub fn match_font(
     set: &[FontInfo],
-    stretch: FontStretch,
+    width: FontWidth,
     style: FontStyle,
     weight: FontWeight,
     synthesize_style: bool,
@@ -25,7 +25,7 @@ pub fn match_font(
     #[derive(Copy, Clone)]
     struct Candidate {
         index: usize,
-        stretch: i32,
+        width: i32,
         style: FontStyle,
         weight: f32,
         has_slnt: bool,
@@ -35,63 +35,63 @@ pub fn match_font(
         .enumerate()
         .map(|(i, font)| Candidate {
             index: i,
-            stretch: (font.stretch().ratio() * 100.0) as i32,
+            width: (font.width().ratio() * 100.0) as i32,
             style: font.style(),
             weight: font.weight().value(),
             has_slnt: font.has_slant_axis(),
         })
         .collect();
-    let stretch = (stretch.ratio() * 100.0) as i32;
+    let width = (width.ratio() * 100.0) as i32;
     let weight = weight.value();
-    // font-stretch is tried first:
-    let mut use_stretch = set[0].stretch;
-    if !set.iter().any(|f| f.stretch == stretch) {
-        // If the desired stretch value is less than or equal to 100%...
-        if stretch <= 100 {
-            // stretch values below the desired stretch value are checked in
+    // font-width is tried first:
+    let mut use_width = set[0].width;
+    if !set.iter().any(|f| f.width == width) {
+        // If the desired width value is less than or equal to 100%...
+        if width <= 100 {
+            // width values below the desired width value are checked in
             // descending order...
             if let Some(found) = set
                 .iter()
-                .filter(|f| f.stretch < stretch)
-                .max_by_key(|f| f.stretch)
+                .filter(|f| f.width < width)
+                .max_by_key(|f| f.width)
             {
-                use_stretch = found.stretch;
+                use_width = found.width;
             }
-            // followed by stretch values above the desired stretch value in
+            // followed by width values above the desired width value in
             // ascending order until a match is found.
             else if let Some(found) = set
                 .iter()
-                .filter(|f| f.stretch > stretch)
-                .min_by_key(|f| f.stretch)
+                .filter(|f| f.width > width)
+                .min_by_key(|f| f.width)
             {
-                use_stretch = found.stretch;
+                use_width = found.width;
             }
         }
         // Otherwise, ...
         else {
-            // stretch values above the desired stretch value are checked in
+            // width values above the desired width value are checked in
             // ascending order...
             if let Some(found) = set
                 .iter()
-                .filter(|f| f.stretch > stretch)
-                .min_by_key(|f| f.stretch)
+                .filter(|f| f.width > width)
+                .min_by_key(|f| f.width)
             {
-                use_stretch = found.stretch;
+                use_width = found.width;
             }
-            // followed by stretch values below the desired stretch value in
+            // followed by width values below the desired width value in
             // descending order until a match is found.
             else if let Some(found) = set
                 .iter()
-                .filter(|f| f.stretch < stretch)
-                .max_by_key(|f| f.stretch)
+                .filter(|f| f.width < width)
+                .max_by_key(|f| f.width)
             {
-                use_stretch = found.stretch;
+                use_width = found.width;
             }
         }
     } else {
-        use_stretch = stretch;
+        use_width = width;
     }
-    set.retain(|f| f.stretch == use_stretch);
+    set.retain(|f| f.width == use_width);
     use core::cmp::Ordering::*;
     let oblique_fonts = set.iter().filter_map(|f| oblique_style(f.style));
     // font-style is tried next:

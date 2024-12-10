@@ -48,7 +48,7 @@ mod source_cache;
 pub use icu_locid::LanguageIdentifier as Language;
 pub use peniko::Blob;
 
-pub use attributes::{Attributes, FontStretch, FontStyle, FontWeight};
+pub use attributes::{Attributes, FontStyle, FontWeight, FontWidth};
 pub use collection::{Collection, CollectionOptions, Query, QueryFamily, QueryFont, QueryStatus};
 pub use fallback::FallbackKey;
 pub use family::{FamilyId, FamilyInfo};

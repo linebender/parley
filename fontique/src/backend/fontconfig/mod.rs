@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::{
-    super::{FontStretch, FontStyle, FontWeight},
+    super::{FontStyle, FontWeight, FontWidth},
     FallbackKey, FamilyId, FamilyInfo, FamilyName, FamilyNameMap, FontInfo, GenericFamily,
     GenericFamilyMap, Script, SourceInfo, SourcePathMap,
 };
@@ -50,7 +50,7 @@ impl SystemFonts {
         fonts.extend(raw_family.fonts.iter().filter_map(|font| {
             let mut info = FontInfo::from_source(font.source.clone(), font.index);
             if let Some(info) = info.as_mut() {
-                info.maybe_override_attributes(font.stretch, font.style, font.weight);
+                info.maybe_override_attributes(font.width, font.style, font.weight);
             }
             info
         }));
@@ -141,7 +141,7 @@ impl SystemFonts {
             raw_family.fonts.push(RawFont {
                 source,
                 index: font.index,
-                stretch: font.stretch,
+                width: font.width,
                 style: font.style,
                 weight: font.weight,
                 coverage: font.coverage.clone(),
@@ -301,7 +301,7 @@ struct RawFamily {
 struct RawFont {
     source: SourceInfo,
     index: u32,
-    stretch: FontStretch,
+    width: FontWidth,
     style: FontStyle,
     weight: FontWeight,
     coverage: cache::Coverage,

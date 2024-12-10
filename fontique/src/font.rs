@@ -3,7 +3,7 @@
 
 //! Model for a font.
 
-use super::attributes::{FontStretch, FontStyle, FontWeight};
+use super::attributes::{FontStyle, FontWeight, FontWidth};
 use super::source::{SourceInfo, SourceKind};
 use super::{source_cache::SourceCache, Blob};
 use read_fonts::{types::Tag, FontRef, TableProvider as _};
@@ -16,7 +16,7 @@ type AxisVec = SmallVec<[AxisInfo; 1]>;
 pub struct FontInfo {
     source: SourceInfo,
     index: u32,
-    stretch: FontStretch,
+    width: FontWidth,
     style: FontStyle,
     weight: FontWeight,
     axes: AxisVec,
@@ -67,8 +67,8 @@ impl FontInfo {
 
     /// Returns the visual width of the font-- a relative change from the normal
     /// aspect ratio, typically in the range `0.5` to `2.0`.
-    pub fn stretch(&self) -> FontStretch {
-        self.stretch
+    pub fn width(&self) -> FontWidth {
+        self.width
     }
 
     /// Returns the visual style or 'slope' of the font.
@@ -83,16 +83,11 @@ impl FontInfo {
     }
 
     /// Returns synthesis suggestions for this font with the given attributes.
-    pub fn synthesis(
-        &self,
-        stretch: FontStretch,
-        style: FontStyle,
-        weight: FontWeight,
-    ) -> Synthesis {
+    pub fn synthesis(&self, width: FontWidth, style: FontStyle, weight: FontWeight) -> Synthesis {
         let mut synth = Synthesis::default();
         let mut len = 0usize;
-        if self.has_width_axis() && self.stretch != stretch {
-            synth.vars[len] = (Tag::new(b"wdth"), stretch.percentage());
+        if self.has_width_axis() && self.width != width {
+            synth.vars[len] = (Tag::new(b"wdth"), width.percentage());
             len += 1;
         }
         if self.weight != weight {
@@ -203,7 +198,7 @@ impl FontInfo {
         source: SourceInfo,
         index: u32,
     ) -> Option<Self> {
-        let (stretch, style, weight) = read_attributes(font);
+        let (width, style, weight) = read_attributes(font);
         let (axes, attr_axes) = if let Ok(fvar_axes) = font.fvar().and_then(|fvar| fvar.axes()) {
             let mut axes = SmallVec::<[AxisInfo; 1]>::with_capacity(fvar_axes.len());
             let mut attrs_axes = 0u8;
@@ -231,7 +226,7 @@ impl FontInfo {
         Some(Self {
             source,
             index,
-            stretch,
+            width,
             style,
             weight,
             axes,
@@ -242,12 +237,12 @@ impl FontInfo {
     #[allow(unused)]
     pub(crate) fn maybe_override_attributes(
         &mut self,
-        stretch: FontStretch,
+        width: FontWidth,
         style: FontStyle,
         weight: FontWeight,
     ) {
-        if self.stretch == FontStretch::default() {
-            self.stretch = stretch;
+        if self.width == FontWidth::default() {
+            self.width = width;
         }
         if self.style == FontStyle::default() {
             self.style = style;
@@ -340,7 +335,7 @@ impl Synthesis {
     }
 }
 
-fn read_attributes(font: &FontRef<'_>) -> (FontStretch, FontStyle, FontWeight) {
+fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
     use read_fonts::{
         tables::{
             head::{Head, MacStyle},
@@ -350,8 +345,8 @@ fn read_attributes(font: &FontRef<'_>) -> (FontStretch, FontStyle, FontWeight) {
         TableProvider,
     };
 
-    fn stretch_from_width_class(width_class: u16) -> FontStretch {
-        FontStretch::from_ratio(match width_class {
+    fn width_from_width_class(width_class: u16) -> FontWidth {
+        FontWidth::from_ratio(match width_class {
             0..=1 => 0.5,
             2 => 0.625,
             3 => 0.75,
@@ -364,8 +359,8 @@ fn read_attributes(font: &FontRef<'_>) -> (FontStretch, FontStyle, FontWeight) {
         })
     }
 
-    fn from_os2_post(os2: Os2<'_>, post: Option<Post<'_>>) -> (FontStretch, FontStyle, FontWeight) {
-        let stretch = stretch_from_width_class(os2.us_width_class());
+    fn from_os2_post(os2: Os2<'_>, post: Option<Post<'_>>) -> (FontWidth, FontStyle, FontWeight) {
+        let width = width_from_width_class(os2.us_width_class());
         // Bits 1 and 9 of the fsSelection field signify italic and
         // oblique, respectively.
         // See: <https://learn.microsoft.com/en-us/typography/opentype/spec/os2#fsselection>
@@ -383,10 +378,10 @@ fn read_attributes(font: &FontRef<'_>) -> (FontStretch, FontStyle, FontWeight) {
         // have a value outside of that range.
         // See <https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass>
         let weight = FontWeight::new(os2.us_weight_class() as f32);
-        (stretch, style, weight)
+        (width, style, weight)
     }
 
-    fn from_head(head: Head<'_>) -> (FontStretch, FontStyle, FontWeight) {
+    fn from_head(head: Head<'_>) -> (FontWidth, FontStyle, FontWeight) {
         let mac_style = head.mac_style();
         let style = mac_style
             .contains(MacStyle::ITALIC)
@@ -396,7 +391,7 @@ fn read_attributes(font: &FontRef<'_>) -> (FontStretch, FontStyle, FontWeight) {
             .contains(MacStyle::BOLD)
             .then_some(700.0)
             .unwrap_or_default();
-        (FontStretch::default(), style, FontWeight::new(weight))
+        (FontWidth::default(), style, FontWeight::new(weight))
     }
 
     if let Ok(os2) = font.os2() {
@@ -408,7 +403,7 @@ fn read_attributes(font: &FontRef<'_>) -> (FontStretch, FontStyle, FontWeight) {
         from_head(head)
     } else {
         (
-            FontStretch::default(),
+            FontWidth::default(),
             FontStyle::Normal,
             FontWeight::default(),
         )
