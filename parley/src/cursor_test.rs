@@ -147,6 +147,9 @@ impl CursorTest {
             format!(" {ansi_bg_color}\u{258F}{ansi_reset}")
         };
 
+        // FIXME - This assumes that the byte index of a string matches how many
+        // terminal tiles that string occupies. This is wrong for even trivial
+        // cases (eg unicode characters spanning multiple code points).
         " ".repeat(index) + &cursor_str
     }
 
