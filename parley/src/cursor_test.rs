@@ -238,8 +238,8 @@ impl CursorTest {
         eprintln!(
             concat!(
                 "dumping test layout value\n",
-                "text: '{text}' - ({actual_index}, {actual_affinity})\n",
-                "      {actual_cursor}\n",
+                "      text: '{text}' - ({actual_index}, {actual_affinity})\n",
+                "            {actual_cursor}\n",
             ),
             text = self.text,
             actual_index = cursor.index(),
