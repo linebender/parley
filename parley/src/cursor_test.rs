@@ -1,7 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::{Affinity, Cursor, FontContext, FontStack, Layout, LayoutContext};
+use crate::{Affinity, Cursor, FontContext, Layout, LayoutContext};
 
 /// Helper struct for creating cursors and checking their values.
 ///
@@ -28,14 +28,11 @@ pub struct CursorTest {
 impl CursorTest {
     pub fn single_line(text: &str, lcx: &mut LayoutContext<()>, fcx: &mut FontContext) -> Self {
         let mut builder = lcx.ranged_builder(fcx, text, 1.0);
-        builder.push(
-            FontStack::Single(crate::FontFamily::Generic(
-                fontique::GenericFamily::Monospace,
-            )),
-            ..,
-        );
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
+
+        // NOTE: If we want to handle more special cases, we may want to use a monospace
+        // font and use the glyph advance values to calculate the cursor position.
 
         Self {
             text: text.to_string(),
@@ -76,7 +73,7 @@ impl CursorTest {
     ///
     /// The needle must be unique in the text to avoid ambiguity.
     ///
-    /// ### Panics
+    /// # Panics
     ///
     /// - If the needle is not found in the text.
     /// - If the needle is found multiple times in the text.
@@ -91,7 +88,7 @@ impl CursorTest {
     ///
     /// The needle must be unique in the text to avoid ambiguity.
     ///
-    /// ### Panics
+    /// # Panics
     ///
     /// - If the needle is not found in the text.
     /// - If the needle is found multiple times in the text.
@@ -164,6 +161,12 @@ impl CursorTest {
         // If it does, we should still print the text on a best effort basis, but
         // without visual cursors and with a warning that the text may not be accurate.
 
+        // We may also render the text to an image, with the cursor highlighted, and
+        // save it to a temporary file, or even print it to the terminal (if the
+        // terminal supports images).
+        // The image would NOT be used for screenshot testing, but it would be useful for
+        // debugging.
+
         panic!(
             concat!(
                 "cursor assertion failed\n",
@@ -186,7 +189,7 @@ impl CursorTest {
     ///
     /// The needle must be unique in the text to avoid ambiguity.
     ///
-    /// ### Panics
+    /// # Panics
     ///
     /// - If the needle is not found in the text.
     /// - If the needle is found multiple times in the text.
@@ -204,7 +207,7 @@ impl CursorTest {
     ///
     /// The needle must be unique in the text to avoid ambiguity.
     ///
-    /// ### Panics
+    /// # Panics
     ///
     /// - If the needle is not found in the text.
     /// - If the needle is found multiple times in the text.
@@ -221,7 +224,7 @@ impl CursorTest {
 
     /// Compares two cursors and asserts that they are the same.
     ///
-    /// ### Panics
+    /// # Panics
     ///
     /// - If the cursors don't have the same index.
     /// - If the cursors don't have the same affinity.
@@ -247,6 +250,9 @@ impl CursorTest {
             actual_cursor = self.cursor_to_monospace(cursor, true),
         );
     }
+
+    // TODO - Add a render_cursor method that creates an image of the text, with
+    // the cursor highlighted. See comment in `cursor_assertion()` for details.
 }
 
 // ---
