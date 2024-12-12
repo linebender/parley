@@ -20,6 +20,16 @@ use crate::{Affinity, Cursor, FontContext, Layout, LayoutContext};
 /// terminal.
 ///
 /// Others will be fixed in the future.
+///
+/// # Writing tests with Parley
+///
+/// This API enables users to write tests for cursor values where the intent of
+/// the test is obvious from the code of the test alone.
+///
+/// In general, Parley tries to encourage users to write this style of test.
+/// Users should avoid tests where you compare the cursor to a numeric value
+/// (mapping a numeric value to a cursor position is not obvious) and
+/// screenshot tests (readers shouldn't need to open a screenshot file).
 pub struct CursorTest {
     text: String,
     layout: Layout<()>,
