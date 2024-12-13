@@ -68,8 +68,7 @@ impl CursorTest {
                 self.text
             );
         };
-        dbg!(index);
-        if self.text[index + needle.len()..].find(needle).is_some() {
+        if self.text[index + needle.len()..].contains(needle) {
             panic!(
                 "Error in {method_name}: needle '{needle}' found multiple times in text '{}'",
                 self.text
@@ -243,10 +242,11 @@ impl CursorTest {
         self.cursor_assertion(expected, cursor);
     }
 
-    /// Prints the TestLayout's text, with the cursor highlighted.
+    /// Prints the text this object was created with, with the cursor highlighted.
     ///
     /// Uses the same format as assertion failures.
     #[track_caller]
+    #[allow(clippy::print_stderr)]
     pub fn print_cursor(&self, cursor: Cursor) {
         eprintln!(
             concat!(
