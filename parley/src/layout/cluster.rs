@@ -397,7 +397,7 @@ impl Affinity {
 }
 
 impl Display for Affinity {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let name = match self {
             Self::Downstream => "Downstream",
             Self::Upstream => "Upstream",
