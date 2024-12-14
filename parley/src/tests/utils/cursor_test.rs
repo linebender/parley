@@ -30,13 +30,17 @@ use crate::{Affinity, Cursor, FontContext, Layout, LayoutContext};
 /// Users should avoid tests where you compare the cursor to a numeric value
 /// (mapping a numeric value to a cursor position is not obvious) and
 /// screenshot tests (readers shouldn't need to open a screenshot file).
-pub struct CursorTest {
+pub(crate) struct CursorTest {
     text: String,
     layout: Layout<()>,
 }
 
 impl CursorTest {
-    pub fn single_line(text: &str, lcx: &mut LayoutContext<()>, fcx: &mut FontContext) -> Self {
+    pub(crate) fn single_line(
+        text: &str,
+        lcx: &mut LayoutContext<()>,
+        fcx: &mut FontContext,
+    ) -> Self {
         let mut builder = lcx.ranged_builder(fcx, text, 1.0);
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
@@ -50,13 +54,14 @@ impl CursorTest {
         }
     }
 
+    #[allow(dead_code)]
     /// Returns the text that was used to create the layout.
-    pub fn text(&self) -> &str {
+    pub(crate) fn text(&self) -> &str {
         &self.text
     }
 
     /// Returns the layout that was created from the text.
-    pub fn layout(&self) -> &Layout<()> {
+    pub(crate) fn layout(&self) -> &Layout<()> {
         &self.layout
     }
 
@@ -87,7 +92,7 @@ impl CursorTest {
     /// - If the needle is not found in the text.
     /// - If the needle is found multiple times in the text.
     #[track_caller]
-    pub fn cursor_before(&self, needle: &str) -> Cursor {
+    pub(crate) fn cursor_before(&self, needle: &str) -> Cursor {
         let index = self.get_unique_index("cursor_before", needle);
         Cursor::from_byte_index(&self.layout, index, Affinity::Downstream)
     }
@@ -102,7 +107,7 @@ impl CursorTest {
     /// - If the needle is not found in the text.
     /// - If the needle is found multiple times in the text.
     #[track_caller]
-    pub fn cursor_after(&self, needle: &str) -> Cursor {
+    pub(crate) fn cursor_after(&self, needle: &str) -> Cursor {
         let index = self.get_unique_index("cursor_after", needle);
         let index = index + needle.len();
         Cursor::from_byte_index(&self.layout, index, Affinity::Upstream)
@@ -205,7 +210,7 @@ impl CursorTest {
     /// - If the cursor has the wrong position.
     /// - If the cursor doesn't have [`Affinity::Downstream`].
     #[track_caller]
-    pub fn assert_cursor_is_before(&self, needle: &str, cursor: Cursor) {
+    pub(crate) fn assert_cursor_is_before(&self, needle: &str, cursor: Cursor) {
         let index = self.get_unique_index("assert_cursor_is_before", needle);
 
         let expected_cursor = Cursor::from_byte_index(&self.layout, index, Affinity::Downstream);
@@ -223,7 +228,7 @@ impl CursorTest {
     /// - If the cursor has the wrong position.
     /// - If the cursor doesn't have [`Affinity::Upstream`].
     #[track_caller]
-    pub fn assert_cursor_is_after(&self, needle: &str, cursor: Cursor) {
+    pub(crate) fn assert_cursor_is_after(&self, needle: &str, cursor: Cursor) {
         let index = self.get_unique_index("assert_cursor_is_after", needle);
         let index = index + needle.len();
 
@@ -237,8 +242,9 @@ impl CursorTest {
     ///
     /// - If the cursors don't have the same index.
     /// - If the cursors don't have the same affinity.
+    #[allow(dead_code)]
     #[track_caller]
-    pub fn assert_cursor_is(&self, expected: Cursor, cursor: Cursor) {
+    pub(crate) fn assert_cursor_is(&self, expected: Cursor, cursor: Cursor) {
         self.cursor_assertion(expected, cursor);
     }
 
@@ -247,7 +253,7 @@ impl CursorTest {
     /// Uses the same format as assertion failures.
     #[track_caller]
     #[allow(clippy::print_stderr)]
-    pub fn print_cursor(&self, cursor: Cursor) {
+    pub(crate) fn print_cursor(&self, cursor: Cursor) {
         eprintln!(
             concat!(
                 "dumping test layout value\n",

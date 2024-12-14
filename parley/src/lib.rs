@@ -116,8 +116,6 @@ mod util;
 pub mod layout;
 pub mod style;
 
-#[cfg(feature = "std")]
-mod cursor_test;
 #[cfg(test)]
 mod tests;
 
@@ -130,9 +128,6 @@ pub use font::FontContext;
 pub use inline_box::InlineBox;
 #[doc(inline)]
 pub use layout::Layout;
-
-#[cfg(feature = "std")]
-pub use cursor_test::CursorTest;
 
 pub use layout::editor::{PlainEditor, PlainEditorDriver};
 

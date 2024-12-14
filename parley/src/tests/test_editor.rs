@@ -3,6 +3,8 @@
 
 use crate::testenv;
 
+// TODO - Use CursorTest API for these tests
+
 #[test]
 fn editor_simple_move() {
     let mut env = testenv!();
