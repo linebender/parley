@@ -12,7 +12,7 @@ fn cursor_previous_visual() {
 
     let mut cursor: Cursor = layout.cursor_after("ipsum");
     layout.print_cursor(cursor);
-    cursor = cursor.previous_visual(&layout.layout());
+    cursor = cursor.previous_visual(layout.layout());
 
     layout.assert_cursor_is_before("m dolor", cursor);
 }
@@ -25,7 +25,7 @@ fn cursor_next_visual() {
 
     let mut cursor: Cursor = layout.cursor_before("dolor");
     layout.print_cursor(cursor);
-    cursor = cursor.next_visual(&layout.layout());
+    cursor = cursor.next_visual(layout.layout());
 
     layout.assert_cursor_is_after("ipsum d", cursor);
 }
