@@ -263,6 +263,8 @@ pub struct Line<'a, B: Brush> {
 /// Style properties.
 #[derive(Clone, Debug)]
 pub struct Style<B: Brush> {
+    /// External ID for the style span
+    pub id: u64,
     /// Brush for drawing glyphs.
     pub brush: B,
     /// Underline decoration.

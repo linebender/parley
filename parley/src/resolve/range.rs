@@ -57,6 +57,8 @@ impl<B: Brush> RangedStyleBuilder<B> {
             return;
         }
         styles.push(RangedStyle {
+            // TODO: Implement external IDs for RangedBuilder
+            id: 0,
             style: self.default_style.clone(),
             range: 0..self.len,
         });

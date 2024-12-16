@@ -83,12 +83,14 @@ impl<B: Brush> LayoutContext<B> {
         &'a mut self,
         fcx: &'a mut FontContext,
         scale: f32,
+        root_node_id: u64,
         raw_style: &TextStyle<'_, B>,
     ) -> TreeBuilder<'a, B> {
         self.begin();
 
         let resolved_root_style = self.resolve_style_set(fcx, scale, raw_style);
-        self.tree_style_builder.begin(resolved_root_style);
+        self.tree_style_builder
+            .begin(root_node_id, resolved_root_style);
 
         fcx.source_cache.prune(128, false);
 
