@@ -617,9 +617,9 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
     fn drop(&mut self) {
         // Compute the overall width and height of the entire layout
         // The "width" excludes trailing whitespace. The "full_width" includes it.
-        let mut width = 0f32;
-        let mut full_width = 0f32;
-        let mut height = 0f32;
+        let mut width = 0_f32;
+        let mut full_width = 0_f32;
+        let mut height = 0_f32;
         for line in &self.lines.lines {
             width = width.max(line.metrics.advance - line.metrics.trailing_whitespace);
             full_width = full_width.max(line.metrics.advance);

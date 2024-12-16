@@ -106,7 +106,7 @@ impl Editor {
         match event {
             WindowEvent::Resized(size) => {
                 self.editor
-                    .set_width(Some(size.width as f32 - 2f32 * INSET));
+                    .set_width(Some(size.width as f32 - 2_f32 * INSET));
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = Some(modifiers);

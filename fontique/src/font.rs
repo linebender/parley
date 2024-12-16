@@ -85,7 +85,7 @@ impl FontInfo {
     /// Returns synthesis suggestions for this font with the given attributes.
     pub fn synthesis(&self, width: FontWidth, style: FontStyle, weight: FontWeight) -> Synthesis {
         let mut synth = Synthesis::default();
-        let mut len = 0usize;
+        let mut len = 0_usize;
         if self.has_width_axis() && self.width != width {
             synth.vars[len] = (Tag::new(b"wdth"), width.percentage());
             len += 1;
@@ -201,7 +201,7 @@ impl FontInfo {
         let (width, style, weight) = read_attributes(font);
         let (axes, attr_axes) = if let Ok(fvar_axes) = font.fvar().and_then(|fvar| fvar.axes()) {
             let mut axes = SmallVec::<[AxisInfo; 1]>::with_capacity(fvar_axes.len());
-            let mut attrs_axes = 0u8;
+            let mut attrs_axes = 0_u8;
             for fvar_axis in fvar_axes {
                 let axis = AxisInfo {
                     tag: fvar_axis.axis_tag(),
