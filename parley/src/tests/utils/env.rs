@@ -65,7 +65,7 @@ pub(crate) struct TestEnv {
 
 fn is_accept_mode() -> bool {
     std::env::var("PARLEY_TEST")
-        .map(|x| x.to_ascii_lowercase() == "accept")
+        .map(|x| x.eq_ignore_ascii_case("accept"))
         .unwrap_or(false)
 }
 
