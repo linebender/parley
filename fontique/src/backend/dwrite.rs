@@ -174,7 +174,7 @@ impl DWriteSystemFonts {
                 .FindFamilyName(PCWSTR::from_raw(name_buf.as_ptr()), &mut index, &mut exists)
                 .ok()?;
         }
-        self.get(index as _)
+        self.get(index)
     }
 
     fn families(&self) -> impl Iterator<Item = DWriteFontFamily> {

@@ -100,21 +100,21 @@ fn parse_font(
             Object::Slant => {
                 for val in elt.values().ok()? {
                     if let Value::Int(i) = val.ok()? {
-                        font.style = FontStyle::from_fontconfig(i as _);
+                        font.style = FontStyle::from_fontconfig(i);
                     }
                 }
             }
             Object::Weight => {
                 for val in elt.values().ok()? {
                     if let Value::Int(i) = val.ok()? {
-                        font.weight = FontWeight::from_fontconfig(i as _);
+                        font.weight = FontWeight::from_fontconfig(i);
                     }
                 }
             }
             Object::Width => {
                 for val in elt.values().ok()? {
                     if let Value::Int(i) = val.ok()? {
-                        font.width = FontWidth::from_fontconfig(i as _);
+                        font.width = FontWidth::from_fontconfig(i);
                     }
                 }
             }

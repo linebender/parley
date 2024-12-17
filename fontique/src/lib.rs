@@ -15,7 +15,6 @@
 #![allow(missing_debug_implementations)]
 #![allow(missing_docs)]
 #![allow(single_use_lifetimes)]
-#![allow(trivial_numeric_casts)]
 #![allow(unnameable_types)]
 #![allow(unreachable_pub)]
 #![allow(clippy::cast_possible_truncation)]
