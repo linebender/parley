@@ -6,7 +6,6 @@
 #![allow(unreachable_pub)]
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::shadow_unrelated)]
-#![allow(clippy::unseparated_literal_suffix)]
 
 use accesskit::{Node, Role, Tree, TreeUpdate};
 use anyhow::Result;
@@ -248,7 +247,7 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
                     .resize_surface(&mut render_state.surface, size.width, size.height);
                 let editor = self.editor.editor();
                 editor.set_scale(1.0);
-                editor.set_width(Some(size.width as f32 - 2f32 * text::INSET));
+                editor.set_width(Some(size.width as f32 - 2_f32 * text::INSET));
                 render_state.window.request_redraw();
             }
 

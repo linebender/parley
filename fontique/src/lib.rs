@@ -22,7 +22,6 @@
 #![allow(clippy::exhaustive_enums)]
 #![allow(clippy::partial_pub_fields)]
 #![allow(clippy::shadow_unrelated)]
-#![allow(clippy::unseparated_literal_suffix)]
 #![allow(clippy::use_self)]
 
 #[cfg(not(any(feature = "std", feature = "libm")))]

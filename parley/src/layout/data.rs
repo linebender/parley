@@ -145,7 +145,7 @@ impl LineItemData {
     pub(crate) fn compute_line_height<B: Brush>(&self, layout: &LayoutData<B>) -> f32 {
         match self.kind {
             LayoutItemKind::TextRun => {
-                let mut line_height = 0f32;
+                let mut line_height = 0_f32;
                 let run = &layout.runs[self.index];
                 let glyph_start = run.glyph_start;
                 for cluster in &layout.clusters[run.cluster_range.clone()] {
@@ -325,7 +325,7 @@ impl<B: Brush> LayoutData<B> {
             advance: 0.,
         };
         // Track these so that we can flush if they overflow a u16.
-        let mut glyph_count = 0usize;
+        let mut glyph_count = 0_usize;
         let mut text_offset = 0;
         macro_rules! flush_run {
             () => {

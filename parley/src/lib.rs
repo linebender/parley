@@ -92,7 +92,6 @@
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::return_self_not_must_use)]
 #![allow(clippy::shadow_unrelated)]
-#![allow(clippy::unseparated_literal_suffix)]
 #![allow(clippy::use_self)]
 
 #[cfg(not(any(feature = "std", feature = "libm")))]

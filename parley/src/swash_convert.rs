@@ -6,7 +6,7 @@ pub(crate) fn script_to_fontique(script: swash::text::Script) -> fontique::Scrip
 }
 
 pub(crate) fn locale_to_fontique(locale: swash::text::Language) -> Option<fontique::Language> {
-    let mut buf = [0u8; 16];
+    let mut buf = [0_u8; 16];
     let mut len = 0;
     for byte in locale.language().bytes() {
         buf[len] = byte;
