@@ -84,21 +84,21 @@ impl GenericFamily {
     }
 
     /// Returns a slice containing all generic family variants.
-    pub const fn all() -> &'static [GenericFamily] {
+    pub const fn all() -> &'static [Self] {
         &[
-            GenericFamily::SansSerif,
-            GenericFamily::Serif,
-            GenericFamily::Monospace,
-            GenericFamily::Cursive,
-            GenericFamily::Fantasy,
-            GenericFamily::SystemUi,
-            GenericFamily::UiSerif,
-            GenericFamily::UiSansSerif,
-            GenericFamily::UiMonospace,
-            GenericFamily::UiRounded,
-            GenericFamily::Emoji,
-            GenericFamily::Math,
-            GenericFamily::FangSong,
+            Self::SansSerif,
+            Self::Serif,
+            Self::Monospace,
+            Self::Cursive,
+            Self::Fantasy,
+            Self::SystemUi,
+            Self::UiSerif,
+            Self::UiSansSerif,
+            Self::UiMonospace,
+            Self::UiRounded,
+            Self::Emoji,
+            Self::Math,
+            Self::FangSong,
         ]
     }
 }

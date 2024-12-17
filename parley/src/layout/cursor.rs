@@ -479,7 +479,7 @@ impl Selection {
 
     /// Creates a new selection bounding the line at the given coordinates.
     pub fn line_from_point<B: Brush>(layout: &Layout<B>, x: f32, y: f32) -> Self {
-        let Selection { anchor, focus, .. } = Self::from_point(layout, x, y)
+        let Self { anchor, focus, .. } = Self::from_point(layout, x, y)
             .line_start(layout, false)
             .line_end(layout, true);
         Self {
