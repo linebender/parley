@@ -386,6 +386,7 @@ pub enum Affinity {
 }
 
 impl Affinity {
+    #[must_use]
     pub fn invert(&self) -> Self {
         match self {
             Self::Downstream => Self::Upstream,
