@@ -33,14 +33,14 @@ const DEFAULT_GENERIC_FAMILIES: &[(GenericFamily, &[&str])] = &[
     (GenericFamily::Math, &["STIX Two Math"]),
 ];
 
-pub struct SystemFonts {
-    pub name_map: Arc<FamilyNameMap>,
-    pub generic_families: Arc<GenericFamilyMap>,
+pub(crate) struct SystemFonts {
+    pub(crate) name_map: Arc<FamilyNameMap>,
+    pub(crate) generic_families: Arc<GenericFamilyMap>,
     family_map: HashMap<FamilyId, FamilyInfo>,
 }
 
 impl SystemFonts {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let paths = unsafe {
             NSSearchPathForDirectoriesInDomains(
                 NSSearchPathDirectory::NSLibraryDirectory,
@@ -70,11 +70,11 @@ impl SystemFonts {
         }
     }
 
-    pub fn family(&mut self, id: FamilyId) -> Option<FamilyInfo> {
+    pub(crate) fn family(&mut self, id: FamilyId) -> Option<FamilyInfo> {
         self.family_map.get(&id).cloned()
     }
 
-    pub fn fallback(&mut self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
+    pub(crate) fn fallback(&mut self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
         let key = key.into();
         let sample = key.script().sample()?;
         self.fallback_for_text(sample, key.locale(), false)

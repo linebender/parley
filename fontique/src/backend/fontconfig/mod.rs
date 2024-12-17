@@ -15,16 +15,16 @@ mod cache;
 mod config;
 
 /// Raw access to the collection of local system fonts.
-pub struct SystemFonts {
-    pub name_map: Arc<FamilyNameMap>,
-    pub generic_families: Arc<GenericFamilyMap>,
+pub(crate) struct SystemFonts {
+    pub(crate) name_map: Arc<FamilyNameMap>,
+    pub(crate) generic_families: Arc<GenericFamilyMap>,
     raw_families: HashMap<FamilyId, RawFamily>,
     family_map: HashMap<FamilyId, Option<FamilyInfo>>,
     fallback_map: HashMap<Script, FallbackFamilies>,
 }
 
 impl SystemFonts {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::try_new().unwrap_or_else(|| Self {
             name_map: Default::default(),
             generic_families: Default::default(),
@@ -34,7 +34,7 @@ impl SystemFonts {
         })
     }
 
-    pub fn family(&mut self, id: FamilyId) -> Option<FamilyInfo> {
+    pub(crate) fn family(&mut self, id: FamilyId) -> Option<FamilyInfo> {
         match self.family_map.get(&id) {
             Some(Some(family)) => return Some(family.clone()),
             Some(None) => return None,
@@ -63,7 +63,7 @@ impl SystemFonts {
         Some(family)
     }
 
-    pub fn fallback(&mut self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
+    pub(crate) fn fallback(&mut self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
         let key = key.into();
         let script = key.script();
         let locale = key.locale();
@@ -81,7 +81,7 @@ impl SystemFonts {
 }
 
 impl SystemFonts {
-    pub fn try_new() -> Option<Self> {
+    pub(crate) fn try_new() -> Option<Self> {
         let mut name_map = FamilyNameMap::default();
         let mut generic_families = GenericFamilyMap::default();
         let mut source_map = SourcePathMap::default();

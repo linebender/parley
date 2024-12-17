@@ -38,16 +38,16 @@ const DEFAULT_GENERIC_FAMILIES: &[(GenericFamily, &[&str])] = &[
 ];
 
 /// Raw access to the collection of local system fonts.
-pub struct SystemFonts {
-    pub name_map: Arc<FamilyNameMap>,
-    pub generic_families: Arc<GenericFamilyMap>,
+pub(crate) struct SystemFonts {
+    pub(crate) name_map: Arc<FamilyNameMap>,
+    pub(crate) generic_families: Arc<GenericFamilyMap>,
     source_cache: SourcePathMap,
     family_map: HashMap<FamilyId, Option<FamilyInfo>>,
     dwrite_fonts: DWriteSystemFonts,
 }
 
 impl SystemFonts {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let dwrite_fonts = DWriteSystemFonts::new(false).unwrap();
         let mut name_map = FamilyNameMap::default();
         for family in dwrite_fonts.families() {
@@ -80,7 +80,7 @@ impl SystemFonts {
         }
     }
 
-    pub fn family(&mut self, id: FamilyId) -> Option<FamilyInfo> {
+    pub(crate) fn family(&mut self, id: FamilyId) -> Option<FamilyInfo> {
         match self.family_map.get(&id) {
             Some(Some(family)) => return Some(family.clone()),
             Some(None) => return None,
@@ -109,7 +109,7 @@ impl SystemFonts {
         None
     }
 
-    pub fn fallback(&mut self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
+    pub(crate) fn fallback(&mut self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
         // DirectWrite does not have a function to get the default font for a script and locale pair
         // so here we provide a sample of the intended script instead.
         let key = key.into();
