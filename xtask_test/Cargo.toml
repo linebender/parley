@@ -12,7 +12,8 @@ categories = ["graphics"]
 readme = "README.md"
 
 [dependencies]
-image_diff_review = "0.2"
+kompari = { git = "https://github.com/linebender/kompari.git", rev = "f7843edb4a816f5e43c037361180347ec6bc190e", features = ["xtask-cli"] }
+clap = { version = "4", features = ["derive"] }
 
 [lints]
 workspace = true

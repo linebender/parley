@@ -20,5 +20,5 @@ It will update snapshots of the failed tests.
 If you want to create a report with image diffs use:
 
 ```bash
-$ cargo xtask-test report
+$ cargo xtask report
 ```
