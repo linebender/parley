@@ -839,7 +839,7 @@ impl Selection {
                         } else {
                             if cur_x != start_x {
                                 let width = (cur_x - start_x).max(MIN_RECT_WIDTH);
-                                f(Rect::new(start_x as _, line_min, start_x + width, line_max));
+                                f(Rect::new(start_x, line_min, start_x + width, line_max));
                             }
                             cur_x += advance;
                             start_x = cur_x;

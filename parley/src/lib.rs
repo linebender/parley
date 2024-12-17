@@ -84,7 +84,6 @@
 #![allow(missing_debug_implementations)]
 #![allow(missing_docs)]
 #![allow(single_use_lifetimes)]
-#![allow(trivial_numeric_casts)]
 #![allow(unnameable_types)]
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::exhaustive_enums)]
