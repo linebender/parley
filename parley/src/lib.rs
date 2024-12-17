@@ -90,7 +90,6 @@
 #![allow(clippy::missing_assert_message)]
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::shadow_unrelated)]
-#![allow(clippy::use_self)]
 
 #[cfg(not(any(feature = "std", feature = "libm")))]
 compile_error!("parley requires either the `std` or `libm` feature to be enabled");

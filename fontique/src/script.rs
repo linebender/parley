@@ -17,7 +17,7 @@ pub struct Script(pub [u8; 4]);
 
 impl Script {
     /// Returns a mapping of scripts to sample text.
-    pub fn all_samples() -> &'static [(Script, &'static str)] {
+    pub fn all_samples() -> &'static [(Self, &'static str)] {
         SCRIPT_SAMPLES
     }
 

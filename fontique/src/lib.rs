@@ -21,7 +21,6 @@
 #![allow(clippy::exhaustive_enums)]
 #![allow(clippy::partial_pub_fields)]
 #![allow(clippy::shadow_unrelated)]
-#![allow(clippy::use_self)]
 
 #[cfg(not(any(feature = "std", feature = "libm")))]
 compile_error!("fontique requires either the `std` or `libm` feature to be enabled");

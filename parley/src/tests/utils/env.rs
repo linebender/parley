@@ -115,7 +115,7 @@ impl TestEnv {
         collection
             .family_id(DEFAULT_FONT_NAME)
             .unwrap_or_else(|| panic!("{} font not found", DEFAULT_FONT_NAME));
-        TestEnv {
+        Self {
             test_name: test_name.to_string(),
             check_counter: 0,
             font_cx: FontContext {
