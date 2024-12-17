@@ -19,7 +19,6 @@
 #![allow(unreachable_pub)]
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::exhaustive_enums)]
-#![allow(clippy::partial_pub_fields)]
 #![allow(clippy::shadow_unrelated)]
 
 #[cfg(not(any(feature = "std", feature = "libm")))]

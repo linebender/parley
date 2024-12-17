@@ -30,16 +30,16 @@ const DEFAULT_GENERIC_FAMILIES: &[(GenericFamily, &[&str])] = &[
     (GenericFamily::Math, &["Noto Sans Math", "Noto Sans"]),
 ];
 
-pub struct SystemFonts {
-    pub name_map: Arc<FamilyNameMap>,
-    pub generic_families: Arc<GenericFamilyMap>,
+pub(crate) struct SystemFonts {
+    pub(crate) name_map: Arc<FamilyNameMap>,
+    pub(crate) generic_families: Arc<GenericFamilyMap>,
     family_map: HashMap<FamilyId, FamilyInfo>,
     locale_fallback: Box<[(Box<str>, FamilyId)]>,
     script_fallback: Box<[(Script, FamilyId)]>,
 }
 
 impl SystemFonts {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let android_root: String = std::env::var("ANDROID_ROOT").unwrap_or("/system".to_string());
 
         let scan::ScannedCollection {
@@ -180,11 +180,11 @@ impl SystemFonts {
         }
     }
 
-    pub fn family(&self, id: FamilyId) -> Option<FamilyInfo> {
+    pub(crate) fn family(&self, id: FamilyId) -> Option<FamilyInfo> {
         self.family_map.get(&id).cloned()
     }
 
-    pub fn fallback(&self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
+    pub(crate) fn fallback(&self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
         let key: FallbackKey = key.into();
         let script = key.script();
 

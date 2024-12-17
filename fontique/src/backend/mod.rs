@@ -31,10 +31,10 @@ use super::{
 use super::source::SourcePathMap;
 
 #[cfg(feature = "system")]
-pub use system::SystemFonts;
+pub(crate) use system::SystemFonts;
 
 #[cfg(not(feature = "system"))]
-pub use null_backend::SystemFonts;
+pub(crate) use null_backend::SystemFonts;
 
 #[cfg(not(feature = "system"))]
 mod null_backend {
@@ -42,13 +42,13 @@ mod null_backend {
     use alloc::sync::Arc;
 
     #[derive(Default)]
-    pub struct SystemFonts {
-        pub name_map: Arc<FamilyNameMap>,
-        pub generic_families: Arc<GenericFamilyMap>,
+    pub(crate) struct SystemFonts {
+        pub(crate) name_map: Arc<FamilyNameMap>,
+        pub(crate) generic_families: Arc<GenericFamilyMap>,
     }
 
     impl SystemFonts {
-        pub fn new() -> Self {
+        pub(crate) fn new() -> Self {
             Self::default()
         }
     }
