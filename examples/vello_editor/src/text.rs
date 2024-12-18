@@ -7,7 +7,8 @@ use parley::{editor::SplitString, layout::PositionedLayoutItem, GenericFamily, S
 use std::time::{Duration, Instant};
 use vello::{
     kurbo::{Affine, Line, Stroke},
-    peniko::{Brush, Color, Fill},
+    peniko::color::palette,
+    peniko::{Brush, Fill},
     Scene,
 };
 use winit::{
@@ -44,7 +45,7 @@ impl Editor {
         let styles = editor.edit_styles();
         styles.insert(StyleProperty::LineHeight(1.2));
         styles.insert(GenericFamily::SystemUi.into());
-        styles.insert(StyleProperty::Brush(Color::WHITE.into()));
+        styles.insert(StyleProperty::Brush(palette::css::WHITE.into()));
         Self {
             font_cx: Default::default(),
             layout_cx: Default::default(),
@@ -357,11 +358,17 @@ impl Editor {
     pub fn draw(&mut self, scene: &mut Scene) -> Generation {
         let transform = Affine::translate((INSET as f64, INSET as f64));
         for rect in self.editor.selection_geometry().iter() {
-            scene.fill(Fill::NonZero, transform, Color::STEEL_BLUE, None, &rect);
+            scene.fill(
+                Fill::NonZero,
+                transform,
+                palette::css::STEEL_BLUE,
+                None,
+                &rect,
+            );
         }
         if self.cursor_visible {
             if let Some(cursor) = self.editor.cursor_geometry(1.5) {
-                scene.fill(Fill::NonZero, transform, Color::WHITE, None, &cursor);
+                scene.fill(Fill::NonZero, transform, palette::css::WHITE, None, &cursor);
             };
         }
         let layout = self.editor.layout(&mut self.font_cx, &mut self.layout_cx);

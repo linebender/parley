@@ -81,15 +81,20 @@
 // END LINEBENDER LINT SET
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
-#![allow(missing_debug_implementations)]
-#![allow(missing_docs)]
-#![allow(single_use_lifetimes)]
-#![allow(unnameable_types)]
-#![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::exhaustive_enums)]
-#![allow(clippy::missing_assert_message)]
-#![allow(clippy::missing_panics_doc)]
-#![allow(clippy::shadow_unrelated)]
+#![allow(missing_docs, reason = "We have many as-yet undocumented items.")]
+#![expect(
+    missing_debug_implementations,
+    single_use_lifetimes,
+    unnameable_types,
+    clippy::allow_attributes,
+    clippy::allow_attributes_without_reason,
+    clippy::cast_possible_truncation,
+    clippy::exhaustive_enums,
+    clippy::missing_assert_message,
+    clippy::missing_panics_doc,
+    clippy::shadow_unrelated,
+    reason = "Deferred"
+)]
 
 #[cfg(not(any(feature = "std", feature = "libm")))]
 compile_error!("parley requires either the `std` or `libm` feature to be enabled");

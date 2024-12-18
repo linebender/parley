@@ -1,11 +1,16 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-#![allow(missing_debug_implementations)]
-#![allow(missing_docs)]
-#![allow(unreachable_pub)]
-#![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::shadow_unrelated)]
+#![allow(missing_docs, reason = "We have many as-yet undocumented items.")]
+#![expect(
+    missing_debug_implementations,
+    unreachable_pub,
+    clippy::allow_attributes,
+    clippy::allow_attributes_without_reason,
+    clippy::cast_possible_truncation,
+    clippy::shadow_unrelated,
+    reason = "Deferred"
+)]
 
 use accesskit::{Node, Role, Tree, TreeUpdate};
 use anyhow::Result;
@@ -303,7 +308,7 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
                         &self.scene,
                         &surface_texture,
                         &vello::RenderParams {
-                            base_color: Color::rgb8(30, 30, 30), // Background color
+                            base_color: Color::from_rgba8(30, 30, 30, 255), // Background color
                             width,
                             height,
                             antialiasing_method: AaConfig::Area,

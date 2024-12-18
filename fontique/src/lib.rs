@@ -12,14 +12,22 @@
 // END LINEBENDER LINT SET
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
-#![allow(missing_debug_implementations)]
-#![allow(missing_docs)]
-#![allow(single_use_lifetimes)]
-#![allow(unnameable_types)]
-#![allow(unreachable_pub)]
-#![allow(clippy::cast_possible_truncation)]
-#![allow(clippy::exhaustive_enums)]
-#![allow(clippy::shadow_unrelated)]
+#![allow(missing_docs, reason = "We have many as-yet undocumented items.")]
+#![expect(
+    missing_debug_implementations,
+    unnameable_types,
+    unreachable_pub,
+    clippy::allow_attributes,
+    clippy::allow_attributes_without_reason,
+    clippy::cast_possible_truncation,
+    clippy::exhaustive_enums,
+    clippy::shadow_unrelated,
+    reason = "Deferred"
+)]
+#![allow(
+    single_use_lifetimes,
+    reason = "Deferred, only apply in some feature sets so not expect"
+)]
 
 #[cfg(not(any(feature = "std", feature = "libm")))]
 compile_error!("fontique requires either the `std` or `libm` feature to be enabled");
