@@ -68,6 +68,10 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.white_space_collapse = white_space_collapse;
     }
 
+    pub(crate) fn set_is_span_first(&mut self, is_span_first: bool) {
+        self.is_span_first = is_span_first;
+    }
+
     pub(crate) fn push_uncommitted_text(&mut self, is_span_last: bool) {
         let span_text: Cow<'_, str> = match self.white_space_collapse {
             WhiteSpaceCollapse::Preserve => Cow::from(&self.uncommitted_text),
@@ -109,6 +113,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
 
         // Nothing to do if there is no uncommitted text.
         if span_text.is_empty() {
+            self.uncommitted_text.clear();
             return;
         }
 

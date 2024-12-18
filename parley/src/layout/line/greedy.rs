@@ -149,11 +149,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         // HACK: ignore max_advance for empty layouts
         // Prevents crash when width is too small (https://github.com/linebender/parley/issues/186)
-        let max_advance = if self.layout.data.text_len == 0 {
-            f32::MAX
-        } else {
-            max_advance
-        };
+        let max_advance =
+            if self.layout.data.text_len == 0 && self.layout.data.inline_boxes.is_empty() {
+                f32::MAX
+            } else {
+                max_advance
+            };
 
         // This macro simply calls the `commit_line` with the provided arguments and some parts of self.
         // It exists solely to cut down on the boilerplate for accessing the self variables while
@@ -528,14 +529,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             line.metrics.trailing_whitespace = 0.0;
             if !line.item_range.is_empty() {
                 // Note: there may not be a "last run" if there are no runs in the line
-                let last_run = &self
-                    .lines
-                    .line_items
-                    .iter()
-                    .rfind(|item| item.is_text_run());
-                if let Some(last_run) = last_run {
-                    if !last_run.cluster_range.is_empty() {
-                        let cluster = &self.layout.data.clusters[last_run.cluster_range.end - 1];
+                let last_item = &self.lines.line_items.last();
+                if let Some(last_item) = last_item {
+                    if last_item.is_text_run() && !last_item.cluster_range.is_empty() {
+                        let cluster = &self.layout.data.clusters[last_item.cluster_range.end - 1];
                         if cluster.info.whitespace().is_space_or_nbsp() {
                             line.metrics.trailing_whitespace = cluster.advance;
                         }
@@ -726,6 +723,7 @@ fn try_commit_line<B: Brush>(
 
     // Iterate over the items to commit
     // println!("\nCOMMIT LINE");
+    let mut last_item_kind = LayoutItemKind::TextRun;
     for (i, item) in items_to_commit.iter().enumerate() {
         // println!("i = {} index = {} {:?}", i, item.index, item.kind);
 
@@ -745,6 +743,8 @@ fn try_commit_line<B: Brush>(
                     cluster_range: 0..0,
                     text_range: 0..0,
                 });
+
+                last_item_kind = item.kind;
             }
             LayoutItemKind::TextRun => {
                 let run_data = &layout.data.runs[item.index];
@@ -767,6 +767,8 @@ fn try_commit_line<B: Brush>(
                     // dbg!(cluster_range);
                     continue;
                 }
+
+                last_item_kind = item.kind;
 
                 // Push run to line
                 let run = Run::new(layout, 0, 0, run_data, None);
@@ -825,10 +827,21 @@ fn try_commit_line<B: Brush>(
     });
 
     // Reset state for the new line
+    state.num_spaces = 0;
     state.clusters.start = state.clusters.end;
     state.clusters.end += 1;
-    state.items.start = state.items.end.saturating_sub(1);
-    state.num_spaces = 0;
+
+    state.items.start = match last_item_kind {
+        // For text runs, the first item of line N+1 needs to be the SAME as
+        // the last item for line N. This is because the item (if it a text run
+        // may be split across the two lines with some clusters in line N and some
+        // in line N+1). The item is later filtered out (see `continue` in loop above)
+        // if there are not actually any clusters in line N+1.
+        LayoutItemKind::TextRun => state.items.end.saturating_sub(1),
+        // Inline boxes cannot be spread across multiple lines, so we should set
+        // the first item of line N+1 to be the item AFTER the last item in line N.
+        LayoutItemKind::InlineBox => state.items.end,
+    };
 
     true
 }
