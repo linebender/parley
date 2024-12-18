@@ -14,3 +14,11 @@ $ PARLEY_TEST="accept" cargo test
 ```
 
 It will update snapshots of the failed tests.
+
+## Report with diffs
+
+If you want to create a report with image diffs use:
+
+```bash
+$ cargo xtask report
+```
