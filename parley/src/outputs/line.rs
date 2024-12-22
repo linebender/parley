@@ -1,11 +1,20 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use core::ops::Range;
+
 use crate::inputs::LineMetrics;
 
-use crate::outputs::{
-    BreakReason, Brush, Glyph, LayoutItemKind, Line, LineItemData, Range, Run, Style,
-};
+use crate::outputs::{Alignment, LayoutData};
+use crate::outputs::{BreakReason, Brush, Glyph, Layout, Run, Style};
+
+/// Line in a text layout.
+#[derive(Copy, Clone)]
+pub struct Line<'a, B: Brush> {
+    pub(crate) layout: &'a Layout<B>,
+    pub(crate) index: u32,
+    pub(crate) data: &'a LineData,
+}
 
 impl<'a, B: Brush> Line<'a, B> {
     /// Returns the metrics for the line.
@@ -91,6 +100,103 @@ impl<'a, B: Brush> Line<'a, B> {
             offset: 0.,
         }
     }
+}
+
+#[derive(Clone, Default)]
+pub(crate) struct LineData {
+    /// Range of the source text.
+    pub(crate) text_range: Range<usize>,
+    /// Range of line items.
+    pub(crate) item_range: Range<usize>,
+    /// Metrics for the line.
+    pub(crate) metrics: LineMetrics,
+    /// The cause of the line break.
+    pub(crate) break_reason: BreakReason,
+    /// Alignment.
+    pub(crate) alignment: Alignment,
+    /// Maximum advance for the line.
+    pub(crate) max_advance: f32,
+    /// Number of justified clusters on the line.
+    pub(crate) num_spaces: usize,
+}
+
+impl LineData {
+    pub(crate) fn size(&self) -> f32 {
+        self.metrics.ascent + self.metrics.descent + self.metrics.leading
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct LineItemData {
+    /// Whether the item is a run or an inline box
+    pub(crate) kind: LayoutItemKind,
+    /// The index of the run or inline box in the runs or `inline_boxes` vec
+    pub(crate) index: usize,
+    /// Bidi level for the item (used for reordering)
+    pub(crate) bidi_level: u8,
+    /// Advance (size in direction of text flow) for the run.
+    pub(crate) advance: f32,
+
+    // Fields that only apply to text runs (Ignored for boxes)
+    // TODO: factor this out?
+    /// True if the run is composed entirely of whitespace.
+    pub(crate) is_whitespace: bool,
+    /// True if the run ends in whitespace.
+    pub(crate) has_trailing_whitespace: bool,
+    /// Range of the source text.
+    pub(crate) text_range: Range<usize>,
+    /// Range of clusters.
+    pub(crate) cluster_range: Range<usize>,
+}
+
+impl LineItemData {
+    pub(crate) fn is_text_run(&self) -> bool {
+        self.kind == LayoutItemKind::TextRun
+    }
+
+    pub(crate) fn compute_line_height<B: Brush>(&self, layout: &LayoutData<B>) -> f32 {
+        match self.kind {
+            LayoutItemKind::TextRun => {
+                let mut line_height = 0_f32;
+                let run = &layout.runs[self.index];
+                let glyph_start = run.glyph_start;
+                for cluster in &layout.clusters[run.cluster_range.clone()] {
+                    if cluster.glyph_len != 0xFF && cluster.has_divergent_styles() {
+                        let start = glyph_start + cluster.glyph_offset as usize;
+                        let end = start + cluster.glyph_len as usize;
+                        for glyph in &layout.glyphs[start..end] {
+                            line_height =
+                                line_height.max(layout.styles[glyph.style_index()].line_height);
+                        }
+                    } else {
+                        line_height = line_height
+                            .max(layout.styles[cluster.style_index as usize].line_height);
+                    }
+                }
+                line_height
+            }
+            LayoutItemKind::InlineBox => {
+                // TODO: account for vertical alignment (e.g. baseline alignment)
+                layout.inline_boxes[self.index].height
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LayoutItemKind {
+    TextRun,
+    InlineBox,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct LayoutItem {
+    /// Whether the item is a run or an inline box
+    pub(crate) kind: LayoutItemKind,
+    /// The index of the run or inline box in the runs or `inline_boxes` vec
+    pub(crate) index: usize,
+    /// Bidi level for the item (used for reordering)
+    pub(crate) bidi_level: u8,
 }
 
 /// The computed result of an item (glyph run or inline box) within a layout

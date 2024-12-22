@@ -1,8 +1,57 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::{BreakReason, Brush, Cluster, ClusterInfo, Glyph, Layout, Line, Range, Run};
-use swash::text::cluster::Whitespace;
+use crate::outputs::RunData;
+use crate::outputs::{BreakReason, Brush, Glyph, Layout, Line, Run};
+
+use core::ops::Range;
+use swash::text::cluster::{ClusterInfo, Whitespace};
+
+/// Atomic unit of text.
+#[derive(Copy, Clone)]
+pub struct Cluster<'a, B: Brush> {
+    pub(crate) path: ClusterPath,
+    pub(crate) run: Run<'a, B>,
+    pub(crate) data: &'a ClusterData,
+}
+
+#[derive(Copy, Clone)]
+pub(crate) struct ClusterData {
+    pub(crate) info: ClusterInfo,
+    pub(crate) flags: u16,
+    pub(crate) style_index: u16,
+    pub(crate) glyph_len: u8,
+    pub(crate) text_len: u8,
+    /// If `glyph_len == 0xFF`, then `glyph_offset` is a glyph identifier,
+    /// otherwise, it's an offset into the glyph array with the base
+    /// taken from the owning run.
+    pub(crate) glyph_offset: u16,
+    pub(crate) text_offset: u16,
+    pub(crate) advance: f32,
+}
+
+impl ClusterData {
+    pub(crate) const LIGATURE_START: u16 = 1;
+    pub(crate) const LIGATURE_COMPONENT: u16 = 2;
+    pub(crate) const DIVERGENT_STYLES: u16 = 4;
+
+    pub(crate) fn is_ligature_start(self) -> bool {
+        self.flags & Self::LIGATURE_START != 0
+    }
+
+    pub(crate) fn is_ligature_component(self) -> bool {
+        self.flags & Self::LIGATURE_COMPONENT != 0
+    }
+
+    pub(crate) fn has_divergent_styles(self) -> bool {
+        self.flags & Self::DIVERGENT_STYLES != 0
+    }
+
+    pub(crate) fn text_range(self, run: &RunData) -> Range<usize> {
+        let start = run.text_range.start + self.text_offset as usize;
+        start..start + self.text_len as usize
+    }
+}
 
 /// Defines the visual side of the cluster for hit testing.
 ///

@@ -1,10 +1,51 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::{
-    Brush, Cluster, ClusterPath, Font, Layout, LineItemData, NormalizedCoord, Range, Run, RunData,
-    Synthesis,
-};
+use core::ops::Range;
+use peniko::Font;
+use swash::{NormalizedCoord, Synthesis};
+
+use crate::outputs::{Brush, Cluster, ClusterPath, Layout, LineItemData};
+
+/// Sequence of clusters with a single font and style.
+#[derive(Copy, Clone)]
+pub struct Run<'a, B: Brush> {
+    pub(crate) layout: &'a Layout<B>,
+    pub(crate) line_index: u32,
+    pub(crate) index: u32,
+    pub(crate) data: &'a RunData,
+    pub(crate) line_data: Option<&'a LineItemData>,
+}
+
+#[derive(Clone)]
+pub(crate) struct RunData {
+    /// Index of the font for the run.
+    pub(crate) font_index: usize,
+    /// Font size.
+    pub(crate) font_size: f32,
+    /// Synthesis information for the font.
+    pub(crate) synthesis: Synthesis,
+    /// Range of normalized coordinates in the layout data.
+    pub(crate) coords_range: Range<usize>,
+    /// Range of the source text.
+    pub(crate) text_range: Range<usize>,
+    /// Bidi level for the run.
+    pub(crate) bidi_level: u8,
+    /// True if the run ends with a newline.
+    pub(crate) ends_with_newline: bool,
+    /// Range of clusters.
+    pub(crate) cluster_range: Range<usize>,
+    /// Base for glyph indices.
+    pub(crate) glyph_start: usize,
+    /// Metrics for the run.
+    pub(crate) metrics: RunMetrics,
+    /// Additional word spacing.
+    pub(crate) word_spacing: f32,
+    /// Additional letter spacing.
+    pub(crate) letter_spacing: f32,
+    /// Total advance of the run.
+    pub(crate) advance: f32,
+}
 
 impl<'a, B: Brush> Run<'a, B> {
     pub(crate) fn new(

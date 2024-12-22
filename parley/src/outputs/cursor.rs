@@ -4,8 +4,8 @@
 //! Text selection support.
 
 #[cfg(feature = "accesskit")]
-use super::LayoutAccessibility;
-use super::{Affinity, BreakReason, Brush, Cluster, ClusterSide, Layout, Line};
+use crate::outputs::LayoutAccessibility;
+use crate::outputs::{Affinity, BreakReason, Brush, Cluster, ClusterSide, Layout, Line};
 #[cfg(feature = "accesskit")]
 use accesskit::TextPosition;
 use alloc::vec::Vec;
@@ -17,8 +17,8 @@ use swash::text::cluster::Whitespace;
 /// Defines a position with a text layout.
 #[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
 pub struct Cursor {
-    index: usize,
-    affinity: Affinity,
+    pub(crate) index: usize,
+    pub(crate) affinity: Affinity,
 }
 
 impl Cursor {
