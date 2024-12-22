@@ -44,8 +44,8 @@ impl<'a> FontFamily<'a> {
     /// ```
     /// # extern crate alloc;
     /// use alloc::borrow::Cow;
-    /// use parley::style::FontFamily::{self, *};
-    /// use parley::style::GenericFamily::*;
+    /// use parley::inputs::style::FontFamily::{self, *};
+    /// use parley::inputs::style::GenericFamily::*;
     ///
     /// assert_eq!(FontFamily::parse("Palatino Linotype"), Some(Named(Cow::Borrowed("Palatino Linotype"))));
     /// assert_eq!(FontFamily::parse("monospace"), Some(Generic(Monospace)));
@@ -64,8 +64,8 @@ impl<'a> FontFamily<'a> {
     /// ```
     /// # extern crate alloc;
     /// use alloc::borrow::Cow;
-    /// use parley::style::FontFamily::{self, *};
-    /// use parley::style::GenericFamily::*;
+    /// use parley::inputs::style::FontFamily::{self, *};
+    /// use parley::inputs::style::GenericFamily::*;
     ///
     /// let source = "Arial, 'Times New Roman', serif";
     ///
