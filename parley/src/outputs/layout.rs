@@ -1,6 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use alloc::vec::Vec;
 use core::cmp::Ordering;
 use swash::shape::Shaper;
 use swash::text::cluster::Boundary;
