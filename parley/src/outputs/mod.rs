@@ -9,9 +9,6 @@ pub(crate) mod layout;
 pub(crate) mod line;
 pub(crate) mod run;
 
-pub mod cursor;
-pub mod editor;
-
 #[cfg(feature = "accesskit")]
 mod accessibility;
 
@@ -20,7 +17,6 @@ pub use accessibility::LayoutAccessibility;
 
 pub use self::alignment::Alignment;
 pub use self::cluster::{Affinity, Cluster, ClusterPath, ClusterSide};
-pub use self::cursor::{Cursor, Selection};
 pub use self::layout::Layout;
 pub use self::line::{GlyphRun, Line, PositionedInlineBox, PositionedLayoutItem};
 pub use self::run::{Run, RunMetrics};

@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use accesskit::{Node, Role, Tree, TreeUpdate};
 use anyhow::Result;
-use parley::outputs::editor::Generation;
+use parley::editing::Generation;
 use vello::peniko::Color;
 use vello::util::{RenderContext, RenderSurface};
 use vello::{kurbo, wgpu, AaConfig, Renderer, RendererOptions, Scene};

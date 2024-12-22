@@ -6,10 +6,10 @@ use std::path::{Path, PathBuf};
 use fontique::{Collection, CollectionOptions};
 use tiny_skia::{Color, Pixmap};
 
+use crate::editing::{PlainEditor, PlainEditorDriver};
 use crate::inputs::{
     FontContext, FontFamily, FontStack, LayoutContext, RangedBuilder, StyleProperty,
 };
-use crate::outputs::editor::{PlainEditor, PlainEditorDriver};
 use crate::outputs::Layout;
 use crate::tests::utils::renderer::{render_layout, ColorBrush, RenderingConfig};
 use crate::Rect;

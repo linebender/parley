@@ -15,8 +15,8 @@ use core::ops::Range;
 use accesskit::{Node, NodeId, TreeUpdate};
 
 use crate::algos::resolve::ResolvedStyle;
+use crate::editing::{Cursor, Selection};
 use crate::inputs::{Brush, FontContext, LayoutContext, StyleProperty, StyleSet};
-use crate::outputs::cursor::{Cursor, Selection};
 use crate::outputs::{Affinity, Alignment, Layout};
 use crate::Rect;
 

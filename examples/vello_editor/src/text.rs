@@ -15,8 +15,8 @@ use winit::{
     keyboard::{Key, NamedKey},
 };
 
+use parley::editing::{Generation, PlainEditor, PlainEditorDriver, SplitString};
 use parley::inputs::{FontContext, GenericFamily, LayoutContext, StyleProperty};
-use parley::outputs::editor::{Generation, PlainEditor, PlainEditorDriver, SplitString};
 use parley::outputs::PositionedLayoutItem;
 
 use crate::access_ids::next_node_id;

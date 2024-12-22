@@ -104,6 +104,7 @@ pub use swash;
 
 pub(crate) mod algos;
 
+pub mod editing;
 pub mod inputs;
 pub mod outputs;
 
@@ -117,5 +118,3 @@ pub use peniko::kurbo::Rect;
 pub use peniko::Font;
 
 pub use inline_box::InlineBox;
-
-pub use outputs::editor::{PlainEditor, PlainEditorDriver};

@@ -1,8 +1,8 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::editing::Cursor;
 use crate::inputs::{FontContext, LayoutContext};
-use crate::outputs::Cursor;
 use crate::tests::utils::CursorTest;
 
 #[test]
