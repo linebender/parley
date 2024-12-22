@@ -3,6 +3,9 @@
 
 use crate::{Affinity, Cursor, FontContext, Layout, LayoutContext};
 
+// Note: This module is only compiled when running tests, which requires std,
+// so we don't have to worry about being no_std-compatible.
+
 /// Helper struct for creating cursors and checking their values.
 ///
 /// This type implements multiple assertion methods which, on failure, will
@@ -184,9 +187,9 @@ impl CursorTest {
         panic!(
             concat!(
                 "cursor assertion failed\n",
-                "  expected: '{text}' - ({expected_index}, {expected_affinity})\n",
+                "  expected: '{text}' - ({expected_index}, {expected_affinity:?})\n",
                 "            {expected_cursor}\n",
-                "       got: '{text}' - ({actual_index}, {actual_affinity})\n",
+                "       got: '{text}' - ({actual_index}, {actual_affinity:?})\n",
                 "            {actual_cursor}\n",
             ),
             text = self.text,
@@ -257,7 +260,7 @@ impl CursorTest {
         eprintln!(
             concat!(
                 "dumping test layout value\n",
-                "      text: '{text}' - ({actual_index}, {actual_affinity})\n",
+                "      text: '{text}' - ({actual_index}, {actual_affinity:?})\n",
                 "            {actual_cursor}\n",
             ),
             text = self.text,

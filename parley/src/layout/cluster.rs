@@ -1,8 +1,6 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use core::fmt::Display;
-
 use super::{BreakReason, Brush, Cluster, ClusterInfo, Glyph, Layout, Line, Range, Run};
 use swash::text::cluster::Whitespace;
 
@@ -393,16 +391,6 @@ impl Affinity {
             Self::Downstream => Self::Upstream,
             Self::Upstream => Self::Downstream,
         }
-    }
-}
-
-impl Display for Affinity {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let name = match self {
-            Self::Downstream => "Downstream",
-            Self::Upstream => "Upstream",
-        };
-        write!(f, "{}", name)
     }
 }
 
