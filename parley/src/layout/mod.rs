@@ -3,10 +3,10 @@
 
 //! Layout types.
 
-mod alignment;
-mod cluster;
-mod line;
-mod run;
+pub(crate) mod alignment;
+pub(crate) mod cluster;
+pub(crate) mod line;
+pub(crate) mod run;
 
 pub(crate) mod data;
 
@@ -15,6 +15,7 @@ pub mod editor;
 
 use self::alignment::align;
 
+use crate::inputs::break_lines::BreakLines;
 use crate::inputs::style::Brush;
 use crate::inputs::LineMetrics;
 use crate::{Font, InlineBox};
@@ -23,20 +24,20 @@ use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
 #[cfg(feature = "accesskit")]
 use alloc::vec::Vec;
 use core::{cmp::Ordering, ops::Range};
-use data::{
-    BreakReason, ClusterData, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
-    RunData,
-};
+use data::{ClusterData, RunData};
 #[cfg(feature = "accesskit")]
 use hashbrown::{HashMap, HashSet};
-use swash::text::cluster::{Boundary, ClusterInfo};
+use swash::text::cluster::ClusterInfo;
 use swash::{GlyphId, NormalizedCoord, Synthesis};
 
 pub use cluster::{Affinity, ClusterPath, ClusterSide};
 pub use cursor::{Cursor, Selection};
-pub use line::greedy::BreakLines;
 pub use line::{GlyphRun, PositionedInlineBox, PositionedLayoutItem};
 pub use run::RunMetrics;
+
+pub(crate) use data::{
+    BreakReason, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
+};
 
 /// Alignment of a layout.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]

@@ -7,8 +7,6 @@ use crate::layout::{
     BreakReason, Brush, Glyph, LayoutItemKind, Line, LineItemData, Range, Run, Style,
 };
 
-pub(crate) mod greedy;
-
 impl<'a, B: Brush> Line<'a, B> {
     /// Returns the metrics for the line.
     pub fn metrics(&self) -> &LineMetrics {

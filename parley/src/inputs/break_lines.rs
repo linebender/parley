@@ -4,6 +4,7 @@
 //! Greedy line breaking.
 
 use alloc::vec::Vec;
+use swash::text::cluster::Boundary;
 use swash::text::cluster::Whitespace;
 
 #[cfg(feature = "libm")]
@@ -11,10 +12,11 @@ use swash::text::cluster::Whitespace;
 use core_maths::CoreFloat;
 
 use crate::inputs::style::Brush;
+use crate::inputs::LineMetrics;
 use crate::layout::alignment::unjustify;
 use crate::layout::{
-    Alignment, Boundary, BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData,
-    LineItemData, LineMetrics, Run,
+    Alignment, BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
+    Run,
 };
 
 use core::ops::Range;
