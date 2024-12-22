@@ -515,9 +515,8 @@ impl Iterator for GlyphIter<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        Alignment, Cluster, FontContext, Layout, LayoutContext, PositionedLayoutItem, StyleProperty,
-    };
+    use crate::inputs::{FontContext, LayoutContext, StyleProperty};
+    use crate::outputs::{Alignment, Cluster, Layout, PositionedLayoutItem};
 
     type Brush = ();
 

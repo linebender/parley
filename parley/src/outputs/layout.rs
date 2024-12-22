@@ -7,8 +7,8 @@ use swash::shape::Shaper;
 use swash::text::cluster::Boundary;
 use swash::Synthesis;
 
-use crate::inputs::break_lines::BreakLines;
-use crate::inputs::style::Brush;
+use crate::inputs::BreakLines;
+use crate::inputs::Brush;
 use crate::{Font, InlineBox};
 
 use crate::outputs::align;

@@ -1,7 +1,8 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::{Affinity, Cursor, FontContext, Layout, LayoutContext};
+use crate::inputs::{FontContext, LayoutContext};
+use crate::outputs::{Affinity, Cursor, Layout};
 
 // Note: This module is only compiled when running tests, which requires std,
 // so we don't have to worry about being no_std-compatible.

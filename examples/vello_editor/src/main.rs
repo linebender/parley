@@ -14,6 +14,7 @@
 
 use accesskit::{Node, Role, Tree, TreeUpdate};
 use anyhow::Result;
+use parley::outputs::editor::Generation;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use vello::kurbo;
@@ -97,7 +98,7 @@ struct SimpleVelloApp<'s> {
     editor: text::Editor,
 
     /// The last generation of the editor layout that we drew.
-    last_drawn_generation: text::Generation,
+    last_drawn_generation: Generation,
 
     /// The IME cursor area we last sent to the platform.
     last_sent_ime_cursor_area: kurbo::Rect,
@@ -185,7 +186,7 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
                 self.editor.cursor_blink();
 
                 if let Some(next_time) = self.editor.next_blink_time() {
-                    self.last_drawn_generation = text::Generation::default();
+                    self.last_drawn_generation = Generation::default();
                     if let RenderState::Active(state) = &self.state {
                         state.window.request_redraw();
                     }
@@ -260,7 +261,7 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
             WindowEvent::Focused(false) => {
                 self.editor.disable_blink();
                 self.editor.cursor_blink();
-                self.last_drawn_generation = text::Generation::default();
+                self.last_drawn_generation = Generation::default();
                 if let RenderState::Active(state) = &self.state {
                     state.window.request_redraw();
                 }

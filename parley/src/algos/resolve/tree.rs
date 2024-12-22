@@ -5,7 +5,7 @@
 use alloc::borrow::Cow;
 use alloc::{string::String, vec::Vec};
 
-use crate::inputs::style::WhiteSpaceCollapse;
+use crate::inputs::WhiteSpaceCollapse;
 
 use super::{Brush, RangedStyle, ResolvedProperty, ResolvedStyle};
 

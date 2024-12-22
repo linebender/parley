@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::tests::utils::CursorTest;
-use crate::{Cursor, FontContext, LayoutContext};
+use crate::{inputs::FontContext, inputs::LayoutContext, outputs::Cursor};
 
 #[test]
 fn cursor_previous_visual() {

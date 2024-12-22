@@ -12,9 +12,9 @@
 
 use image::codecs::png::PngEncoder;
 use image::{self, Pixel, Rgba, RgbaImage};
-use parley::inputs::style::{FontStack, FontWeight, StyleProperty, TextStyle};
+use parley::inputs::{FontStack, FontWeight, StyleProperty, TextStyle};
 use parley::outputs::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
-use parley::{FontContext, InlineBox, LayoutContext};
+use parley::{inputs::FontContext, inputs::LayoutContext, InlineBox};
 use std::fs::File;
 use swash::scale::image::Content;
 use swash::scale::{Render, ScaleContext, Scaler, Source, StrikeWith};

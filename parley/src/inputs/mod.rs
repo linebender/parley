@@ -3,12 +3,16 @@
 
 // TODO - Remove pub(crate)
 
-pub(crate) mod break_lines;
-pub(crate) mod builder;
-pub(crate) mod context;
-pub(crate) mod font;
-pub(crate) mod line_metrics;
+mod break_lines;
+mod builder;
+mod context;
+mod font;
+mod line_metrics;
+mod style;
 
-pub mod style;
-
+pub use break_lines::*;
+pub use builder::*;
+pub use context::*;
+pub use font::*;
 pub use line_metrics::*;
+pub use style::*;

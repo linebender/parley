@@ -7,7 +7,7 @@
 //! Note: Emoji rendering is not currently implemented in this example. See the swash example
 //! if you need emoji rendering.
 
-use crate::{GlyphRun, Layout, PositionedLayoutItem};
+use crate::outputs::{GlyphRun, Layout, PositionedLayoutItem};
 use skrifa::{
     instance::{LocationRef, NormalizedCoord, Size},
     outline::{DrawSettings, OutlinePen},

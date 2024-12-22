@@ -4,7 +4,9 @@
 use core::mem::Discriminant;
 use hashbrown::HashMap;
 
-type StyleProperty<Brush> = crate::StyleProperty<'static, Brush>;
+use crate::inputs::Brush;
+
+type StyleProperty<Brush> = crate::inputs::StyleProperty<'static, Brush>;
 
 /// A long-lived collection of [`StyleProperties`](super::StyleProperty), containing at
 /// most one of each property.
@@ -15,11 +17,9 @@ type StyleProperty<Brush> = crate::StyleProperty<'static, Brush>;
 ///
 /// These styles do not have a corresponding range, and are generally unsuited for rich text.
 #[derive(Clone, Debug)]
-pub struct StyleSet<Brush: crate::Brush>(
-    HashMap<Discriminant<StyleProperty<Brush>>, StyleProperty<Brush>>,
-);
+pub struct StyleSet<B: Brush>(HashMap<Discriminant<StyleProperty<B>>, StyleProperty<B>>);
 
-impl<Brush: crate::Brush> StyleSet<Brush> {
+impl<B: Brush> StyleSet<B> {
     /// Create a new collection of styles.
     ///
     /// The font size will be `font_size`, and can be overwritten at runtime by
@@ -34,7 +34,7 @@ impl<Brush: crate::Brush> StyleSet<Brush> {
     ///
     /// Note: Adding a [font stack](crate::StyleProperty::FontStack) to this collection is not
     /// additive, and instead overwrites any previously added font stack.
-    pub fn insert(&mut self, style: StyleProperty<Brush>) -> Option<StyleProperty<Brush>> {
+    pub fn insert(&mut self, style: StyleProperty<B>) -> Option<StyleProperty<B>> {
         let discriminant = core::mem::discriminant(&style);
         self.0.insert(discriminant, style)
     }
@@ -45,7 +45,7 @@ impl<Brush: crate::Brush> StyleSet<Brush> {
     ///
     /// Removing the [font size](crate::StyleProperty::FontSize) is not recommended, as an unspecified
     /// fallback font size will be used.
-    pub fn retain(&mut self, mut f: impl FnMut(&StyleProperty<Brush>) -> bool) {
+    pub fn retain(&mut self, mut f: impl FnMut(&StyleProperty<B>) -> bool) {
         self.0.retain(|_, v| f(v));
     }
 
@@ -59,10 +59,7 @@ impl<Brush: crate::Brush> StyleSet<Brush> {
     ///
     /// Removing the [font size](crate::StyleProperty::FontSize) is not recommended, as an unspecified
     /// fallback font size will be used.
-    pub fn remove(
-        &mut self,
-        property: Discriminant<StyleProperty<Brush>>,
-    ) -> Option<StyleProperty<Brush>> {
+    pub fn remove(&mut self, property: Discriminant<StyleProperty<B>>) -> Option<StyleProperty<B>> {
         self.0.remove(&property)
     }
 
@@ -70,7 +67,7 @@ impl<Brush: crate::Brush> StyleSet<Brush> {
     ///
     /// Write access is not provided due to the invariant that keys
     /// are the discriminant of their corresponding value.
-    pub fn inner(&self) -> &HashMap<Discriminant<StyleProperty<Brush>>, StyleProperty<Brush>> {
+    pub fn inner(&self) -> &HashMap<Discriminant<StyleProperty<B>>, StyleProperty<B>> {
         &self.0
     }
 }

@@ -11,7 +11,7 @@ use swash::text::cluster::Whitespace;
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 
-use crate::inputs::style::Brush;
+use crate::inputs::Brush;
 use crate::inputs::LineMetrics;
 use crate::outputs::alignment::unjustify;
 use crate::outputs::{

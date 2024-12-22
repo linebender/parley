@@ -3,7 +3,7 @@
 
 use crate::algos::resolve::{RangedStyle, ResolveContext, Resolved};
 use crate::algos::swash_convert::{locale_to_fontique, script_to_fontique, synthesis_to_swash};
-use crate::inputs::style::{Brush, FontFeature, FontVariation};
+use crate::inputs::{Brush, FontFeature, FontVariation};
 use crate::outputs::Layout;
 use crate::util::nearly_eq;
 use crate::Font;

@@ -1,7 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::inputs::style::Brush;
+use crate::inputs::Brush;
 use crate::outputs::{BreakReason, LayoutData};
 
 /// Alignment of a layout.

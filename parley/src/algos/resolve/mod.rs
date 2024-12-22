@@ -10,9 +10,9 @@ pub(crate) use range::RangedStyleBuilder;
 
 use alloc::{vec, vec::Vec};
 
-use crate::inputs::font::FontContext;
-use crate::inputs::style::TextStyle;
-use crate::inputs::style::{
+use crate::inputs::FontContext;
+use crate::inputs::TextStyle;
+use crate::inputs::{
     Brush, FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontVariation, FontWeight,
     FontWidth, StyleProperty,
 };

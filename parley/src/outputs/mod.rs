@@ -20,7 +20,7 @@ pub use accessibility::LayoutAccessibility;
 
 pub(crate) use self::alignment::align;
 
-use crate::inputs::style::Brush;
+use crate::inputs::Brush;
 use swash::GlyphId;
 
 pub use self::{

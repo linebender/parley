@@ -8,15 +8,15 @@ use alloc::{vec, vec::Vec};
 use crate::algos::bidi;
 use crate::algos::resolve::tree::TreeStyleBuilder;
 use crate::algos::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle};
-use crate::inputs::builder::RangedBuilder;
-use crate::inputs::style::{Brush, TextStyle};
-use crate::FontContext;
+use crate::inputs::FontContext;
+use crate::inputs::RangedBuilder;
+use crate::inputs::{Brush, TextStyle};
 
 use swash::shape::ShapeContext;
 use swash::text::cluster::CharInfo;
 
 use crate::inline_box::InlineBox;
-use crate::inputs::builder::TreeBuilder;
+use crate::inputs::TreeBuilder;
 
 /// Shared scratch space used when constructing text layouts.
 ///

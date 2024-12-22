@@ -85,7 +85,6 @@
 #![expect(
     missing_debug_implementations,
     single_use_lifetimes,
-    unnameable_types,
     clippy::allow_attributes,
     clippy::allow_attributes_without_reason,
     clippy::cast_possible_truncation,
@@ -118,16 +117,6 @@ mod tests;
 pub use peniko::kurbo::Rect;
 pub use peniko::Font;
 
-// TODO - Remove
-pub use inputs::builder::{RangedBuilder, TreeBuilder};
-pub use inputs::context::LayoutContext;
-pub use inputs::font::FontContext;
-pub use inputs::style::*;
-
 pub use inline_box::InlineBox;
-#[doc(inline)]
-pub use outputs::Layout;
 
 pub use outputs::editor::{PlainEditor, PlainEditorDriver};
-
-pub use outputs::*;

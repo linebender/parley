@@ -4,9 +4,9 @@
 //! Context for layout.
 
 use crate::algos::shape::shape_text;
-use crate::inputs::context::LayoutContext;
-use crate::inputs::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
-use crate::FontContext;
+use crate::inputs::FontContext;
+use crate::inputs::LayoutContext;
+use crate::inputs::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
 
 use crate::outputs::Layout;
 
