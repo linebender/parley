@@ -7,17 +7,17 @@ use alloc::{vec, vec::Vec};
 
 use self::tree::TreeStyleBuilder;
 
-use super::bidi;
-use super::builder::RangedBuilder;
-use super::resolve::{tree, RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle};
-use super::style::{Brush, TextStyle};
-use super::FontContext;
+use crate::bidi;
+use crate::inputs::builder::RangedBuilder;
+use crate::inputs::style::{Brush, TextStyle};
+use crate::resolve::{tree, RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle};
+use crate::FontContext;
 
 use swash::shape::ShapeContext;
 use swash::text::cluster::CharInfo;
 
-use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
+use crate::inputs::builder::TreeBuilder;
 
 /// Shared scratch space used when constructing text layouts.
 ///

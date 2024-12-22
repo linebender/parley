@@ -15,7 +15,8 @@ pub mod editor;
 
 use self::alignment::align;
 
-use super::style::Brush;
+use crate::inputs::style::Brush;
+use crate::inputs::LineMetrics;
 use crate::{Font, InlineBox};
 #[cfg(feature = "accesskit")]
 use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
@@ -34,7 +35,7 @@ use swash::{GlyphId, NormalizedCoord, Synthesis};
 pub use cluster::{Affinity, ClusterPath, ClusterSide};
 pub use cursor::{Cursor, Selection};
 pub use line::greedy::BreakLines;
-pub use line::{GlyphRun, LineMetrics, PositionedInlineBox, PositionedLayoutItem};
+pub use line::{GlyphRun, PositionedInlineBox, PositionedLayoutItem};
 pub use run::RunMetrics;
 
 /// Alignment of a layout.

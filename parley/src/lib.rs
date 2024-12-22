@@ -104,10 +104,12 @@ extern crate alloc;
 pub use fontique;
 pub use swash;
 
+pub(crate) mod algos;
+
+pub mod inputs;
+pub mod outputs;
+
 mod bidi;
-mod builder;
-mod context;
-mod font;
 mod inline_box;
 mod resolve;
 mod shape;
@@ -115,7 +117,6 @@ mod swash_convert;
 mod util;
 
 pub mod layout;
-pub mod style;
 
 #[cfg(test)]
 mod tests;
@@ -123,9 +124,12 @@ mod tests;
 pub use peniko::kurbo::Rect;
 pub use peniko::Font;
 
-pub use builder::{RangedBuilder, TreeBuilder};
-pub use context::LayoutContext;
-pub use font::FontContext;
+// TODO - Remove
+pub use inputs::builder::{RangedBuilder, TreeBuilder};
+pub use inputs::context::LayoutContext;
+pub use inputs::font::FontContext;
+pub use inputs::style::*;
+
 pub use inline_box::InlineBox;
 #[doc(inline)]
 pub use layout::Layout;
@@ -133,4 +137,3 @@ pub use layout::Layout;
 pub use layout::editor::{PlainEditor, PlainEditorDriver};
 
 pub use layout::*;
-pub use style::*;

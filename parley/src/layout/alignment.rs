@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use super::{Alignment, BreakReason, LayoutData};
-use crate::style::Brush;
+use crate::inputs::style::Brush;
 
 pub(crate) fn align<B: Brush>(
     layout: &mut LayoutData<B>,

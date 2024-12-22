@@ -3,22 +3,18 @@
 
 //! A simple plain text editor and related types.
 
-use crate::{
-    layout::{
-        cursor::{Cursor, Selection},
-        Affinity, Alignment, Layout,
-    },
-    resolve::ResolvedStyle,
-    style::Brush,
-    FontContext, LayoutContext, Rect, StyleProperty, StyleSet,
-};
+use crate::inputs::style::Brush;
+use crate::layout::cursor::{Cursor, Selection};
+use crate::layout::{Affinity, Alignment, Layout};
+use crate::resolve::ResolvedStyle;
+use crate::{FontContext, LayoutContext, Rect, StyleProperty, StyleSet};
+
 use alloc::{borrow::ToOwned, string::String, vec::Vec};
-use core::{
-    cmp::PartialEq,
-    default::Default,
-    fmt::{Debug, Display},
-    ops::Range,
-};
+
+use core::cmp::PartialEq;
+use core::default::Default;
+use core::fmt::{Debug, Display};
+use core::ops::Range;
 
 #[cfg(feature = "accesskit")]
 use crate::layout::LayoutAccessibility;

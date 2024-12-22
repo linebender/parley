@@ -15,7 +15,7 @@ use crate::layout::{
     Alignment, Boundary, BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData,
     LineItemData, LineMetrics, Run,
 };
-use crate::style::Brush;
+use crate::inputs::style::Brush;
 
 use core::ops::Range;
 

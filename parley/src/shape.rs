@@ -1,9 +1,9 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::layout::Layout;
-use super::resolve::{RangedStyle, ResolveContext, Resolved};
-use super::style::{Brush, FontFeature, FontVariation};
+use crate::inputs::style::{Brush, FontFeature, FontVariation};
+use crate::layout::Layout;
+use crate::resolve::{RangedStyle, ResolveContext, Resolved};
 use crate::util::nearly_eq;
 use crate::Font;
 use fontique::QueryFamily;

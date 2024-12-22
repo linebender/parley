@@ -3,11 +3,12 @@
 
 //! Context for layout.
 
-use super::context::LayoutContext;
-use super::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
-use super::FontContext;
+use crate::inputs::context::LayoutContext;
+use crate::inputs::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
+use crate::shape::shape_text;
+use crate::FontContext;
 
-use super::layout::Layout;
+use crate::layout::Layout;
 
 use alloc::string::String;
 use core::ops::RangeBounds;
@@ -165,7 +166,7 @@ fn build_into_layout<B: Brush>(
 
     {
         let query = fcx.collection.query(&mut fcx.source_cache);
-        super::shape::shape_text(
+        shape_text(
             &lcx.rcx,
             query,
             &lcx.styles,

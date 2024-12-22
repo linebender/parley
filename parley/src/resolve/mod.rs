@@ -10,13 +10,13 @@ pub(crate) use range::RangedStyleBuilder;
 
 use alloc::{vec, vec::Vec};
 
-use super::style::{
+use crate::inputs::font::FontContext;
+use crate::inputs::style::TextStyle;
+use crate::inputs::style::{
     Brush, FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontVariation, FontWeight,
     FontWidth, StyleProperty,
 };
-use crate::font::FontContext;
 use crate::layout;
-use crate::style::TextStyle;
 use crate::util::nearly_eq;
 use core::borrow::Borrow;
 use core::ops::Range;
