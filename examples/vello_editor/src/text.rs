@@ -3,7 +3,7 @@
 
 use accesskit::{Node, TreeUpdate};
 use core::default::Default;
-use parley::{editor::SplitString, layout::PositionedLayoutItem, GenericFamily, StyleProperty};
+use parley::{editor::SplitString, outputs::PositionedLayoutItem, GenericFamily, StyleProperty};
 use std::time::{Duration, Instant};
 use vello::{
     kurbo::{Affine, Line, Stroke},
@@ -16,7 +16,7 @@ use winit::{
     keyboard::{Key, NamedKey},
 };
 
-pub use parley::layout::editor::Generation;
+pub use parley::outputs::editor::Generation;
 use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorDriver};
 
 use crate::access_ids::next_node_id;

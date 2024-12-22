@@ -16,7 +16,7 @@ use crate::inputs::style::{
     Brush, FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontVariation, FontWeight,
     FontWidth, StyleProperty,
 };
-use crate::layout;
+use crate::outputs;
 use crate::util::nearly_eq;
 use core::borrow::Borrow;
 use core::ops::Range;
@@ -476,8 +476,8 @@ impl<B: Brush> ResolvedStyle<B> {
         }
     }
 
-    pub(crate) fn as_layout_style(&self) -> layout::Style<B> {
-        layout::Style {
+    pub(crate) fn as_layout_style(&self) -> outputs::Style<B> {
+        outputs::Style {
             brush: self.brush.clone(),
             underline: self.underline.as_layout_decoration(&self.brush),
             strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
@@ -501,9 +501,9 @@ pub(crate) struct ResolvedDecoration<B: Brush> {
 
 impl<B: Brush> ResolvedDecoration<B> {
     /// Convert into a layout Decoration (filtering out disabled decorations)
-    pub(crate) fn as_layout_decoration(&self, default_brush: &B) -> Option<layout::Decoration<B>> {
+    pub(crate) fn as_layout_decoration(&self, default_brush: &B) -> Option<outputs::Decoration<B>> {
         if self.enabled {
-            Some(layout::Decoration {
+            Some(outputs::Decoration {
                 brush: self.brush.clone().unwrap_or_else(|| default_brush.clone()),
                 offset: self.offset,
                 size: self.size,

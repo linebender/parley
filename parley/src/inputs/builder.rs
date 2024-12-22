@@ -8,7 +8,7 @@ use crate::inputs::context::LayoutContext;
 use crate::inputs::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
 use crate::FontContext;
 
-use crate::layout::Layout;
+use crate::outputs::Layout;
 
 use alloc::string::String;
 use core::ops::RangeBounds;

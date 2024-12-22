@@ -112,8 +112,6 @@ pub mod outputs;
 mod inline_box;
 mod util;
 
-pub mod layout;
-
 #[cfg(test)]
 mod tests;
 
@@ -128,8 +126,8 @@ pub use inputs::style::*;
 
 pub use inline_box::InlineBox;
 #[doc(inline)]
-pub use layout::Layout;
+pub use outputs::Layout;
 
-pub use layout::editor::{PlainEditor, PlainEditorDriver};
+pub use outputs::editor::{PlainEditor, PlainEditorDriver};
 
-pub use layout::*;
+pub use outputs::*;

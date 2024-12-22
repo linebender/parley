@@ -13,8 +13,8 @@ use core_maths::CoreFloat;
 
 use crate::inputs::style::Brush;
 use crate::inputs::LineMetrics;
-use crate::layout::alignment::unjustify;
-use crate::layout::{
+use crate::outputs::alignment::unjustify;
+use crate::outputs::{
     Alignment, BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     Run,
 };

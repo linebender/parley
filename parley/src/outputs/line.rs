@@ -3,7 +3,7 @@
 
 use crate::inputs::LineMetrics;
 
-use crate::layout::{
+use crate::outputs::{
     BreakReason, Brush, Glyph, LayoutItemKind, Line, LineItemData, Range, Run, Style,
 };
 

@@ -5,8 +5,8 @@
 
 use crate::algos::resolve::ResolvedStyle;
 use crate::inputs::style::Brush;
-use crate::layout::cursor::{Cursor, Selection};
-use crate::layout::{Affinity, Alignment, Layout};
+use crate::outputs::cursor::{Cursor, Selection};
+use crate::outputs::{Affinity, Alignment, Layout};
 use crate::{FontContext, LayoutContext, Rect, StyleProperty, StyleSet};
 
 use alloc::{borrow::ToOwned, string::String, vec::Vec};
@@ -17,7 +17,7 @@ use core::fmt::{Debug, Display};
 use core::ops::Range;
 
 #[cfg(feature = "accesskit")]
-use crate::layout::LayoutAccessibility;
+use crate::outputs::LayoutAccessibility;
 #[cfg(feature = "accesskit")]
 use accesskit::{Node, NodeId, TreeUpdate};
 

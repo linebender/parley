@@ -13,7 +13,7 @@
 use image::codecs::png::PngEncoder;
 use image::{self, Pixel, Rgba, RgbaImage};
 use parley::inputs::style::{FontStack, FontWeight, StyleProperty, TextStyle};
-use parley::layout::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
+use parley::outputs::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
 use parley::{FontContext, InlineBox, LayoutContext};
 use std::fs::File;
 use swash::scale::image::Content;
