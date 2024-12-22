@@ -5,12 +5,11 @@
 
 use alloc::{vec, vec::Vec};
 
-use self::tree::TreeStyleBuilder;
-
-use crate::bidi;
+use crate::algos::bidi;
+use crate::algos::resolve::tree::TreeStyleBuilder;
+use crate::algos::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle};
 use crate::inputs::builder::RangedBuilder;
 use crate::inputs::style::{Brush, TextStyle};
-use crate::resolve::{tree, RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle};
 use crate::FontContext;
 
 use swash::shape::ShapeContext;

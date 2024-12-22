@@ -10,12 +10,12 @@ use swash::text::cluster::Whitespace;
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 
+use crate::inputs::style::Brush;
 use crate::layout::alignment::unjustify;
 use crate::layout::{
     Alignment, Boundary, BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData,
     LineItemData, LineMetrics, Run,
 };
-use crate::inputs::style::Brush;
 
 use core::ops::Range;
 

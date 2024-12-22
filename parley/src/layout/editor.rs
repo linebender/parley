@@ -3,10 +3,10 @@
 
 //! A simple plain text editor and related types.
 
+use crate::algos::resolve::ResolvedStyle;
 use crate::inputs::style::Brush;
 use crate::layout::cursor::{Cursor, Selection};
 use crate::layout::{Affinity, Alignment, Layout};
-use crate::resolve::ResolvedStyle;
 use crate::{FontContext, LayoutContext, Rect, StyleProperty, StyleSet};
 
 use alloc::{borrow::ToOwned, string::String, vec::Vec};

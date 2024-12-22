@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::inline_box::InlineBox;
-use crate::layout::{Alignment, Glyph, LineMetrics, RunMetrics, Style};
 use crate::inputs::style::Brush;
+use crate::layout::{Alignment, Glyph, LineMetrics, RunMetrics, Style};
 use crate::util::nearly_zero;
 use crate::Font;
 use core::ops::Range;

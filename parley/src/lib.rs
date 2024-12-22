@@ -109,11 +109,7 @@ pub(crate) mod algos;
 pub mod inputs;
 pub mod outputs;
 
-mod bidi;
 mod inline_box;
-mod resolve;
-mod shape;
-mod swash_convert;
 mod util;
 
 pub mod layout;
