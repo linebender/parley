@@ -14,8 +14,9 @@
 )]
 
 use parley::{
-    Alignment, FontContext, FontWeight, GenericFamily, GlyphRun, InlineBox, Layout, LayoutContext,
-    PositionedLayoutItem, StyleProperty,
+    inputs::{FontContext, FontWeight, GenericFamily, LayoutContext, StyleProperty},
+    outputs::{Alignment, GlyphRun, Layout, PositionedLayoutItem},
+    InlineBox,
 };
 use skrifa::{
     instance::{LocationRef, NormalizedCoord, Size},

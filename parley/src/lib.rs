@@ -4,15 +4,15 @@
 //! Parley is a library for rich text layout.
 //!
 //! Some key types are:
-//! - [`FontContext`] and [`LayoutContext`] are resources which should be shared globally (or at coarse-grained boundaries).
-//!   - [`FontContext`] is database of fonts.
-//!   - [`LayoutContext`] is scratch space that allows for reuse of allocations between layouts.
-//! - [`RangedBuilder`] and [`TreeBuilder`] which are builders for creating a [`Layout`].
-//!     - [`RangedBuilder`] allows styles to be specified as a flat `Vec` of spans
-//!     - [`TreeBuilder`] allows styles to be specified as a tree of spans
+//! - [`FontContext`](crate::inputs::FontContext) and [`LayoutContext`](crate::inputs::LayoutContext) are resources which should be shared globally (or at coarse-grained boundaries).
+//!   - [`FontContext`](crate::inputs::FontContext) is database of fonts.
+//!   - [`LayoutContext`](crate::inputs::LayoutContext) is scratch space that allows for reuse of allocations between layouts.
+//! - [`RangedBuilder`](crate::inputs::RangedBuilder) and [`TreeBuilder`](crate::inputs::TreeBuilder) which are builders for creating a [`Layout`](crate::outputs::Layout).
+//!     - [`RangedBuilder`](crate::inputs::RangedBuilder) allows styles to be specified as a flat `Vec` of spans
+//!     - [`TreeBuilder`](crate::inputs::TreeBuilder) allows styles to be specified as a tree of spans
 //!
-//!   They are constructed using the [`ranged_builder`](LayoutContext::ranged_builder) and [`tree_builder`](LayoutContext::ranged_builder) methods on [`LayoutContext`].
-//! - [`Layout`] which represents styled paragraph(s) of text and can perform shaping, line-breaking, bidi-reordering, and alignment of that text.
+//!   They are constructed using the [`ranged_builder`](crate::inputs::LayoutContext::ranged_builder) and [`tree_builder`](crate::inputs::LayoutContext::tree_builder) methods on [`LayoutContext`](crate::inputs::LayoutContext).
+//! - [`Layout`](crate::outputs::Layout) which represents styled paragraph(s) of text and can perform shaping, line-breaking, bidi-reordering, and alignment of that text.
 //!
 //!   `Layout` supports re-linebreaking and re-aligning many times (in case the width at which wrapping should occur changes). But if the text content or
 //!   the styles applied to that content change then a new `Layout` must be created using a new `RangedBuilder` or `TreeBuilder`.
@@ -22,10 +22,9 @@
 //! See the [examples](https://github.com/linebender/parley/tree/main/examples) directory for more complete usage examples that include rendering.
 //!
 //! ```rust
-//! use parley::{
-//!    Alignment, FontContext, FontWeight, InlineBox, Layout, LayoutContext, PositionedLayoutItem,
-//!    StyleProperty,
-//! };
+//! use parley::InlineBox;
+//! use parley::inputs::{FontContext, FontWeight, LayoutContext, StyleProperty};
+//! use parley::outputs::{Alignment, Layout, PositionedLayoutItem};
 //!
 //! // Create a FontContext (font database) and LayoutContext (scratch space).
 //! // These are both intended to be constructed rarely (perhaps even once per app):
@@ -85,7 +84,6 @@
 #![expect(
     missing_debug_implementations,
     single_use_lifetimes,
-    unnameable_types,
     clippy::allow_attributes,
     clippy::allow_attributes_without_reason,
     clippy::cast_possible_truncation,
@@ -104,18 +102,14 @@ extern crate alloc;
 pub use fontique;
 pub use swash;
 
-mod bidi;
-mod builder;
-mod context;
-mod font;
-mod inline_box;
-mod resolve;
-mod shape;
-mod swash_convert;
-mod util;
+pub(crate) mod algos;
 
-pub mod layout;
-pub mod style;
+pub mod editing;
+pub mod inputs;
+pub mod outputs;
+
+mod inline_box;
+mod util;
 
 #[cfg(test)]
 mod tests;
@@ -123,14 +117,4 @@ mod tests;
 pub use peniko::kurbo::Rect;
 pub use peniko::Font;
 
-pub use builder::{RangedBuilder, TreeBuilder};
-pub use context::LayoutContext;
-pub use font::FontContext;
 pub use inline_box::InlineBox;
-#[doc(inline)]
-pub use layout::Layout;
-
-pub use layout::editor::{PlainEditor, PlainEditorDriver};
-
-pub use layout::*;
-pub use style::*;

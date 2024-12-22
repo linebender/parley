@@ -4,9 +4,9 @@
 //! Range based style application.
 
 use alloc::vec;
+use core::ops::{Bound, Range, RangeBounds};
 
 use super::{Brush, RangedProperty, RangedStyle, ResolvedProperty, ResolvedStyle, Vec};
-use core::ops::{Bound, Range, RangeBounds};
 
 /// Builder for constructing an ordered sequence of non-overlapping ranged
 /// styles from a collection of ranged style properties.

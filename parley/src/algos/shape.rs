@@ -1,21 +1,21 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::layout::Layout;
-use super::resolve::{RangedStyle, ResolveContext, Resolved};
-use super::style::{Brush, FontFeature, FontVariation};
-use crate::util::nearly_eq;
-use crate::Font;
-use fontique::QueryFamily;
-use fontique::{self, Query, QueryFont};
+use alloc::vec::Vec;
+
+use fontique::{self, Query, QueryFamily, QueryFont};
 use swash::shape::{partition, Direction, ShapeContext};
 use swash::text::cluster::{CharCluster, CharInfo, Token};
 use swash::text::{Language, Script};
 use swash::{FontRef, Synthesis};
 
-use alloc::vec::Vec;
-
+use crate::algos::resolve::{RangedStyle, ResolveContext, Resolved};
+use crate::algos::swash_convert::{locale_to_fontique, script_to_fontique, synthesis_to_swash};
 use crate::inline_box::InlineBox;
+use crate::inputs::{Brush, FontFeature, FontVariation};
+use crate::outputs::Layout;
+use crate::util::nearly_eq;
+use crate::Font;
 
 struct Item {
     style_index: u16,
@@ -248,8 +248,8 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         let variations = rcx.variations(style.font_variations).unwrap_or(&[]);
         let features = rcx.features(style.font_features).unwrap_or(&[]);
         query.set_families(fonts.iter().copied());
-        let fb_script = crate::swash_convert::script_to_fontique(script);
-        let fb_language = locale.and_then(crate::swash_convert::locale_to_fontique);
+        let fb_script = script_to_fontique(script);
+        let fb_language = locale.and_then(locale_to_fontique);
         query.set_fallbacks(fontique::FallbackKey::new(fb_script, fb_language.as_ref()));
         query.set_attributes(attrs);
         Self {
@@ -306,7 +306,6 @@ impl<B: Brush> partition::Selector for FontSelector<'_, '_, B> {
         let mut selected_font = None;
         self.query.matches_with(|font| {
             if let Ok(font_ref) = skrifa::FontRef::from_index(font.blob.as_ref(), font.index) {
-                use crate::swash_convert::synthesis_to_swash;
                 use skrifa::MetadataProvider;
                 use swash::text::cluster::Status as MapStatus;
                 let charmap = font_ref.charmap();
