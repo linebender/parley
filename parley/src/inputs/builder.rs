@@ -3,17 +3,15 @@
 
 //! Context for layout.
 
-use crate::algos::shape::shape_text;
-use crate::inputs::FontContext;
-use crate::inputs::LayoutContext;
-use crate::inputs::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
-
-use crate::outputs::Layout;
-
 use alloc::string::String;
 use core::ops::RangeBounds;
 
+use crate::algos::shape::shape_text;
 use crate::inline_box::InlineBox;
+use crate::inputs::{
+    Brush, FontContext, LayoutContext, StyleProperty, TextStyle, WhiteSpaceCollapse,
+};
+use crate::outputs::Layout;
 
 /// Builder for constructing a text layout with ranged attributes.
 pub struct RangedBuilder<'a, B: Brush> {

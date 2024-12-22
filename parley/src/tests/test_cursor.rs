@@ -1,8 +1,9 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::inputs::{FontContext, LayoutContext};
+use crate::outputs::Cursor;
 use crate::tests::utils::CursorTest;
-use crate::{inputs::FontContext, inputs::LayoutContext, outputs::Cursor};
 
 #[test]
 fn cursor_previous_visual() {

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use core::mem::Discriminant;
+
 use hashbrown::HashMap;
 
 use crate::inputs::Brush;

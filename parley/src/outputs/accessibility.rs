@@ -1,8 +1,9 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
 use alloc::vec::Vec;
+
+use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
 use hashbrown::{HashMap, HashSet};
 
 use crate::inputs::Brush;

@@ -8,20 +8,20 @@ pub(crate) mod tree;
 
 pub(crate) use range::RangedStyleBuilder;
 
-use alloc::{vec, vec::Vec};
+use alloc::vec;
+use alloc::vec::Vec;
+use core::borrow::Borrow;
+use core::ops::Range;
 
-use crate::inputs::FontContext;
-use crate::inputs::TextStyle;
+use fontique::FamilyId;
+use swash::text::Language;
+
 use crate::inputs::{
-    Brush, FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontVariation, FontWeight,
-    FontWidth, StyleProperty,
+    Brush, FontContext, FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontVariation,
+    FontWeight, FontWidth, StyleProperty, TextStyle,
 };
 use crate::outputs;
 use crate::util::nearly_eq;
-use core::borrow::Borrow;
-use core::ops::Range;
-use fontique::FamilyId;
-use swash::text::Language;
 
 /// Style with an associated range.
 #[derive(Debug, Clone)]

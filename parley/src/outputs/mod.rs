@@ -18,28 +18,21 @@ mod accessibility;
 #[cfg(feature = "accesskit")]
 pub use accessibility::LayoutAccessibility;
 
+pub use self::alignment::Alignment;
+pub use self::cluster::{Affinity, Cluster, ClusterPath, ClusterSide};
+pub use self::cursor::{Cursor, Selection};
+pub use self::layout::Layout;
+pub use self::line::{GlyphRun, Line, PositionedInlineBox, PositionedLayoutItem};
+pub use self::run::{Run, RunMetrics};
+
 pub(crate) use self::alignment::align;
+pub(crate) use self::cluster::ClusterData;
+pub(crate) use self::layout::LayoutData;
+pub(crate) use self::line::{LayoutItem, LayoutItemKind, LineData, LineItemData};
+pub(crate) use self::run::RunData;
 
 use crate::inputs::Brush;
 use swash::GlyphId;
-
-pub use self::{
-    alignment::Alignment,
-    cluster::Cluster,
-    cluster::{Affinity, ClusterPath, ClusterSide},
-    cursor::{Cursor, Selection},
-    layout::Layout,
-    line::Line,
-    line::{GlyphRun, PositionedInlineBox, PositionedLayoutItem},
-    run::Run,
-    run::RunMetrics,
-};
-pub(crate) use self::{
-    cluster::ClusterData,
-    layout::LayoutData,
-    line::{LayoutItem, LayoutItemKind, LineData, LineItemData},
-    run::RunData,
-};
 
 #[derive(Copy, Clone, Default, PartialEq, Debug)]
 pub enum BreakReason {

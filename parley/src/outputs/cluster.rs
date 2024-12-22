@@ -1,11 +1,11 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::outputs::RunData;
-use crate::outputs::{BreakReason, Brush, Glyph, Layout, Line, Run};
-
 use core::ops::Range;
+
 use swash::text::cluster::{ClusterInfo, Whitespace};
+
+use crate::outputs::{BreakReason, Brush, Glyph, Layout, Line, Run, RunData};
 
 /// Atomic unit of text.
 #[derive(Copy, Clone)]

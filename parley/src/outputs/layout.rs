@@ -3,21 +3,19 @@
 
 use alloc::vec::Vec;
 use core::cmp::Ordering;
+
 use swash::shape::Shaper;
 use swash::text::cluster::Boundary;
 use swash::Synthesis;
 
-use crate::inputs::BreakLines;
-use crate::inputs::Brush;
-use crate::{Font, InlineBox};
-
-use crate::outputs::align;
+use crate::inputs::{BreakLines, Brush};
 use crate::outputs::run::RunMetrics;
 use crate::outputs::{
-    Alignment, ClusterData, Glyph, LayoutItem, LayoutItemKind, Line, LineData, LineItemData,
+    align, Alignment, ClusterData, Glyph, LayoutItem, LayoutItemKind, Line, LineData, LineItemData,
     RunData, Style,
 };
 use crate::util::nearly_zero;
+use crate::{Font, InlineBox};
 
 /// Text layout.
 #[derive(Clone)]

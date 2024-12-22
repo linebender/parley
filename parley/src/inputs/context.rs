@@ -3,20 +3,17 @@
 
 //! Context for layout.
 
-use alloc::{vec, vec::Vec};
-
-use crate::algos::bidi;
-use crate::algos::resolve::tree::TreeStyleBuilder;
-use crate::algos::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle};
-use crate::inputs::FontContext;
-use crate::inputs::RangedBuilder;
-use crate::inputs::{Brush, TextStyle};
+use alloc::vec;
+use alloc::vec::Vec;
 
 use swash::shape::ShapeContext;
 use swash::text::cluster::CharInfo;
 
+use crate::algos::bidi;
+use crate::algos::resolve::tree::TreeStyleBuilder;
+use crate::algos::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle};
 use crate::inline_box::InlineBox;
-use crate::inputs::TreeBuilder;
+use crate::inputs::{Brush, FontContext, RangedBuilder, TextStyle, TreeBuilder};
 
 /// Shared scratch space used when constructing text layouts.
 ///

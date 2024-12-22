@@ -3,24 +3,25 @@
 
 //! A simple plain text editor and related types.
 
-use crate::algos::resolve::ResolvedStyle;
-use crate::inputs::Brush;
-use crate::inputs::{FontContext, LayoutContext, StyleProperty, StyleSet};
-use crate::outputs::cursor::{Cursor, Selection};
-use crate::outputs::{Affinity, Alignment, Layout};
-use crate::Rect;
-
-use alloc::{borrow::ToOwned, string::String, vec::Vec};
-
+use alloc::borrow::ToOwned;
+use alloc::string::String;
+use alloc::vec::Vec;
 use core::cmp::PartialEq;
 use core::default::Default;
 use core::fmt::{Debug, Display};
 use core::ops::Range;
 
 #[cfg(feature = "accesskit")]
-use crate::outputs::LayoutAccessibility;
-#[cfg(feature = "accesskit")]
 use accesskit::{Node, NodeId, TreeUpdate};
+
+use crate::algos::resolve::ResolvedStyle;
+use crate::inputs::{Brush, FontContext, LayoutContext, StyleProperty, StyleSet};
+use crate::outputs::cursor::{Cursor, Selection};
+use crate::outputs::{Affinity, Alignment, Layout};
+use crate::Rect;
+
+#[cfg(feature = "accesskit")]
+use crate::outputs::LayoutAccessibility;
 
 /// Opaque representation of a generation.
 ///

@@ -4,9 +4,7 @@
 use core::ops::Range;
 
 use crate::inputs::LineMetrics;
-
-use crate::outputs::{Alignment, LayoutData};
-use crate::outputs::{BreakReason, Brush, Glyph, Layout, Run, Style};
+use crate::outputs::{Alignment, BreakReason, Brush, Glyph, Layout, LayoutData, Run, Style};
 
 /// Line in a text layout.
 #[derive(Copy, Clone)]

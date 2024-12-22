@@ -12,16 +12,15 @@
     reason = "Deferred"
 )]
 
+use std::num::NonZeroUsize;
+use std::sync::Arc;
+
 use accesskit::{Node, Role, Tree, TreeUpdate};
 use anyhow::Result;
 use parley::outputs::editor::Generation;
-use std::num::NonZeroUsize;
-use std::sync::Arc;
-use vello::kurbo;
 use vello::peniko::Color;
 use vello::util::{RenderContext, RenderSurface};
-use vello::wgpu;
-use vello::{AaConfig, Renderer, RendererOptions, Scene};
+use vello::{kurbo, wgpu, AaConfig, Renderer, RendererOptions, Scene};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalPosition, PhysicalSize};
 use winit::event::{StartCause, WindowEvent};

@@ -1,22 +1,21 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::algos::resolve::{RangedStyle, ResolveContext, Resolved};
-use crate::algos::swash_convert::{locale_to_fontique, script_to_fontique, synthesis_to_swash};
-use crate::inputs::{Brush, FontFeature, FontVariation};
-use crate::outputs::Layout;
-use crate::util::nearly_eq;
-use crate::Font;
-use fontique::QueryFamily;
-use fontique::{self, Query, QueryFont};
+use alloc::vec::Vec;
+
+use fontique::{self, Query, QueryFamily, QueryFont};
 use swash::shape::{partition, Direction, ShapeContext};
 use swash::text::cluster::{CharCluster, CharInfo, Token};
 use swash::text::{Language, Script};
 use swash::{FontRef, Synthesis};
 
-use alloc::vec::Vec;
-
+use crate::algos::resolve::{RangedStyle, ResolveContext, Resolved};
+use crate::algos::swash_convert::{locale_to_fontique, script_to_fontique, synthesis_to_swash};
 use crate::inline_box::InlineBox;
+use crate::inputs::{Brush, FontFeature, FontVariation};
+use crate::outputs::Layout;
+use crate::util::nearly_eq;
+use crate::Font;
 
 struct Item {
     style_index: u16,

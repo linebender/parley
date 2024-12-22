@@ -1,8 +1,7 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use alloc::borrow::Cow;
-use alloc::borrow::ToOwned;
+use alloc::borrow::{Cow, ToOwned};
 use core::fmt;
 
 pub use fontique::{FontStyle, FontWeight, FontWidth, GenericFamily};

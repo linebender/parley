@@ -3,11 +3,11 @@
 
 //! Hierarchical tree based style application.
 use alloc::borrow::Cow;
-use alloc::{string::String, vec::Vec};
-
-use crate::inputs::WhiteSpaceCollapse;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 use super::{Brush, RangedStyle, ResolvedProperty, ResolvedStyle};
+use crate::inputs::WhiteSpaceCollapse;
 
 #[derive(Debug, Clone)]
 struct StyleTreeNode<B: Brush> {

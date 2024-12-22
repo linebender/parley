@@ -4,22 +4,19 @@
 //! Greedy line breaking.
 
 use alloc::vec::Vec;
-use swash::text::cluster::Boundary;
-use swash::text::cluster::Whitespace;
+use core::ops::Range;
 
 #[cfg(feature = "libm")]
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
+use swash::text::cluster::{Boundary, Whitespace};
 
-use crate::inputs::Brush;
-use crate::inputs::LineMetrics;
+use crate::inputs::{Brush, LineMetrics};
 use crate::outputs::alignment::unjustify;
 use crate::outputs::{
     Alignment, BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     Run,
 };
-
-use core::ops::Range;
 
 #[derive(Default)]
 struct LineLayout {

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use core::ops::Range;
+
 use peniko::Font;
 use swash::{NormalizedCoord, Synthesis};
 
