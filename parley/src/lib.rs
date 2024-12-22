@@ -22,10 +22,9 @@
 //! See the [examples](https://github.com/linebender/parley/tree/main/examples) directory for more complete usage examples that include rendering.
 //!
 //! ```rust
-//! use parley::{
-//!    Alignment, FontContext, FontWeight, InlineBox, Layout, LayoutContext, PositionedLayoutItem,
-//!    StyleProperty,
-//! };
+//! use parley::InlineBox;
+//! use parley::inputs::{FontContext, FontWeight, LayoutContext, StyleProperty};
+//! use parley::outputs::{Alignment, Layout, PositionedLayoutItem};
 //!
 //! // Create a FontContext (font database) and LayoutContext (scratch space).
 //! // These are both intended to be constructed rarely (perhaps even once per app):
