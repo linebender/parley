@@ -5,8 +5,8 @@ use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
 use alloc::vec::Vec;
 use hashbrown::{HashMap, HashSet};
 
-use crate::inputs::style::Brush;
-use crate::outputs::*;
+use crate::inputs::Brush;
+use crate::outputs::Layout;
 
 #[derive(Clone, Default)]
 pub struct LayoutAccessibility {
