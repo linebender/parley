@@ -18,8 +18,8 @@ workspace = true
 
 [features]
 default = ["system"]
-std = ["fontique/std", "skrifa/std", "peniko/std"]
-libm = ["fontique/libm", "skrifa/libm", "peniko/libm", "dep:core_maths"]
+std = ["fontique/std", "peniko/std", "skrifa/std", "swash/std"]
+libm = ["fontique/libm", "peniko/libm", "skrifa/libm", "swash/libm", "dep:core_maths"]
 # Enables support for system font backends
 system = ["std", "fontique/system"]
 accesskit = ["dep:accesskit"]
