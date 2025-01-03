@@ -3,16 +3,15 @@
 
 //! Context for layout.
 
-use super::context::LayoutContext;
-use super::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
-use super::FontContext;
-
-use super::layout::Layout;
-
 use alloc::string::String;
 use core::ops::RangeBounds;
 
+use crate::algos::shape::shape_text;
 use crate::inline_box::InlineBox;
+use crate::inputs::{
+    Brush, FontContext, LayoutContext, StyleProperty, TextStyle, WhiteSpaceCollapse,
+};
+use crate::outputs::Layout;
 
 /// Builder for constructing a text layout with ranged attributes.
 pub struct RangedBuilder<'a, B: Brush> {
@@ -165,7 +164,7 @@ fn build_into_layout<B: Brush>(
 
     {
         let query = fcx.collection.query(&mut fcx.source_cache);
-        super::shape::shape_text(
+        shape_text(
             &lcx.rcx,
             query,
             &lcx.styles,

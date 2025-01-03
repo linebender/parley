@@ -10,16 +10,16 @@
     reason = "Deferred"
 )]
 
+use std::fs::File;
+
 use image::codecs::png::PngEncoder;
 use image::{self, Pixel, Rgba, RgbaImage};
-use parley::layout::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
-use parley::style::{FontStack, FontWeight, StyleProperty, TextStyle};
-use parley::{FontContext, InlineBox, LayoutContext};
-use std::fs::File;
+use parley::inputs::{FontContext, FontStack, FontWeight, LayoutContext, StyleProperty, TextStyle};
+use parley::outputs::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
+use parley::InlineBox;
 use swash::scale::image::Content;
 use swash::scale::{Render, ScaleContext, Scaler, Source, StrikeWith};
-use swash::zeno;
-use swash::FontRef;
+use swash::{zeno, FontRef};
 use zeno::{Format, Vector};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
