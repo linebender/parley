@@ -111,10 +111,8 @@ jobs:
         with:
           save-if: ${{ github.event_name != 'merge_group' }}
 
-      # TODO: Add --target x86_64-unknown-none to the no_std check once we solve the compilation issues with it.
-      #       https://github.com/linebender/parley/issues/86
       - name: cargo clippy (no_std)
-        run: cargo hack clippy --workspace --locked --optional-deps --each-feature --ignore-unknown-features --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }} -- -D warnings
+        run: cargo hack clippy ${{ env.RUST_MIN_VER_PKGS }} --locked --optional-deps --each-feature --ignore-unknown-features --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }} --target x86_64-unknown-none -- -D warnings
 
       - name: cargo clippy
         run: cargo hack clippy --workspace --locked --optional-deps --each-feature --ignore-unknown-features --features std -- -D warnings
@@ -197,6 +195,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_MIN_VER }}
+          targets: x86_64-unknown-none
 
       - name: install cargo-hack
         uses: taiki-e/install-action@v2
@@ -208,10 +207,8 @@ jobs:
         with:
           save-if: ${{ github.event_name != 'merge_group' }}
 
-      # TODO: Add --target x86_64-unknown-none to the no_std check once we solve the compilation issues with it.
-      #       https://github.com/linebender/parley/issues/86
       - name: cargo check (no_std)
-        run: cargo hack check ${{ env.RUST_MIN_VER_PKGS }} --locked --optional-deps --each-feature --ignore-unknown-features --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }}
+        run: cargo hack check ${{ env.RUST_MIN_VER_PKGS }} --locked --optional-deps --each-feature --ignore-unknown-features --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }} --target x86_64-unknown-none
 
       - name: cargo check
         run: cargo hack check ${{ env.RUST_MIN_VER_PKGS }} --locked --optional-deps --each-feature --ignore-unknown-features --features std
