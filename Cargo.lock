@@ -910,15 +910,6 @@ checksum = "f81ec6369c545a7d40e4589b5597581fa1c441fe1cce96dd1de43159910a36a2"
 
 [[package]]
 name = "font-types"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dda6e36206148f69fc6ecb1bb6c0dedd7ee469f3db1d0dc2045beea28430ca43"
-dependencies = [
- "bytemuck",
-]
-
-[[package]]
-name = "font-types"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "11c3a23a5a151afb1f74ea797f8c300dee41eff9ee3cb1bf94ed316d860c46b3"
@@ -952,7 +943,7 @@ dependencies = [
  "objc2",
  "objc2-foundation",
  "peniko",
- "read-fonts 0.22.3",
+ "read-fonts",
  "roxmltree",
  "smallvec",
  "unicode-script",
@@ -1941,7 +1932,7 @@ dependencies = [
  "fontique",
  "hashbrown 0.15.2",
  "peniko",
- "skrifa 0.22.3",
+ "skrifa",
  "swash",
  "tiny-skia",
 ]
@@ -2163,23 +2154,13 @@ checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
 
 [[package]]
 name = "read-fonts"
-version = "0.22.3"
+version = "0.25.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb94d9ac780fdcf9b6b252253f7d8f221379b84bd3573131139b383df69f85e1"
+checksum = "be4b40e5383c077b9eb19c80c64d47d1369479a136aeae9a23c3ea43e970407b"
 dependencies = [
  "bytemuck",
  "core_maths",
- "font-types 0.7.2",
-]
-
-[[package]]
-name = "read-fonts"
-version = "0.25.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ea267d65fcb21e813c5824611103d18a9d84754a718e3603f60740dce0e3515"
-dependencies = [
- "bytemuck",
- "font-types 0.8.2",
+ "font-types",
 ]
 
 [[package]]
@@ -2330,23 +2311,13 @@ checksum = "d66dc143e6b11c1eddc06d5c423cfc97062865baf299914ab64caa38182078fe"
 
 [[package]]
 name = "skrifa"
-version = "0.22.3"
+version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e1c44ad1f6c5bdd4eefed8326711b7dbda9ea45dfd36068c427d332aa382cbe"
+checksum = "d3a16eb047396452019439e1d6eca13581c141275b7d743f0262f79d65c09c70"
 dependencies = [
  "bytemuck",
  "core_maths",
- "read-fonts 0.22.3",
-]
-
-[[package]]
-name = "skrifa"
-version = "0.26.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79589c6a7f90a81270b6d4ced5c5e8dc77d3064e920adb35315ed79e82fbbe61"
-dependencies = [
- "bytemuck",
- "read-fonts 0.25.1",
+ "read-fonts",
 ]
 
 [[package]]
@@ -2442,11 +2413,12 @@ checksum = "20e16a0f46cf5fd675563ef54f26e83e20f2366bcf027bcb3cc3ed2b98aaf2ca"
 
 [[package]]
 name = "swash"
-version = "0.1.19"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbd59f3f359ddd2c95af4758c18270eddd9c730dde98598023cdabff472c2ca2"
+checksum = "f0e25b48fd1c222c9fdb61148e2203b750f9840c07922fd61b87c6015560b8f6"
 dependencies = [
- "skrifa 0.22.3",
+ "core_maths",
+ "skrifa",
  "yazi",
  "zeno",
 ]
@@ -2457,7 +2429,7 @@ version = "0.1.0"
 dependencies = [
  "image",
  "parley",
- "skrifa 0.22.3",
+ "skrifa",
  "swash",
 ]
 
@@ -2587,7 +2559,7 @@ name = "tiny_skia_render"
 version = "0.1.0"
 dependencies = [
  "parley",
- "skrifa 0.22.3",
+ "skrifa",
  "tiny-skia",
 ]
 
@@ -2712,7 +2684,7 @@ dependencies = [
  "log",
  "peniko",
  "png",
- "skrifa 0.26.1",
+ "skrifa",
  "static_assertions",
  "thiserror 2.0.6",
  "vello_encoding",
@@ -2743,7 +2715,7 @@ dependencies = [
  "bytemuck",
  "guillotiere",
  "peniko",
- "skrifa 0.26.1",
+ "skrifa",
  "smallvec",
 ]
 
@@ -3539,9 +3511,9 @@ checksum = "af4e2e2f7cba5a093896c1e150fbfe177d1883e7448200efb81d40b9d339ef26"
 
 [[package]]
 name = "yazi"
-version = "0.1.6"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c94451ac9513335b5e23d7a8a2b61a7102398b8cca5160829d313e84c9d98be1"
+checksum = "e01738255b5a16e78bbb83e7fbba0a1e7dd506905cfc53f4622d89015a03fbb5"
 
 [[package]]
 name = "yoke"
@@ -3668,9 +3640,12 @@ dependencies = [
 
 [[package]]
 name = "zeno"
-version = "0.2.3"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd15f8e0dbb966fd9245e7498c7e9e5055d9e5c8b676b95bd67091cd11a1e697"
+checksum = "cc0de2315dc13d00e5df3cd6b8d2124a6eaec6a2d4b6a1c5f37b7efad17fcc17"
+dependencies = [
+ "libm",
+]
 
 [[package]]
 name = "zerocopy"
