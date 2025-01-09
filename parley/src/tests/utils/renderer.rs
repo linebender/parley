@@ -7,14 +7,13 @@
 //! Note: Emoji rendering is not currently implemented in this example. See the swash example
 //! if you need emoji rendering.
 
-use crate::{GlyphRun, Layout, PositionedLayoutItem};
-use skrifa::{
-    instance::{LocationRef, NormalizedCoord, Size},
-    outline::{DrawSettings, OutlinePen},
-    raw::FontRef as ReadFontsRef,
-    GlyphId, MetadataProvider, OutlineGlyph,
-};
+use skrifa::instance::{LocationRef, NormalizedCoord, Size};
+use skrifa::outline::{DrawSettings, OutlinePen};
+use skrifa::raw::FontRef as ReadFontsRef;
+use skrifa::{GlyphId, MetadataProvider, OutlineGlyph};
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Rect, Transform};
+
+use crate::outputs::{GlyphRun, Layout, PositionedLayoutItem};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct ColorBrush {
