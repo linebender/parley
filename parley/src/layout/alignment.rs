@@ -27,8 +27,8 @@ pub(crate) fn align<B: Brush>(
         // Compute free space.
         let free_space = alignment_width - line.metrics.advance + line.metrics.trailing_whitespace;
 
-        // Alignment only applies if free_space > 0
-        if free_space <= 0. {
+        // Alignment only applies if free_space is non-zero
+        if free_space == 0.0 {
             continue;
         }
 
@@ -43,6 +43,13 @@ pub(crate) fn align<B: Brush>(
                 line.metrics.offset = free_space * 0.5;
             }
             Alignment::Justified => {
+                // Justified alignment doesn't have any effect if free_space is negative or zero
+                if free_space <= 0.0 {
+                    continue;
+                }
+
+                // Justified alignment doesn't apply to the last line of a paragraph (`BreakReason::None`)
+                // or if there are no whitespace gaps to adjust
                 if line.break_reason == BreakReason::None || line.num_spaces == 0 {
                     continue;
                 }
