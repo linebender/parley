@@ -27,11 +27,6 @@ pub(crate) fn align<B: Brush>(
         // Compute free space.
         let free_space = alignment_width - line.metrics.advance + line.metrics.trailing_whitespace;
 
-        // Alignment only applies if free_space is non-zero
-        if free_space == 0.0 {
-            continue;
-        }
-
         match alignment {
             Alignment::Start => {
                 // Do nothing
