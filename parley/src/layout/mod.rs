@@ -95,6 +95,18 @@ impl<B: Brush> Layout<B> {
         self.data.full_width
     }
 
+    /// Returns the minimum content width of the layout. This is the width of the layout if _all_
+    /// soft line-breaking opportunities are taken.
+    pub fn min_content_width(&self) -> f32 {
+        self.data.min_content_width
+    }
+
+    /// Returns the maximum content width of the layout. This is the width of the layout if _no_
+    /// soft line-breaking opportunities are taken.
+    pub fn max_content_width(&self) -> f32 {
+        self.data.max_content_width
+    }
+
     /// Returns the height of the layout.
     pub fn height(&self) -> f32 {
         self.data.height

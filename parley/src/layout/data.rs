@@ -195,6 +195,8 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) text_len: usize,
     pub(crate) width: f32,
     pub(crate) full_width: f32,
+    pub(crate) min_content_width: f32,
+    pub(crate) max_content_width: f32,
     pub(crate) height: f32,
     pub(crate) fonts: Vec<Font>,
     pub(crate) coords: Vec<i16>,
@@ -223,6 +225,8 @@ impl<B: Brush> Default for LayoutData<B> {
             text_len: 0,
             width: 0.,
             full_width: 0.,
+            min_content_width: 0.,
+            max_content_width: 0.,
             height: 0.,
             fonts: Vec::new(),
             coords: Vec::new(),
@@ -246,6 +250,8 @@ impl<B: Brush> LayoutData<B> {
         self.text_len = 0;
         self.width = 0.;
         self.full_width = 0.;
+        self.min_content_width = 0.;
+        self.max_content_width = 0.;
         self.height = 0.;
         self.fonts.clear();
         self.coords.clear();
@@ -444,6 +450,11 @@ impl<B: Brush> LayoutData<B> {
     }
 
     pub(crate) fn finish(&mut self) {
+        self.apply_spacing();
+        self.calculate_content_widths();
+    }
+
+    fn apply_spacing(&mut self) {
         for run in &self.runs {
             let word = run.word_spacing;
             let letter = run.letter_spacing;
@@ -468,6 +479,45 @@ impl<B: Brush> LayoutData<B> {
                     }
                 }
             }
+        }
+    }
+
+    fn calculate_content_widths(&mut self) {
+        let mut max_width = 0.0;
+        for item in &self.items {
+            match item.kind {
+                LayoutItemKind::TextRun => {
+                    let run = &self.runs[item.index];
+                    let mut min_width = 0.0;
+                    let mut trailing_whitespace = 0.0;
+                    for cluster in &self.clusters[run.cluster_range.clone()] {
+                        let boundary = cluster.info.boundary();
+                        if matches!(boundary, Boundary::Line | Boundary::Mandatory) {
+                            self.min_content_width =
+                                self.min_content_width.max(min_width - trailing_whitespace);
+                            min_width = 0.0;
+                            if boundary == Boundary::Mandatory {
+                                max_width = 0.0;
+                            }
+                        }
+                        min_width += cluster.advance;
+                        trailing_whitespace = if cluster.info.whitespace().is_space_or_nbsp() {
+                            cluster.advance
+                        } else {
+                            0.0
+                        };
+                    }
+                    self.min_content_width =
+                        self.min_content_width.max(min_width - trailing_whitespace);
+                    max_width += run.advance - trailing_whitespace;
+                }
+                LayoutItemKind::InlineBox => {
+                    let ibox = &self.inline_boxes[item.index];
+                    self.min_content_width = self.min_content_width.max(ibox.width);
+                    max_width += ibox.width;
+                }
+            }
+            self.max_content_width = self.max_content_width.max(max_width);
         }
     }
 }
