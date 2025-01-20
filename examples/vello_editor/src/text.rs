@@ -419,11 +419,6 @@ impl Editor {
                 let glyph_xform = synthesis
                     .skew()
                     .map(|angle| Affine::skew(angle.to_radians().tan() as f64, 0.0));
-                let coords = run
-                    .normalized_coords()
-                    .iter()
-                    .map(|coord| vello::skrifa::instance::NormalizedCoord::from_bits(*coord))
-                    .collect::<Vec<_>>();
                 scene
                     .draw_glyphs(font)
                     .brush(&style.brush)
@@ -431,7 +426,7 @@ impl Editor {
                     .transform(transform)
                     .glyph_transform(glyph_xform)
                     .font_size(font_size)
-                    .normalized_coords(&coords)
+                    .normalized_coords(run.normalized_coords())
                     .draw(
                         Fill::NonZero,
                         glyph_run.glyphs().map(|glyph| {

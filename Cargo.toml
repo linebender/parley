@@ -78,11 +78,11 @@ clippy.wildcard_dependencies = "warn"
 
 [workspace.dependencies]
 accesskit = "0.17"
-bytemuck = { version = "1.20.0", default-features = false }
+bytemuck = { version = "1.21.0", default-features = false }
 fontique = { version = "0.2.0", default-features = false, path = "fontique" }
 hashbrown = "0.15.2"
 parley = { version = "0.2.0", default-features = false, path = "parley" }
-peniko = { version = "0.3.0", default-features = false }
-skrifa = { version = "0.26.2", default-features = false }
-read-fonts = { version = "0.25.2", default-features = false }
+peniko = { version = "0.3.1", default-features = false }
+skrifa = { version = "0.26.4", default-features = false }
+read-fonts = { version = "0.25.3", default-features = false }
 swash = { version = "0.2.0", default-features = false }

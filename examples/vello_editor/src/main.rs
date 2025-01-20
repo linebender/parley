@@ -308,7 +308,7 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
                         &self.scene,
                         &surface_texture,
                         &vello::RenderParams {
-                            base_color: Color::from_rgba8(30, 30, 30, 255), // Background color
+                            base_color: Color::from_rgb8(30, 30, 30), // Background color
                             width,
                             height,
                             antialiasing_method: AaConfig::Area,
