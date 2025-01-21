@@ -1,14 +1,18 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::tests::utils::renderer::{render_layout, ColorBrush, RenderingConfig};
-use crate::{
-    FontContext, FontFamily, FontStack, Layout, LayoutContext, PlainEditor, PlainEditorDriver,
-    RangedBuilder, Rect, StyleProperty,
-};
-use fontique::{Collection, CollectionOptions};
 use std::path::{Path, PathBuf};
+
+use fontique::{Collection, CollectionOptions};
 use tiny_skia::{Color, Pixmap};
+
+use crate::editing::{PlainEditor, PlainEditorDriver};
+use crate::inputs::{
+    FontContext, FontFamily, FontStack, LayoutContext, RangedBuilder, StyleProperty,
+};
+use crate::outputs::Layout;
+use crate::tests::utils::renderer::{render_layout, ColorBrush, RenderingConfig};
+use crate::Rect;
 
 // Creates a new instance of TestEnv and put current function name in constructor
 #[macro_export]

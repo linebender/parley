@@ -1,8 +1,7 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use alloc::borrow::Cow;
-use alloc::borrow::ToOwned;
+use alloc::borrow::{Cow, ToOwned};
 use core::fmt;
 
 pub use fontique::{FontStyle, FontWeight, FontWidth, GenericFamily};
@@ -44,8 +43,8 @@ impl<'a> FontFamily<'a> {
     /// ```
     /// # extern crate alloc;
     /// use alloc::borrow::Cow;
-    /// use parley::style::FontFamily::{self, *};
-    /// use parley::style::GenericFamily::*;
+    /// use parley::inputs::FontFamily::{self, *};
+    /// use parley::inputs::GenericFamily::*;
     ///
     /// assert_eq!(FontFamily::parse("Palatino Linotype"), Some(Named(Cow::Borrowed("Palatino Linotype"))));
     /// assert_eq!(FontFamily::parse("monospace"), Some(Generic(Monospace)));
@@ -64,8 +63,8 @@ impl<'a> FontFamily<'a> {
     /// ```
     /// # extern crate alloc;
     /// use alloc::borrow::Cow;
-    /// use parley::style::FontFamily::{self, *};
-    /// use parley::style::GenericFamily::*;
+    /// use parley::inputs::FontFamily::{self, *};
+    /// use parley::inputs::GenericFamily::*;
     ///
     /// let source = "Arial, 'Times New Roman', serif";
     ///

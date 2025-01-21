@@ -1,190 +1,26 @@
-// Copyright 2021 the Parley Authors
+// Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::inline_box::InlineBox;
-use crate::layout::{Alignment, Glyph, LineMetrics, RunMetrics, Style};
-use crate::style::Brush;
-use crate::util::nearly_zero;
-use crate::Font;
-use core::ops::Range;
+use alloc::vec::Vec;
+use core::cmp::Ordering;
+
 use swash::shape::Shaper;
-use swash::text::cluster::{Boundary, ClusterInfo};
+use swash::text::cluster::Boundary;
 use swash::Synthesis;
 
-use alloc::vec::Vec;
+use crate::inputs::{BreakLines, Brush};
+use crate::outputs::run::RunMetrics;
+use crate::outputs::{
+    align, Alignment, ClusterData, Glyph, LayoutItem, LayoutItemKind, Line, LineData, LineItemData,
+    RunData, Style,
+};
+use crate::util::nearly_zero;
+use crate::{Font, InlineBox};
 
-#[derive(Copy, Clone)]
-pub(crate) struct ClusterData {
-    pub(crate) info: ClusterInfo,
-    pub(crate) flags: u16,
-    pub(crate) style_index: u16,
-    pub(crate) glyph_len: u8,
-    pub(crate) text_len: u8,
-    /// If `glyph_len == 0xFF`, then `glyph_offset` is a glyph identifier,
-    /// otherwise, it's an offset into the glyph array with the base
-    /// taken from the owning run.
-    pub(crate) glyph_offset: u16,
-    pub(crate) text_offset: u16,
-    pub(crate) advance: f32,
-}
-
-impl ClusterData {
-    pub(crate) const LIGATURE_START: u16 = 1;
-    pub(crate) const LIGATURE_COMPONENT: u16 = 2;
-    pub(crate) const DIVERGENT_STYLES: u16 = 4;
-
-    pub(crate) fn is_ligature_start(self) -> bool {
-        self.flags & Self::LIGATURE_START != 0
-    }
-
-    pub(crate) fn is_ligature_component(self) -> bool {
-        self.flags & Self::LIGATURE_COMPONENT != 0
-    }
-
-    pub(crate) fn has_divergent_styles(self) -> bool {
-        self.flags & Self::DIVERGENT_STYLES != 0
-    }
-
-    pub(crate) fn text_range(self, run: &RunData) -> Range<usize> {
-        let start = run.text_range.start + self.text_offset as usize;
-        start..start + self.text_len as usize
-    }
-}
-
+/// Text layout.
 #[derive(Clone)]
-pub(crate) struct RunData {
-    /// Index of the font for the run.
-    pub(crate) font_index: usize,
-    /// Font size.
-    pub(crate) font_size: f32,
-    /// Synthesis information for the font.
-    pub(crate) synthesis: Synthesis,
-    /// Range of normalized coordinates in the layout data.
-    pub(crate) coords_range: Range<usize>,
-    /// Range of the source text.
-    pub(crate) text_range: Range<usize>,
-    /// Bidi level for the run.
-    pub(crate) bidi_level: u8,
-    /// True if the run ends with a newline.
-    pub(crate) ends_with_newline: bool,
-    /// Range of clusters.
-    pub(crate) cluster_range: Range<usize>,
-    /// Base for glyph indices.
-    pub(crate) glyph_start: usize,
-    /// Metrics for the run.
-    pub(crate) metrics: RunMetrics,
-    /// Additional word spacing.
-    pub(crate) word_spacing: f32,
-    /// Additional letter spacing.
-    pub(crate) letter_spacing: f32,
-    /// Total advance of the run.
-    pub(crate) advance: f32,
-}
-
-#[derive(Copy, Clone, Default, PartialEq, Debug)]
-pub enum BreakReason {
-    #[default]
-    None,
-    Regular,
-    Explicit,
-    Emergency,
-}
-
-#[derive(Clone, Default)]
-pub(crate) struct LineData {
-    /// Range of the source text.
-    pub(crate) text_range: Range<usize>,
-    /// Range of line items.
-    pub(crate) item_range: Range<usize>,
-    /// Metrics for the line.
-    pub(crate) metrics: LineMetrics,
-    /// The cause of the line break.
-    pub(crate) break_reason: BreakReason,
-    /// Alignment.
-    pub(crate) alignment: Alignment,
-    /// Maximum advance for the line.
-    pub(crate) max_advance: f32,
-    /// Number of justified clusters on the line.
-    pub(crate) num_spaces: usize,
-}
-
-impl LineData {
-    pub(crate) fn size(&self) -> f32 {
-        self.metrics.ascent + self.metrics.descent + self.metrics.leading
-    }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct LineItemData {
-    /// Whether the item is a run or an inline box
-    pub(crate) kind: LayoutItemKind,
-    /// The index of the run or inline box in the runs or `inline_boxes` vec
-    pub(crate) index: usize,
-    /// Bidi level for the item (used for reordering)
-    pub(crate) bidi_level: u8,
-    /// Advance (size in direction of text flow) for the run.
-    pub(crate) advance: f32,
-
-    // Fields that only apply to text runs (Ignored for boxes)
-    // TODO: factor this out?
-    /// True if the run is composed entirely of whitespace.
-    pub(crate) is_whitespace: bool,
-    /// True if the run ends in whitespace.
-    pub(crate) has_trailing_whitespace: bool,
-    /// Range of the source text.
-    pub(crate) text_range: Range<usize>,
-    /// Range of clusters.
-    pub(crate) cluster_range: Range<usize>,
-}
-
-impl LineItemData {
-    pub(crate) fn is_text_run(&self) -> bool {
-        self.kind == LayoutItemKind::TextRun
-    }
-
-    pub(crate) fn compute_line_height<B: Brush>(&self, layout: &LayoutData<B>) -> f32 {
-        match self.kind {
-            LayoutItemKind::TextRun => {
-                let mut line_height = 0_f32;
-                let run = &layout.runs[self.index];
-                let glyph_start = run.glyph_start;
-                for cluster in &layout.clusters[run.cluster_range.clone()] {
-                    if cluster.glyph_len != 0xFF && cluster.has_divergent_styles() {
-                        let start = glyph_start + cluster.glyph_offset as usize;
-                        let end = start + cluster.glyph_len as usize;
-                        for glyph in &layout.glyphs[start..end] {
-                            line_height =
-                                line_height.max(layout.styles[glyph.style_index()].line_height);
-                        }
-                    } else {
-                        line_height = line_height
-                            .max(layout.styles[cluster.style_index as usize].line_height);
-                    }
-                }
-                line_height
-            }
-            LayoutItemKind::InlineBox => {
-                // TODO: account for vertical alignment (e.g. baseline alignment)
-                layout.inline_boxes[self.index].height
-            }
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum LayoutItemKind {
-    TextRun,
-    InlineBox,
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct LayoutItem {
-    /// Whether the item is a run or an inline box
-    pub(crate) kind: LayoutItemKind,
-    /// The index of the run or inline box in the runs or `inline_boxes` vec
-    pub(crate) index: usize,
-    /// Bidi level for the item (used for reordering)
-    pub(crate) bidi_level: u8,
+pub struct Layout<B: Brush> {
+    pub(crate) data: LayoutData<B>,
 }
 
 #[derive(Clone)]
@@ -468,6 +304,154 @@ impl<B: Brush> LayoutData<B> {
                     }
                 }
             }
+        }
+    }
+}
+
+impl<B: Brush> Layout<B> {
+    /// Creates an empty layout.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Returns the scale factor provided when creating the layout.
+    pub fn scale(&self) -> f32 {
+        self.data.scale
+    }
+
+    /// Returns the style collection for the layout.
+    pub fn styles(&self) -> &[Style<B>] {
+        &self.data.styles
+    }
+
+    /// Returns the width of the layout.
+    pub fn width(&self) -> f32 {
+        self.data.width
+    }
+
+    /// Returns the width of the layout, including the width of any trailing
+    /// whitespace.
+    pub fn full_width(&self) -> f32 {
+        self.data.full_width
+    }
+
+    /// Returns the height of the layout.
+    pub fn height(&self) -> f32 {
+        self.data.height
+    }
+
+    /// Returns the number of lines in the layout.
+    pub fn len(&self) -> usize {
+        self.data.lines.len()
+    }
+
+    /// Returns `true` if the layout is empty.
+    pub fn is_empty(&self) -> bool {
+        self.data.lines.is_empty()
+    }
+
+    /// Returns the line at the specified index.
+    pub fn get(&self, index: usize) -> Option<Line<'_, B>> {
+        Some(Line {
+            index: index as u32,
+            layout: self,
+            data: self.data.lines.get(index)?,
+        })
+    }
+
+    /// Returns true if the dominant direction of the layout is right-to-left.
+    pub fn is_rtl(&self) -> bool {
+        self.data.base_level & 1 != 0
+    }
+
+    pub fn inline_boxes(&self) -> &[InlineBox] {
+        &self.data.inline_boxes
+    }
+
+    pub fn inline_boxes_mut(&mut self) -> &mut [InlineBox] {
+        &mut self.data.inline_boxes
+    }
+
+    /// Returns an iterator over the lines in the layout.
+    pub fn lines(&self) -> impl Iterator<Item = Line<'_, B>> + '_ + Clone {
+        self.data
+            .lines
+            .iter()
+            .enumerate()
+            .map(move |(index, data)| Line {
+                index: index as u32,
+                layout: self,
+                data,
+            })
+    }
+
+    /// Returns line breaker to compute lines for the layout.
+    pub fn break_lines(&mut self) -> BreakLines<'_, B> {
+        BreakLines::new(self)
+    }
+
+    /// Breaks all lines with the specified maximum advance.
+    pub fn break_all_lines(&mut self, max_advance: Option<f32>) {
+        self.break_lines()
+            .break_remaining(max_advance.unwrap_or(f32::MAX));
+    }
+
+    // Apply to alignment to layout relative to the specified container width. If container_width is not
+    // specified then the max line length is used.
+    pub fn align(&mut self, container_width: Option<f32>, alignment: Alignment) {
+        align(&mut self.data, container_width, alignment);
+    }
+
+    /// Returns the index and `Line` object for the line containing the
+    /// given byte `index` in the source text.
+    pub(crate) fn line_for_byte_index(&self, index: usize) -> Option<(usize, Line<'_, B>)> {
+        let line_index = self
+            .data
+            .lines
+            .binary_search_by(|line| {
+                if index < line.text_range.start {
+                    Ordering::Greater
+                } else if index >= line.text_range.end {
+                    Ordering::Less
+                } else {
+                    Ordering::Equal
+                }
+            })
+            .ok()?;
+        Some((line_index, self.get(line_index)?))
+    }
+
+    /// Returns the index and `Line` object for the line containing the
+    /// given `offset`.
+    ///
+    /// The offset is specified in the direction orthogonal to line direction.
+    /// For horizontal text, this is a vertical or y offset. If the offset is
+    /// on a line boundary, it is considered to be contained by the later line.
+    pub(crate) fn line_for_offset(&self, offset: f32) -> Option<(usize, Line<'_, B>)> {
+        if offset < 0.0 {
+            return Some((0, self.get(0)?));
+        }
+        let maybe_line_index = self.data.lines.binary_search_by(|line| {
+            if offset < line.metrics.min_coord {
+                Ordering::Greater
+            } else if offset >= line.metrics.max_coord {
+                Ordering::Less
+            } else {
+                Ordering::Equal
+            }
+        });
+        let line_index = match maybe_line_index {
+            Ok(index) => index,
+            Err(index) => index.saturating_sub(1),
+        };
+        Some((line_index, self.get(line_index)?))
+    }
+}
+
+impl<B: Brush> Default for Layout<B> {
+    fn default() -> Self {
+        Self {
+            data: Default::default(),
         }
     }
 }
