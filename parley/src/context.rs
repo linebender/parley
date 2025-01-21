@@ -109,7 +109,7 @@ impl<B: Brush> LayoutContext<B> {
             self.bidi.resolve(
                 text.chars()
                     .zip(self.info.iter().map(|info| info.0.bidi_class())),
-                Some(0),
+                None,
             );
         }
     }
