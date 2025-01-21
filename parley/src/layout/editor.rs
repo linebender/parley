@@ -1038,7 +1038,11 @@ where
         }
         self.layout = builder.build(&self.buffer);
         self.layout.break_all_lines(self.width);
-        self.layout.align(self.width, self.alignment);
+        self.layout.align(
+            self.width,
+            self.alignment,
+            false, /* align_when_overflowing */
+        );
         self.selection = self.selection.refresh(&self.layout);
         self.layout_dirty = false;
         self.generation.nudge();

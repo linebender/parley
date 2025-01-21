@@ -165,7 +165,11 @@ fn main() {
 
     // Perform layout (including bidi resolution and shaping) with start alignment
     layout.break_all_lines(max_advance);
-    layout.align(max_advance, Alignment::Start);
+    layout.align(
+        max_advance,
+        Alignment::Start,
+        false, /* align_when_overflowing */
+    );
 
     // Create image to render into
     let width = layout.width().ceil() as u32 + (padding * 2);

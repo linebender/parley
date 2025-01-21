@@ -144,8 +144,22 @@ impl<B: Brush> Layout<B> {
 
     // Apply to alignment to layout relative to the specified container width. If container_width is not
     // specified then the max line length is used.
-    pub fn align(&mut self, container_width: Option<f32>, alignment: Alignment) {
-        align(&mut self.data, container_width, alignment);
+    //
+    // If `align_when_overflowing` is set to `true` then `Center` and `End` alignment will apply even if
+    // the line contents are wider than the `container_width`. If it is set to `false` then all overflowing
+    // lines will be `Start` aligned.
+    pub fn align(
+        &mut self,
+        container_width: Option<f32>,
+        alignment: Alignment,
+        align_when_overflowing: bool,
+    ) {
+        align(
+            &mut self.data,
+            container_width,
+            alignment,
+            align_when_overflowing,
+        );
     }
 
     /// Returns the index and `Line` object for the line containing the

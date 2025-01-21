@@ -8,6 +8,7 @@ pub(crate) fn align<B: Brush>(
     layout: &mut LayoutData<B>,
     alignment_width: Option<f32>,
     alignment: Alignment,
+    align_when_overflowing: bool,
 ) {
     let alignment_width = alignment_width.unwrap_or_else(|| {
         let max_line_length = layout
@@ -26,6 +27,10 @@ pub(crate) fn align<B: Brush>(
 
         // Compute free space.
         let free_space = alignment_width - line.metrics.advance + line.metrics.trailing_whitespace;
+
+        if !align_when_overflowing && free_space <= 0.0 {
+            continue;
+        }
 
         match alignment {
             Alignment::Start => {
