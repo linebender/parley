@@ -1,6 +1,9 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use tiny_skia::{Color, Pixmap, PixmapPaint, Transform};
+
+use crate::tests::utils::renderer::{render_layout, ColorBrush, RenderingConfig};
 use crate::{Affinity, Cursor, FontContext, Layout, LayoutContext};
 
 // Note: This module is only compiled when running tests, which requires std,
@@ -35,13 +38,15 @@ use crate::{Affinity, Cursor, FontContext, Layout, LayoutContext};
 /// screenshot tests (readers shouldn't need to open a screenshot file).
 pub(crate) struct CursorTest {
     text: String,
-    layout: Layout<()>,
+    layout: Layout<ColorBrush>,
 }
+
+const CURSOR_WIDTH: f32 = 2.0;
 
 impl CursorTest {
     pub(crate) fn single_line(
         text: &str,
-        lcx: &mut LayoutContext<()>,
+        lcx: &mut LayoutContext<ColorBrush>,
         fcx: &mut FontContext,
     ) -> Self {
         let mut builder = lcx.ranged_builder(fcx, text, 1.0);
@@ -64,7 +69,7 @@ impl CursorTest {
     }
 
     /// Returns the layout that was created from the text.
-    pub(crate) fn layout(&self) -> &Layout<()> {
+    pub(crate) fn layout(&self) -> &Layout<ColorBrush> {
         &self.layout
     }
 
@@ -178,19 +183,84 @@ impl CursorTest {
         // If it does, we should still print the text on a best effort basis, but
         // without visual cursors and with a warning that the text may not be accurate.
 
-        // We may also render the text to an image, with the cursor highlighted, and
-        // save it to a temporary file, or even print it to the terminal (if the
-        // terminal supports images).
-        // The image would NOT be used for screenshot testing, but it would be useful for
-        // debugging.
+        let bg_color_expected = Color::from_rgba8(255, 255, 255, 255);
+        let cursor_color_expected = Color::from_rgba8(0, 255, 0, 255);
+        let selection_color_expected = Color::from_rgba8(0, 255, 0, 200);
+        let bg_color_actual = Color::from_rgba8(230, 230, 230, 255);
+        let cursor_color_actual = Color::from_rgba8(255, 0, 0, 255);
+        let selection_color_actual = Color::from_rgba8(255, 0, 0, 200);
+
+        let rendering_config_expected = RenderingConfig {
+            background_color: bg_color_expected,
+            inline_box_color: bg_color_expected,
+            cursor_color: cursor_color_expected,
+            selection_color: selection_color_expected,
+        };
+        let rendering_config_actual = RenderingConfig {
+            background_color: bg_color_actual,
+            inline_box_color: bg_color_actual,
+            cursor_color: cursor_color_actual,
+            selection_color: selection_color_actual,
+        };
+
+        let rect_expected = expected.geometry(&self.layout, CURSOR_WIDTH);
+        let rect_actual = actual.geometry(&self.layout, CURSOR_WIDTH);
+
+        let img_expected = render_layout(
+            &rendering_config_expected,
+            &self.layout,
+            Some(rect_expected),
+            &[],
+        );
+        let img_actual = render_layout(
+            &rendering_config_actual,
+            &self.layout,
+            Some(rect_actual),
+            &[],
+        );
+
+        assert_eq!(img_expected.width(), img_actual.width());
+        assert_eq!(img_expected.height(), img_actual.height());
+
+        let mut full_img = Pixmap::new(img_actual.width(), img_actual.height() * 2).unwrap();
+        full_img.draw_pixmap(
+            0,
+            0,
+            img_expected.as_ref(),
+            &PixmapPaint::default(),
+            Transform::identity(),
+            None,
+        );
+        full_img.draw_pixmap(
+            0,
+            img_expected.height() as i32,
+            img_actual.as_ref(),
+            &PixmapPaint::default(),
+            Transform::identity(),
+            None,
+        );
+
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let screenshot_path = std::env::temp_dir().join(format!("parley-{timestamp:016}.png"));
+
+        // TODO - If possible, display the image in the terminal using Kitty Image Protocol
+        // https://sw.kovidgoyal.net/kitty/graphics-protocol/
+        // (probably with kitty_image crate)
+        full_img.save_png(&screenshot_path).unwrap();
 
         panic!(
             concat!(
+                "-----------\n",
                 "cursor assertion failed\n",
                 "  expected: '{text}' - ({expected_index}, {expected_affinity:?})\n",
                 "            {expected_cursor}\n",
                 "       got: '{text}' - ({actual_index}, {actual_affinity:?})\n",
                 "            {actual_cursor}\n",
+                "screenshot saved in '{screenshot_path}'\n",
+                "-----------\n",
             ),
             text = self.text,
             expected_index = expected.index(),
@@ -199,6 +269,7 @@ impl CursorTest {
             actual_affinity = actual.affinity(),
             expected_cursor = self.cursor_to_monospace(expected, true),
             actual_cursor = self.cursor_to_monospace(actual, false),
+            screenshot_path = screenshot_path.display(),
         );
     }
 
@@ -270,8 +341,48 @@ impl CursorTest {
         );
     }
 
-    // TODO - Add a render_cursor method that creates an image of the text, with
-    // the cursor highlighted. See comment in `cursor_assertion()` for details.
+    /// Renders the text this object was created with, with the cursor highlighted, and saves it to a temp file.
+    ///
+    /// Uses the same visual format as assertion failures.
+    #[track_caller]
+    #[allow(clippy::print_stderr)]
+    #[allow(dead_code)]
+    pub(crate) fn render_cursor(&self, cursor: Cursor) {
+        let bg_color_cursor = Color::from_rgba8(255, 255, 255, 255);
+        let cursor_color_cursor = Color::from_rgba8(0, 255, 0, 255);
+        let selection_color_cursor = Color::from_rgba8(0, 255, 0, 200);
+
+        let rendering_config_cursor = RenderingConfig {
+            background_color: bg_color_cursor,
+            inline_box_color: bg_color_cursor,
+            cursor_color: cursor_color_cursor,
+            selection_color: selection_color_cursor,
+        };
+
+        let rect_cursor = cursor.geometry(&self.layout, CURSOR_WIDTH);
+
+        let img_cursor = render_layout(
+            &rendering_config_cursor,
+            &self.layout,
+            Some(rect_cursor),
+            &[],
+        );
+
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let screenshot_path = std::env::temp_dir().join(format!("parley-{timestamp:016}.png"));
+
+        // TODO - If possible, display the image in the terminal,
+        // see comment in cursor_assertion
+        img_cursor.save_png(&screenshot_path).unwrap();
+
+        eprintln!(
+            "screenshot saved in '{screenshot_path}'\n",
+            screenshot_path = screenshot_path.display(),
+        );
+    }
 }
 
 // ---
