@@ -61,7 +61,7 @@ pub(crate) fn align<B: Brush>(
                     .filter(|item| item.is_text_run())
                 {
                     // Iterate over clusters in the run
-                    //   - Iterate forwards for even bidi levels (which represent RTL runs)
+                    //   - Iterate forwards for even bidi levels (which represent LTR runs)
                     //   - Iterate backwards for odd bidi levels (which represent RTL runs)
                     let clusters = &mut layout.clusters[line_item.cluster_range.clone()];
                     let bidi_level_is_odd = line_item.bidi_level & 1 != 0;
