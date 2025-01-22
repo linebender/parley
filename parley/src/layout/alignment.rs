@@ -8,6 +8,7 @@ pub(crate) fn align<B: Brush>(
     layout: &mut LayoutData<B>,
     alignment_width: Option<f32>,
     alignment: Alignment,
+    align_when_overflowing: bool,
 ) {
     let alignment_width = alignment_width.unwrap_or_else(|| {
         let max_line_length = layout
@@ -27,8 +28,7 @@ pub(crate) fn align<B: Brush>(
         // Compute free space.
         let free_space = alignment_width - line.metrics.advance + line.metrics.trailing_whitespace;
 
-        // Alignment only applies if free_space > 0
-        if free_space <= 0. {
+        if !align_when_overflowing && free_space <= 0.0 {
             continue;
         }
 
@@ -43,6 +43,13 @@ pub(crate) fn align<B: Brush>(
                 line.metrics.offset = free_space * 0.5;
             }
             Alignment::Justified => {
+                // Justified alignment doesn't have any effect if free_space is negative or zero
+                if free_space <= 0.0 {
+                    continue;
+                }
+
+                // Justified alignment doesn't apply to the last line of a paragraph (`BreakReason::None`)
+                // or if there are no whitespace gaps to adjust
                 if line.break_reason == BreakReason::None || line.num_spaces == 0 {
                     continue;
                 }

@@ -99,7 +99,11 @@ fn main() {
 
     // Perform layout (including bidi resolution and shaping) with start alignment
     layout.break_all_lines(max_advance);
-    layout.align(max_advance, Alignment::Start);
+    layout.align(
+        max_advance,
+        Alignment::Start,
+        false, /* align_when_overflowing */
+    );
     let width = layout.width().ceil() as u32;
     let height = layout.height().ceil() as u32;
     let padded_width = width + padding * 2;

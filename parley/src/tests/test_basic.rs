@@ -11,7 +11,11 @@ fn plain_multiline_text() {
     let mut builder = env.builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(None, Alignment::Start);
+    layout.align(
+        None,
+        Alignment::Start,
+        false, /* align_when_overflowing */
+    );
 
     env.check_layout_snapshot(&layout);
 }
@@ -36,7 +40,11 @@ fn placing_inboxes() {
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start);
+        layout.align(
+            None,
+            Alignment::Start,
+            false, /* align_when_overflowing */
+        );
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
@@ -57,7 +65,11 @@ fn only_inboxes_wrap() {
     }
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(40.0));
-    layout.align(None, Alignment::Middle);
+    layout.align(
+        None,
+        Alignment::Middle,
+        false, /* align_when_overflowing */
+    );
 
     env.check_layout_snapshot(&layout);
 }
