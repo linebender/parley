@@ -828,7 +828,6 @@ fn try_commit_line<B: Brush>(
     state.num_spaces = 0;
     if committed_text_run {
         state.clusters.start = state.clusters.end;
-        state.clusters.end += 1;
     }
 
     state.items.start = match last_item_kind {
