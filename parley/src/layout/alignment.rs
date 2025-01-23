@@ -10,6 +10,8 @@ pub(crate) fn align<B: Brush>(
     alignment: Alignment,
     align_when_overflowing: bool,
 ) {
+    // Whether the text base direction is right-to-left.
+    let is_rtl = layout.base_level & 1 == 1;
     let alignment_width = alignment_width.unwrap_or_else(|| {
         let max_line_length = layout
             .lines
@@ -32,17 +34,17 @@ pub(crate) fn align<B: Brush>(
             continue;
         }
 
-        match alignment {
-            Alignment::Start => {
+        match (alignment, is_rtl) {
+            (Alignment::Left, _) | (Alignment::Start, false) | (Alignment::End, true) => {
                 // Do nothing
             }
-            Alignment::End => {
+            (Alignment::Right, _) | (Alignment::Start, true) | (Alignment::End, false) => {
                 line.metrics.offset = free_space;
             }
-            Alignment::Middle => {
+            (Alignment::Middle, _) => {
                 line.metrics.offset = free_space * 0.5;
             }
-            Alignment::Justified => {
+            (Alignment::Justified, _) => {
                 // Justified alignment doesn't have any effect if free_space is negative or zero
                 if free_space <= 0.0 {
                     continue;
