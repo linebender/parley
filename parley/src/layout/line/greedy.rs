@@ -696,8 +696,6 @@ fn try_commit_line<B: Brush>(
     alignment: Alignment,
     break_reason: BreakReason,
 ) -> bool {
-    let is_empty = layout.data.text_len == 0;
-
     // Ensure that the cluster and item endpoints are within range
     state.clusters.end = state.clusters.end.min(layout.data.clusters.len());
     state.items.end = state.items.end.min(layout.data.items.len());
@@ -760,12 +758,7 @@ fn try_commit_line<B: Brush>(
                     cluster_range.end = state.clusters.end;
                 }
 
-                let overlap = run_data.cluster_range.contains(&cluster_range.start)
-                    && run_data.cluster_range.contains(&(cluster_range.end - 1));
-                if cluster_range.start > cluster_range.end
-                    || (!is_empty && cluster_range.start == cluster_range.end)
-                    || !overlap
-                {
+                if cluster_range.start >= run_data.cluster_range.end {
                     // println!("INVALID CLUSTER");
                     // dbg!(&run_data.text_range);
                     // dbg!(cluster_range);
