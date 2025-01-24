@@ -215,12 +215,11 @@ jobs:
 
       - name: cargo nextest
         run: cargo nextest run --workspace --locked --all-features --no-fail-fast
-        env:
+        # env:
           # Although GitHub's LFS limits are very low, we don't expect to run out of bandwidth.
           # However, if we do, the tests are designed to be robust against that, if this environment variable is set.
-          # If we do run out of bandwidth, uncomment the following line and inform @DJMcNab.
+          # If we do run out of bandwidth, uncomment both `# env:` above and the following line, and inform @DJMcNab.
           # PARLEY_IGNORE_DECODING_ERRORS: 1
-          ~
 
       - name: cargo test --doc
         run: cargo test --doc --workspace --locked --all-features --no-fail-fast
