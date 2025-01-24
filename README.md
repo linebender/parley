@@ -62,13 +62,10 @@ This part of Swash is now superseded by Skrifa: the implementation in Skrifa is 
 
 ### Parley
 
-Parley itself does text layout.
+Parley itself does text layout and includes utilities for text selection and editing.
 
 **Text layout** means computing x/y coordinates for each glyph in a string of text.
 Besides what the other libraries do, this involves things like determining a glyph's size, line breaking, and bidi resolution.
-
-In the future, Parley will likely also implement text selection and text editing helpers.
-
 
 ## Minimum supported Rust Version (MSRV)
 
