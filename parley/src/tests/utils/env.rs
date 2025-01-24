@@ -190,8 +190,20 @@ impl TestEnv {
         if !snapshot_path.is_file() {
             return Err(format!("Cannot find snapshot {}", snapshot_path.display()));
         }
-        let snapshot_img = Pixmap::load_png(snapshot_path)
-            .map_err(|_| format!("Loading snapshot {} failed", snapshot_path.display()))?;
+        let snapshot_img = match Pixmap::load_png(snapshot_path) {
+            Ok(snapshot_img) => snapshot_img,
+            Err(d) => {
+                if std::env::var("PARLEY_IGNORE_DECODING_ERRORS").is_ok() {
+                    return Ok(());
+                }
+                return Err(format!(
+                    "Loading snapshot {} failed due to decoding error {d}.\n\
+                    If this file is an LFS file, install git lfs (https://git-lfs.com/) and run `git lfs pull`.\n\
+                    If that fails (due to e.g. a lack of bandwidth), rerun tests with `PARLEY_IGNORE_DECODING_ERRORS=1` to skip this test.",
+                    snapshot_path.display()
+                ))?;
+            }
+        };
         if snapshot_img.width() != current_img.width()
             || snapshot_img.height() != current_img.height()
         {
