@@ -78,7 +78,13 @@ impl<B: Brush> TreeStyleBuilder<B> {
             WhiteSpaceCollapse::Collapse => {
                 let mut span_text = self.uncommitted_text.as_str();
 
-                if self.is_span_first {
+                if self.is_span_first
+                    || self
+                        .text
+                        .chars()
+                        .last()
+                        .is_some_and(|c| c.is_ascii_whitespace())
+                {
                     span_text = span_text.trim_start();
                 }
                 if is_span_last {
