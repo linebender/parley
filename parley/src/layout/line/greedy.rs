@@ -696,8 +696,6 @@ fn try_commit_line<B: Brush>(
     alignment: Alignment,
     break_reason: BreakReason,
 ) -> bool {
-    let is_empty = layout.data.text_len == 0;
-
     // Ensure that the cluster and item endpoints are within range
     state.clusters.end = state.clusters.end.min(layout.data.clusters.len());
     state.items.end = state.items.end.min(layout.data.items.len());
@@ -724,6 +722,7 @@ fn try_commit_line<B: Brush>(
     // Iterate over the items to commit
     // println!("\nCOMMIT LINE");
     let mut last_item_kind = LayoutItemKind::TextRun;
+    let mut committed_text_run = false;
     for (i, item) in items_to_commit.iter().enumerate() {
         // println!("i = {} index = {} {:?}", i, item.index, item.kind);
 
@@ -759,9 +758,7 @@ fn try_commit_line<B: Brush>(
                     cluster_range.end = state.clusters.end;
                 }
 
-                if cluster_range.start > cluster_range.end
-                    || (!is_empty && cluster_range.start == cluster_range.end)
-                {
+                if cluster_range.start >= run_data.cluster_range.end {
                     // println!("INVALID CLUSTER");
                     // dbg!(&run_data.text_range);
                     // dbg!(cluster_range);
@@ -769,6 +766,7 @@ fn try_commit_line<B: Brush>(
                 }
 
                 last_item_kind = item.kind;
+                committed_text_run = true;
 
                 // Push run to line
                 let run = Run::new(layout, 0, 0, run_data, None);
@@ -828,8 +826,9 @@ fn try_commit_line<B: Brush>(
 
     // Reset state for the new line
     state.num_spaces = 0;
-    state.clusters.start = state.clusters.end;
-    state.clusters.end += 1;
+    if committed_text_run {
+        state.clusters.start = state.clusters.end;
+    }
 
     state.items.start = match last_item_kind {
         // For text runs, the first item of line N+1 needs to be the SAME as

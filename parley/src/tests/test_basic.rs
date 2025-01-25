@@ -73,3 +73,39 @@ fn only_inboxes_wrap() {
 
     env.check_layout_snapshot(&layout);
 }
+
+#[test]
+fn full_width_inbox() {
+    let mut env = testenv!();
+
+    for (width, test_case_name) in [(99., "smaller"), (100., "exact"), (101., "larger")] {
+        let text = "ABC";
+        let mut builder = env.builder(text);
+        builder.push_inline_box(InlineBox {
+            id: 0,
+            index: 1,
+            width: 10.,
+            height: 10.0,
+        });
+        builder.push_inline_box(InlineBox {
+            id: 1,
+            index: 1,
+            width,
+            height: 10.0,
+        });
+        builder.push_inline_box(InlineBox {
+            id: 2,
+            index: 2,
+            width,
+            height: 10.0,
+        });
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(100.));
+        layout.align(
+            None,
+            Alignment::Start,
+            false, /* align_when_overflowing */
+        );
+        env.with_name(test_case_name).check_layout_snapshot(&layout);
+    }
+}
