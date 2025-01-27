@@ -7,7 +7,10 @@ use crate::{
     RangedBuilder, Rect, StyleProperty, TextStyle, TreeBuilder,
 };
 use fontique::{Collection, CollectionOptions};
-use std::path::{Path, PathBuf};
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+};
 use tiny_skia::{Color, Pixmap};
 
 // Creates a new instance of TestEnv and put current function name in constructor
@@ -40,14 +43,24 @@ fn snapshot_dir() -> PathBuf {
         .join("snapshots")
 }
 
-fn font_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("assets")
-        .join("roboto_fonts")
+fn font_dirs() -> impl Iterator<Item = PathBuf> {
+    [
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("assets")
+            .join("roboto_fonts"),
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("assets")
+            .join("noto_fonts"),
+    ]
+    .into_iter()
 }
 
-const DEFAULT_FONT_NAME: &str = "Roboto";
+const FONT_STACK: &[FontFamily<'_>] = &[
+    FontFamily::Named(Cow::Borrowed("Roboto")),
+    FontFamily::Named(Cow::Borrowed("Noto Kufi Arabic")),
+];
 
 pub(crate) struct TestEnv {
     test_name: String,
@@ -69,24 +82,28 @@ fn is_accept_mode() -> bool {
         .unwrap_or(false)
 }
 
-pub(crate) fn load_fonts_dir(collection: &mut Collection, path: &Path) -> std::io::Result<()> {
-    let paths = std::fs::read_dir(path)?;
-    for entry in paths {
-        let entry = entry?;
-        if !entry.metadata()?.is_file() {
-            continue;
+pub(crate) fn load_fonts(
+    collection: &mut Collection,
+    font_dirs: impl Iterator<Item = PathBuf>,
+) -> std::io::Result<()> {
+    for dir in font_dirs {
+        let paths = std::fs::read_dir(dir)?;
+        for entry in paths {
+            let entry = entry?;
+            if !entry.metadata()?.is_file() {
+                continue;
+            }
+            let path = entry.path();
+            if path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .is_none_or(|ext| !["ttf", "otf", "ttc", "otc"].contains(&ext))
+            {
+                continue;
+            }
+            let font_data = std::fs::read(&path)?;
+            collection.register_fonts(font_data);
         }
-        let path = entry.path();
-        if path
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .map(|ext| !["ttf", "otf", "ttc", "otc"].contains(&ext))
-            .unwrap_or(true)
-        {
-            continue;
-        }
-        let font_data = std::fs::read(&path)?;
-        collection.register_fonts(font_data);
     }
     Ok(())
 }
@@ -111,10 +128,14 @@ impl TestEnv {
             shared: false,
             system_fonts: false,
         });
-        load_fonts_dir(&mut collection, &font_dir()).unwrap();
-        collection
-            .family_id(DEFAULT_FONT_NAME)
-            .unwrap_or_else(|| panic!("{} font not found", DEFAULT_FONT_NAME));
+        load_fonts(&mut collection, font_dirs()).unwrap();
+        for font in FONT_STACK {
+            if let FontFamily::Named(font_name) = font {
+                collection
+                    .family_id(font_name)
+                    .unwrap_or_else(|| panic!("{font_name} font not found"));
+            }
+        }
         Self {
             test_name: test_name.to_string(),
             check_counter: 0,
@@ -142,9 +163,7 @@ impl TestEnv {
             StyleProperty::Brush(ColorBrush {
                 color: self.text_color,
             }),
-            StyleProperty::FontStack(FontStack::Single(FontFamily::Named(
-                DEFAULT_FONT_NAME.into(),
-            ))),
+            StyleProperty::FontStack(FontStack::List(FONT_STACK.into())),
         ]
     }
 
