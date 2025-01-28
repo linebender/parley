@@ -109,6 +109,9 @@ pub(crate) fn align<B: Brush>(
 /// Removes previous justification applied to clusters.
 /// This is part of resetting state in preparation for re-linebreaking the same layout.
 pub(crate) fn unjustify<B: Brush>(layout: &mut LayoutData<B>) {
+    // Whether the text base direction is right-to-left.
+    let is_rtl = layout.base_level & 1 == 1;
+
     for line in &layout.lines {
         if line.alignment == Alignment::Justified
             && line.max_advance.is_finite()
@@ -118,10 +121,13 @@ pub(crate) fn unjustify<B: Brush>(layout: &mut LayoutData<B>) {
             if line.break_reason != BreakReason::None && line.num_spaces != 0 {
                 let adjustment = extra / line.num_spaces as f32;
                 let mut applied = 0;
-                for line_run in layout.line_items[line.item_range.clone()]
-                    .iter()
-                    .filter(|item| item.is_text_run())
-                {
+
+                let line_items: &mut dyn Iterator<Item = &LineItemData> = if is_rtl {
+                    &mut layout.line_items[line.item_range.clone()].iter().rev()
+                } else {
+                    &mut layout.line_items[line.item_range.clone()].iter()
+                };
+                for line_run in line_items.filter(|item| item.is_text_run()) {
                     if line_run.bidi_level & 1 != 0 {
                         for cluster in layout.clusters[line_run.cluster_range.clone()]
                             .iter_mut()
