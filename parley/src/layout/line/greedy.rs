@@ -528,7 +528,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             // Compute size of line's trailing whitespace. "Trailing" is considered the right edge
             // for LTR text and the left edge for RTL text.
             if self.layout.is_rtl() {
-                // RTL
                 let first_run = &self.lines.line_items[line.item_range.clone()]
                     .first()
                     .filter(|item| item.is_text_run());
@@ -541,7 +540,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     })
                     .unwrap_or(0.0);
             } else {
-                // LTR
                 let last_run = &self.lines.line_items[line.item_range.clone()]
                     .last()
                     .filter(|item| item.is_text_run());
