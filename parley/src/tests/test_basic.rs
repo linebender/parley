@@ -109,3 +109,21 @@ fn full_width_inbox() {
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
+
+#[test]
+fn trailing_whitespace() {
+    let mut env = testenv!();
+
+    let text = "AAA BBB";
+    let mut builder = env.builder(text);
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(45.));
+    layout.align(None, Alignment::Start, false);
+
+    assert!(
+        layout.width() < layout.full_width(),
+        "Trailing whitespace should cause a difference between width and full_width"
+    );
+
+    env.check_layout_snapshot(&layout);
+}
