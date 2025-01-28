@@ -107,7 +107,7 @@ pub struct LineMetrics {
     pub baseline: f32,
     /// Offset for alignment.
     pub offset: f32,
-    /// Full advance of the line.
+    /// Full advance of the line, including trailing whitespace.
     pub advance: f32,
     /// Advance of trailing whitespace.
     pub trailing_whitespace: f32,
