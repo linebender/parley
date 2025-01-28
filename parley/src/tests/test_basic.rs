@@ -193,11 +193,7 @@ fn base_level_alignment_rtl() {
         let mut builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(150.0));
-        layout.align(
-            Some(150.0),
-            alignment,
-            false, /* align_when_overflowing */
-        );
+        layout.align(None, alignment, false /* align_when_overflowing */);
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }

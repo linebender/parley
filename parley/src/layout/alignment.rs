@@ -1,7 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::{Alignment, BreakReason, LayoutData};
+use super::{data::LineItemData, Alignment, BreakReason, LayoutData};
 use crate::style::Brush;
 
 pub(crate) fn align<B: Brush>(
@@ -53,18 +53,23 @@ pub(crate) fn align<B: Brush>(
                 // Justified alignment doesn't apply to the last line of a paragraph (`BreakReason::None`)
                 // or if there are no whitespace gaps to adjust
                 if line.break_reason == BreakReason::None || line.num_spaces == 0 {
+                    if is_rtl {
+                        line.metrics.offset = free_space;
+                    }
                     continue;
                 }
 
                 let adjustment = free_space / line.num_spaces as f32;
                 let mut applied = 0;
-                for line_item in layout.line_items[line.item_range.clone()]
-                    .iter()
-                    .filter(|item| item.is_text_run())
-                {
-                    // Iterate over clusters in the run
-                    //   - Iterate forwards for even bidi levels (which represent LTR runs)
-                    //   - Iterate backwards for odd bidi levels (which represent RTL runs)
+                // Iterate over text runs in the line and clusters in the text run
+                //   - Iterate forwards for even bidi levels (which represent LTR runs)
+                //   - Iterate backwards for odd bidi levels (which represent RTL runs)
+                let line_items: &mut dyn Iterator<Item = &LineItemData> = if is_rtl {
+                    &mut layout.line_items[line.item_range.clone()].iter().rev()
+                } else {
+                    &mut layout.line_items[line.item_range.clone()].iter()
+                };
+                for line_item in line_items.filter(|item| item.is_text_run()) {
                     let clusters = &mut layout.clusters[line_item.cluster_range.clone()];
                     let bidi_level_is_odd = line_item.bidi_level & 1 != 0;
                     if bidi_level_is_odd {
@@ -90,6 +95,12 @@ pub(crate) fn align<B: Brush>(
                     }
                 }
             }
+        }
+
+        if is_rtl {
+            // In RTL text, trailing whitespace is on the left. As we hang that whitespace, offset
+            // the line to the left.
+            line.metrics.offset -= line.metrics.trailing_whitespace;
         }
     }
 }

@@ -525,18 +525,35 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 reorder_line_items(&mut self.lines.line_items[line.item_range.clone()]);
             }
 
-            // Compute size of line's trailing whitespace
-            let last_run = &self.lines.line_items[line.item_range.clone()]
-                .last()
-                .filter(|item| item.is_text_run());
-            line.metrics.trailing_whitespace = last_run
-                .and_then(|run| {
-                    self.layout.data.clusters[run.cluster_range.clone()]
-                        .last()
-                        .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
-                        .map(|cluster| cluster.advance)
-                })
-                .unwrap_or(0.0);
+            // Compute size of line's trailing whitespace. "Trailing" is considered the right edge
+            // for LTR text and the left edge for RTL text.
+            if self.layout.is_rtl() {
+                // RTL
+                let first_run = &self.lines.line_items[line.item_range.clone()]
+                    .first()
+                    .filter(|item| item.is_text_run());
+                line.metrics.trailing_whitespace = first_run
+                    .and_then(|run| {
+                        self.layout.data.clusters[run.cluster_range.clone()]
+                            .first()
+                            .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
+                            .map(|cluster| cluster.advance)
+                    })
+                    .unwrap_or(0.0);
+            } else {
+                // LTR
+                let last_run = &self.lines.line_items[line.item_range.clone()]
+                    .last()
+                    .filter(|item| item.is_text_run());
+                line.metrics.trailing_whitespace = last_run
+                    .and_then(|run| {
+                        self.layout.data.clusters[run.cluster_range.clone()]
+                            .last()
+                            .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
+                            .map(|cluster| cluster.advance)
+                    })
+                    .unwrap_or(0.0);
+            }
 
             if !have_metrics {
                 // Line consisting entirely of whitespace?
