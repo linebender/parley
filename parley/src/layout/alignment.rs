@@ -50,8 +50,9 @@ pub(crate) fn align<B: Brush>(
                     continue;
                 }
 
-                // Justified alignment doesn't apply to the last line of a paragraph (`BreakReason::None`)
-                // or if there are no whitespace gaps to adjust
+                // Justified alignment doesn't apply to the last line of a paragraph
+                // (`BreakReason::None`) or if there are no whitespace gaps to adjust. In that
+                // case, start-align, i.e., left-align for LTR text and right-align for RTL text.
                 if line.break_reason == BreakReason::None || line.num_spaces == 0 {
                     if is_rtl {
                         line.metrics.offset = free_space;
