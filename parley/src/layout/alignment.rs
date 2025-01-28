@@ -15,15 +15,7 @@ pub(crate) fn align<B: Brush>(
 ) {
     // Whether the text base direction is right-to-left.
     let is_rtl = layout.base_level & 1 == 1;
-    let alignment_width = alignment_width.unwrap_or_else(|| {
-        let max_line_length = layout
-            .lines
-            .iter()
-            .map(|line| line.metrics.advance)
-            .max_by(f32::total_cmp)
-            .unwrap_or(0.0);
-        max_line_length.min(max_line_length)
-    });
+    let alignment_width = alignment_width.unwrap_or(layout.full_width);
 
     // Apply alignment to line items
     for line in &mut layout.lines {
