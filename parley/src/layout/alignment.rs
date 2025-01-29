@@ -70,31 +70,33 @@ pub(crate) fn align<B: Brush>(
                 } else {
                     &mut layout.line_items[line.item_range.clone()].iter()
                 };
-                for line_item in line_items.filter(|item| item.is_text_run()) {
-                    let clusters = &mut layout.clusters[line_item.cluster_range.clone()];
-                    let bidi_level_is_odd = line_item.bidi_level & 1 != 0;
-                    if bidi_level_is_odd {
-                        for cluster in clusters.iter_mut().rev() {
-                            if applied == line.num_spaces {
-                                break;
+                line_items
+                    .filter(|item| item.is_text_run())
+                    .for_each(|line_item| {
+                        let clusters = &mut layout.clusters[line_item.cluster_range.clone()];
+                        let bidi_level_is_odd = line_item.bidi_level & 1 != 0;
+                        if bidi_level_is_odd {
+                            for cluster in clusters.iter_mut().rev() {
+                                if applied == line.num_spaces {
+                                    break;
+                                }
+                                if cluster.info.whitespace().is_space_or_nbsp() {
+                                    cluster.advance += adjustment;
+                                    applied += 1;
+                                }
                             }
-                            if cluster.info.whitespace().is_space_or_nbsp() {
-                                cluster.advance += adjustment;
-                                applied += 1;
+                        } else {
+                            for cluster in clusters.iter_mut() {
+                                if applied == line.num_spaces {
+                                    break;
+                                }
+                                if cluster.info.whitespace().is_space_or_nbsp() {
+                                    cluster.advance += adjustment;
+                                    applied += 1;
+                                }
                             }
                         }
-                    } else {
-                        for cluster in clusters.iter_mut() {
-                            if applied == line.num_spaces {
-                                break;
-                            }
-                            if cluster.info.whitespace().is_space_or_nbsp() {
-                                cluster.advance += adjustment;
-                                applied += 1;
-                            }
-                        }
-                    }
-                }
+                    })
             }
         }
 
