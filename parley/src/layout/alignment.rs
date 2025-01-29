@@ -96,7 +96,7 @@ pub(crate) fn align<B: Brush>(
                                 }
                             }
                         }
-                    })
+                    });
             }
         }
 
