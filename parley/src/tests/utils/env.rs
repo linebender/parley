@@ -4,7 +4,7 @@
 use crate::tests::utils::renderer::{render_layout, ColorBrush, RenderingConfig};
 use crate::{
     FontContext, FontFamily, FontStack, Layout, LayoutContext, PlainEditor, PlainEditorDriver,
-    RangedBuilder, Rect, StyleProperty,
+    RangedBuilder, Rect, StyleProperty, TextStyle, TreeBuilder,
 };
 use fontique::{Collection, CollectionOptions};
 use std::path::{Path, PathBuf};
@@ -148,12 +148,21 @@ impl TestEnv {
         ]
     }
 
-    pub(crate) fn builder<'a>(&'a mut self, text: &'a str) -> RangedBuilder<'a, ColorBrush> {
+    pub(crate) fn ranged_builder<'a>(&'a mut self, text: &'a str) -> RangedBuilder<'a, ColorBrush> {
         let default_style = self.default_style();
         let mut builder = self.layout_cx.ranged_builder(&mut self.font_cx, text, 1.0);
         for style in default_style {
             builder.push_default(style);
         }
+        builder
+    }
+
+    pub(crate) fn tree_builder(&mut self) -> TreeBuilder<'_, ColorBrush> {
+        let default_style = self.default_style();
+        let mut builder =
+            self.layout_cx
+                .tree_builder(&mut self.font_cx, 1.0, &TextStyle::default());
+        builder.push_style_modification_span(&default_style);
         builder
     }
 
