@@ -3,7 +3,7 @@
 
 use peniko::kurbo::Size;
 
-use crate::{testenv, Alignment, InlineBox, WhiteSpaceCollapse};
+use crate::{testenv, util::nearly_eq, Alignment, InlineBox, WhiteSpaceCollapse};
 
 #[test]
 fn plain_multiline_text() {
@@ -241,16 +241,41 @@ fn content_widths() {
 fn inbox_content_width() {
     let mut env = testenv!();
 
-    let text = "Hello world!";
-    let mut builder = env.ranged_builder(text);
-    builder.push_inline_box(InlineBox {
-        id: 0,
-        index: 3,
-        width: 100.0,
-        height: 10.0,
-    });
-    let mut layout = builder.build(text);
-    layout.break_all_lines(Some(layout.min_content_width()));
-    layout.align(None, Alignment::Start, false);
-    env.check_layout_snapshot(&layout);
+    {
+        let text = "Hello world!";
+        let mut builder = env.ranged_builder(text);
+        builder.push_inline_box(InlineBox {
+            id: 0,
+            index: 3,
+            width: 100.0,
+            height: 10.0,
+        });
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(layout.min_content_width()));
+        layout.align(None, Alignment::Start, false);
+
+        env.with_name("full_width").check_layout_snapshot(&layout);
+    }
+
+    {
+        let text = "A ";
+        let mut builder = env.ranged_builder(text);
+        builder.push_inline_box(InlineBox {
+            id: 0,
+            index: 2,
+            width: 10.0,
+            height: 10.0,
+        });
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(layout.max_content_width()));
+        layout.align(None, Alignment::Start, false);
+
+        assert!(
+            nearly_eq(layout.width(), layout.max_content_width()),
+            "Layout should be as wide as the max content width"
+        );
+
+        env.with_name("trailing_whitespace")
+            .check_layout_snapshot(&layout);
+    }
 }

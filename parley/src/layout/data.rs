@@ -483,16 +483,23 @@ impl<B: Brush> LayoutData<B> {
     }
 
     fn calculate_content_widths(&mut self) {
+        fn whitespace_advance(cluster: Option<&ClusterData>) -> f32 {
+            cluster
+                .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
+                .map_or(0.0, |cluster| cluster.advance)
+        }
+
         let mut max_width = 0.0;
+        let mut prev_cluster: Option<&ClusterData> = None;
         for item in &self.items {
             match item.kind {
                 LayoutItemKind::TextRun => {
                     let run = &self.runs[item.index];
                     let mut min_width = 0.0;
-                    let mut trailing_whitespace = 0.0;
                     for cluster in &self.clusters[run.cluster_range.clone()] {
                         let boundary = cluster.info.boundary();
                         if matches!(boundary, Boundary::Line | Boundary::Mandatory) {
+                            let trailing_whitespace = whitespace_advance(prev_cluster);
                             self.min_content_width =
                                 self.min_content_width.max(min_width - trailing_whitespace);
                             min_width = 0.0;
@@ -501,23 +508,22 @@ impl<B: Brush> LayoutData<B> {
                             }
                         }
                         min_width += cluster.advance;
-                        trailing_whitespace = if cluster.info.whitespace().is_space_or_nbsp() {
-                            cluster.advance
-                        } else {
-                            0.0
-                        };
+                        prev_cluster = Some(cluster);
                     }
+                    let trailing_whitespace = whitespace_advance(prev_cluster);
                     self.min_content_width =
                         self.min_content_width.max(min_width - trailing_whitespace);
-                    max_width += run.advance - trailing_whitespace;
+                    max_width += run.advance;
                 }
                 LayoutItemKind::InlineBox => {
                     let ibox = &self.inline_boxes[item.index];
                     self.min_content_width = self.min_content_width.max(ibox.width);
                     max_width += ibox.width;
+                    prev_cluster = None;
                 }
             }
-            self.max_content_width = self.max_content_width.max(max_width);
+            let trailing_whitespace = whitespace_advance(prev_cluster);
+            self.max_content_width = self.max_content_width.max(max_width - trailing_whitespace);
         }
     }
 }
