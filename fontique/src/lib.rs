@@ -23,7 +23,7 @@
     clippy::shadow_unrelated,
     reason = "Deferred"
 )]
-#![expect(
+#![allow(
     single_use_lifetimes,
     reason = "False positive: https://github.com/rust-lang/rust/issues/129255"
 )]
