@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::inline_box::InlineBox;
-use crate::layout::{Alignment, Glyph, LineMetrics, RunMetrics, Style};
+use crate::layout::{Alignment, ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::nearly_zero;
 use crate::Font;
@@ -201,7 +201,7 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) coords: Vec<i16>,
 
     // Lazily calculated values
-    content_widths: OnceCell<(f32, f32)>,
+    content_widths: OnceCell<ContentWidths>,
 
     // Input (/ output of style resolution)
     pub(crate) styles: Vec<Style<B>>,
@@ -477,13 +477,13 @@ impl<B: Brush> LayoutData<B> {
         }
     }
 
-    pub(crate) fn content_widths(&self) -> (f32, f32) {
+    pub(crate) fn content_widths(&self) -> ContentWidths {
         *self
             .content_widths
             .get_or_init(|| self.calculate_content_widths())
     }
 
-    fn calculate_content_widths(&self) -> (f32, f32) {
+    fn calculate_content_widths(&self) -> ContentWidths {
         fn whitespace_advance(cluster: Option<&ClusterData>) -> f32 {
             cluster
                 .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
@@ -528,6 +528,9 @@ impl<B: Brush> LayoutData<B> {
             max_width = max_width.max(running_max_width - trailing_whitespace);
         }
 
-        (min_width, max_width)
+        ContentWidths {
+            min: min_width,
+            max: max_width,
+        }
     }
 }

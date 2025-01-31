@@ -95,16 +95,21 @@ impl<B: Brush> Layout<B> {
         self.data.full_width
     }
 
+    /// Returns the lower and upper bounds on the width of the layout.
+    pub fn content_widths(&self) -> ContentWidths {
+        self.data.content_widths()
+    }
+
     /// Returns the minimum content width of the layout. This is the width of the layout if _all_
     /// soft line-breaking opportunities are taken.
     pub fn min_content_width(&self) -> f32 {
-        self.data.content_widths().0
+        self.data.content_widths().min
     }
 
     /// Returns the maximum content width of the layout. This is the width of the layout if _no_
     /// soft line-breaking opportunities are taken.
     pub fn max_content_width(&self) -> f32 {
-        self.data.content_widths().1
+        self.data.content_widths().max
     }
 
     /// Returns the height of the layout.
@@ -462,4 +467,15 @@ impl LayoutAccessibility {
             self.access_ids_by_run_path.remove(&run_path);
         }
     }
+}
+
+/// Lower and upper bounds on layout width based on its contents.
+#[derive(Copy, Clone, Debug)]
+pub struct ContentWidths {
+    /// The minimum content width. This is the width of the layout if _all_ soft line-breaking
+    /// opportunities are taken.
+    pub min: f32,
+    /// The maximum content width. This is the width of the layout if _no_ soft line-breaking
+    /// opportunities are taken.
+    pub max: f32,
 }
