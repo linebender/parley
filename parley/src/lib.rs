@@ -84,16 +84,16 @@
 #![allow(missing_docs, reason = "We have many as-yet undocumented items.")]
 #![expect(
     missing_debug_implementations,
-    single_use_lifetimes,
     unnameable_types,
-    clippy::allow_attributes,
     clippy::allow_attributes_without_reason,
     clippy::cast_possible_truncation,
-    clippy::exhaustive_enums,
     clippy::missing_assert_message,
-    clippy::missing_panics_doc,
     clippy::shadow_unrelated,
     reason = "Deferred"
+)]
+#![expect(
+    single_use_lifetimes,
+    reason = "False positive: https://github.com/rust-lang/rust/issues/129255"
 )]
 
 #[cfg(not(any(feature = "std", feature = "libm")))]

@@ -5,7 +5,6 @@
 #![expect(
     missing_debug_implementations,
     unreachable_pub,
-    clippy::allow_attributes,
     clippy::allow_attributes_without_reason,
     clippy::cast_possible_truncation,
     clippy::shadow_unrelated,

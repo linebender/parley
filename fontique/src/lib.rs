@@ -12,21 +12,20 @@
 // END LINEBENDER LINT SET
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![allow(unsafe_code, reason = "We access platform libraries using ffi.")]
 #![allow(missing_docs, reason = "We have many as-yet undocumented items.")]
 #![expect(
     missing_debug_implementations,
     unnameable_types,
     unreachable_pub,
-    clippy::allow_attributes,
     clippy::allow_attributes_without_reason,
     clippy::cast_possible_truncation,
-    clippy::exhaustive_enums,
     clippy::shadow_unrelated,
     reason = "Deferred"
 )]
-#![allow(
+#![expect(
     single_use_lifetimes,
-    reason = "Deferred, only apply in some feature sets so not expect"
+    reason = "False positive: https://github.com/rust-lang/rust/issues/129255"
 )]
 
 #[cfg(not(any(feature = "std", feature = "libm")))]
