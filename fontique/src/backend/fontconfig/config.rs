@@ -30,6 +30,7 @@ pub fn parse_config(path: &Path, sink: &mut impl ParserSink) {
     if root.tag_name().name() != "fontconfig" {
         return;
     }
+    let mut has_cachedir = false;
     let mut prefer = vec![];
     'outer: for child in root.children() {
         match child.tag_name().name() {
@@ -65,6 +66,9 @@ pub fn parse_config(path: &Path, sink: &mut impl ParserSink) {
             "cachedir" => {
                 if let Some(path) = resolve_dir(child, path) {
                     sink.cache_path(&path);
+                    if !has_cachedir {
+                        has_cachedir = true;
+                    }
                 }
             }
             "include" => {
@@ -119,6 +123,16 @@ pub fn parse_config(path: &Path, sink: &mut impl ParserSink) {
                 }
             }
             _ => {}
+        }
+    }
+
+    if !has_cachedir {
+        if let Ok(home) = config_home() {
+            let default_cache_dir = std::env::var("XDG_CACHE_HOME")
+                .map(PathBuf::from)
+                .unwrap_or(Path::new(&home).join(".cache"))
+                .join("fontconfig");
+            sink.cache_path(&default_cache_dir);
         }
     }
 }
