@@ -127,13 +127,7 @@ pub fn parse_config(path: &Path, sink: &mut impl ParserSink) {
     }
 
     if !has_cachedir {
-        if let Ok(home) = config_home() {
-            let default_cache_dir = std::env::var("XDG_CACHE_HOME")
-                .map(PathBuf::from)
-                .unwrap_or(Path::new(&home).join(".cache"))
-                .join("fontconfig");
-            sink.cache_path(&default_cache_dir);
-        }
+        sink.cache_path(&fc_xdg_dir_home("XDG_CACHE_HOME"));
     }
 }
 
@@ -191,16 +185,13 @@ fn include_config(path: &Path, sink: &mut impl ParserSink) -> std::io::Result<()
 
 fn resolve_dir(node: Node<'_, '_>, config_file_path: impl AsRef<Path>) -> Option<PathBuf> {
     let dir_path = node.text()?;
-    let (xdg_env, xdg_fallback) = match node.tag_name().name() {
-        "include" => ("XDG_CONFIG_HOME", "~/.config"),
-        "cachedir" => ("XDG_CACHE_HOME", "~/.cache"),
+    let xdg_env = match node.tag_name().name() {
+        "include" => "XDG_CONFIG_HOME",
+        "cachedir" => "XDG_CACHE_HOME",
         _ => return None,
     };
     let path = match node.attribute("prefix") {
-        Some("xdg") => {
-            PathBuf::from(std::env::var(xdg_env).unwrap_or_else(|_| xdg_fallback.into()))
-                .join(dir_path)
-        }
+        Some("xdg") => xdg_dir_home(xdg_env).join(dir_path),
         _ => {
             if dir_path.starts_with('/') {
                 dir_path.into()
@@ -212,12 +203,7 @@ fn resolve_dir(node: Node<'_, '_>, config_file_path: impl AsRef<Path>) -> Option
             }
         }
     };
-    Some(if let Ok(stripped_path) = path.strip_prefix("~") {
-        let home = config_home().unwrap_or("/".to_string());
-        Path::new(&home).join(stripped_path)
-    } else {
-        path
-    })
+    Some(expand_home(path))
 }
 
 /// Get the location to user home directory.
@@ -232,4 +218,46 @@ fn config_home() -> Result<String, std::env::VarError> {
         home = home.or_else(|_| std::env::var("USERPROFILE"));
     }
     home
+}
+
+/// Expand initial "~" in path expands to your home directory.
+fn expand_home(path: PathBuf) -> PathBuf {
+    match (path.strip_prefix("~"), config_home()) {
+        (Ok(stripped_path), Ok(home)) => Path::new(&home).join(stripped_path),
+        (Ok(_), Err(e)) => {
+            panic!("Failed to get the location to user home directory: {:?}", e)
+        }
+        (_, _) => path,
+    }
+}
+
+fn xdg_dir_home(environ: &str) -> PathBuf {
+    fn default_path(environ: &str) -> PathBuf {
+        let fallback = match environ {
+            "XDG_CONFIG_HOME" => "~/.config",
+            "XDG_CACHE_HOME" => "~/.cache",
+            _ => unreachable!(),
+        };
+        PathBuf::from(fallback)
+    }
+
+    fn abspath(path: String) -> Option<PathBuf> {
+        let path = PathBuf::from(path);
+        if path.is_absolute() || path.strip_prefix("~").is_ok() {
+            Some(path)
+        } else {
+            None
+        }
+    }
+
+    let dir_home = std::env::var(environ)
+        .ok()
+        .and_then(abspath)
+        .unwrap_or(default_path(environ));
+
+    expand_home(dir_home)
+}
+
+pub(crate) fn fc_xdg_dir_home(environ: &str) -> PathBuf {
+    xdg_dir_home(environ).join("fontconfig")
 }
