@@ -1,7 +1,10 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::{data::LineItemData, Alignment, BreakReason, LayoutData};
+use super::{
+    data::{ClusterData, LineItemData},
+    Alignment, BreakReason, LayoutData,
+};
 use crate::style::Brush;
 
 pub(crate) fn align<B: Brush>(
@@ -74,28 +77,22 @@ pub(crate) fn align<B: Brush>(
                     .filter(|item| item.is_text_run())
                     .for_each(|line_item| {
                         let clusters = &mut layout.clusters[line_item.cluster_range.clone()];
-                        let bidi_level_is_odd = line_item.bidi_level & 1 != 0;
-                        if bidi_level_is_odd {
-                            for cluster in clusters.iter_mut().rev() {
-                                if applied == line.num_spaces {
-                                    break;
-                                }
-                                if cluster.info.whitespace().is_space_or_nbsp() {
-                                    cluster.advance += adjustment;
-                                    applied += 1;
-                                }
+                        let line_item_is_rtl = line_item.bidi_level & 1 != 0;
+                        let clusters: &mut dyn Iterator<Item = &mut ClusterData> =
+                            if line_item_is_rtl {
+                                &mut clusters.iter_mut().rev()
+                            } else {
+                                &mut clusters.iter_mut()
+                            };
+                        clusters.for_each(|cluster| {
+                            if applied == line.num_spaces {
+                                return;
                             }
-                        } else {
-                            for cluster in clusters.iter_mut() {
-                                if applied == line.num_spaces {
-                                    break;
-                                }
-                                if cluster.info.whitespace().is_space_or_nbsp() {
-                                    cluster.advance += adjustment;
-                                    applied += 1;
-                                }
+                            if cluster.info.whitespace().is_space_or_nbsp() {
+                                cluster.advance += adjustment;
+                                applied += 1;
                             }
-                        }
+                        });
                     });
             }
         }
