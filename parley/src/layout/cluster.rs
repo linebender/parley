@@ -1,7 +1,7 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::{BreakReason, Brush, Cluster, ClusterInfo, Glyph, Layout, Line, Range, Run};
+use super::{BreakReason, Brush, Cluster, ClusterInfo, Glyph, Layout, Line, Range, Run, Style};
 use swash::text::cluster::Whitespace;
 
 /// Defines the visual side of the cluster for hit testing.
@@ -99,6 +99,12 @@ impl<'a, B: Brush> Cluster<'a, B> {
     /// Returns the range of text that defines the cluster.
     pub fn text_range(&self) -> Range<usize> {
         self.data.text_range(self.run.data)
+    }
+
+    /// Returns the first style that applies to the cluster. If the cluster contains multiple glyphs
+    /// then this style may not apply to all glyphs in the cluster (see the `DIVERGENT_STYLES` flag)
+    pub fn first_style(&self) -> &Style<B> {
+        &self.run.layout.styles()[usize::from(self.data.style_index)]
     }
 
     /// Returns the advance of the cluster.
