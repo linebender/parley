@@ -10,7 +10,7 @@ publish = false
 [dependencies]
 vello = "0.4.0"
 anyhow = "1.0.95"
-pollster = "0.3.0"
+pollster = "0.4.0"
 winit = "0.30.9"
 parley = { workspace = true, default-features = true, features = ["accesskit"] }
 peniko = { workspace = true }
