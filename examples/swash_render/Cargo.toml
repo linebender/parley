@@ -10,7 +10,7 @@ publish = false
 [dependencies]
 parley = { workspace = true, default-features = true }
 skrifa = { workspace = true }
-image = { version = "0.25.2", default-features = false, features = ["png"] }
+image = { version = "0.25.5", default-features = false, features = ["png"] }
 swash = { workspace = true, default-features = true }
 
 [lints]
