@@ -525,14 +525,22 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 reorder_line_items(&mut self.lines.line_items[line.item_range.clone()]);
             }
 
-            // Compute size of line's trailing whitespace
-            let last_run = &self.lines.line_items[line.item_range.clone()]
-                .last()
-                .filter(|item| item.is_text_run());
-            line.metrics.trailing_whitespace = last_run
+            // Compute size of line's trailing whitespace. "Trailing" is considered the right edge
+            // for LTR text and the left edge for RTL text.
+            let run = if self.layout.is_rtl() {
+                self.lines.line_items[line.item_range.clone()].first()
+            } else {
+                self.lines.line_items[line.item_range.clone()].last()
+            };
+            line.metrics.trailing_whitespace = run
+                .filter(|item| item.is_text_run())
                 .and_then(|run| {
-                    self.layout.data.clusters[run.cluster_range.clone()]
-                        .last()
+                    let cluster = if self.layout.is_rtl() {
+                        self.layout.data.clusters[run.cluster_range.clone()].first()
+                    } else {
+                        self.layout.data.clusters[run.cluster_range.clone()].last()
+                    };
+                    cluster
                         .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
                         .map(|cluster| cluster.advance)
                 })

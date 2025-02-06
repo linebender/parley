@@ -107,6 +107,7 @@ at your option.
 Some files used for tests are under different licenses:
 
 - The font file `Roboto-Regular.ttf` in `/parley/tests/assets/roboto_fonts/` is licensed solely as documented in that folder (and is licensed under the Apache License, Version 2.0).
+- The font file `NotoKufiArabic-Regular.otf` in `/parley/tests/assets/noto_fonts/` is licensed solely as documented in that folder (and is licensed under the SIL Open Font License, Version 1.1).
 
 
 [Rust code of conduct]: https://www.rust-lang.org/policies/code-of-conduct

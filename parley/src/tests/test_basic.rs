@@ -155,3 +155,45 @@ fn leading_whitespace() {
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
+
+#[test]
+fn base_level_alignment_ltr() {
+    let mut env = testenv!();
+
+    for (alignment, test_case_name) in [
+        (Alignment::Start, "start"),
+        (Alignment::End, "end"),
+        (Alignment::Middle, "middle"),
+        (Alignment::Justified, "justified"),
+    ] {
+        let text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
+        let mut builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(150.0));
+        layout.align(
+            Some(150.0),
+            alignment,
+            false, /* align_when_overflowing */
+        );
+        env.with_name(test_case_name).check_layout_snapshot(&layout);
+    }
+}
+
+#[test]
+fn base_level_alignment_rtl() {
+    let mut env = testenv!();
+
+    for (alignment, test_case_name) in [
+        (Alignment::Start, "start"),
+        (Alignment::End, "end"),
+        (Alignment::Middle, "middle"),
+        (Alignment::Justified, "justified"),
+    ] {
+        let text = "عند برمجة أجهزة الكمبيوتر، قد تجد نفسك فجأة في مواقف غريبة، مثل الكتابة بلغة لا تتحدثها فعليًا.";
+        let mut builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(150.0));
+        layout.align(None, alignment, false /* align_when_overflowing */);
+        env.with_name(test_case_name).check_layout_snapshot(&layout);
+    }
+}
