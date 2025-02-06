@@ -6,7 +6,6 @@ use super::{
 };
 use alloc::sync::Arc;
 use hashbrown::HashMap;
-use objc2::runtime::Bool;
 use objc2_foundation::{
     NSSearchPathDirectory, NSSearchPathDomainMask, NSSearchPathForDirectoriesInDomains,
 };
@@ -43,12 +42,11 @@ impl SystemFonts {
     pub(crate) fn new() -> Self {
         let paths = unsafe {
             NSSearchPathForDirectoriesInDomains(
-                NSSearchPathDirectory::NSLibraryDirectory,
-                NSSearchPathDomainMask::NSAllDomainsMask,
-                Bool::YES,
+                NSSearchPathDirectory::LibraryDirectory,
+                NSSearchPathDomainMask::AllDomainsMask,
+                true,
             )
-            .as_ref()
-            .iter()
+            .into_iter()
             .map(|p| format!("{p}/Fonts/"))
         };
         let scanned = scan::ScannedCollection::from_paths(paths, 8);
