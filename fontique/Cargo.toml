@@ -54,4 +54,4 @@ objc2-foundation = { version = "0.3.0", features = ["NSArray", "NSEnumerator", "
 fontconfig-cache-parser = { version = "0.2.0", optional = true }
 
 [target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
-roxmltree = { version = "0.19.0", optional = true }
+roxmltree = { version = "0.20.0", optional = true }
