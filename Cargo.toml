@@ -18,10 +18,14 @@ repository = "https://github.com/linebender/parley"
 
 [workspace.lints]
 rust.unsafe_code = "deny"
+
+# LINEBENDER LINT SET - Cargo.toml - v5
+# See https://linebender.org/wiki/canonical-lints/
 rust.keyword_idents_2024 = "forbid"
 rust.non_ascii_idents = "forbid"
 rust.non_local_definitions = "forbid"
 rust.unsafe_op_in_unsafe_fn = "forbid"
+
 rust.elided_lifetimes_in_paths = "warn"
 rust.missing_debug_implementations = "warn"
 rust.missing_docs = "warn"
