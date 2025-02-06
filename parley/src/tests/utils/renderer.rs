@@ -48,7 +48,8 @@ fn draw_rect(pen: &mut TinySkiaPen<'_>, x: f32, y: f32, width: f32, height: f32,
 
 /// Render the layout to a [`Pixmap`].
 ///
-/// If given [`RenderingConfig::size`] is not specified, [`Layout::width`] is used.
+/// If given [`RenderingConfig::size`] is not specified, [`Layout::width`] and [`Layout::height`]
+/// are used.
 pub(crate) fn render_layout(
     config: &RenderingConfig,
     layout: &Layout<ColorBrush>,
