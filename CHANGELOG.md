@@ -36,6 +36,14 @@ This release has an [MSRV] of 1.82.
 #### Parley
 
 - Breaking change: `PlainEditor`'s semantics are no longer transactional ([#192][] by [@DJMcNab][])
+- Breaking change: `Alignment::Start` and `Alignment::End` now depend on text base direction.
+  `Alignment::Left` and `Alignment::Right` are introduced for text direction-independent alignment. ([#250][] by [@tomcur][])
+
+### Fixed
+
+#### Parley
+
+- Fix alignment of right-to-left text. ([#250][] by [@tomcur][])
 
 ## [0.2.0] - 2024-10-10
 
@@ -115,6 +123,7 @@ This release has an [MSRV] of 1.70.
 [#211]: https://github.com/linebender/parley/pull/211
 [#223]: https://github.com/linebender/parley/pull/223
 [#224]: https://github.com/linebender/parley/pull/224
+[#250]: https://github.com/linebender/parley/pull/250
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/linebender/parley/releases/tag/v0.2.0
