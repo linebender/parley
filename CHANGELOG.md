@@ -43,7 +43,7 @@ This release has an [MSRV] of 1.82.
 
 #### Parley
 
-- Fix alignment of right-to-left text. ([#250][] by [@tomcur][])
+- Fix alignment of right-to-left text. ([#250][], [#268][] by [@tomcur][])
 
 ## [0.2.0] - 2024-10-10
 
@@ -124,6 +124,7 @@ This release has an [MSRV] of 1.70.
 [#223]: https://github.com/linebender/parley/pull/223
 [#224]: https://github.com/linebender/parley/pull/224
 [#250]: https://github.com/linebender/parley/pull/250
+[#268]: https://github.com/linebender/parley/pull/268
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/linebender/parley/releases/tag/v0.2.0

@@ -8,6 +8,7 @@
 //! if you need emoji rendering.
 
 use crate::{GlyphRun, Layout, PositionedLayoutItem};
+use peniko::kurbo;
 use skrifa::{
     instance::{LocationRef, NormalizedCoord, Size},
     outline::{DrawSettings, OutlinePen},
@@ -34,6 +35,9 @@ pub(crate) struct RenderingConfig {
     pub inline_box_color: Color,
     pub cursor_color: Color,
     pub selection_color: Color,
+
+    /// The width of the pixmap in pixels, excluding padding.
+    pub size: Option<kurbo::Size>,
 }
 
 fn draw_rect(pen: &mut TinySkiaPen<'_>, x: f32, y: f32, width: f32, height: f32, color: Color) {
@@ -42,6 +46,9 @@ fn draw_rect(pen: &mut TinySkiaPen<'_>, x: f32, y: f32, width: f32, height: f32,
     pen.fill_rect(width, height);
 }
 
+/// Render the layout to a [`Pixmap`].
+///
+/// If given [`RenderingConfig::size`] is not specified, [`Layout::width`] is used.
 pub(crate) fn render_layout(
     config: &RenderingConfig,
     layout: &Layout<ColorBrush>,
@@ -49,8 +56,16 @@ pub(crate) fn render_layout(
     selection_rects: &[crate::Rect],
 ) -> Pixmap {
     let padding = 20;
-    let width = layout.width().ceil() as u32;
-    let height = layout.height().ceil() as u32;
+    let width = config
+        .size
+        .map(|size| size.width as f32)
+        .unwrap_or(layout.width())
+        .ceil() as u32;
+    let height = config
+        .size
+        .map(|size| size.height as f32)
+        .unwrap_or(layout.height())
+        .ceil() as u32;
     let padded_width = width + padding * 2;
     let padded_height = height + padding * 2;
     let fpadding = padding as f32;
