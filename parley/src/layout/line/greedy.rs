@@ -527,31 +527,24 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
             // Compute size of line's trailing whitespace. "Trailing" is considered the right edge
             // for LTR text and the left edge for RTL text.
-            if self.layout.is_rtl() {
-                let first_run = &self.lines.line_items[line.item_range.clone()]
-                    .first()
-                    .filter(|item| item.is_text_run());
-                line.metrics.trailing_whitespace = first_run
-                    .and_then(|run| {
-                        self.layout.data.clusters[run.cluster_range.clone()]
-                            .first()
-                            .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
-                            .map(|cluster| cluster.advance)
-                    })
-                    .unwrap_or(0.0);
+            let run = if self.layout.is_rtl() {
+                self.lines.line_items[line.item_range.clone()].first()
             } else {
-                let last_run = &self.lines.line_items[line.item_range.clone()]
-                    .last()
-                    .filter(|item| item.is_text_run());
-                line.metrics.trailing_whitespace = last_run
-                    .and_then(|run| {
-                        self.layout.data.clusters[run.cluster_range.clone()]
-                            .last()
-                            .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
-                            .map(|cluster| cluster.advance)
-                    })
-                    .unwrap_or(0.0);
-            }
+                self.lines.line_items[line.item_range.clone()].last()
+            };
+            line.metrics.trailing_whitespace = run
+                .filter(|item| item.is_text_run())
+                .and_then(|run| {
+                    let cluster = if self.layout.is_rtl() {
+                        self.layout.data.clusters[run.cluster_range.clone()].first()
+                    } else {
+                        self.layout.data.clusters[run.cluster_range.clone()].last()
+                    };
+                    cluster
+                        .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
+                        .map(|cluster| cluster.advance)
+                })
+                .unwrap_or(0.0);
 
             if !have_metrics {
                 // Line consisting entirely of whitespace?
