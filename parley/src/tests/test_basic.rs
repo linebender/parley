@@ -238,6 +238,28 @@ fn content_widths() {
 }
 
 #[test]
+fn content_widths_rtl() {
+    let mut env = testenv!();
+
+    let text = "بببب ااااا";
+    let mut builder = env.ranged_builder(text);
+
+    let mut layout = builder.build(text);
+
+    layout.break_all_lines(Some(layout.min_content_width()));
+    layout.align(None, Alignment::Start, false);
+    env.with_name("min").check_layout_snapshot(&layout);
+
+    layout.break_all_lines(Some(layout.max_content_width()));
+    layout.align(None, Alignment::Start, false);
+    assert!(
+        layout.width() <= layout.max_content_width(),
+        "Layout should never be wider than the max content width"
+    );
+    env.with_name("max").check_layout_snapshot(&layout);
+}
+
+#[test]
 fn inbox_content_width() {
     let mut env = testenv!();
 
