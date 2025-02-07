@@ -1,6 +1,8 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use peniko::kurbo::Size;
+
 use crate::{testenv, Alignment, InlineBox, WhiteSpaceCollapse};
 
 #[test]
@@ -196,4 +198,23 @@ fn base_level_alignment_rtl() {
         layout.align(None, alignment, false /* align_when_overflowing */);
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
+}
+
+#[test]
+/// On overflow without alignment-on-overflow, RTL-text should be start-aligned (i.e., aligned to
+/// the right edge, overflowing on the left).
+fn overflow_alignment_rtl() {
+    let mut env = testenv!();
+
+    let text = "عند برمجة أجهزة الكمبيوتر، قد تجد نفسك فجأة في مواقف غريبة، مثل الكتابة بلغة لا تتحدثها فعليًا.";
+    let mut builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(1000.0));
+    layout.align(
+        Some(10.),
+        Alignment::Middle,
+        false, /* align_when_overflowing */
+    );
+    env.rendering_config().size = Some(Size::new(10., layout.height().into()));
+    env.check_layout_snapshot(&layout);
 }

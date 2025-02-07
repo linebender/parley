@@ -34,6 +34,10 @@ pub(crate) fn align<B: Brush>(
         let free_space = alignment_width - line.metrics.advance + line.metrics.trailing_whitespace;
 
         if !align_when_overflowing && free_space <= 0.0 {
+            if is_rtl {
+                // In RTL text, right-align on overflow.
+                line.metrics.offset = free_space;
+            }
             continue;
         }
 

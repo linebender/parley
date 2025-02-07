@@ -151,11 +151,16 @@ impl TestEnv {
                 cursor_color: Color::from_rgba8(255, 0, 0, 255),
                 selection_color: Color::from_rgba8(196, 196, 0, 255),
                 inline_box_color: Color::BLACK,
+                size: None,
             },
             cursor_size: 2.0,
             errors: Vec::new(),
             next_test_case_name: String::new(),
         }
+    }
+
+    pub(crate) fn rendering_config(&mut self) -> &mut RenderingConfig {
+        &mut self.rendering_config
     }
 
     fn default_style(&self) -> [StyleProperty<'static, ColorBrush>; 2] {
