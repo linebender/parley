@@ -15,20 +15,18 @@ pub(crate) fn align<B: Brush>(
 ) {
     // Whether the text base direction is right-to-left.
     let is_rtl = layout.base_level & 1 == 1;
-    let alignment_width = alignment_width.unwrap_or_else(|| {
-        let max_line_length = layout
-            .lines
-            .iter()
-            .map(|line| line.metrics.advance)
-            .max_by(f32::total_cmp)
-            .unwrap_or(0.0);
-        max_line_length.min(max_line_length)
-    });
+    let alignment_width = alignment_width.unwrap_or(layout.width);
 
     // Apply alignment to line items
     for line in &mut layout.lines {
         // TODO: remove this field
         line.alignment = alignment;
+
+        if is_rtl {
+            // In RTL text, trailing whitespace is on the left. As we hang that whitespace, offset
+            // the line to the left.
+            line.metrics.offset = -line.metrics.trailing_whitespace;
+        }
 
         // Compute free space.
         let free_space = alignment_width - line.metrics.advance + line.metrics.trailing_whitespace;
@@ -36,7 +34,7 @@ pub(crate) fn align<B: Brush>(
         if !align_when_overflowing && free_space <= 0.0 {
             if is_rtl {
                 // In RTL text, right-align on overflow.
-                line.metrics.offset = free_space;
+                line.metrics.offset += free_space;
             }
             continue;
         }
@@ -46,10 +44,10 @@ pub(crate) fn align<B: Brush>(
                 // Do nothing
             }
             (Alignment::Right, _) | (Alignment::Start, true) | (Alignment::End, false) => {
-                line.metrics.offset = free_space;
+                line.metrics.offset += free_space;
             }
             (Alignment::Middle, _) => {
-                line.metrics.offset = free_space * 0.5;
+                line.metrics.offset += free_space * 0.5;
             }
             (Alignment::Justified, _) => {
                 // Justified alignment doesn't have any effect if free_space is negative or zero
@@ -62,7 +60,7 @@ pub(crate) fn align<B: Brush>(
                 // case, start-align, i.e., left-align for LTR text and right-align for RTL text.
                 if line.break_reason == BreakReason::None || line.num_spaces == 0 {
                     if is_rtl {
-                        line.metrics.offset = free_space;
+                        line.metrics.offset += free_space;
                     }
                     continue;
                 }
@@ -99,12 +97,6 @@ pub(crate) fn align<B: Brush>(
                         });
                     });
             }
-        }
-
-        if is_rtl {
-            // In RTL text, trailing whitespace is on the left. As we hang that whitespace, offset
-            // the line to the left.
-            line.metrics.offset -= line.metrics.trailing_whitespace;
         }
     }
 }

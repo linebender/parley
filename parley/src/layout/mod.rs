@@ -156,12 +156,16 @@ impl<B: Brush> Layout<B> {
             .break_remaining(max_advance.unwrap_or(f32::MAX));
     }
 
-    // Apply to alignment to layout relative to the specified container width. If container_width is not
-    // specified then the max line length is used.
-    //
-    // If `align_when_overflowing` is set to `true` then `Center` and `End` alignment will apply even if
-    // the line contents are wider than the `container_width`. If it is set to `false` then all overflowing
-    // lines will be `Start` aligned.
+    /// Apply alignment to the layout relative to the specified container width or full layout
+    /// width.
+    ///
+    /// You must perform line breaking prior to aligning, through [`Layout::break_lines`] or
+    /// [`Layout::break_all_lines`]. If `container_width` is not specified, the layout's
+    /// [`Layout::width`] is used.
+    ///
+    /// If `align_when_overflowing` is set to `true`, alignment will apply even if the line
+    /// contents are wider than the alignment width. If it is set to `false`, all overflowing lines
+    /// will be [`Alignment::Start`] aligned.
     pub fn align(
         &mut self,
         container_width: Option<f32>,
