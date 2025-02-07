@@ -3,7 +3,7 @@
 
 use peniko::kurbo::Size;
 
-use crate::{testenv, util::nearly_eq, Alignment, InlineBox, WhiteSpaceCollapse};
+use crate::{testenv, Alignment, InlineBox, WhiteSpaceCollapse};
 
 #[test]
 fn plain_multiline_text() {
@@ -271,8 +271,8 @@ fn inbox_content_width() {
         layout.align(None, Alignment::Start, false);
 
         assert!(
-            nearly_eq(layout.width(), layout.max_content_width()),
-            "Layout should be as wide as the max content width"
+            layout.width() <= layout.max_content_width(),
+            "Layout should never be wider than the max content width"
         );
 
         env.with_name("trailing_whitespace")

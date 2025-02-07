@@ -14,6 +14,10 @@ use swash::Synthesis;
 
 use alloc::vec::Vec;
 
+#[cfg(feature = "libm")]
+#[allow(unused_imports)]
+use core_maths::CoreFloat;
+
 #[derive(Copy, Clone)]
 pub(crate) struct ClusterData {
     pub(crate) info: ClusterInfo,
@@ -529,8 +533,8 @@ impl<B: Brush> LayoutData<B> {
         }
 
         ContentWidths {
-            min: min_width,
-            max: max_width,
+            min: min_width.ceil(),
+            max: max_width.ceil(),
         }
     }
 }
