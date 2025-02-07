@@ -301,3 +301,25 @@ fn inbox_content_width() {
             .check_layout_snapshot(&layout);
     }
 }
+
+#[test]
+/// Layouts can be re-line-breaked and re-aligned.
+fn realign() {
+    let mut env = testenv!();
+
+    let text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
+    let mut builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(150.0));
+    for idx in 0..8 {
+        if [2, 3, 4].contains(&idx) {
+            layout.break_all_lines(Some(150.0));
+        }
+        layout.align(
+            Some(150.),
+            Alignment::Justified,
+            false, /* align_when_overflowing */
+        );
+    }
+    env.check_layout_snapshot(&layout);
+}
