@@ -487,6 +487,7 @@ impl<B: Brush> LayoutData<B> {
             .get_or_init(|| self.calculate_content_widths())
     }
 
+    // TODO: this method does not handle mixed direction text at all.
     fn calculate_content_widths(&self) -> ContentWidths {
         fn whitespace_advance(cluster: Option<&ClusterData>) -> f32 {
             cluster
@@ -499,12 +500,17 @@ impl<B: Brush> LayoutData<B> {
 
         let mut running_max_width = 0.0;
         let mut prev_cluster: Option<&ClusterData> = None;
+        let is_rtl = self.base_level & 1 == 1;
         for item in &self.items {
             match item.kind {
                 LayoutItemKind::TextRun => {
                     let run = &self.runs[item.index];
                     let mut running_min_width = 0.0;
-                    for cluster in &self.clusters[run.cluster_range.clone()] {
+                    let clusters = &self.clusters[run.cluster_range.clone()];
+                    if is_rtl {
+                        prev_cluster = clusters.first();
+                    }
+                    for cluster in clusters {
                         let boundary = cluster.info.boundary();
                         if matches!(boundary, Boundary::Line | Boundary::Mandatory) {
                             let trailing_whitespace = whitespace_advance(prev_cluster);
@@ -515,7 +521,9 @@ impl<B: Brush> LayoutData<B> {
                             }
                         }
                         running_min_width += cluster.advance;
-                        prev_cluster = Some(cluster);
+                        if !is_rtl {
+                            prev_cluster = Some(cluster);
+                        }
                     }
                     let trailing_whitespace = whitespace_advance(prev_cluster);
                     min_width = min_width.max(running_min_width - trailing_whitespace);
