@@ -176,7 +176,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 current_box = inline_box_iter.next();
             } else {
                 break;
-            };
+            }
         }
 
         if break_run && !text_range.is_empty() {
