@@ -20,6 +20,7 @@ This release has an [MSRV] of 1.82.
 #### Fontique
 
 - `FontStretch`, `FontStyle`, and `FontWeight` get helper functions `from_fontconfig` ([#212] by [@waywardmonkeys][])
+- `Layout` methods to calculate minimum and maximum content widths. ([#259][] by [@wfdewith][])
 
 #### Parley
 
@@ -38,6 +39,7 @@ This release has an [MSRV] of 1.82.
 - Breaking change: `PlainEditor`'s semantics are no longer transactional ([#192][] by [@DJMcNab][])
 - Breaking change: `Alignment::Start` and `Alignment::End` now depend on text base direction.
   `Alignment::Left` and `Alignment::Right` are introduced for text direction-independent alignment. ([#250][] by [@tomcur][])
+- Breaking change: `Layout` is no longer `Sync`. ([#259][] by [@wfdewith][])
 
 ### Fixed
 
@@ -103,6 +105,7 @@ This release has an [MSRV] of 1.70.
 [@nicoburns]: https://github.com/nicoburns
 [@tomcur]: https://github.com/tomcur
 [@waywardmonkeys]: https://github.com/waywardmonkeys
+[@wfdewith]: https://github.com/wfdewith
 [@xorgy]: https://github.com/xorgy
 
 [#54]: https://github.com/linebender/parley/pull/54
@@ -124,6 +127,7 @@ This release has an [MSRV] of 1.70.
 [#223]: https://github.com/linebender/parley/pull/223
 [#224]: https://github.com/linebender/parley/pull/224
 [#250]: https://github.com/linebender/parley/pull/250
+[#259]: https://github.com/linebender/parley/pull/259
 [#268]: https://github.com/linebender/parley/pull/268
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.2.0...HEAD
