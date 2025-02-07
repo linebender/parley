@@ -161,7 +161,7 @@ impl<B: Brush> Layout<B> {
     ///
     /// You must perform line breaking prior to aligning, through [`Layout::break_lines`] or
     /// [`Layout::break_all_lines`]. If `container_width` is not specified, the layout's
-    /// [`Layout::full_width`] is used.
+    /// [`Layout::width`] is used.
     ///
     /// If `align_when_overflowing` is set to `true`, alignment will apply even if the line
     /// contents are wider than the alignment width. If it is set to `false`, all overflowing lines
