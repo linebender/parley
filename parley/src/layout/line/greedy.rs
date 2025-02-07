@@ -221,7 +221,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             if try_commit_line!(BreakReason::Regular) {
                                 return self.start_new_line();
                             }
-                        };
+                        }
                     }
                 }
                 LayoutItemKind::TextRun => {

@@ -164,7 +164,7 @@ impl Editor {
                             drv.collapse_selection();
                         } else {
                             drv.select_all();
-                        };
+                        }
                     }
                     Key::Named(NamedKey::ArrowLeft) => {
                         if action_mod {
@@ -307,7 +307,7 @@ impl Editor {
                             2 => drv.select_word_at_point(cursor_pos.0, cursor_pos.1),
                             3 => drv.select_line_at_point(cursor_pos.0, cursor_pos.1),
                             _ => drv.move_to_point(cursor_pos.0, cursor_pos.1),
-                        };
+                        }
                     }
                 }
             }
@@ -369,7 +369,7 @@ impl Editor {
         if self.cursor_visible {
             if let Some(cursor) = self.editor.cursor_geometry(1.5) {
                 scene.fill(Fill::NonZero, transform, palette::css::WHITE, None, &cursor);
-            };
+            }
         }
         let layout = self.editor.layout(&mut self.font_cx, &mut self.layout_cx);
         for line in layout.lines() {

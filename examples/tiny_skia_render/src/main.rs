@@ -130,7 +130,7 @@ fn main() {
                     pen.set_color(foreground_color);
                     pen.fill_rect(inline_box.width, inline_box.height);
                 }
-            };
+            }
         }
     }
 
