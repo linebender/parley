@@ -7,21 +7,52 @@ use super::{
 };
 use crate::style::Brush;
 
+/// Align the layout.
+///
+/// If [`Alignment::Justified`] is requested, clusters' [`ClusterData::advance`] will be adjusted.
+/// Prior to re-line-breaking or re-aligning, [`unjustify`] has to be called.
 pub(crate) fn align<B: Brush>(
     layout: &mut LayoutData<B>,
     alignment_width: Option<f32>,
     alignment: Alignment,
     align_when_overflowing: bool,
 ) {
+    layout.alignment_width = alignment_width.unwrap_or(layout.width);
+    layout.is_aligned_justified = alignment == Alignment::Justified;
+
+    align_impl::<_, false>(layout, alignment, align_when_overflowing);
+}
+
+/// Removes previous justification applied to clusters.
+///
+/// This is part of resetting state in preparation for re-line-breaking or re-aligning the same
+/// layout.
+pub(crate) fn unjustify<B: Brush>(layout: &mut LayoutData<B>) {
+    if layout.is_aligned_justified {
+        align_impl::<_, true>(layout, Alignment::Justified, false);
+        layout.is_aligned_justified = false;
+    }
+}
+
+/// The actual alignment implementation.
+///
+/// This is const-generic over `UNDO_JUSTIFICATION`: justified alignment adjusts clusters'
+/// [`ClusterData::advance`], and this mutation has to be undone for re-line-breaking or
+/// re-aligning. `UNDO_JUSTIFICATION` indicates whether the adjustment has to be applied, or
+/// undone.
+///
+/// Writing a separate function for undoing justification would be faster, but not by much, and
+/// doing it this way we are sure the calculations performed are equivalent.
+fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
+    layout: &mut LayoutData<B>,
+    alignment: Alignment,
+    align_when_overflowing: bool,
+) {
     // Whether the text base direction is right-to-left.
     let is_rtl = layout.base_level & 1 == 1;
-    let alignment_width = alignment_width.unwrap_or(layout.width);
 
     // Apply alignment to line items
     for line in &mut layout.lines {
-        // TODO: remove this field
-        line.alignment = alignment;
-
         if is_rtl {
             // In RTL text, trailing whitespace is on the left. As we hang that whitespace, offset
             // the line to the left.
@@ -29,7 +60,8 @@ pub(crate) fn align<B: Brush>(
         }
 
         // Compute free space.
-        let free_space = alignment_width - line.metrics.advance + line.metrics.trailing_whitespace;
+        let free_space =
+            layout.alignment_width - line.metrics.advance + line.metrics.trailing_whitespace;
 
         if !align_when_overflowing && free_space <= 0.0 {
             if is_rtl {
@@ -65,7 +97,8 @@ pub(crate) fn align<B: Brush>(
                     continue;
                 }
 
-                let adjustment = free_space / line.num_spaces as f32;
+                let adjustment =
+                    free_space / line.num_spaces as f32 * if UNDO_JUSTIFICATION { -1. } else { 1. };
                 let mut applied = 0;
                 // Iterate over text runs in the line and clusters in the text run
                 //   - Iterate forwards for even bidi levels (which represent LTR runs)
@@ -96,58 +129,6 @@ pub(crate) fn align<B: Brush>(
                             }
                         });
                     });
-            }
-        }
-    }
-}
-
-/// Removes previous justification applied to clusters.
-/// This is part of resetting state in preparation for re-linebreaking the same layout.
-pub(crate) fn unjustify<B: Brush>(layout: &mut LayoutData<B>) {
-    // Whether the text base direction is right-to-left.
-    let is_rtl = layout.base_level & 1 == 1;
-
-    for line in &layout.lines {
-        if line.alignment == Alignment::Justified
-            && line.max_advance.is_finite()
-            && line.max_advance < f32::MAX
-        {
-            let extra = line.max_advance - line.metrics.advance + line.metrics.trailing_whitespace;
-            if line.break_reason != BreakReason::None && line.num_spaces != 0 {
-                let adjustment = extra / line.num_spaces as f32;
-                let mut applied = 0;
-
-                let line_items: &mut dyn Iterator<Item = &LineItemData> = if is_rtl {
-                    &mut layout.line_items[line.item_range.clone()].iter().rev()
-                } else {
-                    &mut layout.line_items[line.item_range.clone()].iter()
-                };
-                for line_run in line_items.filter(|item| item.is_text_run()) {
-                    if line_run.bidi_level & 1 != 0 {
-                        for cluster in layout.clusters[line_run.cluster_range.clone()]
-                            .iter_mut()
-                            .rev()
-                        {
-                            if applied == line.num_spaces {
-                                break;
-                            }
-                            if cluster.info.whitespace().is_space_or_nbsp() {
-                                cluster.advance -= adjustment;
-                                applied += 1;
-                            }
-                        }
-                    } else {
-                        for cluster in layout.clusters[line_run.cluster_range.clone()].iter_mut() {
-                            if applied == line.num_spaces {
-                                break;
-                            }
-                            if cluster.info.whitespace().is_space_or_nbsp() {
-                                cluster.advance -= adjustment;
-                                applied += 1;
-                            }
-                        }
-                    }
-                }
             }
         }
     }

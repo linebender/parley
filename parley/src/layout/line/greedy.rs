@@ -10,10 +10,9 @@ use swash::text::cluster::Whitespace;
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 
-use crate::layout::alignment::unjustify;
 use crate::layout::{
-    Alignment, Boundary, BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData,
-    LineItemData, LineMetrics, Run,
+    Boundary, BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
+    LineMetrics, Run,
 };
 use crate::style::Brush;
 
@@ -108,7 +107,6 @@ pub struct BreakLines<'a, B: Brush> {
 
 impl<'a, B: Brush> BreakLines<'a, B> {
     pub(crate) fn new(layout: &'a mut Layout<B>) -> Self {
-        unjustify(&mut layout.data);
         layout.data.width = 0.;
         layout.data.height = 0.;
         let mut lines = LineLayout::default();
@@ -166,7 +164,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     &mut self.lines,
                     &mut self.state.line,
                     max_advance,
-                    Alignment::Start,
                     $break_reason,
                 )
             };
@@ -699,7 +696,6 @@ fn try_commit_line<B: Brush>(
     lines: &mut LineLayout,
     state: &mut LineState,
     max_advance: f32,
-    alignment: Alignment,
     break_reason: BreakReason,
 ) -> bool {
     // Ensure that the cluster and item endpoints are within range
@@ -820,7 +816,6 @@ fn try_commit_line<B: Brush>(
     lines.lines.push(LineData {
         item_range: start_item_idx..end_item_idx,
         max_advance,
-        alignment,
         break_reason,
         num_spaces,
         metrics: LineMetrics {
