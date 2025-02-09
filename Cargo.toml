@@ -5,7 +5,7 @@ members = [
     "parley",
     "examples/tiny_skia_render",
     "examples/swash_render",
-    "examples/vello_editor",
+    "examples/vello_editor", "xtask",
 ]
 
 [workspace.package]
