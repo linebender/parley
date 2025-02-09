@@ -1,0 +1,15 @@
+[package]
+name = "xtask"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+kompari = { git = "https://github.com/linebender/kompari.git", rev = "f7ce5310505c427b53e046ce0758261a613af2a4" }
+kompari-tasks = { git = "https://github.com/linebender/kompari.git", rev = "f7ce5310505c427b53e046ce0758261a613af2a4" }
+clap = { version = "4", features = ["derive"] }
+
+[lints]
+workspace = true
