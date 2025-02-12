@@ -14,3 +14,26 @@ $ PARLEY_TEST="accept" cargo test
 ```
 
 It will update snapshots of the failed tests.
+
+## Usage of xtask when test fails
+
+After some tests fails, you may run the following for generating kompari HTML report:
+
+```bash
+cargo xtask report
+```
+
+or start an interactive test blessing
+
+```bash
+cargo xtask review
+```
+
+## Detect dead snapshots
+
+The following command shows snapshots that are not used in any test. The command also allows to delete such snaphosts.
+
+```bash
+cargo xtask dead-snapshots 
+```
+
