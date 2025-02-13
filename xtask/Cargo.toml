@@ -5,6 +5,10 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Dev tooling for Parley"
+keywords = ["testing"]
+categories = ["testing", "graphics"]
+
 
 [dependencies]
 kompari = { git = "https://github.com/linebender/kompari.git", rev = "f7ce5310505c427b53e046ce0758261a613af2a4" }
