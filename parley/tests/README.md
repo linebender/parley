@@ -15,9 +15,9 @@ $ PARLEY_TEST="accept" cargo test
 
 It will update snapshots of the failed tests.
 
-## Usage of xtask when test fails
+## Usage of xtask when a test fails
 
-After some tests fails, you may run the following for generating kompari HTML report:
+After some tests fail, you may run the following for generating a Kompari HTML report:
 
 ```bash
 cargo xtask report
