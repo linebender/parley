@@ -1,11 +1,12 @@
 [workspace]
 resolver = "2"
 members = [
-    "fontique",
-    "parley",
-    "examples/tiny_skia_render",
-    "examples/swash_render",
-    "examples/vello_editor", "xtask",
+  "fontique",
+  "parley",
+  "examples/tiny_skia_render",
+  "examples/swash_render",
+  "examples/vello_editor",
+  "xtask",
 ]
 
 [workspace.package]
