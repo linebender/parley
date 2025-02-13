@@ -1,7 +1,7 @@
 // Copyright 2025 the Kompari Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Xtask utilities for Parley, currently only integrates
+//! Xtask utilities for Parley, currently only integrates Kompari
 
 use clap::Parser;
 use kompari::DirDiffConfig;
