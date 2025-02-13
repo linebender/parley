@@ -1,4 +1,4 @@
-// Copyright 2025 the Kompari Authors
+// Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Xtask utilities for Parley, currently only integrates Kompari
