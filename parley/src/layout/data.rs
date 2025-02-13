@@ -521,13 +521,13 @@ impl<B: Brush> LayoutData<B> {
                             }
                         }
                         running_min_width += cluster.advance;
+                        running_max_width += cluster.advance;
                         if !is_rtl {
                             prev_cluster = Some(cluster);
                         }
                     }
                     let trailing_whitespace = whitespace_advance(prev_cluster);
                     min_width = min_width.max(running_min_width - trailing_whitespace);
-                    running_max_width += run.advance;
                 }
                 LayoutItemKind::InlineBox => {
                     let ibox = &self.inline_boxes[item.index];
@@ -541,8 +541,8 @@ impl<B: Brush> LayoutData<B> {
         }
 
         ContentWidths {
-            min: min_width.ceil(),
-            max: max_width.ceil(),
+            min: min_width,
+            max: max_width,
         }
     }
 }
