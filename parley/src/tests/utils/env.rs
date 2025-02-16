@@ -82,6 +82,12 @@ fn is_accept_mode() -> bool {
         .unwrap_or(false)
 }
 
+fn is_generate_all_mode() -> bool {
+    std::env::var("PARLEY_TEST")
+        .map(|x| x.eq_ignore_ascii_case("generate-all"))
+        .unwrap_or(false)
+}
+
 pub(crate) fn load_fonts(
     collection: &mut Collection,
     font_dirs: impl Iterator<Item = PathBuf>,
@@ -307,6 +313,8 @@ impl TestEnv {
                 current_img.save_png(&comparison_path).unwrap();
                 self.errors.push((comparison_path, e));
             }
+        } else if is_generate_all_mode() {
+            current_img.save_png(&comparison_path).unwrap();
         }
     }
 }
