@@ -116,18 +116,50 @@ fn full_width_inbox() {
 fn trailing_whitespace() {
     let mut env = testenv!();
 
-    let text = "AAA BBB";
-    let mut builder = env.ranged_builder(text);
-    let mut layout = builder.build(text);
-    layout.break_all_lines(Some(45.));
-    layout.align(None, Alignment::Start, false);
+    {
+        let text = "AAA BBB";
+        let mut builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(45.));
+        layout.align(None, Alignment::Start, false);
 
-    assert!(
-        layout.width() < layout.full_width(),
-        "Trailing whitespace should cause a difference between width and full_width"
-    );
+        env.with_name("soft_wrap").check_layout_snapshot(&layout);
+    }
 
-    env.check_layout_snapshot(&layout);
+    {
+        let text = "AAA \nBBB";
+        let mut builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(None, Alignment::Start, false);
+
+        env.with_name("hard_wrap").check_layout_snapshot(&layout);
+    }
+}
+
+#[test]
+fn trailing_whitespace_rtl() {
+    let mut env = testenv!();
+
+    {
+        let text = "بببب ااااا";
+        let mut builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(45.));
+        layout.align(None, Alignment::Start, false);
+
+        env.with_name("soft_wrap").check_layout_snapshot(&layout);
+    }
+
+    {
+        let text = "بببب \nااااا";
+        let mut builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(None, Alignment::Start, false);
+
+        env.with_name("hard_wrap").check_layout_snapshot(&layout);
+    }
 }
 
 #[test]
