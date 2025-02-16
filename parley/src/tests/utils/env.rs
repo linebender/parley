@@ -148,6 +148,7 @@ impl TestEnv {
             text_color: Color::BLACK,
             rendering_config: RenderingConfig {
                 background_color: Color::WHITE,
+                padding_color: Color::from_rgba8(166, 200, 255, 255),
                 cursor_color: Color::from_rgba8(255, 0, 0, 255),
                 selection_color: Color::from_rgba8(196, 196, 0, 255),
                 inline_box_color: Color::BLACK,

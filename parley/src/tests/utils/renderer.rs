@@ -32,6 +32,7 @@ impl Default for ColorBrush {
 
 pub(crate) struct RenderingConfig {
     pub background_color: Color,
+    pub padding_color: Color,
     pub inline_box_color: Color,
     pub cursor_color: Color,
     pub selection_color: Color,
@@ -73,9 +74,18 @@ pub(crate) fn render_layout(
 
     let mut img = Pixmap::new(padded_width, padded_height).unwrap();
 
-    img.fill(config.background_color);
+    img.fill(config.padding_color);
 
     let mut pen = TinySkiaPen::new(img.as_mut());
+
+    draw_rect(
+        &mut pen,
+        fpadding,
+        fpadding,
+        width as f32,
+        height as f32,
+        config.background_color,
+    );
 
     for rect in selection_rects {
         draw_rect(
