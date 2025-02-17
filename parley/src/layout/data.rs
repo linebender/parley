@@ -2,16 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::inline_box::InlineBox;
-use crate::layout::{Alignment, Glyph, LineMetrics, RunMetrics, Style};
+use crate::layout::{Alignment, ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::nearly_zero;
 use crate::Font;
+use core::cell::OnceCell;
 use core::ops::Range;
 use swash::shape::Shaper;
 use swash::text::cluster::{Boundary, ClusterInfo};
 use swash::Synthesis;
 
 use alloc::vec::Vec;
+
+#[cfg(feature = "libm")]
+#[allow(unused_imports)]
+use core_maths::CoreFloat;
 
 #[derive(Copy, Clone)]
 pub(crate) struct ClusterData {
@@ -199,6 +204,9 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) fonts: Vec<Font>,
     pub(crate) coords: Vec<i16>,
 
+    // Lazily calculated values
+    content_widths: OnceCell<ContentWidths>,
+
     // Input (/ output of style resolution)
     pub(crate) styles: Vec<Style<B>>,
     pub(crate) inline_boxes: Vec<InlineBox>,
@@ -223,6 +231,7 @@ impl<B: Brush> Default for LayoutData<B> {
             text_len: 0,
             width: 0.,
             full_width: 0.,
+            content_widths: OnceCell::new(),
             height: 0.,
             fonts: Vec::new(),
             coords: Vec::new(),
@@ -246,6 +255,7 @@ impl<B: Brush> LayoutData<B> {
         self.text_len = 0;
         self.width = 0.;
         self.full_width = 0.;
+        self.content_widths.take();
         self.height = 0.;
         self.fonts.clear();
         self.coords.clear();
@@ -468,6 +478,71 @@ impl<B: Brush> LayoutData<B> {
                     }
                 }
             }
+        }
+    }
+
+    pub(crate) fn content_widths(&self) -> ContentWidths {
+        *self
+            .content_widths
+            .get_or_init(|| self.calculate_content_widths())
+    }
+
+    // TODO: this method does not handle mixed direction text at all.
+    fn calculate_content_widths(&self) -> ContentWidths {
+        fn whitespace_advance(cluster: Option<&ClusterData>) -> f32 {
+            cluster
+                .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
+                .map_or(0.0, |cluster| cluster.advance)
+        }
+
+        let mut min_width = 0.0_f32;
+        let mut max_width = 0.0_f32;
+
+        let mut running_max_width = 0.0;
+        let mut prev_cluster: Option<&ClusterData> = None;
+        let is_rtl = self.base_level & 1 == 1;
+        for item in &self.items {
+            match item.kind {
+                LayoutItemKind::TextRun => {
+                    let run = &self.runs[item.index];
+                    let mut running_min_width = 0.0;
+                    let clusters = &self.clusters[run.cluster_range.clone()];
+                    if is_rtl {
+                        prev_cluster = clusters.first();
+                    }
+                    for cluster in clusters {
+                        let boundary = cluster.info.boundary();
+                        if matches!(boundary, Boundary::Line | Boundary::Mandatory) {
+                            let trailing_whitespace = whitespace_advance(prev_cluster);
+                            min_width = min_width.max(running_min_width - trailing_whitespace);
+                            running_min_width = 0.0;
+                            if boundary == Boundary::Mandatory {
+                                running_max_width = 0.0;
+                            }
+                        }
+                        running_min_width += cluster.advance;
+                        running_max_width += cluster.advance;
+                        if !is_rtl {
+                            prev_cluster = Some(cluster);
+                        }
+                    }
+                    let trailing_whitespace = whitespace_advance(prev_cluster);
+                    min_width = min_width.max(running_min_width - trailing_whitespace);
+                }
+                LayoutItemKind::InlineBox => {
+                    let ibox = &self.inline_boxes[item.index];
+                    min_width = min_width.max(ibox.width);
+                    running_max_width += ibox.width;
+                    prev_cluster = None;
+                }
+            }
+            let trailing_whitespace = whitespace_advance(prev_cluster);
+            max_width = max_width.max(running_max_width - trailing_whitespace);
+        }
+
+        ContentWidths {
+            min: min_width,
+            max: max_width,
         }
     }
 }

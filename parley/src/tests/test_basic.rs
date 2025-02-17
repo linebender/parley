@@ -218,3 +218,86 @@ fn overflow_alignment_rtl() {
     env.rendering_config().size = Some(Size::new(10., layout.height().into()));
     env.check_layout_snapshot(&layout);
 }
+
+#[test]
+fn content_widths() {
+    let mut env = testenv!();
+
+    let text = "Hello world!\nLonger line with a looooooooong word.";
+    let mut builder = env.ranged_builder(text);
+
+    let mut layout = builder.build(text);
+
+    layout.break_all_lines(Some(layout.min_content_width()));
+    layout.align(None, Alignment::Start, false);
+    env.with_name("min").check_layout_snapshot(&layout);
+
+    layout.break_all_lines(Some(layout.max_content_width()));
+    layout.align(None, Alignment::Start, false);
+    env.with_name("max").check_layout_snapshot(&layout);
+}
+
+#[test]
+fn content_widths_rtl() {
+    let mut env = testenv!();
+
+    let text = "بببب ااااا";
+    let mut builder = env.ranged_builder(text);
+
+    let mut layout = builder.build(text);
+
+    layout.break_all_lines(Some(layout.min_content_width()));
+    layout.align(None, Alignment::Start, false);
+    env.with_name("min").check_layout_snapshot(&layout);
+
+    layout.break_all_lines(Some(layout.max_content_width()));
+    layout.align(None, Alignment::Start, false);
+    assert!(
+        layout.width() <= layout.max_content_width(),
+        "Layout should never be wider than the max content width"
+    );
+    env.with_name("max").check_layout_snapshot(&layout);
+}
+
+#[test]
+fn inbox_content_width() {
+    let mut env = testenv!();
+
+    {
+        let text = "Hello world!";
+        let mut builder = env.ranged_builder(text);
+        builder.push_inline_box(InlineBox {
+            id: 0,
+            index: 3,
+            width: 100.0,
+            height: 10.0,
+        });
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(layout.min_content_width()));
+        layout.align(None, Alignment::Start, false);
+
+        env.with_name("full_width").check_layout_snapshot(&layout);
+    }
+
+    {
+        let text = "A ";
+        let mut builder = env.ranged_builder(text);
+        builder.push_inline_box(InlineBox {
+            id: 0,
+            index: 2,
+            width: 10.0,
+            height: 10.0,
+        });
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(layout.max_content_width()));
+        layout.align(None, Alignment::Start, false);
+
+        assert!(
+            layout.width() <= layout.max_content_width(),
+            "Layout should never be wider than the max content width"
+        );
+
+        env.with_name("trailing_whitespace")
+            .check_layout_snapshot(&layout);
+    }
+}
