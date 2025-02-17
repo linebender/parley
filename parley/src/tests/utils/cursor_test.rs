@@ -184,14 +184,17 @@ impl CursorTest {
         // without visual cursors and with a warning that the text may not be accurate.
 
         let bg_color_expected = Color::from_rgba8(255, 255, 255, 255);
+        let padding_color_expected = Color::from_rgba8(166, 200, 255, 255);
         let cursor_color_expected = Color::from_rgba8(0, 255, 0, 255);
         let selection_color_expected = Color::from_rgba8(0, 255, 0, 200);
         let bg_color_actual = Color::from_rgba8(230, 230, 230, 255);
+        let padding_color_actual = Color::from_rgba8(166, 255, 240, 255);
         let cursor_color_actual = Color::from_rgba8(255, 0, 0, 255);
         let selection_color_actual = Color::from_rgba8(255, 0, 0, 200);
 
         let rendering_config_expected = RenderingConfig {
             background_color: bg_color_expected,
+            padding_color: padding_color_expected,
             inline_box_color: bg_color_expected,
             cursor_color: cursor_color_expected,
             selection_color: selection_color_expected,
@@ -199,6 +202,7 @@ impl CursorTest {
         };
         let rendering_config_actual = RenderingConfig {
             background_color: bg_color_actual,
+            padding_color: padding_color_actual,
             inline_box_color: bg_color_actual,
             cursor_color: cursor_color_actual,
             selection_color: selection_color_actual,
@@ -351,11 +355,13 @@ impl CursorTest {
     #[allow(dead_code)]
     pub(crate) fn render_cursor(&self, cursor: Cursor) {
         let bg_color_cursor = Color::from_rgba8(255, 255, 255, 255);
+        let padding_color_cursor = Color::from_rgba8(166, 200, 255, 255);
         let cursor_color_cursor = Color::from_rgba8(0, 255, 0, 255);
         let selection_color_cursor = Color::from_rgba8(0, 255, 0, 200);
 
         let rendering_config_cursor = RenderingConfig {
             background_color: bg_color_cursor,
+            padding_color: padding_color_cursor,
             inline_box_color: bg_color_cursor,
             cursor_color: cursor_color_cursor,
             selection_color: selection_color_cursor,
