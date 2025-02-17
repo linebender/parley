@@ -32,6 +32,7 @@ use hashbrown::{HashMap, HashSet};
 use swash::text::cluster::{Boundary, ClusterInfo};
 use swash::{GlyphId, NormalizedCoord, Synthesis};
 
+pub use alignment::AlignmentOptions;
 pub use cluster::{Affinity, ClusterPath, ClusterSide};
 pub use cursor::{Cursor, Selection};
 pub use line::greedy::BreakLines;
@@ -181,23 +182,14 @@ impl<B: Brush> Layout<B> {
     /// You must perform line breaking prior to aligning, through [`Layout::break_lines`] or
     /// [`Layout::break_all_lines`]. If `container_width` is not specified, the layout's
     /// [`Layout::width`] is used.
-    ///
-    /// If `align_when_overflowing` is set to `true`, alignment will apply even if the line
-    /// contents are wider than the alignment width. If it is set to `false`, all overflowing lines
-    /// will be [`Alignment::Start`] aligned.
     pub fn align(
         &mut self,
         container_width: Option<f32>,
         alignment: Alignment,
-        align_when_overflowing: bool,
+        options: AlignmentOptions,
     ) {
         unjustify(&mut self.data);
-        align(
-            &mut self.data,
-            container_width,
-            alignment,
-            align_when_overflowing,
-        );
+        align(&mut self.data, container_width, alignment, options);
     }
 
     /// Returns the index and `Line` object for the line containing the

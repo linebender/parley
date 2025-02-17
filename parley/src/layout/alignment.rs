@@ -7,6 +7,27 @@ use super::{
 };
 use crate::style::Brush;
 
+/// Additional options to fine tune alignment
+#[derive(Debug, Clone)]
+pub struct AlignmentOptions {
+    /// If set to `true`, "end" and "center" alignment will apply even if the line contents are
+    /// wider than the alignment width. If it is set to `false`, all overflowing lines will be
+    /// [`Alignment::Start`] aligned.
+    pub align_when_overflowing: bool,
+}
+
+#[expect(
+    clippy::derivable_impls,
+    reason = "Make default values explicit rather than relying on the implicit default value of bool"
+)]
+impl Default for AlignmentOptions {
+    fn default() -> Self {
+        Self {
+            align_when_overflowing: false,
+        }
+    }
+}
+
 /// Align the layout.
 ///
 /// If [`Alignment::Justified`] is requested, clusters' [`ClusterData::advance`] will be adjusted.
@@ -15,12 +36,12 @@ pub(crate) fn align<B: Brush>(
     layout: &mut LayoutData<B>,
     alignment_width: Option<f32>,
     alignment: Alignment,
-    align_when_overflowing: bool,
+    options: AlignmentOptions,
 ) {
     layout.alignment_width = alignment_width.unwrap_or(layout.width);
     layout.is_aligned_justified = alignment == Alignment::Justified;
 
-    align_impl::<_, false>(layout, alignment, align_when_overflowing);
+    align_impl::<_, false>(layout, alignment, options);
 }
 
 /// Removes previous justification applied to clusters.
@@ -29,7 +50,7 @@ pub(crate) fn align<B: Brush>(
 /// layout.
 pub(crate) fn unjustify<B: Brush>(layout: &mut LayoutData<B>) {
     if layout.is_aligned_justified {
-        align_impl::<_, true>(layout, Alignment::Justified, false);
+        align_impl::<_, true>(layout, Alignment::Justified, Default::default());
         layout.is_aligned_justified = false;
     }
 }
@@ -46,7 +67,7 @@ pub(crate) fn unjustify<B: Brush>(layout: &mut LayoutData<B>) {
 fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
     layout: &mut LayoutData<B>,
     alignment: Alignment,
-    align_when_overflowing: bool,
+    options: AlignmentOptions,
 ) {
     // Whether the text base direction is right-to-left.
     let is_rtl = layout.base_level & 1 == 1;
@@ -63,7 +84,7 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
         let free_space =
             layout.alignment_width - line.metrics.advance + line.metrics.trailing_whitespace;
 
-        if !align_when_overflowing && free_space <= 0.0 {
+        if !options.align_when_overflowing && free_space <= 0.0 {
             if is_rtl {
                 // In RTL text, right-align on overflow.
                 line.metrics.offset += free_space;
