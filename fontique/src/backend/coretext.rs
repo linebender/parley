@@ -5,20 +5,16 @@ use super::{
     scan, FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily, GenericFamilyMap,
 };
 use alloc::sync::Arc;
+use core::ptr::{null, null_mut};
 use hashbrown::HashMap;
+use objc2_core_foundation::{CFDictionaryCreate, CFRange, CFRetained, CFString, CFStringGetLength};
+use objc2_core_text::{
+    CTFont, CTFontCopyFamilyName, CTFontCreateForString, CTFontCreateForStringWithLanguage,
+    CTFontCreateUIFontForLanguage, CTFontCreateWithFontDescriptor,
+    CTFontDescriptorCreateWithAttributes, CTFontUIFontType,
+};
 use objc2_foundation::{
     NSSearchPathDirectory, NSSearchPathDomainMask, NSSearchPathForDirectoriesInDomains,
-};
-use {
-    core_foundation::{
-        base::{CFRange, TCFType},
-        dictionary::CFDictionary,
-        string::{CFString, CFStringRef},
-    },
-    core_text::{
-        font::{self, kCTFontSystemFontType, CTFont, CTFontRef, CTFontUIFontType},
-        font_descriptor,
-    },
 };
 
 const DEFAULT_GENERIC_FAMILIES: &[(GenericFamily, &[&str])] = &[
@@ -75,97 +71,45 @@ impl SystemFonts {
     pub(crate) fn fallback(&mut self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
         let key = key.into();
         let sample = key.script().sample()?;
-        self.fallback_for_text(sample, key.locale(), false)
+        let font = create_fallback_font_for_text(sample, key.locale(), false)?;
+        let family_name = unsafe { CTFontCopyFamilyName(&font) };
+        self.name_map.get(&family_name.to_string()).map(|n| n.id())
     }
 }
 
-impl SystemFonts {
-    fn fallback_for_text(
-        &mut self,
-        text: &str,
-        locale: Option<&str>,
-        prefer_ui: bool,
-    ) -> Option<FamilyId> {
-        let font = fallback_for_text(text, locale, prefer_ui)?;
-        self.name_map.get(&font.family_name()).map(|n| n.id())
-    }
-}
-
-fn fallback_for_text(text: &str, locale: Option<&str>, prefer_ui: bool) -> Option<CTFont> {
-    let cf_text = CFString::new(text);
-    let cf_text_range = CFRange::init(0, cf_text.char_len());
-    let cf_locale = locale.map(CFString::new);
-    let base_font = {
-        let desc_attrs = CFDictionary::from_CFType_pairs(&[]);
-        let mut desc = font_descriptor::new_from_attributes(&desc_attrs);
-        if prefer_ui {
-            if let Some(ui_desc) = ui_font_for_language(kCTFontSystemFontType, 0.0, None)
-                .map(|font| font.copy_descriptor())
-            {
-                desc = ui_desc;
-            }
+fn create_base_font(prefer_ui_font: bool) -> CFRetained<CTFont> {
+    if prefer_ui_font {
+        if let Some(font) =
+            unsafe { CTFontCreateUIFontForLanguage(CTFontUIFontType::System, 0.0, None) }
+        {
+            return font;
         }
-        font::new_from_descriptor(&desc, 0.0)
+    }
+    unsafe {
+        let attrs = CFDictionaryCreate(None, null_mut(), null_mut(), 0, null(), null());
+        let desc = CTFontDescriptorCreateWithAttributes(&attrs.unwrap());
+        CTFontCreateWithFontDescriptor(&desc, 0.0, null())
+    }
+}
+
+fn create_fallback_font_for_text(
+    text: &str,
+    locale: Option<&str>,
+    prefer_ui_font: bool,
+) -> Option<CFRetained<CTFont>> {
+    let text = CFString::from_str(text);
+    let text_range = CFRange {
+        location: 0,
+        length: unsafe { CFStringGetLength(&text) },
     };
+    let locale = locale.map(CFString::from_str);
+    let base_font = create_base_font(prefer_ui_font);
     let font = unsafe {
-        CTFont::wrap_under_create_rule(if let Some(locale) = cf_locale {
-            CTFontCreateForStringWithLanguage(
-                base_font.as_concrete_TypeRef(),
-                cf_text.as_concrete_TypeRef(),
-                cf_text_range,
-                locale.as_concrete_TypeRef(),
-            )
+        if let Some(locale) = locale {
+            CTFontCreateForStringWithLanguage(&base_font, &text, text_range, Some(&locale))
         } else {
-            CTFontCreateForString(
-                base_font.as_concrete_TypeRef(),
-                cf_text.as_concrete_TypeRef(),
-                cf_text_range,
-            )
-        })
+            CTFontCreateForString(&base_font, &text, text_range)
+        }
     };
     Some(font)
-}
-
-fn ui_font_for_language(
-    ui_type: CTFontUIFontType,
-    size: f64,
-    language: Option<CFString>,
-) -> Option<CTFont> {
-    unsafe {
-        let font_ref = CTFontCreateUIFontForLanguage(
-            ui_type,
-            size,
-            language
-                .as_ref()
-                .map(|x| x.as_concrete_TypeRef())
-                .unwrap_or(std::ptr::null()),
-        );
-        if font_ref.is_null() {
-            None
-        } else {
-            Some(CTFont::wrap_under_create_rule(font_ref))
-        }
-    }
-}
-
-#[link(name = "CoreText", kind = "framework")]
-extern "C" {
-    fn CTFontCreateUIFontForLanguage(
-        uiType: CTFontUIFontType,
-        size: f64,
-        language: CFStringRef,
-    ) -> CTFontRef;
-
-    fn CTFontCreateForString(
-        currentFont: CTFontRef,
-        string: CFStringRef,
-        range: CFRange,
-    ) -> CTFontRef;
-
-    fn CTFontCreateForStringWithLanguage(
-        currentFont: CTFontRef,
-        string: CFStringRef,
-        range: CFRange,
-        language: CFStringRef,
-    ) -> CTFontRef;
 }
