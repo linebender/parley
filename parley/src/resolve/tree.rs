@@ -15,6 +15,13 @@ struct StyleTreeNode<B: Brush> {
     style: ResolvedStyle<B>,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub(crate) enum ItemKind {
+    None,
+    InlineBox,
+    TextRun,
+}
+
 /// Builder for constructing a tree of styles
 #[derive(Clone)]
 pub(crate) struct TreeStyleBuilder<B: Brush> {
@@ -25,6 +32,7 @@ pub(crate) struct TreeStyleBuilder<B: Brush> {
     uncommitted_text: String,
     current_span: usize,
     is_span_first: bool,
+    last_item_kind: ItemKind,
 }
 
 impl<B: Brush> TreeStyleBuilder<B> {
@@ -43,6 +51,7 @@ impl<B: Brush> Default for TreeStyleBuilder<B> {
             uncommitted_text: String::new(),
             current_span: usize::MAX,
             is_span_first: false,
+            last_item_kind: ItemKind::None,
         }
     }
 }
@@ -72,6 +81,10 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.is_span_first = is_span_first;
     }
 
+    pub(crate) fn set_last_item_kind(&mut self, item_kind: ItemKind) {
+        self.last_item_kind = item_kind;
+    }
+
     pub(crate) fn push_uncommitted_text(&mut self, is_span_last: bool) {
         let span_text: Cow<'_, str> = match self.white_space_collapse {
             WhiteSpaceCollapse::Preserve => Cow::from(&self.uncommitted_text),
@@ -79,11 +92,12 @@ impl<B: Brush> TreeStyleBuilder<B> {
                 let mut span_text = self.uncommitted_text.as_str();
 
                 if self.is_span_first
-                    || self
-                        .text
-                        .chars()
-                        .last()
-                        .is_some_and(|c| c.is_ascii_whitespace())
+                    || (self.last_item_kind == ItemKind::TextRun
+                        && self
+                            .text
+                            .chars()
+                            .last()
+                            .is_some_and(|c| c.is_ascii_whitespace()))
                 {
                     span_text = span_text.trim_start();
                 }
@@ -129,6 +143,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.text.push_str(span_text);
         self.uncommitted_text.clear();
         self.is_span_first = false;
+        self.last_item_kind = ItemKind::TextRun;
     }
 
     pub(crate) fn current_text_len(&self) -> usize {

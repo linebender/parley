@@ -13,6 +13,7 @@ use alloc::string::String;
 use core::ops::RangeBounds;
 
 use crate::inline_box::InlineBox;
+use crate::resolve::tree::ItemKind;
 
 /// Builder for constructing a text layout with ranged attributes.
 pub struct RangedBuilder<'a, B: Brush> {
@@ -102,6 +103,9 @@ impl<B: Brush> TreeBuilder<'_, B> {
     pub fn push_inline_box(&mut self, mut inline_box: InlineBox) {
         self.lcx.tree_style_builder.push_uncommitted_text(false);
         self.lcx.tree_style_builder.set_is_span_first(false);
+        self.lcx
+            .tree_style_builder
+            .set_last_item_kind(ItemKind::InlineBox);
         // TODO: arrange type better here to factor out the index
         inline_box.index = self.lcx.tree_style_builder.current_text_len();
         self.lcx.inline_boxes.push(inline_box);
