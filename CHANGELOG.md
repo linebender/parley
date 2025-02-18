@@ -19,7 +19,7 @@ This release has an [MSRV] of 1.82.
 
 #### Fontique
 
-- `FontStretch`, `FontStyle`, and `FontWeight` get helper functions `from_fontconfig` ([#212] by [@waywardmonkeys][])
+- `FontStretch`, `FontStyle`, and `FontWeight` get helper functions `from_fontconfig` ([#212][] by [@waywardmonkeys][])
 
 #### Parley
 
@@ -125,6 +125,7 @@ This release has an [MSRV] of 1.70.
 [#192]: https://github.com/linebender/parley/pull/192
 [#198]: https://github.com/linebender/parley/pull/198
 [#211]: https://github.com/linebender/parley/pull/211
+[#212]: https://github.com/linebender/parley/pull/212
 [#223]: https://github.com/linebender/parley/pull/223
 [#224]: https://github.com/linebender/parley/pull/224
 [#250]: https://github.com/linebender/parley/pull/250
