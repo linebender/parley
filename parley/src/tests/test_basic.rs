@@ -97,7 +97,7 @@ fn full_width_inbox() {
 }
 
 #[test]
-fn inboxes_separated_by_whitespace() {
+fn inbox_separated_by_whitespace() {
     let mut env = testenv!();
 
     let mut builder = env.tree_builder();
