@@ -473,7 +473,8 @@ impl Iterator for GlyphIter<'_> {
 #[cfg(test)]
 mod tests {
     use crate::{
-        Alignment, Cluster, FontContext, Layout, LayoutContext, PositionedLayoutItem, StyleProperty,
+        Alignment, AlignmentOptions, Cluster, FontContext, Layout, LayoutContext,
+        PositionedLayoutItem, StyleProperty,
     };
 
     type Brush = ();
@@ -493,11 +494,7 @@ mod tests {
     fn cluster_from_position_with_alignment(alignment: Alignment) {
         let mut layout = create_unaligned_layout();
         let width = layout.full_width();
-        layout.align(
-            Some(width + 100.),
-            alignment,
-            false, /* align_when_overflowing */
-        );
+        layout.align(Some(width + 100.), alignment, AlignmentOptions::default());
         assert_eq!(
             layout.len(),
             1,

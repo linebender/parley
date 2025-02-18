@@ -6,7 +6,7 @@
 use crate::{
     layout::{
         cursor::{Cursor, Selection},
-        Affinity, Alignment, Layout,
+        Affinity, Alignment, AlignmentOptions, Layout,
     },
     resolve::ResolvedStyle,
     style::Brush,
@@ -1038,11 +1038,8 @@ where
         }
         self.layout = builder.build(&self.buffer);
         self.layout.break_all_lines(self.width);
-        self.layout.align(
-            self.width,
-            self.alignment,
-            false, /* align_when_overflowing */
-        );
+        self.layout
+            .align(self.width, self.alignment, AlignmentOptions::default());
         self.selection = self.selection.refresh(&self.layout);
         self.layout_dirty = false;
         self.generation.nudge();

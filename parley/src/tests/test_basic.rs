@@ -3,7 +3,7 @@
 
 use peniko::kurbo::Size;
 
-use crate::{testenv, Alignment, InlineBox, WhiteSpaceCollapse};
+use crate::{testenv, Alignment, AlignmentOptions, InlineBox, WhiteSpaceCollapse};
 
 #[test]
 fn plain_multiline_text() {
@@ -13,11 +13,7 @@ fn plain_multiline_text() {
     let mut builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(
-        None,
-        Alignment::Start,
-        false, /* align_when_overflowing */
-    );
+    layout.align(None, Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -42,11 +38,7 @@ fn placing_inboxes() {
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(
-            None,
-            Alignment::Start,
-            false, /* align_when_overflowing */
-        );
+        layout.align(None, Alignment::Start, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
@@ -67,11 +59,7 @@ fn only_inboxes_wrap() {
     }
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(40.0));
-    layout.align(
-        None,
-        Alignment::Middle,
-        false, /* align_when_overflowing */
-    );
+    layout.align(None, Alignment::Middle, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -103,11 +91,7 @@ fn full_width_inbox() {
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(100.));
-        layout.align(
-            None,
-            Alignment::Start,
-            false, /* align_when_overflowing */
-        );
+        layout.align(None, Alignment::Start, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
@@ -120,7 +104,7 @@ fn trailing_whitespace() {
     let mut builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(45.));
-    layout.align(None, Alignment::Start, false);
+    layout.align(None, Alignment::Start, AlignmentOptions::default());
 
     assert!(
         layout.width() < layout.full_width(),
@@ -149,11 +133,7 @@ fn leading_whitespace() {
         builder.push_text("  Line 2");
         let (mut layout, _) = builder.build();
         layout.break_all_lines(None);
-        layout.align(
-            None,
-            Alignment::Start,
-            false, /* align_when_overflowing */
-        );
+        layout.align(None, Alignment::Start, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
@@ -172,11 +152,7 @@ fn base_level_alignment_ltr() {
         let mut builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(150.0));
-        layout.align(
-            Some(150.0),
-            alignment,
-            false, /* align_when_overflowing */
-        );
+        layout.align(Some(150.0), alignment, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
@@ -195,7 +171,7 @@ fn base_level_alignment_rtl() {
         let mut builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(150.0));
-        layout.align(None, alignment, false /* align_when_overflowing */);
+        layout.align(None, alignment, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
@@ -210,11 +186,7 @@ fn overflow_alignment_rtl() {
     let mut builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(1000.0));
-    layout.align(
-        Some(10.),
-        Alignment::Middle,
-        false, /* align_when_overflowing */
-    );
+    layout.align(Some(10.), Alignment::Middle, AlignmentOptions::default());
     env.rendering_config().size = Some(Size::new(10., layout.height().into()));
     env.check_layout_snapshot(&layout);
 }
@@ -229,11 +201,11 @@ fn content_widths() {
     let mut layout = builder.build(text);
 
     layout.break_all_lines(Some(layout.min_content_width()));
-    layout.align(None, Alignment::Start, false);
+    layout.align(None, Alignment::Start, AlignmentOptions::default());
     env.with_name("min").check_layout_snapshot(&layout);
 
     layout.break_all_lines(Some(layout.max_content_width()));
-    layout.align(None, Alignment::Start, false);
+    layout.align(None, Alignment::Start, AlignmentOptions::default());
     env.with_name("max").check_layout_snapshot(&layout);
 }
 
@@ -247,11 +219,11 @@ fn content_widths_rtl() {
     let mut layout = builder.build(text);
 
     layout.break_all_lines(Some(layout.min_content_width()));
-    layout.align(None, Alignment::Start, false);
+    layout.align(None, Alignment::Start, AlignmentOptions::default());
     env.with_name("min").check_layout_snapshot(&layout);
 
     layout.break_all_lines(Some(layout.max_content_width()));
-    layout.align(None, Alignment::Start, false);
+    layout.align(None, Alignment::Start, AlignmentOptions::default());
     assert!(
         layout.width() <= layout.max_content_width(),
         "Layout should never be wider than the max content width"
@@ -274,7 +246,7 @@ fn inbox_content_width() {
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(layout.min_content_width()));
-        layout.align(None, Alignment::Start, false);
+        layout.align(None, Alignment::Start, AlignmentOptions::default());
 
         env.with_name("full_width").check_layout_snapshot(&layout);
     }
@@ -290,7 +262,7 @@ fn inbox_content_width() {
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(layout.max_content_width()));
-        layout.align(None, Alignment::Start, false);
+        layout.align(None, Alignment::Start, AlignmentOptions::default());
 
         assert!(
             layout.width() <= layout.max_content_width(),
@@ -318,7 +290,7 @@ fn realign() {
         layout.align(
             Some(150.),
             Alignment::Justified,
-            false, /* align_when_overflowing */
+            AlignmentOptions::default(),
         );
     }
     env.check_layout_snapshot(&layout);

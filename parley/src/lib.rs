@@ -23,8 +23,8 @@
 //!
 //! ```rust
 //! use parley::{
-//!    Alignment, FontContext, FontWeight, InlineBox, Layout, LayoutContext, PositionedLayoutItem,
-//!    StyleProperty,
+//!    Alignment, AlignmentOptions, FontContext, FontWeight, InlineBox, Layout, LayoutContext,
+//!    PositionedLayoutItem, StyleProperty,
 //! };
 //!
 //! // Create a FontContext (font database) and LayoutContext (scratch space).
@@ -53,7 +53,7 @@
 //! // Run line-breaking and alignment on the Layout
 //! const MAX_WIDTH : Option<f32> = Some(100.0);
 //! layout.break_all_lines(MAX_WIDTH);
-//! layout.align(MAX_WIDTH, Alignment::Start, false /* align_when_overflowing */);
+//! layout.align(MAX_WIDTH, Alignment::Start, AlignmentOptions::default());
 //!
 //! // Inspect computed layout (see examples for more details)
 //! let width = layout.width();
