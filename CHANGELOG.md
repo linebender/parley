@@ -20,13 +20,13 @@ This release has an [MSRV] of 1.82.
 #### Fontique
 
 - `FontStretch`, `FontStyle`, and `FontWeight` get helper functions `from_fontconfig` ([#212] by [@waywardmonkeys][])
-- `Layout` methods to calculate minimum and maximum content widths. ([#259][] by [@wfdewith][])
 
 #### Parley
 
 - `Generation` on `PlainEditor` to help implement lazy drawing. ([#143] by [@xorgy])
 - Support for preedit for input methods in `PlainEditor` ([#192][], [#198][] by [@tomcur][])
 - `PlainEditor` method to get a cursor area for use by the platform's input method ([#224][] by [@tomcur][])
+- `Layout` methods to calculate minimum and maximum content widths. ([#259][] by [@wfdewith][])
 
 ### Changed
 
