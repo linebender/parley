@@ -182,12 +182,7 @@ impl<B: Brush> Layout<B> {
     /// You must perform line breaking prior to aligning, through [`Layout::break_lines`] or
     /// [`Layout::break_all_lines`]. If `container_width` is not specified, the layout's
     /// [`Layout::width`] is used.
-    pub fn align(
-        &mut self,
-        container_width: f32,
-        alignment: Alignment,
-        options: AlignmentOptions,
-    ) {
+    pub fn align(&mut self, container_width: f32, alignment: Alignment, options: AlignmentOptions) {
         unjustify(&mut self.data);
         align(&mut self.data, container_width, alignment, options);
     }
