@@ -19,6 +19,7 @@ use super::style::Brush;
 use crate::{Font, InlineBox};
 #[cfg(feature = "accesskit")]
 use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
+use alignment::unjustify;
 #[cfg(feature = "accesskit")]
 use alloc::vec::Vec;
 use core::{cmp::Ordering, ops::Range};
@@ -164,6 +165,7 @@ impl<B: Brush> Layout<B> {
 
     /// Returns line breaker to compute lines for the layout.
     pub fn break_lines(&mut self) -> BreakLines<'_, B> {
+        unjustify(&mut self.data);
         BreakLines::new(self)
     }
 
@@ -189,6 +191,7 @@ impl<B: Brush> Layout<B> {
         alignment: Alignment,
         align_when_overflowing: bool,
     ) {
+        unjustify(&mut self.data);
         align(
             &mut self.data,
             container_width,

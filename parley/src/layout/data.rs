@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::inline_box::InlineBox;
-use crate::layout::{Alignment, ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
+use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::nearly_zero;
 use crate::Font;
@@ -105,8 +105,10 @@ pub(crate) struct LineData {
     pub(crate) metrics: LineMetrics,
     /// The cause of the line break.
     pub(crate) break_reason: BreakReason,
-    /// Alignment.
-    pub(crate) alignment: Alignment,
+    #[expect(
+        dead_code,
+        reason = "needed in the future for aligning around floated boxes"
+    )]
     /// Maximum advance for the line.
     pub(crate) max_advance: f32,
     /// Number of justified clusters on the line.
@@ -220,6 +222,12 @@ pub(crate) struct LayoutData<B: Brush> {
     // Output of line breaking
     pub(crate) lines: Vec<LineData>,
     pub(crate) line_items: Vec<LineItemData>,
+
+    // Output of alignment
+    /// Whether the layout is aligned with [`crate::Alignment::Justified`].
+    pub(crate) is_aligned_justified: bool,
+    /// The width the layout was aligned to.
+    pub(crate) alignment_width: f32,
 }
 
 impl<B: Brush> Default for LayoutData<B> {
@@ -243,6 +251,8 @@ impl<B: Brush> Default for LayoutData<B> {
             glyphs: Vec::new(),
             lines: Vec::new(),
             line_items: Vec::new(),
+            is_aligned_justified: false,
+            alignment_width: 0.0,
         }
     }
 }
