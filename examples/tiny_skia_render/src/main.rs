@@ -48,7 +48,7 @@ fn main() {
     let display_scale = 1.0;
 
     // The width for line wrapping
-    let max_advance = Some(200.0 * display_scale);
+    let max_advance = 200.0 * display_scale;
 
     // Colours for rendering
     let foreground_color = Color::BLACK;
@@ -98,7 +98,7 @@ fn main() {
     let mut layout: Layout<ColorBrush> = builder.build(&text);
 
     // Perform layout (including bidi resolution and shaping) with start alignment
-    layout.break_all_lines(max_advance);
+    layout.break_all_lines(Some(max_advance));
     layout.align(max_advance, Alignment::Start, AlignmentOptions::default());
     let width = layout.width().ceil() as u32;
     let height = layout.height().ceil() as u32;

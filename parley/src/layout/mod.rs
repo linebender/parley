@@ -184,7 +184,7 @@ impl<B: Brush> Layout<B> {
     /// [`Layout::width`] is used.
     pub fn align(
         &mut self,
-        container_width: Option<f32>,
+        container_width: f32,
         alignment: Alignment,
         options: AlignmentOptions,
     ) {

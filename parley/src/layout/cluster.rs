@@ -494,7 +494,7 @@ mod tests {
     fn cluster_from_position_with_alignment(alignment: Alignment) {
         let mut layout = create_unaligned_layout();
         let width = layout.full_width();
-        layout.align(Some(width + 100.), alignment, AlignmentOptions::default());
+        layout.align(width + 100., alignment, AlignmentOptions::default());
         assert_eq!(
             layout.len(),
             1,
