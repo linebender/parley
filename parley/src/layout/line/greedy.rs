@@ -532,14 +532,29 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             line.metrics.trailing_whitespace = run
                 .filter(|item| item.is_text_run())
                 .and_then(|run| {
-                    let cluster = if self.layout.is_rtl() {
-                        self.layout.data.clusters[run.cluster_range.clone()].first()
+                    if self.layout.is_rtl() {
+                        // An RTL layout that has a line that ends with a space followed by a
+                        // forced line break will always have a separate run that looks like:
+                        // [" ", "\n"]. This means that the first cluster of a run with trailing
+                        // white space is always a space, regardless of whether the forced line
+                        // break follows, so we don't have to check for forced line breaks
+                        // explicitly.
+                        self.layout.data.clusters[run.cluster_range.clone()]
+                            .first()
+                            .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
+                            .map(|cluster| cluster.advance)
                     } else {
-                        self.layout.data.clusters[run.cluster_range.clone()].last()
-                    };
-                    cluster
-                        .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
-                        .map(|cluster| cluster.advance)
+                        match &self.layout.data.clusters[run.cluster_range.clone()] {
+                            [.., a, b]
+                                if a.info.whitespace().is_space_or_nbsp()
+                                    && b.info.whitespace() == Whitespace::Newline =>
+                            {
+                                Some(a.advance + b.advance)
+                            }
+                            [.., a] if a.info.whitespace().is_space_or_nbsp() => Some(a.advance),
+                            _ => None,
+                        }
+                    }
                 })
                 .unwrap_or(0.0);
 
