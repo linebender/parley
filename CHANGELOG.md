@@ -76,7 +76,6 @@ This release has an [MSRV] of 1.75.
 
 #### Parley
 
-
 - Emoji clusters now get an Emoji family added by default ([#56] by [@dfrg])
 - Style builders now accept `Into<StyleProperty<'a, B: Brush>>` so you can push a `GenericFamily` or `FontStack` directly. ([#129] by [@xorgy])
 
