@@ -131,7 +131,7 @@ impl CursorTest {
             if env_var == "0" {
                 return false;
             }
-            if env_var.to_ascii_lowercase() == "false" {
+            if env_var.eq_ignore_ascii_case("false") {
                 return false;
             }
             true
