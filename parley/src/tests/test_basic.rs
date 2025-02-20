@@ -97,6 +97,44 @@ fn full_width_inbox() {
 }
 
 #[test]
+fn inbox_separated_by_whitespace() {
+    let mut env = testenv!();
+
+    let mut builder = env.tree_builder();
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        index: 0,
+        width: 10.,
+        height: 10.0,
+    });
+    builder.push_text(" ");
+    builder.push_inline_box(InlineBox {
+        id: 1,
+        index: 1,
+        width: 10.0,
+        height: 10.0,
+    });
+    builder.push_text(" ");
+    builder.push_inline_box(InlineBox {
+        id: 2,
+        index: 2,
+        width: 10.0,
+        height: 10.0,
+    });
+    builder.push_text(" ");
+    builder.push_inline_box(InlineBox {
+        id: 3,
+        index: 3,
+        width: 10.0,
+        height: 10.0,
+    });
+    let (mut layout, _text) = builder.build();
+    layout.break_all_lines(Some(100.));
+    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
 fn trailing_whitespace() {
     let mut env = testenv!();
 
