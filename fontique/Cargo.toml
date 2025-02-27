@@ -33,7 +33,7 @@ system = [
 bytemuck = { workspace = true }
 read-fonts = { workspace = true }
 peniko = { workspace = true }
-smallvec = "1.13.2"
+smallvec = "1.14.0"
 memmap2 = { version = "0.9.5", optional = true }
 unicode-script = { version = "0.5.7", optional = true }
 core_maths = { version = "0.1.1", optional = true }
