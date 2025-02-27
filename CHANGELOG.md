@@ -21,11 +21,6 @@ This release has an [MSRV] of 1.82.
 
 ### Added
 
-#### Fontique
-
-- `FontStretch`, `FontStyle`, and `FontWeight` get helper functions `from_fontconfig` ([#212][] by [@waywardmonkeys][])
-- Impl `bytemuck` traits for `GenericFamily` ([#213][] by [@waywardmonkeys][])
-
 #### Parley
 
 - `Generation` on `PlainEditor` to help implement lazy drawing. ([#143] by [@xorgy])
@@ -37,12 +32,12 @@ This release has an [MSRV] of 1.82.
 - AccessKit integration ([#166][] by [@mwcampbell])
 - `first_style` method to `Cluster` ([#264][] by [@nicoburns])
 
-### Changed
-
 #### Fontique
 
-- Breaking change: `Stretch`, `Style`, and `Weight` renamed to `FontWidth`, `FontStyle`, `FontWeight` ([#211][], [#223][] by [@waywardmonkeys][])
-- Depend on `read-fonts` instead of `skrifa` ([#162][] by [@nicoburns][])
+- `FontStretch`, `FontStyle`, and `FontWeight` get helper functions `from_fontconfig` ([#212][] by [@waywardmonkeys][])
+- Impl `bytemuck` traits for `GenericFamily` ([#213][] by [@waywardmonkeys][])
+
+### Changed
 
 #### Parley
 
@@ -54,6 +49,11 @@ This release has an [MSRV] of 1.82.
 - Breaking change: `Layout` is no longer `Sync`. ([#259][] by [@wfdewith][])
 - Breaking change: `PlainEditor`'s width is now `Option<f32>` rather than `f32` ([#137][] by [@nicoburns])
 - Breaking change: Make alignment when free space is negative configurable ([#241][] by [@nicoburns])
+
+#### Fontique
+
+- Breaking change: `Stretch`, `Style`, and `Weight` renamed to `FontWidth`, `FontStyle`, `FontWeight` ([#211][], [#223][] by [@waywardmonkeys][])
+- Depend on `read-fonts` instead of `skrifa` ([#162][] by [@nicoburns][])
 
 ### Fixed
 
