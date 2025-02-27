@@ -24,7 +24,7 @@ This release has an [MSRV] of 1.82.
 #### Fontique
 
 - `FontStretch`, `FontStyle`, and `FontWeight` get helper functions `from_fontconfig` ([#212][] by [@waywardmonkeys][])
-- Impl bytemuck traits for GenericFamily ([#213][] by [@waywardmonkeys][])
+- Impl `bytemuck` traits for `GenericFamily` ([#213][] by [@waywardmonkeys][])
 
 #### Parley
 
@@ -32,17 +32,17 @@ This release has an [MSRV] of 1.82.
 - Support for preedit for input methods in `PlainEditor` ([#192][], [#198][] by [@tomcur][])
 - `PlainEditor` method to get a cursor area for use by the platform's input method ([#224][] by [@tomcur][])
 - `Layout` methods to calculate minimum and maximum content widths. ([#259][] by [@wfdewith][])
-- `PlainEditor` now implements `Clone` for ([#133][] by [@nicoburns])
-- `PlainEditor`: Add byte selection and navigation operations. ([#146][] by [@xorgy])
+- `PlainEditor` now implements `Clone` ([#133][] by [@nicoburns])
+- Navigation and byte selection operations for `PlainEditor`. ([#146][] by [@xorgy])
 - AccessKit integration ([#166][] by [@mwcampbell])
-- Add `first_style` method to Cluster ([#264][] by [@nicoburns])
+- `first_style` method to `Cluster` ([#264][] by [@nicoburns])
 
 ### Changed
 
 #### Fontique
 
 - Breaking change: `Stretch`, `Style`, and `Weight` renamed to `FontWidth`, `FontStyle`, `FontWeight` ([#211][], [#223][] by [@waywardmonkeys][])
-- Fontique: depend on read-fonts instead of skrifa ([#162][] by [@nicoburns][])
+- Depend on `read-fonts` instead of `skrifa` ([#162][] by [@nicoburns][])
 
 #### Parley
 
@@ -65,14 +65,14 @@ This release has an [MSRV] of 1.82.
 - Performing line breaking or aligning a layout again, after justified alignment had been applied previously, now lead to the correct results. ([#271][] by [@tomcur][])
 - Fix placement of inline boxes ([#163][] by [@spirali][])
 - Cursor position for lines that are not left-aligned ([#169][] by [@mwcampbell])
-- Fix Cursor::from_point to use the line's offset ([#176][] by [@DJMcNab])
-- Fix off-by-one error in PlainEditor::cursor_at ([#187][] by [@tomcur])
-- Fix binary search in Layout::line_for_offset ([#188][] by [@tomcur])
+- Fix `Cursor::from_point` to use the line's offset ([#176][] by [@DJMcNab])
+- Fix off-by-one error in `PlainEditor::cursor_at` ([#187][] by [@tomcur])
+- Fix binary search in `Layout::line_for_offset` ([#188][] by [@tomcur])
 - Fix whitespace collapsing at the start of inline spans ([#191][] by [@nicoburns])
 - Fix collapsing selection ([#201][] by [@tomcur])
-- Ignore affinities in Selection::is_collapsed ([#202][] by [@nicoburns])
+- Ignore affinities in `Selection::is_collapsed` ([#202][] by [@nicoburns])
 - Misc. inline box layout fixes ([#207][] by [@nicoburns])
-- Allow Bidi base_level to be determined from text ([#245][] by [@nicoburns])
+- Allow Bidi `base_level` to be determined from text ([#245][] by [@nicoburns])
 - Fix linebreaking for lines without text runs ([#249][] by [@wfdewith])
 - Correctly calculate trailing whitespace for all lines ([#256][] by [@wfdewith])
 - Strip whitespace following a newline when whitespace collapsing is enabled ([#254][] by [@nicoburns])
@@ -162,6 +162,7 @@ This release has an [MSRV] of 1.70.
 [#143]: https://github.com/linebender/parley/pull/143
 [#146]: https://github.com/linebender/parley/pull/146
 [#154]: https://github.com/linebender/parley/pull/154
+[#162]: https://github.com/linebender/parley/pull/162
 [#163]: https://github.com/linebender/parley/pull/163
 [#166]: https://github.com/linebender/parley/pull/166
 [#169]: https://github.com/linebender/parley/pull/169
@@ -182,6 +183,7 @@ This release has an [MSRV] of 1.70.
 [#213]: https://github.com/linebender/parley/pull/213
 [#223]: https://github.com/linebender/parley/pull/223
 [#224]: https://github.com/linebender/parley/pull/224
+[#241]: https://github.com/linebender/parley/pull/241
 [#245]: https://github.com/linebender/parley/pull/245
 [#249]: https://github.com/linebender/parley/pull/249
 [#250]: https://github.com/linebender/parley/pull/250
