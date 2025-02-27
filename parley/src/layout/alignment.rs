@@ -34,11 +34,11 @@ impl Default for AlignmentOptions {
 /// Prior to re-line-breaking or re-aligning, [`unjustify`] has to be called.
 pub(crate) fn align<B: Brush>(
     layout: &mut LayoutData<B>,
-    alignment_width: Option<f32>,
+    alignment_width: f32,
     alignment: Alignment,
     options: AlignmentOptions,
 ) {
-    layout.alignment_width = alignment_width.unwrap_or(layout.width);
+    layout.alignment_width = alignment_width;
     layout.is_aligned_justified = alignment == Alignment::Justified;
 
     align_impl::<_, false>(layout, alignment, options);

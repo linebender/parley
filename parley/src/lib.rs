@@ -51,8 +51,8 @@
 //! let mut layout: Layout<()> = builder.build(&TEXT);
 //!
 //! // Run line-breaking and alignment on the Layout
-//! const MAX_WIDTH : Option<f32> = Some(100.0);
-//! layout.break_all_lines(MAX_WIDTH);
+//! const MAX_WIDTH: f32 = 100.0;
+//! layout.break_all_lines(Some(MAX_WIDTH));
 //! layout.align(MAX_WIDTH, Alignment::Start, AlignmentOptions::default());
 //!
 //! // Inspect computed layout (see examples for more details)

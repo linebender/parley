@@ -40,6 +40,10 @@ This release has an [MSRV] of 1.82.
 - Breaking change: `Alignment::Start` and `Alignment::End` now depend on text base direction.
   `Alignment::Left` and `Alignment::Right` are introduced for text direction-independent alignment. ([#250][] by [@tomcur][])
 - Breaking change: `Layout` is no longer `Sync`. ([#259][] by [@wfdewith][])
+- Breaking change: `Layout::align` now takes `AlignmentOptions` and requires `container_width` to be set.
+  Consider setting `container_width` to the value used for line breaking.
+  To keep the old default behavior, set `container_width` to the value returned by `Layout::width`.
+  ([#278][] by [@nicoburns][], [#283][] by [@tomcur][])
 
 ### Fixed
 
@@ -132,6 +136,8 @@ This release has an [MSRV] of 1.70.
 [#259]: https://github.com/linebender/parley/pull/259
 [#268]: https://github.com/linebender/parley/pull/268
 [#271]: https://github.com/linebender/parley/pull/271
+[#278]: https://github.com/linebender/parley/pull/278
+[#283]: https://github.com/linebender/parley/pull/283
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/linebender/parley/releases/tag/v0.2.0

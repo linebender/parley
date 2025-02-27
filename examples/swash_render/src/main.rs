@@ -45,7 +45,7 @@ fn main() {
     let display_scale = 1.0;
 
     // The width for line wrapping
-    let max_advance = Some(200.0 * display_scale);
+    let max_advance = 200.0 * display_scale;
 
     // Colours for rendering
     let text_color = Rgba([0, 0, 0, 255]);
@@ -167,7 +167,7 @@ fn main() {
     };
 
     // Perform layout (including bidi resolution and shaping) with start alignment
-    layout.break_all_lines(max_advance);
+    layout.break_all_lines(Some(max_advance));
     layout.align(max_advance, Alignment::Start, AlignmentOptions::default());
 
     // Create image to render into
