@@ -9,7 +9,7 @@ publish = false
 
 [dependencies]
 vello = "0.4.0"
-anyhow = "1.0.95"
+anyhow = "1.0.96"
 pollster = "0.4.0"
 winit = "0.30.9"
 parley = { workspace = true, default-features = true, features = ["accesskit"] }
@@ -24,4 +24,4 @@ workspace = true
 winit = { version = "0.30.9", features = ["android-native-activity"] }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
-clipboard-rs = "0.2.2"
+clipboard-rs = "0.2.4"
