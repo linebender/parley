@@ -55,8 +55,6 @@ This release has an [MSRV] of 1.82.
 - Breaking change: `PlainEditor`'s width is now `Option<f32>` rather than `f32` ([#137][] by [@nicoburns])
 - Breaking change: Make alignment when free space is negative configurable ([#241][] by [@nicoburns])
 
-241
-
 ### Fixed
 
 #### Parley
