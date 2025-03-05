@@ -22,6 +22,32 @@ pub enum WhiteSpaceCollapse {
     Preserve,
 }
 
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
+pub enum VerticalAlign {
+    #[default]
+    Baseline,
+    TextBottom,
+    Middle,
+    TextTop,
+}
+
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum BaselineShift {
+    Absolute(f32),
+    Relative(f32),
+    Sub,
+    Super,
+    Top,
+    Center,
+    Bottom,
+}
+
+impl Default for BaselineShift {
+    fn default() -> Self {
+        BaselineShift::Absolute(0.0)
+    }
+}
+
 /// Properties that define a style.
 #[derive(Clone, PartialEq, Debug)]
 pub enum StyleProperty<'a, B: Brush> {
@@ -65,6 +91,10 @@ pub enum StyleProperty<'a, B: Brush> {
     WordSpacing(f32),
     /// Extra spacing between letters.
     LetterSpacing(f32),
+    /// The baseline along which this item is aligned.
+    VerticalAlign(VerticalAlign),
+    /// Additional baseline alignment applied afterwards.
+    BaselineShift(BaselineShift),
 }
 
 /// Unresolved styles.
@@ -110,6 +140,10 @@ pub struct TextStyle<'a, B: Brush> {
     pub word_spacing: f32,
     /// Extra spacing between letters.
     pub letter_spacing: f32,
+    /// The baseline along which this item is aligned.
+    pub vertical_align: VerticalAlign,
+    /// Additional baseline alignment applied afterwards.
+    pub baseline_shift: BaselineShift,
 }
 
 impl<B: Brush> Default for TextStyle<'_, B> {
@@ -135,6 +169,8 @@ impl<B: Brush> Default for TextStyle<'_, B> {
             line_height: 1.2,
             word_spacing: Default::default(),
             letter_spacing: Default::default(),
+            vertical_align: Default::default(),
+            baseline_shift: Default::default(),
         }
     }
 }

@@ -15,9 +15,9 @@ use super::style::{
     FontWidth, StyleProperty,
 };
 use crate::font::FontContext;
-use crate::layout;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
+use crate::{layout, BaselineShift, VerticalAlign};
 use core::borrow::Borrow;
 use core::ops::Range;
 use fontique::FamilyId;
@@ -155,6 +155,16 @@ impl ResolveContext {
             StyleProperty::LineHeight(value) => LineHeight(*value),
             StyleProperty::WordSpacing(value) => WordSpacing(*value * scale),
             StyleProperty::LetterSpacing(value) => LetterSpacing(*value * scale),
+            StyleProperty::VerticalAlign(value) => VerticalAlign(*value),
+            StyleProperty::BaselineShift(value) => BaselineShift(match value {
+                crate::BaselineShift::Absolute(value) => {
+                    crate::BaselineShift::Absolute(*value * scale)
+                }
+                crate::BaselineShift::Relative(value) => {
+                    crate::BaselineShift::Relative(*value * scale)
+                }
+                _ => *value,
+            }),
         }
     }
 
@@ -189,6 +199,8 @@ impl ResolveContext {
             line_height: raw_style.line_height,
             word_spacing: raw_style.word_spacing * scale,
             letter_spacing: raw_style.letter_spacing * scale,
+            vertical_align: raw_style.vertical_align,
+            baseline_shift: raw_style.baseline_shift,
         }
     }
 
@@ -366,6 +378,10 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     WordSpacing(f32),
     /// Extra spacing between letters.
     LetterSpacing(f32),
+    /// The baseline along which this item is aligned.
+    VerticalAlign(VerticalAlign),
+    /// Additional baseline alignment applied afterwards.
+    BaselineShift(BaselineShift),
 }
 
 /// Flattened group of style properties.
@@ -399,6 +415,10 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     pub(crate) word_spacing: f32,
     /// Extra spacing between letters.
     pub(crate) letter_spacing: f32,
+    /// The baseline along which this item is aligned.
+    pub vertical_align: VerticalAlign,
+    /// Additional baseline alignment applied afterwards.
+    pub baseline_shift: BaselineShift,
 }
 
 impl<B: Brush> Default for ResolvedStyle<B> {
@@ -418,6 +438,8 @@ impl<B: Brush> Default for ResolvedStyle<B> {
             line_height: 1.,
             word_spacing: 0.,
             letter_spacing: 0.,
+            vertical_align: Default::default(),
+            baseline_shift: Default::default(),
         }
     }
 }
@@ -447,6 +469,8 @@ impl<B: Brush> ResolvedStyle<B> {
             LineHeight(value) => self.line_height = value,
             WordSpacing(value) => self.word_spacing = value,
             LetterSpacing(value) => self.letter_spacing = value,
+            VerticalAlign(value) => self.vertical_align = value,
+            BaselineShift(value) => self.baseline_shift = value,
         }
     }
 
@@ -473,6 +497,16 @@ impl<B: Brush> ResolvedStyle<B> {
             LineHeight(value) => nearly_eq(self.line_height, *value),
             WordSpacing(value) => nearly_eq(self.word_spacing, *value),
             LetterSpacing(value) => nearly_eq(self.letter_spacing, *value),
+            VerticalAlign(value) => self.vertical_align == *value,
+            BaselineShift(value) => match (self.baseline_shift, value) {
+                (crate::BaselineShift::Absolute(ours), crate::BaselineShift::Absolute(value)) => {
+                    nearly_eq(ours, *value)
+                }
+                (crate::BaselineShift::Relative(ours), crate::BaselineShift::Relative(value)) => {
+                    nearly_eq(ours, *value)
+                }
+                _ => false,
+            },
         }
     }
 
