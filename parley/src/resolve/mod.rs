@@ -26,8 +26,22 @@ use swash::text::Language;
 /// Style with an associated range.
 #[derive(Debug, Clone)]
 pub(crate) struct RangedStyle<B: Brush> {
+    pub(crate) id: u64,
     pub(crate) style: ResolvedStyle<B>,
     pub(crate) range: Range<usize>,
+}
+
+impl<B: Brush> RangedStyle<B> {
+    pub(crate) fn as_layout_style(&self) -> layout::Style<B> {
+        let style = &self.style;
+        layout::Style {
+            id: self.id,
+            brush: style.brush.clone(),
+            underline: style.underline.as_layout_decoration(&style.brush),
+            strikethrough: style.strikethrough.as_layout_decoration(&style.brush),
+            line_height: style.line_height * style.font_size,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -473,15 +487,6 @@ impl<B: Brush> ResolvedStyle<B> {
             LineHeight(value) => nearly_eq(self.line_height, *value),
             WordSpacing(value) => nearly_eq(self.word_spacing, *value),
             LetterSpacing(value) => nearly_eq(self.letter_spacing, *value),
-        }
-    }
-
-    pub(crate) fn as_layout_style(&self) -> layout::Style<B> {
-        layout::Style {
-            brush: self.brush.clone(),
-            underline: self.underline.as_layout_decoration(&self.brush),
-            strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
-            line_height: self.line_height * self.font_size,
         }
     }
 }
