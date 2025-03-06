@@ -21,9 +21,10 @@ mod system;
 
 #[allow(unused_imports)]
 use super::{
+    FallbackKey, FamilyId, FamilyInfo, FontInfo, GenericFamily, Script, SourceInfo,
     family_name::{FamilyName, FamilyNameMap},
     generic::GenericFamilyMap,
-    scan, FallbackKey, FamilyId, FamilyInfo, FontInfo, GenericFamily, Script, SourceInfo,
+    scan,
 };
 
 #[cfg(feature = "std")]

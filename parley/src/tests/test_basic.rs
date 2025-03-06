@@ -3,7 +3,7 @@
 
 use peniko::kurbo::Size;
 
-use crate::{testenv, Alignment, AlignmentOptions, InlineBox, WhiteSpaceCollapse};
+use crate::{Alignment, AlignmentOptions, InlineBox, WhiteSpaceCollapse, testenv};
 
 #[test]
 fn plain_multiline_text() {

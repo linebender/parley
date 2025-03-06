@@ -3,21 +3,21 @@
 
 use hashbrown::HashMap;
 use std::{
-    ffi::{c_void, OsString},
+    ffi::{OsString, c_void},
     os::windows::ffi::OsStringExt,
     path::PathBuf,
     sync::Arc,
 };
 use windows::{
-    core::{implement, Interface, PCWSTR},
     Win32::Graphics::DirectWrite::{
-        DWriteCreateFactory, IDWriteFactory, IDWriteFactory2, IDWriteFont, IDWriteFontCollection,
-        IDWriteFontFace, IDWriteFontFallback, IDWriteFontFamily, IDWriteFontFile,
-        IDWriteLocalFontFileLoader, IDWriteNumberSubstitution, IDWriteTextAnalysisSource,
-        IDWriteTextAnalysisSource_Impl, DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL,
-        DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT_REGULAR, DWRITE_READING_DIRECTION,
-        DWRITE_READING_DIRECTION_LEFT_TO_RIGHT,
+        DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL,
+        DWRITE_FONT_WEIGHT_REGULAR, DWRITE_READING_DIRECTION,
+        DWRITE_READING_DIRECTION_LEFT_TO_RIGHT, DWriteCreateFactory, IDWriteFactory,
+        IDWriteFactory2, IDWriteFont, IDWriteFontCollection, IDWriteFontFace, IDWriteFontFallback,
+        IDWriteFontFamily, IDWriteFontFile, IDWriteLocalFontFileLoader, IDWriteNumberSubstitution,
+        IDWriteTextAnalysisSource, IDWriteTextAnalysisSource_Impl,
     },
+    core::{Interface, PCWSTR, implement},
 };
 
 use super::{

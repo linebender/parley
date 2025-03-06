@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use super::{
-    data::{ClusterData, LineItemData},
     Alignment, BreakReason, LayoutData,
+    data::{ClusterData, LineItemData},
 };
 use crate::style::Brush;
 

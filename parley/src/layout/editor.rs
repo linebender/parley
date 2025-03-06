@@ -4,13 +4,13 @@
 //! A simple plain text editor and related types.
 
 use crate::{
+    FontContext, LayoutContext, Rect, StyleProperty, StyleSet,
     layout::{
-        cursor::{Cursor, Selection},
         Affinity, Alignment, AlignmentOptions, Layout,
+        cursor::{Cursor, Selection},
     },
     resolve::ResolvedStyle,
     style::Brush,
-    FontContext, LayoutContext, Rect, StyleProperty, StyleSet,
 };
 use alloc::{borrow::ToOwned, string::String, vec::Vec};
 use core::{
@@ -51,7 +51,7 @@ pub struct SplitString<'source>([&'source str; 2]);
 
 impl<'source> SplitString<'source> {
     /// Get the characters of this string.
-    pub fn chars(self) -> impl Iterator<Item = char> + 'source {
+    pub fn chars(self) -> impl Iterator<Item = char> + use<'source> {
         self.into_iter().flat_map(str::chars)
     }
 }

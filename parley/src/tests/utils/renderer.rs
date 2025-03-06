@@ -10,10 +10,10 @@
 use crate::{GlyphRun, Layout, PositionedLayoutItem};
 use peniko::kurbo;
 use skrifa::{
+    GlyphId, MetadataProvider, OutlineGlyph,
     instance::{LocationRef, NormalizedCoord, Size},
     outline::{DrawSettings, OutlinePen},
     raw::FontRef as ReadFontsRef,
-    GlyphId, MetadataProvider, OutlineGlyph,
 };
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Rect, Transform};
 

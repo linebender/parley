@@ -112,7 +112,7 @@ impl<'a, B: Brush> Run<'a, B> {
     }
 
     /// Returns an iterator over the clusters in logical order.
-    pub fn clusters(&'a self) -> impl Iterator<Item = Cluster<'a, B>> + 'a + Clone {
+    pub fn clusters(&'a self) -> impl Iterator<Item = Cluster<'a, B>> + Clone {
         let range = self.cluster_range();
         Clusters {
             run: self,

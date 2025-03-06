@@ -5,8 +5,8 @@
 
 use alloc::vec::Vec;
 
-use swash::text::{BidiClass, BracketType, Codepoint as _};
 use BidiClass::*;
+use swash::text::{BidiClass, BracketType, Codepoint as _};
 
 /// Type alias for a bidirectional level.
 pub(crate) type BidiLevel = u8;
@@ -599,11 +599,7 @@ impl BidiResolver {
                     leading
                 } else {
                     // N2
-                    if level & 1 != 0 {
-                        R
-                    } else {
-                        L
-                    }
+                    if level & 1 != 0 { R } else { L }
                 };
                 for j in offset..limit {
                     types[j] = resolved;
@@ -643,11 +639,7 @@ impl BidiResolver {
 
 /// Returns a default bidi type for a level.
 pub(crate) fn type_from_level(level: BidiLevel) -> BidiClass {
-    if level & 1 == 0 {
-        L
-    } else {
-        R
-    }
+    if level & 1 == 0 { L } else { R }
 }
 
 /// Computes an ordering for a sequence of bidi runs based on levels.

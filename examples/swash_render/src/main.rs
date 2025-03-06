@@ -16,10 +16,10 @@ use parley::layout::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
 use parley::style::{FontStack, FontWeight, StyleProperty, TextStyle};
 use parley::{AlignmentOptions, FontContext, InlineBox, LayoutContext};
 use std::fs::File;
+use swash::FontRef;
 use swash::scale::image::Content;
 use swash::scale::{Render, ScaleContext, Scaler, Source, StrikeWith};
 use swash::zeno;
-use swash::FontRef;
 use zeno::{Format, Vector};
 
 #[derive(Clone, Copy, Debug, PartialEq)]

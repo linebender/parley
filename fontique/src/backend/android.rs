@@ -8,7 +8,7 @@ use icu_locid::LanguageIdentifier;
 use roxmltree::{Document, Node};
 
 use super::{
-    scan, FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily, GenericFamilyMap, Script,
+    FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily, GenericFamilyMap, Script, scan,
 };
 
 // TODO: Use actual generic families here, where available, when fonts.xml is properly parsed.

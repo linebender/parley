@@ -4,7 +4,7 @@
 //! Generic font families.
 
 use super::FamilyId;
-use bytemuck::{checked::CheckedBitPattern, Contiguous, NoUninit, Zeroable};
+use bytemuck::{Contiguous, NoUninit, Zeroable, checked::CheckedBitPattern};
 use core::fmt;
 use smallvec::SmallVec;
 
@@ -178,7 +178,7 @@ impl GenericFamilyMap {
 #[cfg(test)]
 mod tests {
     use crate::GenericFamily;
-    use bytemuck::{checked::try_from_bytes, Contiguous, Zeroable};
+    use bytemuck::{Contiguous, Zeroable, checked::try_from_bytes};
     use core::ptr;
 
     #[test]
@@ -214,7 +214,7 @@ mod tests {
         let mut value = 0;
         while value <= GenericFamily::MAX_VALUE {
             // Safety: In a const context, therefore if this makes an invalid GenericFamily, that will be detected.
-            // When updating the MSRV to 1.82 or later, this can use `&raw const value` instead of the addr_of!
+            // TODO: use `&raw const value` instead of the addr_of!
             let it: GenericFamily = unsafe { ptr::read((core::ptr::addr_of!(value)).cast()) };
             // Evaluate the enum value to ensure it actually has a valid tag
             if it as u8 != value {
@@ -239,7 +239,7 @@ mod doctests {
     ///     let value = GenericFamily::MAX_VALUE + 1;
     ///     // Safety: In a const context, therefore if this makes an invalid GenericFamily, that will be detected.
     ///     // (Indeed, we rely upon that)
-    ///     // When updating the MSRV to 1.82 or later, this can use `&raw const value` instead of the addr_of!
+    ///     // TODO: use `&raw const value` instead of the addr_of!
     ///     let it: GenericFamily = unsafe { core::ptr::read((core::ptr::addr_of!(value)).cast()) };
     ///     // Evaluate the enum value to ensure it actually has an invalid tag
     ///     if it as u8 != value {

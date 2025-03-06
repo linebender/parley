@@ -3,9 +3,9 @@
 
 //! Context for layout.
 
+use super::FontContext;
 use super::context::LayoutContext;
 use super::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
-use super::FontContext;
 
 use super::layout::Layout;
 
