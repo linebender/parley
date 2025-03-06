@@ -64,7 +64,7 @@ impl<'a, B: Brush> Line<'a, B> {
 
     /// Returns an iterator over the runs for the line.
     // TODO: provide iterator over inline_boxes and items
-    pub fn runs(&self) -> impl Iterator<Item = Run<'a, B>> + 'a + Clone {
+    pub fn runs(&self) -> impl Iterator<Item = Run<'a, B>> + Clone {
         let copy = self.clone();
         let line_items = &copy.layout.data.line_items[self.data.item_range.clone()];
         line_items
@@ -81,7 +81,7 @@ impl<'a, B: Brush> Line<'a, B> {
     }
 
     /// Returns an iterator over the glyph runs for the line.
-    pub fn items(&self) -> impl Iterator<Item = PositionedLayoutItem<'a, B>> + 'a + Clone {
+    pub fn items(&self) -> impl Iterator<Item = PositionedLayoutItem<'a, B>> + Clone {
         GlyphRunIter {
             line: self.clone(),
             item_index: 0,
@@ -186,7 +186,7 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     }
 
     /// Returns an iterator over the glyphs in the run.
-    pub fn glyphs(&'a self) -> impl Iterator<Item = Glyph> + 'a + Clone {
+    pub fn glyphs(&'a self) -> impl Iterator<Item = Glyph> + Clone {
         self.run
             .visual_clusters()
             .flat_map(|cluster| cluster.glyphs())
@@ -195,7 +195,7 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     }
 
     /// Returns an iterator over the fully positioned glyphs in the run.
-    pub fn positioned_glyphs(&'a self) -> impl Iterator<Item = Glyph> + 'a + Clone {
+    pub fn positioned_glyphs(&'a self) -> impl Iterator<Item = Glyph> + Clone {
         let mut offset = self.offset;
         let baseline = self.baseline;
         self.glyphs().map(move |mut g| {
