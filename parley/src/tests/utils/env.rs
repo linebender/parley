@@ -1,7 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::tests::utils::renderer::{render_layout, ColorBrush, RenderingConfig};
+use crate::tests::utils::renderer::{ColorBrush, RenderingConfig, render_layout};
 use crate::{
     FontContext, FontFamily, FontStack, Layout, LayoutContext, PlainEditor, PlainEditorDriver,
     RangedBuilder, Rect, StyleProperty, TextStyle, TreeBuilder,
@@ -213,9 +213,11 @@ impl TestEnv {
             self.check_counter += 1;
             name
         } else {
-            assert!(test_case_name
-                .chars()
-                .all(|c| c == '_' || char::is_alphanumeric(c)));
+            assert!(
+                test_case_name
+                    .chars()
+                    .all(|c| c == '_' || char::is_alphanumeric(c))
+            );
             format!("{}-{}.png", self.test_name, test_case_name)
         }
     }

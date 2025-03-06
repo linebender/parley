@@ -3,13 +3,13 @@
 
 use accesskit::{Node, TreeUpdate};
 use core::default::Default;
-use parley::{editor::SplitString, layout::PositionedLayoutItem, GenericFamily, StyleProperty};
+use parley::{GenericFamily, StyleProperty, editor::SplitString, layout::PositionedLayoutItem};
 use std::time::{Duration, Instant};
 use vello::{
+    Scene,
     kurbo::{Affine, Line, Stroke},
     peniko::color::palette,
     peniko::{Brush, Fill},
-    Scene,
 };
 use winit::{
     event::{Ime, Modifiers, Touch, WindowEvent},

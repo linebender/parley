@@ -1,16 +1,16 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::Font;
 use crate::inline_box::InlineBox;
 use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::nearly_zero;
-use crate::Font;
 use core::cell::OnceCell;
 use core::ops::Range;
+use swash::Synthesis;
 use swash::shape::Shaper;
 use swash::text::cluster::{Boundary, ClusterInfo};
-use swash::Synthesis;
 
 use alloc::vec::Vec;
 

@@ -3,7 +3,7 @@
 
 use tiny_skia::{Color, Pixmap, PixmapPaint, Transform};
 
-use crate::tests::utils::renderer::{render_layout, ColorBrush, RenderingConfig};
+use crate::tests::utils::renderer::{ColorBrush, RenderingConfig, render_layout};
 use crate::{Affinity, Cursor, FontContext, Layout, LayoutContext};
 
 // Note: This module is only compiled when running tests, which requires std,

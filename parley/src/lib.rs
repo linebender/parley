@@ -120,8 +120,8 @@ pub mod style;
 #[cfg(test)]
 mod tests;
 
-pub use peniko::kurbo::Rect;
 pub use peniko::Font;
+pub use peniko::kurbo::Rect;
 
 pub use builder::{RangedBuilder, TreeBuilder};
 pub use context::LayoutContext;

@@ -7,11 +7,11 @@ use alloc::{vec, vec::Vec};
 
 use self::tree::TreeStyleBuilder;
 
+use super::FontContext;
 use super::bidi;
 use super::builder::RangedBuilder;
-use super::resolve::{tree, RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle};
+use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle, tree};
 use super::style::{Brush, TextStyle};
-use super::FontContext;
 
 use swash::shape::ShapeContext;
 use swash::text::cluster::CharInfo;

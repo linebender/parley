@@ -5,8 +5,8 @@
 
 use super::attributes::{FontStyle, FontWeight, FontWidth};
 use super::source::{SourceInfo, SourceKind};
-use super::{source_cache::SourceCache, Blob};
-use read_fonts::{types::Tag, FontRef, TableProvider as _};
+use super::{Blob, source_cache::SourceCache};
+use read_fonts::{FontRef, TableProvider as _, types::Tag};
 use smallvec::SmallVec;
 
 type AxisVec = SmallVec<[AxisInfo; 1]>;
@@ -337,12 +337,12 @@ impl Synthesis {
 
 fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
     use read_fonts::{
+        TableProvider,
         tables::{
             head::{Head, MacStyle},
             os2::{Os2, SelectionFlags},
             post::Post,
         },
-        TableProvider,
     };
 
     fn width_from_width_class(width_class: u16) -> FontWidth {
