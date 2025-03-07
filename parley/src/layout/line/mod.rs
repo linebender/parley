@@ -156,6 +156,7 @@ pub struct GlyphRun<'a, B: Brush> {
     glyph_count: usize,
     offset: f32,
     baseline: f32,
+    min_coord: f32,
     advance: f32,
 }
 
@@ -183,6 +184,11 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     /// Returns the total advance of the run.
     pub fn advance(&self) -> f32 {
         self.advance
+    }
+
+    pub fn y_offset(&self) -> f32 {
+        let line_ascent = self.baseline - self.min_coord;
+        self.run.metrics().ascent - line_ascent
     }
 
     /// Returns an iterator over the glyphs in the run.
@@ -266,6 +272,7 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                             glyph_count,
                             offset: offset + self.line.data.metrics.offset,
                             baseline: self.line.data.metrics.baseline,
+                            min_coord: self.line.data.metrics.min_coord,
                             advance,
                         }));
                     }

@@ -86,6 +86,36 @@ pub(crate) struct RunData {
     pub(crate) advance: f32,
 }
 
+impl RunData {
+    pub(crate) fn unique_styles<'a, 'b, B: Brush>(&'a self, layout: &'b LayoutData<B>, mut cb: impl FnMut(&'b Style<B>)) {
+        let glyph_start = self.glyph_start;
+        for cluster in &layout.clusters[self.cluster_range.clone()] {
+            if cluster.glyph_len != 0xFF && cluster.has_divergent_styles() {
+                let mut start = glyph_start + cluster.glyph_offset as usize;
+                let end = start + cluster.glyph_len as usize;
+
+                'runs: loop {
+                    let start_glyph = &layout.glyphs[start];
+                    cb(&layout.styles[start_glyph.style_index()]);
+
+                    loop {
+                        start += 1;
+
+                        if start >= end {
+                            break 'runs;
+                        }
+                        if layout.glyphs[start].style_index != start_glyph.style_index {
+                            break;
+                        }
+                    }
+                }
+            } else {
+                cb(&layout.styles[cluster.style_index as usize]);
+            }
+        }
+    }
+}
+
 #[derive(Copy, Clone, Default, PartialEq, Debug)]
 pub enum BreakReason {
     #[default]
@@ -335,6 +365,8 @@ impl<B: Brush> LayoutData<B> {
                 ascent: metrics.ascent,
                 descent: metrics.descent,
                 leading: metrics.leading,
+                x_height: metrics.x_height,
+                font_size,
                 underline_offset: metrics.underline_offset,
                 underline_size: metrics.stroke_size,
                 strikethrough_offset: metrics.strikeout_offset,

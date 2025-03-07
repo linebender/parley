@@ -16,7 +16,7 @@ pub mod editor;
 use self::alignment::align;
 
 use super::style::Brush;
-use crate::{Font, InlineBox};
+use crate::{Font, InlineBox, ResolvedBaselineShift, VerticalAlign};
 #[cfg(feature = "accesskit")]
 use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
 use alignment::unjustify;
@@ -301,6 +301,10 @@ pub struct Style<B: Brush> {
     pub strikethrough: Option<Decoration<B>>,
     /// Absolute line height in layout units (style line height * font size)
     pub(crate) line_height: f32,
+    /// The baseline along which this item is aligned.
+    pub(crate) vertical_align: VerticalAlign,
+    /// Additional baseline alignment applied afterwards.
+    pub(crate) baseline_shift: ResolvedBaselineShift,
 }
 
 /// Underline or strikethrough decoration.

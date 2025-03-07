@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use super::{
-    Brush, Cluster, ClusterPath, Font, Layout, LineItemData, NormalizedCoord, Range, Run, RunData,
-    Synthesis,
+    Brush, Cluster, ClusterPath, Font, Layout, LineItemData, NormalizedCoord, Range, Run, RunData, Style, Synthesis
 };
 
 impl<'a, B: Brush> Run<'a, B> {
@@ -210,6 +209,11 @@ pub struct RunMetrics {
     pub descent: f32,
     /// Typographic leading.
     pub leading: f32,
+    /// Typographic x-height.
+    pub x_height: f32,
+    // TODO: this is necessary for subscript/superscript layout, but ideally it could be removed
+    /// The run's font size.
+    pub(crate) font_size: f32,
     /// Offset of the top of underline decoration from the baseline.
     pub underline_offset: f32,
     /// Thickness of the underline decoration.

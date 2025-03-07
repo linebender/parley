@@ -1,7 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::{BaselineShift, VerticalAlign};
+use crate::{ResolvedBaselineShift, VerticalAlign};
 
 /// A box to be laid out inline with text
 #[derive(Debug, Clone)]
@@ -19,7 +19,7 @@ pub struct InlineBox {
     /// The baseline along which this item is aligned.
     pub vertical_align: VerticalAlign,
     /// Additional baseline alignment applied afterwards.
-    pub baseline_shift: BaselineShift,
+    pub baseline_shift: ResolvedBaselineShift,
 }
 
 impl InlineBox {
