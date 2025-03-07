@@ -723,7 +723,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 }
 
                 line.metrics.leading =
-                line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
+                    line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
 
                 // Compute
                 let above = (line.metrics.ascent + line.metrics.leading * 0.5).round();

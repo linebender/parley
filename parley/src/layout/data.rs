@@ -87,7 +87,11 @@ pub(crate) struct RunData {
 }
 
 impl RunData {
-    pub(crate) fn unique_styles<'a, 'b, B: Brush>(&'a self, layout: &'b LayoutData<B>, mut cb: impl FnMut(&'b Style<B>)) {
+    pub(crate) fn unique_styles<'a, 'b, B: Brush>(
+        &'a self,
+        layout: &'b LayoutData<B>,
+        mut cb: impl FnMut(&'b Style<B>),
+    ) {
         let glyph_start = self.glyph_start;
         for cluster in &layout.clusters[self.cluster_range.clone()] {
             if cluster.glyph_len != 0xFF && cluster.has_divergent_styles() {

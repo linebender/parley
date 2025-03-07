@@ -517,7 +517,9 @@ impl<B: Brush> ResolvedStyle<B> {
             strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
             line_height: self.line_height * self.font_size,
             vertical_align: self.vertical_align,
-            baseline_shift: self.baseline_shift.resolve(self.font_size, self.line_height),
+            baseline_shift: self
+                .baseline_shift
+                .resolve(self.font_size, self.line_height),
         }
     }
 }

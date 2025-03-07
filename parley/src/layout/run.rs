@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use super::{
-    Brush, Cluster, ClusterPath, Font, Layout, LineItemData, NormalizedCoord, Range, Run, RunData, Style, Synthesis
+    Brush, Cluster, ClusterPath, Font, Layout, LineItemData, NormalizedCoord, Range, Run, RunData,
+    Style, Synthesis,
 };
 
 impl<'a, B: Brush> Run<'a, B> {
