@@ -45,7 +45,7 @@
 //! builder.push(StyleProperty::FontWeight(FontWeight::new(600.0)), 0..4);
 //!
 //! // Add a box to be laid out inline with the text
-//! builder.push_inline_box(InlineBox { id: 0, index: 5, width: 50.0, height: 50.0 });
+//! builder.push_inline_box(InlineBox::new(0, 5, 50.0, 50.0));
 //!
 //! // Build the builder into a Layout
 //! let mut layout: Layout<()> = builder.build(&TEXT);
