@@ -21,8 +21,8 @@ impl<'a, B: Brush> Cluster<'a, B> {
         let mut path = ClusterPath::default();
         if let Some((line_index, line)) = layout.line_for_byte_index(byte_index) {
             path.line_index = line_index as u32;
-            for (run_index, run) in line.runs().enumerate() {
-                path.run_index = run_index as u32;
+            for run in line.runs() {
+                path.run_index = run.index;
                 if !run.text_range().contains(&byte_index) {
                     continue;
                 }
@@ -44,13 +44,17 @@ impl<'a, B: Brush> Cluster<'a, B> {
             path.line_index = line_index as u32;
             let mut offset = line.metrics().offset;
             let last_run_index = line.len().saturating_sub(1);
-            for (run_index, run) in line.runs().enumerate() {
+            for run_index in 0..line.len() {
+                let advance = line.item(run_index).unwrap().advance;
+                let Some(run) = line.run(run_index) else {
+                    offset += advance;
+                    continue;
+                };
                 let is_last_run = run_index == last_run_index;
-                let run_advance = run.advance();
                 path.run_index = run_index as u32;
                 path.logical_index = 0;
-                if x > offset + run_advance && !is_last_run {
-                    offset += run_advance;
+                if x > offset + advance && !is_last_run {
+                    offset += advance;
                     continue;
                 }
                 let last_cluster_index = run.cluster_range().len().saturating_sub(1);
@@ -360,16 +364,15 @@ impl<'a, B: Brush> Cluster<'a, B> {
     pub fn visual_offset(&self) -> Option<f32> {
         let line = self.path.line(self.run.layout)?;
         let mut offset = line.metrics().offset;
-        for run_index in 0..=self.path.run_index() {
-            let run = line.run(run_index)?;
-            if run_index != self.path.run_index() {
-                offset += run.advance();
-            } else {
-                let visual_index = run.logical_to_visual(self.path.logical_index())?;
-                for cluster in run.visual_clusters().take(visual_index) {
-                    offset += cluster.advance();
-                }
-            }
+        for run_index in 0..self.path.run_index() {
+            let item = line.item(run_index)?;
+            offset += item.advance;
+        }
+
+        let run = line.run(self.path.run_index())?;
+        let visual_index = run.logical_to_visual(self.path.logical_index())?;
+        for cluster in run.visual_clusters().take(visual_index) {
+            offset += cluster.advance();
         }
         Some(offset)
     }
