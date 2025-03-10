@@ -70,22 +70,24 @@ pub struct TreeBuilder<'a, B: Brush> {
 }
 
 impl<B: Brush> TreeBuilder<'_, B> {
-    pub fn push_style_span(&mut self, style: TextStyle<'_, B>) {
+    pub fn push_style_span(&mut self, id: u64, style: TextStyle<'_, B>) {
         let resolved = self
             .lcx
             .rcx
             .resolve_entire_style_set(self.fcx, &style, self.scale);
-        self.lcx.tree_style_builder.push_style_span(resolved);
+        self.lcx.tree_style_builder.push_style_span(id, resolved);
     }
 
     pub fn push_style_modification_span<'s, 'iter>(
         &mut self,
+        id: u64,
         properties: impl IntoIterator<Item = &'iter StyleProperty<'s, B>>,
     ) where
         's: 'iter,
         B: 'iter,
     {
         self.lcx.tree_style_builder.push_style_modification_span(
+            id,
             properties
                 .into_iter()
                 .map(|p| self.lcx.rcx.resolve_property(self.fcx, p, self.scale)),
@@ -161,7 +163,7 @@ fn build_into_layout<B: Brush>(
     layout
         .data
         .styles
-        .extend(lcx.styles.iter().map(|s| s.style.as_layout_style()));
+        .extend(lcx.styles.iter().map(|s| s.as_layout_style()));
 
     // Sort the inline boxes as subsequent code assumes that they are in text index order.
     // Note: It's important that this is a stable sort to allow users to control the order of contiguous inline boxes
