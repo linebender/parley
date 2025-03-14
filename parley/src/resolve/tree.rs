@@ -11,7 +11,11 @@ use super::{Brush, RangedStyle, ResolvedProperty, ResolvedStyle};
 
 #[derive(Debug, Clone)]
 struct StyleTreeNode<B: Brush> {
-    parent: Option<usize>,
+    // An external id provided by the user
+    id: u64,
+    // The index of the parent in the tree Vec (*not* the id of the parent node)
+    parent_idx: Option<usize>,
+    // The styles associated with the node
     style: ResolvedStyle<B>,
 }
 
@@ -36,6 +40,9 @@ pub(crate) struct TreeStyleBuilder<B: Brush> {
 }
 
 impl<B: Brush> TreeStyleBuilder<B> {
+    fn current_span_id(&self) -> u64 {
+        self.tree[self.current_span].id
+    }
     fn current_style(&self) -> ResolvedStyle<B> {
         self.tree[self.current_span].style.clone()
     }
@@ -58,7 +65,7 @@ impl<B: Brush> Default for TreeStyleBuilder<B> {
 
 impl<B: Brush> TreeStyleBuilder<B> {
     /// Prepares the builder for accepting a style tree for text of the specified length.
-    pub(crate) fn begin(&mut self, root_style: ResolvedStyle<B>) {
+    pub(crate) fn begin(&mut self, id: u64, root_style: ResolvedStyle<B>) {
         self.tree.clear();
         self.flatted_styles.clear();
         self.white_space_collapse = WhiteSpaceCollapse::Preserve;
@@ -66,7 +73,8 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.uncommitted_text.clear();
 
         self.tree.push(StyleTreeNode {
-            parent: None,
+            id,
+            parent_idx: None,
             style: root_style,
         });
         self.current_span = 0;
@@ -138,8 +146,9 @@ impl<B: Brush> TreeStyleBuilder<B> {
         }
 
         let range = self.text.len()..(self.text.len() + span_text.len());
+        let id = self.current_span_id();
         let style = self.current_style();
-        self.flatted_styles.push(RangedStyle { style, range });
+        self.flatted_styles.push(RangedStyle { id, style, range });
         self.text.push_str(span_text);
         self.uncommitted_text.clear();
         self.is_span_first = false;
@@ -150,11 +159,12 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.text.len()
     }
 
-    pub(crate) fn push_style_span(&mut self, style: ResolvedStyle<B>) {
+    pub(crate) fn push_style_span(&mut self, id: u64, style: ResolvedStyle<B>) {
         self.push_uncommitted_text(false);
 
         self.tree.push(StyleTreeNode {
-            parent: Some(self.current_span),
+            id,
+            parent_idx: Some(self.current_span),
             style,
         });
         self.current_span = self.tree.len() - 1;
@@ -163,20 +173,21 @@ impl<B: Brush> TreeStyleBuilder<B> {
 
     pub(crate) fn push_style_modification_span(
         &mut self,
+        id: u64,
         properties: impl Iterator<Item = ResolvedProperty<B>>,
     ) {
         let mut style = self.current_style();
         for prop in properties {
             style.apply(prop.clone());
         }
-        self.push_style_span(style);
+        self.push_style_span(id, style);
     }
 
     pub(crate) fn pop_style_span(&mut self) {
         self.push_uncommitted_text(true);
 
         self.current_span = self.tree[self.current_span]
-            .parent
+            .parent_idx
             .expect("Popped root style");
     }
 
@@ -189,7 +200,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
 
     /// Computes the sequence of ranged styles.
     pub(crate) fn finish(&mut self, styles: &mut Vec<RangedStyle<B>>) -> String {
-        while self.tree[self.current_span].parent.is_some() {
+        while self.tree[self.current_span].parent_idx.is_some() {
             self.pop_style_span();
         }
 
