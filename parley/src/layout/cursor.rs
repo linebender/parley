@@ -5,7 +5,7 @@
 
 #[cfg(feature = "accesskit")]
 use super::LayoutAccessibility;
-use super::{Affinity, BreakReason, Brush, Cluster, ClusterSide, Layout, Line};
+use super::{Affinity, BreakReason, Brush, Cluster, ClusterSide, Layout, Line, LineItem};
 #[cfg(feature = "accesskit")]
 use accesskit::TextPosition;
 use alloc::vec::Vec;
@@ -74,7 +74,7 @@ impl Cursor {
     ) -> Option<Self> {
         let (line_index, run_index) = *layout_access.run_paths_by_access_id.get(&pos.node)?;
         let line = layout.get(line_index)?;
-        let run = line.run(run_index)?;
+        let run = line.item(run_index)?.run()?;
         let index = run
             .get(pos.character_index)
             .map(|cluster| cluster.text_range().start)
@@ -799,10 +799,7 @@ impl Selection {
     /// This avoids allocation if the intent is to render the rectangles
     /// immediately.
     pub fn geometry_with<B: Brush>(&self, layout: &Layout<B>, mut f: impl FnMut(Rect)) {
-        // Ensure we add some visual indicator for selected empty
-        // lines.
-        // Make this configurable?
-        const MIN_RECT_WIDTH: f64 = 8.0;
+        const NEWLINE_WHITESPACE_WIDTH_RATIO: f64 = 0.25;
         if self.is_collapsed() {
             return;
         }
@@ -824,36 +821,73 @@ impl Selection {
             let metrics = line.metrics();
             let line_min = metrics.min_coord as f64;
             let line_max = metrics.max_coord as f64;
+            // Trailing whitespace to indicate that the newline character at the
+            // end of this line is selected. It's based on the ascent and
+            // descent so it doesn't change with the line height.
+            //
+            // TODO: the width of this whitespace should be the width of a space
+            // (U+0020) character.
+            let newline_whitespace = if line.break_reason() == BreakReason::Explicit {
+                (metrics.ascent as f64 + metrics.descent as f64) * NEWLINE_WHITESPACE_WIDTH_RATIO
+            } else {
+                0.0
+            };
             if line_ix == line_start_ix || line_ix == line_end_ix {
                 // We only need to run the expensive logic on the first and
                 // last lines
                 let mut start_x = metrics.offset as f64;
                 let mut cur_x = start_x;
                 let mut cluster_count = 0;
-                for run in line.runs() {
-                    for cluster in run.visual_clusters() {
-                        let advance = cluster.advance() as f64;
-                        if text_range.contains(&cluster.text_range().start) {
-                            cluster_count += 1;
-                            cur_x += advance;
-                        } else {
-                            if cur_x != start_x {
-                                let width = (cur_x - start_x).max(MIN_RECT_WIDTH);
-                                f(Rect::new(start_x, line_min, start_x + width, line_max));
+                let mut box_advance = 0.0;
+                let mut have_seen_any_runs = false;
+                for item in line.items_nonpositioned() {
+                    match item {
+                        LineItem::Run(run) => {
+                            have_seen_any_runs = true;
+                            for cluster in run.visual_clusters() {
+                                let advance = cluster.advance() as f64 + box_advance;
+                                box_advance = 0.0;
+                                if text_range.contains(&cluster.text_range().start) {
+                                    cluster_count += 1;
+                                    cur_x += advance;
+                                } else {
+                                    if cur_x != start_x {
+                                        f(Rect::new(start_x, line_min, cur_x, line_max));
+                                    }
+                                    cur_x += advance;
+                                    start_x = cur_x;
+                                }
                             }
-                            cur_x += advance;
-                            start_x = cur_x;
+                        }
+                        LineItem::InlineBox(inline_box) => {
+                            box_advance += inline_box.width as f64;
+                            // HACK: Don't display selections for inline boxes
+                            // if they're the first thing in the line. This
+                            // makes the selection match the cursor position.
+                            if !have_seen_any_runs {
+                                cur_x += box_advance;
+                                box_advance = 0.0;
+                                start_x = cur_x;
+                            }
                         }
                     }
                 }
-                if cur_x != start_x || (cluster_count != 0 && line.metrics().advance == 0.0) {
-                    let width = (cur_x - start_x).max(MIN_RECT_WIDTH);
-                    f(Rect::new(start_x, line_min, start_x + width, line_max));
+                let mut end_x = cur_x;
+                if line_ix != line_end_ix || (cluster_count != 0 && metrics.advance == 0.0) {
+                    end_x += newline_whitespace;
+                }
+                if end_x != start_x {
+                    f(Rect::new(start_x, line_min, end_x, line_max));
                 }
             } else {
                 let x = metrics.offset as f64;
-                let width = (metrics.advance as f64).max(MIN_RECT_WIDTH);
-                f(Rect::new(x, line_min, x + width, line_max));
+                let width = metrics.advance as f64;
+                f(Rect::new(
+                    x,
+                    line_min,
+                    x + width + newline_whitespace,
+                    line_max,
+                ));
             }
         }
     }
