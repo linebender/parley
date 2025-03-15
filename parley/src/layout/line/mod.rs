@@ -1,7 +1,9 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::{BreakReason, Brush, Glyph, LayoutItemKind, Line, LineItemData, Range, Run, Style};
+use crate::InlineBox;
+
+use super::{BreakReason, Brush, Glyph, LayoutItemKind, Line, Range, Run, Style};
 
 pub(crate) mod greedy;
 
@@ -30,18 +32,8 @@ impl<'a, B: Brush> Line<'a, B> {
         self.data.item_range.is_empty()
     }
 
-    /// Returns the run at the specified index.
-    pub(crate) fn item(&self, index: usize) -> Option<&LineItemData> {
-        let index = self.data.item_range.start + index;
-        if index >= self.data.item_range.end {
-            return None;
-        }
-        let item = self.layout.data.line_items.get(index)?;
-        Some(item)
-    }
-
-    /// Returns the run at the specified index.
-    pub fn run(&self, index: usize) -> Option<Run<'a, B>> {
+    /// Returns the line item at the specified index.
+    pub(crate) fn item(&self, index: usize) -> Option<LineItem<'a, B>> {
         let original_index = index;
         let index = self.data.item_range.start + index;
         if index >= self.data.item_range.end {
@@ -49,34 +41,43 @@ impl<'a, B: Brush> Line<'a, B> {
         }
         let item = self.layout.data.line_items.get(index)?;
 
-        if item.kind == LayoutItemKind::TextRun {
-            Some(Run {
+        Some(match item.kind {
+            LayoutItemKind::TextRun => LineItem::Run(Run {
                 layout: self.layout,
                 line_index: self.index,
                 index: original_index as u32,
                 data: self.layout.data.runs.get(item.index)?,
                 line_data: Some(item),
-            })
-        } else {
-            None
-        }
+            }),
+            LayoutItemKind::InlineBox => {
+                LineItem::InlineBox(self.layout.data.inline_boxes.get(item.index)?)
+            }
+        })
     }
 
     /// Returns an iterator over the runs for the line.
-    // TODO: provide iterator over inline_boxes and items
     pub fn runs(&self) -> impl Iterator<Item = Run<'a, B>> + 'a + Clone {
+        self.items_nonpositioned().filter_map(|item| item.run())
+    }
+
+    /// Returns an iterator over the non-glyph runs and inline boxes for the line.
+    pub(crate) fn items_nonpositioned(&self) -> impl Iterator<Item = LineItem<'a, B>> + Clone {
         let copy = self.clone();
         let line_items = &copy.layout.data.line_items[self.data.item_range.clone()];
         line_items
             .iter()
             .enumerate()
-            .filter(|(_, item)| item.kind == LayoutItemKind::TextRun)
-            .map(move |(index, line_data)| Run {
-                layout: copy.layout,
-                line_index: copy.index,
-                index: index as u32,
-                data: &copy.layout.data.runs[line_data.index],
-                line_data: Some(line_data),
+            .map(move |(item_index, line_data)| match line_data.kind {
+                LayoutItemKind::TextRun => LineItem::Run(Run {
+                    layout: copy.layout,
+                    line_index: copy.index,
+                    index: item_index as u32,
+                    data: &copy.layout.data.runs[line_data.index],
+                    line_data: Some(line_data),
+                }),
+                LayoutItemKind::InlineBox => {
+                    LineItem::InlineBox(&copy.layout.data.inline_boxes[line_data.index])
+                }
             })
     }
 
@@ -127,6 +128,22 @@ impl LineMetrics {
     /// Returns the size of the line
     pub fn size(&self) -> f32 {
         self.line_height
+    }
+}
+
+/// A line item and its corresponding data (a run or inline box). Unlike a
+/// [`PositionedLayoutItem`], runs are not guaranteed to be split by style.
+pub(crate) enum LineItem<'a, B: Brush> {
+    Run(Run<'a, B>),
+    InlineBox(&'a InlineBox),
+}
+
+impl<'a, B: Brush> LineItem<'a, B> {
+    pub(crate) fn run(self) -> Option<Run<'a, B>> {
+        match self {
+            LineItem::Run(run) => Some(run),
+            _ => None,
+        }
     }
 }
 
@@ -221,15 +238,13 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let item = self.line.item(self.item_index)?;
-            match item.kind {
-                LayoutItemKind::InlineBox => {
-                    let inline_box = &self.line.layout.data.inline_boxes[item.index];
-
+            match item {
+                LineItem::InlineBox(inline_box) => {
                     let x = self.offset + self.line.data.metrics.offset;
 
                     self.item_index += 1;
                     self.glyph_start = 0;
-                    self.offset += item.advance;
+                    self.offset += inline_box.width;
                     return Some(PositionedLayoutItem::InlineBox(PositionedInlineBox {
                         x,
                         y: self.line.data.metrics.baseline - inline_box.height,
@@ -238,9 +253,7 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                         id: inline_box.id,
                     }));
                 }
-
-                LayoutItemKind::TextRun => {
-                    let run = self.line.run(self.item_index)?;
+                LineItem::Run(run) => {
                     let mut iter = run
                         .visual_clusters()
                         .flat_map(|c| c.glyphs())

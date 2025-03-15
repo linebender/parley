@@ -1,7 +1,9 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::{BreakReason, Brush, Cluster, ClusterInfo, Glyph, Layout, Line, Range, Run, Style};
+use super::{
+    BreakReason, Brush, Cluster, ClusterInfo, Glyph, Layout, Line, LineItem, Range, Run, Style,
+};
 use swash::text::cluster::Whitespace;
 
 /// Defines the visual side of the cluster for hit testing.
@@ -21,8 +23,8 @@ impl<'a, B: Brush> Cluster<'a, B> {
         let mut path = ClusterPath::default();
         if let Some((line_index, line)) = layout.line_for_byte_index(byte_index) {
             path.line_index = line_index as u32;
-            for (run_index, run) in line.runs().enumerate() {
-                path.run_index = run_index as u32;
+            for run in line.runs() {
+                path.run_index = run.index;
                 if !run.text_range().contains(&byte_index) {
                     continue;
                 }
@@ -44,32 +46,39 @@ impl<'a, B: Brush> Cluster<'a, B> {
             path.line_index = line_index as u32;
             let mut offset = line.metrics().offset;
             let last_run_index = line.len().saturating_sub(1);
-            for (run_index, run) in line.runs().enumerate() {
-                let is_last_run = run_index == last_run_index;
-                let run_advance = run.advance();
-                path.run_index = run_index as u32;
-                path.logical_index = 0;
-                if x > offset + run_advance && !is_last_run {
-                    offset += run_advance;
-                    continue;
-                }
-                let last_cluster_index = run.cluster_range().len().saturating_sub(1);
-                for (visual_index, cluster) in run.visual_clusters().enumerate() {
-                    let is_last_cluster = is_last_run && visual_index == last_cluster_index;
-                    path.logical_index =
-                        run.visual_to_logical(visual_index).unwrap_or_default() as u32;
-                    let cluster_advance = cluster.advance();
-                    let edge = offset;
-                    offset += cluster_advance;
-                    if x > offset && !is_last_cluster {
-                        continue;
+            for item in line.items_nonpositioned() {
+                match item {
+                    LineItem::Run(run) => {
+                        let is_last_run = run.index as usize == last_run_index;
+                        let run_advance = run.advance();
+                        path.run_index = run.index;
+                        path.logical_index = 0;
+                        if x > offset + run_advance && !is_last_run {
+                            offset += run_advance;
+                            continue;
+                        }
+                        let last_cluster_index = run.cluster_range().len().saturating_sub(1);
+                        for (visual_index, cluster) in run.visual_clusters().enumerate() {
+                            let is_last_cluster = is_last_run && visual_index == last_cluster_index;
+                            path.logical_index =
+                                run.visual_to_logical(visual_index).unwrap_or_default() as u32;
+                            let cluster_advance = cluster.advance();
+                            let edge = offset;
+                            offset += cluster_advance;
+                            if x > offset && !is_last_cluster {
+                                continue;
+                            }
+                            let side = if x <= edge + cluster_advance * 0.5 {
+                                ClusterSide::Left
+                            } else {
+                                ClusterSide::Right
+                            };
+                            return Some((path.cluster(layout)?, side));
+                        }
                     }
-                    let side = if x <= edge + cluster_advance * 0.5 {
-                        ClusterSide::Left
-                    } else {
-                        ClusterSide::Right
-                    };
-                    return Some((path.cluster(layout)?, side));
+                    LineItem::InlineBox(inline_box) => {
+                        offset += inline_box.width;
+                    }
                 }
             }
         }
@@ -246,7 +255,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
             for line_index in self.path.line_index()..layout.len() {
                 let line = layout.get(line_index)?;
                 for run_index in run_index..line.len() {
-                    if let Some(run) = line.run(run_index) {
+                    if let Some(run) = line.item(run_index).and_then(|item| item.run()) {
                         if !run.cluster_range().is_empty() {
                             return ClusterPath {
                                 line_index: line_index as u32,
@@ -287,7 +296,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
                 let line = layout.get(line_index)?;
                 let first_run = run_index.unwrap_or(line.len());
                 for run_index in (0..first_run).rev() {
-                    if let Some(run) = line.run(run_index) {
+                    if let Some(run) = line.item(run_index).and_then(|item| item.run()) {
                         let range = run.cluster_range();
                         if !range.is_empty() {
                             return ClusterPath {
@@ -361,13 +370,20 @@ impl<'a, B: Brush> Cluster<'a, B> {
         let line = self.path.line(self.run.layout)?;
         let mut offset = line.metrics().offset;
         for run_index in 0..=self.path.run_index() {
-            let run = line.run(run_index)?;
-            if run_index != self.path.run_index() {
-                offset += run.advance();
-            } else {
-                let visual_index = run.logical_to_visual(self.path.logical_index())?;
-                for cluster in run.visual_clusters().take(visual_index) {
-                    offset += cluster.advance();
+            let item = line.item(run_index)?;
+            match item {
+                LineItem::Run(run) => {
+                    if run_index != self.path.run_index() {
+                        offset += run.advance();
+                    } else {
+                        let visual_index = run.logical_to_visual(self.path.logical_index())?;
+                        for cluster in run.visual_clusters().take(visual_index) {
+                            offset += cluster.advance();
+                        }
+                    }
+                }
+                LineItem::InlineBox(inline_box) => {
+                    offset += inline_box.width;
                 }
             }
         }
@@ -441,7 +457,7 @@ impl ClusterPath {
 
     /// Returns the run for this path and the specified layout.
     pub fn run<'a, B: Brush>(&self, layout: &'a Layout<B>) -> Option<Run<'a, B>> {
-        self.line(layout)?.run(self.run_index())
+        self.line(layout)?.item(self.run_index())?.run()
     }
 
     /// Returns the cluster for this path and the specified layout.
