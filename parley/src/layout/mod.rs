@@ -23,10 +23,7 @@ use alignment::unjustify;
 #[cfg(feature = "accesskit")]
 use alloc::vec::Vec;
 use core::{cmp::Ordering, ops::Range};
-use data::{
-    BreakReason, ClusterData, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
-    RunData,
-};
+use data::{ClusterData, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData, RunData};
 #[cfg(feature = "accesskit")]
 use hashbrown::{HashMap, HashSet};
 use swash::text::cluster::{Boundary, ClusterInfo};
@@ -35,6 +32,7 @@ use swash::{GlyphId, NormalizedCoord, Synthesis};
 pub use alignment::AlignmentOptions;
 pub use cluster::{Affinity, ClusterPath, ClusterSide};
 pub use cursor::{Cursor, Selection};
+pub use data::BreakReason;
 pub use line::greedy::BreakLines;
 pub use line::{GlyphRun, LineMetrics, PositionedInlineBox, PositionedLayoutItem};
 pub use run::RunMetrics;
