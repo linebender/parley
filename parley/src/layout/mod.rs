@@ -35,6 +35,7 @@ use swash::{GlyphId, NormalizedCoord, Synthesis};
 pub use alignment::AlignmentOptions;
 pub use cluster::{Affinity, ClusterPath, ClusterSide};
 pub use cursor::{Cursor, Selection};
+pub(crate) use line::LineItem;
 pub use line::greedy::BreakLines;
 pub use line::{GlyphRun, LineMetrics, PositionedInlineBox, PositionedLayoutItem};
 pub use run::RunMetrics;
