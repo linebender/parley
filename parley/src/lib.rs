@@ -84,7 +84,6 @@
 #![allow(missing_docs, reason = "We have many as-yet undocumented items.")]
 #![expect(
     missing_debug_implementations,
-    unnameable_types,
     clippy::allow_attributes_without_reason,
     clippy::cast_possible_truncation,
     clippy::missing_assert_message,
