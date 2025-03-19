@@ -29,3 +29,35 @@ fn cursor_next_visual() {
 
     layout.assert_cursor_is_after("ipsum d", cursor);
 }
+
+// Currently fails
+#[ignore]
+#[test]
+fn cursor_rtl_newline_by_character() {
+    let (mut lcx, mut fcx) = (LayoutContext::new(), FontContext::new());
+    let text = "abcאבג\nde";
+    let layout = CursorTest::single_line(text, &mut lcx, &mut fcx);
+
+    let mut cursor: Cursor = layout.cursor_after("אבג");
+    layout.print_cursor(cursor);
+    cursor = cursor.previous_visual(layout.layout());
+
+    layout.assert_cursor_is_after("abcא", cursor);
+    cursor = cursor.previous_visual(layout.layout());
+    cursor = cursor.previous_visual(layout.layout());
+    layout.assert_cursor_is_after("abc", cursor);
+}
+
+// Currently goes into an infinite loop
+#[ignore]
+#[test]
+fn cursor_rtl_newline_by_word() {
+    let (mut lcx, mut fcx) = (LayoutContext::new(), FontContext::new());
+    let text = "abcאבג\nde";
+    let layout = CursorTest::single_line(text, &mut lcx, &mut fcx);
+
+    let mut cursor: Cursor = layout.cursor_after("אבג");
+    layout.print_cursor(cursor);
+    cursor = cursor.previous_visual_word(layout.layout());
+    layout.assert_cursor_is_after("abc", cursor);
+}
