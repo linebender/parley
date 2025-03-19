@@ -112,7 +112,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
         self.data.advance
     }
 
-    /// Returns true if this is a right-to-left cluster.
+    /// Returns `true` if this is a right-to-left cluster.
     pub fn is_rtl(&self) -> bool {
         self.run.is_rtl()
     }
@@ -174,12 +174,12 @@ impl<'a, B: Brush> Cluster<'a, B> {
         }
     }
 
-    /// Returns true if this cluster is at the beginning of a line.
+    /// Returns `true` if this cluster is at the beginning of a line.
     pub fn is_start_of_line(&self) -> bool {
         self.path.run_index == 0 && self.run.logical_to_visual(self.path.logical_index()) == Some(0)
     }
 
-    /// Returns true if this cluster is at the end of a line.
+    /// Returns `true` if this cluster is at the end of a line.
     pub fn is_end_of_line(&self) -> bool {
         self.line().len().saturating_sub(1) == self.path.run_index()
             && self.run.logical_to_visual(self.path.logical_index())
