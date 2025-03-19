@@ -15,6 +15,12 @@ You can find its changes [documented below](#030---2025-02-27).
 
 This release has an [MSRV] of 1.85.
 
+### Changed
+
+#### Parley
+
+- Breaking change: `Collection::register_fonts` now takes a `Blob<u8>` instead of a `Vec<u8>` ([#306][] by [@valadaptive])
+
 ### Internals
 
 Switched to edition 2024.
