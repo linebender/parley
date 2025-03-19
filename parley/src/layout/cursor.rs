@@ -501,7 +501,7 @@ impl Selection {
         Some(Self::new(anchor, focus))
     }
 
-    /// Returns true if the anchor and focus of the selection are the same.
+    /// Returns `true` if the anchor and focus of the selection are the same.
     ///
     /// This means that the selection represents a single position rather than
     /// a range.
