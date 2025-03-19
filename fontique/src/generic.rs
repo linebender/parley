@@ -214,8 +214,7 @@ mod tests {
         let mut value = 0;
         while value <= GenericFamily::MAX_VALUE {
             // Safety: In a const context, therefore if this makes an invalid GenericFamily, that will be detected.
-            // TODO: use `&raw const value` instead of the addr_of!
-            let it: GenericFamily = unsafe { ptr::read((core::ptr::addr_of!(value)).cast()) };
+            let it: GenericFamily = unsafe { ptr::read((&raw const value).cast()) };
             // Evaluate the enum value to ensure it actually has a valid tag
             if it as u8 != value {
                 unreachable!();
@@ -239,8 +238,7 @@ mod doctests {
     ///     let value = GenericFamily::MAX_VALUE + 1;
     ///     // Safety: In a const context, therefore if this makes an invalid GenericFamily, that will be detected.
     ///     // (Indeed, we rely upon that)
-    ///     // TODO: use `&raw const value` instead of the addr_of!
-    ///     let it: GenericFamily = unsafe { core::ptr::read((core::ptr::addr_of!(value)).cast()) };
+    ///     let it: GenericFamily = unsafe { core::ptr::read((&raw const value).cast()) };
     ///     // Evaluate the enum value to ensure it actually has an invalid tag
     ///     if it as u8 != value {
     ///         unreachable!();
