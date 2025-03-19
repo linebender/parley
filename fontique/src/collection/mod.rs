@@ -174,7 +174,7 @@ impl Collection {
     ///
     /// Returns a list of pairs each containing the family identifier and fonts
     /// added to that family.
-    pub fn register_fonts(&mut self, data: Vec<u8>) -> Vec<(FamilyId, Vec<FontInfo>)> {
+    pub fn register_fonts(&mut self, data: Blob<u8>) -> Vec<(FamilyId, Vec<FontInfo>)> {
         self.inner.register_fonts(data)
     }
 }
@@ -419,7 +419,7 @@ impl Inner {
     ///
     /// Returns a list of pairs each containing the family identifier and fonts
     /// added to that family.
-    pub fn register_fonts(&mut self, data: Vec<u8>) -> Vec<(FamilyId, Vec<FontInfo>)> {
+    pub fn register_fonts(&mut self, data: Blob<u8>) -> Vec<(FamilyId, Vec<FontInfo>)> {
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             let result = shared.data.lock().unwrap().register_fonts(data);
@@ -546,12 +546,11 @@ struct CommonData {
 }
 
 impl CommonData {
-    fn register_fonts(&mut self, data: Vec<u8>) -> Vec<(FamilyId, Vec<FontInfo>)> {
-        let blob = Blob::new(Arc::new(data));
+    fn register_fonts(&mut self, data: Blob<u8>) -> Vec<(FamilyId, Vec<FontInfo>)> {
         let mut families: HashMap<FamilyId, (FamilyName, Vec<FontInfo>)> = Default::default();
         let mut family_name = String::default();
         let data_id = SourceId::new();
-        super::scan::scan_memory(blob.as_ref(), |scanned_font| {
+        super::scan::scan_memory(data.as_ref(), |scanned_font| {
             family_name.clear();
             let family_chars = scanned_font
                 .english_or_first_name(NameId::TYPOGRAPHIC_FAMILY_NAME)
@@ -566,7 +565,7 @@ impl CommonData {
             }
             let data = SourceInfo {
                 id: data_id,
-                kind: SourceKind::Memory(blob.clone()),
+                kind: SourceKind::Memory(data.clone()),
             };
             let Some(font) = FontInfo::from_font_ref(&scanned_font.font, data, scanned_font.index)
             else {
