@@ -19,7 +19,7 @@ This release has an [MSRV] of 1.85.
 
 #### Parley
 
-- Breaking change: `Collection::register_fonts` now takes a `Blob<u8>` instead of a `Vec<u8>` ([#306][] by [@valadaptive])
+- Breaking change: `Collection::register_fonts` now takes a `Blob<u8>` instead of a `Vec<u8>` ([#306][] by [@valadaptive][])
 
 ### Internals
 
@@ -149,6 +149,7 @@ This release has an [MSRV] of 1.70.
 [@nicoburns]: https://github.com/nicoburns
 [@spirali]: https://github.com/spirali
 [@tomcur]: https://github.com/tomcur
+[@valadaptive]: https://github.com/valadaptive
 [@waywardmonkeys]: https://github.com/waywardmonkeys
 [@wfdewith]: https://github.com/wfdewith
 [@xorgy]: https://github.com/xorgy
@@ -202,6 +203,7 @@ This release has an [MSRV] of 1.70.
 [#268]: https://github.com/linebender/parley/pull/268
 [#271]: https://github.com/linebender/parley/pull/271
 [#280]: https://github.com/linebender/parley/pull/280
+[#306]: https://github.com/linebender/parley/pull/306
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/linebender/parley/releases/tag/v0.3.0
