@@ -51,7 +51,7 @@ pub struct SplitString<'source>([&'source str; 2]);
 
 impl<'source> SplitString<'source> {
     /// Get the characters of this string.
-    pub fn chars(self) -> impl Iterator<Item = char> + use<'source> {
+    pub fn chars(self) -> impl Iterator<Item = char> + 'source {
         self.into_iter().flat_map(str::chars)
     }
 }
