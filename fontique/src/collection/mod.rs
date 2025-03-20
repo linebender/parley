@@ -85,7 +85,7 @@ impl Collection {
     ///
     /// If `fontique` was compiled with the `"system"` feature, then it will
     /// include system fonts after the registered fonts.
-    pub fn family_names(&mut self) -> impl Iterator<Item = &str> + Clone {
+    pub fn family_names(&mut self) -> impl Iterator<Item = &str> + '_ + Clone {
         self.inner.family_names()
     }
 
@@ -114,7 +114,7 @@ impl Collection {
     pub fn generic_families(
         &mut self,
         family: GenericFamily,
-    ) -> impl Iterator<Item = FamilyId> + Clone {
+    ) -> impl Iterator<Item = FamilyId> + '_ + Clone {
         self.inner.generic_families(family)
     }
 
@@ -142,7 +142,7 @@ impl Collection {
     pub fn fallback_families(
         &mut self,
         key: impl Into<FallbackKey>,
-    ) -> impl Iterator<Item = FamilyId> + Clone {
+    ) -> impl Iterator<Item = FamilyId> + '_ + Clone {
         self.inner.fallback_families(key)
     }
 
@@ -214,7 +214,7 @@ impl Inner {
     /// Returns an iterator over all available family names in the collection.
     ///
     /// This includes both system and registered fonts.
-    pub fn family_names(&mut self) -> impl Iterator<Item = &str> + Clone {
+    pub fn family_names(&mut self) -> impl Iterator<Item = &str> + '_ + Clone {
         self.sync_shared();
         FamilyNames {
             ours: self.data.family_names.iter(),
@@ -286,7 +286,7 @@ impl Inner {
     pub fn generic_families(
         &mut self,
         family: GenericFamily,
-    ) -> impl Iterator<Item = FamilyId> + Clone {
+    ) -> impl Iterator<Item = FamilyId> + '_ + Clone {
         self.sync_shared();
         GenericFamilies {
             ours: self.data.generic_families.get(family).iter().copied(),
@@ -349,7 +349,7 @@ impl Inner {
     pub fn fallback_families(
         &mut self,
         key: impl Into<FallbackKey>,
-    ) -> impl Iterator<Item = FamilyId> + Clone {
+    ) -> impl Iterator<Item = FamilyId> + '_ + Clone {
         let selector = key.into();
         let script = selector.script();
         let lang_key = selector.locale();

@@ -74,7 +74,7 @@ impl<'a> FontFamily<'a> {
     ///
     /// assert_eq!(parsed_families, families);
     /// ```
-    pub fn parse_list(s: &'a str) -> impl Iterator<Item = FontFamily<'a>> + Clone {
+    pub fn parse_list(s: &'a str) -> impl Iterator<Item = FontFamily<'a>> + 'a + Clone {
         ParseList {
             source: s.as_bytes(),
             len: s.len(),
