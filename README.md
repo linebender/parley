@@ -7,7 +7,7 @@
 [![Latest published parley version.](https://img.shields.io/crates/v/parley.svg)](https://crates.io/crates/parley)
 [![Documentation build status.](https://img.shields.io/docsrs/parley.svg)](https://docs.rs/parley)
 [![Dependency staleness status.](https://deps.rs/crate/parley/latest/status.svg)](https://deps.rs/crate/parley)
-[![Linebender Zulip chat.](https://img.shields.io/badge/Linebender-%23text-blue?logo=Zulip)](https://xi.zulipchat.com/#narrow/stream/205635-text)
+[![Linebender Zulip chat.](https://img.shields.io/badge/Linebender-%23parley-blue?logo=Zulip)](https://xi.zulipchat.com/#narrow/channel/205635-parley)
 [![Apache 2.0 or MIT license.](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](#license)
 
 </div>
@@ -88,7 +88,7 @@ cargo update -p package_name --precise 0.1.1
 
 ## Community
 
-Discussion of Parley development happens in the [Linebender Zulip](https://xi.zulipchat.com/), specifically the [#text stream](https://xi.zulipchat.com/#narrow/stream/205635-text).
+Discussion of Parley development happens in the [Linebender Zulip](https://xi.zulipchat.com/), specifically the [#parley channel](https://xi.zulipchat.com/#narrow/channel/205635-parley).
 All public content can be read without logging in.
 
 Contributions are welcome by pull request. The [Rust code of conduct] applies.
