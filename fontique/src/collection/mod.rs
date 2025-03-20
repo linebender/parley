@@ -177,6 +177,13 @@ impl Collection {
     pub fn register_fonts(&mut self, data: Blob<u8>) -> Vec<(FamilyId, Vec<FontInfo>)> {
         self.inner.register_fonts(data)
     }
+
+    /// Clears this collection. Un-registers all fonts previously registered via
+    /// [`Self::register_fonts`], and unsets all previously-set generic families
+    /// and fallbacks. This will not remove any system fonts.
+    pub fn clear(&mut self) {
+        self.inner.clear();
+    }
 }
 
 impl Default for Collection {
@@ -432,6 +439,20 @@ impl Inner {
         self.data.register_fonts(data)
     }
 
+    /// Clears this collection. Un-registers all fonts previously registered via
+    /// [`Self::register_fonts`], and unsets all previously-set generic families
+    /// and fallbacks. This will not remove any system fonts.
+    pub fn clear(&mut self) {
+        #[cfg(feature = "std")]
+        if let Some(shared) = &self.shared {
+            shared.data.lock().unwrap().clear();
+            shared.bump_version();
+        } else {
+            self.data.clear();
+        }
+        self.data.clear();
+    }
+
     fn sync_shared(&mut self) {
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
@@ -591,6 +612,10 @@ impl CommonData {
             .into_iter()
             .map(|(id, (_, fonts))| (id, fonts))
             .collect()
+    }
+
+    fn clear(&mut self) {
+        *self = Default::default();
     }
 }
 
