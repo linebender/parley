@@ -7,6 +7,8 @@ mod query;
 
 pub use query::{Query, QueryFamily, QueryFont, QueryStatus};
 
+use crate::font::FontInfoOverride;
+
 use super::SourceCache;
 
 use super::{
@@ -174,8 +176,14 @@ impl Collection {
     ///
     /// Returns a list of pairs each containing the family identifier and fonts
     /// added to that family.
-    pub fn register_fonts(&mut self, data: Blob<u8>) -> Vec<(FamilyId, Vec<FontInfo>)> {
-        self.inner.register_fonts(data)
+    ///
+    /// Optionally, you can override various aspects of the font's metadata.
+    pub fn register_fonts(
+        &mut self,
+        data: Blob<u8>,
+        info_override: Option<FontInfoOverride<'_>>,
+    ) -> Vec<(FamilyId, Vec<FontInfo>)> {
+        self.inner.register_fonts(data, info_override)
     }
 
     /// Clears this collection. Un-registers all fonts previously registered via
@@ -426,17 +434,25 @@ impl Inner {
     ///
     /// Returns a list of pairs each containing the family identifier and fonts
     /// added to that family.
-    pub fn register_fonts(&mut self, data: Blob<u8>) -> Vec<(FamilyId, Vec<FontInfo>)> {
+    pub fn register_fonts(
+        &mut self,
+        data: Blob<u8>,
+        info_override: Option<FontInfoOverride<'_>>,
+    ) -> Vec<(FamilyId, Vec<FontInfo>)> {
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
-            let result = shared.data.lock().unwrap().register_fonts(data);
+            let result = shared
+                .data
+                .lock()
+                .unwrap()
+                .register_fonts(data, info_override);
             shared.bump_version();
             result
         } else {
-            self.data.register_fonts(data)
+            self.data.register_fonts(data, info_override)
         }
         #[cfg(not(feature = "std"))]
-        self.data.register_fonts(data)
+        self.data.register_fonts(data, info_override)
     }
 
     /// Clears this collection. Un-registers all fonts previously registered via
@@ -567,20 +583,32 @@ struct CommonData {
 }
 
 impl CommonData {
-    fn register_fonts(&mut self, data: Blob<u8>) -> Vec<(FamilyId, Vec<FontInfo>)> {
+    fn register_fonts(
+        &mut self,
+        data: Blob<u8>,
+        info_override: Option<FontInfoOverride<'_>>,
+    ) -> Vec<(FamilyId, Vec<FontInfo>)> {
         let mut families: HashMap<FamilyId, (FamilyName, Vec<FontInfo>)> = Default::default();
         let mut family_name = String::default();
         let data_id = SourceId::new();
         super::scan::scan_memory(data.as_ref(), |scanned_font| {
             family_name.clear();
-            let family_chars = scanned_font
-                .english_or_first_name(NameId::TYPOGRAPHIC_FAMILY_NAME)
-                .or_else(|| scanned_font.english_or_first_name(NameId::FAMILY_NAME))
-                .map(|name| name.chars());
-            let Some(family_chars) = family_chars else {
-                return;
-            };
-            family_name.extend(family_chars);
+
+            let family_name =
+                if let Some(override_family_name) = info_override.and_then(|o| o.family_name) {
+                    override_family_name
+                } else {
+                    let family_chars = scanned_font
+                        .english_or_first_name(NameId::TYPOGRAPHIC_FAMILY_NAME)
+                        .or_else(|| scanned_font.english_or_first_name(NameId::FAMILY_NAME))
+                        .map(|name| name.chars());
+                    let Some(family_chars) = family_chars else {
+                        return;
+                    };
+                    family_name.extend(family_chars);
+                    &family_name
+                };
+
             if family_name.is_empty() {
                 return;
             }
@@ -588,11 +616,17 @@ impl CommonData {
                 id: data_id,
                 kind: SourceKind::Memory(data.clone()),
             };
-            let Some(font) = FontInfo::from_font_ref(&scanned_font.font, data, scanned_font.index)
+            let Some(mut font) =
+                FontInfo::from_font_ref(&scanned_font.font, data, scanned_font.index)
             else {
                 return;
             };
-            let name = self.family_names.get_or_insert(&family_name);
+
+            if let Some(info_override) = info_override.as_ref() {
+                font.apply_override(info_override);
+            }
+
+            let name = self.family_names.get_or_insert(family_name);
             families
                 .entry(name.id())
                 .or_insert_with(|| (name, Default::default()))
