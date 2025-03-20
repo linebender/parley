@@ -6,10 +6,11 @@ use crate::{
     FontContext, FontFamily, FontStack, Layout, LayoutContext, PlainEditor, PlainEditorDriver,
     RangedBuilder, Rect, StyleProperty, TextStyle, TreeBuilder,
 };
-use fontique::{Collection, CollectionOptions};
+use fontique::{Blob, Collection, CollectionOptions};
 use std::{
     borrow::Cow,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use tiny_skia::{Color, Pixmap};
 
@@ -102,7 +103,7 @@ pub(crate) fn load_fonts(
                 continue;
             }
             let font_data = std::fs::read(&path)?;
-            collection.register_fonts(font_data);
+            collection.register_fonts(Blob::new(Arc::new(font_data)));
         }
     }
     Ok(())
