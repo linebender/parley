@@ -52,7 +52,7 @@ fn main() {
     let bg_color = Rgba([255, 255, 255, 255]);
 
     // Padding around the output image
-    let padding = 20;
+    let padding = (20f32 * display_scale).round() as u32;
 
     // Create a FontContext, LayoutContext and ScaleContext
     //
@@ -92,21 +92,21 @@ fn main() {
 
         builder.push_text(&text[5..40]);
 
-        builder.push_inline_box(InlineBox {
-            id: 0,
-            index: 0,
-            width: 50.0,
-            height: 50.0,
-        });
+        builder.push_inline_box(InlineBox::new(
+            0,
+            0,
+            50.0 * display_scale,
+            50.0 * display_scale,
+        ));
 
         builder.push_text(&text[40..50]);
 
-        builder.push_inline_box(InlineBox {
-            id: 1,
-            index: 50,
-            width: 50.0,
-            height: 30.0,
-        });
+        builder.push_inline_box(InlineBox::new(
+            1,
+            50,
+            50.0 * display_scale,
+            30.0 * display_scale,
+        ));
 
         builder.push_text(&text[50..141]);
 
@@ -147,18 +147,18 @@ fn main() {
         builder.push(underline_style, 141..150);
         builder.push(strikethrough_style, 155..168);
 
-        builder.push_inline_box(InlineBox {
-            id: 0,
-            index: 40,
-            width: 50.0,
-            height: 50.0,
-        });
-        builder.push_inline_box(InlineBox {
-            id: 1,
-            index: 50,
-            width: 50.0,
-            height: 30.0,
-        });
+        builder.push_inline_box(InlineBox::new(
+            0,
+            40,
+            50.0 * display_scale,
+            50.0 * display_scale,
+        ));
+        builder.push_inline_box(InlineBox::new(
+            1,
+            50,
+            50.0 * display_scale,
+            30.0 * display_scale,
+        ));
 
         // Build the builder into a Layout
         // let mut layout: Layout<ColorBrush> = builder.build(&text);

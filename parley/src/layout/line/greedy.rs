@@ -15,6 +15,7 @@ use crate::layout::{
     LineMetrics, Run,
 };
 use crate::style::Brush;
+use crate::{ResolvedBaselineShift, VerticalAlign};
 
 use core::ops::Range;
 
@@ -440,7 +441,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 }
             }
         }
-        let mut y = 0.;
+        let mut y = 0f32;
         let mut prev_line_metrics = None;
         for line in &mut self.lines.lines {
             // Reset metrics for line
@@ -454,12 +455,20 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 line.text_range = self.layout.data.text_len..self.layout.data.text_len;
             }
             // Compute metrics for the line, but ignore trailing whitespace.
-            let mut have_metrics = false;
             let mut needs_reorder = false;
+            let mut line_relative_alignment_needed = false;
+            // Accumulate the top and bottom bounds of all the positioned items in the line, relative to the baseline (which is the origin)
+            let mut top = f32::INFINITY;
+            let mut ascent = f32::INFINITY;
+            let mut bottom = f32::NEG_INFINITY;
+            let mut descent = f32::NEG_INFINITY;
+            let mut min_line_height = 0f32;
+
             for line_item in self.lines.line_items[line.item_range.clone()]
                 .iter_mut()
                 .rev()
             {
+                //let item_line_height = line_item.compute_line_height(&self.layout.data);
                 match line_item.kind {
                     LayoutItemKind::InlineBox => {
                         let item = &self.layout.data.inline_boxes[line_item.index];
@@ -468,11 +477,28 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         // Default vertical alignment is to align the bottom of boxes with the text baseline.
                         // This is equivalent to the entire height of the box being "ascent"
-                        line.metrics.ascent = line.metrics.ascent.max(item.height);
-                        line.metrics.line_height = line.metrics.line_height.max(item.height);
+                        min_line_height = min_line_height.max(item.height);
+                        let (mut style_top, mut style_bottom) = match item.vertical_align {
+                            VerticalAlign::Baseline | VerticalAlign::TextBottom => {
+                                (-item.height, 0.0)
+                            }
+                            VerticalAlign::Middle => (-item.height * 0.5, item.height * 0.5),
+                            VerticalAlign::TextTop => (0.0, item.height),
+                        };
+                        let offset = match item.baseline_shift {
+                            ResolvedBaselineShift::Absolute(value) => value,
+                            ResolvedBaselineShift::Top
+                            | ResolvedBaselineShift::Center
+                            | ResolvedBaselineShift::Bottom => {
+                                line_relative_alignment_needed = true;
+                                continue;
+                            }
+                        };
 
-                        // Mark us as having seen non-whitespace content on this line
-                        have_metrics = true;
+                        style_top += offset;
+                        style_bottom += offset;
+                        top = top.min(style_top);
+                        bottom = bottom.max(style_bottom);
                     }
                     LayoutItemKind::TextRun => {
                         // Compute the text range for the line
@@ -488,8 +514,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         }
 
                         let run = &self.layout.data.runs[line_item.index];
-                        let line_height = line_item.compute_line_height(&self.layout.data);
-                        line.metrics.line_height = line.metrics.line_height.max(line_height);
+
+                        /*run.unique_styles(&self.layout.data, |style| {
+                            line.metrics.line_height = line.metrics.line_height.max(style.line_height);
+                        });*/
 
                         // Compute the run's advance by summing the advances of its constituent clusters
                         line_item.advance = self.layout.data.clusters
@@ -500,17 +528,101 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         // Ignore trailing whitespace for metrics computation
                         // (we are iterating backwards so trailing whitespace comes first)
+                        let have_metrics = top.is_finite();
                         if !have_metrics && line_item.is_whitespace {
                             continue;
                         }
 
-                        // Compute the run's vertical metrics
-                        line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent);
-                        line.metrics.descent = line.metrics.descent.max(run.metrics.descent);
-                        line.metrics.leading = line.metrics.leading.max(run.metrics.leading);
+                        // Compute the bounds of items whose baseline values are not line-relative
+                        run.unique_styles(&self.layout.data, |style| {
+                            min_line_height = min_line_height.max(style.line_height);
+                            let (mut style_top, mut style_bottom) = match style.vertical_align {
+                                VerticalAlign::Baseline => {
+                                    (-run.metrics.ascent, run.metrics.descent)
+                                }
+                                VerticalAlign::TextBottom => {
+                                    (-run.metrics.ascent - run.metrics.descent, 0.0)
+                                }
+                                VerticalAlign::Middle => {
+                                    let offset = run.metrics.x_height * 0.5;
+                                    (-run.metrics.ascent + offset, run.metrics.descent + offset)
+                                }
+                                VerticalAlign::TextTop => {
+                                    (0.0, run.metrics.ascent + run.metrics.descent)
+                                }
+                            };
+                            let offset = match style.baseline_shift {
+                                ResolvedBaselineShift::Absolute(value) => -value,
+                                ResolvedBaselineShift::Top
+                                | ResolvedBaselineShift::Center
+                                | ResolvedBaselineShift::Bottom => {
+                                    line_relative_alignment_needed = true;
+                                    return;
+                                }
+                            };
+                            style_top += offset;
+                            style_bottom += offset;
+                            top = top.min(style_top);
+                            ascent = ascent.min(style_top);
+                            bottom = bottom.max(style_bottom);
+                            descent = descent.max(style_bottom);
+                        });
+                    }
+                }
+            }
 
-                        // Mark us as having seen non-whitespace content on this line
-                        have_metrics = true;
+            if line_relative_alignment_needed {
+                // Align the line-relative items to the previously-computed bounds
+                let bounding_top = top;
+                let bounding_bottom = bottom;
+
+                for line_item in self.lines.line_items[line.item_range.clone()]
+                    .iter_mut()
+                    .rev()
+                {
+                    match line_item.kind {
+                        LayoutItemKind::TextRun => {
+                            let run = &self.layout.data.runs[line_item.index];
+                            let height = run.metrics.ascent + run.metrics.descent;
+                            run.unique_styles(&self.layout.data, |style| {
+                                match style.baseline_shift {
+                                    ResolvedBaselineShift::Absolute(_) => return,
+                                    ResolvedBaselineShift::Top => {
+                                        bottom = bottom.max(bounding_top + height);
+                                        ascent = ascent.min(bounding_top);
+                                        descent = descent.max(bounding_top + height);
+                                    }
+                                    ResolvedBaselineShift::Center => {
+                                        let center = (bounding_top + bounding_bottom) * 0.5;
+                                        top = top.min(center - (height * 0.5));
+                                        ascent = ascent.min(center - (height * 0.5));
+                                        descent = descent.max(center + (height * 0.5));
+                                    }
+                                    ResolvedBaselineShift::Bottom => {
+                                        top = top.min(bounding_bottom - height);
+                                        descent = descent.max(bounding_bottom);
+                                        ascent = ascent.min(bounding_bottom - height);
+                                    }
+                                }
+                            });
+                        }
+                        LayoutItemKind::InlineBox => {
+                            let item = &self.layout.data.inline_boxes[line_item.index];
+                            match item.baseline_shift {
+                                ResolvedBaselineShift::Absolute(_) => return,
+                                ResolvedBaselineShift::Top => {
+                                    bottom = bottom.max(bounding_top + item.height);
+                                }
+                                ResolvedBaselineShift::Center => {
+                                    let center = (bounding_top + bounding_bottom) * 0.5;
+                                    top = top.min(center - (item.height * 0.5));
+                                    bottom = bottom.max(center + (item.height * 0.5));
+                                }
+                                ResolvedBaselineShift::Bottom => {
+                                    top = top.min(bounding_bottom - item.height);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -543,7 +655,30 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 })
                 .unwrap_or(0.0);
 
-            if !have_metrics {
+            let have_metrics = top.is_finite();
+            if have_metrics {
+                if bottom - top < min_line_height {
+                    let half_leading = (min_line_height - (bottom - top)) * 0.5;
+                    top -= half_leading;
+                    bottom += half_leading;
+                }
+
+                line.metrics.line_height = bottom - top;
+
+                let baseline_offset = -top;
+                line.metrics.ascent = -ascent - baseline_offset;
+                line.metrics.descent = descent - baseline_offset;
+
+                line.metrics.min_coord = y.round();
+                line.metrics.baseline = (y + baseline_offset).round();
+                y += line.metrics.line_height;
+                line.metrics.max_coord = y.round();
+
+                // Round block/vertical axis metrics
+                line.metrics.ascent = line.metrics.ascent.round();
+                line.metrics.descent = line.metrics.descent.round();
+                line.metrics.line_height = line.metrics.line_height.round();
+            } else {
                 // Line consisting entirely of whitespace?
                 if !line.item_range.is_empty() {
                     let line_item = &self.lines.line_items[line.item_range.start];
@@ -586,23 +721,19 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         line.item_range = run_index..run_index + 1;
                     }
                 }
+
+                line.metrics.leading =
+                    line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
+
+                // Compute
+                let above = (line.metrics.ascent + line.metrics.leading * 0.5).round();
+                let below = (line.metrics.descent + line.metrics.leading * 0.5).round();
+                line.metrics.min_coord = y;
+                line.metrics.baseline = y + above;
+                y = line.metrics.baseline + below;
+                line.metrics.max_coord = y;
+                prev_line_metrics = Some(line.metrics);
             }
-
-            // Round block/vertical axis metrics
-            line.metrics.ascent = line.metrics.ascent.round();
-            line.metrics.descent = line.metrics.descent.round();
-            line.metrics.line_height = line.metrics.line_height.round();
-            line.metrics.leading =
-                line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
-
-            // Compute
-            let above = (line.metrics.ascent + line.metrics.leading * 0.5).round();
-            let below = (line.metrics.descent + line.metrics.leading * 0.5).round();
-            line.metrics.min_coord = y;
-            line.metrics.baseline = y + above;
-            y = line.metrics.baseline + below;
-            line.metrics.max_coord = y;
-            prev_line_metrics = Some(line.metrics);
         }
         if self.layout.data.text_len == 0 {
             if let Some(line) = self.lines.line_items.first_mut() {
