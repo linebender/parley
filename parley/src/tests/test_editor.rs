@@ -31,3 +31,11 @@ fn editor_select_all() {
     env.driver(&mut editor).select_all();
     env.check_editor_snapshot(&mut editor);
 }
+
+#[test]
+fn editor_double_newline() {
+    let mut env = testenv!();
+    let mut editor = env.editor("Hi, all!\n\nNext");
+    env.driver(&mut editor).select_all();
+    env.check_editor_snapshot(&mut editor);
+}
