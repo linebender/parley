@@ -147,8 +147,10 @@ pub const SCRIPT_SAMPLES: &[(Script, &str)] = &[
     (Script(*b"Gujr"), "\u{a81}\u{a82}ઃઅઆઇઈઉઊઋઌઍએઐઑઓ"),
     (Script(*b"Guru"), "\u{a01}\u{a02}ਃਅਆਇਈਉਊਏਐਓਔਕਖਗ"),
     (Script(*b"Hang"), "가"),
-    (Script(*b"Hani"), "今"),
+    (Script(*b"Hani"), "严揯今"),
     (Script(*b"Hano"), "ᜠᜡᜢᜣᜤᜥᜦᜧᜨᜩᜪᜫᜬᜭᜮᜯ"),
+    (Script(*b"Hans"), "严"),
+    (Script(*b"Hant"), "揯"),
     (Script(*b"Hatr"), "𐣠𐣡𐣢𐣣𐣤𐣥𐣦𐣧𐣨𐣩𐣪𐣫𐣬𐣭𐣮𐣯"),
     (
         Script(*b"Hebr"),
