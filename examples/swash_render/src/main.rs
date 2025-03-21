@@ -84,9 +84,9 @@ fn main() {
             ..Default::default()
         };
 
-        let mut builder = layout_cx.tree_builder(&mut font_cx, display_scale, &root_style);
+        let mut builder = layout_cx.tree_builder(&mut font_cx, display_scale, 0, &root_style);
 
-        builder.push_style_modification_span(&[bold_style]);
+        builder.push_style_modification_span(1, &[bold_style]);
         builder.push_text(&text[0..5]);
         builder.pop_style_span();
 
@@ -111,14 +111,14 @@ fn main() {
         builder.push_text(&text[50..141]);
 
         // Set the underline style
-        builder.push_style_modification_span(&[underline_style]);
+        builder.push_style_modification_span(2, &[underline_style]);
         builder.push_text(&text[141..150]);
 
         builder.pop_style_span();
         builder.push_text(&text[150..155]);
 
         // Set the strikethrough style
-        builder.push_style_modification_span(&[strikethrough_style]);
+        builder.push_style_modification_span(3, &[strikethrough_style]);
         builder.push_text(&text[155..168]);
 
         // Build the builder into a Layout
