@@ -103,7 +103,7 @@ pub(crate) fn load_fonts(
                 continue;
             }
             let font_data = std::fs::read(&path)?;
-            collection.register_fonts(Blob::new(Arc::new(font_data)));
+            collection.register_fonts(Blob::new(Arc::new(font_data)), None);
         }
     }
     Ok(())
