@@ -251,6 +251,27 @@ impl FontInfo {
             self.weight = weight;
         }
     }
+
+    pub(crate) fn apply_override(&mut self, info_override: &FontInfoOverride<'_>) {
+        if let Some(width) = info_override.width {
+            self.width = width;
+        }
+        if let Some(style) = info_override.style {
+            self.style = style;
+        }
+        if let Some(weight) = info_override.weight {
+            self.weight = weight;
+        }
+        if let Some(axes) = info_override.axes {
+            // This is O(n^2) but no font should have enough axes for that to
+            // matter (read-fonts does the same thing)
+            for (tag, value) in axes {
+                if let Some(axis) = self.axes.iter_mut().find(|axis| axis.tag == *tag) {
+                    axis.default = *value;
+                }
+            }
+        }
+    }
 }
 
 const WEIGHT_AXIS: u8 = 0x01;
@@ -408,4 +429,24 @@ fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
             FontWeight::default(),
         )
     }
+}
+
+/// Helper for specifying aspects of a font's metadata to be overridden when the
+/// font is registered. Helpful when implementing a `@font-face`-like API, which
+/// allows those defining the fonts to specify certain font properties manually.
+#[derive(Copy, Clone, Debug, Default)]
+pub struct FontInfoOverride<'a> {
+    /// Font family name to be used instead of the one specified in the font
+    /// itself.
+    pub family_name: Option<&'a str>,
+    /// Font width to be used instead of the one specified in the font itself.
+    pub width: Option<FontWidth>,
+    /// Font's visual style / "slope" to be used instead of the one specified in
+    /// the font itself.
+    pub style: Option<FontStyle>,
+    /// Font weight to be used instead of the one specified in the font itself.
+    pub weight: Option<FontWeight>,
+    /// Default values for the font's variation axes. Axes not included within
+    /// the font will be ignored.
+    pub axes: Option<&'a [(Tag, f32)]>,
 }

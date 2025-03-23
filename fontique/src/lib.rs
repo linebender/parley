@@ -55,7 +55,7 @@ pub use attributes::{Attributes, FontStyle, FontWeight, FontWidth};
 pub use collection::{Collection, CollectionOptions, Query, QueryFamily, QueryFont, QueryStatus};
 pub use fallback::FallbackKey;
 pub use family::{FamilyId, FamilyInfo};
-pub use font::{AxisInfo, FontInfo, Synthesis};
+pub use font::{AxisInfo, FontInfo, FontInfoOverride, Synthesis};
 pub use generic::GenericFamily;
 pub use script::Script;
 pub use source::{SourceId, SourceInfo, SourceKind};
