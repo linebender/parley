@@ -17,9 +17,11 @@ This release has an [MSRV] of 1.82.
 
 ### Changed
 
-#### Parley
+#### Fontique
 
 - Breaking change: `Collection::register_fonts` now takes a `Blob<u8>` instead of a `Vec<u8>` ([#306][] by [@valadaptive][])
+- Breaking change: `Collection::register_fonts` now takes an optional second parameter which allows overriding the metadata 
+  used for matching the font ([#312][] by [@valadaptive][])
 
 ## [0.3.0] - 2025-02-27
 
@@ -200,6 +202,7 @@ This release has an [MSRV] of 1.70.
 [#271]: https://github.com/linebender/parley/pull/271
 [#280]: https://github.com/linebender/parley/pull/280
 [#306]: https://github.com/linebender/parley/pull/306
+[#312]: https://github.com/linebender/parley/pull/312
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/linebender/parley/releases/tag/v0.3.0
