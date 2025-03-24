@@ -23,6 +23,12 @@ This release has an [MSRV] of 1.82.
 - Breaking change: `Collection::register_fonts` now takes an optional second parameter which allows overriding the metadata 
   used for matching the font ([#312][] by [@valadaptive][])
 
+#### Parley
+
+- Update to `accesskit` 0.18. ([#294][] by [@waywardmonkeys][]))
+- Display selected newlines as whitespace in the selection highlight. ([#296][] by [@valadaptive][])
+- Make `BreakReason` public. ([#300][] by [@valadaptive][])
+
 ## [0.3.0] - 2025-02-27
 
 This release has an [MSRV] of 1.82.
@@ -31,14 +37,14 @@ This release has an [MSRV] of 1.82.
 
 #### Parley
 
-- `Generation` on `PlainEditor` to help implement lazy drawing. ([#143] by [@xorgy])
+- `Generation` on `PlainEditor` to help implement lazy drawing. ([#143][] by [@xorgy][])
 - Support for preedit for input methods in `PlainEditor` ([#192][], [#198][] by [@tomcur][])
 - `PlainEditor` method to get a cursor area for use by the platform's input method ([#224][] by [@tomcur][])
 - `Layout` methods to calculate minimum and maximum content widths. ([#259][] by [@wfdewith][])
-- `PlainEditor` now implements `Clone` ([#133][] by [@nicoburns])
-- Navigation and byte selection operations for `PlainEditor`. ([#146][] by [@xorgy])
-- AccessKit integration ([#166][] by [@mwcampbell])
-- `first_style` method to `Cluster` ([#264][] by [@nicoburns])
+- `PlainEditor` now implements `Clone` ([#133][] by [@nicoburns][])
+- Navigation and byte selection operations for `PlainEditor`. ([#146][] by [@xorgy][])
+- AccessKit integration ([#166][] by [@mwcampbell][])
+- `first_style` method to `Cluster` ([#264][] by [@nicoburns][])
 
 #### Fontique
 
@@ -201,6 +207,9 @@ This release has an [MSRV] of 1.70.
 [#268]: https://github.com/linebender/parley/pull/268
 [#271]: https://github.com/linebender/parley/pull/271
 [#280]: https://github.com/linebender/parley/pull/280
+[#294]: https://github.com/linebender/parley/pull/294
+[#296]: https://github.com/linebender/parley/pull/296
+[#300]: https://github.com/linebender/parley/pull/300
 [#306]: https://github.com/linebender/parley/pull/306
 [#312]: https://github.com/linebender/parley/pull/312
 
