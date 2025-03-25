@@ -784,21 +784,23 @@ impl Selection {
     }
 
     /// Returns a vector containing the rectangles which represent the visual
-    /// geometry of this selection for the given layout.
+    /// geometry of this selection for the given layout, and the indices of the
+    /// lines to which they belong.
     ///
     /// This is a convenience method built on [`geometry_with`](Self::geometry_with).
-    pub fn geometry<B: Brush>(&self, layout: &Layout<B>) -> Vec<Rect> {
+    pub fn geometry<B: Brush>(&self, layout: &Layout<B>) -> Vec<(Rect, usize)> {
         let mut rects = Vec::new();
-        self.geometry_with(layout, |rect| rects.push(rect));
+        self.geometry_with(layout, |rect, line_idx| rects.push((rect, line_idx)));
         rects
     }
 
     /// Invokes `f` with the sequence of rectangles which represent the visual
-    /// geometry of this selection for the given layout.
+    /// geometry of this selection for the given layout, and the indices of the
+    /// lines to which they belong.
     ///
     /// This avoids allocation if the intent is to render the rectangles
     /// immediately.
-    pub fn geometry_with<B: Brush>(&self, layout: &Layout<B>, mut f: impl FnMut(Rect)) {
+    pub fn geometry_with<B: Brush>(&self, layout: &Layout<B>, mut f: impl FnMut(Rect, usize)) {
         const NEWLINE_WHITESPACE_WIDTH_RATIO: f64 = 0.25;
         if self.is_collapsed() {
             return;
@@ -846,7 +848,7 @@ impl Selection {
                             cur_x += advance;
                         } else {
                             if cur_x != start_x {
-                                f(Rect::new(start_x, line_min, cur_x, line_max));
+                                f(Rect::new(start_x, line_min, cur_x, line_max), line_ix);
                             }
                             cur_x += advance;
                             start_x = cur_x;
@@ -858,17 +860,15 @@ impl Selection {
                     end_x += newline_whitespace;
                 }
                 if end_x != start_x {
-                    f(Rect::new(start_x, line_min, end_x, line_max));
+                    f(Rect::new(start_x, line_min, end_x, line_max), line_ix);
                 }
             } else {
                 let x = metrics.offset as f64;
                 let width = metrics.advance as f64;
-                f(Rect::new(
-                    x,
-                    line_min,
-                    x + width + newline_whitespace,
-                    line_max,
-                ));
+                f(
+                    Rect::new(x, line_min, x + width + newline_whitespace, line_max),
+                    line_ix,
+                );
             }
         }
     }
