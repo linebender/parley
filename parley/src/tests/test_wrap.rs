@@ -1,7 +1,7 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::{Alignment, AlignmentOptions, OverflowWrap, StyleProperty, WordBreak, testenv};
+use crate::{Alignment, AlignmentOptions, OverflowWrap, StyleProperty, WordBreakStrength, testenv};
 
 use super::utils::{ColorBrush, TestEnv};
 
@@ -163,7 +163,7 @@ fn word_break_break_all_first_half() {
     test_wrap(
         &mut env,
         Some("Antidis"),
-        StyleProperty::WordBreak(WordBreak::BreakAll),
+        StyleProperty::WordBreak(WordBreakStrength::BreakAll),
         ColorBrush::new(0, 128, 0, 255),
         120.0,
     );
@@ -176,7 +176,7 @@ fn word_break_break_all_second_half() {
     test_wrap(
         &mut env,
         Some("anism"),
-        StyleProperty::WordBreak(WordBreak::BreakAll),
+        StyleProperty::WordBreak(WordBreakStrength::BreakAll),
         ColorBrush::new(0, 128, 0, 255),
         120.0,
     );
@@ -189,7 +189,7 @@ fn word_break_break_all_during() {
     test_wrap(
         &mut env,
         Some("establishment"),
-        StyleProperty::WordBreak(WordBreak::BreakAll),
+        StyleProperty::WordBreak(WordBreakStrength::BreakAll),
         ColorBrush::new(0, 128, 0, 255),
         120.0,
     );
@@ -202,7 +202,7 @@ fn word_break_break_all_everywhere() {
     test_wrap(
         &mut env,
         Some("Most words are short. But Antidisestablishmentarianism is long and needs to wrap."),
-        StyleProperty::WordBreak(WordBreak::BreakAll),
+        StyleProperty::WordBreak(WordBreakStrength::BreakAll),
         ColorBrush::new(0, 128, 0, 255),
         120.0,
     );
@@ -214,7 +214,7 @@ fn word_break_break_all_min_content_width() {
 
     let text = "Hello world!\nLonger line with a looooooooong word.";
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::WordBreak(WordBreak::BreakAll));
+    builder.push_default(StyleProperty::WordBreak(WordBreakStrength::BreakAll));
 
     let mut layout = builder.build(text);
 
@@ -237,7 +237,7 @@ fn word_break_wpt007() {
         &mut env,
         "aaaaaaabbbbbbbcccccc",
         Some("bbbbbbb"),
-        StyleProperty::WordBreak(WordBreak::BreakAll),
+        StyleProperty::WordBreak(WordBreakStrength::BreakAll),
         ColorBrush::new(0, 128, 0, 255),
         55.0,
     );
@@ -249,7 +249,7 @@ fn word_break_keep_all() {
 
     let mut test_text = |text, name, wrap_width| {
         let mut builder = env.ranged_builder(text);
-        builder.push_default(StyleProperty::WordBreak(WordBreak::KeepAll));
+        builder.push_default(StyleProperty::WordBreak(WordBreakStrength::KeepAll));
 
         let mut layout = builder.build(text);
 

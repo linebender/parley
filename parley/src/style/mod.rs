@@ -15,36 +15,12 @@ pub use font::{
     FontWidth, GenericFamily,
 };
 pub use styleset::StyleSet;
+pub use swash::text::WordBreakStrength;
 
 #[derive(Debug, Clone, Copy)]
 pub enum WhiteSpaceCollapse {
     Collapse,
     Preserve,
-}
-
-/// Control over where words can wrap.
-///
-/// See <https://drafts.csswg.org/css-text/#propdef-word-break> for more information.
-#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-#[repr(u8)]
-pub enum WordBreak {
-    /// Words can be broken according to their normal Unicode rules.
-    #[default]
-    Normal,
-    /// Breaking is allowed within words. This does not affect breaking around punctuation.
-    BreakAll,
-    /// Breaking is forbidden within words.
-    KeepAll,
-}
-
-impl WordBreak {
-    pub(crate) fn as_swash(&self) -> swash::text::WordBreakStrength {
-        match self {
-            Self::Normal => swash::text::WordBreakStrength::Normal,
-            Self::BreakAll => swash::text::WordBreakStrength::BreakAll,
-            Self::KeepAll => swash::text::WordBreakStrength::KeepAll,
-        }
-    }
 }
 
 /// Control over "emergency" line-breaking.
@@ -53,7 +29,8 @@ impl WordBreak {
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum OverflowWrap {
-    /// Even with extremely long words, lines can only break at places specified in [`WordBreak`].
+    /// Even with extremely long words, lines can only break at places specified in
+    /// [`WordBreakStrength`].
     #[default]
     Normal,
     /// Words may be broken at an arbitrary point if there are no other places in the line to break
@@ -108,7 +85,7 @@ pub enum StyleProperty<'a, B: Brush> {
     /// Extra spacing between letters.
     LetterSpacing(f32),
     /// Control over where words can wrap.
-    WordBreak(WordBreak),
+    WordBreak(WordBreakStrength),
     /// Control over "emergency" line-breaking.
     OverflowWrap(OverflowWrap),
 }
@@ -157,7 +134,7 @@ pub struct TextStyle<'a, B: Brush> {
     /// Extra spacing between letters.
     pub letter_spacing: f32,
     /// Control over where words can wrap.
-    pub word_break: WordBreak,
+    pub word_break: WordBreakStrength,
     /// Control over "emergency" line-breaking.
     pub overflow_wrap: OverflowWrap,
 }
