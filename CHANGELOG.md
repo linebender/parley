@@ -15,6 +15,12 @@ You can find its changes [documented below](#030---2025-02-27).
 
 This release has an [MSRV] of 1.82.
 
+### Added
+
+#### Parley
+
+- `PlainEditor::selection_geometry_with`, the equivalent of `Selection::geometry_with` method
+
 ### Changed
 
 #### Fontique
@@ -25,6 +31,8 @@ This release has an [MSRV] of 1.82.
 
 #### Parley
 
+- Breaking change: `Selection::geometry`, `Selection::geometry_with`, and `PlainEditor::selection_geometry` now include
+  the line indices that the selection rectangles belong to. ([#318][] by [@valadaptive][])
 - Update to `accesskit` 0.18. ([#294][] by [@waywardmonkeys][]))
 - Display selected newlines as whitespace in the selection highlight. ([#296][] by [@valadaptive][])
 - Make `BreakReason` public. ([#300][] by [@valadaptive][])
@@ -212,6 +220,7 @@ This release has an [MSRV] of 1.70.
 [#300]: https://github.com/linebender/parley/pull/300
 [#306]: https://github.com/linebender/parley/pull/306
 [#312]: https://github.com/linebender/parley/pull/312
+[#318]: https://github.com/linebender/parley/pull/318
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/linebender/parley/releases/tag/v0.3.0
