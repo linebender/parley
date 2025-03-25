@@ -742,6 +742,11 @@ where
         }
     }
 
+    /// Returns the current selection.
+    pub fn selection(&self) -> &Selection {
+        &self.selection
+    }
+
     /// If the current selection is not collapsed, returns the text content of
     /// that selection.
     pub fn selected_text(&self) -> Option<&str> {
