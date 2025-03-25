@@ -1,11 +1,11 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::Font;
 use crate::inline_box::InlineBox;
 use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::nearly_zero;
+use crate::{Font, OverflowWrap};
 use core::cell::OnceCell;
 use core::ops::Range;
 use swash::Synthesis;
@@ -522,7 +522,10 @@ impl<B: Brush> LayoutData<B> {
                     }
                     for cluster in clusters {
                         let boundary = cluster.info.boundary();
-                        if matches!(boundary, Boundary::Line | Boundary::Mandatory) {
+                        let style = &self.styles[cluster.style_index as usize];
+                        if matches!(boundary, Boundary::Line | Boundary::Mandatory)
+                            || style.overflow_wrap == OverflowWrap::Anywhere
+                        {
                             let trailing_whitespace = whitespace_advance(prev_cluster);
                             min_width = min_width.max(running_min_width - trailing_whitespace);
                             running_min_width = 0.0;

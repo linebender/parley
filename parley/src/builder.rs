@@ -121,8 +121,6 @@ impl<B: Brush> TreeBuilder<'_, B> {
         // Apply TreeStyleBuilder styles to LayoutContext
         let text = self.lcx.tree_style_builder.finish(&mut self.lcx.styles);
 
-        self.lcx.analyze_text(&text);
-
         // Call generic layout builder method
         build_into_layout(layout, self.scale, &text, self.lcx, self.fcx);
 
@@ -143,6 +141,8 @@ fn build_into_layout<B: Brush>(
     lcx: &mut LayoutContext<B>,
     fcx: &mut FontContext,
 ) {
+    lcx.analyze_text(text);
+
     layout.data.clear();
     layout.data.scale = scale;
     layout.data.has_bidi = !lcx.bidi.levels().is_empty();

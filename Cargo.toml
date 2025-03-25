@@ -74,4 +74,4 @@ parley = { version = "0.3.0", default-features = false, path = "parley" }
 peniko = { version = "0.3.1", default-features = false }
 skrifa = { version = "0.26.6", default-features = false }
 read-fonts = { version = "0.25.3", default-features = false }
-swash = { version = "0.2.0", default-features = false }
+swash = { git = "https://github.com/valadaptive/swash", branch = "word-break-setting", default-features = false }
