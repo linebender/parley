@@ -7,3 +7,4 @@ mod renderer;
 
 pub(crate) use cursor_test::CursorTest;
 pub(crate) use env::TestEnv;
+pub(crate) use renderer::ColorBrush;

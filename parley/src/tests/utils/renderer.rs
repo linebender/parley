@@ -19,7 +19,15 @@ use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Rect, Tr
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct ColorBrush {
-    pub(crate) color: Color,
+    pub(super) color: Color,
+}
+
+impl ColorBrush {
+    pub(crate) fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
+        Self {
+            color: Color::from_rgba8(r, g, b, a),
+        }
+    }
 }
 
 impl Default for ColorBrush {
