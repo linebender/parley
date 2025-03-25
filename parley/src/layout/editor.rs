@@ -846,6 +846,12 @@ where
         }
     }
 
+    /// Borrow the text content of the buffer, including the IME preedit
+    /// region if any.
+    pub fn raw_text(&self) -> &str {
+        &self.buffer
+    }
+
     /// Get the current `Generation` of the layout, to decide whether to draw.
     ///
     /// You should store the generation the editor was at when you last drew it, and then redraw
