@@ -120,7 +120,7 @@ impl<B: Brush> LayoutContext<B> {
                 }
                 style_idx += 1;
             }
-            a.set_break_strength(word_break.as_swash());
+            a.set_break_strength(word_break);
 
             let Some((properties, boundary)) = a.next() else {
                 break;
