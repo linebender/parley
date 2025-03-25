@@ -20,6 +20,7 @@ fn test_wrap(
         let start = text.find(pattern).unwrap();
         let range = start..start + pattern.len();
         builder.push(StyleProperty::Brush(color), range.clone());
+        builder.push(StyleProperty::Underline(true), range.clone());
         builder.push(wrap_property, range.clone());
     }
 
@@ -223,6 +224,8 @@ fn word_break_keep_all() {
     };
 
     test_text("Latin latin latin latin", "latin", 120.0);
+    // These will all show up as boxes because CJK fonts are quite large (several megabytes per language) and could
+    // bloat the repository. Line break analysis should work the same regardless of font, however.
     test_text("日本語 日本語 日本語", "japanese", 60.0);
     test_text("한글이 한글이 한글이", "korean", 60.0);
     // TODO: we fail this test; so does Safari
