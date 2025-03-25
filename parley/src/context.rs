@@ -107,9 +107,7 @@ impl<B: Brush> LayoutContext<B> {
 
         let mut char_indices = text.char_indices();
         loop {
-            let (Some((properties, boundary)), Some((char_idx, _))) =
-                (a.next(), char_indices.next())
-            else {
+            let Some((char_idx, _)) = char_indices.next() else {
                 break;
             };
 
@@ -122,8 +120,12 @@ impl<B: Brush> LayoutContext<B> {
                 }
                 style_idx += 1;
             }
-            // Set the word break strength for the *next* character, which seems to be what Chrome does.
             a.set_break_strength(word_break.as_swash());
+
+            let Some((properties, boundary)) = a.next() else {
+                break;
+            };
+
             self.info.push((CharInfo::new(properties, boundary), 0));
         }
         if a.needs_bidi_resolution() {

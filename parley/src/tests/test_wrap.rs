@@ -12,7 +12,24 @@ fn test_wrap(
     color: ColorBrush,
     wrap_width: f32,
 ) {
-    let text = "Most words are short. But Antidisestablishmentarianism is long and needs to wrap.";
+    test_wrap_with_custom_text(
+        env,
+        "Most words are short. But Antidisestablishmentarianism is long and needs to wrap.",
+        pattern,
+        wrap_property,
+        color,
+        wrap_width,
+    );
+}
+
+fn test_wrap_with_custom_text(
+    env: &mut TestEnv,
+    text: &str,
+    pattern: Option<&str>,
+    wrap_property: StyleProperty<'_, ColorBrush>,
+    color: ColorBrush,
+    wrap_width: f32,
+) {
     let mut builder = env.ranged_builder(text);
     builder.push_default(StyleProperty::Brush(ColorBrush::new(255, 0, 0, 255)));
 
@@ -209,6 +226,24 @@ fn word_break_break_all_min_content_width() {
 }
 
 #[test]
+fn word_break_wpt007() {
+    // See http://wpt.live/css/css-text/word-break/word-break-break-all-inline-007.tentative.html
+    //
+    // All browsers fail this currently, but we pass it. This means that word_break_break_all_first_half doesn't match
+    // what any browsers do currently, but should be theoretically correct.
+    let mut env = testenv!();
+
+    test_wrap_with_custom_text(
+        &mut env,
+        "aaaaaaabbbbbbbcccccc",
+        Some("bbbbbbb"),
+        StyleProperty::WordBreak(WordBreak::BreakAll),
+        ColorBrush::new(0, 128, 0, 255),
+        55.0,
+    );
+}
+
+#[test]
 fn word_break_keep_all() {
     let mut env = testenv!();
 
@@ -223,6 +258,8 @@ fn word_break_keep_all() {
         env.with_name(name).check_layout_snapshot(&layout);
     };
 
+    // These are the word-break-keep-all tests from WPT:
+    // https://wpt.fyi/results/css/css-text/word-break?label=experimental&label=master&aligned
     test_text("Latin latin latin latin", "latin", 120.0);
     // These will all show up as boxes because CJK fonts are quite large (several megabytes per language) and could
     // bloat the repository. Line break analysis should work the same regardless of font, however.
