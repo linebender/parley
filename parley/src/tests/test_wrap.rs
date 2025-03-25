@@ -223,6 +223,8 @@ fn word_break_keep_all() {
         env.with_name(name).check_layout_snapshot(&layout);
     };
 
+    // These are the word-break-keep-all tests from WPT:
+    // https://wpt.fyi/results/css/css-text/word-break?label=experimental&label=master&aligned
     test_text("Latin latin latin latin", "latin", 120.0);
     // These will all show up as boxes because CJK fonts are quite large (several megabytes per language) and could
     // bloat the repository. Line break analysis should work the same regardless of font, however.
