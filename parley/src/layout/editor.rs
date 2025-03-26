@@ -742,8 +742,11 @@ where
         }
     }
 
-    /// Returns the current selection.
-    pub fn selection(&self) -> &Selection {
+    /// Borrow the current selection. The indices returned by functions
+    /// such as [`Selection::text_range`] refer to the raw text buffer,
+    /// including the IME preedit region, which can be accessed via
+    /// [`PlainEditor::raw_text`].
+    pub fn raw_selection(&self) -> &Selection {
         &self.selection
     }
 
