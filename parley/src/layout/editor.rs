@@ -760,11 +760,20 @@ where
         }
     }
 
-    /// Get rectangles representing the selected portions of text.
-    pub fn selection_geometry(&self) -> Vec<Rect> {
+    /// Get rectangles, and their corresponding line indices, representing the selected portions of
+    /// text.
+    pub fn selection_geometry(&self) -> Vec<(Rect, usize)> {
         // We do not check `self.show_cursor` here, as the IME handling code collapses the
         // selection to a caret in that case.
         self.selection.geometry(&self.layout)
+    }
+
+    /// Invoke a callback with each rectangle representing the selected portions of text, and the
+    /// indices of the lines to which they belong.
+    pub fn selection_geometry_with(&self, f: impl FnMut(Rect, usize)) {
+        // We do not check `self.show_cursor` here, as the IME handling code collapses the
+        // selection to a caret in that case.
+        self.selection.geometry_with(&self.layout, f);
     }
 
     /// Get a rectangle representing the current caret cursor position.
@@ -790,7 +799,7 @@ where
 
             // Bound the entire preedit text.
             let mut area = None;
-            selection.geometry_with(&self.layout, |rect| {
+            selection.geometry_with(&self.layout, |rect, _| {
                 let area = area.get_or_insert(rect);
                 *area = area.union(rect);
             });
@@ -803,7 +812,7 @@ where
             // Bound the selected parts of the focused line only.
             let focus = self.selection.focus().geometry(&self.layout, 0.);
             let mut area = focus;
-            self.selection.geometry_with(&self.layout, |rect| {
+            self.selection.geometry_with(&self.layout, |rect, _| {
                 if rect.y0 == focus.y0 {
                     area = area.union(rect);
                 }

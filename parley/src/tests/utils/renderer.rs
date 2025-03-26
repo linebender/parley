@@ -55,7 +55,7 @@ pub(crate) fn render_layout(
     config: &RenderingConfig,
     layout: &Layout<ColorBrush>,
     cursor_rect: Option<crate::Rect>,
-    selection_rects: &[crate::Rect],
+    selection_rects: &[(crate::Rect, usize)],
 ) -> Pixmap {
     let padding = 20;
     let width = config
@@ -87,7 +87,7 @@ pub(crate) fn render_layout(
         config.background_color,
     );
 
-    for rect in selection_rects {
+    for (rect, _) in selection_rects {
         draw_rect(
             &mut pen,
             fpadding + rect.x0 as f32,

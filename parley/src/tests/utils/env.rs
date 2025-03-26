@@ -294,7 +294,7 @@ impl TestEnv {
         &mut self,
         layout: &Layout<ColorBrush>,
         cursor_rect: Option<Rect>,
-        selection_rects: &[Rect],
+        selection_rects: &[(Rect, usize)],
     ) {
         let test_case_name = std::mem::take(&mut self.next_test_case_name);
         let current_img =

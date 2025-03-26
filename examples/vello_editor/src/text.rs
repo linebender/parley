@@ -357,7 +357,7 @@ impl Editor {
     /// Returns drawn `Generation`.
     pub fn draw(&mut self, scene: &mut Scene) -> Generation {
         let transform = Affine::translate((INSET as f64, INSET as f64));
-        for rect in self.editor.selection_geometry().iter() {
+        self.editor.selection_geometry_with(|rect, _| {
             scene.fill(
                 Fill::NonZero,
                 transform,
@@ -365,7 +365,7 @@ impl Editor {
                 None,
                 &rect,
             );
-        }
+        });
         if self.cursor_visible {
             if let Some(cursor) = self.editor.cursor_geometry(1.5) {
                 scene.fill(Fill::NonZero, transform, palette::css::WHITE, None, &cursor);
