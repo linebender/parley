@@ -851,6 +851,10 @@ where
 
     /// Borrow the text content of the buffer, including the IME preedit
     /// region if any.
+    ///
+    /// Application authors should generally prefer [`text`](Self::text). That method excludes the
+    /// IME preedit contents, which are not meaningful for applications to access; the
+    /// in-progress IME content is not itself what the user intends to write.
     pub fn raw_text(&self) -> &str {
         &self.buffer
     }
