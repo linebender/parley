@@ -136,6 +136,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         Some((line.metrics.advance, line.size()))
     }
 
+    /// Returns true if all the text has been placed into lines.
+    pub fn is_done(&self) -> bool {
+        self.done
+    }
+
     /// Computes the next line in the paragraph. Returns the advance and size
     /// (width and height for horizontal layouts) of the line.
     pub fn break_next(&mut self, max_advance: f32) -> Option<(f32, f32)> {
