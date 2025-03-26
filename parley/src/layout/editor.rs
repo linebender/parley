@@ -742,8 +742,11 @@ where
         }
     }
 
-    /// Returns the current selection.
-    pub fn selection(&self) -> &Selection {
+    /// Borrow the current selection. The indices returned by functions
+    /// such as [`Selection::text_range`] refer to the raw text buffer,
+    /// including the IME preedit region, which can be accessed via
+    /// [`PlainEditor::raw_text`].
+    pub fn raw_selection(&self) -> &Selection {
         &self.selection
     }
 
@@ -853,6 +856,16 @@ where
         } else {
             SplitString([&self.buffer, ""])
         }
+    }
+
+    /// Borrow the text content of the buffer, including the IME preedit
+    /// region if any.
+    ///
+    /// Application authors should generally prefer [`text`](Self::text). That method excludes the
+    /// IME preedit contents, which are not meaningful for applications to access; the
+    /// in-progress IME content is not itself what the user intends to write.
+    pub fn raw_text(&self) -> &str {
+        &self.buffer
     }
 
     /// Get the current `Generation` of the layout, to decide whether to draw.
