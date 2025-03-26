@@ -760,14 +760,16 @@ where
         }
     }
 
-    /// Get rectangles representing the selected portions of text.
+    /// Get rectangles, and their corresponding line indices, representing the selected portions of
+    /// text.
     pub fn selection_geometry(&self) -> Vec<(Rect, usize)> {
         // We do not check `self.show_cursor` here, as the IME handling code collapses the
         // selection to a caret in that case.
         self.selection.geometry(&self.layout)
     }
 
-    /// Invoke a callback for each rectangle representing the selected portions of text.
+    /// Invoke a callback with each rectangle representing the selected portions of text, and the
+    /// indices of the lines to which they belong.
     pub fn selection_geometry_with(&self, f: impl FnMut(Rect, usize)) {
         // We do not check `self.show_cursor` here, as the IME handling code collapses the
         // selection to a caret in that case.
