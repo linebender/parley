@@ -588,16 +588,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 }
             }
 
-            // Round block/vertical axis metrics
-            line.metrics.ascent = line.metrics.ascent.round();
-            line.metrics.descent = line.metrics.descent.round();
-            line.metrics.line_height = line.metrics.line_height.round();
             line.metrics.leading =
                 line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
 
             // Compute
-            let above = (line.metrics.ascent + line.metrics.leading * 0.5).round();
-            let below = (line.metrics.descent + line.metrics.leading * 0.5).round();
+            let above = line.metrics.ascent + line.metrics.leading * 0.5;
+            let below = line.metrics.descent + line.metrics.leading * 0.5;
             line.metrics.min_coord = y;
             line.metrics.baseline = y + above;
             y = line.metrics.baseline + below;
