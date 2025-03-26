@@ -15,11 +15,30 @@ pub use font::{
     FontWidth, GenericFamily,
 };
 pub use styleset::StyleSet;
+pub use swash::text::WordBreakStrength;
 
 #[derive(Debug, Clone, Copy)]
 pub enum WhiteSpaceCollapse {
     Collapse,
     Preserve,
+}
+
+/// Control over "emergency" line-breaking.
+///
+/// See <https://drafts.csswg.org/css-text/#overflow-wrap-property> for more information.
+#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
+#[repr(u8)]
+pub enum OverflowWrap {
+    /// Even with extremely long words, lines can only break at places specified in
+    /// [`WordBreakStrength`].
+    #[default]
+    Normal,
+    /// Words may be broken at an arbitrary point if there are no other places in the line to break
+    /// them.
+    Anywhere,
+    /// Like [`OverflowWrap::Anywhere`], except arbitrary wrapping opportunities are not considered
+    /// when calculating the minimum content width (see [`crate::Layout::min_content_width`]).
+    BreakWord,
 }
 
 /// Properties that define a style.
@@ -65,6 +84,10 @@ pub enum StyleProperty<'a, B: Brush> {
     WordSpacing(f32),
     /// Extra spacing between letters.
     LetterSpacing(f32),
+    /// Control over where words can wrap.
+    WordBreak(WordBreakStrength),
+    /// Control over "emergency" line-breaking.
+    OverflowWrap(OverflowWrap),
 }
 
 /// Unresolved styles.
@@ -110,6 +133,10 @@ pub struct TextStyle<'a, B: Brush> {
     pub word_spacing: f32,
     /// Extra spacing between letters.
     pub letter_spacing: f32,
+    /// Control over where words can wrap.
+    pub word_break: WordBreakStrength,
+    /// Control over "emergency" line-breaking.
+    pub overflow_wrap: OverflowWrap,
 }
 
 impl<B: Brush> Default for TextStyle<'_, B> {
@@ -135,6 +162,8 @@ impl<B: Brush> Default for TextStyle<'_, B> {
             line_height: 1.2,
             word_spacing: Default::default(),
             letter_spacing: Default::default(),
+            word_break: Default::default(),
+            overflow_wrap: Default::default(),
         }
     }
 }

@@ -2447,9 +2447,8 @@ checksum = "ce5d813d71d82c4cbc1742135004e4a79fd870214c155443451c139c9470a0aa"
 
 [[package]]
 name = "swash"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0e25b48fd1c222c9fdb61148e2203b750f9840c07922fd61b87c6015560b8f6"
+version = "0.2.1"
+source = "git+https://github.com/valadaptive/swash?branch=word-break-setting#1c0431d44e5dfcc52a3469df3cf82cc73c9dce05"
 dependencies = [
  "core_maths",
  "skrifa",
