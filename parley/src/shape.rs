@@ -136,7 +136,9 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 
     // Iterate over characters in the text
-    for ((char_index, ch), (info, style_index)) in text.chars().enumerate().zip(infos) {
+    for ((char_index, (byte_index, ch)), (info, style_index)) in
+        text.char_indices().enumerate().zip(infos)
+    {
         let mut break_run = false;
         let mut script = info.script();
         if !real_script(script) {
@@ -167,9 +169,9 @@ pub(crate) fn shape_text<'a, B: Brush>(
         //   - We do this *before* processing the text run because we need to know whether we should
         //     break the run due to the presence of an inline box.
         while let Some((box_idx, inline_box)) = current_box {
-            // println!("{} {}", char_index, inline_box.index);
+            // println!("{} {}", byte_index, inline_box.index);
 
-            if inline_box.index == char_index {
+            if inline_box.index == byte_index {
                 break_run = true;
                 deferred_boxes.push(box_idx);
                 // Update the current box to the next box

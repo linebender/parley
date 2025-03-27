@@ -37,6 +37,12 @@ This release has an [MSRV] of 1.82.
 - Display selected newlines as whitespace in the selection highlight. ([#296][] by [@valadaptive][])
 - Make `BreakReason` public. ([#300][] by [@valadaptive][])
 
+### Fixed
+
+#### Parley
+
+- Fix text editing for layouts which contain inline boxes ([#299][] by [@valadaptive][])
+
 ## [0.3.0] - 2025-02-27
 
 This release has an [MSRV] of 1.82.
@@ -217,6 +223,7 @@ This release has an [MSRV] of 1.70.
 [#280]: https://github.com/linebender/parley/pull/280
 [#294]: https://github.com/linebender/parley/pull/294
 [#296]: https://github.com/linebender/parley/pull/296
+[#299]: https://github.com/linebender/parley/pull/299
 [#300]: https://github.com/linebender/parley/pull/300
 [#306]: https://github.com/linebender/parley/pull/306
 [#312]: https://github.com/linebender/parley/pull/312
