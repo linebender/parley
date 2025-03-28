@@ -99,6 +99,14 @@ impl<'a, B: Brush> Cluster<'a, B> {
         self.run.clone()
     }
 
+    /// The external ID associated with the cluster.
+    ///    - For layouts built with the `RangedBuilder` this will always be 0
+    ///    - For layouts built with the `TreeBuilder` this will the ID associated with the
+    ///      deepest style span that contains this cluster.
+    pub fn external_span_id(&self) -> u64 {
+        self.run.layout.data.styles[self.data.style_index as usize].id
+    }
+
     /// Returns the path that contains the set of indices to reach the cluster
     /// from a layout.
     pub fn path(&self) -> ClusterPath {
