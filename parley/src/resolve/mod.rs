@@ -152,7 +152,10 @@ impl ResolveContext {
             }
             StyleProperty::StrikethroughSize(value) => StrikethroughSize(value.map(|x| x * scale)),
             StyleProperty::StrikethroughBrush(value) => StrikethroughBrush(value.clone()),
-            StyleProperty::LineHeight(value) => LineHeight(*value),
+            StyleProperty::LineHeight(value) => LineHeight(match value {
+                crate::LineHeight::Relative(value) => crate::LineHeight::Relative(*value),
+                crate::LineHeight::Absolute(value) => crate::LineHeight::Absolute(*value * scale),
+            }),
             StyleProperty::WordSpacing(value) => WordSpacing(*value * scale),
             StyleProperty::LetterSpacing(value) => LetterSpacing(*value * scale),
         }
@@ -360,8 +363,8 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     StrikethroughSize(Option<f32>),
     /// Brush for rendering the strikethrough decoration.
     StrikethroughBrush(Option<B>),
-    /// Line height multiplier.
-    LineHeight(f32),
+    /// Line height.
+    LineHeight(crate::LineHeight),
     /// Extra spacing between words.
     WordSpacing(f32),
     /// Extra spacing between letters.
@@ -393,8 +396,8 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     pub(crate) underline: ResolvedDecoration<B>,
     /// Strikethrough decoration.
     pub(crate) strikethrough: ResolvedDecoration<B>,
-    /// Line height multiplier.
-    pub(crate) line_height: f32,
+    /// Line height.
+    pub(crate) line_height: crate::LineHeight,
     /// Extra spacing between words.
     pub(crate) word_spacing: f32,
     /// Extra spacing between letters.
@@ -415,7 +418,7 @@ impl<B: Brush> Default for ResolvedStyle<B> {
             brush: Default::default(),
             underline: Default::default(),
             strikethrough: Default::default(),
-            line_height: 1.,
+            line_height: crate::LineHeight::Relative(1.),
             word_spacing: 0.,
             letter_spacing: 0.,
         }
@@ -470,7 +473,13 @@ impl<B: Brush> ResolvedStyle<B> {
             StrikethroughOffset(value) => self.strikethrough.offset == *value,
             StrikethroughSize(value) => self.strikethrough.size == *value,
             StrikethroughBrush(value) => self.strikethrough.brush == *value,
-            LineHeight(value) => nearly_eq(self.line_height, *value),
+            LineHeight(value) => match (self.line_height, *value) {
+                (crate::LineHeight::Relative(a), crate::LineHeight::Relative(b))
+                | (crate::LineHeight::Absolute(a), crate::LineHeight::Absolute(b)) => {
+                    nearly_eq(a, b)
+                }
+                _ => false,
+            },
             WordSpacing(value) => nearly_eq(self.word_spacing, *value),
             LetterSpacing(value) => nearly_eq(self.letter_spacing, *value),
         }
@@ -481,7 +490,10 @@ impl<B: Brush> ResolvedStyle<B> {
             brush: self.brush.clone(),
             underline: self.underline.as_layout_decoration(&self.brush),
             strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
-            line_height: self.line_height * self.font_size,
+            line_height: match self.line_height {
+                crate::LineHeight::Relative(value) => value * self.font_size,
+                crate::LineHeight::Absolute(value) => value,
+            },
         }
     }
 }
