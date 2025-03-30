@@ -41,6 +41,14 @@ pub enum OverflowWrap {
     BreakWord,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LineHeight {
+    /// Line height specified as a multiple of the font size.
+    Relative(f32),
+    /// Line height specified in absolute units.
+    Absolute(f32),
+}
+
 /// Properties that define a style.
 #[derive(Clone, PartialEq, Debug)]
 pub enum StyleProperty<'a, B: Brush> {
@@ -78,8 +86,8 @@ pub enum StyleProperty<'a, B: Brush> {
     StrikethroughSize(Option<f32>),
     /// Brush for rendering the strikethrough decoration.
     StrikethroughBrush(Option<B>),
-    /// Line height multiplier.
-    LineHeight(f32),
+    /// Line height.
+    LineHeight(LineHeight),
     /// Extra spacing between words.
     WordSpacing(f32),
     /// Extra spacing between letters.
@@ -127,8 +135,8 @@ pub struct TextStyle<'a, B: Brush> {
     pub strikethrough_size: Option<f32>,
     /// Brush for rendering the strikethrough decoration.
     pub strikethrough_brush: Option<B>,
-    /// Line height multiplier.
-    pub line_height: f32,
+    /// Line height.
+    pub line_height: LineHeight,
     /// Extra spacing between words.
     pub word_spacing: f32,
     /// Extra spacing between letters.
@@ -159,7 +167,7 @@ impl<B: Brush> Default for TextStyle<'_, B> {
             strikethrough_offset: Default::default(),
             strikethrough_size: Default::default(),
             strikethrough_brush: Default::default(),
-            line_height: 1.2,
+            line_height: LineHeight::Relative(1.2),
             word_spacing: Default::default(),
             letter_spacing: Default::default(),
             word_break: Default::default(),
