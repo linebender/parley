@@ -76,7 +76,7 @@ fn main() {
 
     // Set default font family
     builder.push_default(GenericFamily::SystemUi);
-    builder.push_default(StyleProperty::LineHeight(1.3));
+    builder.push_default(StyleProperty::LineHeight(parley::LineHeight::Relative(1.3)));
     builder.push_default(StyleProperty::FontSize(16.0));
 
     // Set the first 4 characters to bold
