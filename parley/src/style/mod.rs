@@ -170,3 +170,9 @@ impl<B: Brush> From<GenericFamily> for StyleProperty<'_, B> {
         StyleProperty::FontStack(f.into())
     }
 }
+
+impl<B: Brush> From<LineHeight> for StyleProperty<'_, B> {
+    fn from(value: LineHeight) -> Self {
+        Self::LineHeight(value)
+    }
+}
