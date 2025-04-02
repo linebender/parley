@@ -19,13 +19,14 @@ use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Rect, Tr
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct ColorBrush {
-    pub(super) color: Color,
+    pub(crate) color: Color,
 }
 
 impl ColorBrush {
-    pub(crate) fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
+    pub(crate) fn new(color: peniko::Color) -> Self {
+        let rgba8 = color.to_rgba8();
         Self {
-            color: Color::from_rgba8(r, g, b, a),
+            color: Color::from_rgba8(rgba8.r, rgba8.g, rgba8.b, rgba8.a),
         }
     }
 }

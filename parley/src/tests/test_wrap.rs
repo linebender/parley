@@ -1,6 +1,8 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use peniko::color::palette::css;
+
 use crate::{Alignment, AlignmentOptions, OverflowWrap, StyleProperty, WordBreakStrength, testenv};
 
 use super::utils::{ColorBrush, TestEnv};
@@ -31,7 +33,7 @@ fn test_wrap_with_custom_text(
     wrap_width: f32,
 ) {
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::Brush(ColorBrush::new(255, 0, 0, 255)));
+    builder.push_default(StyleProperty::Brush(ColorBrush::new(css::RED)));
 
     if let Some(pattern) = pattern {
         let start = text.find(pattern).unwrap();
@@ -69,7 +71,7 @@ fn overflow_wrap_first_half() {
         &mut env,
         Some("Antidis"),
         StyleProperty::OverflowWrap(OverflowWrap::Anywhere),
-        ColorBrush::new(0, 0, 255, 255),
+        ColorBrush::new(css::BLUE),
         120.0,
     );
 }
@@ -82,7 +84,7 @@ fn overflow_wrap_second_half() {
         &mut env,
         Some("anism"),
         StyleProperty::OverflowWrap(OverflowWrap::Anywhere),
-        ColorBrush::new(0, 0, 255, 255),
+        ColorBrush::new(css::BLUE),
         120.0,
     );
 }
@@ -95,7 +97,7 @@ fn overflow_wrap_during() {
         &mut env,
         Some("establishment"),
         StyleProperty::OverflowWrap(OverflowWrap::Anywhere),
-        ColorBrush::new(0, 0, 255, 255),
+        ColorBrush::new(css::BLUE),
         120.0,
     );
 }
@@ -108,7 +110,7 @@ fn overflow_wrap_everywhere() {
         &mut env,
         Some("Most words are short. But Antidisestablishmentarianism is long and needs to wrap."),
         StyleProperty::OverflowWrap(OverflowWrap::Anywhere),
-        ColorBrush::new(0, 0, 255, 255),
+        ColorBrush::new(css::BLUE),
         120.0,
     );
 }
@@ -121,7 +123,7 @@ fn overflow_wrap_narrow() {
         &mut env,
         Some("Most words are short. But Antidisestablishmentarianism is long and needs to wrap."),
         StyleProperty::OverflowWrap(OverflowWrap::Anywhere),
-        ColorBrush::new(0, 0, 255, 255),
+        ColorBrush::new(css::BLUE),
         5.0,
     );
 }
@@ -164,7 +166,7 @@ fn word_break_break_all_first_half() {
         &mut env,
         Some("Antidis"),
         StyleProperty::WordBreak(WordBreakStrength::BreakAll),
-        ColorBrush::new(0, 128, 0, 255),
+        ColorBrush::new(css::GREEN),
         120.0,
     );
 }
@@ -177,7 +179,7 @@ fn word_break_break_all_second_half() {
         &mut env,
         Some("anism"),
         StyleProperty::WordBreak(WordBreakStrength::BreakAll),
-        ColorBrush::new(0, 128, 0, 255),
+        ColorBrush::new(css::GREEN),
         120.0,
     );
 }
@@ -190,7 +192,7 @@ fn word_break_break_all_during() {
         &mut env,
         Some("establishment"),
         StyleProperty::WordBreak(WordBreakStrength::BreakAll),
-        ColorBrush::new(0, 128, 0, 255),
+        ColorBrush::new(css::GREEN),
         120.0,
     );
 }
@@ -203,7 +205,7 @@ fn word_break_break_all_everywhere() {
         &mut env,
         Some("Most words are short. But Antidisestablishmentarianism is long and needs to wrap."),
         StyleProperty::WordBreak(WordBreakStrength::BreakAll),
-        ColorBrush::new(0, 128, 0, 255),
+        ColorBrush::new(css::GREEN),
         120.0,
     );
 }
@@ -238,7 +240,7 @@ fn word_break_wpt007() {
         "aaaaaaabbbbbbbcccccc",
         Some("bbbbbbb"),
         StyleProperty::WordBreak(WordBreakStrength::BreakAll),
-        ColorBrush::new(0, 128, 0, 255),
+        ColorBrush::new(css::GREEN),
         55.0,
     );
 }
