@@ -20,7 +20,7 @@ This release has an [MSRV] of 1.82.
 #### Parley
 
 - `PlainEditor::selection_geometry_with`, the equivalent of `Selection::geometry_with` method
-- The `WordBreak` and `OverflowWrap` style properties for controlling line wrapping, ([#315][] by [@valadaptive][])
+- The `WordBreak` and `OverflowWrap` style properties for controlling line wrapping. ([#315][] by [@valadaptive][])
 
 ### Changed
 
