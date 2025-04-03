@@ -15,9 +15,9 @@ use super::style::{
     FontWidth, StyleProperty,
 };
 use crate::font::FontContext;
-use crate::layout;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
+use crate::{OverflowWrap, WordBreakStrength, layout};
 use core::borrow::Borrow;
 use core::ops::Range;
 use fontique::FamilyId;
@@ -155,6 +155,8 @@ impl ResolveContext {
             StyleProperty::LineHeight(value) => LineHeight(*value),
             StyleProperty::WordSpacing(value) => WordSpacing(*value * scale),
             StyleProperty::LetterSpacing(value) => LetterSpacing(*value * scale),
+            StyleProperty::WordBreak(value) => WordBreak(*value),
+            StyleProperty::OverflowWrap(value) => OverflowWrap(*value),
         }
     }
 
@@ -189,6 +191,8 @@ impl ResolveContext {
             line_height: raw_style.line_height,
             word_spacing: raw_style.word_spacing * scale,
             letter_spacing: raw_style.letter_spacing * scale,
+            word_break: raw_style.word_break,
+            overflow_wrap: raw_style.overflow_wrap,
         }
     }
 
@@ -366,6 +370,10 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     WordSpacing(f32),
     /// Extra spacing between letters.
     LetterSpacing(f32),
+    /// Control over where words can wrap.
+    WordBreak(WordBreakStrength),
+    /// Control over "emergency" line-breaking.
+    OverflowWrap(OverflowWrap),
 }
 
 /// Flattened group of style properties.
@@ -399,6 +407,10 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     pub(crate) word_spacing: f32,
     /// Extra spacing between letters.
     pub(crate) letter_spacing: f32,
+    /// Control over where words can wrap.
+    pub(crate) word_break: WordBreakStrength,
+    /// Control over "emergency" line-breaking.
+    pub(crate) overflow_wrap: OverflowWrap,
 }
 
 impl<B: Brush> Default for ResolvedStyle<B> {
@@ -418,6 +430,8 @@ impl<B: Brush> Default for ResolvedStyle<B> {
             line_height: 1.,
             word_spacing: 0.,
             letter_spacing: 0.,
+            word_break: Default::default(),
+            overflow_wrap: Default::default(),
         }
     }
 }
@@ -447,6 +461,8 @@ impl<B: Brush> ResolvedStyle<B> {
             LineHeight(value) => self.line_height = value,
             WordSpacing(value) => self.word_spacing = value,
             LetterSpacing(value) => self.letter_spacing = value,
+            WordBreak(value) => self.word_break = value,
+            OverflowWrap(value) => self.overflow_wrap = value,
         }
     }
 
@@ -473,6 +489,8 @@ impl<B: Brush> ResolvedStyle<B> {
             LineHeight(value) => nearly_eq(self.line_height, *value),
             WordSpacing(value) => nearly_eq(self.word_spacing, *value),
             LetterSpacing(value) => nearly_eq(self.letter_spacing, *value),
+            WordBreak(value) => self.word_break == *value,
+            OverflowWrap(value) => self.overflow_wrap == *value,
         }
     }
 
@@ -482,6 +500,7 @@ impl<B: Brush> ResolvedStyle<B> {
             underline: self.underline.as_layout_decoration(&self.brush),
             strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
             line_height: self.line_height * self.font_size,
+            overflow_wrap: self.overflow_wrap,
         }
     }
 }

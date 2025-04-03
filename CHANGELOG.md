@@ -20,13 +20,14 @@ This release has an [MSRV] of 1.82.
 #### Parley
 
 - `PlainEditor::selection_geometry_with`, the equivalent of `Selection::geometry_with` method
+- The `WordBreak` and `OverflowWrap` style properties for controlling line wrapping. ([#315][] by [@valadaptive][])
 
 ### Changed
 
 #### Fontique
 
 - Breaking change: `Collection::register_fonts` now takes a `Blob<u8>` instead of a `Vec<u8>` ([#306][] by [@valadaptive][])
-- Breaking change: `Collection::register_fonts` now takes an optional second parameter which allows overriding the metadata 
+- Breaking change: `Collection::register_fonts` now takes an optional second parameter which allows overriding the metadata
   used for matching the font ([#312][] by [@valadaptive][])
 
 #### Parley
@@ -227,6 +228,7 @@ This release has an [MSRV] of 1.70.
 [#300]: https://github.com/linebender/parley/pull/300
 [#306]: https://github.com/linebender/parley/pull/306
 [#312]: https://github.com/linebender/parley/pull/312
+[#315]: https://github.com/linebender/parley/pull/315
 [#318]: https://github.com/linebender/parley/pull/318
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.3.0...HEAD

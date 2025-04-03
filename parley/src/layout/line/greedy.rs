@@ -10,6 +10,7 @@ use swash::text::cluster::Whitespace;
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 
+use crate::OverflowWrap;
 use crate::layout::{
     Boundary, BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -63,6 +64,7 @@ struct BreakerState {
 
     line: LineState,
     prev_boundary: Option<PrevBoundaryState>,
+    emergency_boundary: Option<PrevBoundaryState>,
 }
 
 impl BreakerState {
@@ -88,6 +90,17 @@ impl BreakerState {
     /// the line breaking opportunity at this point.
     fn mark_line_break_opportunity(&mut self) {
         self.prev_boundary = Some(PrevBoundaryState {
+            item_idx: self.item_idx,
+            run_idx: self.run_idx,
+            cluster_idx: self.cluster_idx,
+            state: self.line.clone(),
+        });
+    }
+
+    /// Store the current iteration state so that we can revert to it if we later want to take
+    /// an *emergency* line breaking opportunity at this point.
+    fn mark_emergency_break_opportunity(&mut self) {
+        self.emergency_boundary = Some(PrevBoundaryState {
             item_idx: self.item_idx,
             run_idx: self.run_idx,
             cluster_idx: self.cluster_idx,
@@ -128,6 +141,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         self.state.lines = self.lines.lines.len();
         self.state.line.x = 0.;
         self.state.prev_boundary = None; // Added by Nico
+        self.state.emergency_boundary = None;
         self.last_line_data()
     }
 
@@ -246,6 +260,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let is_newline = whitespace == Whitespace::Newline;
                         let is_space = whitespace.is_space_or_nbsp();
                         let boundary = cluster.info().boundary();
+                        let style = &self.layout.data.styles[cluster.data.style_index as usize];
 
                         if boundary == Boundary::Line {
                             // We do not currently handle breaking within a ligature, so we ignore boundaries in such a position.
@@ -263,6 +278,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 self.state.cluster_idx += 1;
                                 return self.start_new_line();
                             }
+                        } else if
+                        // This text can contribute "emergency" line breaks.
+                        style.overflow_wrap != OverflowWrap::Normal && !is_ligature_continuation
+                        // If we're at the start of the line, this particular cluster will never fit, so it's not a valid emergency break opportunity.
+                        && self.state.line.x != 0.0
+                        {
+                            self.state.mark_emergency_break_opportunity();
                         }
 
                         // If current cluster is the start of a ligature, then advance state to include
@@ -327,34 +349,21 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 }
                             }
                             // Otherwise perform an emergency line break
-                            // TODO: make emergency line breaks controllable via a setting
-                            else {
-                                const BREAK_WORDS_IN_EMERGENCY: bool = false;
-                                if BREAK_WORDS_IN_EMERGENCY {
-                                    // If we're at the start of the line, this particular cluster will never fit,
-                                    // so consume it and accept the overflow.
-                                    if self.state.line.x == 0. {
-                                        self.state.append_cluster_to_line(next_x);
-                                        self.state.cluster_idx += 1;
-                                        if is_space {
-                                            self.state.line.num_spaces += 1;
-                                        }
+                            else if let Some(prev_emergency) =
+                                self.state.emergency_boundary.take()
+                            {
+                                self.state.line = prev_emergency.state;
+                                if try_commit_line!(BreakReason::Emergency) {
+                                    // Revert boundary state to prev state
+                                    self.state.item_idx = prev_emergency.item_idx;
+                                    self.state.run_idx = prev_emergency.run_idx;
+                                    self.state.cluster_idx = prev_emergency.cluster_idx;
 
-                                        if try_commit_line!(BreakReason::Emergency) {
-                                            self.state.cluster_idx += 1;
-                                            return self.start_new_line();
-                                        }
-                                    } else {
-                                        // Else start a new line
-                                        if try_commit_line!(BreakReason::Emergency) {
-                                            self.state.cluster_idx += 1;
-                                            return self.start_new_line();
-                                        }
-                                    }
-                                } else {
-                                    self.state.append_cluster_to_line(next_x);
-                                    self.state.cluster_idx += 1;
+                                    return self.start_new_line();
                                 }
+                            } else {
+                                self.state.append_cluster_to_line(next_x);
+                                self.state.cluster_idx += 1;
                             }
                         }
                     }

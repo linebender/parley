@@ -67,7 +67,6 @@ impl<B: Brush> LayoutContext<B> {
         scale: f32,
     ) -> RangedBuilder<'a, B> {
         self.begin();
-        self.analyze_text(text);
         self.ranged_style_builder.begin(text.len());
 
         fcx.source_cache.prune(128, false);
@@ -102,8 +101,32 @@ impl<B: Brush> LayoutContext<B> {
     pub(crate) fn analyze_text(&mut self, text: &str) {
         let text = if text.is_empty() { " " } else { text };
         let mut a = swash::text::analyze(text.chars());
-        for x in a.by_ref() {
-            self.info.push((CharInfo::new(x.0, x.1), 0));
+
+        let mut word_break = Default::default();
+        let mut style_idx = 0;
+
+        let mut char_indices = text.char_indices();
+        loop {
+            let Some((char_idx, _)) = char_indices.next() else {
+                break;
+            };
+
+            // Find the style for this character. If the text is empty, we may not have any styles. Otherwise,
+            // self.styles should span the entire range of the text.
+            while let Some(style) = self.styles.get(style_idx) {
+                if style.range.end > char_idx {
+                    word_break = style.style.word_break;
+                    break;
+                }
+                style_idx += 1;
+            }
+            a.set_break_strength(word_break);
+
+            let Some((properties, boundary)) = a.next() else {
+                break;
+            };
+
+            self.info.push((CharInfo::new(properties, boundary), 0));
         }
         if a.needs_bidi_resolution() {
             self.bidi.resolve(
