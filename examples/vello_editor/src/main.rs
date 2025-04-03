@@ -36,7 +36,7 @@ const WINDOW_TITLE: &str = "Vello Text Editor";
 // Simple struct to hold the state of the renderer
 pub struct ActiveRenderState<'s> {
     // The fields MUST be in this order, so that the surface and AccessKit adapter are dropped before the window
-    surface: RenderSurface<'s>,
+    surface: Box<RenderSurface<'s>>,
     access_adapter: accesskit_winit::Adapter,
     window: Arc<Window>,
     sent_initial_access_update: bool,
@@ -159,9 +159,9 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
 
         // Save the Window and Surface to a state variable
         self.state = RenderState::Active(ActiveRenderState {
-            window,
-            surface,
+            surface: Box::new(surface),
             access_adapter,
+            window,
             sent_initial_access_update: false,
         });
 
