@@ -25,8 +25,10 @@ impl Cursor {
     /// Creates a new cursor from the given byte index and affinity.
     pub fn from_byte_index<B: Brush>(layout: &Layout<B>, index: usize, affinity: Affinity) -> Self {
         if let Some(cluster) = Cluster::from_byte_index(layout, index) {
-            let index = cluster.text_range().start;
-            Self { index, affinity }
+            Self {
+                index: cluster.text_range().start,
+                affinity,
+            }
         } else {
             Self {
                 index: layout.data.text_len,
