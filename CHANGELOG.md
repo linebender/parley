@@ -43,6 +43,7 @@ This release has an [MSRV] of 1.82.
 #### Parley
 
 - Fix text editing for layouts which contain inline boxes ([#299][] by [@valadaptive][])
+- Fix cursor navigation in RTL text sometimes getting stuck within a line ([#331][] by [@valadaptive][])
 
 ## [0.3.0] - 2025-02-27
 
@@ -230,6 +231,7 @@ This release has an [MSRV] of 1.70.
 [#312]: https://github.com/linebender/parley/pull/312
 [#315]: https://github.com/linebender/parley/pull/315
 [#318]: https://github.com/linebender/parley/pull/318
+[#331]: https://github.com/linebender/parley/pull/331
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/linebender/parley/releases/tag/v0.3.0
