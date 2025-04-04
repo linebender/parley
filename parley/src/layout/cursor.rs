@@ -26,11 +26,6 @@ impl Cursor {
     pub fn from_byte_index<B: Brush>(layout: &Layout<B>, index: usize, affinity: Affinity) -> Self {
         if let Some(cluster) = Cluster::from_byte_index(layout, index) {
             let index = cluster.text_range().start;
-            let affinity = if cluster.is_line_break() == Some(BreakReason::Explicit) {
-                Affinity::Downstream
-            } else {
-                affinity
-            };
             Self { index, affinity }
         } else {
             Self {
