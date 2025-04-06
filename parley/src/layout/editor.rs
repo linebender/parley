@@ -689,7 +689,7 @@ where
         }
     }
 
-    /// --- MARK: Rendering ---
+    // --- MARK: Rendering ---
     #[cfg(feature = "accesskit")]
     /// Perform an accessibility update.
     pub fn accessibility(
@@ -710,6 +710,7 @@ where
     pub fn layout(&mut self) -> &Layout<T> {
         self.editor.layout(self.font_cx, self.layout_cx)
     }
+
     // --- MARK: Internal helpers---
     /// Update the layout if needed.
     pub fn refresh_layout(&mut self) {
