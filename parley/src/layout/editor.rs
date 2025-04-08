@@ -17,6 +17,7 @@ use core::{
     cmp::PartialEq,
     default::Default,
     fmt::{Debug, Display},
+    num::NonZeroUsize,
     ops::Range,
 };
 
@@ -192,10 +193,9 @@ where
     ///
     /// The deleted range is clamped to the start of the buffer.
     /// No-op if the start of the range is not a char boundary.
-    pub fn delete_bytes_before_selection(&mut self, len: usize) {
-        debug_assert!(len > 0);
+    pub fn delete_bytes_before_selection(&mut self, len: NonZeroUsize) {
         let selection_range = self.editor.selection.text_range();
-        let range = selection_range.start.saturating_sub(len)..selection_range.start;
+        let range = selection_range.start.saturating_sub(len.get())..selection_range.start;
         if range.is_empty() || !self.editor.buffer.is_char_boundary(range.start) {
             return;
         }
@@ -225,13 +225,12 @@ where
     ///
     /// The deleted range is clamped to the end of the buffer.
     /// No-op if the end of the range is not a char boundary.
-    pub fn delete_bytes_after_selection(&mut self, len: usize) {
-        debug_assert!(len > 0);
+    pub fn delete_bytes_after_selection(&mut self, len: NonZeroUsize) {
         let selection_range = self.editor.selection.text_range();
         let range = selection_range.end
             ..selection_range
                 .end
-                .saturating_add(len)
+                .saturating_add(len.get())
                 .min(self.editor.buffer.len());
         if range.is_empty() || !self.editor.buffer.is_char_boundary(range.end) {
             return;
