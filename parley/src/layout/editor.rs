@@ -760,6 +760,12 @@ where
         &self.selection
     }
 
+    /// Borrow the current IME preedit range, if any. These indices refer
+    /// to the raw text buffer, which can be accessed via [`PlainEditor::raw_text`].
+    pub fn raw_compose(&self) -> &Option<Range<usize>> {
+        &self.compose
+    }
+
     /// If the current selection is not collapsed, returns the text content of
     /// that selection.
     pub fn selected_text(&self) -> Option<&str> {
