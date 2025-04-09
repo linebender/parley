@@ -347,6 +347,10 @@ where
     /// Set the IME preedit composing text.
     ///
     /// This starts composing. Composing is reset by calling [`clear_compose`](Self::clear_compose).
+    /// Alternatively, the preedit text can be committed by calling [`finish_compose`](Self::finish_compose).
+    ///
+    /// The selection and preedit region can be manipulated independently while composing
+    /// is active.
     ///
     /// The preedit text replaces the current selection if this call starts composing.
     ///
@@ -400,7 +404,8 @@ where
 
     /// Stop IME composing.
     ///
-    /// This removes the IME preedit text.
+    /// This removes the IME preedit text, shows the cursor if it was hidden,
+    /// and moves the cursor to the start of the former preedit region.
     pub fn clear_compose(&mut self) {
         if let Some(preedit_range) = self.editor.compose.take() {
             self.editor.buffer.replace_range(preedit_range.clone(), "");
