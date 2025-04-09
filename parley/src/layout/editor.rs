@@ -1030,6 +1030,9 @@ where
     }
 
     fn update_compose_for_replaced_range(&mut self, old_range: Range<usize>, new_len: usize) {
+        if new_len == old_range.len() {
+            return;
+        }
         let Some(compose) = &mut self.compose else {
             return;
         };
@@ -1037,8 +1040,13 @@ where
             return;
         }
         if compose.start >= old_range.end {
-            let diff = new_len - old_range.len();
-            *compose = compose.start + diff..compose.end + diff;
+            if new_len > old_range.len() {
+                let diff = new_len - old_range.len();
+                *compose = compose.start + diff..compose.end + diff;
+            } else {
+                let diff = old_range.len() - new_len;
+                *compose = compose.start - diff..compose.end - diff;
+            }
             return;
         }
         if new_len < old_range.len() {
