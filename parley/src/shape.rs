@@ -250,10 +250,12 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         let variations = rcx.variations(style.font_variations).unwrap_or(&[]);
         let features = rcx.features(style.font_features).unwrap_or(&[]);
         query.set_families(fonts.iter().copied());
+
         let fb_script = crate::swash_convert::script_to_fontique(script);
         let fb_language = locale.and_then(crate::swash_convert::locale_to_fontique);
         query.set_fallbacks(fontique::FallbackKey::new(fb_script, fb_language.as_ref()));
         query.set_attributes(attrs);
+
         Self {
             query,
             fonts_id: Some(fonts_id),
@@ -276,76 +278,69 @@ impl<B: Brush> partition::Selector for FontSelector<'_, '_, B> {
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize].style;
+
             let fonts_id = style.font_stack.id();
+            let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
+            let fonts = fonts.iter().copied().map(QueryFamily::Id);
+            if is_emoji {
+                use core::iter::once;
+                let emoji_family = QueryFamily::Generic(fontique::GenericFamily::Emoji);
+                self.query.set_families(fonts.chain(once(emoji_family)));
+                self.fonts_id = None;
+            } else if self.fonts_id != Some(fonts_id) {
+                self.query.set_families(fonts);
+                self.fonts_id = Some(fonts_id);
+            }
+
             let attrs = fontique::Attributes {
                 width: style.font_width,
                 weight: style.font_weight,
                 style: style.font_style,
             };
-            let variations = self.rcx.variations(style.font_variations).unwrap_or(&[]);
-            let features = self.rcx.features(style.font_features).unwrap_or(&[]);
-            if is_emoji {
-                let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
-                let fonts = fonts.iter().map(|id| QueryFamily::Id(*id));
-                self.query
-                    .set_families(fonts.chain(core::iter::once(QueryFamily::Generic(
-                        fontique::GenericFamily::Emoji,
-                    ))));
-                self.fonts_id = None;
-            } else if self.fonts_id != Some(fonts_id) {
-                let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
-                self.query.set_families(fonts.iter().copied());
-                self.fonts_id = Some(fonts_id);
-            }
             if self.attrs != attrs {
                 self.query.set_attributes(attrs);
                 self.attrs = attrs;
             }
-            self.attrs = attrs;
-            self.variations = variations;
-            self.features = features;
+            self.variations = self.rcx.variations(style.font_variations).unwrap_or(&[]);
+            self.features = self.rcx.features(style.font_features).unwrap_or(&[]);
         }
         let mut selected_font = None;
         self.query.matches_with(|font| {
-            if let Ok(font_ref) = skrifa::FontRef::from_index(font.blob.as_ref(), font.index) {
-                use crate::swash_convert::synthesis_to_swash;
-                use skrifa::MetadataProvider;
-                use swash::text::cluster::Status as MapStatus;
-                let charmap = font_ref.charmap();
-                match cluster.map(|ch| {
-                    charmap
-                        .map(ch)
-                        .map(|g| {
-                            g.to_u32()
-                                .try_into()
-                                .expect("Swash requires u16 glyph, so we hope that the glyph fits")
-                        })
-                        .unwrap_or_default()
-                }) {
-                    MapStatus::Complete => {
-                        selected_font = Some(SelectedFont {
-                            font: font.clone(),
-                            synthesis: synthesis_to_swash(font.synthesis),
-                        });
-                        return fontique::QueryStatus::Stop;
+            use skrifa::MetadataProvider;
+            use swash::text::cluster::Status as MapStatus;
+
+            let Ok(font_ref) = skrifa::FontRef::from_index(font.blob.as_ref(), font.index) else {
+                return fontique::QueryStatus::Continue;
+            };
+
+            let charmap = font_ref.charmap();
+            let map_status = cluster.map(|ch| {
+                charmap
+                    .map(ch)
+                    .map(|g| {
+                        g.to_u32()
+                            .try_into()
+                            .expect("Swash requires u16 glyph, so we hope that the glyph fits")
+                    })
+                    .unwrap_or_default()
+            });
+
+            match map_status {
+                MapStatus::Complete => {
+                    selected_font = Some(font.into());
+                    fontique::QueryStatus::Stop
+                }
+                MapStatus::Keep => {
+                    selected_font = Some(font.into());
+                    fontique::QueryStatus::Continue
+                }
+                MapStatus::Discard => {
+                    if selected_font.is_none() {
+                        selected_font = Some(font.into());
                     }
-                    MapStatus::Keep => {
-                        selected_font = Some(SelectedFont {
-                            font: font.clone(),
-                            synthesis: synthesis_to_swash(font.synthesis),
-                        });
-                    }
-                    MapStatus::Discard => {
-                        if selected_font.is_none() {
-                            selected_font = Some(SelectedFont {
-                                font: font.clone(),
-                                synthesis: synthesis_to_swash(font.synthesis),
-                            });
-                        }
-                    }
+                    fontique::QueryStatus::Continue
                 }
             }
-            fontique::QueryStatus::Continue
         });
         selected_font
     }
@@ -354,6 +349,16 @@ impl<B: Brush> partition::Selector for FontSelector<'_, '_, B> {
 struct SelectedFont {
     font: QueryFont,
     synthesis: Synthesis,
+}
+
+impl From<&QueryFont> for SelectedFont {
+    fn from(font: &QueryFont) -> Self {
+        use crate::swash_convert::synthesis_to_swash;
+        Self {
+            font: font.clone(),
+            synthesis: synthesis_to_swash(font.synthesis),
+        }
+    }
 }
 
 impl PartialEq for SelectedFont {
