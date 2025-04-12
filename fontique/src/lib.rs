@@ -61,3 +61,4 @@ pub use script::Script;
 pub use source::{SourceId, SourceInfo, SourceKind};
 
 pub use source_cache::{SourceCache, SourceCacheOptions};
+use objc2 as _;
