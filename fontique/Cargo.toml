@@ -26,6 +26,7 @@ system = [
     "std",
     "dep:windows",
     "dep:windows-core",
+    "dep:objc2",
     "dep:objc2-core-foundation",
     "dep:objc2-core-text",
     "dep:objc2-foundation",
@@ -53,6 +54,10 @@ windows = { version = "0.58.0", features = [
 windows-core = { version = "0.58", optional = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
+# FIX: Enable relax-sign-encoding to prevent the bug described in this issue: https://github.com/madsmtm/objc2/issues/566
+objc2 = { version = "0.6.0", optional = true, features = ["std", "relax-sign-encoding"] }
+# NOTE: When updating objc2-foundation, objc2-core-foundation, or objc2-core-text make sure to use the version of objc2
+# that they reference to prevent crate duplication.
 objc2-foundation = { version = "0.3.0", optional = true, default-features = false, features = [
     "alloc",
     "NSArray",
