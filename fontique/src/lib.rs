@@ -60,4 +60,6 @@ pub use generic::GenericFamily;
 pub use script::Script;
 pub use source::{SourceId, SourceInfo, SourceKind};
 
+#[cfg(all(feature = "system", target_vendor = "apple"))]
+use objc2 as _;
 pub use source_cache::{SourceCache, SourceCacheOptions};

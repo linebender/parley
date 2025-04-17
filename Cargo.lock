@@ -907,6 +907,7 @@ dependencies = [
  "icu_locid",
  "icu_properties",
  "memmap2",
+ "objc2 0.6.0",
  "objc2-core-foundation",
  "objc2-core-text",
  "objc2-foundation 0.3.0",
