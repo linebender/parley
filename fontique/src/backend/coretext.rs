@@ -7,12 +7,8 @@ use super::{
 use alloc::sync::Arc;
 use core::ptr::{null, null_mut};
 use hashbrown::HashMap;
-use objc2_core_foundation::{CFDictionaryCreate, CFRange, CFRetained, CFString, CFStringGetLength};
-use objc2_core_text::{
-    CTFont, CTFontCopyFamilyName, CTFontCreateForString, CTFontCreateForStringWithLanguage,
-    CTFontCreateUIFontForLanguage, CTFontCreateWithFontDescriptor,
-    CTFontDescriptorCreateWithAttributes, CTFontUIFontType,
-};
+use objc2_core_foundation::{CFDictionary, CFRange, CFRetained, CFString};
+use objc2_core_text::{CTFont, CTFontDescriptor, CTFontUIFontType};
 use objc2_foundation::{
     NSSearchPathDirectory, NSSearchPathDomainMask, NSSearchPathForDirectoriesInDomains,
 };
@@ -72,7 +68,7 @@ impl SystemFonts {
         let key = key.into();
         let sample = key.script().sample()?;
         let font = create_fallback_font_for_text(sample, key.locale(), false)?;
-        let family_name = unsafe { CTFontCopyFamilyName(&font) };
+        let family_name = unsafe { font.family_name() };
         self.name_map.get(&family_name.to_string()).map(|n| n.id())
     }
 }
@@ -80,15 +76,15 @@ impl SystemFonts {
 fn create_base_font(prefer_ui_font: bool) -> CFRetained<CTFont> {
     if prefer_ui_font {
         if let Some(font) =
-            unsafe { CTFontCreateUIFontForLanguage(CTFontUIFontType::System, 0.0, None) }
+            unsafe { CTFont::new_ui_font_for_language(CTFontUIFontType::System, 0.0, None) }
         {
             return font;
         }
     }
     unsafe {
-        let attrs = CFDictionaryCreate(None, null_mut(), null_mut(), 0, null(), null());
-        let desc = CTFontDescriptorCreateWithAttributes(&attrs.unwrap());
-        CTFontCreateWithFontDescriptor(&desc, 0.0, null())
+        let attrs = CFDictionary::new(None, null_mut(), null_mut(), 0, null(), null());
+        let desc = CTFontDescriptor::with_attributes(&attrs.unwrap());
+        CTFont::with_font_descriptor(&desc, 0.0, null())
     }
 }
 
@@ -100,15 +96,15 @@ fn create_fallback_font_for_text(
     let text = CFString::from_str(text);
     let text_range = CFRange {
         location: 0,
-        length: unsafe { CFStringGetLength(&text) },
+        length: text.length(),
     };
     let locale = locale.map(CFString::from_str);
     let base_font = create_base_font(prefer_ui_font);
     let font = unsafe {
         if let Some(locale) = locale {
-            CTFontCreateForStringWithLanguage(&base_font, &text, text_range, Some(&locale))
+            CTFont::for_string_with_language(&base_font, &text, text_range, Some(&locale))
         } else {
-            CTFontCreateForString(&base_font, &text, text_range)
+            CTFont::for_string(&base_font, &text, text_range)
         }
     };
     Some(font)
