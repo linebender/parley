@@ -155,10 +155,10 @@ jobs:
           save-if: ${{ github.event_name != 'merge_group' }}
 
       - name: cargo clippy
-        run: cargo hack clippy --workspace --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std -- -D warnings
+        run: cargo hack clippy --package parley --package fontique --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std -- -D warnings
 
       - name: cargo clippy (auxiliary)
-        run: cargo hack clippy --workspace --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std --tests --benches --examples -- -D warnings
+        run: cargo hack clippy --package parley --package fontique --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std --tests --benches --examples -- -D warnings
 
   prime-lfs-cache:
     name: Prime LFS Cache
@@ -289,7 +289,7 @@ jobs:
           save-if: ${{ github.event_name != 'merge_group' }}
 
       - name: cargo check
-        run: cargo hack check ${{ env.RUST_MIN_VER_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std
+        run: cargo hack check --package parley --package fontique ${{ env.RUST_MIN_VER_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std
 
   doc:
     name: cargo doc
