@@ -98,7 +98,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [ windows-latest, macos-latest, ubuntu-latest ]
     steps:
       - uses: actions/checkout@v4
 
@@ -133,7 +133,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [armv7-linux-androideabi, aarch64-linux-android, x86_64-linux-android]
+        target: [ armv7-linux-androideabi, aarch64-linux-android, x86_64-linux-android ]
     steps:
       - uses: actions/checkout@v4
 
@@ -155,32 +155,32 @@ jobs:
           save-if: ${{ github.event_name != 'merge_group' }}
 
       - name: cargo clippy
-        run: cargo hack clippy --workspace --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std -- -D warnings
+        run: cargo hack clippy --workspace --exclude xtask --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std -- -D warnings
 
       - name: cargo clippy (auxiliary)
-        run: cargo hack clippy --workspace --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std --tests --benches --examples -- -D warnings
+        run: cargo hack clippy --workspace --exclude xtask --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std --tests --benches --examples -- -D warnings
 
   prime-lfs-cache:
     name: Prime LFS Cache
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Cache git lfs
-      id: lfs-cache
-      uses: actions/cache@v4
-      with:
-        path: .git/lfs
-        # The files targeted with git lfs
-        key: parley-lfs-${{ hashFiles('parley/tests/snapshots/*.png') }}
-        restore-keys: parley-lfs-
-        enableCrossOsArchive: true
+      - name: Cache git lfs
+        id: lfs-cache
+        uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          # The files targeted with git lfs
+          key: parley-lfs-${{ hashFiles('parley/tests/snapshots/*.png') }}
+          restore-keys: parley-lfs-
+          enableCrossOsArchive: true
 
-    - name: Fetch lfs data
-      if: ${{ steps.lfs-cache.outputs.cache-hit != 'true' }}
-      run: git lfs fetch
+      - name: Fetch lfs data
+        if: ${{ steps.lfs-cache.outputs.cache-hit != 'true' }}
+        run: git lfs fetch
 
   test-stable:
     name: cargo test
@@ -188,7 +188,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [ windows-latest, macos-latest, ubuntu-latest ]
     steps:
       - uses: actions/checkout@v4
         # We intentionally do not use lfs: true here, instead using the caching method to save LFS bandwidth.
@@ -223,11 +223,11 @@ jobs:
 
       - name: cargo nextest
         run: cargo nextest run --workspace --locked --all-features --no-fail-fast
-        # env:
+          # env:
           # Although GitHub's LFS limits are very low, we don't expect to run out of bandwidth.
-          # However, if we do, the tests are designed to be robust against that, if this environment variable is set.
-          # If we do run out of bandwidth, uncomment both `# env:` above and the following line, and inform @DJMcNab.
-          # PARLEY_IGNORE_DECODING_ERRORS: 1
+        # However, if we do, the tests are designed to be robust against that, if this environment variable is set.
+        # If we do run out of bandwidth, uncomment both `# env:` above and the following line, and inform @DJMcNab.
+        # PARLEY_IGNORE_DECODING_ERRORS: 1
 
       - name: cargo test --doc
         run: cargo test --doc --workspace --locked --all-features --no-fail-fast
@@ -237,7 +237,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [ windows-latest, macos-latest, ubuntu-latest ]
     steps:
       - uses: actions/checkout@v4
 
@@ -268,7 +268,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [armv7-linux-androideabi, aarch64-linux-android, x86_64-linux-android]
+        target: [ armv7-linux-androideabi, aarch64-linux-android, x86_64-linux-android ]
     steps:
       - uses: actions/checkout@v4
 
@@ -289,14 +289,14 @@ jobs:
           save-if: ${{ github.event_name != 'merge_group' }}
 
       - name: cargo check
-        run: cargo hack check ${{ env.RUST_MIN_VER_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std
+        run: cargo hack check --workspace --exclude xtask ${{ env.RUST_MIN_VER_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std
 
   doc:
     name: cargo doc
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [ windows-latest, macos-latest, ubuntu-latest ]
     steps:
       - uses: actions/checkout@v4
 
