@@ -120,7 +120,7 @@ impl fmt::Display for GenericFamily {
             Self::Math => "math",
             Self::FangSong => "fangsong",
         };
-        write!(f, "{}", name)
+        write!(f, "{name}")
     }
 }
 

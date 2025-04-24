@@ -73,7 +73,7 @@ impl core::fmt::Debug for SourceKind {
         match self {
             #[cfg(feature = "std")]
             Self::Path(path) => {
-                write!(f, "Path({:?})", path)
+                write!(f, "Path({path:?})")
             }
             Self::Memory(_) => {
                 write!(f, "Data([..])")
