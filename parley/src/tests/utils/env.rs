@@ -111,7 +111,7 @@ pub(crate) fn load_fonts(
 
 impl TestEnv {
     pub(crate) fn new(test_name: &str) -> Self {
-        let file_prefix = format!("{}-", test_name);
+        let file_prefix = format!("{test_name}-");
         let entries = std::fs::read_dir(current_imgs_dir()).unwrap();
         for entry in entries.flatten() {
             let path = entry.path();

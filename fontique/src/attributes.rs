@@ -242,7 +242,7 @@ impl fmt::Display for FontWidth {
                     return write!(f, "{}%", self.percentage());
                 }
             };
-            write!(f, "{}", keyword)
+            write!(f, "{keyword}")
         } else {
             write!(f, "{}%", self.percentage())
         }
@@ -404,7 +404,7 @@ impl fmt::Display for FontWeight {
                 900 => "black",
                 _ => return write!(f, "{}", self.0),
             };
-            write!(f, "{}", keyword)
+            write!(f, "{keyword}")
         } else {
             write!(f, "{}", self.0)
         }
@@ -502,10 +502,10 @@ impl fmt::Display for FontStyle {
             Self::Oblique(None) => "oblique",
             Self::Oblique(Some(degrees)) if *degrees == 14.0 => "oblique",
             Self::Oblique(Some(degrees)) => {
-                return write!(f, "oblique({}deg)", degrees);
+                return write!(f, "oblique({degrees}deg)");
             }
         };
-        write!(f, "{}", value)
+        write!(f, "{value}")
     }
 }
 
