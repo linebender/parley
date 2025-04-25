@@ -3,7 +3,8 @@
 
 use peniko::kurbo::Size;
 
-use crate::{Alignment, AlignmentOptions, InlineBox, WhiteSpaceCollapse, testenv};
+use crate::data::LayoutData;
+use crate::{Alignment, AlignmentOptions, Brush, InlineBox, WhiteSpaceCollapse, testenv};
 
 #[test]
 fn plain_multiline_text() {
@@ -332,4 +333,129 @@ fn realign() {
         );
     }
     env.check_layout_snapshot(&layout);
+}
+
+#[test]
+/// Tests that all alignment option combinations can be applied to a dirty layout.
+///
+/// Rendering 684 snapshots takes over 10 seconds on a 5950X, so a simpler assert is used instead.
+fn realign_all() {
+    let mut env = testenv!();
+
+    let latin = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
+    let arabic = "عند برمجة أجهزة الكمبيوتر، قد تجد نفسك فجأة في مواقف غريبة، مثل الكتابة بلغة لا تتحدثها فعليًا.";
+
+    let texts = [(latin, "latin"), (arabic, "arabic")];
+
+    let alignments = [
+        (Alignment::Start, "start"),
+        (Alignment::End, "end"),
+        (Alignment::Left, "left"),
+        (Alignment::Middle, "middle"),
+        (Alignment::Right, "right"),
+        (Alignment::Justified, "justified"),
+    ];
+
+    let all_opts = [
+        (Some(150.), AlignmentOptions::default(), "150", "default"),
+        (
+            None,
+            AlignmentOptions {
+                align_when_overflowing: true,
+            },
+            "none",
+            "awo_true",
+        ),
+        (
+            None,
+            AlignmentOptions {
+                align_when_overflowing: false,
+            },
+            "none",
+            "awo_false",
+        ),
+    ];
+
+    // Build a collection of base truth
+    let mut layouts = Vec::new();
+    for (text, _) in texts {
+        for (alignment, _) in alignments {
+            for (max_advance, opts, _, _) in all_opts {
+                let mut builder = env.ranged_builder(text);
+                let mut layout = builder.build(text);
+                layout.break_all_lines(max_advance);
+                layout.align(Some(150.), alignment, opts);
+                layouts.push(layout);
+            }
+        }
+    }
+
+    // Loop over all the base truths ..
+    let mut idx = 0;
+    for (text_idx, (_, text_name)) in texts.iter().enumerate() {
+        for (_, align_name) in alignments {
+            for (max_advance, _, ma_name, opts_name) in all_opts {
+                let layout = &layouts[idx];
+                idx += 1;
+
+                let base_name = format!("{text_name}_{align_name}_{opts_name}_{ma_name}");
+                //env.with_name(&base_name).check_layout_snapshot(&layout);
+
+                // .. and make sure every combination can be applied on top without issues
+                let mut jdx = text_idx * (layouts.len() / texts.len());
+                for (top_alignment, align_name) in alignments {
+                    for (top_max_advance, top_opts, ma_name, opts_name) in all_opts {
+                        let mut top_layout = layout.clone();
+                        // Only break lines again if the max advance differs from base,
+                        // because otherwise we already have the correct line breaks.
+                        if max_advance != top_max_advance {
+                            top_layout.break_all_lines(top_max_advance);
+                        }
+                        top_layout.align(Some(150.), top_alignment, top_opts);
+
+                        let top_name = format!("{text_name}_{align_name}_{opts_name}_{ma_name}");
+                        //env.with_name(&top_name).check_layout_snapshot(&top_layout);
+
+                        let top_layout_truth = &layouts[jdx];
+                        jdx += 1;
+
+                        assert_eq_layout_alignments(
+                            &top_layout_truth.data,
+                            &top_layout.data,
+                            &format!("{base_name} -> {top_name}"),
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Assert that the two provided layouts are equal in terms of alignment metrics.
+fn assert_eq_layout_alignments<B: Brush>(a: &LayoutData<B>, b: &LayoutData<B>, case: &str) {
+    assert_eq!(
+        a.lines.len(),
+        b.lines.len(),
+        "line count mismatch with {case}"
+    );
+
+    for (line_a, line_b) in a.lines.iter().zip(b.lines.iter()) {
+        assert_eq!(
+            line_a.metrics.offset, line_b.metrics.offset,
+            "line offset mismatch with {case}"
+        );
+    }
+
+    assert_eq!(
+        a.clusters.len(),
+        b.clusters.len(),
+        "cluster count mismatch with {case}"
+    );
+
+    for (cluster_a, cluster_b) in a.clusters.iter().zip(b.clusters.iter()) {
+        assert_eq!(
+            cluster_a.advance, cluster_b.advance,
+            "cluster advance mismatch with {case}"
+        );
+    }
 }

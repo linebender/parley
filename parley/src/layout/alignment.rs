@@ -8,7 +8,7 @@ use super::{
 use crate::style::Brush;
 
 /// Additional options to fine tune alignment
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct AlignmentOptions {
     /// If set to `true`, "end" and "center" alignment will apply even if the line contents are
     /// wider than the alignment width. If it is set to `false`, all overflowing lines will be
@@ -74,6 +74,8 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
 
     // Apply alignment to line items
     for line in &mut layout.lines {
+        line.metrics.offset = 0.;
+
         if is_rtl {
             // In RTL text, trailing whitespace is on the left. As we hang that whitespace, offset
             // the line to the left.
