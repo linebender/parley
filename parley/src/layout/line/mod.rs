@@ -159,11 +159,11 @@ pub enum PositionedLayoutItem<'a, B: Brush> {
 pub struct PositionedInlineBox {
     pub x: f32,
     /// To achieve less blurry rendering, compute the following:
-    /// 
+    ///
     /// ```ignore
     /// y = (y + height).round_to_pixel_boundary() - height
     /// ```
-    /// 
+    ///
     /// In a 1.0x scale scenario the rounding function can be just [`f32::round`].
     /// For other scaling scenarios you need to provide your own rounding function.
     pub y: f32,
@@ -196,7 +196,7 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     }
 
     /// Returns the offset to the baseline.
-    /// 
+    ///
     /// Round this to physical pixel boundary to achieve less blurry rendering.
     pub fn baseline(&self) -> f32 {
         self.baseline
