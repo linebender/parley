@@ -408,6 +408,7 @@ fn realign_all() {
                         let mut top_layout = layout.clone();
                         // Only break lines again if the max advance differs from base,
                         // because otherwise we already have the correct line breaks.
+                        // We want to specifically test the optimization of skipping it.
                         if max_advance != top_max_advance {
                             top_layout.break_all_lines(top_max_advance);
                         }
