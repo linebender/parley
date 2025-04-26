@@ -97,6 +97,7 @@ pub(crate) fn render_layout(
     );
 
     for (rect, _) in selection_rects {
+        let rect = rect.round(); // Round to logical pixels (physical would be even better)
         draw_rect(
             &mut pen,
             fpadding + rect.x0 as f32,
@@ -107,7 +108,11 @@ pub(crate) fn render_layout(
         );
     }
 
-    if let Some(rect) = cursor_rect {
+    if let Some(mut rect) = cursor_rect {
+        // Round to logical pixels (physical would be even better)
+        // We round only the y coords, because fractional width cursors may be requested.
+        rect.y0 = rect.y0.round();
+        rect.y1 = rect.y1.round();
         draw_rect(
             &mut pen,
             fpadding + rect.x0 as f32,
@@ -126,10 +131,15 @@ pub(crate) fn render_layout(
                     render_glyph_run(&glyph_run, &mut pen, padding);
                 }
                 PositionedLayoutItem::InlineBox(inline_box) => {
+                    // Round the baseline to pixel boundary.
+                    // An even better renderer would account for fractional DPI scale.
+                    // To get the baseline we need to calculate the bottom edge of the box.
+                    let pixel_aligned_box_y =
+                        (inline_box.y + inline_box.height).round() - inline_box.height;
                     draw_rect(
                         &mut pen,
                         inline_box.x + fpadding,
-                        inline_box.y + fpadding,
+                        pixel_aligned_box_y + fpadding,
                         inline_box.width,
                         inline_box.height,
                         config.inline_box_color,
@@ -144,7 +154,9 @@ pub(crate) fn render_layout(
 fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<'_>, padding: u32) {
     // Resolve properties of the GlyphRun
     let mut run_x = glyph_run.offset();
-    let run_y = glyph_run.baseline();
+    // Round the baseline to pixel boundary.
+    // An even better renderer would account for fractional DPI scale.
+    let run_y = glyph_run.baseline().round();
     let style = glyph_run.style();
     let brush = style.brush;
 
@@ -205,7 +217,10 @@ fn render_decoration(
     width: f32,
     padding: u32,
 ) {
-    let y = glyph_run.baseline() - offset + padding as f32;
+    // Round the baseline to pixel boundary.
+    // An even better renderer would account for fractional DPI scale.
+    let baseline = glyph_run.baseline().round();
+    let y = baseline - offset + padding as f32;
     let x = glyph_run.offset() + padding as f32;
     pen.set_color(brush.color);
     pen.set_origin(x, y);

@@ -363,11 +363,15 @@ impl Editor {
                 transform,
                 palette::css::STEEL_BLUE,
                 None,
-                &rect,
+                &rect.round(), // Round to logical pixels (physical would be even better)
             );
         });
         if self.cursor_visible {
-            if let Some(cursor) = self.editor.cursor_geometry(1.5) {
+            if let Some(mut cursor) = self.editor.cursor_geometry(1.5) {
+                // Round to logical pixels (physical would be even better)
+                // We round only the y coords, because we specifically asked for fractional width.
+                cursor.y0 = cursor.y0.round();
+                cursor.y1 = cursor.y1.round();
                 scene.fill(Fill::NonZero, transform, palette::css::WHITE, None, &cursor);
             }
         }
@@ -377,6 +381,9 @@ impl Editor {
                 let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
                     continue;
                 };
+                // We need to round the baseline to pixels to avoid blurry text.
+                // An even better renderer would account for fractional DPI scale.
+                let glyph_run_baseline = glyph_run.baseline().round();
                 let style = glyph_run.style();
                 // We draw underlines under the text, then the strikethrough on top, following:
                 // https://drafts.csswg.org/css-text-decor/#painting-order
@@ -396,7 +403,7 @@ impl Editor {
                     // Remember that we are using a y-down coordinate system
                     // If there's a custom width, because this is an underline, we want the custom
                     // width to go down from the default expectation
-                    let y = glyph_run.baseline() - offset + width / 2.;
+                    let y = glyph_run_baseline - offset + width / 2.;
 
                     let line = Line::new(
                         (glyph_run.offset() as f64, y as f64),
@@ -411,7 +418,7 @@ impl Editor {
                     );
                 }
                 let mut x = glyph_run.offset();
-                let y = glyph_run.baseline();
+                let y = glyph_run_baseline;
                 let run = glyph_run.run();
                 let font = run.font();
                 let font_size = run.font_size();
@@ -455,7 +462,7 @@ impl Editor {
                     // so we calculate the middle y-position of the strikethrough based on the font's
                     // standard strikethrough width.
                     // Remember that we are using a y-down coordinate system
-                    let y = glyph_run.baseline() - offset + run_metrics.strikethrough_size / 2.;
+                    let y = glyph_run_baseline - offset + run_metrics.strikethrough_size / 2.;
 
                     let line = Line::new(
                         (glyph_run.offset() as f64, y as f64),

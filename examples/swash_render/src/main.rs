@@ -186,8 +186,14 @@ fn main() {
                 PositionedLayoutItem::InlineBox(inline_box) => {
                     for x_off in 0..(inline_box.width.floor() as u32) {
                         for y_off in 0..(inline_box.height.floor() as u32) {
+                            // Round the baseline to pixel boundary.
+                            // An even better renderer would account for fractional DPI scale.
+                            // To get the baseline we need to calculate the bottom edge of the box.
+                            let pixel_aligned_box_y = ((inline_box.y + inline_box.height).round()
+                                - inline_box.height)
+                                as u32;
                             let x = inline_box.x as u32 + x_off + padding;
-                            let y = inline_box.y as u32 + y_off + padding;
+                            let y = pixel_aligned_box_y + y_off + padding;
                             img.put_pixel(x, y, Rgba([0, 0, 0, 255]));
                         }
                     }
@@ -221,7 +227,9 @@ fn render_glyph_run(
 ) {
     // Resolve properties of the GlyphRun
     let mut run_x = glyph_run.offset();
-    let run_y = glyph_run.baseline();
+    // Round the baseline to pixel boundary.
+    // An even better renderer would account for fractional DPI scale.
+    let run_y = glyph_run.baseline().round();
     let style = glyph_run.style();
     let color = style.brush;
 
@@ -279,7 +287,10 @@ fn render_decoration(
     width: f32,
     padding: u32,
 ) {
-    let y = glyph_run.baseline() - offset;
+    // Round the baseline to pixel boundary.
+    // An even better renderer would account for fractional DPI scale.
+    let baseline = glyph_run.baseline().round();
+    let y = baseline - offset;
     for pixel_y in y as u32..(y + width) as u32 {
         for pixel_x in glyph_run.offset() as u32..(glyph_run.offset() + glyph_run.advance()) as u32
         {
