@@ -19,14 +19,12 @@ This release has an [MSRV] of 1.82.
 
 [Vertical metrics are no longer rounded by Parley][#297] and so to avoid blurry text the rounding needs to happen in the renderer.
 
-The renderer will need to round the following to pixel boundaries:
+The renderer will need to round the following:
 * Glyph run baseline
 * Inline box baseline
-  - `box.y = (box.y + box.height).round_to_pixel_boundary() - box.height`
+  - `box.y = (box.y + box.height).round() - box.height`
 * Selection geometry's `y0` & `y1`
 * Cursor geometry's `y0` & `y1`
-
-For a simple version you can just use `f32::round` but to properly support fractional DPI scales more work is needed.
 
 ### Added
 

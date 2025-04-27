@@ -363,13 +363,13 @@ impl Editor {
                 transform,
                 palette::css::STEEL_BLUE,
                 None,
-                &rect.round(), // Round to logical pixels (physical would be even better)
+                &rect.round(), // Round to to pixel boundary.
             );
         });
         if self.cursor_visible {
             if let Some(mut cursor) = self.editor.cursor_geometry(1.5) {
-                // Round to logical pixels (physical would be even better)
-                // We round only the y coords, because we specifically asked for fractional width.
+                // Round the y coords to pixel boundary.
+                // We don't round the x coords, because we specifically asked for fractional width.
                 cursor.y0 = cursor.y0.round();
                 cursor.y1 = cursor.y1.round();
                 scene.fill(Fill::NonZero, transform, palette::css::WHITE, None, &cursor);
@@ -382,7 +382,6 @@ impl Editor {
                     continue;
                 };
                 // We need to round the baseline to pixels to avoid blurry text.
-                // An even better renderer would account for fractional DPI scale.
                 let glyph_run_baseline = glyph_run.baseline().round();
                 let style = glyph_run.style();
                 // We draw underlines under the text, then the strikethrough on top, following:

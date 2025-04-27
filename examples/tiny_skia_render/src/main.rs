@@ -123,7 +123,6 @@ fn main() {
                 }
                 PositionedLayoutItem::InlineBox(inline_box) => {
                     // Round the baseline to pixel boundary.
-                    // An even better renderer would account for fractional DPI scale.
                     // To get the baseline we need to calculate the bottom edge of the box.
                     let pixel_aligned_box_y =
                         (inline_box.y + inline_box.height).round() - inline_box.height;
@@ -157,7 +156,6 @@ fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<
     // Resolve properties of the GlyphRun
     let mut run_x = glyph_run.offset();
     // Round the baseline to pixel boundary.
-    // An even better renderer would account for fractional DPI scale.
     let run_y = glyph_run.baseline().round();
     let style = glyph_run.style();
     let brush = style.brush;
@@ -220,7 +218,6 @@ fn render_decoration(
     padding: u32,
 ) {
     // Round the baseline to pixel boundary.
-    // An even better renderer would account for fractional DPI scale.
     let baseline = glyph_run.baseline().round();
     let y = baseline - offset + padding as f32;
     let x = glyph_run.offset() + padding as f32;
