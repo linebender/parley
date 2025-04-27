@@ -15,6 +15,19 @@ You can find its changes [documented below](#030---2025-02-27).
 
 This release has an [MSRV] of 1.82.
 
+### Migration
+
+[Vertical metrics are no longer rounded by Parley][#297] and so to avoid blurry text the rounding needs to happen in the renderer.
+
+The renderer will need to round the following to pixel boundaries:
+* Glyph run baseline
+* Inline box baseline
+  - `box.y = (box.y + box.height).round_to_pixel_boundary() - box.height`
+* Selection geometry's `y0` & `y1`
+* Cursor geometry's `y0` & `y1`
+
+For a simple version you can just use `f32::round` but to properly support fractional DPI scales more work is needed.
+
 ### Added
 
 #### Parley
@@ -32,6 +45,7 @@ This release has an [MSRV] of 1.82.
 
 #### Parley
 
+- Breaking change: Don't round vertical metrics. ([#297][] by [@valadaptive][])
 - Breaking change: `Selection::geometry`, `Selection::geometry_with`, and `PlainEditor::selection_geometry` now include
   the line indices that the selection rectangles belong to. ([#318][] by [@valadaptive][])
 - Update to `accesskit` 0.18. ([#294][] by [@waywardmonkeys][]))
@@ -227,6 +241,7 @@ This release has an [MSRV] of 1.70.
 [#280]: https://github.com/linebender/parley/pull/280
 [#294]: https://github.com/linebender/parley/pull/294
 [#296]: https://github.com/linebender/parley/pull/296
+[#297]: https://github.com/linebender/parley/pull/297
 [#299]: https://github.com/linebender/parley/pull/299
 [#300]: https://github.com/linebender/parley/pull/300
 [#306]: https://github.com/linebender/parley/pull/306
