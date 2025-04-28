@@ -194,7 +194,8 @@ where
     /// The deleted range is clamped to the start of the buffer.
     /// No-op if the start of the range is not a char boundary.
     pub fn delete_bytes_before_selection(&mut self, len: NonZeroUsize) {
-        let selection_range = self.editor.selection.text_range();
+        let old_selection = self.editor.selection;
+        let selection_range = old_selection.text_range();
         let range = selection_range.start.saturating_sub(len.get())..selection_range.start;
         if range.is_empty() || !self.editor.buffer.is_char_boundary(range.start) {
             return;
@@ -203,7 +204,6 @@ where
         self.editor
             .update_compose_for_replaced_range(range.clone(), 0);
         self.update_layout();
-        let old_selection = self.editor.selection;
         let old_anchor = old_selection.anchor();
         let old_focus = old_selection.focus();
         self.editor.set_selection(Selection::new(
