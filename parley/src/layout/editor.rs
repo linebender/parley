@@ -206,16 +206,23 @@ where
         self.update_layout();
         let old_anchor = old_selection.anchor();
         let old_focus = old_selection.focus();
+        // When doing the equivalent of a backspace on a collapsed selection,
+        // always use downstream affinity, as `backdelete` does.
+        let (anchor_affinity, focus_affinity) = if old_selection.is_collapsed() {
+            (Affinity::Downstream, Affinity::Downstream)
+        } else {
+            (old_anchor.affinity(), old_focus.affinity())
+        };
         self.editor.set_selection(Selection::new(
             Cursor::from_byte_index(
                 &self.editor.layout,
                 old_anchor.index() - range.len(),
-                old_anchor.affinity(),
+                anchor_affinity,
             ),
             Cursor::from_byte_index(
                 &self.editor.layout,
                 old_focus.index() - range.len(),
-                old_focus.affinity(),
+                focus_affinity,
             ),
         ));
     }
