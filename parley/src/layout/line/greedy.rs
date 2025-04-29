@@ -628,17 +628,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
             line.metrics.leading =
                 line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
-            // We mimic Chrome in giving 'above' the remainder in cases of odd leading.
             let leading_below = if quantize {
+                // We mimic Chrome in giving 'above' the remainder in cases of odd leading.
                 (line.metrics.leading * 0.5).trunc()
             } else {
                 line.metrics.leading * 0.5
             };
-            let leading_above = if quantize {
-                line.metrics.leading - leading_below
-            } else {
-                line.metrics.leading * 0.5
-            };
+            let leading_above = line.metrics.leading - leading_below;
             // Small line heights will cause leading to be negative.
             // Negative leadings are correct for baseline calculation, but not for min/max coords.
             // We clamp leading to zero for the purposes of min/max coords,
