@@ -47,6 +47,9 @@ fn main() {
     // The display scale for HiDPI rendering
     let display_scale = 1.0;
 
+    // Whether to automatically align the output to pixel boundaries, to avoid blurry text.
+    let quantize = true;
+
     // The width for line wrapping
     let max_advance = Some(200.0 * display_scale);
 
@@ -65,7 +68,7 @@ fn main() {
     let mut layout_cx = LayoutContext::new();
 
     // Create a RangedBuilder
-    let mut builder = layout_cx.ranged_builder(&mut font_cx, &text, display_scale, true);
+    let mut builder = layout_cx.ranged_builder(&mut font_cx, &text, display_scale, quantize);
 
     // Set default text colour styles (set foreground text color)
     let foreground_brush = ColorBrush {
