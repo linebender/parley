@@ -15,6 +15,11 @@ You can find its changes [documented below](#030---2025-02-27).
 
 This release has an [MSRV] of 1.82.
 
+### Migration
+
+Quantization of vertical layout metrics is now optional.
+For an easy upgrade we recommend enabling it by setting `quantize` to `true` when calling [`LayoutContext::ranged_builder`](https://docs.rs/parley/0.4.0/parley/struct.LayoutContext.html#method.ranged_builder) or [`LayoutContext::tree_builder`](https://docs.rs/parley/0.4.0/parley/struct.LayoutContext.html#method.tree_builder).
+
 ### Added
 
 #### Parley
