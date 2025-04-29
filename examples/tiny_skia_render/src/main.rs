@@ -65,7 +65,7 @@ fn main() {
     let mut layout_cx = LayoutContext::new();
 
     // Create a RangedBuilder
-    let mut builder = layout_cx.ranged_builder(&mut font_cx, &text, display_scale);
+    let mut builder = layout_cx.ranged_builder(&mut font_cx, &text, display_scale, true);
 
     // Set default text colour styles (set foreground text color)
     let foreground_brush = ColorBrush {

@@ -419,6 +419,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
     /// Consumes the line breaker and finalizes all line computations.
     pub fn finish(mut self) {
+        // Whether metrics should be quantized to pixel boundaries
+        let quantize = self.layout.data.quantize;
         // For each run (item which is a text run):
         //   - Determine if it consists entirely of whitespace (is_whitespace property)
         //   - Determine if it has trailing whitespace (has_trailing_whitespace property)
@@ -455,6 +457,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
         }
         let mut y = 0.;
+        let mut y_overflow = 0.;
         let mut prev_line_metrics = None;
         for line in &mut self.lines.lines {
             // Reset metrics for line
@@ -602,16 +605,53 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 }
             }
 
+            if quantize {
+                // We round line height to full pixels and then keep track of the overflow.
+                let rounded_line_height = line.metrics.line_height.round();
+                let overflow = line.metrics.line_height - rounded_line_height;
+                line.metrics.line_height = rounded_line_height;
+                // The overflow tracking logic is based on observing Chrome's behavior.
+                // Fractional line height will lead to fluctuating integral perceived line height.
+                if y_overflow <= -0.5 {
+                    // This line will overflow to the previous line.
+                    y -= 1.;
+                    y_overflow += 1.;
+                } else if y_overflow >= 0.5 {
+                    // There will be a 1px gap before the start of the line.
+                    y += 1.;
+                    y_overflow -= 1.;
+                }
+                y_overflow += overflow;
+                // We also mimic Chrome in rounding ascent/descent.
+                line.metrics.ascent = line.metrics.ascent.round();
+                line.metrics.descent = line.metrics.descent.round();
+            }
             line.metrics.leading =
                 line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
-
+            // We mimic Chrome in giving 'above' the remainder in cases of odd leading.
+            let leading_below = if quantize {
+                (line.metrics.leading * 0.5).trunc()
+            } else {
+                line.metrics.leading * 0.5
+            };
+            let leading_above = if quantize {
+                line.metrics.leading - leading_below
+            } else {
+                line.metrics.leading * 0.5
+            };
+            // Small line heights will cause leading to be negative.
+            // Negative leadings are correct for baseline calculation, but not for min/max coords.
+            // We clamp leading to zero for the purposes of min/max coords,
+            // which in turn clamps the selection box minimum height to ascent + descent.
+            let negative_leading_above = leading_above.min(0.);
+            let negative_leading_below = leading_below.min(0.);
             // Compute
-            let above = line.metrics.ascent + line.metrics.leading * 0.5;
-            let below = line.metrics.descent + line.metrics.leading * 0.5;
-            line.metrics.min_coord = y;
+            let above = line.metrics.ascent + leading_above;
+            let below = line.metrics.descent + leading_below;
+            line.metrics.min_coord = y + negative_leading_above;
             line.metrics.baseline = y + above;
             y = line.metrics.baseline + below;
-            line.metrics.max_coord = y;
+            line.metrics.max_coord = y - negative_leading_below;
             prev_line_metrics = Some(line.metrics);
         }
         if self.layout.data.text_len == 0 {

@@ -182,7 +182,9 @@ impl TestEnv {
 
     pub(crate) fn ranged_builder<'a>(&'a mut self, text: &'a str) -> RangedBuilder<'a, ColorBrush> {
         let default_style = self.default_style();
-        let mut builder = self.layout_cx.ranged_builder(&mut self.font_cx, text, 1.0);
+        let mut builder = self
+            .layout_cx
+            .ranged_builder(&mut self.font_cx, text, 1.0, true);
         for style in default_style {
             builder.push_default(style);
         }
@@ -193,7 +195,7 @@ impl TestEnv {
         let default_style = self.default_style();
         let mut builder =
             self.layout_cx
-                .tree_builder(&mut self.font_cx, 1.0, &TextStyle::default());
+                .tree_builder(&mut self.font_cx, 1.0, true, &TextStyle::default());
         builder.push_style_modification_span(&default_style);
         builder
     }

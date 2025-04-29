@@ -84,7 +84,7 @@ fn main() {
             ..Default::default()
         };
 
-        let mut builder = layout_cx.tree_builder(&mut font_cx, display_scale, &root_style);
+        let mut builder = layout_cx.tree_builder(&mut font_cx, display_scale, true, &root_style);
 
         builder.push_style_modification_span(&[bold_style]);
         builder.push_text(&text[0..5]);
@@ -130,7 +130,7 @@ fn main() {
         // ============
 
         // Creates a RangedBuilder
-        let mut builder = layout_cx.ranged_builder(&mut font_cx, &text, display_scale);
+        let mut builder = layout_cx.ranged_builder(&mut font_cx, &text, display_scale, true);
 
         // Set default text colour styles (set foreground text color)
         builder.push_default(brush_style);

@@ -1057,7 +1057,7 @@ where
     }
     /// Update the layout.
     fn update_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
-        let mut builder = layout_cx.ranged_builder(font_cx, &self.buffer, self.scale);
+        let mut builder = layout_cx.ranged_builder(font_cx, &self.buffer, self.scale, true);
         for prop in self.default_style.inner().values() {
             builder.push_default(prop.to_owned());
         }

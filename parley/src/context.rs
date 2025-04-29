@@ -60,11 +60,31 @@ impl<B: Brush> LayoutContext<B> {
             .resolve_entire_style_set(font_ctx, raw_style, scale)
     }
 
+    /// Create a ranged style layout builder.
+    ///
+    /// Set `quantize` as `true` to have the layout coordinates aligned to pixel boundaries.
+    /// That is the easiest way to avoid blurry text and to receive ready-to-paint layout metrics.
+    ///
+    /// For advanced rendering use cases you can set `quantize` as `false` and receive
+    /// fractional coordinates. This ensures the most accurate results if you want to perform
+    /// some post-processing on the coordinates before painting. To avoid blurry text you will
+    /// still need to quantize the coordinates just before painting.
+    ///
+    /// Your should round at least the following:
+    /// * Glyph run baseline
+    /// * Inline box baseline
+    ///   - `box.y = (box.y + box.height).round() - box.height`
+    /// * Selection geometry's `y0` & `y1`
+    /// * Cursor geometry's `y0` & `y1`
+    ///
+    /// Keep in mind that for the simple `f32::round` to be effective,
+    /// you need to first ensure the coordinates are in physical pixel space.
     pub fn ranged_builder<'a>(
         &'a mut self,
         fcx: &'a mut FontContext,
         text: &'a str,
         scale: f32,
+        quantize: bool,
     ) -> RangedBuilder<'a, B> {
         self.begin();
         self.ranged_style_builder.begin(text.len());
@@ -73,15 +93,36 @@ impl<B: Brush> LayoutContext<B> {
 
         RangedBuilder {
             scale,
+            quantize,
             lcx: self,
             fcx,
         }
     }
 
+    /// Create a tree style layout builder.
+    ///
+    /// Set `quantize` as `true` to have the layout coordinates aligned to pixel boundaries.
+    /// That is the easiest way to avoid blurry text and to receive ready-to-paint layout metrics.
+    ///
+    /// For advanced rendering use cases you can set `quantize` as `false` and receive
+    /// fractional coordinates. This ensures the most accurate results if you want to perform
+    /// some post-processing on the coordinates before painting. To avoid blurry text you will
+    /// still need to quantize the coordinates just before painting.
+    ///
+    /// Your should round at least the following:
+    /// * Glyph run baseline
+    /// * Inline box baseline
+    ///   - `box.y = (box.y + box.height).round() - box.height`
+    /// * Selection geometry's `y0` & `y1`
+    /// * Cursor geometry's `y0` & `y1`
+    ///
+    /// Keep in mind that for the simple `f32::round` to be effective,
+    /// you need to first ensure the coordinates are in physical pixel space.
     pub fn tree_builder<'a>(
         &'a mut self,
         fcx: &'a mut FontContext,
         scale: f32,
+        quantize: bool,
         raw_style: &TextStyle<'_, B>,
     ) -> TreeBuilder<'a, B> {
         self.begin();
@@ -93,6 +134,7 @@ impl<B: Brush> LayoutContext<B> {
 
         TreeBuilder {
             scale,
+            quantize,
             lcx: self,
             fcx,
         }

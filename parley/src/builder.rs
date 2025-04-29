@@ -18,6 +18,7 @@ use crate::resolve::tree::ItemKind;
 /// Builder for constructing a text layout with ranged attributes.
 pub struct RangedBuilder<'a, B: Brush> {
     pub(crate) scale: f32,
+    pub(crate) quantize: bool,
     pub(crate) lcx: &'a mut LayoutContext<B>,
     pub(crate) fcx: &'a mut FontContext,
 }
@@ -52,7 +53,14 @@ impl<B: Brush> RangedBuilder<'_, B> {
         self.lcx.ranged_style_builder.finish(&mut self.lcx.styles);
 
         // Call generic layout builder method
-        build_into_layout(layout, self.scale, text.as_ref(), self.lcx, self.fcx);
+        build_into_layout(
+            layout,
+            self.scale,
+            self.quantize,
+            text.as_ref(),
+            self.lcx,
+            self.fcx,
+        );
     }
 
     pub fn build(&mut self, text: impl AsRef<str>) -> Layout<B> {
@@ -65,6 +73,7 @@ impl<B: Brush> RangedBuilder<'_, B> {
 /// Builder for constructing a text layout with a tree of attributes.
 pub struct TreeBuilder<'a, B: Brush> {
     pub(crate) scale: f32,
+    pub(crate) quantize: bool,
     pub(crate) lcx: &'a mut LayoutContext<B>,
     pub(crate) fcx: &'a mut FontContext,
 }
@@ -122,7 +131,7 @@ impl<B: Brush> TreeBuilder<'_, B> {
         let text = self.lcx.tree_style_builder.finish(&mut self.lcx.styles);
 
         // Call generic layout builder method
-        build_into_layout(layout, self.scale, &text, self.lcx, self.fcx);
+        build_into_layout(layout, self.scale, self.quantize, &text, self.lcx, self.fcx);
 
         text
     }
@@ -137,6 +146,7 @@ impl<B: Brush> TreeBuilder<'_, B> {
 fn build_into_layout<B: Brush>(
     layout: &mut Layout<B>,
     scale: f32,
+    quantize: bool,
     text: &str,
     lcx: &mut LayoutContext<B>,
     fcx: &mut FontContext,
@@ -145,6 +155,7 @@ fn build_into_layout<B: Brush>(
 
     layout.data.clear();
     layout.data.scale = scale;
+    layout.data.quantize = quantize;
     layout.data.has_bidi = !lcx.bidi.levels().is_empty();
     layout.data.base_level = lcx.bidi.base_level();
     layout.data.text_len = text.len();
