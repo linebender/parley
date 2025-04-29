@@ -5,7 +5,7 @@ use crate::{FontWeight, InlineBox, Layout, StyleProperty, testenv};
 
 use super::utils::{ColorBrush, TestEnv};
 
-fn build_layout<'a>(env: &'a mut TestEnv, font_size: f32, line_height: f32) -> Layout<ColorBrush> {
+fn build_layout(env: &mut TestEnv, font_size: f32, line_height: f32) -> Layout<ColorBrush> {
     let text = "Some text here. Let's make it a bit longer so that line wrapping kicks in 😊.\
 		And also some اللغة العربية arabic text.\n\
 		This is underline and strikethrough text and some extra more text\n\
