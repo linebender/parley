@@ -630,6 +630,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
             let leading_below = if quantize {
                 // We mimic Chrome in giving 'above' the remainder in cases of odd leading.
+                // TODO: Test Chrome with a font where descent > ascent to see if it's dynamic.
                 (line.metrics.leading * 0.5).trunc()
             } else {
                 line.metrics.leading * 0.5
