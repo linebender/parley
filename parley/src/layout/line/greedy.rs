@@ -616,8 +616,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 (line.metrics.ascent, line.metrics.descent)
             };
 
-            let leading = line.metrics.line_height - (ascent + descent);
             let (leading_above, leading_below) = if quantize {
+                // Calculate leading using the rounded ascent and descent.
+                let leading = line.metrics.line_height - (ascent + descent);
                 // We mimic Chrome in giving 'below' the larger leading half.
                 // Although the comment in Chromium's NGLineHeightMetrics::AddLeading function
                 // in ng_line_height_metrics.cc claims it's for legacy test compatibility.
@@ -626,7 +627,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 let below = leading.round() - above;
                 (above, below)
             } else {
-                (leading * 0.5, leading * 0.5)
+                (line.metrics.leading * 0.5, line.metrics.leading * 0.5)
             };
 
             line.metrics.baseline =
