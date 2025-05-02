@@ -290,8 +290,8 @@ fn lines_integral_line_height_plus_one_leading() {
 /// Test that ascent and descent are rounded separately and then summed.
 ///
 /// With Roboto 19.0px the ascent and descent are 17.626953 and 4.638672.
-/// When rounded before suming we get 23, when rounding after sum we get 22.
-/// Chrome renders the selection box with a height of 23px with Roboto 19.0px.
+/// When rounding before summing we get 23, when rounding after summing we get 22.
+/// Chrome renders the selection box with a height of 23px.
 ///
 /// Roboto 20.0px would be another example with 18.554688 and 4.8828125.
 #[test]
