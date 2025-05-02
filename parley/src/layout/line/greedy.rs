@@ -607,15 +607,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             line.metrics.leading =
                 line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
 
-            let mut ascent = line.metrics.ascent;
-            let mut descent = line.metrics.descent;
-            if quantize {
+            let (ascent, descent) = if quantize {
                 // We mimic Chrome in rounding ascent and descent separately,
                 // before calculating the rest.
                 // See lines_integral_line_height_ascent_descent_rounding() for more details.
-                ascent = ascent.round();
-                descent = descent.round();
-            }
+                (line.metrics.ascent.round(), line.metrics.descent.round())
+            } else {
+                (line.metrics.ascent, line.metrics.descent)
+            };
 
             let leading = line.metrics.line_height - (ascent + descent);
             let (leading_above, leading_below) = if quantize {
