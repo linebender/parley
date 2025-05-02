@@ -7,6 +7,7 @@ use crate::{
     RangedBuilder, Rect, StyleProperty, TextStyle, TreeBuilder,
 };
 use fontique::{Blob, Collection, CollectionOptions};
+use peniko::kurbo::Size;
 use std::{
     borrow::Cow,
     path::{Path, PathBuf},
@@ -14,11 +15,10 @@ use std::{
 };
 use tiny_skia::{Color, Pixmap};
 
-// Creates a new instance of TestEnv and put current function name in constructor
+// Returns the current function name
 #[macro_export]
-macro_rules! testenv {
+macro_rules! test_name {
     () => {{
-        // Get name of the current function
         fn f() {}
         fn type_name_of<T>(_: T) -> &'static str {
             std::any::type_name::<T>()
@@ -27,8 +27,7 @@ macro_rules! testenv {
         let name = &name[..name.len() - 3];
         let name = &name[name.rfind(':').map(|x| x + 1).unwrap_or(0)..];
 
-        // Create test env
-        $crate::tests::utils::TestEnv::new(name)
+        name
     }};
 }
 
@@ -116,7 +115,7 @@ pub(crate) fn load_fonts(
 }
 
 impl TestEnv {
-    pub(crate) fn new(test_name: &str) -> Self {
+    pub(crate) fn new<S: Into<Option<Size>>>(test_name: &str, size: S) -> Self {
         let file_prefix = format!("{test_name}-");
         let entries = std::fs::read_dir(current_imgs_dir()).unwrap();
         for entry in entries.flatten() {
@@ -156,10 +155,13 @@ impl TestEnv {
             rendering_config: RenderingConfig {
                 background_color: Color::WHITE,
                 padding_color: Color::from_rgba8(166, 200, 255, 255),
-                cursor_color: Color::from_rgba8(255, 0, 0, 255),
-                selection_color: Color::from_rgba8(196, 196, 0, 255),
+                cursor_color: Color::from_rgba8(0, 0, 255, 255),
+                selection_colors: [
+                    Color::from_rgba8(0, 255, 0, 255),
+                    Color::from_rgba8(255, 0, 0, 255),
+                ],
                 inline_box_color: Color::BLACK,
-                size: None,
+                size: size.into(),
             },
             cursor_size: 2.0,
             errors: Vec::new(),
@@ -298,7 +300,7 @@ impl TestEnv {
         self.render_and_check_snapshot(layout, None, &[]);
     }
 
-    fn render_and_check_snapshot(
+    pub(crate) fn render_and_check_snapshot(
         &mut self,
         layout: &Layout<ColorBrush>,
         cursor_rect: Option<Rect>,

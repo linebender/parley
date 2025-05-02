@@ -1,13 +1,15 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::testenv;
+use crate::test_name;
+
+use super::utils::TestEnv;
 
 // TODO - Use CursorTest API for these tests
 
 #[test]
 fn editor_simple_move() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
     let mut editor = env.editor("Hi, all!\nNext");
     env.check_editor_snapshot(&mut editor);
     let mut drv = env.driver(&mut editor);
@@ -26,7 +28,7 @@ fn editor_simple_move() {
 
 #[test]
 fn editor_select_all() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
     let mut editor = env.editor("Hi, all!\nNext");
     env.driver(&mut editor).select_all();
     env.check_editor_snapshot(&mut editor);
@@ -34,7 +36,7 @@ fn editor_select_all() {
 
 #[test]
 fn editor_double_newline() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
     let mut editor = env.editor("Hi, all!\n\nNext");
     env.driver(&mut editor).select_all();
     env.check_editor_snapshot(&mut editor);

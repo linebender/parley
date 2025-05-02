@@ -3,7 +3,9 @@
 
 use peniko::color::palette::css;
 
-use crate::{Alignment, AlignmentOptions, OverflowWrap, StyleProperty, WordBreakStrength, testenv};
+use crate::{
+    Alignment, AlignmentOptions, OverflowWrap, StyleProperty, WordBreakStrength, test_name,
+};
 
 use super::utils::{ColorBrush, TestEnv};
 
@@ -52,7 +54,7 @@ fn test_wrap_with_custom_text(
 
 #[test]
 fn overflow_wrap_off() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     test_wrap(
         &mut env,
@@ -65,7 +67,7 @@ fn overflow_wrap_off() {
 
 #[test]
 fn overflow_wrap_first_half() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     test_wrap(
         &mut env,
@@ -78,7 +80,7 @@ fn overflow_wrap_first_half() {
 
 #[test]
 fn overflow_wrap_second_half() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     test_wrap(
         &mut env,
@@ -91,7 +93,7 @@ fn overflow_wrap_second_half() {
 
 #[test]
 fn overflow_wrap_during() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     test_wrap(
         &mut env,
@@ -104,7 +106,7 @@ fn overflow_wrap_during() {
 
 #[test]
 fn overflow_wrap_everywhere() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     test_wrap(
         &mut env,
@@ -117,7 +119,7 @@ fn overflow_wrap_everywhere() {
 
 #[test]
 fn overflow_wrap_narrow() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     test_wrap(
         &mut env,
@@ -130,7 +132,7 @@ fn overflow_wrap_narrow() {
 
 #[test]
 fn overflow_wrap_anywhere_min_content_width() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     let text = "Hello world!\nLonger line with a looooooooong word.";
     let mut builder = env.ranged_builder(text);
@@ -145,7 +147,7 @@ fn overflow_wrap_anywhere_min_content_width() {
 
 #[test]
 fn overflow_wrap_break_word_min_content_width() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     let text = "Hello world!\nLonger line with a looooooooong word.";
     let mut builder = env.ranged_builder(text);
@@ -160,7 +162,7 @@ fn overflow_wrap_break_word_min_content_width() {
 
 #[test]
 fn word_break_break_all_first_half() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     test_wrap(
         &mut env,
@@ -173,7 +175,7 @@ fn word_break_break_all_first_half() {
 
 #[test]
 fn word_break_break_all_second_half() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     test_wrap(
         &mut env,
@@ -186,7 +188,7 @@ fn word_break_break_all_second_half() {
 
 #[test]
 fn word_break_break_all_during() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     test_wrap(
         &mut env,
@@ -199,7 +201,7 @@ fn word_break_break_all_during() {
 
 #[test]
 fn word_break_break_all_everywhere() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     test_wrap(
         &mut env,
@@ -212,7 +214,7 @@ fn word_break_break_all_everywhere() {
 
 #[test]
 fn word_break_break_all_min_content_width() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     let text = "Hello world!\nLonger line with a looooooooong word.";
     let mut builder = env.ranged_builder(text);
@@ -233,7 +235,7 @@ fn word_break_wpt007() {
     //
     // All browsers fail this currently, but we pass it. This means that word_break_break_all_first_half doesn't match
     // what any browsers do currently, but should be theoretically correct.
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     test_wrap_with_custom_text(
         &mut env,
@@ -247,7 +249,7 @@ fn word_break_wpt007() {
 
 #[test]
 fn word_break_keep_all() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     let mut test_text = |text, name, wrap_width| {
         let mut builder = env.ranged_builder(text);

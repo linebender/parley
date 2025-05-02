@@ -4,11 +4,13 @@
 use peniko::kurbo::Size;
 
 use crate::data::LayoutData;
-use crate::{Alignment, AlignmentOptions, Brush, InlineBox, WhiteSpaceCollapse, testenv};
+use crate::{Alignment, AlignmentOptions, Brush, InlineBox, WhiteSpaceCollapse, test_name};
+
+use super::utils::TestEnv;
 
 #[test]
 fn plain_multiline_text() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     let text = "Hello world!\nLine 2\nLine 4";
     let mut builder = env.ranged_builder(text);
@@ -21,7 +23,7 @@ fn plain_multiline_text() {
 
 #[test]
 fn placing_inboxes() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     for (position, test_case_name) in [
         (0, "start"),
@@ -46,7 +48,7 @@ fn placing_inboxes() {
 
 #[test]
 fn only_inboxes_wrap() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     let text = "";
     let mut builder = env.ranged_builder(text);
@@ -67,7 +69,7 @@ fn only_inboxes_wrap() {
 
 #[test]
 fn full_width_inbox() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     for (width, test_case_name) in [(99., "smaller"), (100., "exact"), (101., "larger")] {
         let text = "ABC";
@@ -99,7 +101,7 @@ fn full_width_inbox() {
 
 #[test]
 fn inbox_separated_by_whitespace() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     let mut builder = env.tree_builder();
     builder.push_inline_box(InlineBox {
@@ -137,7 +139,7 @@ fn inbox_separated_by_whitespace() {
 
 #[test]
 fn trailing_whitespace() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     let text = "AAA BBB";
     let mut builder = env.ranged_builder(text);
@@ -155,7 +157,7 @@ fn trailing_whitespace() {
 
 #[test]
 fn leading_whitespace() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     for (mode, test_case_name) in [
         (WhiteSpaceCollapse::Preserve, "preserve"),
@@ -179,7 +181,7 @@ fn leading_whitespace() {
 
 #[test]
 fn base_level_alignment_ltr() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     for (alignment, test_case_name) in [
         (Alignment::Start, "start"),
@@ -198,7 +200,7 @@ fn base_level_alignment_ltr() {
 
 #[test]
 fn base_level_alignment_rtl() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     for (alignment, test_case_name) in [
         (Alignment::Start, "start"),
@@ -219,7 +221,7 @@ fn base_level_alignment_rtl() {
 /// On overflow without alignment-on-overflow, RTL-text should be start-aligned (i.e., aligned to
 /// the right edge, overflowing on the left).
 fn overflow_alignment_rtl() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     let text = "عند برمجة أجهزة الكمبيوتر، قد تجد نفسك فجأة في مواقف غريبة، مثل الكتابة بلغة لا تتحدثها فعليًا.";
     let mut builder = env.ranged_builder(text);
@@ -232,7 +234,7 @@ fn overflow_alignment_rtl() {
 
 #[test]
 fn content_widths() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     let text = "Hello world!\nLonger line with a looooooooong word.";
     let mut builder = env.ranged_builder(text);
@@ -250,7 +252,7 @@ fn content_widths() {
 
 #[test]
 fn content_widths_rtl() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     let text = "بببب ااااا";
     let mut builder = env.ranged_builder(text);
@@ -272,7 +274,7 @@ fn content_widths_rtl() {
 
 #[test]
 fn inbox_content_width() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     {
         let text = "Hello world!";
@@ -316,7 +318,7 @@ fn inbox_content_width() {
 #[test]
 /// Layouts can be re-line-breaked and re-aligned.
 fn realign() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     let text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
     let mut builder = env.ranged_builder(text);
@@ -340,7 +342,7 @@ fn realign() {
 ///
 /// Rendering 684 snapshots takes over 10 seconds on a 5950X, so a simpler assert is used instead.
 fn realign_all() {
-    let mut env = testenv!();
+    let mut env = TestEnv::new(test_name!(), None);
 
     let latin = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
     let arabic = "عند برمجة أجهزة الكمبيوتر، قد تجد نفسك فجأة في مواقف غريبة، مثل الكتابة بلغة لا تتحدثها فعليًا.";

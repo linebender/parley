@@ -37,3 +37,7 @@ The following command shows snapshots that are not used in any test. The command
 cargo xtask dead-snapshots 
 ```
 
+## Matching Chrome in line height calculations
+
+The `lines.html` file can be used to generate images roughly similar to the ones in `test_lines.rs`.
+It can be used to verify existing test goals or to create additional tests.
