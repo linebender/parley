@@ -51,6 +51,7 @@ For an easy upgrade we recommend enabling it by setting `quantize` to `true` whe
 - Fix text editing for layouts which contain inline boxes ([#299][] by [@valadaptive][])
 - Fix cursor navigation in RTL text sometimes getting stuck within a line ([#331][] by [@valadaptive][])
 - Using `Layout::align` on an aligned layout without breaking lines again. ([#342][] by [@xStrom][])
+- Selection box height going below ascent + descent with small line heights. ([#344][] by [@xStrom])
 - Rounding error accumulation of vertical layout metrics. ([#344][] by [@xStrom])
 
 ## [0.3.0] - 2025-02-27
