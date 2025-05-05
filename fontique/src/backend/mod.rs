@@ -31,14 +31,21 @@ use super::{
 #[allow(unused_imports)]
 use super::source::SourcePathMap;
 
-#[cfg(feature = "system")]
 pub(crate) use system::SystemFonts;
 
-#[cfg(not(feature = "system"))]
-pub(crate) use null_backend::SystemFonts;
-
-#[cfg(not(feature = "system"))]
-mod null_backend {
+// Dummy system font backend for targets like wasm32-unknown-unknown
+#[cfg(any(
+    not(feature = "system"),
+    not(any(
+        target_os = "windows",
+        target_os = "linux",
+        target_os = "android",
+        target_vendor = "apple"
+    ))
+))]
+mod system {
+    #[cfg(feature = "system")]
+    use super::{FallbackKey, FamilyId, FamilyInfo};
     use super::{FamilyNameMap, GenericFamilyMap};
     use alloc::sync::Arc;
 
@@ -51,6 +58,16 @@ mod null_backend {
     impl SystemFonts {
         pub(crate) fn new() -> Self {
             Self::default()
+        }
+
+        #[cfg(feature = "system")]
+        pub(crate) fn family(&mut self, _id: FamilyId) -> Option<FamilyInfo> {
+            None
+        }
+
+        #[cfg(feature = "system")]
+        pub(crate) fn fallback(&mut self, _key: impl Into<FallbackKey>) -> Option<FamilyId> {
+            None
         }
     }
 }
