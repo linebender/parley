@@ -8,20 +8,20 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-vello = "0.4.0"
-anyhow = "1.0.96"
+vello = "0.4.1"
+anyhow = "1.0.98"
 pollster = "0.4.0"
-winit = "0.30.9"
+winit = "0.30.10"
 parley = { workspace = true, default-features = true, features = ["accesskit"] }
 peniko = { workspace = true }
 accesskit = { workspace = true }
-accesskit_winit = "0.24"
+accesskit_winit = "0.27.0"
 
 [lints]
 workspace = true
 
 [target.'cfg(target_os = "android")'.dependencies]
-winit = { version = "0.30.9", features = ["android-native-activity"] }
+winit = { version = "0.30.10", features = ["android-native-activity"] }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 clipboard-rs = "0.2.4"
