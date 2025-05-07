@@ -13,6 +13,8 @@ You can find its changes [documented below](#040---2025-05-08).
 
 ## [Unreleased]
 
+This release has an [MSRV] of 1.82.
+
 ### Added
 
 ### Changed
