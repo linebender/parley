@@ -114,6 +114,7 @@ where
     show_cursor: bool,
     width: Option<f32>,
     scale: f32,
+    quantize: bool,
     // Simple tracking of when the layout needs to be updated
     // before it can be used for `Selection` calculations or
     // for drawing.
@@ -145,6 +146,7 @@ where
             show_cursor: true,
             width: None,
             scale: 1.0,
+            quantize: true,
             layout_dirty: true,
             alignment: Alignment::Start,
             // We don't use the `default` value to start with, as our consumers
@@ -904,6 +906,30 @@ where
         self.layout_dirty = true;
     }
 
+    /// Set whether to quantize the layout coordinates.
+    ///
+    /// Set `quantize` as `true` to have the layout coordinates aligned to pixel boundaries.
+    /// That is the easiest way to avoid blurry text and to receive ready-to-paint layout metrics.
+    ///
+    /// For advanced rendering use cases you can set `quantize` as `false` and receive
+    /// fractional coordinates. This ensures the most accurate results if you want to perform
+    /// some post-processing on the coordinates before painting. To avoid blurry text you will
+    /// still need to quantize the coordinates just before painting.
+    ///
+    /// Your should round at least the following:
+    /// * Glyph run baseline
+    /// * Inline box baseline
+    ///   - `box.y = (box.y + box.height).round() - box.height`
+    /// * Selection geometry's `y0` & `y1`
+    /// * Cursor geometry's `y0` & `y1`
+    ///
+    /// Keep in mind that for the simple `f32::round` to be effective,
+    /// you need to first ensure the coordinates are in physical pixel space.
+    pub fn set_quantize(&mut self, quantize: bool) {
+        self.quantize = quantize;
+        self.layout_dirty = true;
+    }
+
     /// Modify the styles provided for this editor.
     pub fn edit_styles(&mut self) -> &mut StyleSet<T> {
         self.layout_dirty = true;
@@ -1057,7 +1083,8 @@ where
     }
     /// Update the layout.
     fn update_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
-        let mut builder = layout_cx.ranged_builder(font_cx, &self.buffer, self.scale);
+        let mut builder =
+            layout_cx.ranged_builder(font_cx, &self.buffer, self.scale, self.quantize);
         for prop in self.default_style.inner().values() {
             builder.push_default(prop.to_owned());
         }

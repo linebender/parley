@@ -15,12 +15,18 @@ You can find its changes [documented below](#030---2025-02-27).
 
 This release has an [MSRV] of 1.82.
 
+### Migration
+
+Quantization of vertical layout metrics is now optional.
+For an easy upgrade we recommend enabling it by setting `quantize` to `true` when calling [`LayoutContext::ranged_builder`](https://docs.rs/parley/0.4.0/parley/struct.LayoutContext.html#method.ranged_builder) or [`LayoutContext::tree_builder`](https://docs.rs/parley/0.4.0/parley/struct.LayoutContext.html#method.tree_builder).
+
 ### Added
 
 #### Parley
 
 - `PlainEditor::selection_geometry_with`, the equivalent of `Selection::geometry_with` method
 - The `WordBreak` and `OverflowWrap` style properties for controlling line wrapping. ([#315][] by [@valadaptive][])
+- Option to skip quantization of vertical layout metrics for advanced rendering use cases. ([#297][] by [@valadaptive][], [#344][] by [@xStrom])
 
 ### Changed
 
@@ -45,6 +51,8 @@ This release has an [MSRV] of 1.82.
 - Fix text editing for layouts which contain inline boxes ([#299][] by [@valadaptive][])
 - Fix cursor navigation in RTL text sometimes getting stuck within a line ([#331][] by [@valadaptive][])
 - Using `Layout::align` on an aligned layout without breaking lines again. ([#342][] by [@xStrom][])
+- Selection box height going below ascent + descent with small line heights. ([#344][] by [@xStrom])
+- Rounding error accumulation of vertical layout metrics. ([#344][] by [@xStrom])
 
 ## [0.3.0] - 2025-02-27
 
@@ -227,6 +235,7 @@ This release has an [MSRV] of 1.70.
 [#280]: https://github.com/linebender/parley/pull/280
 [#294]: https://github.com/linebender/parley/pull/294
 [#296]: https://github.com/linebender/parley/pull/296
+[#297]: https://github.com/linebender/parley/pull/297
 [#299]: https://github.com/linebender/parley/pull/299
 [#300]: https://github.com/linebender/parley/pull/300
 [#306]: https://github.com/linebender/parley/pull/306
@@ -235,6 +244,7 @@ This release has an [MSRV] of 1.70.
 [#318]: https://github.com/linebender/parley/pull/318
 [#331]: https://github.com/linebender/parley/pull/331
 [#342]: https://github.com/linebender/parley/pull/342
+[#344]: https://github.com/linebender/parley/pull/344
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/linebender/parley/releases/tag/v0.3.0

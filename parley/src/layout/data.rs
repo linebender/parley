@@ -197,6 +197,7 @@ pub(crate) struct LayoutItem {
 #[derive(Clone)]
 pub(crate) struct LayoutData<B: Brush> {
     pub(crate) scale: f32,
+    pub(crate) quantize: bool,
     pub(crate) has_bidi: bool,
     pub(crate) base_level: u8,
     pub(crate) text_len: usize,
@@ -234,6 +235,7 @@ impl<B: Brush> Default for LayoutData<B> {
     fn default() -> Self {
         Self {
             scale: 1.,
+            quantize: true,
             has_bidi: false,
             base_level: 0,
             text_len: 0,
@@ -260,6 +262,7 @@ impl<B: Brush> Default for LayoutData<B> {
 impl<B: Brush> LayoutData<B> {
     pub(crate) fn clear(&mut self) {
         self.scale = 1.;
+        self.quantize = true;
         self.has_bidi = false;
         self.base_level = 0;
         self.text_len = 0;

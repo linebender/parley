@@ -44,7 +44,8 @@ pub(crate) struct RenderingConfig {
     pub padding_color: Color,
     pub inline_box_color: Color,
     pub cursor_color: Color,
-    pub selection_color: Color,
+    /// The selection color is chosen based on line index.
+    pub selection_colors: [Color; 2],
 
     /// The width of the pixmap in pixels, excluding padding.
     pub size: Option<kurbo::Size>,
@@ -96,14 +97,14 @@ pub(crate) fn render_layout(
         config.background_color,
     );
 
-    for (rect, _) in selection_rects {
+    for (rect, lidx) in selection_rects {
         draw_rect(
             &mut pen,
             fpadding + rect.x0 as f32,
             fpadding + rect.y0 as f32,
             rect.width() as f32,
             rect.height() as f32,
-            config.selection_color,
+            config.selection_colors[lidx % 2],
         );
     }
 

@@ -500,7 +500,7 @@ mod tests {
         // TODO: Use a test font
         let mut font_ctx = FontContext::new();
         let text = "Parley exists";
-        let mut builder = layout_ctx.ranged_builder(&mut font_ctx, text, 1.0);
+        let mut builder = layout_ctx.ranged_builder(&mut font_ctx, text, 1.0, true);
         builder.push_default(StyleProperty::FontSize(10.));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);

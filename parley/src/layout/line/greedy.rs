@@ -419,6 +419,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
     /// Consumes the line breaker and finalizes all line computations.
     pub fn finish(mut self) {
+        // Whether metrics should be quantized to pixel boundaries
+        let quantize = self.layout.data.quantize;
         // For each run (item which is a text run):
         //   - Determine if it consists entirely of whitespace (is_whitespace property)
         //   - Determine if it has trailing whitespace (has_trailing_whitespace property)
@@ -454,7 +456,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 }
             }
         }
-        let mut y = 0.;
+        let mut y: f64 = 0.; // f32 causes test failures due to accumulated error
         let mut prev_line_metrics = None;
         for line in &mut self.lines.lines {
             // Reset metrics for line
@@ -605,13 +607,41 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             line.metrics.leading =
                 line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
 
-            // Compute
-            let above = line.metrics.ascent + line.metrics.leading * 0.5;
-            let below = line.metrics.descent + line.metrics.leading * 0.5;
-            line.metrics.min_coord = y;
-            line.metrics.baseline = y + above;
-            y = line.metrics.baseline + below;
-            line.metrics.max_coord = y;
+            let (ascent, descent) = if quantize {
+                // We mimic Chrome in rounding ascent and descent separately,
+                // before calculating the rest.
+                // See lines_integral_line_height_ascent_descent_rounding() for more details.
+                (line.metrics.ascent.round(), line.metrics.descent.round())
+            } else {
+                (line.metrics.ascent, line.metrics.descent)
+            };
+
+            let (leading_above, leading_below) = if quantize {
+                // Calculate leading using the rounded ascent and descent.
+                let leading = line.metrics.line_height - (ascent + descent);
+                // We mimic Chrome in giving 'below' the larger leading half.
+                // Although the comment in Chromium's NGLineHeightMetrics::AddLeading function
+                // in ng_line_height_metrics.cc claims it's for legacy test compatibility.
+                // So we might want to think about giving 'above' the larger half instead.
+                let above = (leading * 0.5).floor();
+                let below = leading.round() - above;
+                (above, below)
+            } else {
+                (line.metrics.leading * 0.5, line.metrics.leading * 0.5)
+            };
+
+            line.metrics.baseline =
+                ascent + leading_above + if quantize { y.round() as f32 } else { y as f32 };
+
+            // Small line heights will cause leading to be negative.
+            // Negative leadings are correct for baseline calculation, but not for min/max coords.
+            // We clamp leading to zero for the purposes of min/max coords,
+            // which in turn clamps the selection box minimum height to ascent + descent.
+            line.metrics.min_coord = line.metrics.baseline - ascent - leading_above.max(0.);
+            line.metrics.max_coord = line.metrics.baseline + descent + leading_below.max(0.);
+
+            y += line.metrics.line_height as f64;
+
             prev_line_metrics = Some(line.metrics);
         }
         if self.layout.data.text_len == 0 {
@@ -629,17 +659,17 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
         // The "width" excludes trailing whitespace. The "full_width" includes it.
         let mut width = 0_f32;
         let mut full_width = 0_f32;
-        let mut height = 0_f32;
+        let mut height = 0_f64; // f32 causes test failures due to accumulated error
         for line in &self.lines.lines {
             width = width.max(line.metrics.advance - line.metrics.trailing_whitespace);
             full_width = full_width.max(line.metrics.advance);
-            height = height.max(line.metrics.max_coord);
+            height += line.metrics.line_height as f64;
         }
 
         // Save the computed widths/height to the layout
         self.layout.data.width = width;
         self.layout.data.full_width = full_width;
-        self.layout.data.height = height;
+        self.layout.data.height = height as f32;
 
         // for (i, line) in self.lines.lines.iter().enumerate() {
         //     println!("LINE {i}");
