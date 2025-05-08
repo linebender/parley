@@ -26,7 +26,7 @@ parley = { version = "0.3.0", default-features = false, path = "parley" }
 peniko = { version = "0.4.0", default-features = false }
 skrifa = { version = "0.31.0", default-features = false }
 read-fonts = { version = "0.29.0", default-features = false }
-swash = { version = "0.2.2", default-features = false }
+swash = { version = "0.2.4", default-features = false }
 
 [workspace.lints]
 rust.unsafe_code = "deny"
