@@ -3589,6 +3589,7 @@ dependencies = [
  "peniko 0.4.0",
  "pollster",
  "vello",
+ "web-time",
  "winit",
 ]
 

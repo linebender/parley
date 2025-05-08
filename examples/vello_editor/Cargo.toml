@@ -25,3 +25,6 @@ winit = { version = "0.30.10", features = ["android-native-activity"] }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 clipboard-rs = "0.2.4"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-time = "1.1.0"

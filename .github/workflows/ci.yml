@@ -14,6 +14,10 @@ env:
   RUST_MIN_VER_PKGS: "-p parley -p fontique"
   # List of features that depend on the standard library and will be excluded from no_std checks.
   FEATURES_DEPENDING_ON_STD: "std,default,system"
+  # List of packages that can not target Wasm.
+  NO_WASM_PKGS: "--exclude xtask"
+  # List of packages that can not target Android.
+  NO_ANDROID_PKGS: "--exclude xtask"
 
 
 # Rationale
@@ -98,7 +102,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ windows-latest, macos-latest, ubuntu-latest ]
+        os: [windows-latest, macos-latest, ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -128,12 +132,41 @@ jobs:
       - name: cargo clippy (auxiliary)
         run: cargo hack clippy --workspace --locked --optional-deps --each-feature --ignore-unknown-features --features std --tests --benches --examples -- -D warnings
 
+  clippy-stable-wasm:
+    name: cargo clippy (wasm32)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install stable toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_STABLE_VER }}
+          targets: wasm32-unknown-unknown
+          components: clippy
+
+      - name: install cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
+
+      - name: restore cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name != 'merge_group' }}
+
+      - name: cargo clippy
+        run: cargo hack clippy --workspace ${{ env.NO_WASM_PKGS }} --locked --target wasm32-unknown-unknown --optional-deps --each-feature --ignore-unknown-features --features std -- -D warnings
+
+      - name: cargo clippy (auxiliary)
+        run: cargo hack clippy --workspace ${{ env.NO_WASM_PKGS }} --locked --target wasm32-unknown-unknown --optional-deps --each-feature --ignore-unknown-features --features std --tests --benches --examples -- -D warnings
+
   clippy-stable-android:
     name: cargo clippy (android)
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [ armv7-linux-androideabi, aarch64-linux-android, x86_64-linux-android ]
+        target: [armv7-linux-androideabi, aarch64-linux-android, x86_64-linux-android]
     steps:
       - uses: actions/checkout@v4
 
@@ -155,10 +188,10 @@ jobs:
           save-if: ${{ github.event_name != 'merge_group' }}
 
       - name: cargo clippy
-        run: cargo hack clippy --workspace --exclude xtask --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std -- -D warnings
+        run: cargo hack clippy --workspace ${{ env.NO_ANDROID_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std -- -D warnings
 
       - name: cargo clippy (auxiliary)
-        run: cargo hack clippy --workspace --exclude xtask --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std --tests --benches --examples -- -D warnings
+        run: cargo hack clippy --workspace ${{ env.NO_ANDROID_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std --tests --benches --examples -- -D warnings
 
   prime-lfs-cache:
     name: Prime LFS Cache
@@ -188,7 +221,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ windows-latest, macos-latest, ubuntu-latest ]
+        os: [windows-latest, macos-latest, ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
         # We intentionally do not use lfs: true here, instead using the caching method to save LFS bandwidth.
@@ -225,19 +258,40 @@ jobs:
         run: cargo nextest run --workspace --locked --all-features --no-fail-fast
           # env:
           # Although GitHub's LFS limits are very low, we don't expect to run out of bandwidth.
-        # However, if we do, the tests are designed to be robust against that, if this environment variable is set.
-        # If we do run out of bandwidth, uncomment both `# env:` above and the following line, and inform @DJMcNab.
-        # PARLEY_IGNORE_DECODING_ERRORS: 1
+          # However, if we do, the tests are designed to be robust against that, if this environment variable is set.
+          # If we do run out of bandwidth, uncomment both `# env:` above and the following line, and inform @DJMcNab.
+          # PARLEY_IGNORE_DECODING_ERRORS: 1
 
       - name: cargo test --doc
         run: cargo test --doc --workspace --locked --all-features --no-fail-fast
+
+  test-stable-wasm:
+    name: cargo test (wasm32)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install stable toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_STABLE_VER }}
+          targets: wasm32-unknown-unknown
+
+      - name: restore cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name != 'merge_group' }}
+
+      # TODO: Find a way to make tests work. Until then the tests are merely compiled.
+      - name: cargo test compile
+        run: cargo test --workspace ${{ env.NO_WASM_PKGS }} --locked --target wasm32-unknown-unknown --all-features --no-run
 
   check-msrv:
     name: cargo check (msrv)
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ windows-latest, macos-latest, ubuntu-latest ]
+        os: [windows-latest, macos-latest, ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -263,12 +317,37 @@ jobs:
       - name: cargo check
         run: cargo hack check ${{ env.RUST_MIN_VER_PKGS }} --locked --optional-deps --each-feature --ignore-unknown-features --features std
 
+  check-msrv-wasm:
+    name: cargo check (msrv) (wasm32)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install msrv toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_MIN_VER }}
+          targets: wasm32-unknown-unknown
+
+      - name: install cargo-hack
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-hack
+
+      - name: restore cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name != 'merge_group' }}
+
+      - name: cargo check
+        run: cargo hack check ${{ env.RUST_MIN_VER_PKGS }} ${{ env.NO_WASM_PKGS }} --locked --target wasm32-unknown-unknown --optional-deps --each-feature --ignore-unknown-features --features std
+
   check-msrv-android:
     name: cargo check (msrv) (android)
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        target: [ armv7-linux-androideabi, aarch64-linux-android, x86_64-linux-android ]
+        target: [armv7-linux-androideabi, aarch64-linux-android, x86_64-linux-android]
     steps:
       - uses: actions/checkout@v4
 
@@ -289,14 +368,14 @@ jobs:
           save-if: ${{ github.event_name != 'merge_group' }}
 
       - name: cargo check
-        run: cargo hack check --workspace --exclude xtask ${{ env.RUST_MIN_VER_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std
+        run: cargo hack check ${{ env.RUST_MIN_VER_PKGS }} ${{ env.NO_ANDROID_PKGS }} --locked --target ${{ matrix.target }} --optional-deps --each-feature --ignore-unknown-features --features std
 
   doc:
     name: cargo doc
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ windows-latest, macos-latest, ubuntu-latest ]
+        os: [windows-latest, macos-latest, ubuntu-latest]
     steps:
       - uses: actions/checkout@v4
 
