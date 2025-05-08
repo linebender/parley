@@ -34,7 +34,7 @@ For an easy upgrade we recommend enabling it by setting `quantize` to `true` whe
 
 #### Parley
 
-- Option to skip quantization of vertical layout metrics for advanced rendering use cases. ([#297][] by [@valadaptive][], [#344][] by [@xStrom])
+- Option to skip quantization of vertical layout metrics for advanced rendering use cases. ([#297][] by [@valadaptive][], [#344][] by [@xStrom][])
 - The `WordBreak` and `OverflowWrap` style properties for controlling line wrapping. ([#315][] by [@valadaptive][])
 - `PlainEditor` methods `raw_selection` and `raw_text`. ([#316][], [#317][] by [@mwcampbell][])
 - `PlainEditor::selection_geometry_with`, the equivalent of `Selection::geometry_with` method. ([#318][] by [@valadaptive][])
@@ -45,7 +45,7 @@ For an easy upgrade we recommend enabling it by setting `quantize` to `true` whe
 #### Parley
 
 - Breaking change: `Selection::geometry`, `Selection::geometry_with`, and `PlainEditor::selection_geometry` now include the line indices that the selection rectangles belong to. ([#318][] by [@valadaptive][])
-- Updated to `accesskit` 0.18. ([#294][] by [@waywardmonkeys][]))
+- Updated to `accesskit` 0.19. ([#294][] by [@waywardmonkeys][], [#348][] by [@xStrom][])
 - Now displaying selected newlines as whitespace in the selection highlight. ([#296][] by [@valadaptive][])
 - Made `BreakReason` public. ([#300][] by [@valadaptive][])
 
@@ -61,8 +61,8 @@ For an easy upgrade we recommend enabling it by setting `quantize` to `true` whe
 - Text editing for layouts which contain inline boxes. ([#299][] by [@valadaptive][])
 - Cursor navigation in RTL text sometimes getting stuck within a line. ([#331][] by [@valadaptive][])
 - Using `Layout::align` on an aligned layout without breaking lines again. ([#342][] by [@xStrom][])
-- Selection box height going below ascent + descent with small line heights. ([#344][] by [@xStrom])
-- Rounding error accumulation of vertical layout metrics. ([#344][] by [@xStrom])
+- Selection box height going below ascent + descent with small line heights. ([#344][] by [@xStrom][])
+- Rounding error accumulation of vertical layout metrics. ([#344][] by [@xStrom][])
 
 #### Fontique
 
@@ -94,15 +94,15 @@ This release has an [MSRV] of 1.82.
 
 #### Parley
 
-- Breaking change: The cursor API has been completely reworked. ([#170][] by [@dfrg])
+- Breaking change: The cursor API has been completely reworked. ([#170][] by [@dfrg][])
 - Breaking change: `PlainEditor`s API is now method-based rather than enum based. ([#154][] by [@mwcampbell][])
 - Breaking change: `PlainEditor`'s semantics are no longer transactional. ([#192][] by [@DJMcNab][])
 - Breaking change: `Alignment::Start` and `Alignment::End` now depend on text base direction.
   `Alignment::Left` and `Alignment::Right` are introduced for text direction-independent alignment. ([#250][] by [@tomcur][])
 - Breaking change: `Layout` is no longer `Sync`. ([#259][] by [@wfdewith][])
-- Breaking change: `PlainEditor`'s width is now `Option<f32>` rather than `f32`. ([#137][] by [@nicoburns])
-- Breaking change: Make alignment when free space is negative configurable. ([#241][] by [@nicoburns])
-- Allow Bidi `base_level` to be determined from text. ([#245][] by [@tomcur])
+- Breaking change: `PlainEditor`'s width is now `Option<f32>` rather than `f32`. ([#137][] by [@nicoburns][])
+- Breaking change: Make alignment when free space is negative configurable. ([#241][] by [@nicoburns][])
+- Allow Bidi `base_level` to be determined from text. ([#245][] by [@tomcur][])
 
 #### Fontique
 
@@ -116,22 +116,22 @@ This release has an [MSRV] of 1.82.
 - Alignment of right-to-left text. ([#250][], [#268][] by [@tomcur][])
 - Performing line breaking or aligning a layout again, after justified alignment had been applied previously. ([#271][] by [@tomcur][])
 - Placement of inline boxes. ([#163][] by [@spirali][])
-- Cursor position for lines that are not left-aligned. ([#169][] by [@mwcampbell])
-- `Cursor::from_point` not using the line's offset. ([#176][] by [@DJMcNab])
-- Off-by-one error in `PlainEditor::cursor_at`. ([#187][] by [@tomcur])
-- Binary search in `Layout::line_for_offset`. ([#188][] by [@tomcur])
-- Whitespace collapsing at the start of inline spans. ([#191][] by [@nicoburns])
-- Collapsing selection. ([#201][] by [@tomcur])
-- Affinities not being ignored in `Selection::is_collapsed`. ([#202][] by [@tomcur])
-- Misc. inline box layout issues. ([#207][] by [@nicoburns])
-- Linebreaking for lines without text runs. ([#249][] by [@wfdewith])
-- Calculating trailing whitespace for all lines. ([#256][] by [@wfdewith])
-- Strip whitespace following a newline when whitespace collapsing is enabled. ([#254][] by [@nicoburns])
-- Account for inline boxes when collapsing whitespace after newlines. ([#280][] by [@nicoburns])
+- Cursor position for lines that are not left-aligned. ([#169][] by [@mwcampbell][])
+- `Cursor::from_point` not using the line's offset. ([#176][] by [@DJMcNab][])
+- Off-by-one error in `PlainEditor::cursor_at`. ([#187][] by [@tomcur][])
+- Binary search in `Layout::line_for_offset`. ([#188][] by [@tomcur][])
+- Whitespace collapsing at the start of inline spans. ([#191][] by [@nicoburns][])
+- Collapsing selection. ([#201][] by [@tomcur][])
+- Affinities not being ignored in `Selection::is_collapsed`. ([#202][] by [@tomcur][])
+- Misc. inline box layout issues. ([#207][] by [@nicoburns][])
+- Linebreaking for lines without text runs. ([#249][] by [@wfdewith][])
+- Calculating trailing whitespace for all lines. ([#256][] by [@wfdewith][])
+- Strip whitespace following a newline when whitespace collapsing is enabled. ([#254][] by [@nicoburns][])
+- Account for inline boxes when collapsing whitespace after newlines. ([#280][] by [@nicoburns][])
 
 #### Fontique
 
-- Skip adding font family as fallback if it has zero coverage for given script. ([#182][] by [@richardhozak]
+- Skip adding font family as fallback if it has zero coverage for given script. ([#182][] by [@richardhozak][])
 
 ## [0.2.0] - 2024-10-10
 
@@ -141,46 +141,46 @@ This release has an [MSRV] of 1.75.
 
 #### Parley
 
-- Example using `tiny-skia` which renders into a PNG. ([#55] by [@nicoburns])
+- Example using `tiny-skia` which renders into a PNG. ([#55][] by [@nicoburns][])
     - Breaking change: There is now a blanket implementation for `Brush`.
-- A Swash example which renders into a PNG. ([#54] by [@nicoburns])
-- An example with Vello on Winit which shows a basic text editor .([#106] by [@dfrg])
-- `PlainEditor`, a basic action-based text editor based on Parley `Selection` and `Cursor`. ([#126] by [@xorgy])
-- Tree style builder. ([#76] by [@nicoburns])
-- Conversions for `FontFamily`, `FontStack`, and `StyleProperty` to make styling more ergonomic. ([#129] by [@xorgy])
+- A Swash example which renders into a PNG. ([#54][] by [@nicoburns][])
+- An example with Vello on Winit which shows a basic text editor .([#106][] by [@dfrg][])
+- `PlainEditor`, a basic action-based text editor based on Parley `Selection` and `Cursor`. ([#126][] by [@xorgy][])
+- Tree style builder. ([#76][] by [@nicoburns][])
+- Conversions for `FontFamily`, `FontStack`, and `StyleProperty` to make styling more ergonomic. ([#129][] by [@xorgy][])
 
 ### Changed
 
 #### General
 
-- Repository layout updated to match Linebender standard. ([#59] by [@waywardmonkeys])
+- Repository layout updated to match Linebender standard. ([#59][] by [@waywardmonkeys][])
 
 #### Parley
 
-- Emoji clusters now get an Emoji family added by default. ([#56] by [@dfrg])
-- Style builders now accept `Into<StyleProperty<'a, B: Brush>>` so you can push a `GenericFamily` or `FontStack` directly. ([#129] by [@xorgy])
+- Emoji clusters now get an Emoji family added by default. ([#56][] by [@dfrg][])
+- Style builders now accept `Into<StyleProperty<'a, B: Brush>>` so you can push a `GenericFamily` or `FontStack` directly. ([#129][] by [@xorgy][])
 
 #### Fontique
 
-- Removed unsafe code from fontconfig cache. ([#78] by [@waywardmonkeys])
-- Switched to `windows-rs` for `dwrite` backend. ([#85] by [@dfrg])
+- Removed unsafe code from fontconfig cache. ([#78][] by [@waywardmonkeys][])
+- Switched to `windows-rs` for `dwrite` backend. ([#85][] by [@dfrg][])
 
 ### Fixed
 
 #### Fontique
 
-- Search correct paths for fonts on Apple platforms. ([#71] by [@waywardmonkeys])
+- Search correct paths for fonts on Apple platforms. ([#71][] by [@waywardmonkeys][])
 
 ### Removed
 
 #### Fontique
 
-- Breaking change: removed conversion to/from `icu_properties::Script` for `fontique::Script`. ([#72] by [@waywardmonkeys])
+- Breaking change: removed conversion to/from `icu_properties::Script` for `fontique::Script`. ([#72][] by [@waywardmonkeys][])
     - This can be restored by using the `icu_properties` feature of `fontique`.
 
 ## [0.1.0] - 2024-05-01
 
-This release has an [MSRV] of 1.70.
+This release has an [MSRV][] of 1.70.
 
 - Initial release
 
@@ -264,6 +264,7 @@ This release has an [MSRV] of 1.70.
 [#335]: https://github.com/linebender/parley/pull/335
 [#342]: https://github.com/linebender/parley/pull/342
 [#344]: https://github.com/linebender/parley/pull/344
+[#348]: https://github.com/linebender/parley/pull/348
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/linebender/parley/releases/tag/v0.4.0
