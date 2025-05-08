@@ -1,10 +1,15 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
+
 use accesskit::{Node, TreeUpdate};
 use core::default::Default;
 use parley::{GenericFamily, StyleProperty, editor::SplitString, layout::PositionedLayoutItem};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use vello::{
     Scene,
     kurbo::{Affine, Line, Stroke},
