@@ -17,6 +17,10 @@ This release has an [MSRV] of 1.82.
 
 ### Added
 
+#### Parley
+
+- Editor features required by Android IME. ([#334][] by [@mwcampbell][]
+
 ### Changed
 
 ### Fixed
@@ -261,6 +265,7 @@ This release has an [MSRV][] of 1.70.
 [#318]: https://github.com/linebender/parley/pull/318
 [#319]: https://github.com/linebender/parley/pull/319
 [#331]: https://github.com/linebender/parley/pull/331
+[#334]: https://github.com/linebender/parley/pull/334
 [#335]: https://github.com/linebender/parley/pull/335
 [#342]: https://github.com/linebender/parley/pull/342
 [#344]: https://github.com/linebender/parley/pull/344
