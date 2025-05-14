@@ -98,6 +98,9 @@ impl<B: Brush> Layout<B> {
 
     /// Calculates the lower and upper bounds on the width of the layout. These
     /// are recalculated every time this method is called.
+    ///
+    /// This method currently may not return the correct results for
+    /// mixed-direction text.
     pub fn calculate_content_widths(&self) -> ContentWidths {
         self.data.calculate_content_widths()
     }
