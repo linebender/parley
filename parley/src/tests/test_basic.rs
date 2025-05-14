@@ -5,7 +5,8 @@ use peniko::kurbo::Size;
 
 use crate::data::LayoutData;
 use crate::{
-    Alignment, AlignmentOptions, Brush, ContentWidths, InlineBox, WhiteSpaceCollapse, test_name,
+    Alignment, AlignmentOptions, Brush, ContentWidths, InlineBox, Layout, WhiteSpaceCollapse,
+    test_name,
 };
 
 use super::utils::TestEnv;
@@ -452,6 +453,12 @@ fn realign_all() {
             }
         }
     }
+}
+
+#[test]
+fn layout_impl_send_sync() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<Layout<()>>();
 }
 
 /// Assert that the two provided layouts are equal in terms of alignment metrics.
