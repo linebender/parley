@@ -96,21 +96,13 @@ impl<B: Brush> Layout<B> {
         self.data.full_width
     }
 
-    /// Returns the lower and upper bounds on the width of the layout.
-    pub fn content_widths(&self) -> ContentWidths {
-        self.data.content_widths()
-    }
-
-    /// Returns the minimum content width of the layout. This is the width of the layout if _all_
-    /// soft line-breaking opportunities are taken.
-    pub fn min_content_width(&self) -> f32 {
-        self.data.content_widths().min
-    }
-
-    /// Returns the maximum content width of the layout. This is the width of the layout if _no_
-    /// soft line-breaking opportunities are taken.
-    pub fn max_content_width(&self) -> f32 {
-        self.data.content_widths().max
+    /// Calculates the lower and upper bounds on the width of the layout. These
+    /// are recalculated every time this method is called.
+    ///
+    /// This method currently may not return the correct results for
+    /// mixed-direction text.
+    pub fn calculate_content_widths(&self) -> ContentWidths {
+        self.data.calculate_content_widths()
     }
 
     /// Returns the height of the layout.

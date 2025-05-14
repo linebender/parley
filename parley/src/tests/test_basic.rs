@@ -4,7 +4,10 @@
 use peniko::kurbo::Size;
 
 use crate::data::LayoutData;
-use crate::{Alignment, AlignmentOptions, Brush, InlineBox, WhiteSpaceCollapse, test_name};
+use crate::{
+    Alignment, AlignmentOptions, Brush, ContentWidths, InlineBox, Layout, WhiteSpaceCollapse,
+    test_name,
+};
 
 use super::utils::TestEnv;
 
@@ -241,11 +244,16 @@ fn content_widths() {
 
     let mut layout = builder.build(text);
 
-    layout.break_all_lines(Some(layout.min_content_width()));
+    let ContentWidths {
+        min: min_content_width,
+        max: max_content_width,
+    } = layout.calculate_content_widths();
+
+    layout.break_all_lines(Some(min_content_width));
     layout.align(None, Alignment::Start, AlignmentOptions::default());
     env.with_name("min").check_layout_snapshot(&layout);
 
-    layout.break_all_lines(Some(layout.max_content_width()));
+    layout.break_all_lines(Some(max_content_width));
     layout.align(None, Alignment::Start, AlignmentOptions::default());
     env.with_name("max").check_layout_snapshot(&layout);
 }
@@ -259,14 +267,19 @@ fn content_widths_rtl() {
 
     let mut layout = builder.build(text);
 
-    layout.break_all_lines(Some(layout.min_content_width()));
+    let ContentWidths {
+        min: min_content_width,
+        max: max_content_width,
+    } = layout.calculate_content_widths();
+
+    layout.break_all_lines(Some(min_content_width));
     layout.align(None, Alignment::Start, AlignmentOptions::default());
     env.with_name("min").check_layout_snapshot(&layout);
 
-    layout.break_all_lines(Some(layout.max_content_width()));
+    layout.break_all_lines(Some(max_content_width));
     layout.align(None, Alignment::Start, AlignmentOptions::default());
     assert!(
-        layout.width() <= layout.max_content_width(),
+        layout.width() <= max_content_width,
         "Layout should never be wider than the max content width"
     );
     env.with_name("max").check_layout_snapshot(&layout);
@@ -286,7 +299,11 @@ fn inbox_content_width() {
             height: 10.0,
         });
         let mut layout = builder.build(text);
-        layout.break_all_lines(Some(layout.min_content_width()));
+        let ContentWidths {
+            min: min_content_width,
+            ..
+        } = layout.calculate_content_widths();
+        layout.break_all_lines(Some(min_content_width));
         layout.align(None, Alignment::Start, AlignmentOptions::default());
 
         env.with_name("full_width").check_layout_snapshot(&layout);
@@ -302,11 +319,15 @@ fn inbox_content_width() {
             height: 10.0,
         });
         let mut layout = builder.build(text);
-        layout.break_all_lines(Some(layout.max_content_width()));
+        let ContentWidths {
+            max: max_content_width,
+            ..
+        } = layout.calculate_content_widths();
+        layout.break_all_lines(Some(max_content_width));
         layout.align(None, Alignment::Start, AlignmentOptions::default());
 
         assert!(
-            layout.width() <= layout.max_content_width(),
+            layout.width() <= max_content_width,
             "Layout should never be wider than the max content width"
         );
 
@@ -432,6 +453,12 @@ fn realign_all() {
             }
         }
     }
+}
+
+#[test]
+fn layout_impl_send_sync() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<Layout<()>>();
 }
 
 /// Assert that the two provided layouts are equal in terms of alignment metrics.
