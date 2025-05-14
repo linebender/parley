@@ -23,6 +23,10 @@ This release has an [MSRV] of 1.82.
 
 ### Changed
 
+#### Parley
+
+- Breaking change: `Layout::min_content_width`, `Layout::max_content_width`, and `Layout::content_widths` have been replaced with `Layout::calculate_content_widths`, which does not internally cache the widths. This means that `Layout` is now `Sync` again, but callers will have to cache the min and max content widths themselves. ([#353][] by [@valadaptive][])
+
 ### Fixed
 
 ## [0.4.0] - 2025-05-08
@@ -270,6 +274,7 @@ This release has an [MSRV][] of 1.70.
 [#342]: https://github.com/linebender/parley/pull/342
 [#344]: https://github.com/linebender/parley/pull/344
 [#348]: https://github.com/linebender/parley/pull/348
+[#353]: https://github.com/linebender/parley/pull/353
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/linebender/parley/releases/tag/v0.4.0
