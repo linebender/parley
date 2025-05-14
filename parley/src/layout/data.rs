@@ -6,7 +6,6 @@ use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::nearly_zero;
 use crate::{Font, OverflowWrap};
-use core::cell::OnceCell;
 use core::ops::Range;
 use swash::Synthesis;
 use swash::shape::Shaper;
@@ -207,9 +206,6 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) fonts: Vec<Font>,
     pub(crate) coords: Vec<i16>,
 
-    // Lazily calculated values
-    content_widths: OnceCell<ContentWidths>,
-
     // Input (/ output of style resolution)
     pub(crate) styles: Vec<Style<B>>,
     pub(crate) inline_boxes: Vec<InlineBox>,
@@ -241,7 +237,6 @@ impl<B: Brush> Default for LayoutData<B> {
             text_len: 0,
             width: 0.,
             full_width: 0.,
-            content_widths: OnceCell::new(),
             height: 0.,
             fonts: Vec::new(),
             coords: Vec::new(),
@@ -268,7 +263,6 @@ impl<B: Brush> LayoutData<B> {
         self.text_len = 0;
         self.width = 0.;
         self.full_width = 0.;
-        self.content_widths.take();
         self.height = 0.;
         self.fonts.clear();
         self.coords.clear();
@@ -494,14 +488,8 @@ impl<B: Brush> LayoutData<B> {
         }
     }
 
-    pub(crate) fn content_widths(&self) -> ContentWidths {
-        *self
-            .content_widths
-            .get_or_init(|| self.calculate_content_widths())
-    }
-
     // TODO: this method does not handle mixed direction text at all.
-    fn calculate_content_widths(&self) -> ContentWidths {
+    pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
         fn whitespace_advance(cluster: Option<&ClusterData>) -> f32 {
             cluster
                 .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
