@@ -37,7 +37,7 @@ pub enum OverflowWrap {
     /// them.
     Anywhere,
     /// Like [`OverflowWrap::Anywhere`], except arbitrary wrapping opportunities are not considered
-    /// when calculating the minimum content width (see [`crate::Layout::min_content_width`]).
+    /// when calculating the minimum content width (see [`crate::Layout::calculate_content_widths`]).
     BreakWord,
 }
 
