@@ -6,7 +6,7 @@
 use super::{family::FamilyId, script::Script};
 use alloc::vec::Vec;
 use hashbrown::HashMap;
-use icu_locid::LanguageIdentifier;
+use icu_locale_core::LanguageIdentifier;
 
 type FamilyList = smallvec::SmallVec<[FamilyId; 1]>;
 
@@ -165,7 +165,7 @@ where
     S: Into<Script>,
 {
     fn from(value: (S, &str)) -> Self {
-        let locale = LanguageIdentifier::try_from_bytes(value.1.as_bytes()).ok();
+        let locale = LanguageIdentifier::try_from_str(value.1).ok();
         Self::new(value.0, locale.as_ref())
     }
 }

@@ -4,7 +4,7 @@
 use std::{path::Path, str::FromStr, sync::Arc};
 
 use hashbrown::HashMap;
-use icu_locid::LanguageIdentifier;
+use icu_locale_core::LanguageIdentifier;
 use roxmltree::{Document, Node};
 
 use super::{
