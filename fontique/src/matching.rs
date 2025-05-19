@@ -27,7 +27,7 @@ pub fn match_font(
         index: usize,
         width: i32,
         style: FontStyle,
-        weight: f32,
+        weight: u16,
         has_slnt: bool,
     }
     let mut set: SmallVec<[Candidate; 16]> = set
@@ -377,13 +377,13 @@ pub fn match_font(
         return Some(f.index);
     } else {
         // If the desired weight is inclusively between 400 and 500...
-        if (400.0..=500.0).contains(&weight) {
+        if (400..=500).contains(&weight) {
             // weights greater than or equal to the target weight are checked in ascending
             // order until 500 is hit and checked
             if let Some(found) = set
                 .iter()
                 .enumerate()
-                .filter(|f| f.1.weight >= weight && f.1.weight <= 500.0)
+                .filter(|f| f.1.weight >= weight && f.1.weight <= 500)
                 .min_by(|x, y| x.1.weight.partial_cmp(&y.1.weight).unwrap_or(Less))
             {
                 return Some(found.1.index);
@@ -401,14 +401,14 @@ pub fn match_font(
             if let Some(found) = set
                 .iter()
                 .enumerate()
-                .filter(|f| f.1.weight > 500.0)
+                .filter(|f| f.1.weight > 500)
                 .min_by(|x, y| x.1.weight.partial_cmp(&y.1.weight).unwrap_or(Less))
             {
                 return Some(found.1.index);
             }
         }
         // If the desired weight is less than 400...
-        else if weight < 400.0 {
+        else if weight < 400 {
             // weights less than or equal to the target weight are checked in descending
             if let Some(found) = set
                 .iter()

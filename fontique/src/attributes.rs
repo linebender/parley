@@ -254,12 +254,12 @@ impl Default for FontWidth {
     }
 }
 
-/// Visual weight class of a font, typically on a scale from 1.0 to 1000.0.
+/// Visual weight class of a font, typically on a scale from 1 to 1000.
 ///
-/// The default value is [`FontWeight::NORMAL`] or `400.0`.
+/// The default value is [`FontWeight::NORMAL`] or `400`.
 ///
 /// In variable fonts, this can be controlled with the `wght` [axis]. This
-/// is an `f32` so that it can represent the same range of values as the
+/// is a `u16` so that it can represent the same range of values as the
 /// `wght` axis.
 ///
 /// See <https://fonts.google.com/knowledge/glossary/weight>
@@ -268,52 +268,52 @@ impl Default for FontWidth {
 ///
 /// [axis]: crate::AxisInfo
 /// [`font-weight`]: https://www.w3.org/TR/css-fonts-4/#font-weight-prop
-#[derive(Copy, Clone, PartialEq, PartialOrd, Debug)]
-pub struct FontWeight(f32);
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+pub struct FontWeight(u16);
 
 impl FontWeight {
     /// Weight value of 100.
-    pub const THIN: Self = Self(100.0);
+    pub const THIN: Self = Self(100);
 
     /// Weight value of 200.
-    pub const EXTRA_LIGHT: Self = Self(200.0);
+    pub const EXTRA_LIGHT: Self = Self(200);
 
     /// Weight value of 300.
-    pub const LIGHT: Self = Self(300.0);
+    pub const LIGHT: Self = Self(300);
 
     /// Weight value of 350.
-    pub const SEMI_LIGHT: Self = Self(350.0);
+    pub const SEMI_LIGHT: Self = Self(350);
 
     /// Weight value of 400. This is the default value.
-    pub const NORMAL: Self = Self(400.0);
+    pub const NORMAL: Self = Self(400);
 
     /// Weight value of 500.
-    pub const MEDIUM: Self = Self(500.0);
+    pub const MEDIUM: Self = Self(500);
 
     /// Weight value of 600.
-    pub const SEMI_BOLD: Self = Self(600.0);
+    pub const SEMI_BOLD: Self = Self(600);
 
     /// Weight value of 700.
-    pub const BOLD: Self = Self(700.0);
+    pub const BOLD: Self = Self(700);
 
     /// Weight value of 800.
-    pub const EXTRA_BOLD: Self = Self(800.0);
+    pub const EXTRA_BOLD: Self = Self(800);
 
     /// Weight value of 900.
-    pub const BLACK: Self = Self(900.0);
+    pub const BLACK: Self = Self(900);
 
     /// Weight value of 950.
-    pub const EXTRA_BLACK: Self = Self(950.0);
+    pub const EXTRA_BLACK: Self = Self(950);
 }
 
 impl FontWeight {
     /// Creates a new weight attribute with the given value.
-    pub fn new(weight: f32) -> Self {
+    pub fn new(weight: u16) -> Self {
         Self(weight)
     }
 
     /// Returns the underlying weight value.
-    pub fn value(self) -> f32 {
+    pub fn value(self) -> u16 {
         self.0
     }
 
@@ -325,7 +325,7 @@ impl FontWeight {
     /// # use fontique::FontWeight;
     /// assert_eq!(FontWeight::parse("normal"), Some(FontWeight::NORMAL));
     /// assert_eq!(FontWeight::parse("bold"), Some(FontWeight::BOLD));
-    /// assert_eq!(FontWeight::parse("850"), Some(FontWeight::new(850.0)));
+    /// assert_eq!(FontWeight::parse("850"), Some(FontWeight::new(850)));
     /// assert_eq!(FontWeight::parse("invalid"), None);
     /// ```
     pub fn parse(s: &str) -> Option<Self> {
@@ -333,7 +333,7 @@ impl FontWeight {
         Some(match s {
             "normal" => Self::NORMAL,
             "bold" => Self::BOLD,
-            _ => Self(s.parse::<f32>().ok()?),
+            _ => Self(s.parse::<u16>().ok()?),
         })
     }
 }
@@ -364,7 +364,7 @@ impl FontWeight {
         ];
         for (i, (ot, fc)) in MAP.iter().skip(1).enumerate() {
             if weight == *fc {
-                return Self::new(*ot as f32);
+                return Self::new(*ot as u16);
             }
             // Linear interpolation if not an exact match
             if weight < *fc {
@@ -374,7 +374,8 @@ impl FontWeight {
                 let ot_a = MAP[i - 1].1 as f32;
                 let ot_b = *ot as f32;
                 let t = (fc_a - fc_b) / (weight - fc_a);
-                return Self::new(ot_a + (ot_b - ot_a) * t);
+                let w = ot_a + (ot_b - ot_a) * t;
+                return Self::new(w.round() as u16);
             }
         }
         Self::EXTRA_BLACK
@@ -389,24 +390,19 @@ impl Default for FontWeight {
 
 impl fmt::Display for FontWeight {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let value = self.0;
-        if value.fract() == 0.0 {
-            let keyword = match value as i32 {
-                100 => "thin",
-                200 => "extra-light",
-                300 => "light",
-                400 => "normal",
-                500 => "medium",
-                600 => "semi-bold",
-                700 => "bold",
-                800 => "extra-bold",
-                900 => "black",
-                _ => return write!(f, "{}", self.0),
-            };
-            write!(f, "{keyword}")
-        } else {
-            write!(f, "{}", self.0)
-        }
+        let keyword = match self.0 {
+            100 => "thin",
+            200 => "extra-light",
+            300 => "light",
+            400 => "normal",
+            500 => "medium",
+            600 => "semi-bold",
+            700 => "bold",
+            800 => "extra-bold",
+            900 => "black",
+            _ => return write!(f, "{}", self.0),
+        };
+        write!(f, "{keyword}")
     }
 }
 

@@ -92,7 +92,7 @@ impl FontInfo {
         }
         if self.weight != weight {
             if self.has_weight_axis() {
-                synth.vars[len] = (Tag::new(b"wght"), weight.value());
+                synth.vars[len] = (Tag::new(b"wght"), weight.value() as f32);
                 len += 1;
             } else if weight.value() > self.weight.value() {
                 synth.embolden = true;
@@ -398,7 +398,7 @@ fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
         // we don't clamp here because variable fonts could potentially
         // have a value outside of that range.
         // See <https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass>
-        let weight = FontWeight::new(os2.us_weight_class() as f32);
+        let weight = FontWeight::new(os2.us_weight_class());
         (width, style, weight)
     }
 
@@ -410,7 +410,7 @@ fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
             .unwrap_or_default();
         let weight = mac_style
             .contains(MacStyle::BOLD)
-            .then_some(700.0)
+            .then_some(700)
             .unwrap_or_default();
         (FontWidth::default(), style, FontWeight::new(weight))
     }
