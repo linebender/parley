@@ -44,13 +44,11 @@ impl fmt::Display for Attributes {
 }
 
 /// Visual width of a font-- a relative change from the normal aspect
-/// ratio, typically in the range `0.5` to `2.0`.
+/// ratio, typically in the 50% - 200% range.
 ///
-/// The default value is [`FontWidth::NORMAL`] or `1.0`.
+/// The default value is [`FontWidth::NORMAL`].
 ///
-/// In variable fonts, this can be controlled with the `wdth` [axis]. This
-/// is an `f32` so that it can represent the same range of values as the
-/// `wdth` axis.
+/// In variable fonts, this can be controlled with the `wdth` [axis].
 ///
 /// In Open Type, the `u16` [`usWidthClass`] field has 9 values, from 1-9,
 /// which doesn't allow for the wide range of values possible with variable
@@ -67,40 +65,42 @@ impl fmt::Display for Attributes {
 /// [`usWidthClass`]: https://learn.microsoft.com/en-us/typography/opentype/spec/os2#uswidthclass
 /// [`font-width`]: https://www.w3.org/TR/css-fonts-4/#font-width-prop
 /// [`font-stretch`]: https://www.w3.org/TR/css-fonts-4/#font-stretch-prop
-#[derive(Copy, Clone, PartialEq, PartialOrd, Debug)]
-pub struct FontWidth(f32);
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub struct FontWidth(u16);
 
 impl FontWidth {
     /// Width that is 50% of normal.
-    pub const ULTRA_CONDENSED: Self = Self(0.5);
+    pub const ULTRA_CONDENSED: Self = Self(128);
 
     /// Width that is 62.5% of normal.
-    pub const EXTRA_CONDENSED: Self = Self(0.625);
+    pub const EXTRA_CONDENSED: Self = Self(160);
 
     /// Width that is 75% of normal.
-    pub const CONDENSED: Self = Self(0.75);
+    pub const CONDENSED: Self = Self(192);
 
     /// Width that is 87.5% of normal.
-    pub const SEMI_CONDENSED: Self = Self(0.875);
+    pub const SEMI_CONDENSED: Self = Self(224);
 
     /// Width that is 100% of normal. This is the default value.
-    pub const NORMAL: Self = Self(1.0);
+    pub const NORMAL: Self = Self(256);
 
     /// Width that is 112.5% of normal.
-    pub const SEMI_EXPANDED: Self = Self(1.125);
+    pub const SEMI_EXPANDED: Self = Self(288);
 
     /// Width that is 125% of normal.
-    pub const EXPANDED: Self = Self(1.25);
+    pub const EXPANDED: Self = Self(320);
 
     /// Width that is 150% of normal.
-    pub const EXTRA_EXPANDED: Self = Self(1.5);
+    pub const EXTRA_EXPANDED: Self = Self(384);
 
     /// Width that is 200% of normal.
-    pub const ULTRA_EXPANDED: Self = Self(2.0);
+    pub const ULTRA_EXPANDED: Self = Self(512);
 }
 
 impl FontWidth {
     /// Creates a new width attribute with the given ratio.
+    ///
+    /// Panics if the ratio is not between `0` and `255.996`.
     ///
     /// This can also be created [from a percentage](Self::from_percentage).
     ///
@@ -111,10 +111,14 @@ impl FontWidth {
     /// assert_eq!(FontWidth::from_ratio(1.5), FontWidth::EXTRA_EXPANDED);
     /// ```
     pub fn from_ratio(ratio: f32) -> Self {
-        Self(ratio)
+        let value = (ratio * 256.0).round();
+        assert!(0.0 <= value && value <= (u16::MAX as f32));
+        Self(value as u16)
     }
 
     /// Creates a width attribute from a percentage.
+    ///
+    /// Panics if the percentage is not between `0%` and `25599.6%`.
     ///
     /// This can also be created [from a ratio](Self::from_ratio).
     ///
@@ -125,7 +129,7 @@ impl FontWidth {
     /// assert_eq!(FontWidth::from_percentage(87.5), FontWidth::SEMI_CONDENSED);
     /// ```
     pub fn from_percentage(percentage: f32) -> Self {
-        Self(percentage / 100.0)
+        Self::from_ratio(percentage / 100.0)
     }
 
     /// Returns the width attribute as a ratio.
@@ -139,14 +143,14 @@ impl FontWidth {
     /// assert_eq!(FontWidth::NORMAL.ratio(), 1.0);
     /// ```
     pub fn ratio(self) -> f32 {
-        self.0
+        (self.0 as f32) / 256.0
     }
 
     /// Returns the width attribute as a percentage value.
     ///
     /// This is generally the value associated with the `wdth` axis.
     pub fn percentage(self) -> f32 {
-        self.0 * 100.0
+        self.ratio() * 100.0
     }
 
     /// Returns `true` if the width is [normal].
@@ -226,26 +230,21 @@ impl FontWidth {
 
 impl fmt::Display for FontWidth {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let value = self.0 * 1000.0;
-        if value.fract() == 0.0 {
-            let keyword = match value as i32 {
-                500 => "ultra-condensed",
-                625 => "extra-condensed",
-                750 => "condensed",
-                875 => "semi-condensed",
-                1000 => "normal",
-                1125 => "semi-expanded",
-                1250 => "expanded",
-                1500 => "extra-expanded",
-                2000 => "ultra-expanded",
-                _ => {
-                    return write!(f, "{}%", self.percentage());
-                }
-            };
-            write!(f, "{keyword}")
-        } else {
-            write!(f, "{}%", self.percentage())
-        }
+        let keyword = match *self {
+            v if v == Self::ULTRA_CONDENSED => "ultra-condensed",
+            v if v == Self::EXTRA_CONDENSED => "extra-condensed",
+            v if v == Self::CONDENSED => "condensed",
+            v if v == Self::SEMI_CONDENSED => "semi-condensed",
+            v if v == Self::NORMAL => "normal",
+            v if v == Self::SEMI_EXPANDED => "semi-expanded",
+            v if v == Self::EXPANDED => "expanded",
+            v if v == Self::EXTRA_EXPANDED => "extra-expanded",
+            v if v == Self::ULTRA_EXPANDED => "ultra-expanded",
+            _ => {
+                return write!(f, "{}%", self.percentage());
+            }
+        };
+        write!(f, "{keyword}")
     }
 }
 
