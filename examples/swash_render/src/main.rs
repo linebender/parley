@@ -69,7 +69,7 @@ fn main() {
     let text_brush = ColorBrush { color: text_color };
     let brush_style = StyleProperty::Brush(text_brush);
     let font_stack = FontStack::from("system-ui");
-    let bold_style = StyleProperty::FontWeight(FontWeight::new(600.0));
+    let bold_style = StyleProperty::FontWeight(FontWeight::new(600));
     let underline_style = StyleProperty::Underline(true);
     let strikethrough_style = StyleProperty::Strikethrough(true);
 

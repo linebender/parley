@@ -42,7 +42,7 @@
 //! builder.push_default(StyleProperty::FontSize(16.0));
 //!
 //! // Set a style that applies to the first 4 characters
-//! builder.push(StyleProperty::FontWeight(FontWeight::new(600.0)), 0..4);
+//! builder.push(StyleProperty::FontWeight(FontWeight::new(600)), 0..4);
 //!
 //! // Add a box to be laid out inline with the text
 //! builder.push_inline_box(InlineBox { id: 0, index: 5, width: 50.0, height: 50.0 });

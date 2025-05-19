@@ -83,7 +83,7 @@ fn main() {
     builder.push_default(StyleProperty::FontSize(16.0));
 
     // Set the first 4 characters to bold
-    let bold = FontWeight::new(600.0);
+    let bold = FontWeight::new(600);
     builder.push(StyleProperty::FontWeight(bold), 0..4);
 
     // Set the underline & strikethrough style
