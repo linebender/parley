@@ -451,14 +451,14 @@ pub fn match_font(
 
 fn oblique_angle(style: FontStyle) -> Option<f32> {
     match style {
-        FontStyle::Oblique(angle) => Some(angle.unwrap_or(DEFAULT_OBLIQUE_ANGLE)),
+        FontStyle::Oblique(angle) => Some(FontStyle::oblique_degrees(angle)),
         _ => None,
     }
 }
 
 fn oblique_style(style: FontStyle) -> Option<(FontStyle, f32)> {
     match style {
-        FontStyle::Oblique(angle) => Some((style, angle.unwrap_or(DEFAULT_OBLIQUE_ANGLE))),
+        FontStyle::Oblique(angle) => Some((style, FontStyle::oblique_degrees(angle))),
         _ => None,
     }
 }

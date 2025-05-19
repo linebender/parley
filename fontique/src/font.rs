@@ -116,7 +116,7 @@ impl FontInfo {
                 }
                 FontStyle::Oblique(angle) => {
                     if self.style == FontStyle::Normal {
-                        let degrees = angle.unwrap_or(14.0);
+                        let degrees = FontStyle::oblique_degrees(angle);
                         if self.has_slant_axis() {
                             synth.vars[len] = (Tag::new(b"slnt"), degrees);
                             len += 1;
@@ -389,8 +389,9 @@ fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
         let style = if fs_selection.contains(SelectionFlags::ITALIC) {
             FontStyle::Italic
         } else if fs_selection.contains(SelectionFlags::OBLIQUE) {
-            let angle = post.map(|post| post.italic_angle().to_f64() as f32);
-            FontStyle::Oblique(angle)
+            post.map(|post| post.italic_angle().to_f64() as f32)
+                .map(|degrees| FontStyle::from_degrees(degrees))
+                .unwrap_or(FontStyle::Oblique(None))
         } else {
             FontStyle::Normal
         };

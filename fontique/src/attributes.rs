@@ -15,7 +15,7 @@ use core::fmt;
 ///
 /// [configure]: crate::Query::set_attributes
 /// [`Query`]: crate::Query
-#[derive(Copy, Clone, PartialEq, Default, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Default, Debug)]
 pub struct Attributes {
     pub width: FontWidth,
     pub style: FontStyle,
@@ -421,7 +421,7 @@ impl fmt::Display for FontWeight {
 ///
 /// [axes]: crate::AxisInfo
 /// [`font-style`]: https://www.w3.org/TR/css-fonts-4/#font-style-prop
-#[derive(Copy, Clone, PartialEq, Default, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Default, Debug, Hash)]
 pub enum FontStyle {
     /// An upright or "roman" style.
     #[default]
@@ -429,9 +429,12 @@ pub enum FontStyle {
     /// Generally a slanted style, originally based on semi-cursive forms.
     /// This often has a different structure from the normal style.
     Italic,
-    /// Oblique (or slanted) style with an optional angle in degrees,
+    /// Oblique (or slanted) style with an optional angle in degrees times 256,
     /// counter-clockwise from the vertical.
-    Oblique(Option<f32>),
+    ///
+    /// To convert `Some(angle)` to degrees, use
+    /// `degrees = (angle as f32) / 256.0` or [`FontStyle::oblique_degrees`].
+    Oblique(Option<i16>),
 }
 
 impl FontStyle {
@@ -441,29 +444,29 @@ impl FontStyle {
         Some(match s {
             "normal" => Self::Normal,
             "italic" => Self::Italic,
-            "oblique" => Self::Oblique(Some(14.)),
+            "oblique" => Self::Oblique(Some(14 * 256)),
             _ => {
                 if s.starts_with("oblique ") {
                     s = s.get(8..)?;
                     if s.ends_with("deg") {
                         s = s.get(..s.len() - 3)?;
                         if let Ok(degrees) = s.trim().parse::<f32>() {
-                            return Some(Self::Oblique(Some(degrees)));
+                            return Some(Self::from_degrees(degrees));
                         }
                     } else if s.ends_with("grad") {
                         s = s.get(..s.len() - 4)?;
                         if let Ok(gradians) = s.trim().parse::<f32>() {
-                            return Some(Self::Oblique(Some(gradians / 400.0 * 360.0)));
+                            return Some(Self::from_degrees(gradians / 400.0 * 360.0));
                         }
                     } else if s.ends_with("rad") {
                         s = s.get(..s.len() - 3)?;
                         if let Ok(radians) = s.trim().parse::<f32>() {
-                            return Some(Self::Oblique(Some(radians.to_degrees())));
+                            return Some(Self::from_degrees(radians.to_degrees()));
                         }
                     } else if s.ends_with("turn") {
                         s = s.get(..s.len() - 4)?;
                         if let Ok(turns) = s.trim().parse::<f32>() {
-                            return Some(Self::Oblique(Some(turns * 360.0)));
+                            return Some(Self::from_degrees(turns * 360.0));
                         }
                     }
                     return Some(Self::Oblique(None));
@@ -475,6 +478,24 @@ impl FontStyle {
 }
 
 impl FontStyle {
+    /// Convert an `Oblique` payload to an angle in degrees.
+    pub const fn oblique_degrees(angle: Option<i16>) -> f32 {
+        if let Some(a) = angle {
+            (a as f32) / 256.0
+        } else {
+            14.0
+        }
+    }
+
+    /// Creates a new oblique style with angle specified in degrees.
+    ///
+    /// Panics if `degrees` is not between `-90` and `90`.
+    pub fn from_degrees(degrees: f32) -> Self {
+        let a = (degrees * 256.0).round();
+        assert!(-90.0 <= a && a <= 90.0);
+        Self::Oblique(Some(a as i16))
+    }
+
     /// Creates a new style attribute with the given value from Fontconfig.
     ///
     /// The values are determined based on the [fonts.conf documentation].
@@ -491,12 +512,13 @@ impl FontStyle {
 
 impl fmt::Display for FontStyle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let value = match self {
+        let value = match *self {
             Self::Normal => "normal",
             Self::Italic => "italic",
             Self::Oblique(None) => "oblique",
-            Self::Oblique(Some(degrees)) if *degrees == 14.0 => "oblique",
-            Self::Oblique(Some(degrees)) => {
+            Self::Oblique(Some(angle)) if angle == 14 * 256 => "oblique",
+            Self::Oblique(Some(angle)) => {
+                let degrees = (angle as f32) / 256.0;
                 return write!(f, "oblique({degrees}deg)");
             }
         };
