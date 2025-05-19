@@ -111,7 +111,7 @@ impl FallbackMap {
 ///
 /// It can be constructed directly via [`FallbackKey::new`] or any of
 /// a variety of `From` implementations to improve the ease of use.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
 pub struct FallbackKey {
     script: Script,
     locale: Option<&'static str>,
