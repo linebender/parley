@@ -82,7 +82,7 @@ fn main() {
         let root_style = TextStyle {
             brush: text_brush,
             font_stack,
-            line_height: parley::LineHeight::Relative(1.3),
+            line_height: parley::LineHeight::SizeRelative(1.3),
             font_size: 16.0,
             ..Default::default()
         };
@@ -141,7 +141,9 @@ fn main() {
 
         // Set default font family
         builder.push_default(font_stack);
-        builder.push_default(StyleProperty::LineHeight(parley::LineHeight::Relative(1.3)));
+        builder.push_default(StyleProperty::LineHeight(parley::LineHeight::SizeRelative(
+            1.3,
+        )));
         builder.push_default(StyleProperty::FontSize(16.0));
 
         // Set the first 4 characters to bold

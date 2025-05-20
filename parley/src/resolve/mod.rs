@@ -153,8 +153,8 @@ impl ResolveContext {
             StyleProperty::StrikethroughSize(value) => StrikethroughSize(value.map(|x| x * scale)),
             StyleProperty::StrikethroughBrush(value) => StrikethroughBrush(value.clone()),
             StyleProperty::LineHeight(value) => LineHeight(match value {
-                crate::LineHeight::Relative(value) => crate::LineHeight::Relative(*value),
                 crate::LineHeight::Absolute(value) => crate::LineHeight::Absolute(*value * scale),
+                height => *height,
             }),
             StyleProperty::WordSpacing(value) => WordSpacing(*value * scale),
             StyleProperty::LetterSpacing(value) => LetterSpacing(*value * scale),
@@ -430,7 +430,7 @@ impl<B: Brush> Default for ResolvedStyle<B> {
             brush: Default::default(),
             underline: Default::default(),
             strikethrough: Default::default(),
-            line_height: crate::LineHeight::Relative(1.),
+            line_height: crate::LineHeight::SizeRelative(1.),
             word_spacing: 0.,
             letter_spacing: 0.,
             word_break: Default::default(),
@@ -490,7 +490,8 @@ impl<B: Brush> ResolvedStyle<B> {
             StrikethroughSize(value) => self.strikethrough.size == *value,
             StrikethroughBrush(value) => self.strikethrough.brush == *value,
             LineHeight(value) => match (self.line_height, *value) {
-                (crate::LineHeight::Relative(a), crate::LineHeight::Relative(b))
+                (crate::LineHeight::MetricsRelative(a), crate::LineHeight::MetricsRelative(b))
+                | (crate::LineHeight::SizeRelative(a), crate::LineHeight::SizeRelative(b))
                 | (crate::LineHeight::Absolute(a), crate::LineHeight::Absolute(b)) => {
                     nearly_eq(a, b)
                 }
@@ -509,8 +510,13 @@ impl<B: Brush> ResolvedStyle<B> {
             underline: self.underline.as_layout_decoration(&self.brush),
             strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
             line_height: match self.line_height {
-                crate::LineHeight::Relative(value) => value * self.font_size,
-                crate::LineHeight::Absolute(value) => value,
+                crate::LineHeight::MetricsRelative(value) => {
+                    crate::LayoutLineHeight::MetricsRelative(value)
+                }
+                crate::LineHeight::SizeRelative(value) => {
+                    crate::LayoutLineHeight::Absolute(value * self.font_size)
+                }
+                crate::LineHeight::Absolute(value) => crate::LayoutLineHeight::Absolute(value),
             },
             overflow_wrap: self.overflow_wrap,
         }

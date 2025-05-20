@@ -43,8 +43,10 @@ pub enum OverflowWrap {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LineHeight {
+    /// Line height specified relative to what's defined in the font's metrics.
+    MetricsRelative(f32),
     /// Line height specified as a multiple of the font size.
-    Relative(f32),
+    SizeRelative(f32),
     /// Line height specified in absolute units.
     Absolute(f32),
 }
@@ -167,7 +169,7 @@ impl<B: Brush> Default for TextStyle<'_, B> {
             strikethrough_offset: Default::default(),
             strikethrough_size: Default::default(),
             strikethrough_brush: Default::default(),
-            line_height: LineHeight::Relative(1.2),
+            line_height: LineHeight::SizeRelative(1.2),
             word_spacing: Default::default(),
             letter_spacing: Default::default(),
             word_break: Default::default(),

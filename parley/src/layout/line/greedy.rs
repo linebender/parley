@@ -523,7 +523,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // Compute the run's vertical metrics
                         line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent);
                         line.metrics.descent = line.metrics.descent.max(run.metrics.descent);
-                        line.metrics.leading = line.metrics.leading.max(run.metrics.leading);
 
                         // Mark us as having seen non-whitespace content on this line
                         have_metrics = true;
@@ -567,7 +566,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let run = &self.layout.data.runs[line_item.index];
                         line.metrics.ascent = run.metrics.ascent;
                         line.metrics.descent = run.metrics.descent;
-                        line.metrics.leading = run.metrics.leading;
                     }
                 } else if let Some(metrics) = prev_line_metrics {
                     // HACK: copy metrics from previous line if we don't have

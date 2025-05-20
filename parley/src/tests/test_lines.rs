@@ -6,7 +6,9 @@
 use peniko::kurbo::{Rect, Size};
 
 use super::utils::{ColorBrush, TestEnv};
-use crate::{Affinity, Brush, Cursor, InlineBox, Layout, Selection, StyleProperty, test_name};
+use crate::{
+    Affinity, Brush, Cursor, InlineBox, Layout, LineHeight, Selection, StyleProperty, test_name,
+};
 
 const TEXT: &str = "Some text here. Let's make\n\
         it a bit longer so that\n \
@@ -89,7 +91,7 @@ fn build_layout<A: Into<Option<f32>>>(
 ) -> Layout<ColorBrush> {
     let mut builder = env.ranged_builder(TEXT);
     builder.push_default(StyleProperty::FontSize(font_size));
-    builder.push_default(StyleProperty::LineHeight(line_height));
+    builder.push_default(LineHeight::SizeRelative(line_height));
 
     let underline_style = StyleProperty::Underline(true);
     let strikethrough_style = StyleProperty::Strikethrough(true);
