@@ -169,7 +169,7 @@ impl<B: Brush> Default for TextStyle<'_, B> {
             strikethrough_offset: Default::default(),
             strikethrough_size: Default::default(),
             strikethrough_brush: Default::default(),
-            line_height: LineHeight::SizeRelative(1.2),
+            line_height: LineHeight::MetricsRelative(1.),
             word_spacing: Default::default(),
             letter_spacing: Default::default(),
             word_break: Default::default(),
