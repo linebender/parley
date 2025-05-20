@@ -152,10 +152,7 @@ impl ResolveContext {
             }
             StyleProperty::StrikethroughSize(value) => StrikethroughSize(value.map(|x| x * scale)),
             StyleProperty::StrikethroughBrush(value) => StrikethroughBrush(value.clone()),
-            StyleProperty::LineHeight(value) => LineHeight(match value {
-                crate::LineHeight::Absolute(value) => crate::LineHeight::Absolute(*value * scale),
-                height => *height,
-            }),
+            StyleProperty::LineHeight(value) => LineHeight(value.scale(scale)),
             StyleProperty::WordSpacing(value) => WordSpacing(*value * scale),
             StyleProperty::LetterSpacing(value) => LetterSpacing(*value * scale),
             StyleProperty::WordBreak(value) => WordBreak(*value),
@@ -489,17 +486,7 @@ impl<B: Brush> ResolvedStyle<B> {
             StrikethroughOffset(value) => self.strikethrough.offset == *value,
             StrikethroughSize(value) => self.strikethrough.size == *value,
             StrikethroughBrush(value) => self.strikethrough.brush == *value,
-            LineHeight(value) => match (self.line_height, *value) {
-                (crate::LineHeight::MetricsRelative(a), crate::LineHeight::MetricsRelative(b))
-                | (
-                    crate::LineHeight::FontSizeRelative(a),
-                    crate::LineHeight::FontSizeRelative(b),
-                )
-                | (crate::LineHeight::Absolute(a), crate::LineHeight::Absolute(b)) => {
-                    nearly_eq(a, b)
-                }
-                _ => false,
-            },
+            LineHeight(value) => self.line_height.nearly_eq(value),
             WordSpacing(value) => nearly_eq(self.word_spacing, *value),
             LetterSpacing(value) => nearly_eq(self.letter_spacing, *value),
             WordBreak(value) => self.word_break == *value,
@@ -512,15 +499,7 @@ impl<B: Brush> ResolvedStyle<B> {
             brush: self.brush.clone(),
             underline: self.underline.as_layout_decoration(&self.brush),
             strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
-            line_height: match self.line_height {
-                crate::LineHeight::MetricsRelative(value) => {
-                    crate::LayoutLineHeight::MetricsRelative(value)
-                }
-                crate::LineHeight::FontSizeRelative(value) => {
-                    crate::LayoutLineHeight::Absolute(value * self.font_size)
-                }
-                crate::LineHeight::Absolute(value) => crate::LayoutLineHeight::Absolute(value),
-            },
+            line_height: self.line_height.resolve(self.font_size),
             overflow_wrap: self.overflow_wrap,
         }
     }

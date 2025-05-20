@@ -17,6 +17,8 @@ pub use font::{
 pub use styleset::StyleSet;
 pub use swash::text::WordBreakStrength;
 
+use crate::{LayoutLineHeight, util::nearly_eq};
+
 #[derive(Debug, Clone, Copy)]
 pub enum WhiteSpaceCollapse {
     Collapse,
@@ -49,6 +51,32 @@ pub enum LineHeight {
     FontSizeRelative(f32),
     /// Line height specified in absolute units.
     Absolute(f32),
+}
+
+impl LineHeight {
+    pub(crate) fn nearly_eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::MetricsRelative(a), Self::MetricsRelative(b))
+            | (Self::FontSizeRelative(a), Self::FontSizeRelative(b))
+            | (Self::Absolute(a), Self::Absolute(b)) => nearly_eq(*a, *b),
+            _ => false,
+        }
+    }
+
+    pub(crate) fn scale(&self, scale: f32) -> Self {
+        match self {
+            Self::Absolute(value) => Self::Absolute(*value * scale),
+            value => *value,
+        }
+    }
+
+    pub(crate) fn resolve(&self, scale: f32) -> LayoutLineHeight {
+        match self {
+            Self::MetricsRelative(value) => LayoutLineHeight::MetricsRelative(*value),
+            Self::FontSizeRelative(value) => LayoutLineHeight::Absolute(*value * scale),
+            Self::Absolute(value) => LayoutLineHeight::Absolute(*value),
+        }
+    }
 }
 
 /// Properties that define a style.
