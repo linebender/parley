@@ -541,3 +541,57 @@ fn lines_fractional_line_height_big_positive_leading() {
 
     lines_fractional_line_height_positive_leading_internal(test_name!(), font_size, line_height_px);
 }
+
+#[test]
+fn lines_line_height_metrics_relative() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let mut builder = env.ranged_builder(TEXT);
+    builder.push_default(LineHeight::MetricsRelative(1.1));
+
+    let mut layout = builder.build(TEXT);
+
+    layout.break_all_lines(None);
+    layout.align(
+        None,
+        crate::Alignment::Start,
+        crate::AlignmentOptions::default(),
+    );
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn lines_line_height_size_relative() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let mut builder = env.ranged_builder(TEXT);
+    builder.push_default(LineHeight::SizeRelative(1.2));
+
+    let mut layout = builder.build(TEXT);
+
+    layout.break_all_lines(None);
+    layout.align(
+        None,
+        crate::Alignment::Start,
+        crate::AlignmentOptions::default(),
+    );
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn lines_line_height_absolute() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let mut builder = env.ranged_builder(TEXT);
+    builder.push_default(LineHeight::Absolute(20.0));
+
+    let mut layout = builder.build(TEXT);
+
+    layout.break_all_lines(None);
+    layout.align(
+        None,
+        crate::Alignment::Start,
+        crate::AlignmentOptions::default(),
+    );
+    env.check_layout_snapshot(&layout);
+}
