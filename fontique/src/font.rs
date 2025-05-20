@@ -6,6 +6,7 @@
 use super::attributes::{FontStyle, FontWeight, FontWidth};
 use super::source::{SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
+use core::fmt;
 use read_fonts::{FontRef, TableProvider as _, types::Tag};
 use smallvec::SmallVec;
 
@@ -318,7 +319,7 @@ pub struct AxisInfo {
 /// as well as [`QueryFont::synthesis`].
 ///
 /// [`QueryFont::synthesis`]: crate::QueryFont::synthesis
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default)]
 pub struct Synthesis {
     vars: [(Tag, f32); 3],
     len: u8,
@@ -353,6 +354,17 @@ impl Synthesis {
         } else {
             None
         }
+    }
+}
+
+#[allow(clippy::missing_fields_in_debug)]
+impl fmt::Debug for Synthesis {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Synthesis")
+            .field("vars", &self.variation_settings())
+            .field("embolden", &self.embolden)
+            .field("skew", &self.skew)
+            .finish()
     }
 }
 
