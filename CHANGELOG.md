@@ -26,6 +26,8 @@ This release has an [MSRV] of 1.82.
 #### Parley
 
 - Breaking change: `Layout::min_content_width`, `Layout::max_content_width`, and `Layout::content_widths` have been replaced with `Layout::calculate_content_widths`, which does not internally cache the widths. This means that `Layout` is now `Sync` again, but callers will have to cache the min and max content widths themselves. ([#353][] by [@valadaptive][])
+- Breaking change: the line height style property (`StyleProperty::LineHeight` and the `line_height` field on `TextStyle`) is now a `LineHeight` enum that allows you to specify absolute, font-size-relative, and font-metrics-relative line heights. Previously, it was always font-size-relative. ([#362][] by [@valadaptive][])
+  - The default line height was previously `LineHeight::FontSizeRelative(1.0)` if you used `RangedStyleBuilder`, or `LineHeight::FontSizeRelative(1.2)` if you used `TreeStyleBuilder`. It is now `LineHeight::MetricsRelative(1.0)` in both cases. This will affect layout if you don't specify your own line height.
 
 ### Fixed
 
@@ -275,6 +277,7 @@ This release has an [MSRV][] of 1.70.
 [#344]: https://github.com/linebender/parley/pull/344
 [#348]: https://github.com/linebender/parley/pull/348
 [#353]: https://github.com/linebender/parley/pull/353
+[#362]: https://github.com/linebender/parley/pull/362
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/linebender/parley/releases/tag/v0.4.0
