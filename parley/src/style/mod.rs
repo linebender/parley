@@ -46,7 +46,7 @@ pub enum LineHeight {
     /// Line height specified relative to what's defined in the font's metrics.
     MetricsRelative(f32),
     /// Line height specified as a multiple of the font size.
-    SizeRelative(f32),
+    FontSizeRelative(f32),
     /// Line height specified in absolute units.
     Absolute(f32),
 }

@@ -48,9 +48,9 @@ impl Editor {
         editor.set_text(text);
         editor.set_scale(1.0);
         let styles = editor.edit_styles();
-        styles.insert(StyleProperty::LineHeight(parley::LineHeight::SizeRelative(
-            1.2,
-        )));
+        styles.insert(StyleProperty::LineHeight(
+            parley::LineHeight::FontSizeRelative(1.2),
+        ));
         styles.insert(GenericFamily::SystemUi.into());
         styles.insert(StyleProperty::Brush(palette::css::WHITE.into()));
         Self {

@@ -491,7 +491,10 @@ impl<B: Brush> ResolvedStyle<B> {
             StrikethroughBrush(value) => self.strikethrough.brush == *value,
             LineHeight(value) => match (self.line_height, *value) {
                 (crate::LineHeight::MetricsRelative(a), crate::LineHeight::MetricsRelative(b))
-                | (crate::LineHeight::SizeRelative(a), crate::LineHeight::SizeRelative(b))
+                | (
+                    crate::LineHeight::FontSizeRelative(a),
+                    crate::LineHeight::FontSizeRelative(b),
+                )
                 | (crate::LineHeight::Absolute(a), crate::LineHeight::Absolute(b)) => {
                     nearly_eq(a, b)
                 }
@@ -513,7 +516,7 @@ impl<B: Brush> ResolvedStyle<B> {
                 crate::LineHeight::MetricsRelative(value) => {
                     crate::LayoutLineHeight::MetricsRelative(value)
                 }
-                crate::LineHeight::SizeRelative(value) => {
+                crate::LineHeight::FontSizeRelative(value) => {
                     crate::LayoutLineHeight::Absolute(value * self.font_size)
                 }
                 crate::LineHeight::Absolute(value) => crate::LayoutLineHeight::Absolute(value),
