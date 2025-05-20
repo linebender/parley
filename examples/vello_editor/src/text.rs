@@ -8,7 +8,9 @@ use web_time::Instant;
 
 use accesskit::{Node, TreeUpdate};
 use core::default::Default;
-use parley::{GenericFamily, StyleProperty, editor::SplitString, layout::PositionedLayoutItem};
+use parley::{
+    GenericFamily, LineHeight, StyleProperty, editor::SplitString, layout::PositionedLayoutItem,
+};
 use std::time::Duration;
 use vello::{
     Scene,
@@ -48,9 +50,7 @@ impl Editor {
         editor.set_text(text);
         editor.set_scale(1.0);
         let styles = editor.edit_styles();
-        styles.insert(StyleProperty::LineHeight(
-            parley::LineHeight::FontSizeRelative(1.2),
-        ));
+        styles.insert(LineHeight::FontSizeRelative(1.2).into());
         styles.insert(GenericFamily::SystemUi.into());
         styles.insert(StyleProperty::Brush(palette::css::WHITE.into()));
         Self {
