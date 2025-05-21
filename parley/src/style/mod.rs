@@ -60,6 +60,12 @@ pub enum LineHeight {
     Absolute(f32),
 }
 
+impl Default for LineHeight {
+    fn default() -> Self {
+        Self::MetricsRelative(1.0)
+    }
+}
+
 impl LineHeight {
     pub(crate) fn nearly_eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -204,7 +210,7 @@ impl<B: Brush> Default for TextStyle<'_, B> {
             strikethrough_offset: Default::default(),
             strikethrough_size: Default::default(),
             strikethrough_brush: Default::default(),
-            line_height: LineHeight::MetricsRelative(1.),
+            line_height: Default::default(),
             word_spacing: Default::default(),
             letter_spacing: Default::default(),
             word_break: Default::default(),

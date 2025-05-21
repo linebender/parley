@@ -427,7 +427,7 @@ impl<B: Brush> Default for ResolvedStyle<B> {
             brush: Default::default(),
             underline: Default::default(),
             strikethrough: Default::default(),
-            line_height: crate::LineHeight::MetricsRelative(1.),
+            line_height: Default::default(),
             word_spacing: 0.,
             letter_spacing: 0.,
             word_break: Default::default(),
