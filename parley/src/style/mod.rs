@@ -83,10 +83,10 @@ impl LineHeight {
         }
     }
 
-    pub(crate) fn resolve(&self, scale: f32) -> LayoutLineHeight {
+    pub(crate) fn resolve(&self, font_size: f32) -> LayoutLineHeight {
         match self {
             Self::MetricsRelative(value) => LayoutLineHeight::MetricsRelative(*value),
-            Self::FontSizeRelative(value) => LayoutLineHeight::Absolute(*value * scale),
+            Self::FontSizeRelative(value) => LayoutLineHeight::Absolute(*value * font_size),
             Self::Absolute(value) => LayoutLineHeight::Absolute(*value),
         }
     }
