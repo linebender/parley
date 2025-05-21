@@ -280,7 +280,7 @@ pub struct Line<'a, B: Brush> {
     data: &'a LineData,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) enum LayoutLineHeight {
     MetricsRelative(f32),
     Absolute(f32),
