@@ -179,6 +179,8 @@ impl TestEnv {
                 color: self.text_color,
             }),
             StyleProperty::FontStack(FontStack::List(FONT_STACK.into())),
+            // When our tests were originally generated, they used this style value, as it was the default.
+            // To avoid regenerating all tests, as the default has now changed, set this explicitly.
             StyleProperty::LineHeight(LineHeight::FontSizeRelative(1.0)),
         ]
     }
