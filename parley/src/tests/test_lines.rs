@@ -91,7 +91,7 @@ fn build_layout<A: Into<Option<f32>>>(
 ) -> Layout<ColorBrush> {
     let mut builder = env.ranged_builder(TEXT);
     builder.push_default(StyleProperty::FontSize(font_size));
-    builder.push_default(LineHeight::FontSizeRelative(line_height));
+    builder.push_default(LineHeight::Absolute(line_height));
 
     let underline_style = StyleProperty::Underline(true);
     let strikethrough_style = StyleProperty::Strikethrough(true);
@@ -134,7 +134,7 @@ fn compute(
     // Compute the layout
     let size = Size::new(width as f64, height as f64);
     let mut env = TestEnv::new(test_name, size);
-    let layout = build_layout(&mut env, font_size, line_height_px / font_size, width);
+    let layout = build_layout(&mut env, font_size, line_height_px, width);
     let selections = get_selections(&layout);
     (env, layout, selections)
 }
