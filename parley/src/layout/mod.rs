@@ -307,7 +307,7 @@ pub struct Style<B: Brush> {
     pub underline: Option<Decoration<B>>,
     /// Strikethrough decoration.
     pub strikethrough: Option<Decoration<B>>,
-    /// Resolved line height, either in in layout units or dependent on metrics
+    /// Partially resolved line height, either in in layout units or dependent on metrics
     pub(crate) line_height: LayoutLineHeight,
     /// Per-cluster overflow-wrap setting
     pub(crate) overflow_wrap: OverflowWrap,
