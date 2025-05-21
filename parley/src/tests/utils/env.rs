@@ -3,8 +3,8 @@
 
 use crate::tests::utils::renderer::{ColorBrush, RenderingConfig, render_layout};
 use crate::{
-    FontContext, FontFamily, FontStack, Layout, LayoutContext, PlainEditor, PlainEditorDriver,
-    RangedBuilder, Rect, StyleProperty, TextStyle, TreeBuilder,
+    FontContext, FontFamily, FontStack, Layout, LayoutContext, LineHeight, PlainEditor,
+    PlainEditorDriver, RangedBuilder, Rect, StyleProperty, TextStyle, TreeBuilder,
 };
 use fontique::{Blob, Collection, CollectionOptions};
 use peniko::kurbo::Size;
@@ -173,12 +173,13 @@ impl TestEnv {
         &mut self.rendering_config
     }
 
-    fn default_style(&self) -> [StyleProperty<'static, ColorBrush>; 2] {
+    fn default_style(&self) -> [StyleProperty<'static, ColorBrush>; 3] {
         [
             StyleProperty::Brush(ColorBrush {
                 color: self.text_color,
             }),
             StyleProperty::FontStack(FontStack::List(FONT_STACK.into())),
+            StyleProperty::LineHeight(LineHeight::FontSizeRelative(1.0)),
         ]
     }
 
