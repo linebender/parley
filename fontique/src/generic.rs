@@ -11,7 +11,7 @@ use smallvec::SmallVec;
 type FamilyVec = SmallVec<[FamilyId; 2]>;
 
 /// Describes a generic font family.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 #[repr(u8)]
 pub enum GenericFamily {
     /// Glyphs have finishing strokes, flared or tapering ends, or have actual

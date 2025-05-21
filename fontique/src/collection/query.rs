@@ -180,7 +180,7 @@ pub enum QueryStatus {
 ///
 /// This allows [`Query::set_families`] to
 /// take a variety of family types.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum QueryFamily<'a> {
     /// A named font family.
     Named(&'a str),
