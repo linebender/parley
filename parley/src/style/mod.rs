@@ -43,13 +43,20 @@ pub enum OverflowWrap {
     BreakWord,
 }
 
+/// The height that this text takes up. The default is `MetricsRelative(1.0)`, which is the given
+/// font's preferred line height.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LineHeight {
-    /// Line height specified relative to what's defined in the font's metrics.
+    /// The line's height is a multiple of the "line height" defined by the font's metrics--the sum
+    /// of the ascender height, descender height, and line gap / leading.
     MetricsRelative(f32),
-    /// Line height specified as a multiple of the font size.
+    /// Line height specified as a multiple of the font size. This is how the CSS `line-height`
+    /// property behaves if given a unitless number. Useful if you're using system-defined generic
+    /// font families and want the layout to be consistent across platforms.
     FontSizeRelative(f32),
-    /// Line height specified in absolute units.
+    /// Line height specified in absolute units. This can be useful for ensuring all lines are
+    /// spaced a whole number of pixels apart, or fitting lines into a given layout container
+    /// height.
     Absolute(f32),
 }
 
