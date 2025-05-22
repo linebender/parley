@@ -125,6 +125,9 @@ fn main() {
         builder.push_style_modification_span(&[strikethrough_style]);
         builder.push_text(&text[155..168]);
 
+        builder.pop_style_span();
+        builder.push_text(&text[168..]);
+
         // Build the builder into a Layout
         // let mut layout: Layout<ColorBrush> = builder.build(&text);
         let (layout, _text): (Layout<ColorBrush>, String) = builder.build();
