@@ -188,7 +188,7 @@ impl ResolveContext {
                 size: raw_style.strikethrough_size.map(|x| x * scale),
                 brush: raw_style.strikethrough_brush.clone(),
             },
-            line_height: raw_style.line_height,
+            line_height: raw_style.line_height.scale(scale),
             word_spacing: raw_style.word_spacing * scale,
             letter_spacing: raw_style.letter_spacing * scale,
             word_break: raw_style.word_break,
