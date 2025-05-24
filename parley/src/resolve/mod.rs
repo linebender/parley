@@ -17,7 +17,7 @@ use super::style::{
 use crate::font::FontContext;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
-use crate::{OverflowWrap, WordBreakStrength, layout};
+use crate::{LineHeight, OverflowWrap, WordBreakStrength, layout};
 use core::borrow::Borrow;
 use core::ops::Range;
 use fontique::FamilyId;
@@ -365,7 +365,7 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     /// Brush for rendering the strikethrough decoration.
     StrikethroughBrush(Option<B>),
     /// Line height.
-    LineHeight(crate::LineHeight),
+    LineHeight(LineHeight),
     /// Extra spacing between words.
     WordSpacing(f32),
     /// Extra spacing between letters.
@@ -402,7 +402,7 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     /// Strikethrough decoration.
     pub(crate) strikethrough: ResolvedDecoration<B>,
     /// Line height.
-    pub(crate) line_height: crate::LineHeight,
+    pub(crate) line_height: LineHeight,
     /// Extra spacing between words.
     pub(crate) word_spacing: f32,
     /// Extra spacing between letters.

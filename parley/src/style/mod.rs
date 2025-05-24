@@ -52,7 +52,7 @@ pub enum LineHeight {
     MetricsRelative(f32),
     /// Line height specified as a multiple of the font size. This is how the CSS `line-height`
     /// property behaves if given a unitless number. Useful if you're using system-defined generic
-    /// font families and want the layout to be consistent across platforms.
+    /// font families and want the line heights to be consistent across platforms.
     FontSizeRelative(f32),
     /// Line height specified in absolute units. This can be useful for ensuring all lines are
     /// spaced a whole number of pixels apart, or fitting lines into a given layout container
