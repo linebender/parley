@@ -3194,8 +3194,7 @@ checksum = "0193cc4331cfd2f3d2011ef287590868599a2f33c3e69bc22c1a3d3acf9e02fb"
 [[package]]
 name = "swash"
 version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dce3f0af95643c855cdc449fbaa17d8c2cd08e0b00a49a6babcbe6e71667f3d"
+source = "git+https://github.com/dfrg/swash?rev=fbc4c5aea5167fa10b92b453d9e308934e7232fd#fbc4c5aea5167fa10b92b453d9e308934e7232fd"
 dependencies = [
  "core_maths",
  "skrifa",

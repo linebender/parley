@@ -17,7 +17,7 @@ use alloc::vec::Vec;
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct ClusterData {
     pub(crate) info: ClusterInfo,
     pub(crate) flags: u16,
@@ -55,7 +55,7 @@ impl ClusterData {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct RunData {
     /// Index of the font for the run.
     pub(crate) font_index: usize,
@@ -94,7 +94,7 @@ pub enum BreakReason {
     Emergency,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug, PartialEq)]
 pub(crate) struct LineData {
     /// Range of the source text.
     pub(crate) text_range: Range<usize>,
@@ -104,10 +104,6 @@ pub(crate) struct LineData {
     pub(crate) metrics: LineMetrics,
     /// The cause of the line break.
     pub(crate) break_reason: BreakReason,
-    #[expect(
-        dead_code,
-        reason = "needed in the future for aligning around floated boxes"
-    )]
     /// Maximum advance for the line.
     pub(crate) max_advance: f32,
     /// Number of justified clusters on the line.
@@ -120,7 +116,7 @@ impl LineData {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LineItemData {
     /// Whether the item is a run or an inline box
     pub(crate) kind: LayoutItemKind,
@@ -186,7 +182,7 @@ pub(crate) enum LayoutItemKind {
     InlineBox,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LayoutItem {
     /// Whether the item is a run or an inline box
     pub(crate) kind: LayoutItemKind,
@@ -196,7 +192,7 @@ pub(crate) struct LayoutItem {
     pub(crate) bidi_level: u8,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct LayoutData<B: Brush> {
     pub(crate) scale: f32,
     pub(crate) quantize: bool,

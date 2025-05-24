@@ -93,7 +93,7 @@ impl<'a, B: Brush> Line<'a, B> {
 }
 
 /// Metrics information for a line.
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, PartialEq)]
 pub struct LineMetrics {
     /// Typographic ascent.
     pub ascent: f32,
