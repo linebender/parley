@@ -79,6 +79,7 @@ impl LineHeight {
     pub(crate) fn scale(&self, scale: f32) -> Self {
         match self {
             Self::Absolute(value) => Self::Absolute(*value * scale),
+            // The other variants are relative to the font size, so scaling here needn't do anything
             value => *value,
         }
     }
