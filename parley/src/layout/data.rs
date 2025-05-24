@@ -159,12 +159,15 @@ impl LineItemData {
                         let start = glyph_start + cluster.glyph_offset as usize;
                         let end = start + cluster.glyph_len as usize;
                         for glyph in &layout.glyphs[start..end] {
-                            line_height =
-                                line_height.max(layout.styles[glyph.style_index()].line_height);
+                            line_height = line_height
+                                .max(layout.styles[glyph.style_index()].line_height.resolve(run));
                         }
                     } else {
-                        line_height = line_height
-                            .max(layout.styles[cluster.style_index as usize].line_height);
+                        line_height = line_height.max(
+                            layout.styles[cluster.style_index as usize]
+                                .line_height
+                                .resolve(run),
+                        );
                     }
                 }
                 line_height

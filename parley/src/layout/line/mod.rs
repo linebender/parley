@@ -102,7 +102,6 @@ pub struct LineMetrics {
     /// Typographic leading.
     pub leading: f32,
     /// The absolute line height (in layout units).
-    /// It matches the CSS definition of line height where it is derived as a multiple of the font size.
     pub line_height: f32,
     /// Offset to the baseline.
     pub baseline: f32,

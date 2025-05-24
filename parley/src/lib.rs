@@ -24,7 +24,7 @@
 //! ```rust
 //! use parley::{
 //!    Alignment, AlignmentOptions, FontContext, FontWeight, InlineBox, Layout, LayoutContext,
-//!    PositionedLayoutItem, StyleProperty,
+//!    LineHeight, PositionedLayoutItem, StyleProperty,
 //! };
 //!
 //! // Create a FontContext (font database) and LayoutContext (scratch space).
@@ -38,7 +38,6 @@
 //! let mut builder = layout_cx.ranged_builder(&mut font_cx, &TEXT, DISPLAY_SCALE, true);
 //!
 //! // Set default styles that apply to the entire layout
-//! builder.push_default(StyleProperty::LineHeight(1.3));
 //! builder.push_default(StyleProperty::FontSize(16.0));
 //!
 //! // Set a style that applies to the first 4 characters

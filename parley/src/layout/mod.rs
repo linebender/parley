@@ -280,6 +280,23 @@ pub struct Line<'a, B: Brush> {
     data: &'a LineData,
 }
 
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum LayoutLineHeight {
+    MetricsRelative(f32),
+    Absolute(f32),
+}
+
+impl LayoutLineHeight {
+    pub(crate) fn resolve(&self, run: &RunData) -> f32 {
+        match self {
+            Self::MetricsRelative(value) => {
+                (run.metrics.ascent + run.metrics.descent + run.metrics.leading) * value
+            }
+            Self::Absolute(value) => *value,
+        }
+    }
+}
+
 #[allow(clippy::partial_pub_fields)]
 /// Style properties.
 #[derive(Clone, Debug)]
@@ -290,8 +307,8 @@ pub struct Style<B: Brush> {
     pub underline: Option<Decoration<B>>,
     /// Strikethrough decoration.
     pub strikethrough: Option<Decoration<B>>,
-    /// Absolute line height in layout units (style line height * font size)
-    pub(crate) line_height: f32,
+    /// Partially resolved line height, either in in layout units or dependent on metrics
+    pub(crate) line_height: LayoutLineHeight,
     /// Per-cluster overflow-wrap setting
     pub(crate) overflow_wrap: OverflowWrap,
 }

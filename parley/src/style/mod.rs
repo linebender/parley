@@ -17,6 +17,8 @@ pub use font::{
 pub use styleset::StyleSet;
 pub use swash::text::WordBreakStrength;
 
+use crate::{LayoutLineHeight, util::nearly_eq};
+
 #[derive(Debug, Clone, Copy)]
 pub enum WhiteSpaceCollapse {
     Collapse,
@@ -39,6 +41,56 @@ pub enum OverflowWrap {
     /// Like [`OverflowWrap::Anywhere`], except arbitrary wrapping opportunities are not considered
     /// when calculating the minimum content width (see [`crate::Layout::calculate_content_widths`]).
     BreakWord,
+}
+
+/// The height that this text takes up. The default is `MetricsRelative(1.0)`, which is the given
+/// font's preferred line height.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum LineHeight {
+    /// The line's height is a multiple of the "line height" defined by the font's metrics--the sum
+    /// of the ascender height, descender height, and line gap / leading.
+    MetricsRelative(f32),
+    /// Line height specified as a multiple of the font size. This is how the CSS `line-height`
+    /// property behaves if given a unitless number. Useful if you're using system-defined generic
+    /// font families and want the line heights to be consistent across platforms.
+    FontSizeRelative(f32),
+    /// Line height specified in absolute units. This can be useful for ensuring all lines are
+    /// spaced a whole number of pixels apart, or fitting lines into a given layout container
+    /// height.
+    Absolute(f32),
+}
+
+impl Default for LineHeight {
+    fn default() -> Self {
+        Self::MetricsRelative(1.0)
+    }
+}
+
+impl LineHeight {
+    pub(crate) fn nearly_eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::MetricsRelative(a), Self::MetricsRelative(b))
+            | (Self::FontSizeRelative(a), Self::FontSizeRelative(b))
+            | (Self::Absolute(a), Self::Absolute(b)) => nearly_eq(*a, *b),
+            _ => false,
+        }
+    }
+
+    pub(crate) fn scale(&self, scale: f32) -> Self {
+        match self {
+            Self::Absolute(value) => Self::Absolute(*value * scale),
+            // The other variants are relative to the font size, so scaling here needn't do anything
+            value => *value,
+        }
+    }
+
+    pub(crate) fn resolve(&self, font_size: f32) -> LayoutLineHeight {
+        match self {
+            Self::MetricsRelative(value) => LayoutLineHeight::MetricsRelative(*value),
+            Self::FontSizeRelative(value) => LayoutLineHeight::Absolute(*value * font_size),
+            Self::Absolute(value) => LayoutLineHeight::Absolute(*value),
+        }
+    }
 }
 
 /// Properties that define a style.
@@ -78,8 +130,8 @@ pub enum StyleProperty<'a, B: Brush> {
     StrikethroughSize(Option<f32>),
     /// Brush for rendering the strikethrough decoration.
     StrikethroughBrush(Option<B>),
-    /// Line height multiplier.
-    LineHeight(f32),
+    /// Line height.
+    LineHeight(LineHeight),
     /// Extra spacing between words.
     WordSpacing(f32),
     /// Extra spacing between letters.
@@ -127,8 +179,8 @@ pub struct TextStyle<'a, B: Brush> {
     pub strikethrough_size: Option<f32>,
     /// Brush for rendering the strikethrough decoration.
     pub strikethrough_brush: Option<B>,
-    /// Line height multiplier.
-    pub line_height: f32,
+    /// Line height.
+    pub line_height: LineHeight,
     /// Extra spacing between words.
     pub word_spacing: f32,
     /// Extra spacing between letters.
@@ -159,7 +211,7 @@ impl<B: Brush> Default for TextStyle<'_, B> {
             strikethrough_offset: Default::default(),
             strikethrough_size: Default::default(),
             strikethrough_brush: Default::default(),
-            line_height: 1.2,
+            line_height: Default::default(),
             word_spacing: Default::default(),
             letter_spacing: Default::default(),
             word_break: Default::default(),
@@ -189,5 +241,11 @@ impl<'a, B: Brush> From<FontFamily<'a>> for StyleProperty<'a, B> {
 impl<B: Brush> From<GenericFamily> for StyleProperty<'_, B> {
     fn from(f: GenericFamily) -> Self {
         StyleProperty::FontStack(f.into())
+    }
+}
+
+impl<B: Brush> From<LineHeight> for StyleProperty<'_, B> {
+    fn from(value: LineHeight) -> Self {
+        StyleProperty::LineHeight(value)
     }
 }

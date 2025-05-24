@@ -14,7 +14,7 @@ use image::codecs::png::PngEncoder;
 use image::{self, Pixel, Rgba, RgbaImage};
 use parley::layout::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
 use parley::style::{FontStack, FontWeight, StyleProperty, TextStyle};
-use parley::{AlignmentOptions, FontContext, InlineBox, LayoutContext};
+use parley::{AlignmentOptions, FontContext, InlineBox, LayoutContext, LineHeight};
 use std::fs::File;
 use swash::FontRef;
 use swash::scale::image::Content;
@@ -82,7 +82,7 @@ fn main() {
         let root_style = TextStyle {
             brush: text_brush,
             font_stack,
-            line_height: 1.3,
+            line_height: LineHeight::FontSizeRelative(1.3),
             font_size: 16.0,
             ..Default::default()
         };
@@ -144,7 +144,7 @@ fn main() {
 
         // Set default font family
         builder.push_default(font_stack);
-        builder.push_default(StyleProperty::LineHeight(1.3));
+        builder.push_default(LineHeight::FontSizeRelative(1.3));
         builder.push_default(StyleProperty::FontSize(16.0));
 
         // Set the first 4 characters to bold

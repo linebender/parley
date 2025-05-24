@@ -6,7 +6,9 @@
 use peniko::kurbo::{Rect, Size};
 
 use super::utils::{ColorBrush, TestEnv};
-use crate::{Affinity, Brush, Cursor, InlineBox, Layout, Selection, StyleProperty, test_name};
+use crate::{
+    Affinity, Brush, Cursor, InlineBox, Layout, LineHeight, Selection, StyleProperty, test_name,
+};
 
 const TEXT: &str = "Some text here. Let's make\n\
         it a bit longer so that\n \
@@ -89,7 +91,7 @@ fn build_layout<A: Into<Option<f32>>>(
 ) -> Layout<ColorBrush> {
     let mut builder = env.ranged_builder(TEXT);
     builder.push_default(StyleProperty::FontSize(font_size));
-    builder.push_default(StyleProperty::LineHeight(line_height));
+    builder.push_default(LineHeight::Absolute(line_height));
 
     let underline_style = StyleProperty::Underline(true);
     let strikethrough_style = StyleProperty::Strikethrough(true);
@@ -132,7 +134,7 @@ fn compute(
     // Compute the layout
     let size = Size::new(width as f64, height as f64);
     let mut env = TestEnv::new(test_name, size);
-    let layout = build_layout(&mut env, font_size, line_height_px / font_size, width);
+    let layout = build_layout(&mut env, font_size, line_height_px, width);
     let selections = get_selections(&layout);
     (env, layout, selections)
 }
@@ -538,4 +540,58 @@ fn lines_fractional_line_height_big_positive_leading() {
     let line_height_px = 46.66;
 
     lines_fractional_line_height_positive_leading_internal(test_name!(), font_size, line_height_px);
+}
+
+#[test]
+fn lines_line_height_metrics_relative() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let mut builder = env.ranged_builder(TEXT);
+    builder.push_default(LineHeight::MetricsRelative(1.1));
+
+    let mut layout = builder.build(TEXT);
+
+    layout.break_all_lines(None);
+    layout.align(
+        None,
+        crate::Alignment::Start,
+        crate::AlignmentOptions::default(),
+    );
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn lines_line_height_size_relative() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let mut builder = env.ranged_builder(TEXT);
+    builder.push_default(LineHeight::FontSizeRelative(1.2));
+
+    let mut layout = builder.build(TEXT);
+
+    layout.break_all_lines(None);
+    layout.align(
+        None,
+        crate::Alignment::Start,
+        crate::AlignmentOptions::default(),
+    );
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn lines_line_height_absolute() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let mut builder = env.ranged_builder(TEXT);
+    builder.push_default(LineHeight::Absolute(20.0));
+
+    let mut layout = builder.build(TEXT);
+
+    layout.break_all_lines(None);
+    layout.align(
+        None,
+        crate::Alignment::Start,
+        crate::AlignmentOptions::default(),
+    );
+    env.check_layout_snapshot(&layout);
 }

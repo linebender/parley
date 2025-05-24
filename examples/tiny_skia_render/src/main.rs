@@ -15,7 +15,7 @@
 
 use parley::{
     Alignment, AlignmentOptions, FontContext, FontWeight, GenericFamily, GlyphRun, InlineBox,
-    Layout, LayoutContext, PositionedLayoutItem, StyleProperty,
+    Layout, LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty,
 };
 use skrifa::{
     GlyphId, MetadataProvider, OutlineGlyph,
@@ -79,7 +79,7 @@ fn main() {
 
     // Set default font family
     builder.push_default(GenericFamily::SystemUi);
-    builder.push_default(StyleProperty::LineHeight(1.3));
+    builder.push_default(LineHeight::FontSizeRelative(1.3));
     builder.push_default(StyleProperty::FontSize(16.0));
 
     // Set the first 4 characters to bold
