@@ -57,7 +57,7 @@ fn font_dirs() -> impl Iterator<Item = PathBuf> {
     .into_iter()
 }
 
-const FONT_STACK: &[FontFamily<'_>] = &[
+pub(crate) const FONT_STACK: &[FontFamily<'_>] = &[
     FontFamily::Named(Cow::Borrowed("Roboto")),
     FontFamily::Named(Cow::Borrowed("Noto Kufi Arabic")),
 ];

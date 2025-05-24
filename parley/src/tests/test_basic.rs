@@ -1,15 +1,17 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use peniko::kurbo::Size;
-
-use crate::data::LayoutData;
-use crate::{
-    Alignment, AlignmentOptions, Brush, ContentWidths, InlineBox, Layout, WhiteSpaceCollapse,
-    test_name,
+use peniko::{
+    color::{AlphaColor, Srgb, palette},
+    kurbo::Size,
 };
 
-use super::utils::TestEnv;
+use crate::{
+    Alignment, AlignmentOptions, Brush, ContentWidths, FontStack, InlineBox, Layout, LineHeight,
+    StyleProperty, TextStyle, WhiteSpaceCollapse, data::LayoutData, test_name,
+};
+
+use super::utils::{ColorBrush, FONT_STACK, TestEnv};
 
 #[test]
 fn plain_multiline_text() {
@@ -180,6 +182,58 @@ fn leading_whitespace() {
         layout.align(None, Alignment::Start, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
+}
+
+#[test]
+fn nested_span_inheritance() {
+    let ts = |c: AlphaColor<Srgb>| TextStyle {
+        font_stack: FontStack::from(FONT_STACK),
+        font_size: 24.,
+        line_height: LineHeight::Absolute(30.),
+        brush: ColorBrush::new(c),
+        ..TextStyle::default()
+    };
+    let sp = |c: AlphaColor<Srgb>| [StyleProperty::Brush(ColorBrush::new(c))];
+
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut tb = env.tree_builder();
+    tb.push_style_span(ts(palette::css::RED));
+    tb.push_text("N"); // Red
+    tb.push_style_span(ts(palette::css::RED));
+    tb.push_text("e"); // Red
+    tb.push_style_span(ts(palette::css::GREEN));
+    tb.push_text("s"); // Green
+    tb.push_style_modification_span(&sp(palette::css::GREEN));
+    tb.push_text("t"); // Green
+    tb.push_style_span(ts(palette::css::BLUE));
+    tb.push_text("e"); // Blue
+    tb.push_style_modification_span(None);
+    tb.push_text("d"); // Blue
+    tb.push_text(" ");
+    tb.pop_style_span();
+    tb.push_text("s"); // Blue
+    tb.pop_style_span();
+    tb.push_text("p"); // Green
+    tb.pop_style_span();
+    tb.push_text("a"); // Green
+    tb.pop_style_span();
+    tb.push_text("n"); // Red
+    tb.pop_style_span();
+    tb.push_text("s"); // Red
+    tb.pop_style_span();
+    tb.push_text(" w"); // Root style
+    tb.push_style_span(ts(palette::css::GOLD));
+    tb.push_style_span(ts(palette::css::GOLD));
+    tb.push_style_span(ts(palette::css::GOLD));
+    tb.push_text("o"); // Triple-nested gold
+    tb.pop_style_span();
+    tb.pop_style_span();
+    tb.pop_style_span();
+    tb.push_text("rk"); // Root style
+
+    let (mut layout, _) = tb.build();
+    layout.break_all_lines(None);
+    env.check_layout_snapshot(&layout);
 }
 
 #[test]
