@@ -87,7 +87,10 @@ impl<B: Brush> LayoutContext<B> {
         quantize: bool,
     ) -> RangedBuilder<'a, B> {
         self.begin();
-        self.ranged_style_builder.begin(text.len());
+
+        let resolved_root_style = self.resolve_style_set(fcx, scale, &TextStyle::default());
+        self.ranged_style_builder
+            .begin(resolved_root_style, text.len());
 
         fcx.source_cache.prune(128, false);
 
@@ -123,11 +126,11 @@ impl<B: Brush> LayoutContext<B> {
         fcx: &'a mut FontContext,
         scale: f32,
         quantize: bool,
-        raw_style: &TextStyle<'_, B>,
+        root_style: &TextStyle<'_, B>,
     ) -> TreeBuilder<'a, B> {
         self.begin();
 
-        let resolved_root_style = self.resolve_style_set(fcx, scale, raw_style);
+        let resolved_root_style = self.resolve_style_set(fcx, scale, root_style);
         self.tree_style_builder.begin(resolved_root_style);
 
         fcx.source_cache.prune(128, false);

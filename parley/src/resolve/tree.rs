@@ -57,7 +57,9 @@ impl<B: Brush> Default for TreeStyleBuilder<B> {
 }
 
 impl<B: Brush> TreeStyleBuilder<B> {
-    /// Prepares the builder for accepting a style tree for text of the specified length.
+    /// Prepares the builder for accepting a tree of styles and text.
+    ///
+    /// The provided `root_style` is the default style applied to all text unless overridden.
     pub(crate) fn begin(&mut self, root_style: ResolvedStyle<B>) {
         self.tree.clear();
         self.flatted_styles.clear();

@@ -21,6 +21,10 @@ This release has an [MSRV] of 1.82.
 
 ### Fixed
 
+#### Parley
+
+- Range builder default style not respecting `scale`. ([#368][] by [@xStrom][])
+
 ## [0.5.0] - 2025-06-01
 
 This release has an [MSRV] of 1.82.
@@ -291,6 +295,7 @@ This release has an [MSRV][] of 1.70.
 [#348]: https://github.com/linebender/parley/pull/348
 [#353]: https://github.com/linebender/parley/pull/353
 [#362]: https://github.com/linebender/parley/pull/362
+[#368]: https://github.com/linebender/parley/pull/368
 [#369]: https://github.com/linebender/parley/pull/369
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.5.0...HEAD
