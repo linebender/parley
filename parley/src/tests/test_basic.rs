@@ -18,7 +18,7 @@ fn plain_multiline_text() {
     let mut env = TestEnv::new(test_name!(), None);
 
     let text = "Hello world!\nLine 2\nLine 4";
-    let mut builder = env.ranged_builder(text);
+    let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
     layout.align(None, Alignment::Start, AlignmentOptions::default());
@@ -147,7 +147,7 @@ fn trailing_whitespace() {
     let mut env = TestEnv::new(test_name!(), None);
 
     let text = "AAA BBB";
-    let mut builder = env.ranged_builder(text);
+    let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(45.));
     layout.align(None, Alignment::Start, AlignmentOptions::default());
@@ -247,7 +247,7 @@ fn base_level_alignment_ltr() {
         (Alignment::Justified, "justified"),
     ] {
         let text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
-        let mut builder = env.ranged_builder(text);
+        let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(150.0));
         layout.align(Some(150.0), alignment, AlignmentOptions::default());
@@ -266,7 +266,7 @@ fn base_level_alignment_rtl() {
         (Alignment::Justified, "justified"),
     ] {
         let text = "عند برمجة أجهزة الكمبيوتر، قد تجد نفسك فجأة في مواقف غريبة، مثل الكتابة بلغة لا تتحدثها فعليًا.";
-        let mut builder = env.ranged_builder(text);
+        let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(150.0));
         layout.align(None, alignment, AlignmentOptions::default());
@@ -281,7 +281,7 @@ fn overflow_alignment_rtl() {
     let mut env = TestEnv::new(test_name!(), None);
 
     let text = "عند برمجة أجهزة الكمبيوتر، قد تجد نفسك فجأة في مواقف غريبة، مثل الكتابة بلغة لا تتحدثها فعليًا.";
-    let mut builder = env.ranged_builder(text);
+    let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(1000.0));
     layout.align(Some(10.), Alignment::Middle, AlignmentOptions::default());
@@ -294,7 +294,7 @@ fn content_widths() {
     let mut env = TestEnv::new(test_name!(), None);
 
     let text = "Hello world!\nLonger line with a looooooooong word.";
-    let mut builder = env.ranged_builder(text);
+    let builder = env.ranged_builder(text);
 
     let mut layout = builder.build(text);
 
@@ -317,7 +317,7 @@ fn content_widths_rtl() {
     let mut env = TestEnv::new(test_name!(), None);
 
     let text = "بببب ااااا";
-    let mut builder = env.ranged_builder(text);
+    let builder = env.ranged_builder(text);
 
     let mut layout = builder.build(text);
 
@@ -396,7 +396,7 @@ fn realign() {
     let mut env = TestEnv::new(test_name!(), None);
 
     let text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
-    let mut builder = env.ranged_builder(text);
+    let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(150.0));
     for idx in 0..8 {
@@ -458,7 +458,7 @@ fn realign_all() {
     for (text, _) in texts {
         for (alignment, _) in alignments {
             for (max_advance, opts, _, _) in all_opts {
-                let mut builder = env.ranged_builder(text);
+                let builder = env.ranged_builder(text);
                 let mut layout = builder.build(text);
                 layout.break_all_lines(max_advance);
                 layout.align(Some(150.), alignment, opts);
