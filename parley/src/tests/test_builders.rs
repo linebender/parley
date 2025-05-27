@@ -11,9 +11,53 @@ use swash::text::WordBreakStrength;
 
 use super::utils::{ColorBrush, FONT_STACK, asserts::assert_eq_layout_data, create_font_context};
 use crate::{
-    FontSettings, FontStack, LayoutContext, LineHeight, OverflowWrap, RangedBuilder, StyleProperty,
-    TextStyle, TreeBuilder,
+    FontContext, FontSettings, FontStack, Layout, LayoutContext, LineHeight, OverflowWrap,
+    RangedBuilder, StyleProperty, TextStyle, TreeBuilder,
 };
+
+/// Set of options for [`build_layout_with_ranged`].
+struct RangedOptions<'a> {
+    scale: f32,
+    quantize: bool,
+    max_advance: Option<f32>,
+    text: &'a str,
+}
+
+/// Set of options for [`build_layout_with_tree`].
+struct TreeOptions<'a, 'b> {
+    scale: f32,
+    quantize: bool,
+    max_advance: Option<f32>,
+    root_style: &'a TextStyle<'b, ColorBrush>,
+}
+
+/// Generates a `Layout` with a ranged builder.
+fn build_layout_with_ranged(
+    fcx: &mut FontContext,
+    lcx: &mut LayoutContext<ColorBrush>,
+    opts: &RangedOptions<'_>,
+    with_builder: impl Fn(&mut RangedBuilder<'_, ColorBrush>),
+) -> Layout<ColorBrush> {
+    let mut rb = lcx.ranged_builder(fcx, opts.text, opts.scale, opts.quantize);
+    with_builder(&mut rb);
+    let mut layout = rb.build(opts.text);
+    layout.break_all_lines(opts.max_advance);
+    layout
+}
+
+/// Generates a `Layout` with a tree builder.
+fn build_layout_with_tree(
+    fcx: &mut FontContext,
+    lcx: &mut LayoutContext<ColorBrush>,
+    opts: &TreeOptions<'_, '_>,
+    with_builder: impl Fn(&mut TreeBuilder<'_, ColorBrush>),
+) -> Layout<ColorBrush> {
+    let mut tb = lcx.tree_builder(fcx, opts.scale, opts.quantize, opts.root_style);
+    with_builder(&mut tb);
+    let (mut layout, _) = tb.build();
+    layout.break_all_lines(opts.max_advance);
+    layout
+}
 
 /// Computes layout in various ways to ensure they all produce the same result.
 ///
@@ -30,12 +74,12 @@ use crate::{
 /// LayoutContext D - Tree for dirt
 /// LayoutContext D - Ranged from dirty
 /// ```
-fn assert_builders_produce_same_result(
+fn assert_builders_produce_same_result<'a, 'b>(
     text: &str,
     scale: f32,
     quantize: bool,
     max_advance: Option<f32>,
-    root_style: &TextStyle<'_, ColorBrush>,
+    root_style: &'a TextStyle<'b, ColorBrush>,
     with_ranged_builder: impl Fn(&mut RangedBuilder<'_, ColorBrush>),
     with_tree_builder: impl Fn(&mut TreeBuilder<'_, ColorBrush>),
 ) {
@@ -46,105 +90,71 @@ fn assert_builders_produce_same_result(
     let mut lcx_c: LayoutContext<ColorBrush> = LayoutContext::new();
     let mut lcx_d: LayoutContext<ColorBrush> = LayoutContext::new();
 
+    let ropts = RangedOptions {
+        scale,
+        quantize,
+        max_advance,
+        text,
+    };
+    let topts = TreeOptions {
+        scale,
+        quantize,
+        max_advance,
+        root_style,
+    };
+
     // Source of truth - ranged builder from a clean layout context
-    let mut lcx_a_rb_one = lcx_a.ranged_builder(&mut fcx, text, scale, quantize);
-    with_ranged_builder(&mut lcx_a_rb_one);
-    let mut lcx_a_rb_one_layout = lcx_a_rb_one.build(text);
-    lcx_a_rb_one_layout.break_all_lines(max_advance);
+    let layout_truth = build_layout_with_ranged(&mut fcx, &mut lcx_a, &ropts, &with_ranged_builder);
     assert!(
-        !lcx_a_rb_one_layout.data.runs.is_empty(),
-        "expected runs to exist for lcx_a_rb_one_layout"
+        !layout_truth.data.runs.is_empty(),
+        "expected runs to exist for lcx_a_rb_one"
     );
 
     // Testing idempotence of ranged builder creation
-    let mut lcx_a_rb_two = lcx_a.ranged_builder(&mut fcx, text, scale, quantize);
-    with_ranged_builder(&mut lcx_a_rb_two);
-    let mut lcx_a_rb_two_layout = lcx_a_rb_two.build(text);
-    lcx_a_rb_two_layout.break_all_lines(max_advance);
+    let layout = build_layout_with_ranged(&mut fcx, &mut lcx_a, &ropts, &with_ranged_builder);
     assert!(
-        !lcx_a_rb_two_layout.data.runs.is_empty(),
-        "expected runs to exist for lcx_a_rb_two_layout"
+        !layout.data.runs.is_empty(),
+        "expected runs to exist for lcx_a_rb_two"
     );
-
-    assert_eq_layout_data(
-        &lcx_a_rb_one_layout.data,
-        &lcx_a_rb_two_layout.data,
-        "lcx_a_rb_two",
-    );
+    assert_eq_layout_data(&layout_truth.data, &layout.data, "lcx_a_rb_two");
 
     // Basic builder compatibility - tree builder from a clean layout context
-    let mut lcx_b_tb_one = lcx_b.tree_builder(&mut fcx, scale, quantize, root_style);
-    with_tree_builder(&mut lcx_b_tb_one);
-    let (mut lcx_b_tb_one_layout, _) = lcx_b_tb_one.build();
-    lcx_b_tb_one_layout.break_all_lines(max_advance);
+    let layout = build_layout_with_tree(&mut fcx, &mut lcx_b, &topts, &with_tree_builder);
     assert!(
-        !lcx_b_tb_one_layout.data.runs.is_empty(),
-        "expected runs to exist for lcx_b_tb_one_layout"
+        !layout.data.runs.is_empty(),
+        "expected runs to exist for lcx_b_tb_one"
     );
-
-    assert_eq_layout_data(
-        &lcx_a_rb_one_layout.data,
-        &lcx_b_tb_one_layout.data,
-        "lcx_b_tb_one",
-    );
+    assert_eq_layout_data(&layout_truth.data, &layout.data, "lcx_b_tb_one");
 
     // Testing idempotence of tree builder creation
-    let mut lcx_b_tb_two = lcx_b.tree_builder(&mut fcx, scale, quantize, root_style);
-    with_tree_builder(&mut lcx_b_tb_two);
-    let (mut lcx_b_tb_two_layout, _) = lcx_b_tb_two.build();
-    lcx_b_tb_two_layout.break_all_lines(max_advance);
+    let layout = build_layout_with_tree(&mut fcx, &mut lcx_b, &topts, &with_tree_builder);
     assert!(
-        !lcx_b_tb_two_layout.data.runs.is_empty(),
-        "expected runs to exist for lcx_b_tb_two_layout"
+        !layout.data.runs.is_empty(),
+        "expected runs to exist for lcx_b_tb_two"
     );
-
-    assert_eq_layout_data(
-        &lcx_a_rb_one_layout.data,
-        &lcx_b_tb_two_layout.data,
-        "lcx_b_tb_two",
-    );
+    assert_eq_layout_data(&layout_truth.data, &layout.data, "lcx_b_tb_two");
 
     // Priming a fresh layout context with ranged builder creation
-    let mut lcx_c_rb_one = lcx_c.ranged_builder(&mut fcx, text, scale, quantize);
-    with_ranged_builder(&mut lcx_c_rb_one);
-    let _ = lcx_c_rb_one.build(text);
+    let _ = build_layout_with_ranged(&mut fcx, &mut lcx_c, &ropts, &with_ranged_builder);
 
     // Testing tree builder creation with a dirty layout context
-    let mut lcx_c_tb_one = lcx_c.tree_builder(&mut fcx, scale, quantize, root_style);
-    with_tree_builder(&mut lcx_c_tb_one);
-    let (mut lcx_c_tb_one_layout, _) = lcx_c_tb_one.build();
-    lcx_c_tb_one_layout.break_all_lines(max_advance);
+    let layout = build_layout_with_tree(&mut fcx, &mut lcx_c, &topts, &with_tree_builder);
     assert!(
-        !lcx_c_tb_one_layout.data.runs.is_empty(),
-        "expected runs to exist for lcx_c_tb_one_layout"
+        !layout.data.runs.is_empty(),
+        "expected runs to exist for lcx_c_tb_one"
     );
-
-    assert_eq_layout_data(
-        &lcx_a_rb_one_layout.data,
-        &lcx_c_tb_one_layout.data,
-        "lcx_c_tb_one",
-    );
+    assert_eq_layout_data(&layout_truth.data, &layout.data, "lcx_c_tb_one");
 
     // Priming a fresh layout context with tree builder creation
-    let mut lcx_d_tb_one = lcx_d.tree_builder(&mut fcx, scale, quantize, root_style);
-    with_tree_builder(&mut lcx_d_tb_one);
-    let _ = lcx_d_tb_one.build();
+    let _ = build_layout_with_tree(&mut fcx, &mut lcx_d, &topts, &with_tree_builder);
 
     // Testing ranged builder creation with a dirty layout context
-    let mut lcx_d_rb_one = lcx_d.ranged_builder(&mut fcx, text, scale, quantize);
-    with_ranged_builder(&mut lcx_d_rb_one);
-    let mut lcx_d_rb_one_layout = lcx_d_rb_one.build(text);
-    lcx_d_rb_one_layout.break_all_lines(max_advance);
+    let layout = build_layout_with_ranged(&mut fcx, &mut lcx_d, &ropts, &with_ranged_builder);
     assert!(
-        !lcx_d_rb_one_layout.data.runs.is_empty(),
-        "expected runs to exist for lcx_d_rb_one_layout"
+        !layout.data.runs.is_empty(),
+        "expected runs to exist for lcx_d_rb_one"
     );
-
-    assert_eq_layout_data(
-        &lcx_a_rb_one_layout.data,
-        &lcx_d_rb_one_layout.data,
-        "lcx_d_rb_one",
-    );
+    assert_eq_layout_data(&layout_truth.data, &layout.data, "lcx_d_rb_one");
 }
 
 /// Returns a root style that uses non-default values.
