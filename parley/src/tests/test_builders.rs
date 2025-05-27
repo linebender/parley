@@ -30,7 +30,7 @@ use crate::{
 /// LayoutContext D - Tree for dirt
 /// LayoutContext D - Ranged from dirty
 /// ```
-fn compute(
+fn assert_builders_produce_same_result(
     text: &str,
     scale: f32,
     quantize: bool,
@@ -229,7 +229,7 @@ fn builders_root_only() {
         tb.push_text(text);
     };
 
-    compute(
+    assert_builders_produce_same_result(
         text,
         scale,
         quantize,
@@ -283,7 +283,7 @@ fn builders_mixed_styles() {
         tb.push_text(&text[17..]);
     };
 
-    compute(
+    assert_builders_produce_same_result(
         text,
         scale,
         quantize,
