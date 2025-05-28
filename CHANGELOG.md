@@ -31,6 +31,7 @@ This release has an [MSRV] of 1.82.
   - The default line height was previously `LineHeight::FontSizeRelative(1.0)` if you used `RangedStyleBuilder`, or `LineHeight::FontSizeRelative(1.2)` if you used `TreeStyleBuilder`.
     It is now `LineHeight::MetricsRelative(1.0)` in both cases.
     This will affect layout if you don't specify your own line height.
+- Breaking change: `{RangedBuilder, TreeBuilder}::{build_into, build}` methods now consume `self`. ([#369][] by [@dhardy][])
 
 ### Fixed
 
@@ -211,6 +212,7 @@ This release has an [MSRV][] of 1.70.
 [@wfdewith]: https://github.com/wfdewith
 [@xorgy]: https://github.com/xorgy
 [@xStrom]: https://github.com/xStrom
+[@dhardy]: https://github.com/dhardy
 
 [#54]: https://github.com/linebender/parley/pull/54
 [#55]: https://github.com/linebender/parley/pull/55
@@ -281,6 +283,7 @@ This release has an [MSRV][] of 1.70.
 [#348]: https://github.com/linebender/parley/pull/348
 [#353]: https://github.com/linebender/parley/pull/353
 [#362]: https://github.com/linebender/parley/pull/362
+[#369]: https://github.com/linebender/parley/pull/369
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/linebender/parley/releases/tag/v0.4.0

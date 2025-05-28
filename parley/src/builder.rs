@@ -16,6 +16,7 @@ use crate::inline_box::InlineBox;
 use crate::resolve::tree::ItemKind;
 
 /// Builder for constructing a text layout with ranged attributes.
+#[must_use]
 pub struct RangedBuilder<'a, B: Brush> {
     pub(crate) scale: f32,
     pub(crate) quantize: bool,
@@ -48,7 +49,7 @@ impl<B: Brush> RangedBuilder<'_, B> {
         self.lcx.inline_boxes.push(inline_box);
     }
 
-    pub fn build_into(&mut self, layout: &mut Layout<B>, text: impl AsRef<str>) {
+    pub fn build_into(self, layout: &mut Layout<B>, text: impl AsRef<str>) {
         // Apply RangedStyleBuilder styles to LayoutContext
         self.lcx.ranged_style_builder.finish(&mut self.lcx.styles);
 
@@ -63,7 +64,7 @@ impl<B: Brush> RangedBuilder<'_, B> {
         );
     }
 
-    pub fn build(&mut self, text: impl AsRef<str>) -> Layout<B> {
+    pub fn build(self, text: impl AsRef<str>) -> Layout<B> {
         let mut layout = Layout::default();
         self.build_into(&mut layout, text);
         layout
@@ -71,6 +72,7 @@ impl<B: Brush> RangedBuilder<'_, B> {
 }
 
 /// Builder for constructing a text layout with a tree of attributes.
+#[must_use]
 pub struct TreeBuilder<'a, B: Brush> {
     pub(crate) scale: f32,
     pub(crate) quantize: bool,
@@ -126,7 +128,8 @@ impl<B: Brush> TreeBuilder<'_, B> {
             .set_white_space_mode(white_space_collapse);
     }
 
-    pub fn build_into(&mut self, layout: &mut Layout<B>) -> String {
+    #[inline]
+    pub fn build_into(self, layout: &mut Layout<B>) -> String {
         // Apply TreeStyleBuilder styles to LayoutContext
         let text = self.lcx.tree_style_builder.finish(&mut self.lcx.styles);
 
@@ -136,7 +139,8 @@ impl<B: Brush> TreeBuilder<'_, B> {
         text
     }
 
-    pub fn build(&mut self) -> (Layout<B>, String) {
+    #[inline]
+    pub fn build(self) -> (Layout<B>, String) {
         let mut layout = Layout::default();
         let text = self.build_into(&mut layout);
         (layout, text)
