@@ -317,7 +317,13 @@ struct Config {
 impl config::ParserSink for Config {
     fn alias(&mut self, family: &str, prefer: &[&str]) {
         if let Some(generic) = GenericFamily::parse(family) {
-            self.generics[generic as usize].extend(prefer.iter().map(|s| s.to_string()));
+            // Ensure additions are unique
+            let list = &mut self.generics[generic as usize];
+            for pref in prefer {
+                if list.iter().all(|item| item != pref) {
+                    list.push(pref.to_string());
+                }
+            }
         }
     }
 
