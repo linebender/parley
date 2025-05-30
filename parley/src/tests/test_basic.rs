@@ -7,11 +7,11 @@ use peniko::{
 };
 
 use crate::{
-    Alignment, AlignmentOptions, Brush, ContentWidths, FontStack, InlineBox, Layout, LineHeight,
-    StyleProperty, TextStyle, WhiteSpaceCollapse, data::LayoutData, test_name,
+    Alignment, AlignmentOptions, ContentWidths, FontStack, InlineBox, Layout, LineHeight,
+    StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
 };
 
-use super::utils::{ColorBrush, FONT_STACK, TestEnv};
+use super::utils::{ColorBrush, FONT_STACK, TestEnv, asserts::assert_eq_layout_data_alignments};
 
 #[test]
 fn plain_multiline_text() {
@@ -497,7 +497,7 @@ fn realign_all() {
                         let top_layout_truth = &layouts[jdx];
                         jdx += 1;
 
-                        assert_eq_layout_alignments(
+                        assert_eq_layout_data_alignments(
                             &top_layout_truth.data,
                             &top_layout.data,
                             &format!("{base_name} -> {top_name}"),
@@ -513,33 +513,4 @@ fn realign_all() {
 fn layout_impl_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<Layout<()>>();
-}
-
-/// Assert that the two provided layouts are equal in terms of alignment metrics.
-fn assert_eq_layout_alignments<B: Brush>(a: &LayoutData<B>, b: &LayoutData<B>, case: &str) {
-    assert_eq!(
-        a.lines.len(),
-        b.lines.len(),
-        "line count mismatch with {case}"
-    );
-
-    for (line_a, line_b) in a.lines.iter().zip(b.lines.iter()) {
-        assert_eq!(
-            line_a.metrics.offset, line_b.metrics.offset,
-            "line offset mismatch with {case}"
-        );
-    }
-
-    assert_eq!(
-        a.clusters.len(),
-        b.clusters.len(),
-        "cluster count mismatch with {case}"
-    );
-
-    for (cluster_a, cluster_b) in a.clusters.iter().zip(b.clusters.iter()) {
-        assert_eq!(
-            cluster_a.advance, cluster_b.advance,
-            "cluster advance mismatch with {case}"
-        );
-    }
 }
