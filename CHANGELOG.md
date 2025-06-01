@@ -23,7 +23,7 @@ This release has an [MSRV] of 1.82.
 
 #### Parley
 
-- Range builder default style not respecting `scale`. ([#368][] by [@xStrom][])
+- Ranged builder default style not respecting `scale`. ([#368][] by [@xStrom][])
 
 ## [0.5.0] - 2025-06-01
 
