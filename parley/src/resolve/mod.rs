@@ -377,7 +377,7 @@ pub(crate) enum ResolvedProperty<B: Brush> {
 }
 
 /// Flattened group of style properties.
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Default)]
 pub(crate) struct ResolvedStyle<B: Brush> {
     /// Font stack.
     pub(crate) font_stack: Resolved<FamilyId>,
@@ -411,29 +411,6 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     pub(crate) word_break: WordBreakStrength,
     /// Control over "emergency" line-breaking.
     pub(crate) overflow_wrap: OverflowWrap,
-}
-
-impl<B: Brush> Default for ResolvedStyle<B> {
-    fn default() -> Self {
-        Self {
-            font_stack: Resolved::default(),
-            font_size: 16.,
-            font_width: Default::default(),
-            font_style: Default::default(),
-            font_weight: Default::default(),
-            font_variations: Default::default(),
-            font_features: Default::default(),
-            locale: None,
-            brush: Default::default(),
-            underline: Default::default(),
-            strikethrough: Default::default(),
-            line_height: Default::default(),
-            word_spacing: 0.,
-            letter_spacing: 0.,
-            word_break: Default::default(),
-            overflow_wrap: Default::default(),
-        }
-    }
 }
 
 impl<B: Brush> ResolvedStyle<B> {
