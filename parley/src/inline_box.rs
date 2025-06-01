@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 /// A box to be laid out inline with text
-#[derive(Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct InlineBox {
     /// User-specified identifier for the box, which can be used by the user to determine which box in
     /// parley's output corresponds to which box in its input.

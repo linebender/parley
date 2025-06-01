@@ -202,7 +202,7 @@ impl<'a, B: Brush> Iterator for Clusters<'a, B> {
 }
 
 /// Metrics information for a run.
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, PartialEq)]
 pub struct RunMetrics {
     /// Typographic ascent.
     pub ascent: f32,

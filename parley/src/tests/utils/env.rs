@@ -114,6 +114,25 @@ pub(crate) fn load_fonts(
     Ok(())
 }
 
+pub(crate) fn create_font_context() -> FontContext {
+    let mut collection = Collection::new(CollectionOptions {
+        shared: false,
+        system_fonts: false,
+    });
+    load_fonts(&mut collection, font_dirs()).unwrap();
+    for font in FONT_STACK {
+        if let FontFamily::Named(font_name) = font {
+            collection
+                .family_id(font_name)
+                .unwrap_or_else(|| panic!("{font_name} font not found"));
+        }
+    }
+    FontContext {
+        collection,
+        source_cache: Default::default(),
+    }
+}
+
 impl TestEnv {
     pub(crate) fn new<S: Into<Option<Size>>>(test_name: &str, size: S) -> Self {
         let file_prefix = format!("{test_name}-");
@@ -129,26 +148,10 @@ impl TestEnv {
                 std::fs::remove_file(&path).unwrap();
             }
         }
-
-        let mut collection = Collection::new(CollectionOptions {
-            shared: false,
-            system_fonts: false,
-        });
-        load_fonts(&mut collection, font_dirs()).unwrap();
-        for font in FONT_STACK {
-            if let FontFamily::Named(font_name) = font {
-                collection
-                    .family_id(font_name)
-                    .unwrap_or_else(|| panic!("{font_name} font not found"));
-            }
-        }
         Self {
             test_name: test_name.to_string(),
             check_counter: 0,
-            font_cx: FontContext {
-                collection,
-                source_cache: Default::default(),
-            },
+            font_cx: create_font_context(),
             tolerance: 0.0,
             layout_cx: LayoutContext::new(),
             text_color: Color::BLACK,

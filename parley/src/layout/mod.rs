@@ -256,7 +256,7 @@ pub struct Cluster<'a, B: Brush> {
 }
 
 /// Glyph with an offset and advance.
-#[derive(Copy, Clone, Default, Debug)]
+#[derive(Copy, Clone, Default, Debug, PartialEq)]
 pub struct Glyph {
     pub id: GlyphId,
     pub style_index: u16,
@@ -280,7 +280,7 @@ pub struct Line<'a, B: Brush> {
     data: &'a LineData,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum LayoutLineHeight {
     MetricsRelative(f32),
     Absolute(f32),
@@ -299,7 +299,7 @@ impl LayoutLineHeight {
 
 #[allow(clippy::partial_pub_fields)]
 /// Style properties.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Style<B: Brush> {
     /// Brush for drawing glyphs.
     pub brush: B,
@@ -314,7 +314,7 @@ pub struct Style<B: Brush> {
 }
 
 /// Underline or strikethrough decoration.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Decoration<B: Brush> {
     /// Brush used to draw the decoration.
     pub brush: B,
