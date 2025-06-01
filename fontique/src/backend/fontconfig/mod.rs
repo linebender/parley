@@ -90,23 +90,12 @@ impl SystemFonts {
         // First, parse the raw config files
         let mut config = Config::default();
         config::parse_config("/etc/fonts/fonts.conf".as_ref(), &mut config);
-        if let Ok(xdg_config_home) = std::env::var("XDG_CONFIG_HOME") {
-            config::parse_config(
-                PathBuf::from(xdg_config_home)
-                    .as_path()
-                    .join("fontconfig/fonts.conf")
-                    .as_path(),
-                &mut config,
-            );
-        } else if let Ok(user_home) = std::env::var("HOME") {
-            config::parse_config(
-                PathBuf::from(user_home)
-                    .as_path()
-                    .join(".config/fontconfig/fonts.conf")
-                    .as_path(),
-                &mut config,
-            );
-        }
+        config::parse_config(
+            config::fc_xdg_dir_home("XDG_CONFIG_HOME")
+                .join("fonts.conf")
+                .as_path(),
+            &mut config,
+        );
 
         // Extract all font/family metadata from the cache files
         cache::parse_caches(&config.cache_dirs, |font| {
