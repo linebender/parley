@@ -8,8 +8,8 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 # Changelog
 
-The latest published Parley release is [0.5.0](#040---2025-05-31) which was released on 2025-05-31.
-You can find its changes [documented below](#050---2025-05-31).
+The latest published Parley release is [0.5.0](#050---2025-06-01) which was released on 2025-06-01.
+You can find its changes [documented below](#050---2025-06-01).
 
 ## [Unreleased]
 
@@ -21,7 +21,7 @@ This release has an [MSRV] of 1.82.
 
 ### Fixed
 
-## [0.5.0] - 2025-05-31
+## [0.5.0] - 2025-06-01
 
 This release has an [MSRV] of 1.82.
 
@@ -29,7 +29,7 @@ This release has an [MSRV] of 1.82.
 
 #### Parley
 
-- Editor features required by Android IME. ([#334][] by [@mwcampbell][]
+- Editor features required by Android IME. ([#334][] by [@mwcampbell][])
 
 ### Changed
 
