@@ -16,7 +16,7 @@ pub mod editor;
 use self::alignment::align;
 
 use super::style::Brush;
-use crate::{Font, InlineBox, OverflowWrap};
+use crate::{Font, InlineBox, OverflowWrap, TextWrapMode};
 #[cfg(feature = "accesskit")]
 use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
 use alignment::unjustify;
@@ -309,6 +309,8 @@ pub struct Style<B: Brush> {
     pub strikethrough: Option<Decoration<B>>,
     /// Partially resolved line height, either in in layout units or dependent on metrics
     pub(crate) line_height: LayoutLineHeight,
+    /// Per-cluster text-wrap-mode setting
+    pub(crate) text_wrap_mode: TextWrapMode,
     /// Per-cluster overflow-wrap setting
     pub(crate) overflow_wrap: OverflowWrap,
 }
