@@ -183,10 +183,13 @@ fn resolve_dir(node: Node<'_, '_>, config_file_path: impl AsRef<Path>) -> Option
         _ => return None,
     };
     let path = match node.attribute("prefix") {
-        Some("xdg") => {
-            PathBuf::from(std::env::var(xdg_env).unwrap_or_else(|_| xdg_fallback.into()))
-                .join(dir_path)
-        }
+        Some("xdg") => PathBuf::from(
+            std::env::var(xdg_env)
+                .ok()
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| xdg_fallback.into()),
+        )
+        .join(dir_path),
         _ => {
             if dir_path.starts_with('/') {
                 dir_path.into()

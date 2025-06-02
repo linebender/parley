@@ -87,25 +87,19 @@ impl SystemFonts {
         let mut source_map = SourcePathMap::default();
         let mut raw_families: HashMap<_, _> = Default::default();
         let mut fallback_map: HashMap<Script, FallbackFamilies> = Default::default();
+
         // First, parse the raw config files
         let mut config = Config::default();
         config::parse_config("/etc/fonts/fonts.conf".as_ref(), &mut config);
-        if let Ok(xdg_config_home) = std::env::var("XDG_CONFIG_HOME") {
-            config::parse_config(
-                PathBuf::from(xdg_config_home)
-                    .as_path()
-                    .join("fontconfig/fonts.conf")
-                    .as_path(),
-                &mut config,
-            );
-        } else if let Ok(user_home) = std::env::var("HOME") {
-            config::parse_config(
-                PathBuf::from(user_home)
-                    .as_path()
-                    .join(".config/fontconfig/fonts.conf")
-                    .as_path(),
-                &mut config,
-            );
+        if let Some(dir) = std::env::var("XDG_CONFIG_HOME")
+            .ok()
+            .filter(|v| !v.is_empty())
+        {
+            let path = PathBuf::from(dir).join("fontconfig/fonts.conf");
+            config::parse_config(&path, &mut config);
+        } else if let Some(dir) = std::env::var("HOME").ok().filter(|v| !v.is_empty()) {
+            let path = PathBuf::from(dir).join(".config/fontconfig/fonts.conf");
+            config::parse_config(&path, &mut config);
         }
 
         // Extract all font/family metadata from the cache files
