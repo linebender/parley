@@ -37,12 +37,12 @@ pub struct Query<'a> {
 }
 
 impl<'a> Query<'a> {
-    pub(super) fn new(collection: &'a mut Collection, source_cache: &'a mut SourceCache) -> Self {
+    pub(super) fn new(collection: &'a mut Collection) -> Self {
         collection.query_state.clear();
         Self {
             collection: &mut collection.inner,
             state: &mut collection.query_state,
-            source_cache,
+            source_cache: &mut collection.source_cache,
             attributes: Attributes::default(),
             fallbacks: None,
         }
