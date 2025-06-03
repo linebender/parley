@@ -88,7 +88,9 @@ impl SystemFonts {
         let mut raw_families: HashMap<_, _> = Default::default();
         let mut fallback_map: HashMap<Script, FallbackFamilies> = Default::default();
 
-        // First, parse the raw config files
+        // First, parse the raw config files. We attempt to replicate fontconfig
+        // behaviour as specified in the user guide:
+        // https://www.freedesktop.org/software/fontconfig/fontconfig-user.html
         let mut config = Config::default();
         config::parse_config("/etc/fonts/fonts.conf".as_ref(), &mut config);
         if let Some(dir) = std::env::var("XDG_CONFIG_HOME")
