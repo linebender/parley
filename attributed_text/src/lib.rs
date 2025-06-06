@@ -17,3 +17,11 @@
 // END LINEBENDER LINT SET
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![no_std]
+
+extern crate alloc;
+
+mod attributed_text;
+mod text_storage;
+
+pub use crate::attributed_text::{ApplyAttributeError, AttributedText};
+pub use crate::text_storage::TextStorage;
