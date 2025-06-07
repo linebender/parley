@@ -45,6 +45,7 @@ mod matching;
 mod scan;
 mod script;
 mod source;
+mod unicode_range;
 
 mod source_cache;
 
@@ -59,6 +60,7 @@ pub use font::{AxisInfo, FontInfo, FontInfoOverride, Synthesis};
 pub use generic::GenericFamily;
 pub use script::Script;
 pub use source::{SourceId, SourceInfo, SourceKind};
+pub use unicode_range::UnicodeRange;
 
 #[cfg(all(feature = "system", target_vendor = "apple"))]
 use objc2 as _;
