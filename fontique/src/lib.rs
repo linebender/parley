@@ -60,7 +60,7 @@ pub use font::{AxisInfo, FontInfo, FontInfoOverride, Synthesis};
 pub use generic::GenericFamily;
 pub use script::Script;
 pub use source::{SourceId, SourceInfo, SourceKind};
-pub use unicode_range::UnicodeRange;
+pub use unicode_range::{UnicodeRange, UnicodeRanges};
 
 #[cfg(all(feature = "system", target_vendor = "apple"))]
 use objc2 as _;

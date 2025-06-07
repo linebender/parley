@@ -3,6 +3,7 @@
 
 //! Unicode Range property
 
+use core::fmt;
 use core::ops::Range;
 
 /// A [Unicode Range]
@@ -88,6 +89,59 @@ impl UnicodeRange {
             Err(next) => next - 1,
         };
         Self::from_u8((MAP[i] >> 24) as u8)
+    }
+}
+
+/// A bit-map of [`UnicodeRange`]s
+///
+/// This type represents the set of [`UnicodeRange`]s over which a font is
+/// "functional".
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct UnicodeRanges(u128);
+
+impl UnicodeRanges {
+    /// Iterate over the ranges represented
+    pub fn as_iter(self) -> impl Iterator<Item = UnicodeRange> {
+        (0_u8..=127)
+            .filter(move |n| self.0 & (1_u128 << n) != 0)
+            .flat_map(UnicodeRange::from_u8)
+    }
+
+    /// Test inclusion of a [`UnicodeRange`]
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use fontique::{UnicodeRange, UnicodeRanges};
+    /// let ranges: UnicodeRanges = [3, 0, 0, 0].into();
+    /// assert!(ranges.contains(UnicodeRange::Latin1Supplement));
+    /// assert!(!ranges.contains(UnicodeRange::LatinExtendedA));
+    /// ```
+    #[inline]
+    pub fn contains(self, ur: UnicodeRange) -> bool {
+        self.0 & (1_u128 << (ur as u8)) != 0
+    }
+}
+
+impl fmt::Debug for UnicodeRanges {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "UnicodeRanges(")?;
+        let mut first = true;
+        for ur in self.as_iter() {
+            if !first {
+                write!(f, ", ")?;
+            }
+            write!(f, "{ur:?}")?;
+            first = false;
+        }
+        write!(f, ")")
+    }
+}
+
+impl From<[u32; 4]> for UnicodeRanges {
+    #[inline]
+    fn from(a: [u32; 4]) -> Self {
+        Self((a[3] as u128) << 96 | (a[2] as u128) << 64 | (a[1] as u128) << 32 | (a[0] as u128))
     }
 }
 
