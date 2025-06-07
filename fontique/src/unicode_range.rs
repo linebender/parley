@@ -20,7 +20,18 @@ pub enum UnicodeRange {
     LatinExtendedA = 2,
     LatinExtendedB = 3,
     IpaExtensions = 4,
+    SpacingModifierLetters = 5,
+    CombiningDiacriticalMarks = 6,
+    GreekAndCoptic = 7,
+    Coptic = 8,
+    Cyrillic = 9,
+    Armenian = 10,
+    Hebrew = 11,
+    Vai = 12,
+    Arabic = 13,
     // TODO: the rest
+    Arrows = 37,
+    Dingbats = 47,
 }
 
 impl UnicodeRange {
@@ -41,7 +52,18 @@ impl UnicodeRange {
             2 => Some(LatinExtendedA),
             3 => Some(LatinExtendedB),
             4 => Some(IpaExtensions),
+            5 => Some(SpacingModifierLetters),
+            6 => Some(CombiningDiacriticalMarks),
+            7 => Some(GreekAndCoptic),
+            8 => Some(Coptic),
+            9 => Some(Cyrillic),
+            10 => Some(Armenian),
+            11 => Some(Hebrew),
+            12 => Some(Vai),
+            13 => Some(Arabic),
             // TODO: the rest
+            37 => Some(Arrows),
+            47 => Some(Dingbats),
             _ => None,
         }
     }
@@ -56,6 +78,22 @@ impl UnicodeRange {
             LatinExtendedA => &[0x0100..0x0180],
             LatinExtendedB => &[0x0180..0x0250],
             IpaExtensions => &[0x0250..0x02B0, 0x1D00..0x1DC0],
+            SpacingModifierLetters => &[0x2B0..0x0300, 0xA700..0xA720],
+            CombiningDiacriticalMarks => &[0x0300..0x0370, 0x1DC0..0x1E00],
+            GreekAndCoptic => &[0x0370..0x0400],
+            Coptic => &[0x2C80..0x2D00],
+            Cyrillic => &[0x0400..0x0530, 0x2D20..0x2E00, 0xA640..0xA6A0],
+            Armenian => &[0x0530..0x0590],
+            Hebrew => &[0x0590..0600],
+            Vai => &[0xA500..0xA640],
+            Arabic => &[0x0600..0x0700, 0x0750..0x0780],
+            Arrows => &[
+                0x2190..0x2200,
+                0x27F0..0x2800,
+                0x2900..0x2980,
+                0x2B00..0x2E00,
+            ],
+            Dingbats => &[0x2700..0x27C0],
         }
     }
 
@@ -151,14 +189,33 @@ impl From<[u32; 4]> for UnicodeRanges {
 // any. Entries are ordered. Unmapped char ranges map to None.
 // Top 8 bits represent the UnicodeRange, bottom 24 the `char`.
 #[allow(clippy::identity_op)]
-const MAP: [u32; 8] = [
+const MAP: [u32; 27] = [
     0x00_0000 | (UnicodeRange::BasicLatin as u32) << 24,
     0x00_0080 | (UnicodeRange::Latin1Supplement as u32) << 24,
     0x00_0100 | (UnicodeRange::LatinExtendedA as u32) << 24,
     0x00_0180 | (UnicodeRange::LatinExtendedB as u32) << 24,
     0x00_0250 | (UnicodeRange::IpaExtensions as u32) << 24,
-    0x00_02B0 | 255 << 24,
+    0x00_02B0 | (UnicodeRange::SpacingModifierLetters as u32) << 24,
+    0x00_0300 | (UnicodeRange::CombiningDiacriticalMarks as u32) << 24,
+    0x00_0370 | (UnicodeRange::GreekAndCoptic as u32) << 24,
+    0x00_0400 | (UnicodeRange::Cyrillic as u32) << 24,
+    0x00_0530 | (UnicodeRange::Armenian as u32) << 24,
+    0x00_0590 | (UnicodeRange::Hebrew as u32) << 24,
+    0x00_0600 | (UnicodeRange::Arabic as u32) << 24,
+    0x00_0700 | 255 << 24,
+    0x00_0750 | (UnicodeRange::Arabic as u32) << 24,
+    0x00_0780 | 255 << 24,
     0x00_1D00 | (UnicodeRange::IpaExtensions as u32) << 24,
     0x00_1DC0 | 255 << 24,
+    0x00_2190 | (UnicodeRange::Arrows as u32) << 24,
+    0x00_2200 | 255 << 24,
+    0x00_2700 | (UnicodeRange::Dingbats as u32) << 24,
+    0x00_27C0 | 255 << 24,
+    0x00_27F0 | (UnicodeRange::Arrows as u32) << 24,
+    0x00_2800 | 255 << 24,
+    0x00_2900 | (UnicodeRange::Arrows as u32) << 24,
+    0x00_2980 | 255 << 24,
+    0x00_2B00 | (UnicodeRange::Arrows as u32) << 24,
+    0x00_2E00 | 255 << 24,
     // TODO: the rest
 ];
