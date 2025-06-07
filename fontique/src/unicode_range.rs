@@ -96,7 +96,9 @@ impl UnicodeRange {
 ///
 /// This type represents the set of [`UnicodeRange`]s over which a font is
 /// "functional".
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+///
+/// The default instance is empty (contains no ranges).
+#[derive(Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub struct UnicodeRanges(u128);
 
 impl UnicodeRanges {
