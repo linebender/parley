@@ -219,3 +219,9 @@ const MAP: [u32; 27] = [
     0x00_2E00 | 255 << 24,
     // TODO: the rest
 ];
+
+#[cfg(test)]
+#[test]
+fn is_sorted() {
+    assert!(MAP.is_sorted_by_key(|x| (*x) & 0x00FF_FFFF));
+}
