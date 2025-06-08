@@ -458,17 +458,18 @@ impl SystemFonts {
         // to is that if we destroyed this config on another thread and then
         // tried to access what it returns, it would dereference a null pointer.
         // But we're not doing that.
-        let font_set =
-            NonNull::new(unsafe { (LIB.FcConfigGetFonts)(config.inner.as_ptr(), FcSetSystem) })
-                .unwrap();
-        let fonts = unsafe { (*font_set.as_ptr()).fonts };
-        let n_fonts = unsafe { (*font_set.as_ptr()).nfont };
+        let Some(font_set) = (unsafe {
+            FontSet::from_raw(
+                (LIB.FcConfigGetFonts)(config.inner.as_ptr(), FcSetSystem),
+                Ownership::Fontconfig,
+            )
+        }) else {
+            return Default::default();
+        };
 
         // Populate the family name map
         let mut name_map = FamilyNameMap::default();
-        for i in 0..n_fonts as usize {
-            let pattern: *mut FcPattern = unsafe { *fonts.add(i) };
-            let pattern = unsafe { Pattern::from_raw(pattern, Ownership::Fontconfig) }.unwrap();
+        for pattern in font_set.iter() {
             let mut i = 0;
 
             let mut first_name_id = None;
