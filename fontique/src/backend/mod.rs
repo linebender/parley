@@ -12,7 +12,7 @@ mod system;
 mod system;
 
 #[cfg(all(feature = "system", target_os = "linux"))]
-#[path = "fontconfig/mod.rs"]
+#[path = "fontconfig.rs"]
 mod system;
 
 #[cfg(all(feature = "system", target_os = "android"))]
