@@ -223,6 +223,36 @@ fn set_root_style(rb: &mut RangedBuilder<'_, ColorBrush>) {
     rb.push_default(StyleProperty::OverflowWrap(OverflowWrap::Anywhere));
 }
 
+/// Test that all the builders have the same default behavior.
+#[test]
+fn builders_default() {
+    let text = "Builders often wear hard hats for safety while working on construction sites.";
+    let scale = 2.;
+    let quantize = false;
+    let max_advance = Some(50.);
+    let root_style = TextStyle {
+        font_stack: FontStack::from(FONT_STACK),
+        ..TextStyle::default()
+    };
+
+    let with_ranged_builder = |rb: &mut RangedBuilder<'_, ColorBrush>| {
+        rb.push_default(FontStack::from(FONT_STACK));
+    };
+    let with_tree_builder = |tb: &mut TreeBuilder<'_, ColorBrush>| {
+        tb.push_text(text);
+    };
+
+    assert_builders_produce_same_result(
+        text,
+        scale,
+        quantize,
+        max_advance,
+        &root_style,
+        with_ranged_builder,
+        with_tree_builder,
+    );
+}
+
 /// Test that all the builders behave the same when given the same root style.
 #[test]
 fn builders_root_only() {
