@@ -326,7 +326,7 @@ impl Config {
         trim: bool,
     ) -> MatchResult<FontSet<'ret>> {
         let mut result = 0;
-        // The returned FcFontSet is for us to free
+        // The returned FcFontSet is for us to free.
         let font_set = unsafe {
             FontSet::from_raw(
                 (LIB.FcFontSort)(
@@ -447,7 +447,7 @@ impl SystemFonts {
             (LIB.FcConfigBuildFonts)(config.inner.as_ptr());
         }
 
-        // Get all the fonts
+        // Get all the fonts.
 
         // The fontconfig docs say this "isn't threadsafe", but this seems to be
         // related to refcounting:
@@ -467,14 +467,14 @@ impl SystemFonts {
             return Default::default();
         };
 
-        // Populate the family name map
+        // Populate the family name map.
         let mut name_map = FamilyNameMap::default();
         for pattern in font_set.iter() {
             let mut i = 0;
 
             let mut first_name_id = None;
             // For fonts with more than one family name, the second one is
-            // *often* (but not always) an RBIZ name
+            // *often* (but not always) an RBIZ name.
             while let Ok(name) = pattern.get_string(FC_FAMILY, i) {
                 if i == 0 {
                     // First name
@@ -486,7 +486,7 @@ impl SystemFonts {
             }
         }
 
-        // Populate the generic family map
+        // Populate the generic family map.
         let mut generic_families = GenericFamilyMap::default();
         for (generic_family, name) in GENERIC_FAMILY_NAMES {
             let mut pattern = Pattern::new().unwrap();
@@ -507,12 +507,12 @@ impl SystemFonts {
             for font in font_set.iter() {
                 // Not sure if FcFontRenderPrepare performs any substitutions
                 // relevant to fallback family name matching, but it's a good
-                // idea to call it just in case
+                // idea to call it just in case.
                 let Some(font) = config.font_render_prepare(&pattern, &font) else {
                     continue;
                 };
                 // Generic families can have more than one name, but the only
-                // one we care about is the first one
+                // one we care about is the first one.
                 let Ok(name) = font.get_string(FC_FAMILY, 0) else {
                     continue;
                 };
@@ -574,7 +574,7 @@ impl SystemFonts {
 
         config.substitute(&mut pattern, FcMatchPattern);
 
-        // This calls FcFontRenderPrepare for us
+        // This calls FcFontRenderPrepare for us.
         let font = config.font_match(&pattern).ok()?;
 
         let family_name = font.get_string(FC_FAMILY, 0).ok()?;
@@ -587,7 +587,7 @@ impl SystemFonts {
         let config = self.config.as_ref()?;
         let name = self.name_map.get_by_id(id).cloned()?;
 
-        // Match by family name
+        // Match by family name.
         let mut pattern = Pattern::new()?;
         pattern.add_string(FC_FAMILY, CString::new(name.name()).ok()?.as_c_str());
         config.substitute(&mut pattern, FcMatchPattern);
