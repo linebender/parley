@@ -661,8 +661,25 @@ const GENERIC_FAMILY_NAMES: &[(GenericFamily, &CStr)] = &[
 /// categorizing fonts. This removes those suffixes from family names so that
 /// we can match on all attributes.
 fn strip_rbiz(name: &str) -> &str {
-    // TODO(valadaptive): this seems incomplete. check fcname.c for their
-    // constants
+    // TODO: Figure out a more robust way to do this.
+    //
+    // This list of RBIZ suffixes is preexisting, and doesn't match fontconfig's
+    // list of weight and width names. However, fontconfig's list is also
+    // incomplete, and fonts can in general have arbitrary RBIZ names.
+    //
+    // Fontconfig provides the `FC_STYLE` property on fonts which *should*
+    // provide the RBIZ suffix, but this doesn't always return what we need. For
+    // instance, Lato Hairline Italic has two listed `FC_FAMILY` names: "Lato"
+    // (with platform_id: 1, encoding_id: 0, language_id: 0) and "Lato Hairline"
+    // (with platform_id: 3, encoding_id: 1, language_id: 1033). Note that there
+    // is no "Italic" in either name.
+    //
+    // However, that font's `FC_STYLE` values are "Hairline Italic" and
+    // "Italic". Note that neither of those are suffixes of "Lato Hairline", and
+    // so neither lets us strip the "Hairline" suffix.
+    //
+    // What we really want is the OpenType "typographic family name", which
+    // fontconfig doesn't give us. For now, we're keeping this existing code.
     const SUFFIXES: &[&str] = &[
         " Thin",
         " ExtraLight",
