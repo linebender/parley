@@ -478,9 +478,9 @@ impl SystemFonts {
             while let Ok(name) = pattern.get_string(FC_FAMILY, i) {
                 if i == 0 {
                     // First name
-                    first_name_id = Some(name_map.get_or_insert(strip_rbiz(&name)).id());
+                    first_name_id = Some(name_map.get_or_insert(&name).id());
                 } else if let Some(first_name_id) = first_name_id {
-                    name_map.add_alias(first_name_id, strip_rbiz(&name));
+                    name_map.add_alias(first_name_id, &name);
                 }
                 i += 1;
             }
@@ -517,15 +517,14 @@ impl SystemFonts {
                     continue;
                 };
 
-                let name = strip_rbiz(&name);
-                if added_names.contains(name) {
+                if added_names.contains(name.as_ref()) {
                     continue;
                 }
-                let Some(family_name) = name_map.get(name) else {
+                let Some(family_name) = name_map.get(name.as_ref()) else {
                     continue;
                 };
 
-                added_names.insert(name.to_owned());
+                added_names.insert(name.into_owned());
                 generic_families.append(*generic_family, once(family_name.id()));
             }
         }
@@ -656,48 +655,3 @@ const GENERIC_FAMILY_NAMES: &[(GenericFamily, &CStr)] = &[
     (GenericFamily::Emoji, c"emoji"),
     (GenericFamily::Math, c"math"),
 ];
-
-/// Fontconfig seems to force RBIZ (regular, bold, italic, bold italic) when
-/// categorizing fonts. This removes those suffixes from family names so that
-/// we can match on all attributes.
-fn strip_rbiz(name: &str) -> &str {
-    // TODO: Figure out a more robust way to do this.
-    //
-    // This list of RBIZ suffixes is preexisting, and doesn't match fontconfig's
-    // list of weight and width names. However, fontconfig's list is also
-    // incomplete, and fonts can in general have arbitrary RBIZ names.
-    //
-    // Fontconfig provides the `FC_STYLE` property on fonts which *should*
-    // provide the RBIZ suffix, but this doesn't always return what we need. For
-    // instance, Lato Hairline Italic has two listed `FC_FAMILY` names: "Lato"
-    // (with platform_id: 1, encoding_id: 0, language_id: 0) and "Lato Hairline"
-    // (with platform_id: 3, encoding_id: 1, language_id: 1033). Note that there
-    // is no "Italic" in either name.
-    //
-    // However, that font's `FC_STYLE` values are "Hairline Italic" and
-    // "Italic". Note that neither of those are suffixes of "Lato Hairline", and
-    // so neither lets us strip the "Hairline" suffix.
-    //
-    // What we really want is the OpenType "typographic family name", which
-    // fontconfig doesn't give us. For now, we're keeping this existing code.
-    const SUFFIXES: &[&str] = &[
-        " Thin",
-        " ExtraLight",
-        " DemiLight",
-        " Light",
-        " Medium",
-        " Black",
-        " SemiBold",
-        " Semibold",
-        " ExtraBold",
-        " Extra Bold",
-        " Black",
-        " Narrow",
-    ];
-    for suffix in SUFFIXES {
-        if let Some(name) = name.strip_suffix(suffix) {
-            return name;
-        }
-    }
-    name
-}
