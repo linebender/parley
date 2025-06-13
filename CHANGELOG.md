@@ -21,6 +21,10 @@ This release has an [MSRV] of 1.82.
 
 ### Fixed
 
+#### Fontique
+
+- Font family name aliases (secondary names for font families, often in another language) not being registered. ([#380][] by [@valadaptive][])
+
 ## [0.5.0] - 2025-06-01
 
 This release has an [MSRV] of 1.82.
@@ -292,6 +296,7 @@ This release has an [MSRV][] of 1.70.
 [#353]: https://github.com/linebender/parley/pull/353
 [#362]: https://github.com/linebender/parley/pull/362
 [#369]: https://github.com/linebender/parley/pull/369
+[#380]: https://github.com/linebender/parley/pull/380
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/linebender/parley/compare/v0.4.0...v0.5.0
