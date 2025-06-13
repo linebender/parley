@@ -82,7 +82,7 @@ impl FamilyNameMap {
             }
             let new_name = FamilyName {
                 name: name.into(),
-                id: FamilyId::new(),
+                id,
             };
             self.name_map.insert(key.as_bytes().into(), new_name);
         }
