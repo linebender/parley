@@ -798,23 +798,28 @@ impl Selection {
     pub fn paragraph_end<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
         if let Some((mut paragraph_end_index, line)) = self.focus.line(layout) {
             let mut result_byte_index = line.text_range().end;
-            loop {
-                let next_index = paragraph_end_index + 1;
-                if let Some(line) = layout.get(next_index) {
-                    if matches!(line.break_reason(), BreakReason::Explicit) {
-                        // Result byte_index is the last byte of the previous line, so is the value we need
-                        break;
+            // If we're already on the last line of the paragraph, use that.
+            if !matches!(line.break_reason(), BreakReason::Explicit) {
+                // Otherwise, check if any of the following lines are the last line of the paragraph.
+                loop {
+                    let next_index = paragraph_end_index + 1;
+                    if let Some(line) = layout.get(next_index) {
+                        result_byte_index = line.text_range().end;
+                        paragraph_end_index = next_index;
+                        if matches!(line.break_reason(), BreakReason::Explicit) {
+                            // Result byte_index is the last byte of the previous line, so is the value we need
+                            break;
+                        }
+                    } else {
+                        // We hit the end of text. Select to the end of the "final" line, which was not an EOF.
+                        return self.maybe_extend(
+                            Cursor::from_byte_index(layout, result_byte_index, Affinity::Upstream),
+                            extend,
+                        );
                     }
-                    result_byte_index = line.text_range().end;
-                    paragraph_end_index = next_index;
-                } else {
-                    // We hit the end of text. Select to the end of the "final" line, which was not an EOF.
-                    return self.maybe_extend(
-                        Cursor::from_byte_index(layout, result_byte_index, Affinity::Upstream),
-                        extend,
-                    );
                 }
             }
+
             // We want to select to "before" the newline character in the paragraph, so we have downstream affinity on the character before it.
             self.maybe_extend(
                 Cursor::from_byte_index(layout, result_byte_index - 1, Affinity::Downstream),
