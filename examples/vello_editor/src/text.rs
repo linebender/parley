@@ -309,7 +309,7 @@ impl Editor {
                         let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
                         match click_count {
                             2 => drv.select_word_at_point(cursor_pos.0, cursor_pos.1),
-                            3 => drv.select_line_at_point(cursor_pos.0, cursor_pos.1),
+                            3 => drv.select_paragraph_at_point(cursor_pos.0, cursor_pos.1),
                             _ => drv.move_to_point(cursor_pos.0, cursor_pos.1),
                         }
                     }
