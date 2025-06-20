@@ -1,6 +1,8 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use peniko::kurbo::Size;
+
 use crate::test_name;
 
 use super::utils::TestEnv;
@@ -31,6 +33,36 @@ fn editor_select_all() {
     let mut env = TestEnv::new(test_name!(), None);
     let mut editor = env.editor("Hi, all!\nNext");
     env.driver(&mut editor).select_all();
+    env.check_editor_snapshot(&mut editor);
+}
+
+#[test]
+fn editor_select_paragraph() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut editor = env.editor("First\nNew Paragraph with soft break!\nLast");
+    editor.set_width(Some(40.));
+    env.driver(&mut editor).move_right();
+    // We can select the paragraph on the first line.
+    env.driver(&mut editor).select_to_paragraph_end();
+    env.check_editor_snapshot(&mut editor);
+    env.driver(&mut editor).move_to_paragraph_start();
+    env.check_editor_snapshot(&mut editor);
+    env.driver(&mut editor).move_down();
+    env.driver(&mut editor).move_to_paragraph_end();
+    env.check_editor_snapshot(&mut editor);
+    env.driver(&mut editor).select_to_paragraph_start();
+    env.check_editor_snapshot(&mut editor);
+    env.driver(&mut editor).move_right();
+    // Cursor is logically after the newline; there's not really any great answer here.
+    env.driver(&mut editor).select_to_paragraph_start();
+    env.check_editor_snapshot(&mut editor);
+
+    // We can select the paragraph on the last line.
+    env.driver(&mut editor).move_right();
+    env.driver(&mut editor).move_right();
+    env.driver(&mut editor).move_to_paragraph_end();
+    env.check_editor_snapshot(&mut editor);
+    env.driver(&mut editor).select_to_paragraph_start();
     env.check_editor_snapshot(&mut editor);
 }
 
