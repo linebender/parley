@@ -1,8 +1,6 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use peniko::kurbo::Size;
-
 use crate::test_name;
 
 use super::utils::TestEnv;
