@@ -746,18 +746,19 @@ impl Selection {
                     break;
                 }
                 let prev_index = paragraph_start_index - 1;
-                if let Some(line) = layout.get(prev_index) {
-                    if matches!(line.break_reason(), BreakReason::Explicit) {
-                        // The start of the line 'paragraph_start_index' is the target point.
-                        break;
-                    }
-                    result_byte_index = line.text_range().start;
-                    paragraph_start_index = prev_index;
-                } else {
-                    // We think this is unreachable, but to best not panic here.
-                    // Ideally, we'd log an error, but don't seem to have `log` nor `tracing` set up here.
-                    return *self;
+                let Some(line) = layout.get(prev_index) else {
+                    unreachable!(
+                        "{paragraph_start_index} is a valid line in the layout, but {prev_index} isn't, despite the latter being smaller.\n\
+                        The layout has {} lines.",
+                        layout.len()
+                    );
+                };
+                if matches!(line.break_reason(), BreakReason::Explicit) {
+                    // The start of the line 'paragraph_start_index' is the target point.
+                    break;
                 }
+                result_byte_index = line.text_range().start;
+                paragraph_start_index = prev_index;
             }
             self.maybe_extend(
                 Cursor::from_byte_index(layout, result_byte_index, Affinity::Downstream),

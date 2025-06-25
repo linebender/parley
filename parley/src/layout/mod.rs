@@ -121,6 +121,9 @@ impl<B: Brush> Layout<B> {
     }
 
     /// Returns the line at the specified index.
+    ///
+    /// Returns `None` if the index is out of bounds, i.e. if it's
+    /// not less than [`self.len()`](Self::len).
     pub fn get(&self, index: usize) -> Option<Line<'_, B>> {
         Some(Line {
             index: index as u32,
