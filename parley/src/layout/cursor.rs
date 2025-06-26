@@ -487,11 +487,13 @@ impl Selection {
         }
     }
 
-    /// Creates a new selection bounding the paragraph at the given coordinates.
-    pub fn paragraph_from_point<B: Brush>(layout: &Layout<B>, x: f32, y: f32) -> Self {
+    /// Creates a new selection bounding the "logical" line at the given coordinates.
+    ///
+    /// That is, the line as defined by line break characters, rather than due to soft-wrapping.
+    pub fn hard_line_from_point<B: Brush>(layout: &Layout<B>, x: f32, y: f32) -> Self {
         let Self { anchor, focus, .. } = Self::from_point(layout, x, y)
-            .paragraph_start(layout, false)
-            .paragraph_end(layout, true);
+            .hard_line_start(layout, false)
+            .hard_line_end(layout, true);
         Self {
             anchor,
             focus,
@@ -732,33 +734,32 @@ impl Selection {
         }
     }
 
-    /// Returns a new selection with the focus moved to the start of the
-    /// current paragraph.
+    /// Returns a new selection with the focus moved to just after the previous hard line break.
     ///
     /// If `extend` is `true` then the current anchor will be retained,
     /// otherwise the new selection will be collapsed.
     #[must_use]
-    pub fn paragraph_start<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
-        if let Some((mut paragraph_start_index, line)) = self.focus.line(layout) {
+    pub fn hard_line_start<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
+        if let Some((mut hard_line_start_index, line)) = self.focus.line(layout) {
             let mut result_byte_index = line.text_range().start;
             loop {
-                if paragraph_start_index == 0 {
+                if hard_line_start_index == 0 {
                     break;
                 }
-                let prev_index = paragraph_start_index - 1;
+                let prev_index = hard_line_start_index - 1;
                 let Some(line) = layout.get(prev_index) else {
                     unreachable!(
-                        "{paragraph_start_index} is a valid line in the layout, but {prev_index} isn't, despite the latter being smaller.\n\
+                        "{hard_line_start_index} is a valid line in the layout, but {prev_index} isn't, despite the latter being smaller.\n\
                         The layout has {} lines.",
                         layout.len()
                     );
                 };
                 if matches!(line.break_reason(), BreakReason::Explicit) {
-                    // The start of the line 'paragraph_start_index' is the target point.
+                    // The start of the line 'hard_line_start_index' is the target point.
                     break;
                 }
                 result_byte_index = line.text_range().start;
-                paragraph_start_index = prev_index;
+                hard_line_start_index = prev_index;
             }
             self.maybe_extend(
                 Cursor::from_byte_index(layout, result_byte_index, Affinity::Downstream),
@@ -790,25 +791,24 @@ impl Selection {
         }
     }
 
-    /// Returns a new selection with the focus moved to the end of the
-    /// current paragraph.
+    /// Returns a new selection with the focus moved to just before the next hard line break.
     ///
     /// If `extend` is `true` then the current anchor will be retained,
     /// otherwise the new selection will be collapsed.
     #[must_use]
-    pub fn paragraph_end<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
-        if let Some((mut paragraph_end_index, line)) = self.focus.line(layout) {
+    pub fn hard_line_end<B: Brush>(&self, layout: &Layout<B>, extend: bool) -> Self {
+        if let Some((mut hard_line_end_index, line)) = self.focus.line(layout) {
             let mut result_byte_index = line.text_range().end;
-            // If we're already on the last line of the paragraph, use that.
+            // If we're already on the last line of the hard line, use that.
             if !matches!(line.break_reason(), BreakReason::Explicit) {
-                // Otherwise, check if any of the following lines are the last line of the paragraph.
+                // Otherwise, check if any of the following lines are the last line of the hard line.
                 loop {
-                    let next_index = paragraph_end_index + 1;
+                    let next_index = hard_line_end_index + 1;
                     if let Some(line) = layout.get(next_index) {
                         result_byte_index = line.text_range().end;
-                        paragraph_end_index = next_index;
+                        hard_line_end_index = next_index;
                         if matches!(line.break_reason(), BreakReason::Explicit) {
-                            // Result byte_index is the last byte of the previous line, so is the value we need
+                            // result_byte_index is the last byte of the previous line, so is the value we need
                             break;
                         }
                     } else {
@@ -821,7 +821,7 @@ impl Selection {
                 }
             }
 
-            // We want to select to "before" the newline character in the paragraph, so we have downstream affinity on the character before it.
+            // We want to select to "before" the newline character in the hard line, so we have downstream affinity on the boundary before it.
             self.maybe_extend(
                 Cursor::from_byte_index(layout, result_byte_index - 1, Affinity::Downstream),
                 extend,

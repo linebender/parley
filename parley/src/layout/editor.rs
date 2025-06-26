@@ -464,16 +464,13 @@ where
         ));
     }
 
-    /// Move the cursor to the start of the paragraph.
-    ///
-    /// See [`select_paragraph_at_point`](Self::select_paragraph_at_point) for discussion of how a
-    /// paragraph is defined.
-    pub fn move_to_paragraph_start(&mut self) {
+    /// Move the cursor to just after the previous hard line break (such as `\n`).
+    pub fn move_to_hard_line_start(&mut self) {
         self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
-                .paragraph_start(&self.editor.layout, false),
+                .hard_line_start(&self.editor.layout, false),
         );
     }
 
@@ -494,16 +491,13 @@ where
         ));
     }
 
-    /// Move the cursor to the end of the paragraph.
-    ///
-    /// See [`select_paragraph_at_point`](Self::select_paragraph_at_point) for discussion of how a
-    /// paragraph is defined.
-    pub fn move_to_paragraph_end(&mut self) {
+    /// Move the cursor to just before the next hard line break (such as `\n`).
+    pub fn move_to_hard_line_end(&mut self) {
         self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
-                .paragraph_end(&self.editor.layout, false),
+                .hard_line_end(&self.editor.layout, false),
         );
     }
 
@@ -595,16 +589,13 @@ where
         ));
     }
 
-    /// Move the selection focus point to the start of the paragraph.
-    ///
-    /// See [`select_paragraph_at_point`](Self::select_paragraph_at_point) for discussion of how a
-    /// paragraph is defined.
-    pub fn select_to_paragraph_start(&mut self) {
+    /// Move the selection focus point to just after the previous hard line break (such as `\n`).
+    pub fn select_to_hard_line_start(&mut self) {
         self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
-                .paragraph_start(&self.editor.layout, true),
+                .hard_line_start(&self.editor.layout, true),
         );
     }
 
@@ -625,16 +616,13 @@ where
         ));
     }
 
-    /// Move the selection focus point to the end of the paragraph.
-    ///
-    /// See [`select_paragraph_at_point`](Self::select_paragraph_at_point) for discussion of how a
-    /// paragraph is defined.
-    pub fn select_to_paragraph_end(&mut self) {
+    /// Move the selection focus point to just before the next hard line break (such as `\n`).
+    pub fn select_to_hard_line_end(&mut self) {
         self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
-                .paragraph_end(&self.editor.layout, true),
+                .hard_line_end(&self.editor.layout, true),
         );
     }
 
@@ -709,23 +697,21 @@ where
     /// Select the physical line at the point.
     ///
     /// Note that this metehod determines line breaks for any reason, including due to word wrapping.
-    /// To select the text between explicit newlines, use [`select_paragraph_at_point`](Self::select_paragraph_at_point).
+    /// To select the text between explicit newlines, use [`select_hard_line_at_point`](Self::select_hard_line_at_point).
     /// In most text editing cases, this is the preferred behaviour.
-    // TODO: Rename to `select_soft_line_at_point`? Very few users should use this method.
     pub fn select_line_at_point(&mut self, x: f32, y: f32) {
         self.refresh_layout();
         let line = Selection::line_from_point(&self.editor.layout, x, y);
         self.editor.set_selection(line);
     }
 
-    /// Select the paragraph at this point.
+    /// Select the "logical" line at the point.
     ///
-    /// To determine paragraph breaks, this uses any "explicit" breaks, and so has the same behaviour for paragraphs ended/started
-    /// with the "Paragraph Separator" unicode character as with other explicit break characters (such as a `\n` newline character).
-    pub fn select_paragraph_at_point(&mut self, x: f32, y: f32) {
+    /// The logical line is defined by line break characters, such as `\n`, rather than due to soft-wrapping.
+    pub fn select_hard_line_at_point(&mut self, x: f32, y: f32) {
         self.refresh_layout();
-        let paragraph = Selection::paragraph_from_point(&self.editor.layout, x, y);
-        self.editor.set_selection(paragraph);
+        let hard_line = Selection::hard_line_from_point(&self.editor.layout, x, y);
+        self.editor.set_selection(hard_line);
     }
 
     /// Move the selection focus point to the cluster boundary closest to point.
