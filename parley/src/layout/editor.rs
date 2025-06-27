@@ -464,6 +464,16 @@ where
         ));
     }
 
+    /// Move the cursor to just after the previous hard line break (such as `\n`).
+    pub fn move_to_hard_line_start(&mut self) {
+        self.refresh_layout();
+        self.editor.set_selection(
+            self.editor
+                .selection
+                .hard_line_start(&self.editor.layout, false),
+        );
+    }
+
     /// Move the cursor to the start of the physical line.
     pub fn move_to_line_start(&mut self) {
         self.refresh_layout();
@@ -479,6 +489,16 @@ where
             isize::MAX,
             false,
         ));
+    }
+
+    /// Move the cursor to just before the next hard line break (such as `\n`).
+    pub fn move_to_hard_line_end(&mut self) {
+        self.refresh_layout();
+        self.editor.set_selection(
+            self.editor
+                .selection
+                .hard_line_end(&self.editor.layout, false),
+        );
     }
 
     /// Move the cursor to the end of the physical line.
@@ -569,6 +589,16 @@ where
         ));
     }
 
+    /// Move the selection focus point to just after the previous hard line break (such as `\n`).
+    pub fn select_to_hard_line_start(&mut self) {
+        self.refresh_layout();
+        self.editor.set_selection(
+            self.editor
+                .selection
+                .hard_line_start(&self.editor.layout, true),
+        );
+    }
+
     /// Move the selection focus point to the start of the physical line.
     pub fn select_to_line_start(&mut self) {
         self.refresh_layout();
@@ -584,6 +614,16 @@ where
             isize::MAX,
             true,
         ));
+    }
+
+    /// Move the selection focus point to just before the next hard line break (such as `\n`).
+    pub fn select_to_hard_line_end(&mut self) {
+        self.refresh_layout();
+        self.editor.set_selection(
+            self.editor
+                .selection
+                .hard_line_end(&self.editor.layout, true),
+        );
     }
 
     /// Move the selection focus point to the end of the physical line.
@@ -655,10 +695,23 @@ where
     }
 
     /// Select the physical line at the point.
+    ///
+    /// Note that this metehod determines line breaks for any reason, including due to word wrapping.
+    /// To select the text between explicit newlines, use [`select_hard_line_at_point`](Self::select_hard_line_at_point).
+    /// In most text editing cases, this is the preferred behaviour.
     pub fn select_line_at_point(&mut self, x: f32, y: f32) {
         self.refresh_layout();
         let line = Selection::line_from_point(&self.editor.layout, x, y);
         self.editor.set_selection(line);
+    }
+
+    /// Select the "logical" line at the point.
+    ///
+    /// The logical line is defined by line break characters, such as `\n`, rather than due to soft-wrapping.
+    pub fn select_hard_line_at_point(&mut self, x: f32, y: f32) {
+        self.refresh_layout();
+        let hard_line = Selection::hard_line_from_point(&self.editor.layout, x, y);
+        self.editor.set_selection(hard_line);
     }
 
     /// Move the selection focus point to the cluster boundary closest to point.

@@ -265,7 +265,7 @@ impl Editor {
                 );
                 match state.count {
                     2 => drv.select_word_at_point(cursor_pos.0, cursor_pos.1),
-                    3 => drv.select_line_at_point(cursor_pos.0, cursor_pos.1),
+                    3 => drv.select_hard_line_at_point(cursor_pos.0, cursor_pos.1),
                     _ => drv.move_to_point(cursor_pos.0, cursor_pos.1),
                 }
             }
