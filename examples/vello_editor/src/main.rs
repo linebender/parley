@@ -15,6 +15,7 @@ use accesskit::{Node, Role, Tree, TreeUpdate};
 use anyhow::Result;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
+use ui_events_winit::{WindowEventReducer, WindowEventTranslation};
 use vello::kurbo;
 use vello::peniko::Color;
 use vello::util::{RenderContext, RenderSurface};
@@ -103,6 +104,9 @@ struct SimpleVelloApp<'s> {
 
     /// The event loop proxy required by the AccessKit winit adapter.
     event_loop_proxy: EventLoopProxy<accesskit_winit::Event>,
+
+    /// Translate winit events into ui-events events.
+    event_reducer: WindowEventReducer,
 }
 
 impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
@@ -222,7 +226,28 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
         render_state
             .access_adapter
             .process_event(&render_state.window, &event);
-        self.editor.handle_event(event.clone());
+
+        if !matches!(
+            event,
+            WindowEvent::KeyboardInput {
+                is_synthetic: true,
+                ..
+            }
+        ) {
+            if let Some(wet) = self.event_reducer.reduce(&event) {
+                match wet {
+                    WindowEventTranslation::Keyboard(k) => {
+                        self.editor.handle_keyboard_event(&k);
+                    }
+                    WindowEventTranslation::Pointer(p) => {
+                        self.editor.handle_pointer_event(&p);
+                    }
+                }
+            } else {
+                self.editor.handle_event(event.clone());
+            }
+        }
+
         if self.last_drawn_generation != self.editor.generation() {
             render_state.window.request_redraw();
             let area = self.editor.editor().ime_cursor_area();
@@ -382,6 +407,7 @@ fn main() -> Result<()> {
         last_drawn_generation: Default::default(),
         last_sent_ime_cursor_area: kurbo::Rect::new(f64::NAN, f64::NAN, f64::NAN, f64::NAN),
         event_loop_proxy: event_loop.create_proxy(),
+        event_reducer: Default::default(),
     };
 
     // Run the winit event loop

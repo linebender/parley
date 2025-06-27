@@ -10,16 +10,18 @@ use accesskit::{Node, TreeUpdate};
 use core::default::Default;
 use parley::{GenericFamily, StyleProperty, editor::SplitString, layout::PositionedLayoutItem};
 use std::time::Duration;
+use ui_events::pointer::PointerButton;
+use ui_events::{
+    keyboard::{Key, KeyboardEvent, NamedKey},
+    pointer::{PointerEvent, PointerInfo, PointerState, PointerType},
+};
 use vello::{
     Scene,
     kurbo::{Affine, Line, Stroke},
     peniko::color::palette,
     peniko::{Brush, Fill},
 };
-use winit::{
-    event::{Ime, Modifiers, Touch, WindowEvent},
-    keyboard::{Key, NamedKey},
-};
+use winit::event::{Ime, WindowEvent};
 
 pub use parley::layout::editor::Generation;
 use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorDriver};
@@ -32,12 +34,7 @@ pub struct Editor {
     font_cx: FontContext,
     layout_cx: LayoutContext<Brush>,
     editor: PlainEditor<Brush>,
-    last_click_time: Option<Instant>,
-    click_count: u32,
-    pointer_down: bool,
-    cursor_pos: (f32, f32),
     cursor_visible: bool,
-    modifiers: Option<Modifiers>,
     start_time: Option<Instant>,
     blink_period: Duration,
 }
@@ -54,12 +51,7 @@ impl Editor {
             font_cx: Default::default(),
             layout_cx: Default::default(),
             editor,
-            last_click_time: Default::default(),
-            click_count: Default::default(),
-            pointer_down: Default::default(),
-            cursor_pos: Default::default(),
             cursor_visible: Default::default(),
-            modifiers: Default::default(),
             start_time: Default::default(),
             blink_period: Default::default(),
         }
@@ -107,37 +99,25 @@ impl Editor {
         });
     }
 
-    pub fn handle_event(&mut self, event: WindowEvent) {
+    pub fn handle_keyboard_event(&mut self, event: &KeyboardEvent) {
         match event {
-            WindowEvent::Resized(size) => {
-                self.editor
-                    .set_width(Some(size.width as f32 - 2_f32 * INSET));
-            }
-            WindowEvent::ModifiersChanged(modifiers) => {
-                self.modifiers = Some(modifiers);
-            }
-            WindowEvent::KeyboardInput { event, .. } if !self.editor.is_composing() => {
-                if !event.state.is_pressed() {
-                    return;
-                }
+            KeyboardEvent {
+                state,
+                key,
+                modifiers,
+                ..
+            } if !self.editor.is_composing() && state.is_down() => {
                 self.cursor_reset();
                 let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
                 #[allow(unused)]
-                let (shift, action_mod) = self
-                    .modifiers
-                    .map(|mods| {
-                        (
-                            mods.state().shift_key(),
-                            if cfg!(target_os = "macos") {
-                                mods.state().super_key()
-                            } else {
-                                mods.state().control_key()
-                            },
-                        )
-                    })
-                    .unwrap_or_default();
+                let action_mod = if cfg!(target_os = "macos") {
+                    modifiers.meta()
+                } else {
+                    modifiers.ctrl()
+                };
+                let shift = modifiers.shift();
 
-                match event.logical_key {
+                match key {
                     #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
                     Key::Character(c) if action_mod && matches!(c.as_str(), "c" | "x" | "v") => {
                         use clipboard_rs::{Clipboard, ClipboardContext};
@@ -256,75 +236,59 @@ impl Editor {
                     Key::Named(NamedKey::Enter) => {
                         drv.insert_or_replace_selection("\n");
                     }
-                    Key::Named(NamedKey::Space) => {
-                        drv.insert_or_replace_selection(" ");
-                    }
                     Key::Character(s) => {
-                        drv.insert_or_replace_selection(&s);
+                        drv.insert_or_replace_selection(s);
                     }
                     _ => (),
                 }
             }
-            WindowEvent::Touch(Touch {
-                phase, location, ..
-            }) if !self.editor.is_composing() => {
+            _ => {}
+        }
+    }
+
+    pub fn handle_pointer_event(&mut self, event: &PointerEvent) {
+        let pressed = |i: &PointerInfo, s: &PointerState| {
+            s.buttons.contains(PointerButton::Primary)
+                || (s.pressure >= 0.5
+                    && matches!(i.pointer_type, PointerType::Touch | PointerType::Pen))
+        };
+        match event {
+            // TODO: Handle touch long press specially, for SelectWordAtPoint.
+            PointerEvent::Down { pointer, state, .. }
+                if pressed(pointer, state) && !self.editor.is_composing() =>
+            {
+                self.cursor_reset();
                 let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
-                use winit::event::TouchPhase::*;
-                match phase {
-                    Started => {
-                        // TODO: start a timer to convert to a SelectWordAtPoint
-                        drv.move_to_point(location.x as f32 - INSET, location.y as f32 - INSET);
-                    }
-                    Cancelled => {
-                        drv.collapse_selection();
-                    }
-                    Moved => {
-                        // TODO: cancel SelectWordAtPoint timer
-                        drv.extend_selection_to_point(
-                            location.x as f32 - INSET,
-                            location.y as f32 - INSET,
-                        );
-                    }
-                    Ended => (),
+                let cursor_pos = (
+                    state.position.x as f32 - INSET,
+                    state.position.y as f32 - INSET,
+                );
+                match state.count {
+                    2 => drv.select_word_at_point(cursor_pos.0, cursor_pos.1),
+                    3 => drv.select_hard_line_at_point(cursor_pos.0, cursor_pos.1),
+                    _ => drv.move_to_point(cursor_pos.0, cursor_pos.1),
                 }
             }
-            WindowEvent::MouseInput { state, button, .. } => {
-                if button == winit::event::MouseButton::Left {
-                    self.pointer_down = state.is_pressed();
-                    self.cursor_reset();
-                    if self.pointer_down && !self.editor.is_composing() {
-                        let now = Instant::now();
-                        if let Some(last) = self.last_click_time.take() {
-                            if now.duration_since(last).as_secs_f64() < 0.25 {
-                                self.click_count = (self.click_count + 1) % 4;
-                            } else {
-                                self.click_count = 1;
-                            }
-                        } else {
-                            self.click_count = 1;
-                        }
-                        self.last_click_time = Some(now);
-                        let click_count = self.click_count;
-                        let cursor_pos = self.cursor_pos;
-                        let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
-                        match click_count {
-                            2 => drv.select_word_at_point(cursor_pos.0, cursor_pos.1),
-                            3 => drv.select_hard_line_at_point(cursor_pos.0, cursor_pos.1),
-                            _ => drv.move_to_point(cursor_pos.0, cursor_pos.1),
-                        }
-                    }
-                }
+            PointerEvent::Move(u)
+                if pressed(&u.pointer, &u.current) && !self.editor.is_composing() =>
+            {
+                let cursor_pos = (
+                    u.current.position.x as f32 - INSET,
+                    u.current.position.y as f32 - INSET,
+                );
+                self.cursor_reset();
+                self.driver()
+                    .extend_selection_to_point(cursor_pos.0, cursor_pos.1);
             }
-            WindowEvent::CursorMoved { position, .. } => {
-                let prev_pos = self.cursor_pos;
-                self.cursor_pos = (position.x as f32 - INSET, position.y as f32 - INSET);
-                // macOS seems to generate a spurious move after selecting word?
-                if self.pointer_down && prev_pos != self.cursor_pos && !self.editor.is_composing() {
-                    self.cursor_reset();
-                    let cursor_pos = self.cursor_pos;
-                    self.driver()
-                        .extend_selection_to_point(cursor_pos.0, cursor_pos.1);
-                }
+            _ => {}
+        }
+    }
+
+    pub fn handle_event(&mut self, event: WindowEvent) {
+        match event {
+            WindowEvent::Resized(size) => {
+                self.editor
+                    .set_width(Some(size.width as f32 - 2_f32 * INSET));
             }
             WindowEvent::Ime(Ime::Disabled) => {
                 self.driver().clear_compose();
