@@ -729,14 +729,14 @@ where
     }
 
     /// Move the selection focus point to the cluster boundary closest to point.
-    pub fn extend_selection_to_precise_point(&mut self, x: f32, y: f32) {
+    pub fn shift_click_extension(&mut self, x: f32, y: f32) {
         self.refresh_layout();
         self.editor
-            .set_selection(self.editor.selection.extend_to_precise_point(
-                &self.editor.layout,
-                x,
-                y,
-            ));
+            .set_selection(
+                self.editor
+                    .selection
+                    .shift_click_extension(&self.editor.layout, x, y),
+            );
     }
 
     /// Move the selection focus point to a byte index.

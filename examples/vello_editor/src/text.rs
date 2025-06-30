@@ -268,7 +268,7 @@ impl Editor {
                     3 => drv.select_hard_line_at_point(cursor_pos.0, cursor_pos.1),
                     _ => {
                         if state.modifiers.shift() {
-                            drv.extend_selection_to_precise_point(cursor_pos.0, cursor_pos.1);
+                            drv.shift_click_extension(cursor_pos.0, cursor_pos.1);
                         } else {
                             drv.move_to_point(cursor_pos.0, cursor_pos.1);
                         }
