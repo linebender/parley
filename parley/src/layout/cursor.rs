@@ -841,8 +841,7 @@ impl Selection {
             AnchorBase::Cluster => Self::new(self.anchor, Cursor::from_point(layout, x, y)),
             AnchorBase::Word(start, end) => {
                 let target = Self::word_from_point(layout, x, y);
-                let [anchor, focus] =
-                    cursor_min_max(layout, [target.anchor, target.focus, start, end]);
+                let [anchor, focus] = extend_selection(target, [start, end]);
                 Self {
                     anchor,
                     focus,
@@ -852,8 +851,7 @@ impl Selection {
             }
             AnchorBase::Line(start, end) => {
                 let target = Self::line_from_point(layout, x, y);
-                let [anchor, focus] =
-                    cursor_min_max(layout, [target.anchor, target.focus, start, end]);
+                let [anchor, focus] = extend_selection(target, [start, end]);
                 Self {
                     anchor,
                     focus,
@@ -1083,23 +1081,31 @@ fn affinity_for_dir(is_rtl: bool, moving_right: bool) -> Affinity {
     }
 }
 
-/// Given four cursors, return the left-most and right-most cursors from
-/// the set.
-///
-/// Used for extending word and line selections.
-fn cursor_min_max<B: Brush>(layout: &Layout<B>, cursors: [Cursor; 4]) -> [Cursor; 2] {
-    let cursor_pos = cursors
-        .map(|cursor| (cursor, cursor.geometry(layout, 0.0)))
-        .map(|(cursor, rect)| (cursor, (rect.y0, rect.x0)));
-    let mut min = cursor_pos[0];
-    let mut max = cursor_pos[0];
-    for pos in cursor_pos {
-        if pos.1 < min.1 {
+/// Given the anchor base and the target selection, returns the anchor and focus of the resulting selection extension.
+fn extend_selection(target_selection: Selection, anchor_base: [Cursor; 2]) -> [Cursor; 2] {
+    let extending_to_the_right = target_selection.anchor.index >= anchor_base[0].index;
+
+    let cursors = [
+        target_selection.anchor,
+        target_selection.focus,
+        anchor_base[0],
+        anchor_base[1],
+    ];
+
+    let mut min = cursors[0];
+    let mut max = cursors[0];
+    for pos in cursors {
+        if pos.index < min.index {
             min = pos;
         }
-        if pos.1 > max.1 {
+        if pos.index > max.index {
             max = pos;
         }
     }
-    [min.0, max.0]
+
+    if extending_to_the_right {
+        [min, max]
+    } else {
+        [max, min]
+    }
 }
