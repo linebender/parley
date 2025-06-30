@@ -864,6 +864,33 @@ impl Selection {
         }
     }
 
+    /// Returns a new selection with the focus extended to the given point.
+    #[must_use]
+    pub fn extend_to_precise_point<B: Brush>(&self, layout: &Layout<B>, x: f32, y: f32) -> Self {
+        let cluster = Cursor::from_point(layout, x, y);
+        match self.anchor_base {
+            AnchorBase::Cluster => Self::new(self.anchor, cluster),
+            AnchorBase::Word(start, end) => {
+                let [anchor, focus] = cursor_min_max(layout, [cluster, cluster, start, end]);
+                Self {
+                    anchor,
+                    focus,
+                    anchor_base: self.anchor_base,
+                    h_pos: None,
+                }
+            }
+            AnchorBase::Line(start, end) => {
+                let [anchor, focus] = cursor_min_max(layout, [cluster, cluster, start, end]);
+                Self {
+                    anchor,
+                    focus,
+                    anchor_base: self.anchor_base,
+                    h_pos: None,
+                }
+            }
+        }
+    }
+
     /// Returns a new selection with the current anchor and the focus set to
     /// the given value.
     #[must_use]

@@ -715,6 +715,9 @@ where
     }
 
     /// Move the selection focus point to the cluster boundary closest to point.
+    ///
+    /// If the initial selection was created from a word or line, then the new
+    /// selection will be extended at the same granularity.
     pub fn extend_selection_to_point(&mut self, x: f32, y: f32) {
         self.refresh_layout();
         // FIXME: This is usually the wrong way to handle selection extension for mouse moves, but not a regression.
@@ -723,6 +726,17 @@ where
                 .selection
                 .extend_to_point(&self.editor.layout, x, y),
         );
+    }
+
+    /// Move the selection focus point to the cluster boundary closest to point.
+    pub fn extend_selection_to_precise_point(&mut self, x: f32, y: f32) {
+        self.refresh_layout();
+        self.editor
+            .set_selection(self.editor.selection.extend_to_precise_point(
+                &self.editor.layout,
+                x,
+                y,
+            ));
     }
 
     /// Move the selection focus point to a byte index.
