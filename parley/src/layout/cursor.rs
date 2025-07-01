@@ -869,14 +869,15 @@ impl Selection {
         match self.anchor_base {
             AnchorBase::Cluster => Self::new(self.anchor, target),
             AnchorBase::Word(start, end) | AnchorBase::Line(start, end) => {
-                let [anchor, focus] = if target.index < start.index {
-                    [end, target]
+                // Place the focus where the user just clicked, and the anchor on the "far" side of the anchorbase.
+                let anchor = if target.index < start.index {
+                    end
                 } else {
-                    [start, target]
+                    start
                 };
                 Self {
                     anchor,
-                    focus,
+                    focus: target,
                     anchor_base: self.anchor_base,
                     h_pos: None,
                 }
