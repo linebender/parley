@@ -10,6 +10,7 @@ use super::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
 use super::layout::Layout;
 
 use alloc::string::String;
+use alloc::vec::Vec;
 use core::ops::RangeBounds;
 
 use crate::inline_box::InlineBox;
@@ -28,7 +29,6 @@ impl<B: Brush> RangedBuilder<'_, B> {
     pub fn push_default<'a>(&mut self, property: impl Into<StyleProperty<'a, B>>) {
         let resolved = self
             .lcx
-            .rcx
             .resolve_property(self.fcx, &property.into(), self.scale);
         self.lcx.ranged_style_builder.push_default(resolved);
     }
@@ -40,7 +40,6 @@ impl<B: Brush> RangedBuilder<'_, B> {
     ) {
         let resolved = self
             .lcx
-            .rcx
             .resolve_property(self.fcx, &property.into(), self.scale);
         self.lcx.ranged_style_builder.push(resolved, range);
     }
@@ -54,14 +53,8 @@ impl<B: Brush> RangedBuilder<'_, B> {
         self.lcx.ranged_style_builder.finish(&mut self.lcx.styles);
 
         // Call generic layout builder method
-        build_into_layout(
-            layout,
-            self.scale,
-            self.quantize,
-            text.as_ref(),
-            self.lcx,
-            self.fcx,
-        );
+        self.lcx
+            .build_into_layout(layout, self.scale, self.quantize, text.as_ref(), self.fcx);
     }
 
     pub fn build(self, text: impl AsRef<str>) -> Layout<B> {
@@ -84,7 +77,6 @@ impl<B: Brush> TreeBuilder<'_, B> {
     pub fn push_style_span(&mut self, style: TextStyle<'_, B>) {
         let resolved = self
             .lcx
-            .rcx
             .resolve_entire_style_set(self.fcx, &style, self.scale);
         self.lcx.tree_style_builder.push_style_span(resolved);
     }
@@ -96,11 +88,15 @@ impl<B: Brush> TreeBuilder<'_, B> {
         's: 'iter,
         B: 'iter,
     {
-        self.lcx.tree_style_builder.push_style_modification_span(
-            properties
-                .into_iter()
-                .map(|p| self.lcx.rcx.resolve_property(self.fcx, p, self.scale)),
-        );
+        // FIXME: eliminate allocation if/when the "style builders" are extracted
+        // from the LayoutContext
+        let resolved_properties: Vec<_> = properties
+            .into_iter()
+            .map(|p| self.lcx.resolve_property(self.fcx, p, self.scale))
+            .collect();
+        self.lcx
+            .tree_style_builder
+            .push_style_modification_span(resolved_properties.into_iter());
     }
 
     pub fn pop_style_span(&mut self) {
@@ -134,7 +130,8 @@ impl<B: Brush> TreeBuilder<'_, B> {
         let text = self.lcx.tree_style_builder.finish(&mut self.lcx.styles);
 
         // Call generic layout builder method
-        build_into_layout(layout, self.scale, self.quantize, &text, self.lcx, self.fcx);
+        self.lcx
+            .build_into_layout(layout, self.scale, self.quantize, &text, self.fcx);
 
         text
     }
@@ -145,61 +142,4 @@ impl<B: Brush> TreeBuilder<'_, B> {
         let text = self.build_into(&mut layout);
         (layout, text)
     }
-}
-
-fn build_into_layout<B: Brush>(
-    layout: &mut Layout<B>,
-    scale: f32,
-    quantize: bool,
-    text: &str,
-    lcx: &mut LayoutContext<B>,
-    fcx: &mut FontContext,
-) {
-    lcx.analyze_text(text);
-
-    layout.data.clear();
-    layout.data.scale = scale;
-    layout.data.quantize = quantize;
-    layout.data.has_bidi = !lcx.bidi.levels().is_empty();
-    layout.data.base_level = lcx.bidi.base_level();
-    layout.data.text_len = text.len();
-
-    let mut char_index = 0;
-    for (i, style) in lcx.styles.iter().enumerate() {
-        for _ in text[style.range.clone()].chars() {
-            lcx.info[char_index].1 = i as u16;
-            char_index += 1;
-        }
-    }
-
-    // Copy the visual styles into the layout
-    layout
-        .data
-        .styles
-        .extend(lcx.styles.iter().map(|s| s.style.as_layout_style()));
-
-    // Sort the inline boxes as subsequent code assumes that they are in text index order.
-    // Note: It's important that this is a stable sort to allow users to control the order of contiguous inline boxes
-    lcx.inline_boxes.sort_by_key(|b| b.index);
-
-    {
-        let query = fcx.collection.query(&mut fcx.source_cache);
-        super::shape::shape_text(
-            &lcx.rcx,
-            query,
-            &lcx.styles,
-            &lcx.inline_boxes,
-            &lcx.info,
-            lcx.bidi.levels(),
-            &mut lcx.scx,
-            text,
-            layout,
-        );
-    }
-
-    // Move inline boxes into the layout
-    layout.data.inline_boxes.clear();
-    core::mem::swap(&mut layout.data.inline_boxes, &mut lcx.inline_boxes);
-
-    layout.data.finish();
 }
