@@ -17,6 +17,10 @@ This release has an [MSRV] of 1.82.
 
 ### Added
 
+#### Parley
+
+- Shift-click support through `Selection::shift_click_extension` and `PlainEditorDriver::shift_click_extension`. ([#385][] by [@kekelp][])
+
 ### Changed
 
 ### Fixed
@@ -24,6 +28,10 @@ This release has an [MSRV] of 1.82.
 #### Fontique
 
 - Font family name aliases (secondary names for font families, often in another language) not being registered. ([#380][] by [@valadaptive][])
+
+#### Parley
+
+- Selection extension moves the focus to the side being extended. ([#385][] by [@kekelp][])
 
 ## [0.5.0] - 2025-06-01
 
@@ -225,6 +233,7 @@ This release has an [MSRV][] of 1.70.
 [@xorgy]: https://github.com/xorgy
 [@xStrom]: https://github.com/xStrom
 [@dhardy]: https://github.com/dhardy
+[@kekelp]: https://github.com/kekelp
 
 [#54]: https://github.com/linebender/parley/pull/54
 [#55]: https://github.com/linebender/parley/pull/55
@@ -297,6 +306,7 @@ This release has an [MSRV][] of 1.70.
 [#362]: https://github.com/linebender/parley/pull/362
 [#369]: https://github.com/linebender/parley/pull/369
 [#380]: https://github.com/linebender/parley/pull/380
+[#385]: https://github.com/linebender/parley/pull/385
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/linebender/parley/compare/v0.4.0...v0.5.0
