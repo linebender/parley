@@ -23,6 +23,10 @@ This release has an [MSRV] of 1.82.
 
 ### Changed
 
+#### Fontique
+
+- The fontconfig backend, used to enumerate system fonts on Linux, has been rewritten to call into the system's fontconfig library instead of parsing fontconfig's configuration files itself. This should significantly improve the behavior of system fonts and generic families on Linux. ([#378][] by [@valadaptive][])
+
 ### Fixed
 
 #### Fontique
@@ -305,6 +309,7 @@ This release has an [MSRV][] of 1.70.
 [#353]: https://github.com/linebender/parley/pull/353
 [#362]: https://github.com/linebender/parley/pull/362
 [#369]: https://github.com/linebender/parley/pull/369
+[#378]: https://github.com/linebender/parley/pull/378
 [#380]: https://github.com/linebender/parley/pull/380
 [#385]: https://github.com/linebender/parley/pull/385
 
