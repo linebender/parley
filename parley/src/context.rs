@@ -16,15 +16,16 @@ use super::style::{Brush, TextStyle};
 use swash::shape::ShapeContext;
 use swash::text::cluster::CharInfo;
 
+use crate::Layout;
+use crate::StyleProperty;
 use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
+use crate::resolve::ResolvedProperty;
 
 /// Shared scratch space used when constructing text layouts.
 ///
 /// This type is designed to be a global resource with only one per-application (or per-thread).
 pub struct LayoutContext<B: Brush = [u8; 4]> {
-    pub(crate) bidi: bidi::BidiResolver,
-    pub(crate) rcx: ResolveContext,
     pub(crate) styles: Vec<RangedStyle<B>>,
     pub(crate) inline_boxes: Vec<InlineBox>,
 
@@ -32,8 +33,11 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) ranged_style_builder: RangedStyleBuilder<B>,
     pub(crate) tree_style_builder: TreeStyleBuilder<B>,
 
-    pub(crate) info: Vec<(CharInfo, u16)>,
-    pub(crate) scx: ShapeContext,
+    // Internal contexts
+    bidi: bidi::BidiResolver,
+    rcx: ResolveContext,
+    scx: ShapeContext,
+    info: Vec<(CharInfo, u16)>,
 }
 
 impl<B: Brush> LayoutContext<B> {
@@ -177,6 +181,88 @@ impl<B: Brush> LayoutContext<B> {
                 None,
             );
         }
+    }
+
+    pub(crate) fn resolve_property(
+        &mut self,
+        fcx: &mut FontContext,
+        property: &StyleProperty<'_, B>,
+        scale: f32,
+    ) -> ResolvedProperty<B> {
+        self.rcx.resolve_property(fcx, property, scale)
+    }
+
+    pub(crate) fn resolve_entire_style_set(
+        &mut self,
+        fcx: &mut FontContext,
+        raw_style: &TextStyle<'_, B>,
+        scale: f32,
+    ) -> ResolvedStyle<B> {
+        self.rcx.resolve_entire_style_set(fcx, raw_style, scale)
+    }
+
+    pub(crate) fn shape_into_layout(
+        &mut self,
+        fcx: &mut FontContext,
+        text: &str,
+        layout: &mut Layout<B>,
+    ) {
+        let query = fcx.collection.query(&mut fcx.source_cache);
+        super::shape::shape_text(
+            &self.rcx,
+            query,
+            &self.styles,
+            &self.inline_boxes,
+            &self.info,
+            self.bidi.levels(),
+            &mut self.scx,
+            text,
+            layout,
+        );
+    }
+
+    pub(crate) fn build_into_layout(
+        &mut self,
+        layout: &mut Layout<B>,
+        scale: f32,
+        quantize: bool,
+        text: &str,
+        fcx: &mut FontContext,
+    ) {
+        self.analyze_text(text);
+
+        layout.data.clear();
+        layout.data.scale = scale;
+        layout.data.quantize = quantize;
+        layout.data.has_bidi = !self.bidi.levels().is_empty();
+        layout.data.base_level = self.bidi.base_level();
+        layout.data.text_len = text.len();
+
+        let mut char_index = 0;
+        for (i, style) in self.styles.iter().enumerate() {
+            for _ in text[style.range.clone()].chars() {
+                self.info[char_index].1 = i as u16;
+                char_index += 1;
+            }
+        }
+
+        // Copy the visual styles into the layout
+        layout
+            .data
+            .styles
+            .extend(self.styles.iter().map(|s| s.style.as_layout_style()));
+
+        // Sort the inline boxes as subsequent code assumes that they are in text index order.
+        // Note: It's important that this is a stable sort to allow users to control the order of contiguous inline boxes
+        self.inline_boxes.sort_by_key(|b| b.index);
+
+        self.shape_into_layout(fcx, text, layout);
+
+        // Move inline boxes into the layout
+        layout.data.inline_boxes.clear();
+        core::mem::swap(&mut layout.data.inline_boxes, &mut self.inline_boxes);
+
+        layout.data.finish();
     }
 
     fn begin(&mut self) {
