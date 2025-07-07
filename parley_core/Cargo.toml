@@ -1,0 +1,18 @@
+[package]
+name = "parley_core"
+version = "0.0.0"
+description = "Parley Core provides low level APIs for implementing text layout."
+keywords = ["text", "layout"]
+categories = ["gui", "graphics"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+publish = false
+
+[package.metadata.docs.rs]
+all-features = true
+
+[lints]
+workspace = true
