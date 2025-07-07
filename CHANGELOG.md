@@ -29,13 +29,14 @@ This release has an [MSRV] of 1.82.
 
 ### Fixed
 
-#### Fontique
-
-- Font family name aliases (secondary names for font families, often in another language) not being registered. ([#380][] by [@valadaptive][])
-
 #### Parley
 
 - Selection extension moves the focus to the side being extended. ([#385][] by [@kekelp][])
+- Ranged builder default style not respecting `scale`. ([#368][] by [@xStrom][])
+
+#### Fontique
+
+- Font family name aliases (secondary names for font families, often in another language) not being registered. ([#380][] by [@valadaptive][])
 
 ## [0.5.0] - 2025-06-01
 
@@ -308,6 +309,7 @@ This release has an [MSRV][] of 1.70.
 [#348]: https://github.com/linebender/parley/pull/348
 [#353]: https://github.com/linebender/parley/pull/353
 [#362]: https://github.com/linebender/parley/pull/362
+[#368]: https://github.com/linebender/parley/pull/368
 [#369]: https://github.com/linebender/parley/pull/369
 [#378]: https://github.com/linebender/parley/pull/378
 [#380]: https://github.com/linebender/parley/pull/380

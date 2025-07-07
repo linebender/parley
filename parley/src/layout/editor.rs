@@ -9,7 +9,6 @@ use crate::{
         Affinity, Alignment, AlignmentOptions, Layout,
         cursor::{Cursor, Selection},
     },
-    resolve::ResolvedStyle,
     style::Brush,
 };
 use alloc::{borrow::ToOwned, string::String, vec::Vec};
@@ -114,6 +113,7 @@ where
     /// Whether the cursor should be shown. The IME can request to hide the cursor.
     show_cursor: bool,
     width: Option<f32>,
+    font_size: f32,
     scale: f32,
     quantize: bool,
     // Simple tracking of when the layout needs to be updated
@@ -146,6 +146,7 @@ where
             compose: None,
             show_cursor: true,
             width: None,
+            font_size,
             scale: 1.0,
             quantize: true,
             layout_dirty: true,
@@ -925,7 +926,7 @@ where
         let font_size = downstream
             .or(upstream)
             .map(|cluster| cluster.run().font_size())
-            .unwrap_or(ResolvedStyle::<T>::default().font_size);
+            .unwrap_or(self.font_size * self.scale);
         // Using 0.6 as an estimate of the average advance
         let inflate = 3. * 0.6 * font_size as f64;
         let editor_width = self.width.map(f64::from).unwrap_or(f64::INFINITY);
