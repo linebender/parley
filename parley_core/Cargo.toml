@@ -16,3 +16,6 @@ all-features = true
 
 [lints]
 workspace = true
+
+[features]
+std = []
