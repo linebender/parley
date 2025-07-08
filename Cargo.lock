@@ -2610,6 +2610,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "parley_core"
+version = "0.0.0"
+
+[[package]]
 name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
