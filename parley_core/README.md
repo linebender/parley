@@ -4,11 +4,13 @@
 
 **Low level text layout**
 
-[![Latest published parley core version.](https://img.shields.io/crates/v/parley_core.svg)](https://crates.io/crates/parley_core)
+[![Latest published version.](https://img.shields.io/crates/v/parley_core.svg)](https://crates.io/crates/parley_core)
 [![Documentation build status.](https://img.shields.io/docsrs/parley_core.svg)](https://docs.rs/parley_core)
-[![Dependency staleness status.](https://deps.rs/crate/parley_core/latest/status.svg)](https://deps.rs/crate/parley_core)
-[![Linebender Zulip chat.](https://img.shields.io/badge/Linebender-%23parley-blue?logo=Zulip)](https://xi.zulipchat.com/#narrow/channel/205635-parley)
 [![Apache 2.0 or MIT license.](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](#license)
+\
+[![Linebender Zulip chat.](https://img.shields.io/badge/Linebender-%23parley-blue?logo=Zulip)](https://xi.zulipchat.com/#narrow/channel/205635-parley)
+[![GitHub Actions CI status.](https://img.shields.io/github/actions/workflow/status/linebender/parley/ci.yml?logo=github&label=CI)](https://github.com/linebender/parley/actions)
+[![Dependency staleness status.](https://deps.rs/crate/parley_core/latest/status.svg)](https://deps.rs/crate/parley_core)
 
 </div>
 
