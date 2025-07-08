@@ -14,8 +14,9 @@ publish = false
 [package.metadata.docs.rs]
 all-features = true
 
+[features]
+default = ["std"]
+std = []
+
 [lints]
 workspace = true
-
-[features]
-std = []
