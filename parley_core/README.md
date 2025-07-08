@@ -14,7 +14,23 @@
 
 </div>
 
+<!-- We use cargo-rdme to update the README with the contents of lib.rs.
+To edit the following section, update it in lib.rs, then run:
+cargo rdme --workspace-project=parley_core --heading-base-level=0
+Full documentation at https://github.com/orium/cargo-rdme -->
+
+<!-- Intra-doc links used in lib.rs should be evaluated here.
+See https://linebender.org/blog/doc-include/ for related discussion. -->
+
+<!-- cargo-rdme start -->
+
 Parley Core provides low level APIs for implementing text layout.
+
+## Features
+
+- `std` (enabled by default): This is currently unused and is provided for forward compatibility.
+
+<!-- cargo-rdme end -->
 
 ## Minimum supported Rust Version (MSRV)
 

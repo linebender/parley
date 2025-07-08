@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Parley Core provides low level APIs for implementing text layout.
+//!
+//! ## Features
+//!
+//! - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
 
 // LINEBENDER LINT SET - lib.rs - v3
 // See https://linebender.org/wiki/canonical-lints/
