@@ -23,6 +23,10 @@ This release has an [MSRV] of 1.82.
 
 ### Changed
 
+#### Parley
+
+- `Alignment`` variants have been renamed to better match CSS. `Alignment::Justified` is now `Alignment::Justify` and `Alignment::Middle` is now `Alignment::Center`. ([#389][] by [@waywardmonkeys][])
+
 #### Fontique
 
 - The fontconfig backend, used to enumerate system fonts on Linux, has been rewritten to call into the system's fontconfig library instead of parsing fontconfig's configuration files itself. This should significantly improve the behavior of system fonts and generic families on Linux. ([#378][] by [@valadaptive][])
@@ -314,6 +318,7 @@ This release has an [MSRV][] of 1.70.
 [#378]: https://github.com/linebender/parley/pull/378
 [#380]: https://github.com/linebender/parley/pull/380
 [#385]: https://github.com/linebender/parley/pull/385
+[#389]: https://github.com/linebender/parley/pull/389
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/linebender/parley/compare/v0.4.0...v0.5.0
