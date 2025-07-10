@@ -53,14 +53,14 @@ pub enum Alignment {
     /// [`Alignment::End`] instead.
     Left,
     /// Align each line centered within the container.
-    Middle,
+    Center,
     /// Align content to the right edge.
     ///
     /// For alignment that should be aware of text direction, use [`Alignment::Start`] or
     /// [`Alignment::End`] instead.
     Right,
     /// Justify each line by spacing out content, except for the last line.
-    Justified,
+    Justify,
 }
 
 /// Text layout.

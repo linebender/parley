@@ -67,7 +67,7 @@ fn only_inboxes_wrap() {
     }
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(40.0));
-    layout.align(None, Alignment::Middle, AlignmentOptions::default());
+    layout.align(None, Alignment::Center, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -243,8 +243,8 @@ fn base_level_alignment_ltr() {
     for (alignment, test_case_name) in [
         (Alignment::Start, "start"),
         (Alignment::End, "end"),
-        (Alignment::Middle, "middle"),
-        (Alignment::Justified, "justified"),
+        (Alignment::Center, "center"),
+        (Alignment::Justify, "justify"),
     ] {
         let text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
         let builder = env.ranged_builder(text);
@@ -262,8 +262,8 @@ fn base_level_alignment_rtl() {
     for (alignment, test_case_name) in [
         (Alignment::Start, "start"),
         (Alignment::End, "end"),
-        (Alignment::Middle, "middle"),
-        (Alignment::Justified, "justified"),
+        (Alignment::Center, "center"),
+        (Alignment::Justify, "justify"),
     ] {
         let text = "عند برمجة أجهزة الكمبيوتر، قد تجد نفسك فجأة في مواقف غريبة، مثل الكتابة بلغة لا تتحدثها فعليًا.";
         let builder = env.ranged_builder(text);
@@ -284,7 +284,7 @@ fn overflow_alignment_rtl() {
     let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(1000.0));
-    layout.align(Some(10.), Alignment::Middle, AlignmentOptions::default());
+    layout.align(Some(10.), Alignment::Center, AlignmentOptions::default());
     env.rendering_config().size = Some(Size::new(10., layout.height().into()));
     env.check_layout_snapshot(&layout);
 }
@@ -403,11 +403,7 @@ fn realign() {
         if [2, 3, 4].contains(&idx) {
             layout.break_all_lines(Some(150.0));
         }
-        layout.align(
-            Some(150.),
-            Alignment::Justified,
-            AlignmentOptions::default(),
-        );
+        layout.align(Some(150.), Alignment::Justify, AlignmentOptions::default());
     }
     env.check_layout_snapshot(&layout);
 }
@@ -428,9 +424,9 @@ fn realign_all() {
         (Alignment::Start, "start"),
         (Alignment::End, "end"),
         (Alignment::Left, "left"),
-        (Alignment::Middle, "middle"),
+        (Alignment::Center, "center"),
         (Alignment::Right, "right"),
-        (Alignment::Justified, "justified"),
+        (Alignment::Justify, "justify"),
     ];
 
     let all_opts = [
