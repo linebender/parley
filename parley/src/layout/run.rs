@@ -40,7 +40,13 @@ impl<'a, B: Brush> Run<'a, B> {
 
     /// Returns the synthesis suggestions for the font associated with the run.
     pub fn synthesis(&self) -> Synthesis {
-        self.data.synthesis
+        // changed: Convert HarfSynthesis to swash::Synthesis for compatibility
+        // self.data.synthesis
+        Synthesis::new(
+            std::iter::empty(), // No variation settings for now
+            self.data.synthesis.bold > 0.0, // Convert weight to boolean embolden
+            self.data.synthesis.italic, // Use italic as skew angle
+        )
     }
 
     /// Returns the normalized variation coordinates for the font associated

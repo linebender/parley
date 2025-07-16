@@ -135,13 +135,10 @@ fn main() {
 
     // Write image to PNG file in examples/_output dir
     let output_path = {
-        let path = std::path::PathBuf::from(file!());
-        let mut path = std::fs::canonicalize(path).unwrap();
-        path.pop();
-        path.pop();
-        path.pop();
+        // Use current working directory and navigate to _output
+        let mut path = std::env::current_dir().unwrap();
         path.push("_output");
-        drop(std::fs::create_dir(path.clone()));
+        drop(std::fs::create_dir_all(path.clone()));
         path.push("tiny_skia_render.png");
         path
     };

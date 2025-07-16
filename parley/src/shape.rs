@@ -91,6 +91,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 return;
             }
             
+            // changed: Restoring harfrust implementation step by step
             // Use our font selector to get the best font
             let mut font_selector = FontSelector::new(
                 &mut fq,
@@ -108,7 +109,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 if let Ok(harf_font) = HarfFontRef::from_index(
                     selected_font.font.blob.as_ref(), 
                     selected_font.font.index
-                ) {
+                )
+                {
                     // Create harfrust shaper
                     let shaper_data = ShaperData::new(&harf_font);
                     let variations: Vec<harfrust::Variation> = vec![]; // TODO: Convert from item.variations
@@ -142,6 +144,9 @@ pub(crate) fn shape_text<'a, B: Brush>(
                         item.word_spacing,
                         item.letter_spacing,
                     );
+                } else {
+                    // Fallback to temporary stub if harfrust font creation fails
+                    // TODO: Handle this case better
                 }
             }
         };

@@ -174,6 +174,8 @@ impl<'a, B: Brush> Cluster<'a, B> {
                 x: 0.,
                 y: 0.,
                 advance: self.data.advance,
+                cluster_index: 0, // TODO: Get from cluster mapping
+                flags: 0, // TODO: Get from harfrust
             }))
         } else {
             let start = self.run.data.glyph_start + self.data.glyph_offset as usize;
