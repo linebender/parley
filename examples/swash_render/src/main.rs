@@ -322,7 +322,7 @@ fn render_glyph(
     // Apply the fractional offset
     .offset(offset)
     // Render the image
-    .render(scaler, glyph.id)
+    .render(scaler, glyph.id as u16)  // Convert harfrust u32 to swash u16
     .unwrap();
 
     let glyph_width = rendered_glyph.placement.width;

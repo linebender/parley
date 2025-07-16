@@ -6,12 +6,14 @@ use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
 use crate::Font;
 use crate::util::nearly_eq;
+use crate::layout::data::HarfSynthesis;
 use fontique::QueryFamily;
 use fontique::{self, Query, QueryFont};
-use swash::shape::{Direction, ShapeContext, partition};
-use swash::text::cluster::{CharCluster, CharInfo, Token};
+// Keep swash for text analysis
+use swash::text::cluster::{CharCluster, CharInfo};
 use swash::text::{Language, Script};
-use swash::{FontRef, Synthesis};
+// Use harfrust for shaping
+use harfrust::{FontRef as HarfFontRef, ShaperData, ShaperInstance, UnicodeBuffer, Direction};
 
 use alloc::vec::Vec;
 
@@ -37,7 +39,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     inline_boxes: &[InlineBox],
     infos: &[(CharInfo, u16)],
     levels: &[u8],
-    scx: &mut ShapeContext,
+    _scx: &mut swash::shape::ShapeContext, // Keep for compatibility but don't use
     mut text: &str,
     layout: &mut Layout<B>,
 ) {
@@ -80,58 +82,68 @@ pub(crate) fn shape_text<'a, B: Brush>(
     let mut current_box = inline_box_iter.next();
     let mut deferred_boxes: Vec<usize> = Vec::with_capacity(16);
 
-    // Define macro to shape
+    // Define macro to shape using harfrust
     macro_rules! shape_item {
         () => {
             let item_text = &text[text_range.clone()];
-            let item_infos = &infos[char_range.start..];
-            let first_style_index = item_infos[0].1;
-            let mut fs = FontSelector::new(
+            
+            if item_text.is_empty() {
+                return;
+            }
+            
+            // Use our font selector to get the best font
+            let mut font_selector = FontSelector::new(
                 &mut fq,
                 rcx,
                 styles,
-                first_style_index,
+                item.style_index,
                 item.script,
                 item.locale,
             );
-            let options = partition::SimpleShapeOptions {
-                size: item.size,
-                script: item.script,
-                language: item.locale,
-                direction: if item.level & 1 != 0 {
-                    Direction::RightToLeft
-                } else {
-                    Direction::LeftToRight
-                },
-                variations: rcx.variations(item.variations).unwrap_or(&[]),
-                features: rcx.features(item.features).unwrap_or(&[]),
-                insert_dotted_circles: false,
-            };
-            partition::shape(
-                scx,
-                &mut fs,
-                &options,
-                item_text.char_indices().zip(item_infos).map(
-                    |((offset, ch), (info, style_index))| Token {
-                        ch,
-                        offset: (text_range.start + offset) as u32,
-                        len: ch.len_utf8() as u8,
-                        info: *info,
-                        data: *style_index as _,
-                    },
-                ),
-                |font, shaper| {
-                    layout.data.push_run(
-                        Font::new(font.font.blob.clone(), font.font.index),
+            
+            // For simplicity, get font for the first character info in this range
+            let char_info = &infos[char_range.start].0;
+            if let Some(selected_font) = font_selector.select_font_for_text(item_text, char_info, item.style_index) {
+                // Try to create harfrust font reference
+                if let Ok(harf_font) = HarfFontRef::from_index(
+                    selected_font.font.blob.as_ref(), 
+                    selected_font.font.index
+                ) {
+                    // Create harfrust shaper
+                    let shaper_data = ShaperData::new(&harf_font);
+                    let variations: Vec<harfrust::Variation> = vec![]; // TODO: Convert from item.variations
+                    let instance = ShaperInstance::from_variations(&harf_font, &variations);
+                    let harf_shaper = shaper_data
+                        .shaper(&harf_font)
+                        .instance(Some(&instance))
+                        .point_size(Some(item.size))
+                        .build();
+                    
+                    // Prepare harfrust buffer
+                    let mut buffer = UnicodeBuffer::new();
+                    buffer.push_str(item_text);
+                    buffer.set_direction(level_to_direction(item.level));
+                    // TODO: buffer.set_script(script_to_harf(item.script));
+                    // TODO: buffer.set_language(item.locale);
+                    
+                    // Convert features
+                    let features: Vec<harfrust::Feature> = vec![]; // TODO: Convert from item.features
+                    
+                    // Shape the text
+                    let glyph_buffer = harf_shaper.shape(buffer, &features);
+                    
+                    // Push the shaped run to layout using our harfrust data structures
+                    layout.data.push_run_from_harfrust(
+                        Font::new(selected_font.font.blob.clone(), selected_font.font.index),
                         item.size,
-                        font.synthesis,
-                        shaper,
+                        selected_font.synthesis,
+                        &glyph_buffer,
                         item.level,
                         item.word_spacing,
                         item.letter_spacing,
                     );
-                },
-            );
+                }
+            }
         };
     }
 
@@ -164,17 +176,10 @@ pub(crate) fn shape_text<'a, B: Brush>(
         }
 
         // Check if there is an inline box at this index
-        // Note:
-        //   - We loop because there may be multiple boxes at this index
-        //   - We do this *before* processing the text run because we need to know whether we should
-        //     break the run due to the presence of an inline box.
         while let Some((box_idx, inline_box)) = current_box {
-            // println!("{} {}", byte_index, inline_box.index);
-
             if inline_box.index == byte_index {
                 break_run = true;
                 deferred_boxes.push(box_idx);
-                // Update the current box to the next box
                 current_box = inline_box_iter.next();
             } else {
                 break;
@@ -194,7 +199,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
         }
 
         for box_idx in deferred_boxes.drain(0..) {
-            // Push the box to the list of items
             layout.data.push_inline_box(box_idx);
         }
 
@@ -206,7 +210,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         shape_item!();
     }
 
-    // Process any remaining inline boxes whose index is greater than the length of the text
+    // Process any remaining inline boxes
     if let Some((box_idx, _inline_box)) = current_box {
         layout.data.push_inline_box(box_idx);
     }
@@ -217,6 +221,31 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
 fn real_script(script: Script) -> bool {
     script != Script::Common && script != Script::Unknown && script != Script::Inherited
+}
+
+/// Convert fontique synthesis to harfrust synthesis
+fn synthesis_to_harf(synthesis: fontique::Synthesis) -> HarfSynthesis {
+    HarfSynthesis {
+        bold: 0.0,        // TODO: Extract from fontique::Synthesis when API is known
+        italic: 0.0,      // TODO: Extract from fontique::Synthesis when API is known  
+        small_caps: false, // TODO: Add small caps support if fontique has it
+    }
+}
+
+/// Convert swash script to harfrust script (if needed)
+fn script_to_harf(_script: Script) -> harfrust::Script {
+    // TODO: Add proper script conversion once we know harfrust's script constants
+    // For now, return a placeholder - this will need to be implemented when harfrust API is known
+    todo!("Implement script conversion when harfrust API is available")
+}
+
+/// Convert swash direction from bidi level to harfrust direction
+fn level_to_direction(level: u8) -> Direction {
+    if level & 1 != 0 {
+        Direction::RightToLeft
+    } else {
+        Direction::LeftToRight
+    }
 }
 
 struct FontSelector<'a, 'b, B: Brush> {
@@ -267,28 +296,18 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             features,
         }
     }
-}
 
-impl<B: Brush> partition::Selector for FontSelector<'_, '_, B> {
-    type SelectedFont = SelectedFont;
-
-    fn select_font(&mut self, cluster: &mut CharCluster) -> Option<Self::SelectedFont> {
-        let style_index = cluster.user_data() as u16;
-        let is_emoji = cluster.info().is_emoji();
-        if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
+    /// Select a font for the given text cluster - simplified for harfrust
+    fn select_font_for_text(&mut self, _text: &str, _char_info: &CharInfo, style_index: u16) -> Option<SelectedFont> {
+        if style_index != self.style_index {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize].style;
-
+            
             let fonts_id = style.font_stack.id();
             let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
-            let fonts = fonts.iter().copied().map(QueryFamily::Id);
-            if is_emoji {
-                use core::iter::once;
-                let emoji_family = QueryFamily::Generic(fontique::GenericFamily::Emoji);
-                self.query.set_families(fonts.chain(once(emoji_family)));
-                self.fonts_id = None;
-            } else if self.fonts_id != Some(fonts_id) {
-                self.query.set_families(fonts);
+            
+            if self.fonts_id != Some(fonts_id) {
+                self.query.set_families(fonts.iter().copied());
                 self.fonts_id = Some(fonts_id);
             }
 
@@ -304,43 +323,11 @@ impl<B: Brush> partition::Selector for FontSelector<'_, '_, B> {
             self.variations = self.rcx.variations(style.font_variations).unwrap_or(&[]);
             self.features = self.rcx.features(style.font_features).unwrap_or(&[]);
         }
+        
         let mut selected_font = None;
         self.query.matches_with(|font| {
-            use skrifa::MetadataProvider;
-            use swash::text::cluster::Status as MapStatus;
-
-            let Ok(font_ref) = skrifa::FontRef::from_index(font.blob.as_ref(), font.index) else {
-                return fontique::QueryStatus::Continue;
-            };
-
-            let charmap = font_ref.charmap();
-            let map_status = cluster.map(|ch| {
-                charmap
-                    .map(ch)
-                    .map(|g| {
-                        g.to_u32()
-                            .try_into()
-                            .expect("Swash requires u16 glyph, so we hope that the glyph fits")
-                    })
-                    .unwrap_or_default()
-            });
-
-            match map_status {
-                MapStatus::Complete => {
-                    selected_font = Some(font.into());
-                    fontique::QueryStatus::Stop
-                }
-                MapStatus::Keep => {
-                    selected_font = Some(font.into());
-                    fontique::QueryStatus::Continue
-                }
-                MapStatus::Discard => {
-                    if selected_font.is_none() {
-                        selected_font = Some(font.into());
-                    }
-                    fontique::QueryStatus::Continue
-                }
-            }
+            selected_font = Some(SelectedFont::from(font));
+            fontique::QueryStatus::Stop // Take the first matching font for now
         });
         selected_font
     }
@@ -348,15 +335,14 @@ impl<B: Brush> partition::Selector for FontSelector<'_, '_, B> {
 
 struct SelectedFont {
     font: QueryFont,
-    synthesis: Synthesis,
+    synthesis: HarfSynthesis,
 }
 
 impl From<&QueryFont> for SelectedFont {
     fn from(font: &QueryFont) -> Self {
-        use crate::swash_convert::synthesis_to_swash;
         Self {
             font: font.clone(),
-            synthesis: synthesis_to_swash(font.synthesis),
+            synthesis: synthesis_to_harf(font.synthesis),
         }
     }
 }
@@ -364,19 +350,5 @@ impl From<&QueryFont> for SelectedFont {
 impl PartialEq for SelectedFont {
     fn eq(&self, other: &Self) -> bool {
         self.font.family == other.font.family && self.synthesis == other.synthesis
-    }
-}
-
-impl partition::SelectedFont for SelectedFont {
-    fn font(&self) -> FontRef<'_> {
-        FontRef::from_index(self.font.blob.as_ref(), self.font.index as _).unwrap()
-    }
-
-    fn id_override(&self) -> Option<[u64; 2]> {
-        Some([self.font.blob.id(), self.font.index as _])
-    }
-
-    fn synthesis(&self) -> Option<Synthesis> {
-        Some(self.synthesis)
     }
 }

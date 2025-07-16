@@ -169,7 +169,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
     pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + 'a + Clone {
         if self.data.glyph_len == 0xFF {
             GlyphIter::Single(Some(Glyph {
-                id: self.data.glyph_offset,
+                id: self.data.glyph_offset as u32,  // Convert u16 to u32 for harfrust glyph ID
                 style_index: self.data.style_index,
                 x: 0.,
                 y: 0.,

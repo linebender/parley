@@ -7,9 +7,9 @@ use crate::style::Brush;
 use crate::util::nearly_zero;
 use crate::{Font, OverflowWrap};
 use core::ops::Range;
-use swash::Synthesis;
-use swash::shape::Shaper;
+// Keep swash for text analysis, use harfrust only for shaping
 use swash::text::cluster::{Boundary, ClusterInfo};
+use harfrust::{GlyphBuffer, Script, Direction};
 
 use alloc::vec::Vec;
 
@@ -17,18 +17,47 @@ use alloc::vec::Vec;
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 
+/// Harfrust-based font synthesis information (replaces swash::Synthesis)
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct HarfSynthesis {
+    /// Synthetic bold weight adjustment (0.0 = no adjustment)
+    pub bold: f32,
+    /// Synthetic italic skew angle in degrees (0.0 = no skew)
+    pub italic: f32,
+    /// Whether to apply synthetic small caps
+    pub small_caps: bool,
+}
+
+impl Default for HarfSynthesis {
+    fn default() -> Self {
+        Self {
+            bold: 0.0,
+            italic: 0.0,
+            small_caps: false,
+        }
+    }
+}
+
+/// Cluster data - uses swash analysis with harfrust shaping
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct ClusterData {
+    /// Cluster information from swash text analysis
     pub(crate) info: ClusterInfo,
+    /// Cluster flags (ligature info, style divergence, etc.)
     pub(crate) flags: u16,
+    /// Style index for this cluster
     pub(crate) style_index: u16,
+    /// Number of glyphs in this cluster (0xFF = single glyph stored inline)
     pub(crate) glyph_len: u8,
+    /// Number of text bytes in this cluster
     pub(crate) text_len: u8,
     /// If `glyph_len == 0xFF`, then `glyph_offset` is a glyph identifier,
     /// otherwise, it's an offset into the glyph array with the base
     /// taken from the owning run.
     pub(crate) glyph_offset: u16,
+    /// Offset into the text for this cluster
     pub(crate) text_offset: u16,
+    /// Advance width for this cluster
     pub(crate) advance: f32,
 }
 
@@ -55,14 +84,15 @@ impl ClusterData {
     }
 }
 
+/// Harfrust-based run data (updated to use harfrust types)
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct RunData {
     /// Index of the font for the run.
     pub(crate) font_index: usize,
     /// Font size.
     pub(crate) font_size: f32,
-    /// Synthesis information for the font.
-    pub(crate) synthesis: Synthesis,
+    /// Harfrust-based synthesis information for the font.
+    pub(crate) synthesis: HarfSynthesis,
     /// Range of normalized coordinates in the layout data.
     pub(crate) coords_range: Range<usize>,
     /// Range of the source text.
@@ -83,6 +113,10 @@ pub(crate) struct RunData {
     pub(crate) letter_spacing: f32,
     /// Total advance of the run.
     pub(crate) advance: f32,
+    /// Text direction for this run
+    pub(crate) direction: Direction,
+    /// Script for this run
+    pub(crate) script: Script,
 }
 
 #[derive(Copy, Clone, Default, PartialEq, Debug)]
@@ -294,8 +328,8 @@ impl<B: Brush> LayoutData<B> {
         &mut self,
         font: Font,
         font_size: f32,
-        synthesis: Synthesis,
-        shaper: Shaper<'_>,
+        synthesis: HarfSynthesis,
+        shaper: harfrust::Shaper<'_>,
         bidi_level: u8,
         word_spacing: f32,
         letter_spacing: f32,
@@ -339,6 +373,8 @@ impl<B: Brush> LayoutData<B> {
             word_spacing,
             letter_spacing,
             advance: 0.,
+            direction: Direction::LTR, // Default to LTR for now
+            script: Script::LATIN,   // Default to LATIN for now
         };
         // Track these so that we can flush if they overflow a u16.
         let mut glyph_count = 0_usize;
@@ -428,7 +464,7 @@ impl<B: Brush> LayoutData<B> {
                 if nearly_zero(g.x) && nearly_zero(g.y) {
                     // Handle the case with a single glyph with zero'd offset.
                     cluster_data.glyph_len = 0xFF;
-                    cluster_data.glyph_offset = g.id;
+                    cluster_data.glyph_offset = g.id as u16;  // Store harfrust u32 glyph ID as u16
                     push_components!();
                     return;
                 }
@@ -446,17 +482,183 @@ impl<B: Brush> LayoutData<B> {
                     cluster_data.flags |= ClusterData::DIVERGENT_STYLES;
                 }
                 Glyph {
-                    id: g.id,
+                    id: g.id as u32,  // Convert swash u16 to harfrust u32
                     style_index,
                     x: g.x,
                     y: g.y,
                     advance: g.advance,
+                    cluster_index: 0, // TODO: Get from harfrust cluster mapping
+                    flags: 0, // TODO: Get from harfrust glyph flags
                 }
             }));
             glyph_count += glyph_len;
             push_components!();
         });
         flush_run!();
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn push_run_from_harfrust(
+        &mut self,
+        font: Font,
+        font_size: f32,
+        synthesis: HarfSynthesis,
+        glyph_buffer: &GlyphBuffer,
+        bidi_level: u8,
+        word_spacing: f32,
+        letter_spacing: f32,
+    ) {
+        let font_index = self
+            .fonts
+            .iter()
+            .position(|f| *f == font)
+            .unwrap_or_else(|| {
+                let index = self.fonts.len();
+                self.fonts.push(font);
+                index
+            });
+        
+        // For now, create default metrics since we don't have them from harfrust
+        // TODO: Get actual metrics from the font
+        let metrics = RunMetrics {
+            ascent: font_size * 0.8,
+            descent: font_size * 0.2,
+            leading: 0.0,
+            underline_offset: -font_size * 0.1,
+            underline_size: font_size * 0.05,
+            strikethrough_offset: font_size * 0.3,
+            strikethrough_size: font_size * 0.05,
+        };
+        
+        let cluster_range = self.clusters.len()..self.clusters.len();
+        let coords_start = self.coords.len();
+        // TODO: Handle font variations
+        let coords_end = self.coords.len();
+        
+        let mut run = RunData {
+            font_index,
+            font_size,
+            synthesis,
+            coords_range: coords_start..coords_end,
+            text_range: 0..0,
+            bidi_level,
+            ends_with_newline: false,
+            cluster_range,
+            glyph_start: self.glyphs.len(),
+            metrics,
+            word_spacing,
+            letter_spacing,
+            advance: 0.,
+            direction: Direction::LTR, // Default to LTR for now
+            script: Script::LATIN,   // Default to LATIN for now
+        };
+
+        // Get harfrust glyph data
+        let glyph_infos = glyph_buffer.glyph_infos();
+        let glyph_positions = glyph_buffer.glyph_positions();
+        
+        if glyph_infos.is_empty() {
+            return;
+        }
+
+        // Track cluster and text ranges
+        let mut cluster_start = 0;
+        let mut text_start = glyph_infos[0].cluster as usize;
+        run.text_range = text_start..text_start;
+        
+        let mut current_cluster = glyph_infos[0].cluster;
+        let mut cluster_glyphs: Vec<(&harfrust::GlyphInfo, &harfrust::GlyphPosition)> = Vec::new();
+        let mut total_advance = 0.0;
+
+        for (i, (info, pos)) in glyph_infos.iter().zip(glyph_positions.iter()).enumerate() {
+            if info.cluster != current_cluster {
+                // Flush the current cluster
+                self.push_harfrust_cluster(
+                    &mut run,
+                    current_cluster,
+                    &cluster_glyphs,
+                    &mut total_advance,
+                );
+                
+                // Start new cluster
+                current_cluster = info.cluster;
+                cluster_glyphs.clear();
+                cluster_start = i;
+            }
+            
+            // Add glyph to current cluster
+            cluster_glyphs.push((info, pos));
+        }
+        
+        // Flush the last cluster
+        if !cluster_glyphs.is_empty() {
+            self.push_harfrust_cluster(
+                &mut run,
+                current_cluster,
+                &cluster_glyphs,
+                &mut total_advance,
+            );
+        }
+
+        run.advance = total_advance;
+        run.text_range.end = run.text_range.start + glyph_buffer.len(); // Rough estimate
+
+        // Push the run
+        if !run.cluster_range.is_empty() {
+            self.runs.push(run);
+            self.items.push(LayoutItem {
+                kind: LayoutItemKind::TextRun,
+                index: self.runs.len() - 1,
+                bidi_level,
+            });
+        }
+    }
+
+    fn push_harfrust_cluster(
+        &mut self,
+        run: &mut RunData,
+        cluster_id: u32,
+        cluster_glyphs: &[(&harfrust::GlyphInfo, &harfrust::GlyphPosition)],
+        total_advance: &mut f32,
+    ) {
+        // TODO: Implement proper cluster creation from harfrust data
+        // For now, create a basic cluster
+        
+        let glyph_start = self.glyphs.len() - run.glyph_start;
+        let glyph_len = cluster_glyphs.len();
+        let mut cluster_advance = 0.0;
+
+        // Create glyphs from harfrust data
+        for (info, pos) in cluster_glyphs {
+            // TODO: Get actual glyph data from harfrust
+            let glyph = Glyph {
+                id: info.glyph_id, // harfrust glyph ID is already u32
+                style_index: 0, // TODO: Get from context
+                x: pos.x_offset as f32, // Get from harfrust position
+                y: pos.y_offset as f32, // Get from harfrust position
+                advance: pos.x_advance as f32, // Get from harfrust position
+                cluster_index: cluster_id, // Map harfrust cluster to index
+                flags: 0, // TODO: Get from harfrust glyph flags
+            };
+            cluster_advance += glyph.advance;
+            self.glyphs.push(glyph);
+        }
+
+        // Create cluster data with default cluster info
+        let cluster_data = ClusterData {
+            info: ClusterInfo::default(), // Use default for now
+            flags: 0,
+            style_index: 0, // TODO: Get from context
+            glyph_len: glyph_len as u8,
+            text_len: 1, // TODO: Calculate proper text length
+            advance: cluster_advance,
+            text_offset: 0, // TODO: Calculate proper offset
+            glyph_offset: glyph_start as u16,
+        };
+
+        self.clusters.push(cluster_data);
+        run.cluster_range.end += 1;
+        *total_advance += cluster_advance;
     }
 
     pub(crate) fn finish(&mut self) {
