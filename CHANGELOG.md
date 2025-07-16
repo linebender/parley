@@ -320,6 +320,7 @@ This release has an [MSRV][] of 1.70.
 [#380]: https://github.com/linebender/parley/pull/380
 [#385]: https://github.com/linebender/parley/pull/385
 [#389]: https://github.com/linebender/parley/pull/389
+[#390]: https://github.com/linebender/parley/pull/390
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/linebender/parley/compare/v0.4.0...v0.5.0
