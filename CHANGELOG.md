@@ -26,6 +26,7 @@ This release has an [MSRV] of 1.82.
 #### Parley
 
 - `Alignment`` variants have been renamed to better match CSS. `Alignment::Justified` is now `Alignment::Justify` and `Alignment::Middle` is now `Alignment::Center`. ([#389][] by [@waywardmonkeys][])
+- Updated to `accesskit` 0.21. ([#390][] by [@mwcampbell][]
 
 #### Fontique
 
