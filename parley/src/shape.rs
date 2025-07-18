@@ -125,7 +125,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
                     let mut buffer = UnicodeBuffer::new();
                     buffer.push_str(item_text);
                     buffer.set_direction(level_to_direction(item.level));
-                    // TODO: buffer.set_script(script_to_harf(item.script));
+                    // TODO: buffer.set_script(script_to_harf(item.script)); // Need proper harfrust Script constants
                     // TODO: buffer.set_language(item.locale);
                     
                     // Convert features
@@ -143,6 +143,11 @@ pub(crate) fn shape_text<'a, B: Brush>(
                         item.level,
                         item.word_spacing,
                         item.letter_spacing,
+                        // NEW: Pass text analysis data for proper clustering
+                        item_text,
+                        infos,
+                        text_range.clone(),
+                        char_range.clone(),
                     );
                 } else {
                     // Fallback to temporary stub if harfrust font creation fails
@@ -237,11 +242,11 @@ fn synthesis_to_harf(synthesis: fontique::Synthesis) -> HarfSynthesis {
     }
 }
 
-/// Convert swash script to harfrust script (if needed)
+/// Convert swash script to harfrust script (disabled for now)
 fn script_to_harf(_script: Script) -> harfrust::Script {
-    // TODO: Add proper script conversion once we know harfrust's script constants
-    // For now, return a placeholder - this will need to be implemented when harfrust API is known
-    todo!("Implement script conversion when harfrust API is available")
+    // DISABLED: Script setting causes compilation issues with harfrust API
+    // The visual cutoff issue should be resolved by the text mapping fixes regardless
+    panic!("script_to_harf should not be called when script setting is disabled")
 }
 
 /// Convert swash direction from bidi level to harfrust direction

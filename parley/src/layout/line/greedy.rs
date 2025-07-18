@@ -262,7 +262,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let boundary = cluster.info().boundary();
                         let style = &self.layout.data.styles[cluster.data.style_index as usize];
 
-                        if boundary == Boundary::Line {
+                        if boundary == Some(Boundary::Line) {
                             // We do not currently handle breaking within a ligature, so we ignore boundaries in such a position.
                             //
                             // We also don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive

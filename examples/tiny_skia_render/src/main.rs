@@ -143,6 +143,46 @@ fn main() {
         path
     };
     img.save_png(output_path).unwrap();
+    
+    // Debug: Dump layout data for analysis
+    dump_layout_data(&layout, "Fixed Harfrust layout");
+}
+
+// Debug function to dump layout data for comparison
+fn dump_layout_data<B: parley::style::Brush>(layout: &parley::Layout<B>, label: &str) {
+    println!("\n=== {} ===", label);
+    println!("Total width: {:.2}", layout.width());
+    println!("Total height: {:.2}", layout.height());
+    println!("Number of lines: {}", layout.lines().count());
+    
+    for (line_index, line) in layout.lines().enumerate() {
+        println!("\nLine {}: {:?}", line_index, line.text_range());
+        println!("  Line metrics: ascent={:.2}, descent={:.2}, leading={:.2}", 
+                line.metrics().ascent, line.metrics().descent, line.metrics().leading);
+        
+        for (run_index, run) in line.runs().enumerate() {
+            println!("  Run {}: {:?}", run_index, run.text_range());
+            println!("    Font: {:?}, size: {:.1}", run.font(), run.font_size());
+            println!("    Advance: {:.2}", run.advance());
+            
+            let mut cluster_count = 0;
+            for (cluster_index, cluster) in run.clusters().enumerate() {
+                cluster_count += 1;
+                if cluster_count <= 10 { // Limit output to first 10 clusters per run
+                    println!("    Cluster {}: {:?}", cluster_index, cluster.text_range());
+                    println!("      Advance: {:.2}", cluster.advance());
+                    
+                    for (glyph_index, glyph) in cluster.glyphs().enumerate() {
+                        println!("      Glyph {}: id={}, advance={:.2}, offset=({:.2}, {:.2})", 
+                                glyph_index, glyph.id, glyph.advance, glyph.x, glyph.y);
+                    }
+                }
+            }
+            if cluster_count > 10 {
+                println!("    ... and {} more clusters", cluster_count - 10);
+            }
+        }
+    }
 }
 
 fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<'_>, padding: u32) {

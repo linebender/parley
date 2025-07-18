@@ -10,11 +10,12 @@ use core::ops::Range;
 // changed: Adding back swash imports for compilation, keeping harfrust for future
 use swash::Synthesis;
 use swash::shape::Shaper;
-use swash::text::cluster::{Boundary, ClusterInfo};
+use swash::text::cluster::{Boundary, ClusterInfo, Whitespace};
 // Keep swash for text analysis, use harfrust only for shaping
 // use harfrust::{GlyphBuffer, Script, Direction};
 
 use alloc::vec::Vec;
+use alloc::collections::BTreeMap;
 
 #[cfg(feature = "libm")]
 #[allow(unused_imports)]
@@ -41,11 +42,79 @@ impl Default for HarfSynthesis {
     }
 }
 
+/// Our own cluster info type that we can populate with data from CharInfo
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct HarfClusterInfo {
+    /// Boundary type for line breaking
+    boundary: Option<Boundary>,
+    /// Whitespace classification
+    whitespace: Whitespace,
+    /// Whether this is a word boundary
+    is_boundary: bool,
+    /// Whether this is an emoji
+    is_emoji: bool,
+}
+
+impl HarfClusterInfo {
+    /// Create from boundary (the critical piece for line breaking)
+    pub fn from_boundary(boundary: Option<Boundary>) -> Self {
+        // For now, focus on boundary info which is critical for line breaking
+        // We can enhance with whitespace detection later
+        let whitespace = match boundary {
+            Some(Boundary::Line) => Whitespace::Space, // Line boundaries are typically spaces
+            _ => Whitespace::None,
+        };
+        
+        Self {
+            boundary,
+            whitespace,
+            is_boundary: boundary == Some(Boundary::Line),
+            is_emoji: false,
+        }
+    }
+    
+    /// Get boundary type (critical for line breaking)
+    pub fn boundary(&self) -> Option<Boundary> {
+        self.boundary
+    }
+    
+    /// Get whitespace type
+    pub fn whitespace(&self) -> Whitespace {
+        self.whitespace
+    }
+    
+    /// Check if this is a word boundary
+    pub fn is_boundary(&self) -> bool {
+        self.is_boundary
+    }
+    
+    /// Check if this is an emoji
+    pub fn is_emoji(&self) -> bool {
+        self.is_emoji
+    }
+    
+    /// Check if this is any kind of whitespace
+    pub fn is_whitespace(&self) -> bool {
+        self.whitespace != Whitespace::None
+    }
+}
+
+impl Default for HarfClusterInfo {
+    fn default() -> Self {
+        Self {
+            boundary: None,
+            whitespace: Whitespace::None,
+            is_boundary: false,
+            is_emoji: false,
+        }
+    }
+}
+
 /// Cluster data - uses swash analysis with harfrust shaping
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct ClusterData {
-    /// Cluster information from swash text analysis
-    pub(crate) info: ClusterInfo,
+    /// Cluster information from swash text analysis (using our own type)
+    pub(crate) info: HarfClusterInfo,
     /// Cluster flags (ligature info, style divergence, etc.)
     pub(crate) flags: u16,
     /// Style index for this cluster
@@ -440,7 +509,7 @@ impl<B: Brush> LayoutData<B> {
             let advance = cluster.advance();
             run.advance += advance;
             let mut cluster_data = ClusterData {
-                info: cluster.info,
+                info: HarfClusterInfo::from_boundary(Some(cluster.info.boundary())),
                 flags: 0,
                 style_index: cluster.data as _,
                 glyph_len: glyph_len as u8,
@@ -542,6 +611,11 @@ impl<B: Brush> LayoutData<B> {
         bidi_level: u8,
         word_spacing: f32,
         letter_spacing: f32,
+        // NEW: Add text analysis data needed for proper clustering
+        source_text: &str,
+        infos: &[(swash::text::cluster::CharInfo, u16)], // From text analysis
+        text_range: Range<usize>, // The text range this run covers
+        char_range: Range<usize>, // Range into infos array
     ) {
         let font_index = self
             .fonts
@@ -575,7 +649,7 @@ impl<B: Brush> LayoutData<B> {
             font_size,
             synthesis,
             coords_range: coords_start..coords_end,
-            text_range: 0..0,
+            text_range: text_range.clone(), // ✅ Use correct text range from parameter
             bidi_level,
             ends_with_newline: false,
             cluster_range,
@@ -597,47 +671,43 @@ impl<B: Brush> LayoutData<B> {
             return;
         }
 
-        // Track cluster and text ranges
-        let mut cluster_start = 0;
-        let mut text_start = glyph_infos[0].cluster as usize;
-        run.text_range = text_start..text_start;
+        // Map harfrust clusters to source text and create proper cluster data
+        let cluster_mappings = self.map_harfrust_clusters_to_text(
+            glyph_buffer, 
+            source_text, 
+            infos, 
+            &text_range,
+            &char_range
+        );
         
-        let mut current_cluster = glyph_infos[0].cluster;
-        let mut cluster_glyphs: Vec<(&harfrust::GlyphInfo, &harfrust::GlyphPosition)> = Vec::new();
-        let mut total_advance = 0.0;
-
-        for (i, (info, pos)) in glyph_infos.iter().zip(glyph_positions.iter()).enumerate() {
-            if info.cluster != current_cluster {
-                // Flush the current cluster
-                self.push_harfrust_cluster(
-                    &mut run,
-                    current_cluster,
-                    &cluster_glyphs,
-                    &mut total_advance,
-                );
-                
-                // Start new cluster
-                current_cluster = info.cluster;
-                cluster_glyphs.clear();
-                cluster_start = i;
-            }
-            
-            // Add glyph to current cluster
-            cluster_glyphs.push((info, pos));
+        // Group glyphs by harfrust cluster ID
+        let mut cluster_groups: BTreeMap<u32, Vec<usize>> = BTreeMap::new();
+        for (i, info) in glyph_infos.iter().enumerate() {
+            cluster_groups.entry(info.cluster).or_default().push(i);
         }
         
-        // Flush the last cluster
-        if !cluster_glyphs.is_empty() {
-            self.push_harfrust_cluster(
-                &mut run,
-                current_cluster,
-                &cluster_glyphs,
-                &mut total_advance,
-            );
+        let mut total_advance = 0.0;
+        
+        // Process each cluster in order
+        for (cluster_id, cluster_text_range, cluster_info, style_index) in cluster_mappings {
+            if let Some(glyph_indices) = cluster_groups.get(&cluster_id) {
+                let cluster_glyphs: Vec<_> = glyph_indices.iter()
+                    .map(|&i| (&glyph_infos[i], &glyph_positions[i]))
+                    .collect();
+                
+                self.push_harfrust_cluster(
+                    &mut run,
+                    cluster_id,
+                    &cluster_glyphs,
+                    &mut total_advance,
+                    cluster_text_range,
+                    cluster_info,
+                    style_index,
+                );
+            }
         }
 
         run.advance = total_advance;
-        run.text_range.end = run.text_range.start + glyph_buffer.len(); // Rough estimate
 
         // Push the run
         if !run.cluster_range.is_empty() {
@@ -650,12 +720,65 @@ impl<B: Brush> LayoutData<B> {
         }
     }
 
+    // Helper method to map harfrust clusters back to source text
+    fn map_harfrust_clusters_to_text(
+        &self,
+        glyph_buffer: &harfrust::GlyphBuffer,
+        source_text: &str,
+        infos: &[(swash::text::cluster::CharInfo, u16)],
+        text_range: &Range<usize>,
+        char_range: &Range<usize>,
+    ) -> Vec<(u32, Range<usize>, HarfClusterInfo, u16)> {
+        // Returns: (harfrust_cluster_id, text_byte_range, cluster_info, style_index)
+        
+        let mut clusters = Vec::new();
+        let glyph_infos = glyph_buffer.glyph_infos();
+        
+        // Group glyphs by harfrust cluster ID
+        let mut cluster_groups: BTreeMap<u32, Vec<usize>> = BTreeMap::new();
+        for (i, info) in glyph_infos.iter().enumerate() {
+            cluster_groups.entry(info.cluster).or_default().push(i);
+        }
+        
+        // Map each harfrust cluster back to source text
+        // Sort cluster IDs to process them in order
+        let mut sorted_cluster_ids: Vec<u32> = cluster_groups.keys().copied().collect();
+        sorted_cluster_ids.sort();
+        
+        for (i, &cluster_id) in sorted_cluster_ids.iter().enumerate() {
+            // For each cluster, map it to the corresponding character in our char_range
+            if i < char_range.len() {
+                let char_idx_in_range = i;
+                let absolute_char_idx = char_range.start + char_idx_in_range;
+                
+                // Get cluster info from swash text analysis
+                if let Some((char_info, style_index)) = infos.get(absolute_char_idx) {
+                                    // ✅ Extract boundary from CharInfo and create our own cluster info!
+                let boundary = char_info.boundary();
+                let cluster_info = HarfClusterInfo::from_boundary(Some(boundary));
+                    
+                    // Calculate text range for this cluster (1 character)
+                    let char_start = text_range.start + char_idx_in_range;
+                    let char_end = char_start + 1;
+                    let cluster_text_range = char_start..char_end.min(text_range.end);
+                    
+                    clusters.push((cluster_id, cluster_text_range, cluster_info, *style_index));
+                }
+            }
+        }
+        
+        clusters
+    }
+
     fn push_harfrust_cluster(
         &mut self,
         run: &mut RunData,
         cluster_id: u32,
         cluster_glyphs: &[(&harfrust::GlyphInfo, &harfrust::GlyphPosition)],
         total_advance: &mut f32,
+        cluster_text_range: Range<usize>,
+        cluster_info: HarfClusterInfo,
+        style_index: u16,
     ) {
         // TODO: Implement proper cluster creation from harfrust data
         // For now, create a basic cluster
@@ -666,13 +789,27 @@ impl<B: Brush> LayoutData<B> {
 
         // Create glyphs from harfrust data
         for (info, pos) in cluster_glyphs {
-            // TODO: Get actual glyph data from harfrust
+            // SCALING FIX: Harfrust returns glyph advances in raw font units (e.g., 1175) 
+            // while swash returns them pre-scaled to font size (e.g., 9.89). This causes
+            // massive layout issues - text width becomes 540x larger than expected, 
+            // breaking line wrapping and causing visual corruption.
+            //
+            // The scaling factor here assumes 2048 units per em (common for TrueType fonts).
+            // This is a TEMPORARY FIX - ideally we should either:
+            // 1. Get actual units_per_em from the font header, or  
+            // 2. Rework parley to work natively with font units throughout the pipeline
+            // 3. Fix harfrust to respect the .point_size() setting and return scaled values
+            //
+            // For now, this scaling makes harfrust output compatible with swash expectations.
+            let units_per_em = 2048.0; // TODO: Get from font header
+            let scale_factor = run.font_size / units_per_em;
+            
             let glyph = Glyph {
                 id: info.glyph_id, // harfrust glyph ID is already u32
-                style_index: 0, // TODO: Get from context
-                x: pos.x_offset as f32, // Get from harfrust position
-                y: pos.y_offset as f32, // Get from harfrust position
-                advance: pos.x_advance as f32, // Get from harfrust position
+                style_index, // ✅ Use correct style index
+                x: (pos.x_offset as f32) * scale_factor, // Scale from font units to font size
+                y: (pos.y_offset as f32) * scale_factor, // Scale from font units to font size  
+                advance: (pos.x_advance as f32) * scale_factor, // Scale from font units to font size
                 cluster_index: cluster_id, // Map harfrust cluster to index
                 flags: 0, // TODO: Get from harfrust glyph flags
             };
@@ -680,15 +817,15 @@ impl<B: Brush> LayoutData<B> {
             self.glyphs.push(glyph);
         }
 
-        // Create cluster data with default cluster info
+        // Create cluster data with PROPER mapping
         let cluster_data = ClusterData {
-            info: ClusterInfo::default(), // Use default for now
+            info: cluster_info, // ✅ Proper boundary info for line breaking
             flags: 0,
-            style_index: 0, // TODO: Get from context
+            style_index, // ✅ Correct style index
             glyph_len: glyph_len as u8,
-            text_len: 1, // TODO: Calculate proper text length
+            text_len: cluster_text_range.len() as u8, // ✅ Actual text length
             advance: cluster_advance,
-            text_offset: 0, // TODO: Calculate proper offset
+            text_offset: cluster_text_range.start.saturating_sub(run.text_range.start) as u16, // ✅ Correct offset (with bounds check)
             glyph_offset: glyph_start as u16,
         };
 
@@ -751,13 +888,13 @@ impl<B: Brush> LayoutData<B> {
                     for cluster in clusters {
                         let boundary = cluster.info.boundary();
                         let style = &self.styles[cluster.style_index as usize];
-                        if matches!(boundary, Boundary::Line | Boundary::Mandatory)
+                        if matches!(boundary, Some(Boundary::Line) | Some(Boundary::Mandatory))
                             || style.overflow_wrap == OverflowWrap::Anywhere
                         {
                             let trailing_whitespace = whitespace_advance(prev_cluster);
                             min_width = min_width.max(running_min_width - trailing_whitespace);
                             running_min_width = 0.0;
-                            if boundary == Boundary::Mandatory {
+                            if boundary == Some(Boundary::Mandatory) {
                                 running_max_width = 0.0;
                             }
                         }
