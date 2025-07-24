@@ -103,6 +103,8 @@ where
 {
     layout: Layout<T>,
     buffer: String,
+    visible_buffer: String,
+    hide_symbol: Option<char>,
     default_style: StyleSet<T>,
     #[cfg(feature = "accesskit")]
     layout_access: LayoutAccessibility,
@@ -139,6 +141,8 @@ where
         Self {
             default_style: StyleSet::new(font_size),
             buffer: Default::default(),
+            visible_buffer: Default::default(),
+            hide_symbol: None,
             layout: Default::default(),
             #[cfg(feature = "accesskit")]
             layout_access: Default::default(),
@@ -979,6 +983,17 @@ where
         self.compose = None;
     }
 
+    /// Hide the text buffer by replacing it with the given character repeated such that the number
+    /// of displayed characters is the same as the length of the buffer.
+    pub fn hide_with(&mut self, symbol: char) {
+        self.hide_symbol = Some(symbol);
+    }
+
+    /// Show the text buffer by clearing the character used for hiding, if any is set.
+    pub fn show(&mut self) {
+        self.hide_symbol = None;
+    }
+
     /// Set the width of the layout.
     pub fn set_width(&mut self, width: Option<f32>) {
         self.width = width;
@@ -1204,8 +1219,23 @@ where
     }
     /// Update the layout.
     fn update_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
-        let mut builder =
-            layout_cx.ranged_builder(font_cx, &self.buffer, self.scale, self.quantize);
+        // Update the visible buffer if hide symbol is set and if the symbol or the length changed.
+        if let Some(symbol) = self.hide_symbol {
+            if self.buffer.len() != self.visible_buffer.len()
+                || self.hide_symbol != self.visible_buffer.chars().next()
+            {
+                self.visible_buffer = std::iter::repeat_n(symbol, self.buffer.len()).collect();
+            }
+        }
+
+        // Determine which buffer to show, i.e., use during layout calculations.
+        let show = if self.hide_symbol.is_some() {
+            &self.visible_buffer
+        } else {
+            &self.buffer
+        };
+
+        let mut builder = layout_cx.ranged_builder(font_cx, show, self.scale, self.quantize);
         for prop in self.default_style.inner().values() {
             builder.push_default(prop.to_owned());
         }
