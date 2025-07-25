@@ -106,7 +106,7 @@ where
     buffer: String,
     visible_buffer: String,
     visible_graphemes: usize,
-    hide_symbol: Option<char>,
+    hide_symbol: Option<String>,
     default_style: StyleSet<T>,
     #[cfg(feature = "accesskit")]
     layout_access: LayoutAccessibility,
@@ -988,7 +988,7 @@ where
 
     /// Hide the text buffer by replacing it with the given character repeated such that the number
     /// of displayed characters is the same as the length of the buffer.
-    pub fn hide_with(&mut self, symbol: char) {
+    pub fn hide_with(&mut self, symbol: String) {
         self.hide_symbol = Some(symbol);
     }
 
@@ -1225,13 +1225,11 @@ where
         // Update the visible buffer with the symbol repeated such that the number of grapheme
         // clusters is the same if the hide symbol is set and if the symbol or the number of
         // grapheme clusters changed.
-        if let Some(symbol) = self.hide_symbol {
+        if let Some(symbol) = &self.hide_symbol {
             let count = UnicodeSegmentation::graphemes(self.buffer.as_str(), true).count();
 
-            if self.visible_graphemes != count
-                || self.hide_symbol != self.visible_buffer.chars().next()
-            {
-                self.visible_buffer = std::iter::repeat_n(symbol, count).collect();
+            if self.visible_graphemes != count || !self.visible_buffer.starts_with(symbol) {
+                self.visible_buffer = symbol.repeat(count);
                 self.visible_graphemes = count;
             }
         }
