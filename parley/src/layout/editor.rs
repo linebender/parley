@@ -11,7 +11,11 @@ use crate::{
     },
     style::Brush,
 };
-use alloc::{borrow::ToOwned, string::String, vec::Vec};
+use alloc::{
+    borrow::ToOwned,
+    string::{String, ToString as _},
+    vec::Vec,
+};
 use core::{
     cmp::PartialEq,
     default::Default,
