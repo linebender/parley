@@ -986,10 +986,13 @@ where
         self.compose = None;
     }
 
-    /// Hide the text buffer by replacing it with the given character repeated such that the number
-    /// of displayed characters is the same as the length of the buffer.
+    /// Hide the text buffer by replacing it with the first grapheme of the given string repeated
+    /// such that the number of displayed graphemes is the same as the number of graphemes in the
+    /// buffer.
     pub fn hide_with(&mut self, symbol: String) {
-        self.hide_symbol = Some(symbol);
+        self.hide_symbol = UnicodeSegmentation::graphemes(symbol.as_str(), true)
+            .next()
+            .map(|s| s.to_string());
     }
 
     /// Show the text buffer by clearing the character used for hiding, if any is set.
