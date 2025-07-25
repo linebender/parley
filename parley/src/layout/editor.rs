@@ -11,7 +11,11 @@ use crate::{
     },
     style::Brush,
 };
-use alloc::{borrow::ToOwned, string::String, vec::Vec};
+use alloc::{
+    borrow::ToOwned,
+    string::{String, ToString as _},
+    vec::Vec,
+};
 use core::{
     cmp::PartialEq,
     default::Default,
@@ -19,6 +23,7 @@ use core::{
     num::NonZeroUsize,
     ops::Range,
 };
+use unicode_segmentation::UnicodeSegmentation;
 
 #[cfg(feature = "accesskit")]
 use crate::layout::LayoutAccessibility;
@@ -103,6 +108,9 @@ where
 {
     layout: Layout<T>,
     buffer: String,
+    visible_buffer: String,
+    visible_graphemes: usize,
+    hide_symbol: Option<String>,
     default_style: StyleSet<T>,
     #[cfg(feature = "accesskit")]
     layout_access: LayoutAccessibility,
@@ -139,6 +147,9 @@ where
         Self {
             default_style: StyleSet::new(font_size),
             buffer: Default::default(),
+            visible_buffer: Default::default(),
+            visible_graphemes: 0,
+            hide_symbol: None,
             layout: Default::default(),
             #[cfg(feature = "accesskit")]
             layout_access: Default::default(),
@@ -979,6 +990,20 @@ where
         self.compose = None;
     }
 
+    /// Hide the text buffer by replacing it with the first grapheme of the given string repeated
+    /// such that the number of displayed graphemes is the same as the number of graphemes in the
+    /// buffer.
+    pub fn hide_with(&mut self, symbol: String) {
+        self.hide_symbol = UnicodeSegmentation::graphemes(symbol.as_str(), true)
+            .next()
+            .map(|s| s.to_string());
+    }
+
+    /// Show the text buffer by clearing the character used for hiding, if any is set.
+    pub fn show(&mut self) {
+        self.hide_symbol = None;
+    }
+
     /// Set the width of the layout.
     pub fn set_width(&mut self, width: Option<f32>) {
         self.width = width;
@@ -1204,8 +1229,26 @@ where
     }
     /// Update the layout.
     fn update_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
-        let mut builder =
-            layout_cx.ranged_builder(font_cx, &self.buffer, self.scale, self.quantize);
+        // Update the visible buffer with the symbol repeated such that the number of grapheme
+        // clusters is the same if the hide symbol is set and if the symbol or the number of
+        // grapheme clusters changed.
+        if let Some(symbol) = &self.hide_symbol {
+            let count = UnicodeSegmentation::graphemes(self.buffer.as_str(), true).count();
+
+            if self.visible_graphemes != count || !self.visible_buffer.starts_with(symbol) {
+                self.visible_buffer = symbol.repeat(count);
+                self.visible_graphemes = count;
+            }
+        }
+
+        // Determine which buffer to show, i.e., use during layout calculations.
+        let show = if self.hide_symbol.is_some() {
+            &self.visible_buffer
+        } else {
+            &self.buffer
+        };
+
+        let mut builder = layout_cx.ranged_builder(font_cx, show, self.scale, self.quantize);
         for prop in self.default_style.inner().values() {
             builder.push_default(prop.to_owned());
         }
