@@ -19,6 +19,7 @@ use core::{
     num::NonZeroUsize,
     ops::Range,
 };
+use unicode_segmentation::UnicodeSegmentation;
 
 #[cfg(feature = "accesskit")]
 use crate::layout::LayoutAccessibility;
@@ -104,6 +105,7 @@ where
     layout: Layout<T>,
     buffer: String,
     visible_buffer: String,
+    visible_graphemes: usize,
     hide_symbol: Option<char>,
     default_style: StyleSet<T>,
     #[cfg(feature = "accesskit")]
@@ -142,6 +144,7 @@ where
             default_style: StyleSet::new(font_size),
             buffer: Default::default(),
             visible_buffer: Default::default(),
+            visible_graphemes: 0,
             hide_symbol: None,
             layout: Default::default(),
             #[cfg(feature = "accesskit")]
@@ -1219,12 +1222,17 @@ where
     }
     /// Update the layout.
     fn update_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
-        // Update the visible buffer if hide symbol is set and if the symbol or the length changed.
+        // Update the visible buffer with the symbol repeated such that the number of grapheme
+        // clusters is the same if the hide symbol is set and if the symbol or the number of
+        // grapheme clusters changed.
         if let Some(symbol) = self.hide_symbol {
-            if self.buffer.len() != self.visible_buffer.len()
+            let count = UnicodeSegmentation::graphemes(self.buffer.as_str(), true).count();
+
+            if self.visible_graphemes != count
                 || self.hide_symbol != self.visible_buffer.chars().next()
             {
-                self.visible_buffer = std::iter::repeat_n(symbol, self.buffer.len()).collect();
+                self.visible_buffer = std::iter::repeat_n(symbol, count).collect();
+                self.visible_graphemes = count;
             }
         }
 
