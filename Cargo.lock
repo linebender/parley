@@ -1168,7 +1168,7 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-core-text",
  "objc2-foundation 0.3.1",
- "peniko",
+ "peniko 0.4.0 (git+https://github.com/taj-p/peniko.git?rev=4ed4241767fe3b6c5935d5c283a484871128c6e6)",
  "read-fonts",
  "roxmltree",
  "smallvec",
@@ -1840,6 +1840,15 @@ name = "kurbo"
 version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1077d333efea6170d9ccb96d3c3026f300ca0773da4938cc4c811daa6df68b0c"
+dependencies = [
+ "arrayvec",
+ "smallvec",
+]
+
+[[package]]
+name = "kurbo"
+version = "0.11.2"
+source = "git+https://github.com/taj-p/kurbo.git?rev=8c47b0bc9bbc3f5949057fccc2c179f694d482db#8c47b0bc9bbc3f5949057fccc2c179f694d482db"
 dependencies = [
  "arrayvec",
  "libm",
@@ -2645,7 +2654,7 @@ dependencies = [
  "core_maths",
  "fontique",
  "hashbrown",
- "peniko",
+ "peniko 0.4.0 (git+https://github.com/taj-p/peniko.git?rev=4ed4241767fe3b6c5935d5c283a484871128c6e6)",
  "skrifa",
  "swash",
  "tiny-skia",
@@ -2668,7 +2677,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f9529efd019889b2a205193c14ffb6e2839b54ed9d2720674f10f4b04d87ac9"
 dependencies = [
  "color",
- "kurbo",
+ "kurbo 0.11.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "smallvec",
+]
+
+[[package]]
+name = "peniko"
+version = "0.4.0"
+source = "git+https://github.com/taj-p/peniko.git?rev=4ed4241767fe3b6c5935d5c283a484871128c6e6#4ed4241767fe3b6c5935d5c283a484871128c6e6"
+dependencies = [
+ "color",
+ "kurbo 0.11.2 (git+https://github.com/taj-p/kurbo.git?rev=8c47b0bc9bbc3f5949057fccc2c179f694d482db)",
  "smallvec",
 ]
 
@@ -3612,7 +3631,7 @@ dependencies = [
  "bytemuck",
  "futures-intrusive",
  "log",
- "peniko",
+ "peniko 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "png",
  "skrifa",
  "static_assertions",
@@ -3631,7 +3650,7 @@ dependencies = [
  "anyhow",
  "clipboard-rs",
  "parley",
- "peniko",
+ "peniko 0.4.0 (git+https://github.com/taj-p/peniko.git?rev=4ed4241767fe3b6c5935d5c283a484871128c6e6)",
  "pollster",
  "ui-events",
  "ui-events-winit",
@@ -3648,7 +3667,7 @@ checksum = "3c5702642f6ea77eedc12d119e1eebead0dba3cf91fe5c5d1f3efc12bf0cfaf1"
 dependencies = [
  "bytemuck",
  "guillotiere",
- "peniko",
+ "peniko 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "skrifa",
  "smallvec",
 ]
