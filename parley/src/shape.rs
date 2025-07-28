@@ -104,22 +104,39 @@ pub(crate) fn shape_text<'a, B: Brush>(
             
             // For simplicity, get font for the first character info in this range
             let char_info = &infos[char_range.start].0;
-            if let Some(selected_font) = font_selector.select_font_for_text(item_text, char_info, item.style_index) {
+            let char_style_index = infos[char_range.start].1;  // ✅ Use actual character's style index
+            if let Some(selected_font) = font_selector.select_font_for_text(item_text, char_info, char_style_index) {
+
+
                 // Try to create harfrust font reference
                 if let Ok(harf_font) = HarfFontRef::from_index(
                     selected_font.font.blob.as_ref(), 
                     selected_font.font.index
                 )
                 {
+
                     // Create harfrust shaper
                     let shaper_data = ShaperData::new(&harf_font);
-                    let variations: Vec<harfrust::Variation> = vec![]; // TODO: Convert from item.variations
+                    // ✅ Extract variations from fontique synthesis for font weight, style, etc.
+                    let mut variations: Vec<harfrust::Variation> = vec![];
+                    
+                    
+                    
+                    for (tag, value) in selected_font.font.synthesis.variation_settings() {
+                        variations.push(harfrust::Variation { tag: *tag, value: *value });
+                    }
+                    
+
+                    
+
                     let instance = ShaperInstance::from_variations(&harf_font, &variations);
                     let harf_shaper = shaper_data
                         .shaper(&harf_font)
                         .instance(Some(&instance))
                         .point_size(Some(item.size))
                         .build();
+                    
+
                     
                     // Prepare harfrust buffer
                     let mut buffer = UnicodeBuffer::new();
@@ -133,6 +150,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
                     
                     // Shape the text
                     let glyph_buffer = harf_shaper.shape(buffer, &features);
+                    
+
                     
                     // Push the shaped run to layout using our harfrust data structures
                     layout.data.push_run_from_harfrust(
@@ -148,6 +167,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
                         infos,
                         text_range.clone(),
                         char_range.clone(),
+                        // ✅ Pass the actual font variations that were used for shaping
+                        &variations,
                     );
                 } else {
                     // Fallback to temporary stub if harfrust font creation fails
@@ -161,6 +182,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     for ((char_index, (byte_index, ch)), (info, style_index)) in
         text.char_indices().enumerate().zip(infos)
     {
+
         let mut break_run = false;
         let mut script = info.script();
         if !real_script(script) {
@@ -170,15 +192,9 @@ pub(crate) fn shape_text<'a, B: Brush>(
         if item.style_index != *style_index {
             item.style_index = *style_index;
             style = &styles[*style_index as usize].style;
-            if !nearly_eq(style.font_size, item.size)
-                || style.locale != item.locale
-                || style.font_variations != item.variations
-                || style.font_features != item.features
-                || !nearly_eq(style.letter_spacing, item.letter_spacing)
-                || !nearly_eq(style.word_spacing, item.word_spacing)
-            {
-                break_run = true;
-            }
+            // ✅ Break run on ANY style change since we need proper font selection
+            // This ensures FontWeight, FontStyle, and FontWidth changes trigger new runs
+            break_run = true;
         }
 
         if level != item.level || script != item.script {
@@ -235,11 +251,15 @@ fn real_script(script: Script) -> bool {
 
 /// Convert fontique synthesis to harfrust synthesis
 fn synthesis_to_harf(synthesis: fontique::Synthesis) -> HarfSynthesis {
-    HarfSynthesis {
-        bold: 0.0,        // TODO: Extract from fontique::Synthesis when API is known
-        italic: 0.0,      // TODO: Extract from fontique::Synthesis when API is known  
+    let result = HarfSynthesis {
+        bold: if synthesis.embolden() { 1.0 } else { 0.0 },  // ✅ Extract embolden flag
+        italic: synthesis.skew().unwrap_or(0.0),              // ✅ Extract skew angle for italic
         small_caps: false, // TODO: Add small caps support if fontique has it
-    }
+    };
+    
+
+    
+    result
 }
 
 /// Convert swash script to harfrust script (disabled for now)
@@ -312,7 +332,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         if style_index != self.style_index {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize].style;
-            
+
             let fonts_id = style.font_stack.id();
             let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
             
@@ -327,6 +347,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
                 style: style.font_style,
             };
             if self.attrs != attrs {
+
                 self.query.set_attributes(attrs);
                 self.attrs = attrs;
             }
@@ -337,6 +358,9 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         let mut selected_font = None;
         self.query.matches_with(|font| {
             selected_font = Some(SelectedFont::from(font));
+            
+
+
             fontique::QueryStatus::Stop // Take the first matching font for now
         });
         selected_font

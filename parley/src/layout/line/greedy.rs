@@ -261,6 +261,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let is_space = whitespace.is_space_or_nbsp();
                         let boundary = cluster.info().boundary();
                         let style = &self.layout.data.styles[cluster.data.style_index as usize];
+                        
+
 
                         if boundary == Some(Boundary::Line) {
                             // We do not currently handle breaking within a ligature, so we ignore boundaries in such a position.

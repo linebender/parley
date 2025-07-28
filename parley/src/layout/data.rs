@@ -56,12 +56,15 @@ pub struct HarfClusterInfo {
 }
 
 impl HarfClusterInfo {
-    /// Create from boundary (the critical piece for line breaking)
-    pub fn from_boundary(boundary: Option<Boundary>) -> Self {
-        // For now, focus on boundary info which is critical for line breaking
-        // We can enhance with whitespace detection later
-        let whitespace = match boundary {
-            Some(Boundary::Line) => Whitespace::Space, // Line boundaries are typically spaces
+    /// Create from boundary and character content
+    pub fn new(boundary: Option<Boundary>, source_char: char) -> Self {
+        // Detect whitespace from actual character content
+        let whitespace = match source_char {
+            ' ' => Whitespace::Space,
+            '\t' => Whitespace::Tab,
+            '\n' => Whitespace::Newline,
+            '\r' => Whitespace::Newline,
+            '\u{00A0}' => Whitespace::Space, // Non-breaking space treated as regular space
             _ => Whitespace::None,
         };
         
@@ -69,7 +72,7 @@ impl HarfClusterInfo {
             boundary,
             whitespace,
             is_boundary: boundary == Some(Boundary::Line),
-            is_emoji: false,
+            is_emoji: false, // TODO: Could enhance with emoji detection from char
         }
     }
     
@@ -402,7 +405,7 @@ impl<B: Brush> LayoutData<B> {
         font: Font,
         font_size: f32,
         synthesis: HarfSynthesis,
-        // changed: Back to swash::Shaper for compilation, harfrust integration preserved below
+        // changed: Back to swash implementation for compilation, harfrust integration preserved below
         shaper: Shaper<'_>,
         // shaper: harfrust::Shaper<'_>, 
         bidi_level: u8,
@@ -509,7 +512,7 @@ impl<B: Brush> LayoutData<B> {
             let advance = cluster.advance();
             run.advance += advance;
             let mut cluster_data = ClusterData {
-                info: HarfClusterInfo::from_boundary(Some(cluster.info.boundary())),
+                info: HarfClusterInfo::new(Some(cluster.info.boundary()), ' '), // Fallback for swash path
                 flags: 0,
                 style_index: cluster.data as _,
                 glyph_len: glyph_len as u8,
@@ -616,6 +619,8 @@ impl<B: Brush> LayoutData<B> {
         infos: &[(swash::text::cluster::CharInfo, u16)], // From text analysis
         text_range: Range<usize>, // The text range this run covers
         char_range: Range<usize>, // Range into infos array
+        // NEW: Add actual font variations used during shaping
+        variations: &[harfrust::Variation],
     ) {
         let font_index = self
             .fonts
@@ -641,7 +646,37 @@ impl<B: Brush> LayoutData<B> {
         
         let cluster_range = self.clusters.len()..self.clusters.len();
         let coords_start = self.coords.len();
-        // TODO: Handle font variations
+        
+        // ✅ Store font variations for rendering! 
+        // Use the actual harfrust variations that were used for shaping
+        for variation in variations {
+            // Convert font variation to normalized coordinate (-1.0 to 1.0)
+            // Different axes have different ranges and defaults:
+            // For weight axis, use proper font weight normalization
+            // For others, use simpler normalization
+            let normalized_f32 = if format!("{:?}", variation.tag).contains("wght") {
+                // Weight: min=100, default=400, max=900
+                // Formula: (value - default) / (max - default) for positive side
+                //          (value - default) / (default - min) for negative side
+                if variation.value >= 400.0 {
+                    (variation.value - 400.0) / (900.0 - 400.0)  // 0.0 to 1.0
+                } else {
+                    (variation.value - 400.0) / (400.0 - 100.0)  // -1.0 to 0.0
+                }
+            } else {
+                // For other axes, use generic 0-1000 normalization as fallback
+                variation.value / 1000.0
+            };
+            
+            // Clamp to valid range and convert to i16
+            let clamped = normalized_f32.clamp(-1.0, 1.0);
+            let normalized_coord = (clamped * 16384.0) as i16;
+            
+
+            
+            self.coords.push(normalized_coord);
+        }
+        
         let coords_end = self.coords.len();
         
         let mut run = RunData {
@@ -687,7 +722,7 @@ impl<B: Brush> LayoutData<B> {
         }
         
         let mut total_advance = 0.0;
-        
+
         // Process each cluster in order
         for (cluster_id, cluster_text_range, cluster_info, style_index) in cluster_mappings {
             if let Some(glyph_indices) = cluster_groups.get(&cluster_id) {
@@ -703,7 +738,7 @@ impl<B: Brush> LayoutData<B> {
                     cluster_text_range,
                     cluster_info,
                     style_index,
-                );
+            );
             }
         }
 
@@ -745,17 +780,25 @@ impl<B: Brush> LayoutData<B> {
         let mut sorted_cluster_ids: Vec<u32> = cluster_groups.keys().copied().collect();
         sorted_cluster_ids.sort();
         
-        for (i, &cluster_id) in sorted_cluster_ids.iter().enumerate() {
-            // For each cluster, map it to the corresponding character in our char_range
-            if i < char_range.len() {
-                let char_idx_in_range = i;
+
+        
+        for &cluster_id in sorted_cluster_ids.iter() {
+            // For each cluster, map it to the corresponding character using the cluster ID
+            // NOTE: cluster IDs are relative to the current text segment, not global
+            let char_idx_in_range = cluster_id as usize;
+            if char_idx_in_range < char_range.len() {
                 let absolute_char_idx = char_range.start + char_idx_in_range;
                 
                 // Get cluster info from swash text analysis
                 if let Some((char_info, style_index)) = infos.get(absolute_char_idx) {
                                     // ✅ Extract boundary from CharInfo and create our own cluster info!
                 let boundary = char_info.boundary();
-                let cluster_info = HarfClusterInfo::from_boundary(Some(boundary));
+                // Use segment-relative index since source_text is only the current segment
+                let segment_relative_char_idx = absolute_char_idx - char_range.start;
+                let source_char = source_text.chars().nth(segment_relative_char_idx).unwrap_or(' ');
+                let cluster_info = HarfClusterInfo::new(Some(boundary), source_char);
+                
+
                     
                     // Calculate text range for this cluster (1 character)
                     let char_start = text_range.start + char_idx_in_range;
