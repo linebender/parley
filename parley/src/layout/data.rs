@@ -160,7 +160,7 @@ impl ClusterData {
 }
 
 /// Harfrust-based run data (updated to use harfrust types)
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub(crate) struct RunData {
     /// Index of the font for the run.
     pub(crate) font_index: usize,
@@ -168,6 +168,8 @@ pub(crate) struct RunData {
     pub(crate) font_size: f32,
     /// Harfrust-based synthesis information for the font.
     pub(crate) synthesis: HarfSynthesis,
+    /// Original fontique synthesis for renderer (contains variation settings)
+    pub(crate) fontique_synthesis: Option<fontique::Synthesis>,
     /// Range of normalized coordinates in the layout data.
     pub(crate) coords_range: Range<usize>,
     /// Range of the source text.
@@ -302,7 +304,7 @@ pub(crate) struct LayoutItem {
     pub(crate) bidi_level: u8,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub(crate) struct LayoutData<B: Brush> {
     pub(crate) scale: f32,
     pub(crate) quantize: bool,
@@ -442,6 +444,7 @@ impl<B: Brush> LayoutData<B> {
             font_index,
             font_size,
             synthesis,
+            fontique_synthesis: None,  // Legacy swash path - no fontique synthesis available
             coords_range: coords_start..coords_end,
             text_range: 0..0,
             bidi_level,
@@ -610,6 +613,7 @@ impl<B: Brush> LayoutData<B> {
         font: Font,
         font_size: f32,
         synthesis: HarfSynthesis,
+        fontique_synthesis: fontique::Synthesis,
         glyph_buffer: &harfrust::GlyphBuffer,
         bidi_level: u8,
         word_spacing: f32,
@@ -647,34 +651,43 @@ impl<B: Brush> LayoutData<B> {
         let cluster_range = self.clusters.len()..self.clusters.len();
         let coords_start = self.coords.len();
         
-        // ✅ Store font variations for rendering! 
-        // Use the actual harfrust variations that were used for shaping
-        for variation in variations {
-            // Convert font variation to normalized coordinate (-1.0 to 1.0)
-            // Different axes have different ranges and defaults:
-            // For weight axis, use proper font weight normalization
-            // For others, use simpler normalization
-            let normalized_f32 = if format!("{:?}", variation.tag).contains("wght") {
-                // Weight: min=100, default=400, max=900
-                // Formula: (value - default) / (max - default) for positive side
-                //          (value - default) / (default - min) for negative side
-                if variation.value >= 400.0 {
-                    (variation.value - 400.0) / (900.0 - 400.0)  // 0.0 to 1.0
+        // Store font variations as normalized coordinates
+        // Match the old swash behavior by mapping variations to correct axis positions
+        if !variations.is_empty() {
+            // Create 4-coordinate array to match SystemUI font's 4 axes
+            // Axes: wdth(0), opsz(1), GRAD(2), wght(3)
+            let mut coords = [0i16; 4];
+            
+            for variation in variations {
+                let normalized_f32 = if format!("{:?}", variation.tag).contains("wght") {
+                    // Weight: Map to same range as old working commit (600 → 0.333)
+                    if variation.value >= 400.0 {
+                        (variation.value - 400.0) / (1000.0 - 400.0)  
+                    } else {
+                        (variation.value - 400.0) / (400.0 - 100.0)
+                    }
                 } else {
-                    (variation.value - 400.0) / (400.0 - 100.0)  // -1.0 to 0.0
+                    // For other axes, use generic normalization
+                    variation.value / 1000.0
+                };
+                
+                let clamped = normalized_f32.clamp(-1.0, 1.0);
+                let normalized_coord = (clamped * 16384.0) as i16;
+                
+                // Map to correct axis position (like swash did)
+                if format!("{:?}", variation.tag).contains("wght") {
+                    coords[3] = normalized_coord;  // wght goes to axis #3
+                } else if format!("{:?}", variation.tag).contains("wdth") {
+                    coords[0] = normalized_coord;  // wdth goes to axis #0
+                } else if format!("{:?}", variation.tag).contains("opsz") {
+                    coords[1] = normalized_coord;  // opsz goes to axis #1
+                } else if format!("{:?}", variation.tag).contains("GRAD") {
+                    coords[2] = normalized_coord;  // GRAD goes to axis #2
                 }
-            } else {
-                // For other axes, use generic 0-1000 normalization as fallback
-                variation.value / 1000.0
-            };
+            }
             
-            // Clamp to valid range and convert to i16
-            let clamped = normalized_f32.clamp(-1.0, 1.0);
-            let normalized_coord = (clamped * 16384.0) as i16;
-            
-
-            
-            self.coords.push(normalized_coord);
+            // Push all 4 coordinates in correct order
+            self.coords.extend_from_slice(&coords);
         }
         
         let coords_end = self.coords.len();
@@ -683,6 +696,7 @@ impl<B: Brush> LayoutData<B> {
             font_index,
             font_size,
             synthesis,
+            fontique_synthesis: Some(fontique_synthesis),  // Store original fontique synthesis
             coords_range: coords_start..coords_end,
             text_range: text_range.clone(), // ✅ Use correct text range from parameter
             bidi_level,

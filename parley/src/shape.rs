@@ -107,7 +107,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
             let char_style_index = infos[char_range.start].1;  // ✅ Use actual character's style index
             if let Some(selected_font) = font_selector.select_font_for_text(item_text, char_info, char_style_index) {
 
-
                 // Try to create harfrust font reference
                 if let Ok(harf_font) = HarfFontRef::from_index(
                     selected_font.font.blob.as_ref(), 
@@ -157,7 +156,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
                     layout.data.push_run_from_harfrust(
                         Font::new(selected_font.font.blob.clone(), selected_font.font.index),
                         item.size,
-                        selected_font.synthesis,
+                        synthesis_to_harf(selected_font.font.synthesis),
+                        selected_font.font.synthesis,
                         &glyph_buffer,
                         item.level,
                         item.word_spacing,
@@ -357,11 +357,12 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         
         let mut selected_font = None;
         self.query.matches_with(|font| {
-            selected_font = Some(SelectedFont::from(font));
+            selected_font = Some(SelectedFont {
+                font: font.clone(),
+                synthesis: synthesis_to_harf(font.synthesis),
+            });
             
-
-
-            fontique::QueryStatus::Stop // Take the first matching font for now
+            return fontique::QueryStatus::Stop;
         });
         selected_font
     }

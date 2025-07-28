@@ -5,6 +5,7 @@ use super::{
     Brush, Cluster, ClusterPath, Font, Layout, LineItemData, NormalizedCoord, Range, Run, RunData,
     Synthesis,
 };
+use swash::{tag_from_bytes, Setting};
 
 impl<'a, B: Brush> Run<'a, B> {
     pub(crate) fn new(
@@ -40,18 +41,24 @@ impl<'a, B: Brush> Run<'a, B> {
 
     /// Returns the synthesis suggestions for the font associated with the run.
     pub fn synthesis(&self) -> Synthesis {
-        // changed: Convert HarfSynthesis to swash::Synthesis for compatibility
-        // self.data.synthesis
-        Synthesis::new(
-            std::iter::empty(), // No variation settings for now
-            self.data.synthesis.bold > 0.0, // Convert weight to boolean embolden
-            self.data.synthesis.italic, // Use italic as skew angle
-        )
+        // Use the original fontique synthesis if available, otherwise fall back to reconstruction
+        if let Some(fontique_synthesis) = &self.data.fontique_synthesis {
+            // TEST: Use original font variations instead of forcing embolden
+            // If harfrust applied weight variations during shaping, we should use the same variations during rendering
+            crate::swash_convert::synthesis_to_swash(*fontique_synthesis)
+        } else {
+            // Fallback for legacy runs without fontique synthesis
+            Synthesis::new(
+                std::iter::empty(),
+                self.data.synthesis.bold > 0.0,
+                self.data.synthesis.italic,
+            )
+        }
     }
 
     /// Returns the normalized variation coordinates for the font associated
     /// with the run.
-    pub fn normalized_coords(&self) -> &[NormalizedCoord] {
+    pub fn normalized_coords(&self) -> &[i16] {
         self.layout
             .data
             .coords

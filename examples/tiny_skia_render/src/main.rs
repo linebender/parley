@@ -18,10 +18,10 @@ use parley::{
     Layout, LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty,
 };
 use skrifa::{
-    GlyphId, MetadataProvider, OutlineGlyph,
-    instance::{LocationRef, NormalizedCoord, Size},
+    instance::{LocationRef, NormalizedCoord, Size}, 
     outline::{DrawSettings, OutlinePen},
     raw::{FontRef as ReadFontsRef, TableProvider},
+    GlyphId, MetadataProvider, OutlineGlyph,
 };
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Rect, Transform};
 
@@ -84,8 +84,8 @@ fn main() {
     builder.push_default(LineHeight::FontSizeRelative(1.3));
     builder.push_default(StyleProperty::FontSize(16.0));
 
-    // Set the first 4 characters to bold - try a more extreme weight
-    let bold = FontWeight::new(700.0);  // Standard Bold weight
+    // Set the first 4 characters to bold
+    let bold = FontWeight::new(600.0);  // Use same value as old working commit
     builder.push(StyleProperty::FontWeight(bold), 0..4);
 
     // Set the underline & strikethrough style
@@ -189,19 +189,16 @@ fn dump_layout_data<B: parley::style::Brush>(layout: &parley::Layout<B>, label: 
 
 fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<'_>, padding: u32) {
     
-
     // Resolve properties of the GlyphRun
     let mut run_x = glyph_run.offset();
-    let run_y = glyph_run.baseline();
-    let style = glyph_run.style();
-    let brush = style.brush;
-
-    // Get the "Run" from the "GlyphRun"
     let run = glyph_run.run();
 
     // Resolve properties of the Run
     let font = run.font();
     let font_size = run.font_size();
+    let run_y = glyph_run.baseline();
+    let style = glyph_run.style();
+    let brush = style.brush;
 
     let normalized_coords = run
         .normalized_coords()
@@ -215,8 +212,6 @@ fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<
     let font_collection_ref = font.data.as_ref();
     let font_ref = ReadFontsRef::from_index(font_collection_ref, font.index).unwrap();
     
-    
-    
     let outlines = font_ref.outline_glyphs();
 
     // Iterates over the glyphs in the GlyphRun
@@ -225,7 +220,7 @@ fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<
         let glyph_y = run_y - glyph.y + padding as f32;
         run_x += glyph.advance;
 
-                 let glyph_id = GlyphId::from(glyph.id as u16); // Convert harfrust u32 to swash u16
+        let glyph_id = GlyphId::from(glyph.id as u16); // Convert harfrust u32 to swash u16
         if let Some(glyph_outline) = outlines.get(glyph_id) {
             pen.set_origin(glyph_x, glyph_y);
             pen.set_color(brush.color);
