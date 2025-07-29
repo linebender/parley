@@ -21,6 +21,8 @@ use alloc::collections::BTreeMap;
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 
+use skrifa::raw::TableProvider;
+
 /// Harfrust-based font synthesis information (replaces swash::Synthesis)
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct HarfSynthesis {
@@ -626,6 +628,16 @@ impl<B: Brush> LayoutData<B> {
         // NEW: Add actual font variations used during shaping
         variations: &[harfrust::Variation],
     ) {
+        // Store font variations as normalized coordinates FIRST (before font moves)
+        // Proper solution: Read font's fvar table and map variations to correct axis positions
+        let coords_start = self.coords.len();
+        
+        if !variations.is_empty() {
+            self.store_variations_properly(&font, variations);
+        }
+        
+        let coords_end = self.coords.len();
+
         let font_index = self
             .fonts
             .iter()
@@ -649,48 +661,6 @@ impl<B: Brush> LayoutData<B> {
         };
         
         let cluster_range = self.clusters.len()..self.clusters.len();
-        let coords_start = self.coords.len();
-        
-        // Store font variations as normalized coordinates
-        // Match the old swash behavior by mapping variations to correct axis positions
-        if !variations.is_empty() {
-            // Create 4-coordinate array to match SystemUI font's 4 axes
-            // Axes: wdth(0), opsz(1), GRAD(2), wght(3)
-            let mut coords = [0i16; 4];
-            
-            for variation in variations {
-                let normalized_f32 = if format!("{:?}", variation.tag).contains("wght") {
-                    // Weight: Map to same range as old working commit (600 → 0.333)
-                    if variation.value >= 400.0 {
-                        (variation.value - 400.0) / (1000.0 - 400.0)  
-                    } else {
-                        (variation.value - 400.0) / (400.0 - 100.0)
-                    }
-                } else {
-                    // For other axes, use generic normalization
-                    variation.value / 1000.0
-                };
-                
-                let clamped = normalized_f32.clamp(-1.0, 1.0);
-                let normalized_coord = (clamped * 16384.0) as i16;
-                
-                // Map to correct axis position (like swash did)
-                if format!("{:?}", variation.tag).contains("wght") {
-                    coords[3] = normalized_coord;  // wght goes to axis #3
-                } else if format!("{:?}", variation.tag).contains("wdth") {
-                    coords[0] = normalized_coord;  // wdth goes to axis #0
-                } else if format!("{:?}", variation.tag).contains("opsz") {
-                    coords[1] = normalized_coord;  // opsz goes to axis #1
-                } else if format!("{:?}", variation.tag).contains("GRAD") {
-                    coords[2] = normalized_coord;  // GRAD goes to axis #2
-                }
-            }
-            
-            // Push all 4 coordinates in correct order
-            self.coords.extend_from_slice(&coords);
-        }
-        
-        let coords_end = self.coords.len();
         
         let mut run = RunData {
             font_index,
@@ -978,6 +948,60 @@ impl<B: Brush> LayoutData<B> {
         ContentWidths {
             min: min_width,
             max: max_width,
+        }
+    }
+    
+    /// Store font variations as normalized coordinates using proper axis mapping
+    /// This replicates what swash did internally: read fvar table, map variations to correct positions
+    fn store_variations_properly(&mut self, font: &Font, variations: &[harfrust::Variation]) {
+        // Try to read font's axis layout from fvar table
+        if let Ok(font_ref) = skrifa::FontRef::from_index(font.data.as_ref(), font.index) {
+            if let Ok(fvar) = font_ref.fvar() {
+                if let Ok(axes) = fvar.axes() {
+                    let axis_count = fvar.axis_count() as usize;
+                    let mut coords = vec![0i16; axis_count];
+                    
+                    // Map each fontique variation to its correct axis position
+                    for variation in variations {
+                        let variation_tag = skrifa::Tag::from_be_bytes(variation.tag.to_be_bytes());
+                        
+                        // Find which axis this variation belongs to
+                        for (axis_index, axis_record) in axes.iter().enumerate() {
+                            if axis_record.axis_tag() == variation_tag {
+                                // Use this axis's actual range for normalization
+                                let min_val = axis_record.min_value().to_f32();
+                                let default_val = axis_record.default_value().to_f32();
+                                let max_val = axis_record.max_value().to_f32();
+                                
+                                // Generic normalization (same formula for all axes)
+                                let normalized_f32 = if variation.value >= default_val {
+                                    (variation.value - default_val) / (max_val - default_val)
+                                } else {
+                                    (variation.value - default_val) / (default_val - min_val)
+                                };
+                                
+                                let clamped = normalized_f32.clamp(-1.0, 1.0);
+                                let normalized_coord = (clamped * 16384.0) as i16;
+                                
+                                coords[axis_index] = normalized_coord;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Store all coordinates (including zeros for unused axes)
+                    self.coords.extend(coords);
+                    return;
+                }
+            }
+        }
+        
+        // Fallback: simple storage if fvar reading fails
+        for variation in variations {
+            let normalized_f32 = (variation.value - 400.0) / (1000.0 - 400.0);
+            let clamped = normalized_f32.clamp(-1.0, 1.0);
+            let normalized_coord = (clamped * 16384.0) as i16;
+            self.coords.push(normalized_coord);
         }
     }
 }
