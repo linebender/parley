@@ -5,15 +5,13 @@ use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
 use crate::Font;
-use crate::util::nearly_eq;
 use crate::layout::data::HarfSynthesis;
-use fontique::QueryFamily;
 use fontique::{self, Query, QueryFont};
 // Keep swash for text analysis
-use swash::text::cluster::{CharCluster, CharInfo};
+use swash::text::cluster::CharInfo;
 use swash::text::{Language, Script};
 // Use harfrust for shaping
-use harfrust::{FontRef as HarfFontRef, ShaperData, ShaperInstance, UnicodeBuffer, Direction};
+use harfrust::{FontRef as HarfFontRef, ShaperData, ShaperInstance, UnicodeBuffer, Direction, Script as HarfScript, script};
 
 use alloc::vec::Vec;
 
@@ -141,7 +139,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
                     let mut buffer = UnicodeBuffer::new();
                     buffer.push_str(item_text);
                     buffer.set_direction(level_to_direction(item.level));
-                    // TODO: buffer.set_script(script_to_harf(item.script)); // Need proper harfrust Script constants
+                    buffer.set_script(script_to_harf(item.script));
                     // TODO: buffer.set_language(item.locale);
                     
                     // Convert features
@@ -262,13 +260,6 @@ fn synthesis_to_harf(synthesis: fontique::Synthesis) -> HarfSynthesis {
     result
 }
 
-/// Convert swash script to harfrust script (disabled for now)
-fn script_to_harf(_script: Script) -> harfrust::Script {
-    // DISABLED: Script setting causes compilation issues with harfrust API
-    // The visual cutoff issue should be resolved by the text mapping fixes regardless
-    panic!("script_to_harf should not be called when script setting is disabled")
-}
-
 /// Convert swash direction from bidi level to harfrust direction
 fn level_to_direction(level: u8) -> Direction {
     if level & 1 != 0 {
@@ -276,6 +267,65 @@ fn level_to_direction(level: u8) -> Direction {
     } else {
         Direction::LeftToRight
     }
+}
+
+/// Convert swash script to harfrust script
+fn script_to_harf(swash_script: Script) -> HarfScript {
+    // Map swash scripts to harfrust script constants
+    // Using the documented harfrust::script constants
+    let harf_script = match swash_script {
+        // Common scripts
+        Script::Latin => script::LATIN,
+        Script::Cyrillic => script::CYRILLIC,
+        Script::Greek => script::GREEK,
+        
+        // Complex scripts requiring proper shaping
+        Script::Arabic => script::ARABIC,
+        Script::Hebrew => script::HEBREW,
+        Script::Syriac => script::SYRIAC,
+        
+        // Indic scripts
+        Script::Devanagari => script::DEVANAGARI,
+        Script::Bengali => script::BENGALI,
+        Script::Gurmukhi => script::GURMUKHI,
+        Script::Gujarati => script::GUJARATI,
+        Script::Oriya => script::ORIYA,
+        Script::Tamil => script::TAMIL,
+        Script::Telugu => script::TELUGU,
+        Script::Kannada => script::KANNADA,
+        Script::Malayalam => script::MALAYALAM,
+        Script::Sinhala => script::SINHALA,
+        
+        // East Asian scripts
+        Script::Han => script::HAN,
+        Script::Hiragana => script::HIRAGANA,
+        Script::Katakana => script::KATAKANA,
+        Script::Hangul => script::HANGUL,
+        Script::Bopomofo => script::BOPOMOFO,
+        
+        // Southeast Asian scripts
+        Script::Thai => script::THAI,
+        Script::Lao => script::LAO,
+        Script::Khmer => script::KHMER,
+        Script::Myanmar => script::MYANMAR,
+        
+        // Other scripts
+        Script::Tibetan => script::TIBETAN,
+        Script::Mongolian => script::MONGOLIAN,
+        Script::Georgian => script::GEORGIAN,
+        Script::Armenian => script::ARMENIAN,
+        Script::Ethiopic => script::ETHIOPIC,
+        
+        // Fallbacks for unknown/inherited scripts
+        Script::Common => script::COMMON,
+        Script::Inherited => script::INHERITED,
+        Script::Unknown => script::UNKNOWN,
+        
+        // For any script not explicitly mapped, use UNKNOWN as fallback
+        _ => script::UNKNOWN,
+    };
+    
+    harf_script
 }
 
 struct FontSelector<'a, 'b, B: Brush> {
