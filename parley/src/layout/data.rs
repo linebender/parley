@@ -8,9 +8,7 @@ use crate::util::nearly_zero;
 use crate::{Font, OverflowWrap};
 use core::ops::Range;
 
-use swash::Synthesis;
-use swash::shape::Shaper;
-use swash::text::cluster::{Boundary, ClusterInfo, Whitespace};
+use swash::text::cluster::{Boundary, Whitespace};
 
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
@@ -29,45 +27,58 @@ use skrifa::raw::TableProvider;
 /// TODO: Extract the actual units_per_em from the font header for more accurate scaling.
 const DEFAULT_UNITS_PER_EM: f32 = 2048.0;
 
-/// HarfBuzz-based font synthesis information
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct HarfSynthesis {
-    /// Synthetic bold weight adjustment (0.0 = no adjustment)
-    pub bold: f32,
-    /// Synthetic italic skew angle in degrees (0.0 = no skew)
-    pub italic: f32,
-    /// Whether to apply synthetic small caps
-    pub small_caps: bool,
+/// Simple synthesis specification for HarfBuzz compatibility
+/// 
+/// TODO: This is a minimal implementation that covers basic font synthesis.
+/// For full compatibility with swash::Synthesis and fontique::Synthesis, we should add:
+/// 
+/// 1. **Variation settings**: `Vec<(Tag, f32)>` - for precise weight/width/slant adjustments
+///    instead of just boolean bold/italic. Modern variable fonts use continuous axes
+///    (e.g., weight 100-900) rather than discrete on/off switches.
+/// 
+/// 2. **Precise skew angle**: `Option<f32>` - the exact italic/oblique angle in degrees
+///    instead of just a boolean. Different fonts may need different skew amounts.
+/// 
+/// 3. **Small caps synthesis**: `bool` - for synthesizing small capitals when the font
+///    doesn't have native small caps support.
+/// 
+/// 4. **Advanced synthesis options**: 
+///    - Condensed/expanded synthesis for width adjustments
+///    - Optical sizing hints
+///    - Any other synthesis features that HarfBuzz supports
+/// 
+/// The current implementation satisfies basic use cases but should be expanded when:
+/// - Variable font support becomes critical
+/// - More sophisticated font matching is needed  
+/// - Full swash feature parity is required
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub(crate) struct HarfSynthesis {
+    /// Fake bold by emboldening glyphs
+    pub bold: bool,
+    /// Fake italic by skewing glyphs  
+    pub italic: bool,
 }
 
 impl Default for HarfSynthesis {
     fn default() -> Self {
         Self {
-            bold: 0.0,
-            italic: 0.0,
-            small_caps: false,
+            bold: false,
+            italic: false,
         }
     }
 }
 
-/// Our own cluster info type that we can populate with data from CharInfo
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct HarfClusterInfo {
-    /// Boundary type for line breaking
+/// Simple cluster info for HarfBuzz compatibility
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub(crate) struct HarfClusterInfo {
     boundary: Option<Boundary>,
-    /// Whitespace classification
-    whitespace: Whitespace,
-    /// Whether this is a word boundary
-    is_boundary: bool,
-    /// Whether this is an emoji
-    is_emoji: bool,
+    source_char: char,
 }
 
 impl HarfClusterInfo {
-    /// Create from boundary and character content
-    pub fn new(boundary: Option<Boundary>, source_char: char) -> Self {
+    pub(crate) fn new(boundary: Option<Boundary>, source_char: char) -> Self {
         // Detect whitespace from actual character content
-        let whitespace = match source_char {
+        let _whitespace = match source_char {
             ' ' => Whitespace::Space,
             '\t' => Whitespace::Tab,
             '\n' => Whitespace::Newline,
@@ -78,35 +89,38 @@ impl HarfClusterInfo {
         
         Self {
             boundary,
-            whitespace,
-            is_boundary: boundary == Some(Boundary::Line),
-            is_emoji: false, // TODO: Could enhance with emoji detection from char
+            source_char,
         }
     }
     
     /// Get boundary type (critical for line breaking)
-    pub fn boundary(&self) -> Option<Boundary> {
+    pub(crate) fn boundary(&self) -> Option<Boundary> {
         self.boundary
     }
     
     /// Get whitespace type
-    pub fn whitespace(&self) -> Whitespace {
-        self.whitespace
+    pub(crate) fn whitespace(&self) -> Whitespace {
+        if self.source_char.is_whitespace() {
+            Whitespace::Space
+        } else {
+            Whitespace::None
+        }
     }
     
     /// Check if this is a word boundary
-    pub fn is_boundary(&self) -> bool {
-        self.is_boundary
+    pub(crate) fn is_boundary(&self) -> bool {
+        self.boundary.is_some()
     }
     
     /// Check if this is an emoji
-    pub fn is_emoji(&self) -> bool {
-        self.is_emoji
+    pub(crate) fn is_emoji(&self) -> bool {
+        // Simple emoji detection - could be enhanced
+        matches!(self.source_char as u32, 0x1F600..=0x1F64F | 0x1F300..=0x1F5FF | 0x1F680..=0x1F6FF | 0x2600..=0x26FF | 0x2700..=0x27BF)
     }
     
     /// Check if this is any kind of whitespace
-    pub fn is_whitespace(&self) -> bool {
-        self.whitespace != Whitespace::None
+    pub(crate) fn is_whitespace(&self) -> bool {
+        self.source_char.is_whitespace()
     }
 }
 
@@ -114,9 +128,7 @@ impl Default for HarfClusterInfo {
     fn default() -> Self {
         Self {
             boundary: None,
-            whitespace: Whitespace::None,
-            is_boundary: false,
-            is_emoji: false,
+            source_char: ' ',
         }
     }
 }
@@ -184,8 +196,6 @@ pub(crate) struct RunData {
     pub(crate) text_range: Range<usize>,
     /// Bidi level for the run.
     pub(crate) bidi_level: u8,
-    /// True if the run ends with a newline.
-    pub(crate) ends_with_newline: bool,
     /// Range of clusters.
     pub(crate) cluster_range: Range<usize>,
     /// Base for glyph indices.
@@ -374,6 +384,32 @@ impl<B: Brush> Default for LayoutData<B> {
 }
 
 impl<B: Brush> LayoutData<B> {
+    /// Create new layout data.
+    pub(crate) fn new() -> Self {
+        Self {
+            scale: 1.0,
+            quantize: true,
+            text_len: 0,
+            base_level: 0,
+            width: 0.0,
+            full_width: 0.0,
+            height: 0.0,
+            fonts: Vec::new(),
+            coords: Vec::new(),
+            styles: Vec::new(),
+            inline_boxes: Vec::new(),
+            has_bidi: false,
+            runs: Vec::new(),
+            items: Vec::new(),
+            clusters: Vec::new(),
+            glyphs: Vec::new(),
+            lines: Vec::new(),
+            line_items: Vec::new(),
+            is_aligned_justified: false,
+            alignment_width: 0.0,
+        }
+    }
+
     pub(crate) fn clear(&mut self) {
         self.scale = 1.;
         self.quantize = true;
@@ -408,209 +444,7 @@ impl<B: Brush> LayoutData<B> {
         });
     }
 
-    #[allow(unused_assignments)]
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn push_run(
-        &mut self,
-        font: Font,
-        font_size: f32,
-        synthesis: HarfSynthesis,
-        shaper: Shaper<'_>, 
-        bidi_level: u8,
-        word_spacing: f32,
-        letter_spacing: f32,
-    ) {
-        let font_index = self
-            .fonts
-            .iter()
-            .position(|f| *f == font)
-            .unwrap_or_else(|| {
-                let index = self.fonts.len();
-                self.fonts.push(font);
-                index
-            });
-        
-        // Convert HarfSynthesis to swash::Synthesis for compatibility
-        let swash_synthesis = Synthesis::new(
-            std::iter::empty(),
-            synthesis.bold > 0.0,
-            synthesis.italic,
-        );
-        
-        let metrics = shaper.metrics();
-        let cluster_range = self.clusters.len()..self.clusters.len();
-        let coords_start = self.coords.len();
-        let coords = shaper.normalized_coords();
-        if coords.iter().any(|coord| *coord != 0) {
-            self.coords.extend_from_slice(coords);
-        }
-        let coords_end = self.coords.len();
-        let mut run = RunData {
-            font_index,
-            font_size,
-            synthesis,
-            fontique_synthesis: None,  // Legacy swash path - no fontique synthesis available
-            coords_range: coords_start..coords_end,
-            text_range: 0..0,
-            bidi_level,
-            ends_with_newline: false,
-            cluster_range,
-            glyph_start: self.glyphs.len(),
-            metrics: RunMetrics {
-                ascent: metrics.ascent,
-                descent: metrics.descent,
-                leading: metrics.leading,
-                underline_offset: metrics.underline_offset,
-                underline_size: metrics.stroke_size,
-                strikethrough_offset: metrics.strikeout_offset,
-                strikethrough_size: metrics.stroke_size,
-            },
-            word_spacing,
-            letter_spacing,
-            advance: 0.,
-            // changed: Commenting out harfrust-specific fields for compilation
-            // direction: Direction::LTR, // Default to LTR for now
-            // script: Script::LATIN,   // Default to LATIN for now
-        };
-        // Track these so that we can flush if they overflow a u16.
-        let mut glyph_count = 0_usize;
-        let mut text_offset = 0;
-        macro_rules! flush_run {
-            () => {
-                if !run.cluster_range.is_empty() {
-                    self.runs.push(run.clone());
-                    self.items.push(LayoutItem {
-                        kind: LayoutItemKind::TextRun,
-                        index: self.runs.len() - 1,
-                        bidi_level: run.bidi_level,
-                    });
-                    run.text_range = text_offset..text_offset;
-                    run.cluster_range.start = run.cluster_range.end;
-                    run.glyph_start = self.glyphs.len();
-                    run.advance = 0.;
-                    glyph_count = 0;
-                }
-            };
-        }
-        let mut first = true;
-        shaper.shape_with(|cluster| {
-            if cluster.info.boundary() == Boundary::Mandatory {
-                run.ends_with_newline = true;
-                flush_run!();
-            }
-            run.ends_with_newline = false;
-            const MAX_LEN: usize = u16::MAX as usize;
-            let source_range = cluster.source.to_range();
-            if first {
-                run.text_range = source_range.start..source_range.start;
-                text_offset = source_range.start;
-                first = false;
-            }
-            let num_components = cluster.components.len() + 1;
-            if glyph_count > MAX_LEN
-                || (text_offset - run.text_range.start) > MAX_LEN
-                || (num_components > 1
-                    && (cluster.components.last().unwrap().start as usize - run.text_range.start)
-                        > MAX_LEN)
-            {
-                flush_run!();
-            }
-            let text_len = source_range.len();
-            let glyph_len = cluster.glyphs.len();
-            let advance = cluster.advance();
-            run.advance += advance;
-            let mut cluster_data = ClusterData {
-                info: HarfClusterInfo::new(Some(cluster.info.boundary()), ' '), // Fallback for swash path
-                flags: 0,
-                style_index: cluster.data as _,
-                glyph_len: glyph_len as u8,
-                text_len: text_len as u8,
-                advance,
-                text_offset: (text_offset - run.text_range.start) as u16,
-                glyph_offset: 0,
-            };
-            if num_components > 1 {
-                cluster_data.flags = ClusterData::LIGATURE_START;
-                cluster_data.advance /= cluster.components.len() as f32;
-                cluster_data.text_len = cluster.components[0].to_range().len() as u8;
-            }
-            macro_rules! push_components {
-                () => {
-                    self.clusters.push(cluster_data);
-                    if num_components > 1 {
-                        cluster_data.glyph_offset = 0;
-                        cluster_data.glyph_len = 0;
-                        for component in &cluster.components[1..] {
-                            let range = component.to_range();
-                            cluster_data.flags = ClusterData::LIGATURE_COMPONENT;
-                            cluster_data.text_offset = (range.start - run.text_range.start) as u16;
-                            cluster_data.text_len = range.len() as u8;
-                            self.clusters.push(cluster_data);
-                            run.cluster_range.end += 1;
-                        }
-                        cluster_data.flags = 0;
-                    }
-                };
-            }
-            run.cluster_range.end += 1;
-            run.text_range.end += text_len;
-            text_offset += text_len;
-            if glyph_len == 1 && num_components == 1 {
-                let g = &cluster.glyphs[0];
-                if nearly_zero(g.x) && nearly_zero(g.y) {
-                    // Handle the case with a single glyph with zero'd offset.
-                    cluster_data.glyph_len = 0xFF;
-                    cluster_data.glyph_offset = g.id;
-                    push_components!();
-                    return;
-                }
-            } else if glyph_len == 0 {
-                // Insert an empty cluster. This occurs for both invisible
-                // control characters and ligature components.
-                push_components!();
-                return;
-            }
-            // Otherwise, encode all of the glyphs.
-            cluster_data.glyph_offset = (self.glyphs.len() - run.glyph_start) as u16;
-            self.glyphs.extend(cluster.glyphs.iter().map(|g| {
-                let style_index = g.data as u16;
-                if cluster_data.style_index != style_index {
-                    cluster_data.flags |= ClusterData::DIVERGENT_STYLES;
-                }
-                Glyph {
-                    id: g.id as u32,  // Convert swash u16 to u32 for harfrust compatibility
-                    style_index,
-                    x: g.x,
-                    y: g.y,
-                    advance: g.advance,
-                    cluster_index: 0, // TODO: Get from harfrust cluster mapping
-                    flags: 0, // TODO: Get from harfrust glyph flags
-                }
-            }));
-            glyph_count += glyph_len;
-            push_components!();
-        });
-        flush_run!();
-        
-        /* changed: Original harfrust implementation preserved here for restoration:
-        // TODO: This method will be fully implemented when harfrust API is available
-        // For now, create a minimal stub to maintain compilation
-        let _font_index = self
-            .fonts
-            .iter()
-            .position(|f| *f == font)
-            .unwrap_or_else(|| {
-                let index = self.fonts.len();
-                self.fonts.push(font);
-                index
-            });
-        
-        // Stub implementation - this will be replaced with actual harfrust shaping
-        // when the API becomes available
-        let _ = (font_size, synthesis, bidi_level, word_spacing, letter_spacing);
-        */
-    }
-
+    /// Push data for a new run using HarfBuzz-shaped glyph data.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn push_run_from_harfrust(
         &mut self,
@@ -672,16 +506,15 @@ impl<B: Brush> LayoutData<B> {
             coords_range: coords_start..coords_end,
             text_range: text_range.clone(), // ✅ Use correct text range from parameter
             bidi_level,
-            ends_with_newline: false,
+            // changed: Commenting out harfrust-specific fields for compilation
+            // direction: Direction::LTR, // Default to LTR for now
+            // script: Script::LATIN,   // Default to LATIN for now
             cluster_range,
             glyph_start: self.glyphs.len(),
             metrics,
             word_spacing,
             letter_spacing,
             advance: 0.,
-            // changed: Commenting out harfrust-specific fields for compilation
-            // direction: Direction::LTR, // Default to LTR for now
-            // script: Script::LATIN,   // Default to LATIN for now
         };
 
         // Get harfrust glyph data
@@ -832,7 +665,7 @@ impl<B: Brush> LayoutData<B> {
             let char_idx_in_range = cluster_id as usize;
             
             if char_idx_in_range < char_range.len() {
-                let absolute_char_idx = char_range.start + char_idx_in_range;
+                let _absolute_char_idx = char_range.start + char_idx_in_range;
                 
                 // Get cluster info from swash text analysis
                 // Use char_idx_in_range (relative index) instead of absolute_char_idx
@@ -869,66 +702,6 @@ impl<B: Brush> LayoutData<B> {
         }
         
         clusters
-    }
-
-    fn push_harfrust_cluster(
-        &mut self,
-        run: &mut RunData,
-        cluster_id: u32,
-        cluster_glyphs: &[(&harfrust::GlyphInfo, &harfrust::GlyphPosition)],
-        total_advance: &mut f32,
-        cluster_text_range: Range<usize>,
-        cluster_info: HarfClusterInfo,
-        style_index: u16,
-    ) {
-        let glyph_start = self.glyphs.len() - run.glyph_start;
-        let glyph_len = cluster_glyphs.len();
-        let mut cluster_advance = 0.0;
-
-        // Create glyphs from harfrust data
-        for (info, pos) in cluster_glyphs {
-            // SCALING FIX: Harfrust returns glyph advances in raw font units (e.g., 1175) 
-            // while swash returns them pre-scaled to font size (e.g., 9.89). This causes
-            // massive layout issues - text width becomes 540x larger than expected, 
-            // breaking line wrapping and causing visual corruption.
-            //
-            // The scaling factor here assumes 2048 units per em (common for TrueType fonts).
-            // This is a TEMPORARY FIX - ideally we should either:
-            // 1. Get actual units_per_em from the font header, or  
-            // 2. Rework parley to work natively with font units throughout the pipeline
-            // 3. Fix harfrust to respect the .point_size() setting and return scaled values
-            //
-            // For now, this scaling makes harfrust output compatible with swash expectations.
-            let scale_factor = run.font_size / DEFAULT_UNITS_PER_EM;
-            
-            let glyph = Glyph {
-                id: info.glyph_id, // harfrust glyph ID is already u32
-                style_index, // ✅ Use correct style index
-                x: (pos.x_offset as f32) * scale_factor, // Scale from font units to font size
-                y: (pos.y_offset as f32) * scale_factor, // Scale from font units to font size  
-                advance: (pos.x_advance as f32) * scale_factor, // Scale from font units to font size
-                cluster_index: cluster_id, // Map harfrust cluster to index
-                flags: 0, // TODO: Get from harfrust glyph flags
-            };
-            cluster_advance += glyph.advance;
-            self.glyphs.push(glyph);
-        }
-
-        // Create cluster data with PROPER mapping
-        let cluster_data = ClusterData {
-            info: cluster_info, // ✅ Proper boundary info for line breaking
-            flags: 0,
-            style_index, // ✅ Correct style index
-            glyph_len: glyph_len as u8,
-            text_len: cluster_text_range.len() as u8, // ✅ Actual text length
-            advance: cluster_advance,
-            text_offset: cluster_text_range.start.saturating_sub(run.text_range.start) as u16, // ✅ Correct offset (with bounds check)
-            glyph_offset: glyph_start as u16,
-        };
-
-        self.clusters.push(cluster_data);
-        run.cluster_range.end += 1;
-        *total_advance += cluster_advance;
     }
 
     pub(crate) fn finish(&mut self) {

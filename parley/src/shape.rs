@@ -28,11 +28,19 @@ const DEFERRED_BOXES_CAPACITY: usize = 16;
 
 /// Convert swash synthesis information to our HarfSynthesis format.
 /// This extracts the bold and italic adjustments for use with harfrust.
+/// 
+/// TODO: This conversion is lossy and discards important synthesis information:
+/// - Variation settings (weight/width/slant axes) are lost
+/// - Precise skew angle is reduced to boolean (any non-zero skew becomes true)
+/// - Small caps and other synthesis options are ignored
+/// 
+/// For full fidelity, HarfSynthesis should be expanded to preserve all
+/// swash::Synthesis fields, or we should pass the original synthesis through
+/// and convert at render time instead of shaping time.
 fn synthesis_to_harf_simple(synthesis: Synthesis) -> HarfSynthesis {
     HarfSynthesis {
-        bold: if synthesis.embolden() { 1.0 } else { 0.0 },
-        italic: synthesis.skew().unwrap_or(0.0),
-        small_caps: false,
+        bold: synthesis.embolden(),
+        italic: synthesis.skew().unwrap_or(0.0) != 0.0,
     }
 }
 
@@ -230,7 +238,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
                     
                     if let Ok(harf_font) = harfrust::FontRef::from_index(
                         font.font.blob.as_ref(),
-                        font.font.index as u32
+                        font.font.index
                     ) {
                         // Create harfrust shaper
                         let shaper_data = harfrust::ShaperData::new(&harf_font);

@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use super::{
-    Brush, Cluster, ClusterPath, Font, Layout, LineItemData, NormalizedCoord, Range, Run, RunData,
+    Brush, Cluster, ClusterPath, Font, Layout, LineItemData, Range, Run, RunData,
     Synthesis,
 };
-use swash::{tag_from_bytes, Setting};
 
 impl<'a, B: Brush> Run<'a, B> {
     pub(crate) fn new(
@@ -48,10 +47,17 @@ impl<'a, B: Brush> Run<'a, B> {
             crate::swash_convert::synthesis_to_swash(*fontique_synthesis)
         } else {
             // Fallback for legacy runs without fontique synthesis
+            // TODO: This reconstruction is imprecise and uses hardcoded values:
+            // - 14.0° is an arbitrary italic skew angle (should be font-specific)
+            // - No variation settings are applied 
+            // - Other synthesis options are ignored
+            // 
+            // This path should only be used for compatibility with old shaping code.
+            // New code should preserve the original fontique::Synthesis.
             Synthesis::new(
                 std::iter::empty(),
-                self.data.synthesis.bold > 0.0,
-                self.data.synthesis.italic,
+                self.data.synthesis.bold,
+                if self.data.synthesis.italic { 14.0 } else { 0.0 },
             )
         }
     }

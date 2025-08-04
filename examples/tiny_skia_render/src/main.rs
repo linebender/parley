@@ -14,13 +14,14 @@
 )]
 
 use parley::{
-    Alignment, AlignmentOptions, FontContext, FontFamily, FontWeight, GenericFamily, GlyphRun, InlineBox,
-    Layout, LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty,
+    layout::{Alignment, PositionedLayoutItem},
+    style::{FontWeight, GenericFamily, StyleProperty},
+    AlignmentOptions, FontContext, GlyphRun, InlineBox, Layout, LayoutContext, LineHeight,
 };
 use skrifa::{
     instance::{LocationRef, NormalizedCoord, Size}, 
     outline::{DrawSettings, OutlinePen},
-    raw::{FontRef as ReadFontsRef, TableProvider},
+    raw::FontRef as ReadFontsRef,
     GlyphId, MetadataProvider, OutlineGlyph,
 };
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Rect, Transform};

@@ -26,8 +26,8 @@ use core::{cmp::Ordering, ops::Range};
 use data::{ClusterData, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData, RunData};
 #[cfg(feature = "accesskit")]
 use hashbrown::{HashMap, HashSet};
-use swash::text::cluster::{Boundary, ClusterInfo};
-use swash::{NormalizedCoord, Synthesis};
+use swash::text::cluster::Boundary;
+use swash::Synthesis;
 // Remove swash::GlyphId - using harfrust glyph IDs instead
 
 pub use alignment::AlignmentOptions;

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use super::{
-    BreakReason, Brush, Cluster, ClusterInfo, Glyph, Layout, Line, LineItem, Range, Run, Style,
+    BreakReason, Brush, Cluster, Glyph, Layout, Line, LineItem, Range, Run, Style,
 };
 use swash::text::cluster::Whitespace;
 
