@@ -221,6 +221,7 @@ fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<
         run_x += glyph.advance;
 
         let glyph_id = GlyphId::from(glyph.id as u16); // Convert harfrust u32 to swash u16
+        
         if let Some(glyph_outline) = outlines.get(glyph_id) {
             pen.set_origin(glyph_x, glyph_y);
             pen.set_color(brush.color);

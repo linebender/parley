@@ -5,17 +5,67 @@ use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
 use crate::Font;
-use crate::layout::data::HarfSynthesis;
+use crate::util::nearly_eq;
+use fontique::QueryFamily;
 use fontique::{self, Query, QueryFont};
-// Keep swash for text analysis
-use swash::text::cluster::CharInfo;
+use swash::text::cluster::{CharCluster, CharInfo, Token};
 use swash::text::{Language, Script};
-// Use harfrust for shaping
-use harfrust::{FontRef as HarfFontRef, ShaperData, ShaperInstance, UnicodeBuffer, Direction, Script as HarfScript, script};
+use swash::{FontRef, Synthesis};
+
+// Import harfrust types for shaping
+use harfrust;
 
 use alloc::vec::Vec;
 
 use crate::inline_box::InlineBox;
+use crate::layout::data::HarfSynthesis;
+
+// Import the trait to use its methods
+use swash::shape::partition::Selector as _;
+
+// Simple conversion function
+fn synthesis_to_harf_simple(synthesis: Synthesis) -> HarfSynthesis {
+    HarfSynthesis {
+        bold: if synthesis.embolden() { 1.0 } else { 0.0 },
+        italic: synthesis.skew().unwrap_or(0.0),
+        small_caps: false,
+    }
+}
+
+// Helper function to convert swash Tag to harfrust Tag
+fn convert_swash_tag_to_harfrust(swash_tag: u32) -> harfrust::Tag {
+    harfrust::Tag::from_be_bytes(swash_tag.to_be_bytes())
+}
+
+// Add helper function to convert scripts
+fn convert_script_to_harfrust(swash_script: Script) -> harfrust::Script {
+    // Map swash scripts to harfrust scripts
+    let tag = match swash_script {
+        Script::Arabic => harfrust::Tag::from_be_bytes(*b"arab"),
+        Script::Latin => harfrust::Tag::from_be_bytes(*b"latn"),
+        Script::Common => harfrust::Tag::from_be_bytes(*b"zyyy"),
+        Script::Unknown => harfrust::Tag::from_be_bytes(*b"zzzz"),
+        Script::Inherited => harfrust::Tag::from_be_bytes(*b"zinh"),
+        Script::Cyrillic => harfrust::Tag::from_be_bytes(*b"cyrl"),
+        Script::Greek => harfrust::Tag::from_be_bytes(*b"grek"),
+        Script::Hebrew => harfrust::Tag::from_be_bytes(*b"hebr"),
+        Script::Han => harfrust::Tag::from_be_bytes(*b"hani"),
+        Script::Hiragana => harfrust::Tag::from_be_bytes(*b"hira"),
+        Script::Katakana => harfrust::Tag::from_be_bytes(*b"kana"),
+        Script::Devanagari => harfrust::Tag::from_be_bytes(*b"deva"),
+        Script::Thai => harfrust::Tag::from_be_bytes(*b"thai"),
+        // Add more mappings as needed, defaulting to Latin for unknown scripts
+        _ => {
+            harfrust::Tag::from_be_bytes(*b"latn")
+        }
+    };
+    
+    harfrust::Script::from_iso15924_tag(tag)
+        .unwrap_or_else(|| {
+            // Fallback to Latin
+            harfrust::Script::from_iso15924_tag(harfrust::Tag::from_be_bytes(*b"latn")).unwrap()
+        })
+}
 
 struct Item {
     style_index: u16,
@@ -37,7 +87,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     inline_boxes: &[InlineBox],
     infos: &[(CharInfo, u16)],
     levels: &[u8],
-    _scx: &mut swash::shape::ShapeContext, // Keep for compatibility but don't use
+    _scx: &mut swash::shape::ShapeContext, // Not used in harfrust approach
     mut text: &str,
     layout: &mut Layout<B>,
 ) {
@@ -80,107 +130,202 @@ pub(crate) fn shape_text<'a, B: Brush>(
     let mut current_box = inline_box_iter.next();
     let mut deferred_boxes: Vec<usize> = Vec::with_capacity(16);
 
-    // Define macro to shape using harfrust
+    // Define macro to shape using swash-style segmentation + harfrust shaping
     macro_rules! shape_item {
         () => {
             let item_text = &text[text_range.clone()];
-            
-            if item_text.is_empty() {
-                return;
-            }
-            
-            // changed: Restoring harfrust implementation step by step
-            // Use our font selector to get the best font
+            let item_infos = &infos[char_range.start..char_range.end]; // Only process current item
+            let first_style_index = item_infos[0].1;
             let mut font_selector = FontSelector::new(
                 &mut fq,
                 rcx,
                 styles,
-                item.style_index,
+                first_style_index,
                 item.script,
                 item.locale,
             );
+
+            // Parse text into clusters (exactly like swash does) - but only for current item
+            let tokens: Vec<Token> = item_text.char_indices().zip(item_infos).map(
+                |((offset, ch), (info, style_index))| Token {
+                    ch,
+                    offset: (text_range.start + offset) as u32,
+                    len: ch.len_utf8() as u8,
+                    info: *info,
+                    data: *style_index as u32,
+                }
+            ).collect();
+
+            let mut parser = swash::text::cluster::Parser::new(item.script, tokens.into_iter());
+            let mut cluster = CharCluster::new();
             
-            // For simplicity, get font for the first character info in this range
-            let char_info = &infos[char_range.start].0;
-            let char_style_index = infos[char_range.start].1;  // ✅ Use actual character's style index
-            if let Some(selected_font) = font_selector.select_font_for_text(item_text, char_info, char_style_index) {
-
-                // Try to create harfrust font reference
-                if let Ok(harf_font) = HarfFontRef::from_index(
-                    selected_font.font.blob.as_ref(), 
-                    selected_font.font.index
-                )
-                {
-
-                    // Create harfrust shaper
-                    let shaper_data = ShaperData::new(&harf_font);
-                    // ✅ Extract variations from fontique synthesis for font weight, style, etc.
-                    let mut variations: Vec<harfrust::Variation> = vec![];
-                    
-                    
-                    
-                    for (tag, value) in selected_font.font.synthesis.variation_settings() {
-                        variations.push(harfrust::Variation { tag: *tag, value: *value });
+            // Reimplement swash's shape_clusters algorithm - but only for current item
+            if !parser.next(&mut cluster) {
+                return;  // No clusters to process
+            }
+            
+            let mut current_font = font_selector.select_font(&mut cluster);
+            
+            // Main segmentation loop (based on swash shape_clusters) - only within current item
+            while let Some(font) = current_font.take() {
+                // Collect all clusters for this font segment
+                let mut segment_clusters = vec![cluster.clone()];
+                let segment_start_offset = cluster.range().start as usize - text_range.start;
+                let mut segment_end_offset = cluster.range().end as usize - text_range.start;
+                
+                loop {
+                    if !parser.next(&mut cluster) {
+                        // End of current item - process final segment
+                        break;
                     }
                     
-
+                    if let Some(next_font) = font_selector.select_font(&mut cluster) {
+                        if next_font != font {
+                            // Font changed - end current segment, start new one
+                            current_font = Some(next_font);
+                            break;
+                        }
+                        // Same font - add to current segment
+                        segment_clusters.push(cluster.clone());
+                        segment_end_offset = cluster.range().end as usize - text_range.start;
+                    } else {
+                        // No font found - skip this cluster
+                        if !parser.next(&mut cluster) {
+                            break;
+                        }
+                    }
+                }
+                
+                // Shape this font segment with harfrust
+                let segment_text = &item_text[segment_start_offset..segment_end_offset];
+                let _segment_text_range = (text_range.start + segment_start_offset)..(text_range.start + segment_end_offset);
+                
+                // Split segment at newlines and shape each part separately
+                let mut current_offset = segment_start_offset;
+                for part in segment_text.split_inclusive('\n') {
+                    if part.is_empty() {
+                        continue;
+                    }
                     
-
-                    let instance = ShaperInstance::from_variations(&harf_font, &variations);
-                    let harf_shaper = shaper_data
-                        .shaper(&harf_font)
-                        .instance(Some(&instance))
-                        .point_size(Some(item.size))
-                        .build();
+                    let part_start = current_offset;
+                    let part_end = current_offset + part.len();
+                    let part_text = &item_text[part_start..part_end];
+                    let part_text_range = (text_range.start + part_start)..(text_range.start + part_end);
                     
-
+                    // Filter out only the actual newline character for shaping (but preserve for ranges)
+                    let part_for_shaping = if part.ends_with('\n') {
+                        &part[..part.len()-1]  // Remove trailing newline for shaping
+                    } else {
+                        part
+                    };
                     
-                    // Prepare harfrust buffer
-                    let mut buffer = UnicodeBuffer::new();
-                    buffer.push_str(item_text);
-                    buffer.set_direction(level_to_direction(item.level));
-                    buffer.set_script(script_to_harf(item.script));
-                    // TODO: buffer.set_language(item.locale);
+                    if part_for_shaping.is_empty() {
+                        current_offset = part_end;
+                        continue; // Skip empty parts
+                    }
                     
-                    // Convert features
-                    let features: Vec<harfrust::Feature> = vec![]; // TODO: Convert from item.features
+                    current_offset = part_end;
                     
-                    // Shape the text
-                    let glyph_buffer = harf_shaper.shape(buffer, &features);
-                    
-
-                    
-                    // Push the shaped run to layout using our harfrust data structures
-                    layout.data.push_run_from_harfrust(
-                        Font::new(selected_font.font.blob.clone(), selected_font.font.index),
-                        item.size,
-                        synthesis_to_harf(selected_font.font.synthesis),
-                        selected_font.font.synthesis,
-                        &glyph_buffer,
-                        item.level,
-                        item.word_spacing,
-                        item.letter_spacing,
-                        // NEW: Pass text analysis data for proper clustering
-                        item_text,
-                        infos,
-                        text_range.clone(),
-                        char_range.clone(),
-                        // ✅ Pass the actual font variations that were used for shaping
-                        &variations,
-                    );
-                } else {
-                    // Fallback to temporary stub if harfrust font creation fails
-                    // TODO: Handle this case better
+                    if let Ok(harf_font) = harfrust::FontRef::from_index(
+                        font.font.blob.as_ref(),
+                        font.font.index as u32
+                    ) {
+                        // Create harfrust shaper
+                        let shaper_data = harfrust::ShaperData::new(&harf_font);
+                        let mut variations: Vec<harfrust::Variation> = vec![];
+                        
+                        // Extract variations from swash synthesis
+                        for setting in font.synthesis.variations() {
+                            variations.push(harfrust::Variation { 
+                                tag: convert_swash_tag_to_harfrust(setting.tag), 
+                                value: setting.value 
+                            });
+                        }
+                        
+                        let instance = harfrust::ShaperInstance::from_variations(&harf_font, &variations);
+                        let harf_shaper = shaper_data
+                            .shaper(&harf_font)
+                            .instance(Some(&instance))
+                            .point_size(Some(item.size))
+                            .build();
+                        
+                        // Prepare harfrust buffer
+                        let mut buffer = harfrust::UnicodeBuffer::new();
+                        
+                        // Use the part for shaping (without newlines)
+                        buffer.push_str(part_for_shaping);
+                        
+                        let direction = if item.level & 1 != 0 {
+                            harfrust::Direction::RightToLeft
+                        } else {
+                            harfrust::Direction::LeftToRight
+                        };
+                        buffer.set_direction(direction);
+                        
+                        let script = convert_script_to_harfrust(item.script);
+                        buffer.set_script(script);
+                        
+                            // Shape the text
+                            let mut features: Vec<harfrust::Feature> = vec![];
+                            
+                            // Add Arabic-specific OpenType features for proper shaping
+                            if item.script == Script::Arabic {
+                                features.extend([
+                                    // Required Arabic features
+                                    harfrust::Feature::new(harfrust::Tag::from_be_bytes(*b"ccmp"), 1, 0..),  // Glyph composition/decomposition
+                                    harfrust::Feature::new(harfrust::Tag::from_be_bytes(*b"isol"), 1, 0..),  // Isolated forms
+                                    harfrust::Feature::new(harfrust::Tag::from_be_bytes(*b"fina"), 1, 0..),  // Final forms
+                                    harfrust::Feature::new(harfrust::Tag::from_be_bytes(*b"medi"), 1, 0..),  // Medial forms
+                                    harfrust::Feature::new(harfrust::Tag::from_be_bytes(*b"init"), 1, 0..),  // Initial forms
+                                    harfrust::Feature::new(harfrust::Tag::from_be_bytes(*b"rlig"), 1, 0..),  // Required ligatures
+                                    harfrust::Feature::new(harfrust::Tag::from_be_bytes(*b"liga"), 1, 0..),  // Standard ligatures
+                                    harfrust::Feature::new(harfrust::Tag::from_be_bytes(*b"calt"), 1, 0..),  // Contextual alternates
+                                ]);
+                            }
+                            
+                            let glyph_buffer = harf_shaper.shape(buffer, &features);
+                            
+                            // Calculate character range for this part within the current item
+                        let char_start = char_range.start + item_text[..part_start].chars().count();
+                        let char_end = char_start + part_text.chars().count();
+                        let segment_char_range = char_start..char_end;
+                        
+                        // Extract relevant CharInfo slice for this part
+                        let segment_char_start = char_start - char_range.start;
+                        let segment_char_count = part_text.chars().count();
+                        let segment_infos = if segment_char_start < item_infos.len() {
+                            let end_idx = (segment_char_start + segment_char_count).min(item_infos.len());
+                            &item_infos[segment_char_start..end_idx]
+                        } else {
+                            &[]
+                        };
+                        
+                        // Push harfrust-shaped run
+                        layout.data.push_run_from_harfrust(
+                            Font::new(font.font.blob.clone(), font.font.index),
+                            item.size,
+                            synthesis_to_harf_simple(font.synthesis),
+                            font.font.synthesis, // Use the original fontique synthesis from QueryFont
+                            &glyph_buffer,
+                            item.level,
+                            item.word_spacing,
+                            item.letter_spacing,
+                            part_text,
+                            segment_infos,
+                            part_text_range,
+                            segment_char_range,
+                            &variations,
+                        );
+                    }
                 }
             }
         };
     }
 
-    // Iterate over characters in the text
+    // Iterate over characters in the text (same as original)
     for ((char_index, (byte_index, ch)), (info, style_index)) in
         text.char_indices().enumerate().zip(infos)
     {
-
         let mut break_run = false;
         let mut script = info.script();
         if !real_script(script) {
@@ -190,9 +335,15 @@ pub(crate) fn shape_text<'a, B: Brush>(
         if item.style_index != *style_index {
             item.style_index = *style_index;
             style = &styles[*style_index as usize].style;
-            // ✅ Break run on ANY style change since we need proper font selection
-            // This ensures FontWeight, FontStyle, and FontWidth changes trigger new runs
-            break_run = true;
+            if !nearly_eq(style.font_size, item.size)
+                || style.locale != item.locale
+                || style.font_variations != item.variations
+                || style.font_features != item.features
+                || !nearly_eq(style.letter_spacing, item.letter_spacing)
+                || !nearly_eq(style.word_spacing, item.word_spacing)
+            {
+                break_run = true;
+            }
         }
 
         if level != item.level || script != item.script {
@@ -247,87 +398,6 @@ fn real_script(script: Script) -> bool {
     script != Script::Common && script != Script::Unknown && script != Script::Inherited
 }
 
-/// Convert fontique synthesis to harfrust synthesis
-fn synthesis_to_harf(synthesis: fontique::Synthesis) -> HarfSynthesis {
-    let result = HarfSynthesis {
-        bold: if synthesis.embolden() { 1.0 } else { 0.0 },  // ✅ Extract embolden flag
-        italic: synthesis.skew().unwrap_or(0.0),              // ✅ Extract skew angle for italic
-        small_caps: false, // TODO: Add small caps support if fontique has it
-    };
-    
-
-    
-    result
-}
-
-/// Convert swash direction from bidi level to harfrust direction
-fn level_to_direction(level: u8) -> Direction {
-    if level & 1 != 0 {
-        Direction::RightToLeft
-    } else {
-        Direction::LeftToRight
-    }
-}
-
-/// Convert swash script to harfrust script
-fn script_to_harf(swash_script: Script) -> HarfScript {
-    // Map swash scripts to harfrust script constants
-    // Using the documented harfrust::script constants
-    let harf_script = match swash_script {
-        // Common scripts
-        Script::Latin => script::LATIN,
-        Script::Cyrillic => script::CYRILLIC,
-        Script::Greek => script::GREEK,
-        
-        // Complex scripts requiring proper shaping
-        Script::Arabic => script::ARABIC,
-        Script::Hebrew => script::HEBREW,
-        Script::Syriac => script::SYRIAC,
-        
-        // Indic scripts
-        Script::Devanagari => script::DEVANAGARI,
-        Script::Bengali => script::BENGALI,
-        Script::Gurmukhi => script::GURMUKHI,
-        Script::Gujarati => script::GUJARATI,
-        Script::Oriya => script::ORIYA,
-        Script::Tamil => script::TAMIL,
-        Script::Telugu => script::TELUGU,
-        Script::Kannada => script::KANNADA,
-        Script::Malayalam => script::MALAYALAM,
-        Script::Sinhala => script::SINHALA,
-        
-        // East Asian scripts
-        Script::Han => script::HAN,
-        Script::Hiragana => script::HIRAGANA,
-        Script::Katakana => script::KATAKANA,
-        Script::Hangul => script::HANGUL,
-        Script::Bopomofo => script::BOPOMOFO,
-        
-        // Southeast Asian scripts
-        Script::Thai => script::THAI,
-        Script::Lao => script::LAO,
-        Script::Khmer => script::KHMER,
-        Script::Myanmar => script::MYANMAR,
-        
-        // Other scripts
-        Script::Tibetan => script::TIBETAN,
-        Script::Mongolian => script::MONGOLIAN,
-        Script::Georgian => script::GEORGIAN,
-        Script::Armenian => script::ARMENIAN,
-        Script::Ethiopic => script::ETHIOPIC,
-        
-        // Fallbacks for unknown/inherited scripts
-        Script::Common => script::COMMON,
-        Script::Inherited => script::INHERITED,
-        Script::Unknown => script::UNKNOWN,
-        
-        // For any script not explicitly mapped, use UNKNOWN as fallback
-        _ => script::UNKNOWN,
-    };
-    
-    harf_script
-}
-
 struct FontSelector<'a, 'b, B: Brush> {
     query: &'b mut Query<'a>,
     fonts_id: Option<usize>,
@@ -376,18 +446,28 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             features,
         }
     }
+}
 
-    /// Select a font for the given text cluster - simplified for harfrust
-    fn select_font_for_text(&mut self, _text: &str, _char_info: &CharInfo, style_index: u16) -> Option<SelectedFont> {
-        if style_index != self.style_index {
+impl<B: Brush> swash::shape::partition::Selector for FontSelector<'_, '_, B> {
+    type SelectedFont = SelectedFont;
+
+    fn select_font(&mut self, cluster: &mut CharCluster) -> Option<Self::SelectedFont> {
+        let style_index = cluster.user_data() as u16;
+        let is_emoji = cluster.info().is_emoji();
+        if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize].style;
 
             let fonts_id = style.font_stack.id();
             let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
-            
-            if self.fonts_id != Some(fonts_id) {
-                self.query.set_families(fonts.iter().copied());
+            let fonts = fonts.iter().copied().map(QueryFamily::Id);
+            if is_emoji {
+                use core::iter::once;
+                let emoji_family = QueryFamily::Generic(fontique::GenericFamily::Emoji);
+                self.query.set_families(fonts.chain(once(emoji_family)));
+                self.fonts_id = None;
+            } else if self.fonts_id != Some(fonts_id) {
+                self.query.set_families(fonts);
                 self.fonts_id = Some(fonts_id);
             }
 
@@ -397,22 +477,49 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
                 style: style.font_style,
             };
             if self.attrs != attrs {
-
                 self.query.set_attributes(attrs);
                 self.attrs = attrs;
             }
             self.variations = self.rcx.variations(style.font_variations).unwrap_or(&[]);
             self.features = self.rcx.features(style.font_features).unwrap_or(&[]);
         }
-        
         let mut selected_font = None;
         self.query.matches_with(|font| {
-            selected_font = Some(SelectedFont {
-                font: font.clone(),
-                synthesis: synthesis_to_harf(font.synthesis),
+            use skrifa::MetadataProvider;
+            use swash::text::cluster::Status as MapStatus;
+
+            let Ok(font_ref) = skrifa::FontRef::from_index(font.blob.as_ref(), font.index) else {
+                return fontique::QueryStatus::Continue;
+            };
+
+            let charmap = font_ref.charmap();
+            let map_status = cluster.map(|ch| {
+                charmap
+                    .map(ch)
+                    .map(|g| {
+                        g.to_u32()
+                            .try_into()
+                            .expect("Swash requires u16 glyph, so we hope that the glyph fits")
+                    })
+                    .unwrap_or_default()
             });
-            
-            return fontique::QueryStatus::Stop;
+
+            match map_status {
+                MapStatus::Complete => {
+                    selected_font = Some(font.into());
+                    fontique::QueryStatus::Stop
+                }
+                MapStatus::Keep => {
+                    selected_font = Some(font.into());
+                    fontique::QueryStatus::Continue
+                }
+                MapStatus::Discard => {
+                    if selected_font.is_none() {
+                        selected_font = Some(font.into());
+                    }
+                    fontique::QueryStatus::Continue
+                }
+            }
         });
         selected_font
     }
@@ -420,14 +527,15 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
 
 struct SelectedFont {
     font: QueryFont,
-    synthesis: HarfSynthesis,
+    synthesis: Synthesis,
 }
 
 impl From<&QueryFont> for SelectedFont {
     fn from(font: &QueryFont) -> Self {
+        use crate::swash_convert::synthesis_to_swash;
         Self {
             font: font.clone(),
-            synthesis: synthesis_to_harf(font.synthesis),
+            synthesis: synthesis_to_swash(font.synthesis),
         }
     }
 }
@@ -437,3 +545,19 @@ impl PartialEq for SelectedFont {
         self.font.family == other.font.family && self.synthesis == other.synthesis
     }
 }
+
+impl swash::shape::partition::SelectedFont for SelectedFont {
+    fn font(&self) -> FontRef<'_> {
+        FontRef::from_index(self.font.blob.as_ref(), self.font.index as _).unwrap()
+    }
+
+    fn id_override(&self) -> Option<[u64; 2]> {
+        Some([self.font.blob.id(), self.font.index as _])
+    }
+
+    fn synthesis(&self) -> Option<Synthesis> {
+        Some(self.synthesis)
+    }
+}
+
+

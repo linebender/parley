@@ -696,7 +696,8 @@ impl<B: Brush> LayoutData<B> {
             source_text, 
             infos, 
             &text_range,
-            &char_range
+            &char_range,
+            bidi_level,
         );
         
         // Group glyphs by harfrust cluster ID
@@ -705,29 +706,82 @@ impl<B: Brush> LayoutData<B> {
             cluster_groups.entry(info.cluster).or_default().push(i);
         }
         
-        let mut total_advance = 0.0;
-
-        // Process each cluster in order
-        for (cluster_id, cluster_text_range, cluster_info, style_index) in cluster_mappings {
-            if let Some(glyph_indices) = cluster_groups.get(&cluster_id) {
+        // Process clusters and add their glyphs to the run
+        let mut all_run_glyphs = Vec::new();
+        let mut cluster_data_list = Vec::new();
+        let mut run_advance = 0.0;
+        
+        for (cluster_id, cluster_text_range, cluster_info, style_index) in &cluster_mappings {
+            if let Some(glyph_indices) = cluster_groups.get(cluster_id) {
                 let cluster_glyphs: Vec<_> = glyph_indices.iter()
                     .map(|&i| (&glyph_infos[i], &glyph_positions[i]))
                     .collect();
                 
-                self.push_harfrust_cluster(
-                    &mut run,
-                    cluster_id,
-                    &cluster_glyphs,
-                    &mut total_advance,
-                    cluster_text_range,
-                    cluster_info,
-                    style_index,
-            );
+                // Store cluster data for later processing
+                cluster_data_list.push((
+                    *cluster_id,
+                    cluster_glyphs,
+                    cluster_text_range.clone(),
+                    cluster_info.clone(),
+                    *style_index
+                ));
             }
         }
-
-        run.advance = total_advance;
-
+        
+        // For RTL text, we need to reverse the glyph order within the run to match visual order
+        let is_rtl = bidi_level & 1 != 0;
+        if is_rtl {
+            cluster_data_list.reverse();
+        }
+        
+        // Now process clusters in the correct visual order
+        for (cluster_id, cluster_glyphs, cluster_text_range, cluster_info, style_index) in cluster_data_list {
+            // Add glyphs to the run in visual order
+            let mut cluster_advance = 0.0;
+            let glyph_start = all_run_glyphs.len();
+            
+            for (info, pos) in &cluster_glyphs {
+                let units_per_em = 2048.0; // TODO: Get from font header
+                let scale_factor = font_size / units_per_em;
+                
+                let glyph = Glyph {
+                    id: info.glyph_id,
+                    style_index,
+                    x: (pos.x_offset as f32) * scale_factor,
+                    y: (pos.y_offset as f32) * scale_factor,
+                    advance: (pos.x_advance as f32) * scale_factor,
+                    cluster_index: cluster_id,
+                    flags: 0,
+                };
+                cluster_advance += glyph.advance;
+                all_run_glyphs.push(glyph);
+            }
+            
+            // Create cluster data
+            let cluster_data = ClusterData {
+                info: cluster_info,
+                flags: 0,
+                style_index,
+                glyph_len: cluster_glyphs.len() as u8,
+                text_len: cluster_text_range.len() as u8,
+                advance: cluster_advance,
+                text_offset: cluster_text_range.start.saturating_sub(text_range.start) as u16,
+                glyph_offset: glyph_start as u16,
+            };
+            
+            self.clusters.push(cluster_data);
+            run.cluster_range.end += 1;
+            run_advance += cluster_advance;
+        }
+        
+        // Add all glyphs to the global glyph list in correct order
+        self.glyphs.extend(all_run_glyphs);
+        
+        run.advance = run_advance;
+        
+        // Store final run data with harfrust synthesis 
+        run.synthesis = synthesis;
+        
         // Push the run
         if !run.cluster_range.is_empty() {
             self.runs.push(run);
@@ -747,6 +801,7 @@ impl<B: Brush> LayoutData<B> {
         infos: &[(swash::text::cluster::CharInfo, u16)],
         text_range: &Range<usize>,
         char_range: &Range<usize>,
+        bidi_level: u8, // Added to handle RTL cluster ordering
     ) -> Vec<(u32, Range<usize>, HarfClusterInfo, u16)> {
         // Returns: (harfrust_cluster_id, text_byte_range, cluster_info, style_index)
         
@@ -764,30 +819,48 @@ impl<B: Brush> LayoutData<B> {
         let mut sorted_cluster_ids: Vec<u32> = cluster_groups.keys().copied().collect();
         sorted_cluster_ids.sort();
         
-
+        // ✅ IMPORTANT: Reverse cluster order for RTL text to match swash behavior
+        let is_rtl = bidi_level & 1 != 0;
+        if is_rtl {
+            sorted_cluster_ids.reverse();
+        }
         
         for &cluster_id in sorted_cluster_ids.iter() {
             // For each cluster, map it to the corresponding character using the cluster ID
             // NOTE: cluster IDs are relative to the current text segment, not global
             let char_idx_in_range = cluster_id as usize;
+            
             if char_idx_in_range < char_range.len() {
                 let absolute_char_idx = char_range.start + char_idx_in_range;
                 
                 // Get cluster info from swash text analysis
-                if let Some((char_info, style_index)) = infos.get(absolute_char_idx) {
-                                    // ✅ Extract boundary from CharInfo and create our own cluster info!
-                let boundary = char_info.boundary();
-                // Use segment-relative index since source_text is only the current segment
-                let segment_relative_char_idx = absolute_char_idx - char_range.start;
-                let source_char = source_text.chars().nth(segment_relative_char_idx).unwrap_or(' ');
-                let cluster_info = HarfClusterInfo::new(Some(boundary), source_char);
-                
-
+                // Use char_idx_in_range (relative index) instead of absolute_char_idx
+                if let Some((char_info, style_index)) = infos.get(char_idx_in_range) {
+                    // ✅ Extract boundary from CharInfo and create our own cluster info!
+                    let boundary = char_info.boundary();
+                    // Use segment-relative index since source_text is only the current segment
+                    let segment_relative_char_idx = char_idx_in_range; // This is already relative to the segment
+                    let source_char = source_text.chars().nth(segment_relative_char_idx).unwrap_or(' ');
+                    let cluster_info = HarfClusterInfo::new(Some(boundary), source_char);
                     
-                    // Calculate text range for this cluster (1 character)
-                    let char_start = text_range.start + char_idx_in_range;
-                    let char_end = char_start + 1;
-                    let cluster_text_range = char_start..char_end.min(text_range.end);
+                    // Calculate BYTE range for this cluster from character positions
+                    // Convert character index to byte index within the segment
+                    let char_byte_start = source_text.char_indices()
+                        .nth(segment_relative_char_idx)
+                        .map(|(byte_idx, _)| byte_idx)
+                        .unwrap_or(0);
+                    
+                    let char_byte_end = if segment_relative_char_idx + 1 < source_text.chars().count() {
+                        source_text.char_indices()
+                            .nth(segment_relative_char_idx + 1)
+                            .map(|(byte_idx, _)| byte_idx)
+                            .unwrap_or(source_text.len())
+                    } else {
+                        source_text.len()
+                    };
+                    
+                    // Convert to absolute byte positions
+                    let cluster_text_range = (text_range.start + char_byte_start)..(text_range.start + char_byte_end);
                     
                     clusters.push((cluster_id, cluster_text_range, cluster_info, *style_index));
                 }
@@ -807,9 +880,6 @@ impl<B: Brush> LayoutData<B> {
         cluster_info: HarfClusterInfo,
         style_index: u16,
     ) {
-        // TODO: Implement proper cluster creation from harfrust data
-        // For now, create a basic cluster
-        
         let glyph_start = self.glyphs.len() - run.glyph_start;
         let glyph_len = cluster_glyphs.len();
         let mut cluster_advance = 0.0;
