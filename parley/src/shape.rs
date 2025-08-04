@@ -458,6 +458,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
     }
 }
 
+// TODO: This doesn't need to implement the Selector trait. 
 impl<B: Brush> swash::shape::partition::Selector for FontSelector<'_, '_, B> {
     type SelectedFont = SelectedFont;
 
