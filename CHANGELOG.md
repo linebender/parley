@@ -36,6 +36,7 @@ This release has an [MSRV] of 1.82.
 
 #### Parley
 
+- Adjust the advance of the whole line when justifying text.  ([#397][] by [@kekelp][])
 - Selection extension moves the focus to the side being extended. ([#385][] by [@kekelp][])
 - Ranged builder default style not respecting `scale`. ([#368][] by [@xStrom][])
 
@@ -321,6 +322,7 @@ This release has an [MSRV][] of 1.70.
 [#385]: https://github.com/linebender/parley/pull/385
 [#389]: https://github.com/linebender/parley/pull/389
 [#390]: https://github.com/linebender/parley/pull/390
+[#397]: https://github.com/linebender/parley/pull/397
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/linebender/parley/compare/v0.4.0...v0.5.0
