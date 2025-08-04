@@ -22,6 +22,7 @@ use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
 use alignment::unjustify;
 #[cfg(feature = "accesskit")]
 use alloc::vec::Vec;
+use alloc::{string::String, sync::Arc};
 use core::{cmp::Ordering, ops::Range};
 use data::{ClusterData, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData, RunData};
 #[cfg(feature = "accesskit")]
@@ -314,6 +315,8 @@ pub struct Style<B: Brush> {
     pub(crate) line_height: LayoutLineHeight,
     /// Per-cluster overflow-wrap setting
     pub(crate) overflow_wrap: OverflowWrap,
+    /// Replace graphemes with another grapheme.
+    pub(crate) grapheme_replacement: Option<Arc<String>>,
 }
 
 /// Underline or strikethrough decoration.
