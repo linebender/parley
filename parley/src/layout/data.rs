@@ -7,12 +7,10 @@ use crate::style::Brush;
 use crate::util::nearly_zero;
 use crate::{Font, OverflowWrap};
 use core::ops::Range;
-// changed: Adding back swash imports for compilation, keeping harfrust for future
+
 use swash::Synthesis;
 use swash::shape::Shaper;
 use swash::text::cluster::{Boundary, ClusterInfo, Whitespace};
-// Keep swash for text analysis, use harfrust only for shaping
-// use harfrust::{GlyphBuffer, Script, Direction};
 
 use alloc::vec::Vec;
 use alloc::collections::BTreeMap;
@@ -23,7 +21,15 @@ use core_maths::CoreFloat;
 
 use skrifa::raw::TableProvider;
 
-/// Harfrust-based font synthesis information (replaces swash::Synthesis)
+/// Default units per em for font scaling.
+/// 
+/// This is used as a fallback when the actual font units per em cannot be determined.
+/// Most TrueType fonts use 2048, while PostScript fonts typically use 1000.
+/// 
+/// TODO: Extract the actual units_per_em from the font header for more accurate scaling.
+const DEFAULT_UNITS_PER_EM: f32 = 2048.0;
+
+/// HarfBuzz-based font synthesis information
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct HarfSynthesis {
     /// Synthetic bold weight adjustment (0.0 = no adjustment)
@@ -409,14 +415,11 @@ impl<B: Brush> LayoutData<B> {
         font: Font,
         font_size: f32,
         synthesis: HarfSynthesis,
-        // changed: Back to swash implementation for compilation, harfrust integration preserved below
-        shaper: Shaper<'_>,
-        // shaper: harfrust::Shaper<'_>, 
+        shaper: Shaper<'_>, 
         bidi_level: u8,
         word_spacing: f32,
         letter_spacing: f32,
     ) {
-        // changed: Using swash implementation for compilation, harfrust version preserved in comments
         let font_index = self
             .fonts
             .iter()
@@ -608,7 +611,6 @@ impl<B: Brush> LayoutData<B> {
         */
     }
 
-    // changed: Restoring harfrust-specific methods step by step
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn push_run_from_harfrust(
         &mut self,
@@ -741,8 +743,7 @@ impl<B: Brush> LayoutData<B> {
             let glyph_start = all_run_glyphs.len();
             
             for (info, pos) in &cluster_glyphs {
-                let units_per_em = 2048.0; // TODO: Get from font header
-                let scale_factor = font_size / units_per_em;
+                let scale_factor = font_size / DEFAULT_UNITS_PER_EM;
                 
                 let glyph = Glyph {
                     id: info.glyph_id,
@@ -898,8 +899,7 @@ impl<B: Brush> LayoutData<B> {
             // 3. Fix harfrust to respect the .point_size() setting and return scaled values
             //
             // For now, this scaling makes harfrust output compatible with swash expectations.
-            let units_per_em = 2048.0; // TODO: Get from font header
-            let scale_factor = run.font_size / units_per_em;
+            let scale_factor = run.font_size / DEFAULT_UNITS_PER_EM;
             
             let glyph = Glyph {
                 id: info.glyph_id, // harfrust glyph ID is already u32

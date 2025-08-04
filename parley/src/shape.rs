@@ -1,29 +1,33 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+//! Text shaping implementation using HarfBuzz (via harfrust) for shaping
+//! and swash for text analysis and font selection.
+
+use alloc::vec::Vec;
+
+// Parley imports
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
-use crate::Font;
+use crate::inline_box::InlineBox;
+use crate::layout::data::HarfSynthesis;
 use crate::util::nearly_eq;
-use fontique::QueryFamily;
-use fontique::{self, Query, QueryFont};
+use crate::Font;
+
+// External crate imports
+use fontique::{self, Query, QueryFamily, QueryFont};
+use harfrust;
+use swash::shape::partition::Selector as _;
 use swash::text::cluster::{CharCluster, CharInfo, Token};
 use swash::text::{Language, Script};
 use swash::{FontRef, Synthesis};
 
-// Import harfrust types for shaping
-use harfrust;
+/// Capacity hint for deferred inline boxes to avoid repeated allocations
+const DEFERRED_BOXES_CAPACITY: usize = 16;
 
-use alloc::vec::Vec;
-
-use crate::inline_box::InlineBox;
-use crate::layout::data::HarfSynthesis;
-
-// Import the trait to use its methods
-use swash::shape::partition::Selector as _;
-
-// Simple conversion function
+/// Convert swash synthesis information to our HarfSynthesis format.
+/// This extracts the bold and italic adjustments for use with harfrust.
 fn synthesis_to_harf_simple(synthesis: Synthesis) -> HarfSynthesis {
     HarfSynthesis {
         bold: if synthesis.embolden() { 1.0 } else { 0.0 },
@@ -32,14 +36,14 @@ fn synthesis_to_harf_simple(synthesis: Synthesis) -> HarfSynthesis {
     }
 }
 
-// Helper function to convert swash Tag to harfrust Tag
+/// Convert a swash Tag (u32) to a harfrust Tag for OpenType feature/script handling.
 fn convert_swash_tag_to_harfrust(swash_tag: u32) -> harfrust::Tag {
     harfrust::Tag::from_be_bytes(swash_tag.to_be_bytes())
 }
 
-// Add helper function to convert scripts
+/// Convert swash Script enum to harfrust Script for proper text shaping.
+/// Maps Unicode script codes to their corresponding OpenType script tags.
 fn convert_script_to_harfrust(swash_script: Script) -> harfrust::Script {
-    // Map swash scripts to harfrust scripts
     let tag = match swash_script {
         Script::Arabic => harfrust::Tag::from_be_bytes(*b"arab"),
         Script::Latin => harfrust::Tag::from_be_bytes(*b"latn"),
@@ -54,17 +58,15 @@ fn convert_script_to_harfrust(swash_script: Script) -> harfrust::Script {
         Script::Katakana => harfrust::Tag::from_be_bytes(*b"kana"),
         Script::Devanagari => harfrust::Tag::from_be_bytes(*b"deva"),
         Script::Thai => harfrust::Tag::from_be_bytes(*b"thai"),
-        // Add more mappings as needed, defaulting to Latin for unknown scripts
-        _ => {
-            harfrust::Tag::from_be_bytes(*b"latn")
-        }
+        // For unmapped scripts, default to Latin
+        _ => harfrust::Tag::from_be_bytes(*b"latn"),
     };
     
-    harfrust::Script::from_iso15924_tag(tag)
-        .unwrap_or_else(|| {
-            // Fallback to Latin
-            harfrust::Script::from_iso15924_tag(harfrust::Tag::from_be_bytes(*b"latn")).unwrap()
-        })
+    // Convert the OpenType script tag to a harfrust Script, with Latin fallback
+    harfrust::Script::from_iso15924_tag(tag).unwrap_or_else(|| {
+        harfrust::Script::from_iso15924_tag(harfrust::Tag::from_be_bytes(*b"latn"))
+            .expect("Latin script should always be available")
+    })
 }
 
 struct Item {
@@ -128,7 +130,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
     let mut inline_box_iter = inline_boxes.iter().enumerate();
     let mut current_box = inline_box_iter.next();
-    let mut deferred_boxes: Vec<usize> = Vec::with_capacity(16);
+    let mut deferred_boxes: Vec<usize> = Vec::with_capacity(DEFERRED_BOXES_CAPACITY);
 
     // Define macro to shape using swash-style segmentation + harfrust shaping
     macro_rules! shape_item {
