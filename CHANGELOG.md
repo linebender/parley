@@ -36,7 +36,7 @@ This release has an [MSRV] of 1.82.
 
 #### Parley
 
-- Adjust the advance of the whole line when justifying text.  ([#397][] by [@kekelp][])
+- Adjust the advance of the whole line when justifying text. ([#397][] by [@kekelp][])
 - Selection extension moves the focus to the side being extended. ([#385][] by [@kekelp][])
 - Ranged builder default style not respecting `scale`. ([#368][] by [@xStrom][])
 
