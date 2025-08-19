@@ -21,7 +21,7 @@ use swash::text::{Language, Script};
 
 pub(crate) struct ShapeContext {
     deferred_boxes: Vec<usize>,
-    unicode_buffer: harfrust::UnicodeBuffer,
+    unicode_buffer: Option<harfrust::UnicodeBuffer>,
     features: Vec<harfrust::Feature>,
 }
 
@@ -29,7 +29,7 @@ impl Default for ShapeContext {
     fn default() -> Self {
         Self {
             deferred_boxes: Vec::new(),
-            unicode_buffer: harfrust::UnicodeBuffer::new(),
+            unicode_buffer: Some(harfrust::UnicodeBuffer::new()),
             features: Vec::new(),
         }
     }
@@ -236,8 +236,6 @@ fn shape_item<'a, B: Brush>(
     }
 
     let mut current_font = font_selector.select_font(&mut cluster);
-    // Purely exists to allow taking temporary ownership of `scx.unicode_buffer`.
-    let mut scratch_buffer = harfrust::UnicodeBuffer::new();
 
     // Main segmentation loop (based on swash shape_clusters) - only within current item
     while let Some(font) = current_font.take() {
@@ -291,7 +289,7 @@ fn shape_item<'a, B: Brush>(
             .build();
 
         // Prepare harfrust buffer
-        let mut buffer = mem::replace(&mut scx.unicode_buffer, scratch_buffer);
+        let mut buffer = mem::take(&mut scx.unicode_buffer).unwrap();
         buffer.clear();
 
         // Use the entire segment text including newlines
@@ -356,7 +354,7 @@ fn shape_item<'a, B: Brush>(
         );
 
         // Replace buffer to reuse allocation in next iteration.
-        scratch_buffer = mem::replace(&mut scx.unicode_buffer, glyph_buffer.clear());
+        scx.unicode_buffer = Some(glyph_buffer.clear());
     }
 }
 
