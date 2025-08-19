@@ -298,6 +298,9 @@ fn shape_item<'a, B: Brush>(
         for (i, ch) in segment_text.chars().enumerate() {
             // Ensure that each cluster's index matches the index into `infos`. This is required
             // for efficient cluster lookup within `data.rs`.
+            //
+            // In other words, instead of using `buffer.push_str`, push each char individually with
+            // the specified cluster index to match `infos`.
             buffer.add(ch, i as u32);
         }
 
