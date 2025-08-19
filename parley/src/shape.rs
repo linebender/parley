@@ -1,8 +1,8 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Text shaping implementation using HarfBuzz (via harfrust) for shaping
-//! and swash for text analysis and font selection.
+//! Text shaping implementation using HarfBuzz (via `harfrust`) for shaping
+//! and swash for text analysis.
 
 use core::mem;
 
@@ -16,7 +16,6 @@ use crate::util::nearly_eq;
 use crate::{Font, swash_convert};
 
 use fontique::{self, Query, QueryFamily, QueryFont};
-use harfrust;
 use swash::text::cluster::{CharCluster, CharInfo, Token};
 use swash::text::{Language, Script};
 
@@ -245,7 +244,6 @@ fn shape_item<'a, B: Brush>(
     // Main segmentation loop (based on swash shape_clusters) - only within current item
     while let Some(font) = current_font.take() {
         // Collect all clusters for this font segment
-        let mut segment_clusters = vec![cluster.clone()];
         let segment_start_offset = cluster.range().start as usize - text_range.start;
         let mut segment_end_offset = cluster.range().end as usize - text_range.start;
 
@@ -261,7 +259,6 @@ fn shape_item<'a, B: Brush>(
                     break;
                 } else {
                     // Same font - add to current segment
-                    segment_clusters.push(cluster.clone());
                     segment_end_offset = cluster.range().end as usize - text_range.start;
                 }
             } else {

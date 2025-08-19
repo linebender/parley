@@ -572,7 +572,7 @@ impl<B: Brush> LayoutData<B> {
                     let axis_count = fvar.axis_count() as usize;
                     let offset = self.coords.len();
                     // Store all coordinates (including zeros for unused axes) in `self.coords`.
-                    self.coords.extend(iter::repeat(0).take(axis_count));
+                    self.coords.extend(iter::repeat_n(0, axis_count));
 
                     // Map each fontique variation to its correct axis position
                     for variation in variations {
@@ -843,9 +843,9 @@ enum ClusterType {
     Newline,
 }
 
-impl Into<u16> for &ClusterType {
-    fn into(self) -> u16 {
-        match self {
+impl From<&ClusterType> for u16 {
+    fn from(cluster_type: &ClusterType) -> Self {
+        match cluster_type {
             ClusterType::LigatureStart => ClusterData::LIGATURE_START,
             ClusterType::LigatureComponent => ClusterData::LIGATURE_COMPONENT,
             ClusterType::Regular | ClusterType::Newline => 0, // No special flags
