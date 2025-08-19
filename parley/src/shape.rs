@@ -321,12 +321,11 @@ fn shape_item<'a, B: Brush>(
 
         scx.features.clear();
         for feature in rcx.features(item.features).unwrap_or(&[]) {
-            scx.features.push(harfrust::Feature {
-                tag: harfrust::Tag::from_u32(feature.tag),
-                value: feature.value as u32,
-                start: 0,
-                end: buffer.len() as u32,
-            });
+            scx.features.push(harfrust::Feature::new(
+                harfrust::Tag::from_u32(feature.tag),
+                feature.value as u32,
+                0..buffer.len(),
+            ));
         }
 
         let glyph_buffer = harf_shaper.shape(buffer, &scx.features);
