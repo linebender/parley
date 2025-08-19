@@ -1,12 +1,12 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Text shaping implementation using HarfBuzz (via `harfrust`) for shaping
-//! and swash for text analysis.
+//! Text shaping implementation using `harfrust`for shaping
+//! and `swash` for text analysis.
 
 use core::mem;
 
-use alloc::{vec, vec::Vec};
+use alloc::vec::Vec;
 
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};

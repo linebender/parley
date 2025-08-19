@@ -443,8 +443,8 @@ fn text_range_rtl() {
     let mut env = TestEnv::new(test_name!(), None);
 
     let text = "اللغة العربية";
-    let builder = env.ranged_builder(&text);
-    let mut layout = builder.build(&text);
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
     layout.break_all_lines(Some(100.0));
     layout.align(None, Alignment::Start, AlignmentOptions::default());
 
@@ -494,9 +494,9 @@ fn variable_fonts() {
     let text = "Hello World";
 
     for wght in [100., 500., 1000.] {
-        let mut builder = env.ranged_builder(&text);
+        let mut builder = env.ranged_builder(text);
         builder.push_default(StyleProperty::FontStack(FontStack::Single(
-            FontFamily::Named(Cow::Borrowed(&"Arimo")),
+            FontFamily::Named(Cow::Borrowed("Arimo")),
         )));
         builder.push_default(StyleProperty::FontVariations(FontSettings::List(
             Cow::Borrowed(&[swash::Setting {
@@ -504,7 +504,7 @@ fn variable_fonts() {
                 value: wght,
             }]),
         )));
-        let mut layout = builder.build(&text);
+        let mut layout = builder.build(text);
         layout.break_all_lines(Some(100.0));
         layout.align(None, Alignment::Start, AlignmentOptions::default());
 
