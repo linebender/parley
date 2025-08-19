@@ -11,7 +11,7 @@ env:
   RUST_MIN_VER: "1.82"
   # List of packages that will be checked with the minimum supported Rust version.
   # This should be limited to packages that are intended for publishing.
-  RUST_MIN_VER_PKGS: "-p parley -p fontique -p attributed_text"
+  RUST_MIN_VER_PKGS: "-p parley -p parley_core -p fontique -p attributed_text"
   # List of features that depend on the standard library and will be excluded from no_std checks.
   FEATURES_DEPENDING_ON_STD: "std,default,system"
   # List of packages that can not target Wasm.
@@ -96,6 +96,17 @@ jobs:
 
       - name: check copyright headers
         run: bash .github/copyright.sh
+
+      - name: Install cargo-rdme
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-rdme@1.4.8
+
+      - name: Run cargo rdme (attributed_text)
+        run: cargo rdme --check --heading-base-level=0 --workspace-project=attributed_text
+
+      - name: Run cargo rdme (parley_core)
+        run: cargo rdme --check --heading-base-level=0 --workspace-project=parley_core
 
   clippy-stable:
     name: cargo clippy

@@ -13,7 +13,7 @@ use core::ops::{Bound, Range, RangeBounds};
 #[derive(Clone)]
 pub(crate) struct RangedStyleBuilder<B: Brush> {
     properties: Vec<RangedProperty<B>>,
-    default_style: ResolvedStyle<B>,
+    root_style: ResolvedStyle<B>,
     len: usize,
 }
 
@@ -21,31 +21,32 @@ impl<B: Brush> Default for RangedStyleBuilder<B> {
     fn default() -> Self {
         Self {
             properties: vec![],
-            default_style: Default::default(),
+            root_style: ResolvedStyle::default(),
             len: !0,
         }
     }
 }
 
 impl<B: Brush> RangedStyleBuilder<B> {
-    /// Prepares the builder for accepting ranged properties for text of the
-    /// specified length.
-    pub(crate) fn begin(&mut self, len: usize) {
+    /// Prepares the builder for accepting ranged properties for text of the specified length.
+    ///
+    /// The provided `root_style` is the default style applied to all text unless overridden.
+    pub(crate) fn begin(&mut self, root_style: ResolvedStyle<B>, len: usize) {
         self.properties.clear();
-        self.default_style = ResolvedStyle::default();
+        self.root_style = root_style;
         self.len = len;
     }
 
-    /// Pushes a property that covers the full range of text.
+    /// Change a property of the root style, which covers the full range of text.
     pub(crate) fn push_default(&mut self, property: ResolvedProperty<B>) {
         assert!(self.len != !0);
-        self.default_style.apply(property);
+        self.root_style.apply(property);
     }
 
-    /// Pushes a property that covers the specified range of text.
+    /// Override a property for the specified range of text.
     pub(crate) fn push(&mut self, property: ResolvedProperty<B>, range: impl RangeBounds<usize>) {
-        let range = resolve_range(range, self.len);
         assert!(self.len != !0);
+        let range = resolve_range(range, self.len);
         self.properties.push(RangedProperty { property, range });
     }
 
@@ -53,11 +54,11 @@ impl<B: Brush> RangedStyleBuilder<B> {
     pub(crate) fn finish(&mut self, styles: &mut Vec<RangedStyle<B>>) {
         if self.len == !0 {
             self.properties.clear();
-            self.default_style = ResolvedStyle::default();
+            self.root_style = ResolvedStyle::default();
             return;
         }
         styles.push(RangedStyle {
-            style: self.default_style.clone(),
+            style: self.root_style.clone(),
             range: 0..self.len,
         });
         for prop in &self.properties {
@@ -125,7 +126,7 @@ impl<B: Brush> RangedStyleBuilder<B> {
         styles.truncate(styles.len() - merged_count);
 
         self.properties.clear();
-        self.default_style = ResolvedStyle::default();
+        self.root_style = ResolvedStyle::default();
         self.len = !0;
     }
 }

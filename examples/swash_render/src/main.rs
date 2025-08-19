@@ -133,7 +133,7 @@ fn main() {
         let (layout, _text): (Layout<ColorBrush>, String) = builder.build();
         layout
     } else {
-        // RANGE BUILDER
+        // RANGED BUILDER
         // ============
 
         // Creates a RangedBuilder

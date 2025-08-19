@@ -278,7 +278,7 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) line_items: Vec<LineItemData>,
 
     // Output of alignment
-    /// Whether the layout is aligned with [`crate::Alignment::Justified`].
+    /// Whether the layout is aligned with [`crate::Alignment::Justify`].
     pub(crate) is_aligned_justified: bool,
     /// The width the layout was aligned to.
     pub(crate) alignment_width: f32,

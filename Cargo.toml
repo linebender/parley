@@ -4,6 +4,7 @@ members = [
     "attributed_text",
     "fontique",
     "parley",
+    "parley_core",
     "examples/tiny_skia_render",
     "examples/swash_render",
     "examples/vello_editor",
@@ -19,7 +20,7 @@ license = "Apache-2.0 OR MIT"
 repository = "https://github.com/linebender/parley"
 
 [workspace.dependencies]
-accesskit = "0.19.0"
+accesskit = "0.21.0"
 bytemuck = { version = "1.23.0", default-features = false }
 fontique = { version = "0.5.0", default-features = false, path = "fontique" }
 harfrust = "0.1.1"

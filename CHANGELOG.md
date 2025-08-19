@@ -23,15 +23,25 @@ This release has an [MSRV] of 1.82.
 
 ### Changed
 
-### Fixed
+#### Parley
+
+- `Alignment`` variants have been renamed to better match CSS. `Alignment::Justified` is now `Alignment::Justify` and `Alignment::Middle` is now `Alignment::Center`. ([#389][] by [@waywardmonkeys][])
+- Updated to `accesskit` 0.21. ([#390][] by [@mwcampbell][])
 
 #### Fontique
 
-- Font family name aliases (secondary names for font families, often in another language) not being registered. ([#380][] by [@valadaptive][])
+- The fontconfig backend, used to enumerate system fonts on Linux, has been rewritten to call into the system's fontconfig library instead of parsing fontconfig's configuration files itself. This should significantly improve the behavior of system fonts and generic families on Linux. ([#378][] by [@valadaptive][])
+
+### Fixed
 
 #### Parley
 
 - Selection extension moves the focus to the side being extended. ([#385][] by [@kekelp][])
+- Ranged builder default style not respecting `scale`. ([#368][] by [@xStrom][])
+
+#### Fontique
+
+- Font family name aliases (secondary names for font families, often in another language) not being registered. ([#380][] by [@valadaptive][])
 
 ## [0.5.0] - 2025-06-01
 
@@ -304,9 +314,13 @@ This release has an [MSRV][] of 1.70.
 [#348]: https://github.com/linebender/parley/pull/348
 [#353]: https://github.com/linebender/parley/pull/353
 [#362]: https://github.com/linebender/parley/pull/362
+[#368]: https://github.com/linebender/parley/pull/368
 [#369]: https://github.com/linebender/parley/pull/369
+[#378]: https://github.com/linebender/parley/pull/378
 [#380]: https://github.com/linebender/parley/pull/380
 [#385]: https://github.com/linebender/parley/pull/385
+[#389]: https://github.com/linebender/parley/pull/389
+[#390]: https://github.com/linebender/parley/pull/390
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/linebender/parley/compare/v0.4.0...v0.5.0

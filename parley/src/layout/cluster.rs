@@ -535,8 +535,8 @@ mod tests {
         cluster_from_position_with_alignment(Alignment::Start);
     }
     #[test]
-    fn cluster_from_position_middle_alignment() {
-        cluster_from_position_with_alignment(Alignment::Middle);
+    fn cluster_from_position_center_alignment() {
+        cluster_from_position_with_alignment(Alignment::Center);
     }
     #[test]
     fn cluster_from_position_end_alignment() {
@@ -544,6 +544,6 @@ mod tests {
     }
     #[test]
     fn cluster_from_position_justified_alignment() {
-        cluster_from_position_with_alignment(Alignment::Justified);
+        cluster_from_position_with_alignment(Alignment::Justify);
     }
 }

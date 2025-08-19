@@ -30,7 +30,7 @@ impl Default for AlignmentOptions {
 
 /// Align the layout.
 ///
-/// If [`Alignment::Justified`] is requested, clusters' [`ClusterData::advance`] will be adjusted.
+/// If [`Alignment::Justify`] is requested, clusters' [`ClusterData::advance`] will be adjusted.
 /// Prior to re-line-breaking or re-aligning, [`unjustify`] has to be called.
 pub(crate) fn align<B: Brush>(
     layout: &mut LayoutData<B>,
@@ -39,7 +39,7 @@ pub(crate) fn align<B: Brush>(
     options: AlignmentOptions,
 ) {
     layout.alignment_width = alignment_width.unwrap_or(layout.width);
-    layout.is_aligned_justified = alignment == Alignment::Justified;
+    layout.is_aligned_justified = alignment == Alignment::Justify;
 
     align_impl::<_, false>(layout, alignment, options);
 }
@@ -50,7 +50,7 @@ pub(crate) fn align<B: Brush>(
 /// layout.
 pub(crate) fn unjustify<B: Brush>(layout: &mut LayoutData<B>) {
     if layout.is_aligned_justified {
-        align_impl::<_, true>(layout, Alignment::Justified, Default::default());
+        align_impl::<_, true>(layout, Alignment::Justify, Default::default());
         layout.is_aligned_justified = false;
     }
 }
@@ -101,10 +101,10 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
             (Alignment::Right, _) | (Alignment::Start, true) | (Alignment::End, false) => {
                 line.metrics.offset += free_space;
             }
-            (Alignment::Middle, _) => {
+            (Alignment::Center, _) => {
                 line.metrics.offset += free_space * 0.5;
             }
-            (Alignment::Justified, _) => {
+            (Alignment::Justify, _) => {
                 // Justified alignment doesn't have any effect if free_space is negative or zero
                 if free_space <= 0.0 {
                     continue;

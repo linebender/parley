@@ -13,6 +13,7 @@ use super::SourceCache;
 
 use super::{
     Blob, GenericFamily, Script,
+    attributes::{FontStyle, FontWeight, FontWidth},
     backend::SystemFonts,
     fallback::{FallbackKey, FallbackMap},
     family::{FamilyId, FamilyInfo},
@@ -184,6 +185,19 @@ impl Collection {
         info_override: Option<FontInfoOverride<'_>>,
     ) -> Vec<(FamilyId, Vec<FontInfo>)> {
         self.inner.register_fonts(data, info_override)
+    }
+
+    /// Unregisters the font with the given attributes from the given family.
+    ///
+    /// Returns true if a font was removed from the family, false otherwise.
+    pub fn unregister_font(
+        &mut self,
+        family: FamilyId,
+        width: FontWidth,
+        style: FontStyle,
+        weight: FontWeight,
+    ) -> bool {
+        self.inner.unregister_font(family, width, style, weight)
     }
 
     /// Clears this collection. Un-registers all fonts previously registered via
@@ -455,6 +469,36 @@ impl Inner {
         self.data.register_fonts(data, info_override)
     }
 
+    /// Unregisters the font with the given attributes from the given family.
+    ///
+    /// Returns true if a font was removed from the family, false otherwise.
+    pub fn unregister_font(
+        &mut self,
+        family: FamilyId,
+        width: FontWidth,
+        style: FontStyle,
+        weight: FontWeight,
+    ) -> bool {
+        #[cfg(feature = "std")]
+        if let Some(shared) = &self.shared {
+            let result = shared
+                .data
+                .lock()
+                .unwrap()
+                .unregister_font(family, width, style, weight);
+            shared.bump_version();
+            result.is_some()
+        } else {
+            self.data
+                .unregister_font(family, width, style, weight)
+                .is_some()
+        }
+        #[cfg(not(feature = "std"))]
+        self.data
+            .unregister_font(family, width, style, weight)
+            .is_some()
+    }
+
     /// Clears this collection. Un-registers all fonts previously registered via
     /// [`Self::register_fonts`], and unsets all previously-set generic families
     /// and fallbacks. This will not remove any system fonts.
@@ -646,6 +690,26 @@ impl CommonData {
             .into_iter()
             .map(|(id, (_, fonts))| (id, fonts))
             .collect()
+    }
+
+    fn unregister_font(
+        &mut self,
+        family: FamilyId,
+        width: FontWidth,
+        style: FontStyle,
+        weight: FontWeight,
+    ) -> Option<()> {
+        let family_name = self.family_names.get_by_id(family)?;
+        let family = self.families.get_mut(&family)?.as_mut()?;
+
+        let new_fonts = family
+            .fonts()
+            .iter()
+            .filter(|f| f.width() != width || f.style() != style || f.weight() != weight)
+            .cloned();
+        *family = FamilyInfo::new(family_name.clone(), new_fonts);
+
+        Some(())
     }
 
     fn clear(&mut self) {
