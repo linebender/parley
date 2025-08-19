@@ -48,6 +48,10 @@ fn font_dirs() -> impl Iterator<Item = PathBuf> {
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests")
             .join("assets")
+            .join("arimo_fonts"),
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("assets")
             .join("roboto_fonts"),
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("tests")

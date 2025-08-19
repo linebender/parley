@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use super::{
-    Brush, Cluster, ClusterPath, Font, Layout, LineItemData, Range, Run, RunData,
-    Synthesis,
+    Brush, Cluster, ClusterPath, Font, Layout, LineItemData, Range, Run, RunData, Synthesis,
 };
 
 impl<'a, B: Brush> Run<'a, B> {
@@ -40,26 +39,7 @@ impl<'a, B: Brush> Run<'a, B> {
 
     /// Returns the synthesis suggestions for the font associated with the run.
     pub fn synthesis(&self) -> Synthesis {
-        // Use the original fontique synthesis if available, otherwise fall back to reconstruction
-        if let Some(fontique_synthesis) = &self.data.fontique_synthesis {
-            // TEST: Use original font variations instead of forcing embolden
-            // If harfrust applied weight variations during shaping, we should use the same variations during rendering
-            crate::swash_convert::synthesis_to_swash(*fontique_synthesis)
-        } else {
-            // Fallback for legacy runs without fontique synthesis
-            // TODO: This reconstruction is imprecise and uses hardcoded values:
-            // - 14.0° is an arbitrary italic skew angle (should be font-specific)
-            // - No variation settings are applied 
-            // - Other synthesis options are ignored
-            // 
-            // This path should only be used for compatibility with old shaping code.
-            // New code should preserve the original fontique::Synthesis.
-            Synthesis::new(
-                std::iter::empty(),
-                self.data.synthesis.bold,
-                if self.data.synthesis.italic { 14.0 } else { 0.0 },
-            )
-        }
+        self.data.synthesis
     }
 
     /// Returns the normalized variation coordinates for the font associated

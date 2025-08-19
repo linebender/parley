@@ -261,10 +261,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let is_space = whitespace.is_space_or_nbsp();
                         let boundary = cluster.info().boundary();
                         let style = &self.layout.data.styles[cluster.data.style_index as usize];
-                        
 
-
-                        if boundary == Some(Boundary::Line) {
+                        if boundary == Boundary::Line {
                             // We do not currently handle breaking within a ligature, so we ignore boundaries in such a position.
                             //
                             // We also don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive

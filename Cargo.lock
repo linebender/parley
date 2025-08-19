@@ -1179,7 +1179,7 @@ dependencies = [
  "objc2-core-text",
  "objc2-foundation 0.3.1",
  "peniko",
- "read-fonts",
+ "read-fonts 0.29.3",
  "roxmltree",
  "smallvec",
  "unicode-script",
@@ -1428,14 +1428,14 @@ dependencies = [
 
 [[package]]
 name = "harfrust"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eed72b8c689b8016a4de5f60010d6df3ea4b832cf3e1efb61f052997006687d9"
+checksum = "dcd79170b62101f61285314e749ea0ccad616f8779d99571c6380a86d690ab9a"
 dependencies = [
  "bitflags 2.9.1",
  "bytemuck",
  "core_maths",
- "read-fonts",
+ "read-fonts 0.31.3",
  "smallvec",
 ]
 
@@ -2871,6 +2871,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "read-fonts"
+version = "0.31.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b8250b8f09ed4b9ba9271e06f10e7b1f03e8f8e3619e2368a991ecb25efa204"
+dependencies = [
+ "bytemuck",
+ "core_maths",
+ "font-types",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3093,7 +3104,7 @@ checksum = "dbeb4ca4399663735553a09dd17ce7e49a0a0203f03b706b39628c4d913a8607"
 dependencies = [
  "bytemuck",
  "core_maths",
- "read-fonts",
+ "read-fonts 0.29.3",
 ]
 
 [[package]]

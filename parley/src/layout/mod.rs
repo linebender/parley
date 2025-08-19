@@ -24,11 +24,10 @@ use alignment::unjustify;
 use alloc::vec::Vec;
 use core::{cmp::Ordering, ops::Range};
 use data::{ClusterData, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData, RunData};
+use fontique::Synthesis;
 #[cfg(feature = "accesskit")]
 use hashbrown::{HashMap, HashSet};
 use swash::text::cluster::Boundary;
-use swash::Synthesis;
-// Remove swash::GlyphId - using harfrust glyph IDs instead
 
 pub use alignment::AlignmentOptions;
 pub use cluster::{Affinity, ClusterPath, ClusterSide};
@@ -259,45 +258,20 @@ pub struct Cluster<'a, B: Brush> {
     data: &'a ClusterData,
 }
 
-/// Harfrust-based glyph with positioning and additional shaping information
+/// Glyph with an offset and advance.
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
 pub struct Glyph {
-    /// Harfrust glyph ID (u32)
     pub id: u32,
-    /// Style index into the layout style collection
     pub style_index: u16,
-    /// Horizontal offset from the baseline origin
     pub x: f32,
-    /// Vertical offset from the baseline origin  
     pub y: f32,
-    /// Horizontal advance to the next glyph position
     pub advance: f32,
-    /// Cluster index this glyph belongs to (for mapping back to text)
-    pub cluster_index: u32,
-    /// Glyph flags from harfrust shaping (e.g., unsafe_to_break, etc.)
-    pub flags: u32,
 }
 
 impl Glyph {
     /// Returns the index into the layout style collection.
     pub fn style_index(&self) -> usize {
         self.style_index as usize
-    }
-    
-    /// Returns the cluster index this glyph belongs to
-    pub fn cluster_index(&self) -> usize {
-        self.cluster_index as usize
-    }
-    
-    /// Checks if this glyph has the unsafe_to_break flag set
-    pub fn is_unsafe_to_break(&self) -> bool {
-        // Harfrust flag constants would be defined in harfrust crate
-        self.flags & 0x00000001 != 0  // Example flag bit
-    }
-    
-    /// Checks if this glyph is part of a cluster that shouldn't be broken
-    pub fn is_cluster_start(&self) -> bool {
-        self.flags & 0x00000002 != 0  // Example flag bit
     }
 }
 
