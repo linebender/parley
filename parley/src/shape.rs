@@ -4,7 +4,9 @@
 //! Text shaping implementation using HarfBuzz (via harfrust) for shaping
 //! and swash for text analysis and font selection.
 
-use alloc::vec::Vec;
+use core::mem;
+
+use alloc::{vec, vec::Vec};
 
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
@@ -204,8 +206,8 @@ fn shape_item<'a, B: Brush>(
     item: &Item,
     scx: &mut ShapeContext,
     text: &str,
-    text_range: &std::ops::Range<usize>,
-    char_range: &std::ops::Range<usize>,
+    text_range: &core::ops::Range<usize>,
+    char_range: &core::ops::Range<usize>,
     infos: &[(CharInfo, u16)],
     layout: &mut Layout<B>,
 ) {
@@ -306,7 +308,7 @@ fn shape_item<'a, B: Brush>(
             .build();
 
         // Prepare harfrust buffer
-        let mut buffer = std::mem::replace(&mut scx.unicode_buffer, scratch_buffer);
+        let mut buffer = mem::replace(&mut scx.unicode_buffer, scratch_buffer);
         buffer.clear();
 
         // Use the entire segment text including newlines
@@ -368,7 +370,7 @@ fn shape_item<'a, B: Brush>(
         );
 
         // Replace buffer to reuse allocation in next iteration.
-        scratch_buffer = std::mem::replace(&mut scx.unicode_buffer, glyph_buffer.clear());
+        scratch_buffer = mem::replace(&mut scx.unicode_buffer, glyph_buffer.clear());
     }
 }
 
