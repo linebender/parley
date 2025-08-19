@@ -298,7 +298,7 @@ fn shape_item<'a, B: Brush>(
             // for efficient cluster lookup within `data.rs`.
             //
             // In other words, instead of using `buffer.push_str`, which iterates `segment_text`
-            // with `char_indices`, push each char individually via `.chars` with a cluster index 
+            // with `char_indices`, push each char individually via `.chars` with a cluster index
             // that matches its `infos` counterpart. This allows us to lookup `infos` via cluster
             // index in `data.rs`.
             buffer.add(ch, i as u32);
