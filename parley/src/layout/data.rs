@@ -365,10 +365,11 @@ impl<B: Brush> LayoutData<B> {
         source_text: &str,
         char_infos: &[(swash::text::cluster::CharInfo, u16)], // From text analysis
         text_range: Range<usize>,                             // The text range this run covers
-        variations: &[harfrust::Variation],
+        variations: impl Iterator<Item = harfrust::Variation>,
     ) {
         let coords_start = self.coords.len();
-        if !variations.is_empty() {
+        let mut variations = variations.peekable();
+        if variations.peek().is_some() {
             self.store_variations(&font, variations);
         }
         let coords_end = self.coords.len();
@@ -388,17 +389,14 @@ impl<B: Brush> LayoutData<B> {
 
         let metrics = &self.font_metrics[font_index];
         let units_per_em = metrics.units_per_em as f32;
-        let metrics = {
-            RunMetrics {
-                ascent: font_size * metrics.ascent as f32 / units_per_em,
-                descent: -font_size * metrics.descent as f32 / units_per_em,
-                leading: font_size * metrics.leading as f32 / units_per_em,
-                underline_offset: font_size * metrics.underline_offset as f32 / units_per_em,
-                underline_size: font_size * metrics.underline_size as f32 / units_per_em,
-                strikethrough_offset: font_size * metrics.strikethrough_offset as f32
-                    / units_per_em,
-                strikethrough_size: font_size * metrics.strikethrough_size as f32 / units_per_em,
-            }
+        let metrics = RunMetrics {
+            ascent: font_size * metrics.ascent as f32 / units_per_em,
+            descent: -font_size * metrics.descent as f32 / units_per_em,
+            leading: font_size * metrics.leading as f32 / units_per_em,
+            underline_offset: font_size * metrics.underline_offset as f32 / units_per_em,
+            underline_size: font_size * metrics.underline_size as f32 / units_per_em,
+            strikethrough_offset: font_size * metrics.strikethrough_offset as f32 / units_per_em,
+            strikethrough_size: font_size * metrics.strikethrough_size as f32 / units_per_em,
         };
 
         let cluster_range = self.clusters.len()..self.clusters.len();
@@ -559,7 +557,11 @@ impl<B: Brush> LayoutData<B> {
     }
 
     /// Normalises and stores the variation coordinates within the layout.
-    fn store_variations(&mut self, font: &Font, variations: &[harfrust::Variation]) {
+    fn store_variations(
+        &mut self,
+        font: &Font,
+        variations: impl Iterator<Item = harfrust::Variation>,
+    ) {
         use core::cmp::Ordering::*;
         use skrifa::raw::{TableProvider, types::Fixed};
 

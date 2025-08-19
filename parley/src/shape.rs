@@ -22,7 +22,6 @@ use swash::text::{Language, Script};
 pub(crate) struct ShapeContext {
     deferred_boxes: Vec<usize>,
     unicode_buffer: harfrust::UnicodeBuffer,
-    variations: Vec<harfrust::Variation>,
     features: Vec<harfrust::Feature>,
 }
 
@@ -31,7 +30,6 @@ impl Default for ShapeContext {
         Self {
             deferred_boxes: Vec::new(),
             unicode_buffer: harfrust::UnicodeBuffer::new(),
-            variations: Vec::new(),
             features: Vec::new(),
         }
     }
@@ -281,22 +279,10 @@ fn shape_item<'a, B: Brush>(
         // Create harfrust shaper
         // TODO: cache this upstream?
         let shaper_data = harfrust::ShaperData::new(&font_ref);
-        // Extract variations from synthesis
-        scx.variations.clear();
-        for (tag, value) in font.font.synthesis.variation_settings() {
-            scx.variations.push(harfrust::Variation {
-                tag: *tag,
-                value: *value,
-            });
-        }
-        for variation in rcx.variations(item.variations).unwrap_or(&[]) {
-            scx.variations.push(harfrust::Variation {
-                tag: harfrust::Tag::from_u32(variation.tag),
-                value: variation.value,
-            });
-        }
-
-        let instance = harfrust::ShaperInstance::from_variations(&font_ref, &scx.variations);
+        let instance = harfrust::ShaperInstance::from_variations(
+            &font_ref,
+            variations_iter(&font.font.synthesis, rcx.variations(item.variations)),
+        );
         // TODO: Don't create a new shaper for each segment.
         let harf_shaper = shaper_data
             .shaper(&font_ref)
@@ -363,7 +349,7 @@ fn shape_item<'a, B: Brush>(
             segment_text,
             segment_infos,
             (text_range.start + segment_start_offset)..(text_range.start + segment_end_offset),
-            &scx.variations,
+            variations_iter(&font.font.synthesis, rcx.variations(item.variations)),
         );
 
         // Replace buffer to reuse allocation in next iteration.
@@ -373,6 +359,27 @@ fn shape_item<'a, B: Brush>(
 
 fn real_script(script: Script) -> bool {
     script != Script::Common && script != Script::Unknown && script != Script::Inherited
+}
+
+fn variations_iter<'a>(
+    synthesis: &'a fontique::Synthesis,
+    item: Option<&'a [FontVariation]>,
+) -> impl Iterator<Item = harfrust::Variation> + 'a {
+    synthesis
+        .variation_settings()
+        .iter()
+        .map(|(tag, value)| harfrust::Variation {
+            tag: *tag,
+            value: *value,
+        })
+        .chain(
+            item.unwrap_or(&[])
+                .iter()
+                .map(|variation| harfrust::Variation {
+                    tag: harfrust::Tag::from_u32(variation.tag),
+                    value: variation.value,
+                }),
+        )
 }
 
 struct FontSelector<'a, 'b, B: Brush> {
