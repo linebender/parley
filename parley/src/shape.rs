@@ -358,7 +358,7 @@ fn shape_item<'a, B: Brush>(
             segment_text,
             segment_infos,
             (text_range.start + segment_start_offset)..(text_range.start + segment_end_offset),
-            variations_iter(&font.font.synthesis, rcx.variations(item.variations)),
+            harf_shaper.coords(),
         );
 
         // Replace buffer to reuse allocation in next iteration.

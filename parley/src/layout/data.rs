@@ -366,13 +366,10 @@ impl<B: Brush> LayoutData<B> {
         source_text: &str,
         char_infos: &[(swash::text::cluster::CharInfo, u16)], // From text analysis
         text_range: Range<usize>,                             // The text range this run covers
-        variations: impl Iterator<Item = harfrust::Variation>,
+        coords: &[harfrust::NormalizedCoord]
     ) {
         let coords_start = self.coords.len();
-        let mut variations = variations.peekable();
-        if variations.peek().is_some() {
-            self.store_variations(&font, variations);
-        }
+        self.coords.extend(coords.iter().map(|c| c.to_bits()));
         let coords_end = self.coords.len();
 
         let font_index = self
@@ -554,66 +551,6 @@ impl<B: Brush> LayoutData<B> {
         ContentWidths {
             min: min_width,
             max: max_width,
-        }
-    }
-
-    /// Normalises and stores the variation coordinates within the layout.
-    fn store_variations(
-        &mut self,
-        font: &Font,
-        variations: impl Iterator<Item = harfrust::Variation>,
-    ) {
-        use core::cmp::Ordering::*;
-        use skrifa::raw::{TableProvider, types::Fixed};
-
-        // Try to read font's axis layout from fvar table
-        if let Ok(font_ref) = skrifa::FontRef::from_index(font.data.as_ref(), font.index) {
-            if let Ok(fvar) = font_ref.fvar() {
-                if let Ok(axes) = fvar.axes() {
-                    let avar = font_ref.avar().ok();
-
-                    let axis_count = fvar.axis_count() as usize;
-                    let offset = self.coords.len();
-                    // Store all coordinates (including zeros for unused axes) in `self.coords`.
-                    self.coords.extend(iter::repeat_n(0, axis_count));
-
-                    // Map each fontique variation to its correct axis position
-                    for variation in variations {
-                        let variation_tag = skrifa::Tag::from_be_bytes(variation.tag.to_be_bytes());
-
-                        // Find which axis this variation belongs to
-                        for (axis_index, axis_record) in axes.iter().enumerate() {
-                            if axis_record.axis_tag() != variation_tag {
-                                continue;
-                            }
-                            // Use this axis's actual range for normalization
-                            let min = axis_record.min_value();
-                            let default = axis_record.default_value();
-                            let max = axis_record.max_value();
-                            let mut val: Fixed =
-                                Fixed::from_f64(variation.value as f64).clamp(min, max);
-
-                            val = match val.partial_cmp(&default) {
-                                Some(Less) => -((default - val) / (default - min)),
-                                Some(Greater) => (val - default) / (max - default),
-                                Some(Equal) | None => Fixed::ZERO,
-                            };
-                            val = val.min(Fixed::ONE).max(-Fixed::ONE);
-
-                            // Apply avar mapping if available
-                            if let Some(avar) = avar.as_ref() {
-                                if let Some(Ok(mapping)) = avar.axis_segment_maps().get(axis_index)
-                                {
-                                    val = mapping.apply(val);
-                                }
-                            }
-
-                            self.coords[offset + axis_index] = val.to_f2dot14().to_bits();
-                            break;
-                        }
-                    }
-                }
-            }
         }
     }
 }
