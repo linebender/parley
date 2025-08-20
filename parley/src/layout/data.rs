@@ -233,6 +233,11 @@ impl LineItemData {
     }
 }
 
+#[derive(Default)]
+pub(crate) struct LayoutDataContext {
+    pub(crate) clusters: Vec<ClusterData>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LayoutItemKind {
     TextRun,
@@ -282,9 +287,6 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) is_aligned_justified: bool,
     /// The width the layout was aligned to.
     pub(crate) alignment_width: f32,
-
-    // Scratch
-    scratch_clusters: Vec<ClusterData>,
 }
 
 impl<B: Brush> Default for LayoutData<B> {
@@ -311,7 +313,6 @@ impl<B: Brush> Default for LayoutData<B> {
             line_items: Vec::new(),
             is_aligned_justified: false,
             alignment_width: 0.0,
-            scratch_clusters: Vec::new(),
         }
     }
 }
@@ -337,7 +338,6 @@ impl<B: Brush> LayoutData<B> {
         self.glyphs.clear();
         self.lines.clear();
         self.line_items.clear();
-        self.scratch_clusters.clear();
     }
 
     /// Push an inline box to the list of items
@@ -355,6 +355,7 @@ impl<B: Brush> LayoutData<B> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn push_run(
         &mut self,
+        ldcx: &mut LayoutDataContext,
         font: Font,
         font_size: f32,
         synthesis: fontique::Synthesis,
@@ -438,7 +439,7 @@ impl<B: Brush> LayoutData<B> {
                 source_text.char_indices(),
             );
         } else {
-            let mut clusters = core::mem::take(&mut self.scratch_clusters);
+            let mut clusters = core::mem::take(&mut ldcx.clusters);
             run.advance = process_clusters(
                 &mut clusters,
                 &mut self.glyphs,
@@ -452,7 +453,7 @@ impl<B: Brush> LayoutData<B> {
             // Reverse clusters into logical order for RTL
             self.clusters.extend(clusters.drain(..).rev());
             // Return scratch cluster allocation.
-            self.scratch_clusters = clusters;
+            ldcx.clusters = clusters;
         }
 
         run.cluster_range = cluster_range_start..self.clusters.len();
