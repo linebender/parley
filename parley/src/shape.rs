@@ -293,6 +293,7 @@ fn shape_item<'a, B: Brush>(
         buffer.clear();
 
         // Use the entire segment text including newlines
+        buffer.reserve(segment_text.len());
         for (i, ch) in segment_text.chars().enumerate() {
             // Ensure that each cluster's index matches the index into `infos`. This is required
             // for efficient cluster lookup within `data.rs`.
