@@ -17,7 +17,7 @@ It is backed by [Swash](https://github.com/dfrg/swash).
 
 ## The Parley text stack
 
-Currently, Parley directly depends on five crates: Fontique, Harfrust, Swash, Skrifa, and Peniko.
+Currently, Parley directly depends on five crates: Fontique, HarfRust, Swash, Skrifa, and Peniko.
 These crates cover different pieces of the text-rendering process.
 
 ### Peniko
