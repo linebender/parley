@@ -13,11 +13,11 @@ use super::builder::RangedBuilder;
 use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle, tree};
 use super::style::{Brush, TextStyle};
 
-use swash::shape::ShapeContext;
 use swash::text::cluster::CharInfo;
 
 use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
+use crate::shape::ShapeContext;
 
 /// Shared scratch space used when constructing text layouts.
 ///

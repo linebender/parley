@@ -2,7 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 pub(crate) fn script_to_fontique(script: swash::text::Script) -> fontique::Script {
-    fontique::Script(*SCRIPT_TAGS.get(script as usize).unwrap_or(b"Zzzz"))
+    fontique::Script(*FONTIQUE_SCRIPT_TAGS.get(script as usize).unwrap_or(b"Zzzz"))
+}
+
+pub(crate) fn script_to_harfrust(script: swash::text::Script) -> harfrust::Script {
+    harfrust::Script::from_iso15924_tag(harfrust::Tag::new(
+        FONTIQUE_SCRIPT_TAGS.get(script as usize).unwrap_or(b"Zzzz"),
+    ))
+    .unwrap_or(harfrust::script::UNKNOWN)
 }
 
 pub(crate) fn locale_to_fontique(locale: swash::text::Language) -> Option<fontique::Language> {
@@ -31,22 +38,8 @@ pub(crate) fn locale_to_fontique(locale: swash::text::Language) -> Option<fontiq
     fontique::Language::try_from_bytes(&buf[..len]).ok()
 }
 
-pub(crate) fn synthesis_to_swash(synthesis: fontique::Synthesis) -> swash::Synthesis {
-    swash::Synthesis::new(
-        synthesis
-            .variation_settings()
-            .iter()
-            .map(|setting| swash::Setting {
-                tag: swash::tag_from_bytes(&setting.0.to_be_bytes()),
-                value: setting.1,
-            }),
-        synthesis.embolden(),
-        synthesis.skew().unwrap_or_default(),
-    )
-}
-
 #[rustfmt::skip]
-const SCRIPT_TAGS: [[u8; 4]; 157] = [
+const FONTIQUE_SCRIPT_TAGS: [[u8; 4]; 157] = [
     *b"Adlm", *b"Aghb", *b"Ahom", *b"Arab", *b"Armi", *b"Armn", *b"Avst", *b"Bali", *b"Bamu",
     *b"Bass", *b"Batk", *b"Beng", *b"Bhks", *b"Bopo", *b"Brah", *b"Brai", *b"Bugi", *b"Buhd",
     *b"Cakm", *b"Cans", *b"Cari", *b"Cham", *b"Cher", *b"Chrs", *b"Copt", *b"Cprt", *b"Cyrl",

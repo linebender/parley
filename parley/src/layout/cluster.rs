@@ -1,9 +1,7 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::{
-    BreakReason, Brush, Cluster, ClusterInfo, Glyph, Layout, Line, LineItem, Range, Run, Style,
-};
+use super::{BreakReason, Brush, Cluster, Glyph, Layout, Line, LineItem, Range, Run, Style, data};
 use swash::text::cluster::Whitespace;
 
 /// Defines the visual side of the cluster for hit testing.
@@ -390,8 +388,8 @@ impl<'a, B: Brush> Cluster<'a, B> {
         Some(offset)
     }
 
-    pub(crate) fn info(&self) -> ClusterInfo {
-        self.data.info
+    pub(crate) fn info(&self) -> &data::ClusterInfo {
+        &self.data.info
     }
 }
 

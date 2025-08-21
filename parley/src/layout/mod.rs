@@ -24,10 +24,10 @@ use alignment::unjustify;
 use alloc::vec::Vec;
 use core::{cmp::Ordering, ops::Range};
 use data::{ClusterData, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData, RunData};
+use fontique::Synthesis;
 #[cfg(feature = "accesskit")]
 use hashbrown::{HashMap, HashSet};
-use swash::text::cluster::{Boundary, ClusterInfo};
-use swash::{GlyphId, NormalizedCoord, Synthesis};
+use swash::text::cluster::Boundary;
 
 pub use alignment::AlignmentOptions;
 pub use cluster::{Affinity, ClusterPath, ClusterSide};
@@ -261,7 +261,7 @@ pub struct Cluster<'a, B: Brush> {
 /// Glyph with an offset and advance.
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
 pub struct Glyph {
-    pub id: GlyphId,
+    pub id: u32,
     pub style_index: u16,
     pub x: f32,
     pub y: f32,

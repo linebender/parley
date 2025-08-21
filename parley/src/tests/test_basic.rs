@@ -1,14 +1,16 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use std::borrow::Cow;
+
 use peniko::{
     color::{AlphaColor, Srgb, palette},
     kurbo::Size,
 };
 
 use crate::{
-    Alignment, AlignmentOptions, ContentWidths, FontStack, InlineBox, Layout, LineHeight,
-    StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
+    Alignment, AlignmentOptions, ContentWidths, FontFamily, FontSettings, FontStack, InlineBox,
+    Layout, LineHeight, StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
 };
 
 use super::utils::{ColorBrush, FONT_STACK, TestEnv, asserts::assert_eq_layout_data_alignments};
@@ -387,6 +389,126 @@ fn inbox_content_width() {
 
         env.with_name("trailing_whitespace")
             .check_layout_snapshot(&layout);
+    }
+}
+
+#[test]
+fn ligatures() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "fi ".repeat(20);
+    let builder = env.ranged_builder(&text);
+    let mut layout = builder.build(&text);
+    layout.break_all_lines(Some(100.0));
+    layout.align(None, Alignment::Start, AlignmentOptions::default());
+
+    // Check that every cluster is correctly classified as a ligature start, ligature continuation,
+    // or none with correct glyphs and advances.
+    for line in layout.lines() {
+        for item in line.items() {
+            if let crate::PositionedLayoutItem::GlyphRun(glyph_run) = item {
+                let mut last_advance = f32::MAX;
+                glyph_run.run().clusters().enumerate().for_each(|(i, c)| {
+                    match i % 3 {
+                        0 => {
+                            assert!(c.is_ligature_start());
+                            assert_eq!(c.glyphs().count(), 1);
+                            assert_eq!(c.text_range().len(), 1);
+                            assert_eq!(c.glyphs().next().unwrap().id, 444);
+                            // The glyph for this ligature lives in the start cluster and should
+                            // contain the whole ligature's advance.
+                            assert_eq!(c.glyphs().next().unwrap().advance, c.advance() * 2.0);
+                        }
+                        1 => {
+                            assert!(c.is_ligature_continuation());
+                            // A continuation shares its advance with the previous cluster.
+                            assert_eq!(c.advance(), last_advance);
+                            assert_eq!(c.text_range().len(), 1);
+                            assert_eq!(c.glyphs().count(), 0);
+                        }
+                        2 => assert!(!c.is_ligature_start() && !c.is_ligature_continuation()),
+                        _ => unreachable!(),
+                    }
+                    last_advance = c.advance();
+                });
+            }
+        }
+    }
+
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn text_range_rtl() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "اللغة العربية";
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(100.0));
+    layout.align(None, Alignment::Start, AlignmentOptions::default());
+
+    for line in layout.lines() {
+        for item in line.items() {
+            if let crate::PositionedLayoutItem::GlyphRun(glyph_run) = item {
+                glyph_run.run().clusters().for_each(|c| {
+                    if !c.is_space_or_nbsp() {
+                        assert_eq!(c.text_range().len(), 2);
+                    }
+                });
+            }
+        }
+    }
+}
+
+#[test]
+fn font_features() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "fi ".repeat(4);
+    let mut builder = env.ranged_builder(&text);
+    builder.push(
+        StyleProperty::FontFeatures(FontSettings::List(Cow::Borrowed(&[swash::Setting {
+            tag: swash::tag_from_bytes(b"liga"),
+            value: 1,
+        }]))),
+        0..5,
+    );
+    builder.push(
+        StyleProperty::FontFeatures(FontSettings::List(Cow::Borrowed(&[swash::Setting {
+            tag: swash::tag_from_bytes(b"liga"),
+            value: 0,
+        }]))),
+        5..10,
+    );
+    let mut layout = builder.build(&text);
+    layout.break_all_lines(Some(100.0));
+    layout.align(None, Alignment::Start, AlignmentOptions::default());
+
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn variable_fonts() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "Hello World";
+
+    for wght in [100., 500., 1000.] {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::FontStack(FontStack::Single(
+            FontFamily::Named(Cow::Borrowed("Arimo")),
+        )));
+        builder.push_default(StyleProperty::FontVariations(FontSettings::List(
+            Cow::Borrowed(&[swash::Setting {
+                tag: swash::tag_from_bytes(b"wght"),
+                value: wght,
+            }]),
+        )));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(100.0));
+        layout.align(None, Alignment::Start, AlignmentOptions::default());
+
+        env.check_layout_snapshot(&layout);
     }
 }
 

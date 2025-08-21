@@ -6,10 +6,10 @@ use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::nearly_zero;
 use crate::{Font, OverflowWrap};
+use core::iter;
 use core::ops::Range;
-use swash::Synthesis;
-use swash::shape::Shaper;
-use swash::text::cluster::{Boundary, ClusterInfo};
+
+use swash::text::cluster::{Boundary, Whitespace};
 
 use alloc::vec::Vec;
 
@@ -20,15 +20,21 @@ use core_maths::CoreFloat;
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct ClusterData {
     pub(crate) info: ClusterInfo,
+    /// Cluster flags (see impl methods for details).
     pub(crate) flags: u16,
+    /// Style index for this cluster.
     pub(crate) style_index: u16,
+    /// Number of glyphs in this cluster (0xFF = single glyph stored inline)
     pub(crate) glyph_len: u8,
+    /// Number of text bytes in this cluster
     pub(crate) text_len: u8,
     /// If `glyph_len == 0xFF`, then `glyph_offset` is a glyph identifier,
     /// otherwise, it's an offset into the glyph array with the base
     /// taken from the owning run.
-    pub(crate) glyph_offset: u16,
+    pub(crate) glyph_offset: u32,
+    /// Offset into the text for this cluster
     pub(crate) text_offset: u16,
+    /// Advance width for this cluster
     pub(crate) advance: f32,
 }
 
@@ -55,22 +61,73 @@ impl ClusterData {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) struct ClusterInfo {
+    boundary: Boundary,
+    source_char: char,
+}
+
+impl ClusterInfo {
+    pub(crate) fn new(boundary: Boundary, source_char: char) -> Self {
+        Self {
+            boundary,
+            source_char,
+        }
+    }
+
+    // Returns the boundary type of the cluster.
+    pub(crate) fn boundary(&self) -> Boundary {
+        self.boundary
+    }
+
+    // Returns the whitespace type of the cluster.
+    pub(crate) fn whitespace(&self) -> Whitespace {
+        to_whitespace(self.source_char)
+    }
+
+    /// Returns if the cluster is a line boundary.
+    pub(crate) fn is_boundary(&self) -> bool {
+        self.boundary != Boundary::None
+    }
+
+    /// Returns if the cluster is an emoji.
+    pub(crate) fn is_emoji(&self) -> bool {
+        // TODO: Defer to ICU4X properties (see: https://docs.rs/icu/latest/icu/properties/props/struct.Emoji.html).
+        matches!(self.source_char as u32, 0x1F600..=0x1F64F | 0x1F300..=0x1F5FF | 0x1F680..=0x1F6FF | 0x2600..=0x26FF | 0x2700..=0x27BF)
+    }
+
+    /// Returns if the cluster is any whitespace.
+    pub(crate) fn is_whitespace(&self) -> bool {
+        self.source_char.is_whitespace()
+    }
+}
+
+fn to_whitespace(c: char) -> Whitespace {
+    match c {
+        ' ' => Whitespace::Space,
+        '\t' => Whitespace::Tab,
+        '\n' => Whitespace::Newline,
+        '\r' => Whitespace::Newline,
+        '\u{00A0}' => Whitespace::NoBreakSpace,
+        _ => Whitespace::None,
+    }
+}
+
+/// `HarfRust`-based run data
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct RunData {
     /// Index of the font for the run.
     pub(crate) font_index: usize,
     /// Font size.
     pub(crate) font_size: f32,
-    /// Synthesis information for the font.
-    pub(crate) synthesis: Synthesis,
+    /// Synthesis for rendering (contains variation settings)
+    pub(crate) synthesis: fontique::Synthesis,
     /// Range of normalized coordinates in the layout data.
     pub(crate) coords_range: Range<usize>,
     /// Range of the source text.
     pub(crate) text_range: Range<usize>,
     /// Bidi level for the run.
     pub(crate) bidi_level: u8,
-    /// True if the run ends with a newline.
-    pub(crate) ends_with_newline: bool,
     /// Range of clusters.
     pub(crate) cluster_range: Range<usize>,
     /// Base for glyph indices.
@@ -287,19 +344,25 @@ impl<B: Brush> LayoutData<B> {
             bidi_level,
         });
     }
-
-    #[allow(unused_assignments)]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn push_run(
         &mut self,
         font: Font,
         font_size: f32,
-        synthesis: Synthesis,
-        shaper: Shaper<'_>,
+        synthesis: fontique::Synthesis,
+        glyph_buffer: &harfrust::GlyphBuffer,
         bidi_level: u8,
         word_spacing: f32,
         letter_spacing: f32,
+        source_text: &str,
+        char_infos: &[(swash::text::cluster::CharInfo, u16)], // From text analysis
+        text_range: Range<usize>,                             // The text range this run covers
+        coords: &[harfrust::NormalizedCoord],
     ) {
+        let coords_start = self.coords.len();
+        self.coords.extend(coords.iter().map(|c| c.to_bits()));
+        let coords_end = self.coords.len();
+
         let font_index = self
             .fonts
             .iter()
@@ -309,154 +372,103 @@ impl<B: Brush> LayoutData<B> {
                 self.fonts.push(font);
                 index
             });
-        let metrics = shaper.metrics();
+
+        let metrics = {
+            let font = &self.fonts[font_index];
+            let font_ref = skrifa::FontRef::from_index(font.data.as_ref(), font.index).unwrap();
+            skrifa::metrics::Metrics::new(&font_ref, skrifa::prelude::Size::new(font_size), coords)
+        };
+        let units_per_em = metrics.units_per_em as f32;
+
+        let metrics = {
+            let (underline_offset, underline_size) = if let Some(underline) = metrics.underline {
+                (underline.offset, underline.thickness)
+            } else {
+                // Default values from Harfbuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334
+                let default = units_per_em / 18.0;
+                (default, default)
+            };
+            let (strikethrough_offset, strikethrough_size) =
+                if let Some(strikeout) = metrics.strikeout {
+                    (strikeout.offset, strikeout.thickness)
+                } else {
+                    // Default values from HarfBuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334-L347
+                    (metrics.ascent / 2.0, units_per_em / 18.0)
+                };
+
+            RunMetrics {
+                ascent: metrics.ascent,
+                descent: -metrics.descent,
+                leading: metrics.leading,
+                underline_offset,
+                underline_size,
+                strikethrough_offset,
+                strikethrough_size,
+            }
+        };
+
         let cluster_range = self.clusters.len()..self.clusters.len();
-        let coords_start = self.coords.len();
-        let coords = shaper.normalized_coords();
-        if coords.iter().any(|coord| *coord != 0) {
-            self.coords.extend_from_slice(coords);
-        }
-        let coords_end = self.coords.len();
+
         let mut run = RunData {
             font_index,
             font_size,
             synthesis,
             coords_range: coords_start..coords_end,
-            text_range: 0..0,
+            text_range,
             bidi_level,
-            ends_with_newline: false,
             cluster_range,
             glyph_start: self.glyphs.len(),
-            metrics: RunMetrics {
-                ascent: metrics.ascent,
-                descent: metrics.descent,
-                leading: metrics.leading,
-                underline_offset: metrics.underline_offset,
-                underline_size: metrics.stroke_size,
-                strikethrough_offset: metrics.strikeout_offset,
-                strikethrough_size: metrics.stroke_size,
-            },
+            metrics,
             word_spacing,
             letter_spacing,
             advance: 0.,
         };
-        // Track these so that we can flush if they overflow a u16.
-        let mut glyph_count = 0_usize;
-        let mut text_offset = 0;
-        macro_rules! flush_run {
-            () => {
-                if !run.cluster_range.is_empty() {
-                    self.runs.push(run.clone());
-                    self.items.push(LayoutItem {
-                        kind: LayoutItemKind::TextRun,
-                        index: self.runs.len() - 1,
-                        bidi_level: run.bidi_level,
-                    });
-                    run.text_range = text_offset..text_offset;
-                    run.cluster_range.start = run.cluster_range.end;
-                    run.glyph_start = self.glyphs.len();
-                    run.advance = 0.;
-                    glyph_count = 0;
-                }
-            };
+
+        // `HarfRust` returns glyphs in visual order, so we need to process them as such while
+        // maintaining logical ordering of clusters.
+
+        let glyph_infos = glyph_buffer.glyph_infos();
+        if glyph_infos.is_empty() {
+            return;
         }
-        let mut first = true;
-        shaper.shape_with(|cluster| {
-            if cluster.info.boundary() == Boundary::Mandatory {
-                run.ends_with_newline = true;
-                flush_run!();
-            }
-            run.ends_with_newline = false;
-            const MAX_LEN: usize = u16::MAX as usize;
-            let source_range = cluster.source.to_range();
-            if first {
-                run.text_range = source_range.start..source_range.start;
-                text_offset = source_range.start;
-                first = false;
-            }
-            let num_components = cluster.components.len() + 1;
-            if glyph_count > MAX_LEN
-                || (text_offset - run.text_range.start) > MAX_LEN
-                || (num_components > 1
-                    && (cluster.components.last().unwrap().start as usize - run.text_range.start)
-                        > MAX_LEN)
-            {
-                flush_run!();
-            }
-            let text_len = source_range.len();
-            let glyph_len = cluster.glyphs.len();
-            let advance = cluster.advance();
-            run.advance += advance;
-            let mut cluster_data = ClusterData {
-                info: cluster.info,
-                flags: 0,
-                style_index: cluster.data as _,
-                glyph_len: glyph_len as u8,
-                text_len: text_len as u8,
-                advance,
-                text_offset: (text_offset - run.text_range.start) as u16,
-                glyph_offset: 0,
-            };
-            if num_components > 1 {
-                cluster_data.flags = ClusterData::LIGATURE_START;
-                cluster_data.advance /= cluster.components.len() as f32;
-                cluster_data.text_len = cluster.components[0].to_range().len() as u8;
-            }
-            macro_rules! push_components {
-                () => {
-                    self.clusters.push(cluster_data);
-                    if num_components > 1 {
-                        cluster_data.glyph_offset = 0;
-                        cluster_data.glyph_len = 0;
-                        for component in &cluster.components[1..] {
-                            let range = component.to_range();
-                            cluster_data.flags = ClusterData::LIGATURE_COMPONENT;
-                            cluster_data.text_offset = (range.start - run.text_range.start) as u16;
-                            cluster_data.text_len = range.len() as u8;
-                            self.clusters.push(cluster_data);
-                            run.cluster_range.end += 1;
-                        }
-                        cluster_data.flags = 0;
-                    }
-                };
-            }
-            run.cluster_range.end += 1;
-            run.text_range.end += text_len;
-            text_offset += text_len;
-            if glyph_len == 1 && num_components == 1 {
-                let g = &cluster.glyphs[0];
-                if nearly_zero(g.x) && nearly_zero(g.y) {
-                    // Handle the case with a single glyph with zero'd offset.
-                    cluster_data.glyph_len = 0xFF;
-                    cluster_data.glyph_offset = g.id;
-                    push_components!();
-                    return;
-                }
-            } else if glyph_len == 0 {
-                // Insert an empty cluster. This occurs for both invisible
-                // control characters and ligature components.
-                push_components!();
-                return;
-            }
-            // Otherwise, encode all of the glyphs.
-            cluster_data.glyph_offset = (self.glyphs.len() - run.glyph_start) as u16;
-            self.glyphs.extend(cluster.glyphs.iter().map(|g| {
-                let style_index = g.data as u16;
-                if cluster_data.style_index != style_index {
-                    cluster_data.flags |= ClusterData::DIVERGENT_STYLES;
-                }
-                Glyph {
-                    id: g.id,
-                    style_index,
-                    x: g.x,
-                    y: g.y,
-                    advance: g.advance,
-                }
-            }));
-            glyph_count += glyph_len;
-            push_components!();
-        });
-        flush_run!();
+        let glyph_positions = glyph_buffer.glyph_positions();
+        let scale_factor = font_size / units_per_em;
+        let cluster_range_start = self.clusters.len();
+        let is_rtl = bidi_level & 1 == 1;
+        if !is_rtl {
+            run.advance = process_clusters(
+                &mut self.clusters,
+                &mut self.glyphs,
+                scale_factor,
+                glyph_infos,
+                glyph_positions,
+                char_infos,
+                source_text.char_indices(),
+            );
+        } else {
+            run.advance = process_clusters(
+                &mut self.clusters,
+                &mut self.glyphs,
+                scale_factor,
+                glyph_infos,
+                glyph_positions,
+                char_infos,
+                source_text.char_indices().rev(),
+            );
+            // Reverse clusters into logical order for RTL
+            let clusters_len = self.clusters.len();
+            self.clusters[cluster_range_start..clusters_len].reverse();
+        }
+
+        run.cluster_range = cluster_range_start..self.clusters.len();
+        if !run.cluster_range.is_empty() {
+            self.runs.push(run);
+            self.items.push(LayoutItem {
+                kind: LayoutItemKind::TextRun,
+                index: self.runs.len() - 1,
+                bidi_level,
+            });
+        }
     }
 
     pub(crate) fn finish(&mut self) {
@@ -548,4 +560,306 @@ impl<B: Brush> LayoutData<B> {
             max: max_width,
         }
     }
+}
+
+/// Processes shaped glyphs from `HarfRust` and converts them into `ClusterData` and `Glyph`.
+///
+/// # Parameters
+///
+/// ## Output Parameters (mutated by this function):
+/// * `clusters` - Vector where new `ClusterData` entries will be pushed.
+/// * `glyphs` - Vector where new `Glyph` entries will be pushed. Note: single-glyph clusters
+///   with zero offsets may be inlined directly into `ClusterData`.
+///
+/// ## Input Parameters:
+/// * `scale_factor` - Scaling factor used to convert font units to the target size.
+/// * `glyph_infos` - `HarfRust` glyph information in visual order.
+/// * `glyph_positions` - `HarfRust` glyph positioning data in visual order.
+/// * `char_infos` - Character information from text analysis, indexed by cluster ID.
+/// * `char_indices_iter` - Iterator over (`byte_offset`, `char`) pairs from the source text.
+///   Should be in logical order (forward for LTR, reverse for RTL).
+fn process_clusters<I: Iterator<Item = (usize, char)>>(
+    clusters: &mut Vec<ClusterData>,
+    glyphs: &mut Vec<Glyph>,
+    scale_factor: f32,
+    glyph_infos: &[harfrust::GlyphInfo],
+    glyph_positions: &[harfrust::GlyphPosition],
+    char_infos: &[(swash::text::cluster::CharInfo, u16)],
+    char_indices_iter: I,
+) -> f32 {
+    let mut char_indices_iter = char_indices_iter.peekable();
+    let mut cluster_start_char = char_indices_iter.next().unwrap();
+    let mut total_glyphs: u32 = 0;
+    let mut cluster_glyph_offset: u32 = 0;
+    let start_cluster_id = glyph_infos.first().unwrap().cluster;
+    let mut cluster_id = start_cluster_id;
+    let mut char_info = &char_infos[cluster_id as usize];
+    let mut run_advance = 0.0;
+    let mut cluster_advance = 0.0;
+    // If the current cluster might be a single-glyph, zero-offset cluster, we defer
+    // pushing the first glyph to `glyphs` because it might be inlined into `ClusterData`.
+    let mut pending_inline_glyph: Option<Glyph> = None;
+
+    let text_len = |char: (usize, char), chars: &mut iter::Peekable<I>| {
+        let next = chars
+            .peek()
+            .map(|x| x.0)
+            .unwrap_or(char.0 + char.1.len_utf8());
+        char.0.abs_diff(next) as u8
+    };
+
+    for (glyph_info, glyph_pos) in glyph_infos.iter().zip(glyph_positions.iter()) {
+        // Flush previous cluster if we've reached a new cluster
+        if cluster_id != glyph_info.cluster {
+            let num_components = cluster_id.abs_diff(glyph_info.cluster);
+            run_advance += cluster_advance;
+            cluster_advance /= num_components as f32;
+            let is_newline = to_whitespace(cluster_start_char.1) == Whitespace::Newline;
+            let cluster_type = if num_components > 1 {
+                debug_assert!(!is_newline);
+                ClusterType::LigatureStart
+            } else if is_newline {
+                ClusterType::Newline
+            } else {
+                ClusterType::Regular
+            };
+
+            let inline_glyph_id = if matches!(cluster_type, ClusterType::Regular) {
+                pending_inline_glyph.take().map(|g| g.id)
+            } else {
+                // This isn't a regular cluster, so we don't inline the glyph and push
+                // it to `glyphs`.
+                if let Some(pending) = pending_inline_glyph.take() {
+                    glyphs.push(pending);
+                    total_glyphs += 1;
+                }
+                None
+            };
+
+            push_cluster(
+                clusters,
+                char_info,
+                text_len(cluster_start_char, &mut char_indices_iter),
+                cluster_start_char,
+                cluster_glyph_offset,
+                cluster_advance,
+                total_glyphs,
+                cluster_type,
+                inline_glyph_id,
+            );
+            cluster_glyph_offset = total_glyphs;
+
+            if num_components > 1 {
+                // Skip characters until we reach the current cluster
+                for i in 0..(num_components - 1) {
+                    cluster_start_char = char_indices_iter.next().unwrap();
+                    if to_whitespace(cluster_start_char.1) == Whitespace::Space {
+                        break;
+                    }
+                    // Iterate in correct (LTR or RTL) order
+                    let char_info_ = if cluster_id < glyph_info.cluster {
+                        &char_infos[(cluster_id + i) as usize]
+                    } else {
+                        &char_infos[(cluster_id - 1) as usize]
+                    };
+
+                    push_cluster(
+                        clusters,
+                        char_info_,
+                        text_len(cluster_start_char, &mut char_indices_iter),
+                        cluster_start_char,
+                        cluster_glyph_offset,
+                        cluster_advance,
+                        total_glyphs,
+                        ClusterType::LigatureComponent,
+                        None,
+                    );
+                }
+            }
+            cluster_start_char = char_indices_iter.next().unwrap();
+
+            cluster_advance = 0.0;
+            cluster_id = glyph_info.cluster;
+            char_info = &char_infos[cluster_id as usize];
+            pending_inline_glyph = None;
+        }
+
+        let glyph = Glyph {
+            id: glyph_info.glyph_id,
+            style_index: char_info.1,
+            x: (glyph_pos.x_offset as f32) * scale_factor,
+            y: (glyph_pos.y_offset as f32) * scale_factor,
+            advance: (glyph_pos.x_advance as f32) * scale_factor,
+        };
+        cluster_advance += glyph.advance;
+        // Push any pending glyph. If it was a zero-offset, single glyph cluster, it would
+        // have been pushed in the first `if` block.
+        if let Some(pending) = pending_inline_glyph.take() {
+            glyphs.push(pending);
+            total_glyphs += 1;
+        }
+        if total_glyphs == cluster_glyph_offset && glyph.x == 0.0 && glyph.y == 0.0 {
+            // Defer this potential zero-offset, single glyph cluster
+            pending_inline_glyph = Some(glyph);
+        } else {
+            glyphs.push(glyph);
+            total_glyphs += 1;
+        }
+    }
+
+    // Push the last cluster
+    {
+        // Since this is the last cluster, it covers from cluster_id to the end of char_infos
+        let remaining_chars = char_infos.len() - cluster_id.abs_diff(start_cluster_id) as usize;
+        if remaining_chars > 1 {
+            // This is a ligature - create ligature start + ligature components
+
+            if let Some(pending) = pending_inline_glyph.take() {
+                glyphs.push(pending);
+                total_glyphs += 1;
+            }
+            let ligature_advance = cluster_advance / remaining_chars as f32;
+            push_cluster(
+                clusters,
+                char_info,
+                text_len(cluster_start_char, &mut char_indices_iter),
+                cluster_start_char,
+                cluster_glyph_offset,
+                ligature_advance,
+                total_glyphs,
+                ClusterType::LigatureStart,
+                None,
+            );
+
+            cluster_glyph_offset = total_glyphs;
+
+            // Create ligature component clusters for the remaining characters
+            let mut i = 1;
+            while let Some(char) = char_indices_iter.next() {
+                if to_whitespace(char.1) == Whitespace::Space {
+                    break;
+                }
+                // Iterate in correct (LTR or RTL) order
+                let component_char_info = if cluster_start_char.0 < char.0 {
+                    &char_infos[(cluster_id + i) as usize]
+                } else {
+                    &char_infos[(cluster_id - i) as usize]
+                };
+
+                push_cluster(
+                    clusters,
+                    component_char_info,
+                    text_len(char, &mut char_indices_iter),
+                    char,
+                    cluster_glyph_offset,
+                    ligature_advance,
+                    total_glyphs,
+                    ClusterType::LigatureComponent,
+                    None,
+                );
+                i += 1;
+            }
+        } else {
+            let is_newline = to_whitespace(cluster_start_char.1) == Whitespace::Newline;
+            let cluster_type = if is_newline {
+                ClusterType::Newline
+            } else {
+                ClusterType::Regular
+            };
+            let mut inline_glyph_id = None;
+            match cluster_type {
+                ClusterType::Regular => {
+                    if total_glyphs == cluster_glyph_offset {
+                        if let Some(pending) = pending_inline_glyph.take() {
+                            inline_glyph_id = Some(pending.id);
+                        }
+                    }
+                }
+                _ => {
+                    if let Some(pending) = pending_inline_glyph.take() {
+                        glyphs.push(pending);
+                        total_glyphs += 1;
+                    }
+                }
+            }
+            push_cluster(
+                clusters,
+                char_info,
+                text_len(cluster_start_char, &mut char_indices_iter),
+                cluster_start_char,
+                cluster_glyph_offset,
+                cluster_advance,
+                total_glyphs,
+                cluster_type,
+                inline_glyph_id,
+            );
+        }
+    }
+
+    run_advance
+}
+
+enum ClusterType {
+    LigatureStart,
+    LigatureComponent,
+    Regular,
+    Newline,
+}
+
+impl From<&ClusterType> for u16 {
+    fn from(cluster_type: &ClusterType) -> Self {
+        match cluster_type {
+            ClusterType::LigatureStart => ClusterData::LIGATURE_START,
+            ClusterType::LigatureComponent => ClusterData::LIGATURE_COMPONENT,
+            ClusterType::Regular | ClusterType::Newline => 0, // No special flags
+        }
+    }
+}
+
+fn push_cluster(
+    clusters: &mut Vec<ClusterData>,
+    char_info: &(swash::text::cluster::CharInfo, u16),
+    text_len: u8,
+    cluster_start_char: (usize, char),
+    glyph_offset: u32,
+    advance: f32,
+    total_glyphs: u32,
+    cluster_type: ClusterType,
+    inline_glyph_id: Option<u32>,
+) {
+    let glyph_len = (total_glyphs - glyph_offset) as u8;
+
+    let (final_glyph_len, final_glyph_offset, final_advance) = match cluster_type {
+        ClusterType::LigatureComponent => {
+            // Ligature components have no glyphs, only advance.
+            debug_assert_eq!(glyph_len, 0);
+            (0_u8, 0_u32, advance)
+        }
+        ClusterType::Newline => {
+            // Newline clusters are stripped of their glyph contribution.
+            debug_assert_eq!(glyph_len, 1);
+            (0_u8, 0_u32, 0.0)
+        }
+        _ if inline_glyph_id.is_some() => {
+            // Inline glyphs are stored inline within `ClusterData`
+            debug_assert_eq!(glyph_len, 0);
+            (0xFF_u8, inline_glyph_id.unwrap(), advance)
+        }
+        ClusterType::Regular | ClusterType::LigatureStart => {
+            // Regular and ligature start clusters maintain their glyphs and advance.
+            debug_assert_ne!(glyph_len, 0);
+            (glyph_len, glyph_offset, advance)
+        }
+    };
+
+    clusters.push(ClusterData {
+        info: ClusterInfo::new(char_info.0.boundary(), cluster_start_char.1),
+        flags: (&cluster_type).into(),
+        style_index: char_info.1,
+        glyph_len: final_glyph_len,
+        text_len,
+        glyph_offset: final_glyph_offset,
+        text_offset: cluster_start_char.0 as u16,
+        advance: final_advance,
+    });
 }

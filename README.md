@@ -17,7 +17,7 @@ It is backed by [Swash](https://github.com/dfrg/swash).
 
 ## The Parley text stack
 
-Currently, Parley directly depends on four crates: Fontique, Swash, Skrifa, and Peniko.
+Currently, Parley directly depends on five crates: Fontique, HarfRust, Swash, Skrifa, and Peniko.
 These crates cover different pieces of the text-rendering process.
 
 ### Peniko
@@ -39,6 +39,11 @@ This is necessary because fonts typically don't cover the entire Unicode range: 
 But if you have, say arabic text or emoji embedded within latin text, you don't typically specify the font for the arabic text or the emoji, one is chosen for you.
 Font fallback is the process which makes that choice.
 
+### HarfRust
+
+HarfRust is a Rust port of HarfBuzz text shaping engine. **Text shaping** means mapping runs of Unicode codepoints to specific glyphs within fonts.
+This includes applying ligatures, resolving emoji modifiers, but also much more complex transformations for some scripts.
+
 ### Skrifa
 
 Skrifa reads TrueType and OpenType fonts.
@@ -50,15 +55,7 @@ Notably it converts the raw glyph representations in font files into scaled, hin
 
 ### Swash
 
-Swash implements text shaping and [some miscellaneous Unicode-related features](https://github.com/dfrg/swash#text-analysis).
-
-**Text shaping** means mapping runs of Unicode codepoints to specific glyphs within fonts.
-This includes applying ligatures, resolving emoji modifiers, but also much more complex transformations for some scripts.
-
-Swash's implementation is faster but less complete and tested than Harfbuzz and Rustybuzz.
-
-Swash also implements font parsing, scaling, and hinting.
-This part of Swash is now superseded by Skrifa: the implementation in Skrifa is directly descended from the one in Swash.
+Within the context of Parley, Swash implements [some miscellaneous Unicode-related features](https://github.com/dfrg/swash#text-analysis).
 
 ### Parley
 
@@ -106,6 +103,7 @@ at your option.
 
 Some files used for tests are under different licenses:
 
+- The font file `Arimo-VariableFont_wght.ttf` in `/parley/tests/assets/arimo_fonts/` is licensed solely as documented in that folder (and is licensed under the Apache License, Version 2.0).
 - The font file `Roboto-Regular.ttf` in `/parley/tests/assets/roboto_fonts/` is licensed solely as documented in that folder (and is licensed under the Apache License, Version 2.0).
 - The font file `NotoKufiArabic-Regular.otf` in `/parley/tests/assets/noto_fonts/` is licensed solely as documented in that folder (and is licensed under the SIL Open Font License, Version 1.1).
 

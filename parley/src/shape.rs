@@ -1,21 +1,39 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::layout::Layout;
-use super::resolve::{RangedStyle, ResolveContext, Resolved};
-use super::style::{Brush, FontFeature, FontVariation};
-use crate::Font;
-use crate::util::nearly_eq;
-use fontique::QueryFamily;
-use fontique::{self, Query, QueryFont};
-use swash::shape::{Direction, ShapeContext, partition};
-use swash::text::cluster::{CharCluster, CharInfo, Token};
-use swash::text::{Language, Script};
-use swash::{FontRef, Synthesis};
+//! Text shaping implementation using `harfrust`for shaping
+//! and `swash` for text analysis.
+
+use core::mem;
 
 use alloc::vec::Vec;
 
+use super::layout::Layout;
+use super::resolve::{RangedStyle, ResolveContext, Resolved};
+use super::style::{Brush, FontFeature, FontVariation};
 use crate::inline_box::InlineBox;
+use crate::util::nearly_eq;
+use crate::{Font, swash_convert};
+
+use fontique::{self, Query, QueryFamily, QueryFont};
+use swash::text::cluster::{CharCluster, CharInfo, Token};
+use swash::text::{Language, Script};
+
+pub(crate) struct ShapeContext {
+    deferred_boxes: Vec<usize>,
+    unicode_buffer: Option<harfrust::UnicodeBuffer>,
+    features: Vec<harfrust::Feature>,
+}
+
+impl Default for ShapeContext {
+    fn default() -> Self {
+        Self {
+            deferred_boxes: Vec::new(),
+            unicode_buffer: Some(harfrust::UnicodeBuffer::new()),
+            features: Vec::new(),
+        }
+    }
+}
 
 struct Item {
     style_index: u16,
@@ -78,62 +96,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
     let mut inline_box_iter = inline_boxes.iter().enumerate();
     let mut current_box = inline_box_iter.next();
-    let mut deferred_boxes: Vec<usize> = Vec::with_capacity(16);
-
-    // Define macro to shape
-    macro_rules! shape_item {
-        () => {
-            let item_text = &text[text_range.clone()];
-            let item_infos = &infos[char_range.start..];
-            let first_style_index = item_infos[0].1;
-            let mut fs = FontSelector::new(
-                &mut fq,
-                rcx,
-                styles,
-                first_style_index,
-                item.script,
-                item.locale,
-            );
-            let options = partition::SimpleShapeOptions {
-                size: item.size,
-                script: item.script,
-                language: item.locale,
-                direction: if item.level & 1 != 0 {
-                    Direction::RightToLeft
-                } else {
-                    Direction::LeftToRight
-                },
-                variations: rcx.variations(item.variations).unwrap_or(&[]),
-                features: rcx.features(item.features).unwrap_or(&[]),
-                insert_dotted_circles: false,
-            };
-            partition::shape(
-                scx,
-                &mut fs,
-                &options,
-                item_text.char_indices().zip(item_infos).map(
-                    |((offset, ch), (info, style_index))| Token {
-                        ch,
-                        offset: (text_range.start + offset) as u32,
-                        len: ch.len_utf8() as u8,
-                        info: *info,
-                        data: *style_index as _,
-                    },
-                ),
-                |font, shaper| {
-                    layout.data.push_run(
-                        Font::new(font.font.blob.clone(), font.font.index),
-                        item.size,
-                        font.synthesis,
-                        shaper,
-                        item.level,
-                        item.word_spacing,
-                        item.letter_spacing,
-                    );
-                },
-            );
-        };
-    }
 
     // Iterate over characters in the text
     for ((char_index, (byte_index, ch)), (info, style_index)) in
@@ -169,11 +131,9 @@ pub(crate) fn shape_text<'a, B: Brush>(
         //   - We do this *before* processing the text run because we need to know whether we should
         //     break the run due to the presence of an inline box.
         while let Some((box_idx, inline_box)) = current_box {
-            // println!("{} {}", byte_index, inline_box.index);
-
             if inline_box.index == byte_index {
                 break_run = true;
-                deferred_boxes.push(box_idx);
+                scx.deferred_boxes.push(box_idx);
                 // Update the current box to the next box
                 current_box = inline_box_iter.next();
             } else {
@@ -182,7 +142,18 @@ pub(crate) fn shape_text<'a, B: Brush>(
         }
 
         if break_run && !text_range.is_empty() {
-            shape_item!();
+            shape_item(
+                &mut fq,
+                rcx,
+                styles,
+                &item,
+                scx,
+                text,
+                &text_range,
+                &char_range,
+                infos,
+                layout,
+            );
             item.size = style.font_size;
             item.level = level;
             item.script = script;
@@ -193,8 +164,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             char_range.start = char_range.end;
         }
 
-        for box_idx in deferred_boxes.drain(0..) {
-            // Push the box to the list of items
+        for box_idx in scx.deferred_boxes.drain(..) {
             layout.data.push_inline_box(box_idx);
         }
 
@@ -203,7 +173,18 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 
     if !text_range.is_empty() {
-        shape_item!();
+        shape_item(
+            &mut fq,
+            rcx,
+            styles,
+            &item,
+            scx,
+            text,
+            &text_range,
+            &char_range,
+            infos,
+            layout,
+        );
     }
 
     // Process any remaining inline boxes whose index is greater than the length of the text
@@ -215,8 +196,193 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 }
 
+fn shape_item<'a, B: Brush>(
+    fq: &mut Query<'a>,
+    rcx: &'a ResolveContext,
+    styles: &'a [RangedStyle<B>],
+    item: &Item,
+    scx: &mut ShapeContext,
+    text: &str,
+    text_range: &core::ops::Range<usize>,
+    char_range: &core::ops::Range<usize>,
+    infos: &[(CharInfo, u16)],
+    layout: &mut Layout<B>,
+) {
+    let item_text = &text[text_range.clone()];
+    let item_infos = &infos[char_range.start..char_range.end]; // Only process current item
+    let first_style_index = item_infos[0].1;
+    let mut font_selector =
+        FontSelector::new(fq, rcx, styles, first_style_index, item.script, item.locale);
+
+    // Parse text into clusters of the current item
+    let tokens =
+        item_text
+            .char_indices()
+            .zip(item_infos)
+            .map(|((offset, ch), (info, style_index))| Token {
+                ch,
+                offset: (text_range.start + offset) as u32,
+                len: ch.len_utf8() as u8,
+                info: *info,
+                data: *style_index as u32,
+            });
+
+    let mut parser = swash::text::cluster::Parser::new(item.script, tokens);
+    let mut cluster = CharCluster::new();
+
+    // Reimplement swash's shape_clusters algorithm - but only for current item
+    if !parser.next(&mut cluster) {
+        return; // No clusters to process
+    }
+
+    let mut current_font = font_selector.select_font(&mut cluster);
+
+    // Main segmentation loop (based on swash shape_clusters) - only within current item
+    while let Some(font) = current_font.take() {
+        // Collect all clusters for this font segment
+        let segment_start_offset = cluster.range().start as usize - text_range.start;
+        let mut segment_end_offset = cluster.range().end as usize - text_range.start;
+
+        loop {
+            if !parser.next(&mut cluster) {
+                // End of current item - process final segment
+                break;
+            }
+
+            if let Some(next_font) = font_selector.select_font(&mut cluster) {
+                if next_font != font {
+                    current_font = Some(next_font);
+                    break;
+                } else {
+                    // Same font - add to current segment
+                    segment_end_offset = cluster.range().end as usize - text_range.start;
+                }
+            } else {
+                // No font found - skip this cluster
+                if !parser.next(&mut cluster) {
+                    break;
+                }
+            }
+        }
+
+        // Shape this font segment with harfrust
+        let segment_text = &item_text[segment_start_offset..segment_end_offset];
+        // Shape the entire segment text including newlines
+        // The line breaking algorithm will handle newlines automatically
+
+        // TODO: How do we want to handle errors like this?
+        let font_ref =
+            harfrust::FontRef::from_index(font.font.blob.as_ref(), font.font.index).unwrap();
+
+        // Create harfrust shaper
+        // TODO: cache this upstream?
+        let shaper_data = harfrust::ShaperData::new(&font_ref);
+        let instance = harfrust::ShaperInstance::from_variations(
+            &font_ref,
+            variations_iter(&font.font.synthesis, rcx.variations(item.variations)),
+        );
+        // TODO: Don't create a new shaper for each segment.
+        let harf_shaper = shaper_data
+            .shaper(&font_ref)
+            .instance(Some(&instance))
+            .point_size(Some(item.size))
+            .build();
+
+        // Prepare harfrust buffer
+        let mut buffer = mem::take(&mut scx.unicode_buffer).unwrap();
+        buffer.clear();
+
+        // Use the entire segment text including newlines
+        buffer.reserve(segment_text.len());
+        for (i, ch) in segment_text.chars().enumerate() {
+            // Ensure that each cluster's index matches the index into `infos`. This is required
+            // for efficient cluster lookup within `data.rs`.
+            //
+            // In other words, instead of using `buffer.push_str`, which iterates `segment_text`
+            // with `char_indices`, push each char individually via `.chars` with a cluster index
+            // that matches its `infos` counterpart. This allows us to lookup `infos` via cluster
+            // index in `data.rs`.
+            buffer.add(ch, i as u32);
+        }
+
+        let direction = if item.level & 1 != 0 {
+            harfrust::Direction::RightToLeft
+        } else {
+            harfrust::Direction::LeftToRight
+        };
+        buffer.set_direction(direction);
+
+        let script = swash_convert::script_to_harfrust(item.script);
+        buffer.set_script(script);
+
+        if let Some(lang) = item.locale {
+            let lang_tag = lang.language();
+            if let Ok(harf_lang) = lang_tag.parse::<harfrust::Language>() {
+                buffer.set_language(harf_lang);
+            }
+        }
+
+        scx.features.clear();
+        for feature in rcx.features(item.features).unwrap_or(&[]) {
+            scx.features.push(harfrust::Feature::new(
+                harfrust::Tag::from_u32(feature.tag),
+                feature.value as u32,
+                0..buffer.len(),
+            ));
+        }
+
+        let glyph_buffer = harf_shaper.shape(buffer, &scx.features);
+
+        // Extract relevant CharInfo slice for this segment
+        let char_start = char_range.start + item_text[..segment_start_offset].chars().count();
+        let segment_char_start = char_start - char_range.start;
+        let segment_char_count = segment_text.chars().count();
+        let segment_infos =
+            &item_infos[segment_char_start..(segment_char_start + segment_char_count)];
+
+        // Push harfrust-shaped run for the entire segment
+        layout.data.push_run(
+            Font::new(font.font.blob.clone(), font.font.index),
+            item.size,
+            font.font.synthesis,
+            &glyph_buffer,
+            item.level,
+            item.word_spacing,
+            item.letter_spacing,
+            segment_text,
+            segment_infos,
+            (text_range.start + segment_start_offset)..(text_range.start + segment_end_offset),
+            harf_shaper.coords(),
+        );
+
+        // Replace buffer to reuse allocation in next iteration.
+        scx.unicode_buffer = Some(glyph_buffer.clear());
+    }
+}
+
 fn real_script(script: Script) -> bool {
     script != Script::Common && script != Script::Unknown && script != Script::Inherited
+}
+
+fn variations_iter<'a>(
+    synthesis: &'a fontique::Synthesis,
+    item: Option<&'a [FontVariation]>,
+) -> impl Iterator<Item = harfrust::Variation> + 'a {
+    synthesis
+        .variation_settings()
+        .iter()
+        .map(|(tag, value)| harfrust::Variation {
+            tag: *tag,
+            value: *value,
+        })
+        .chain(
+            item.unwrap_or(&[])
+                .iter()
+                .map(|variation| harfrust::Variation {
+                    tag: harfrust::Tag::from_u32(variation.tag),
+                    value: variation.value,
+                }),
+        )
 }
 
 struct FontSelector<'a, 'b, B: Brush> {
@@ -267,12 +433,8 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             features,
         }
     }
-}
 
-impl<B: Brush> partition::Selector for FontSelector<'_, '_, B> {
-    type SelectedFont = SelectedFont;
-
-    fn select_font(&mut self, cluster: &mut CharCluster) -> Option<Self::SelectedFont> {
+    fn select_font(&mut self, cluster: &mut CharCluster) -> Option<SelectedFont> {
         let style_index = cluster.user_data() as u16;
         let is_emoji = cluster.info().is_emoji();
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
@@ -348,35 +510,16 @@ impl<B: Brush> partition::Selector for FontSelector<'_, '_, B> {
 
 struct SelectedFont {
     font: QueryFont,
-    synthesis: Synthesis,
 }
 
 impl From<&QueryFont> for SelectedFont {
     fn from(font: &QueryFont) -> Self {
-        use crate::swash_convert::synthesis_to_swash;
-        Self {
-            font: font.clone(),
-            synthesis: synthesis_to_swash(font.synthesis),
-        }
+        Self { font: font.clone() }
     }
 }
 
 impl PartialEq for SelectedFont {
     fn eq(&self, other: &Self) -> bool {
-        self.font.family == other.font.family && self.synthesis == other.synthesis
-    }
-}
-
-impl partition::SelectedFont for SelectedFont {
-    fn font(&self) -> FontRef<'_> {
-        FontRef::from_index(self.font.blob.as_ref(), self.font.index as _).unwrap()
-    }
-
-    fn id_override(&self) -> Option<[u64; 2]> {
-        Some([self.font.blob.id(), self.font.index as _])
-    }
-
-    fn synthesis(&self) -> Option<Synthesis> {
-        Some(self.synthesis)
+        self.font.family == other.font.family && self.font.synthesis == other.font.synthesis
     }
 }

@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use super::{
-    Brush, Cluster, ClusterPath, Font, Layout, LineItemData, NormalizedCoord, Range, Run, RunData,
-    Synthesis,
+    Brush, Cluster, ClusterPath, Font, Layout, LineItemData, Range, Run, RunData, Synthesis,
 };
 
 impl<'a, B: Brush> Run<'a, B> {
@@ -45,7 +44,7 @@ impl<'a, B: Brush> Run<'a, B> {
 
     /// Returns the normalized variation coordinates for the font associated
     /// with the run.
-    pub fn normalized_coords(&self) -> &[NormalizedCoord] {
+    pub fn normalized_coords(&self) -> &[i16] {
         self.layout
             .data
             .coords

@@ -23,6 +23,7 @@ Maka = "Maka"
 ot = "ot"
 ot_a = "ot_a"
 ot_b = "ot_b"
+VAI = "VAI"
 wdth = "wdth"
 
 # Match Inside a Word - Case Insensitive

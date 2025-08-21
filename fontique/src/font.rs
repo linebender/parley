@@ -319,7 +319,7 @@ pub struct AxisInfo {
 /// as well as [`QueryFont::synthesis`].
 ///
 /// [`QueryFont::synthesis`]: crate::QueryFont::synthesis
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, PartialEq)]
 pub struct Synthesis {
     vars: [(Tag, f32); 3],
     len: u8,
