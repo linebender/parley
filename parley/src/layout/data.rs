@@ -357,7 +357,7 @@ impl<B: Brush> LayoutData<B> {
         source_text: &str,
         char_infos: &[(swash::text::cluster::CharInfo, u16)], // From text analysis
         text_range: Range<usize>,                             // The text range this run covers
-        coords: &[harfrust::NormalizedCoord]
+        coords: &[harfrust::NormalizedCoord],
     ) {
         let coords_start = self.coords.len();
         self.coords.extend(coords.iter().map(|c| c.to_bits()));
@@ -388,12 +388,13 @@ impl<B: Brush> LayoutData<B> {
                 let default = units_per_em / 18.0;
                 (default, default)
             };
-            let (strikethrough_offset, strikethrough_size) = if let Some(strikeout) = metrics.strikeout {
-                (strikeout.offset, strikeout.thickness)
-            } else {
-                // Default values from HarfBuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334-L347
-                (metrics.ascent / 2.0, units_per_em / 18.0)
-            };
+            let (strikethrough_offset, strikethrough_size) =
+                if let Some(strikeout) = metrics.strikeout {
+                    (strikeout.offset, strikeout.thickness)
+                } else {
+                    // Default values from HarfBuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334-L347
+                    (metrics.ascent / 2.0, units_per_em / 18.0)
+                };
 
             RunMetrics {
                 ascent: metrics.ascent,
