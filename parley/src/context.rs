@@ -16,7 +16,6 @@ use super::style::{Brush, TextStyle};
 use swash::text::cluster::CharInfo;
 
 use crate::builder::TreeBuilder;
-use crate::data::LayoutDataContext;
 use crate::inline_box::InlineBox;
 use crate::shape::ShapeContext;
 
@@ -35,8 +34,6 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
 
     pub(crate) info: Vec<(CharInfo, u16)>,
     pub(crate) scx: ShapeContext,
-
-    pub(crate) ldcx: LayoutDataContext,
 }
 
 impl<B: Brush> LayoutContext<B> {
@@ -50,7 +47,6 @@ impl<B: Brush> LayoutContext<B> {
             tree_style_builder: TreeStyleBuilder::default(),
             info: vec![],
             scx: ShapeContext::default(),
-            ldcx: LayoutDataContext::default(),
         }
     }
 

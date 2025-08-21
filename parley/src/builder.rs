@@ -192,7 +192,6 @@ fn build_into_layout<B: Brush>(
             &lcx.info,
             lcx.bidi.levels(),
             &mut lcx.scx,
-            &mut lcx.ldcx,
             text,
             layout,
         );

@@ -11,7 +11,6 @@ use alloc::vec::Vec;
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
-use crate::data::LayoutDataContext;
 use crate::inline_box::InlineBox;
 use crate::util::nearly_eq;
 use crate::{Font, swash_convert};
@@ -57,7 +56,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
     infos: &[(CharInfo, u16)],
     levels: &[u8],
     scx: &mut ShapeContext,
-    ldcx: &mut LayoutDataContext,
     mut text: &str,
     layout: &mut Layout<B>,
 ) {
@@ -150,7 +148,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 styles,
                 &item,
                 scx,
-                ldcx,
                 text,
                 &text_range,
                 &char_range,
@@ -182,7 +179,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
             styles,
             &item,
             scx,
-            ldcx,
             text,
             &text_range,
             &char_range,
@@ -206,7 +202,6 @@ fn shape_item<'a, B: Brush>(
     styles: &'a [RangedStyle<B>],
     item: &Item,
     scx: &mut ShapeContext,
-    ldcx: &mut LayoutDataContext,
     text: &str,
     text_range: &core::ops::Range<usize>,
     char_range: &core::ops::Range<usize>,
@@ -347,7 +342,6 @@ fn shape_item<'a, B: Brush>(
 
         // Push harfrust-shaped run for the entire segment
         layout.data.push_run(
-            ldcx,
             Font::new(font.font.blob.clone(), font.font.index),
             item.size,
             font.font.synthesis,

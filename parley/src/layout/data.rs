@@ -233,11 +233,6 @@ impl LineItemData {
     }
 }
 
-#[derive(Default)]
-pub(crate) struct LayoutDataContext {
-    pub(crate) clusters: Vec<ClusterData>,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LayoutItemKind {
     TextRun,
@@ -352,7 +347,6 @@ impl<B: Brush> LayoutData<B> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn push_run(
         &mut self,
-        ldcx: &mut LayoutDataContext,
         font: Font,
         font_size: f32,
         synthesis: fontique::Synthesis,
@@ -451,9 +445,8 @@ impl<B: Brush> LayoutData<B> {
                 source_text.char_indices(),
             );
         } else {
-            let mut clusters = core::mem::take(&mut ldcx.clusters);
             run.advance = process_clusters(
-                &mut clusters,
+                &mut self.clusters,
                 &mut self.glyphs,
                 scale_factor,
                 glyph_infos,
@@ -461,11 +454,9 @@ impl<B: Brush> LayoutData<B> {
                 char_infos,
                 source_text.char_indices().rev(),
             );
-
             // Reverse clusters into logical order for RTL
-            self.clusters.extend(clusters.drain(..).rev());
-            // Return scratch cluster allocation.
-            ldcx.clusters = clusters;
+            let clusters_len = self.clusters.len();
+            self.clusters[cluster_range_start..clusters_len].reverse();
         }
 
         run.cluster_range = cluster_range_start..self.clusters.len();
