@@ -39,9 +39,9 @@ This is necessary because fonts typically don't cover the entire Unicode range: 
 But if you have, say arabic text or emoji embedded within latin text, you don't typically specify the font for the arabic text or the emoji, one is chosen for you.
 Font fallback is the process which makes that choice.
 
-### Harfrust
+### HarfRust
 
-Harfrust is a Rust port of HarfBuzz text shaping engine. **Text shaping** means mapping runs of Unicode codepoints to specific glyphs within fonts.
+HarfRust is a Rust port of HarfBuzz text shaping engine. **Text shaping** means mapping runs of Unicode codepoints to specific glyphs within fonts.
 This includes applying ligatures, resolving emoji modifiers, but also much more complex transformations for some scripts.
 
 ### Skrifa
