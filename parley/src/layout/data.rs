@@ -562,7 +562,7 @@ impl<B: Brush> LayoutData<B> {
     }
 }
 
-/// Processes shaped glyphs from HarfRust and converts them into `ClusterData` and `Glyph`.
+/// Processes shaped glyphs from `HarfRust` and converts them into `ClusterData` and `Glyph`.
 ///
 /// # Parameters
 ///
@@ -573,10 +573,10 @@ impl<B: Brush> LayoutData<B> {
 ///
 /// ## Input Parameters:
 /// * `scale_factor` - Scaling factor used to convert font units to the target size.
-/// * `glyph_infos` - HarfRust glyph information in visual order.
-/// * `glyph_positions` - HarfRust glyph positioning data in visual order.
+/// * `glyph_infos` - `HarfRust` glyph information in visual order.
+/// * `glyph_positions` - `HarfRust` glyph positioning data in visual order.
 /// * `char_infos` - Character information from text analysis, indexed by cluster ID.
-/// * `char_indices_iter` - Iterator over (byte_offset, char) pairs from the source text.
+/// * `char_indices_iter` - Iterator over (`byte_offset`, `char`) pairs from the source text.
 ///   Should be in logical order (forward for LTR, reverse for RTL).
 fn process_clusters<I: Iterator<Item = (usize, char)>>(
     clusters: &mut Vec<ClusterData>,
