@@ -113,7 +113,7 @@ fn to_whitespace(c: char) -> Whitespace {
     }
 }
 
-/// Harfrust-based run data (updated to use harfrust types)
+/// `HarfRust`-based run data
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct RunData {
     /// Index of the font for the run.
@@ -424,7 +424,7 @@ impl<B: Brush> LayoutData<B> {
             advance: 0.,
         };
 
-        // HarfBuzz returns glyphs in visual order, so we need to process them as such while
+        // `HarfRust` returns glyphs in visual order, so we need to process them as such while
         // maintaining logical ordering of clusters.
 
         let glyph_infos = glyph_buffer.glyph_infos();
