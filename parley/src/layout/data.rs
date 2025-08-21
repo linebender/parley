@@ -265,7 +265,6 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) full_width: f32,
     pub(crate) height: f32,
     pub(crate) fonts: Vec<Font>,
-    pub(crate) font_metrics: Vec<FontMetrics>,
     pub(crate) coords: Vec<i16>,
 
     // Input (/ output of style resolution)
@@ -301,7 +300,6 @@ impl<B: Brush> Default for LayoutData<B> {
             full_width: 0.,
             height: 0.,
             fonts: Vec::new(),
-            font_metrics: Vec::new(),
             coords: Vec::new(),
             styles: Vec::new(),
             inline_boxes: Vec::new(),
@@ -328,7 +326,6 @@ impl<B: Brush> LayoutData<B> {
         self.full_width = 0.;
         self.height = 0.;
         self.fonts.clear();
-        self.font_metrics.clear();
         self.coords.clear();
         self.styles.clear();
         self.inline_boxes.clear();
@@ -377,24 +374,42 @@ impl<B: Brush> LayoutData<B> {
             .iter()
             .position(|f| *f == font)
             .unwrap_or_else(|| {
-                debug_assert_eq!(self.fonts.len(), self.font_metrics.len());
-                let font_ref = skrifa::FontRef::from_index(font.data.as_ref(), font.index).unwrap();
-                self.font_metrics.push(FontMetrics::from(&font_ref));
                 let index = self.fonts.len();
                 self.fonts.push(font);
                 index
             });
 
-        let metrics = &self.font_metrics[font_index];
+        let metrics = {
+            let font = &self.fonts[font_index];
+            let font_ref = skrifa::FontRef::from_index(font.data.as_ref(), font.index).unwrap();
+            skrifa::metrics::Metrics::new(&font_ref, skrifa::prelude::Size::new(font_size), coords)
+        };
         let units_per_em = metrics.units_per_em as f32;
-        let metrics = RunMetrics {
-            ascent: font_size * metrics.ascent as f32 / units_per_em,
-            descent: -font_size * metrics.descent as f32 / units_per_em,
-            leading: font_size * metrics.leading as f32 / units_per_em,
-            underline_offset: font_size * metrics.underline_offset as f32 / units_per_em,
-            underline_size: font_size * metrics.underline_size as f32 / units_per_em,
-            strikethrough_offset: font_size * metrics.strikethrough_offset as f32 / units_per_em,
-            strikethrough_size: font_size * metrics.strikethrough_size as f32 / units_per_em,
+
+        let metrics = {
+            let (underline_offset, underline_size) = if let Some(underline) = metrics.underline {
+                (underline.offset, underline.thickness)
+            } else {
+                // Default values from Harfbuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334
+                let default = units_per_em / 18.0;
+                (default, default)
+            };
+            let (strikethrough_offset, strikethrough_size) = if let Some(strikeout) = metrics.strikeout {
+                (strikeout.offset, strikeout.thickness)
+            } else {
+                // Default values from HarfBuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334-L347
+                (metrics.ascent / 2.0, units_per_em / 18.0)
+            };
+
+            RunMetrics {
+                ascent: metrics.ascent,
+                descent: -metrics.descent,
+                leading: metrics.leading,
+                underline_offset,
+                underline_size,
+                strikethrough_offset,
+                strikethrough_size,
+            }
         };
 
         let cluster_range = self.clusters.len()..self.clusters.len();
@@ -839,76 +854,4 @@ fn push_cluster(
         text_offset: cluster_start_char.0 as u16,
         advance: final_advance,
     });
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct FontMetrics {
-    ascent: i16,
-    descent: i16,
-    leading: i16,
-
-    units_per_em: u16,
-
-    strikethrough_offset: i16,
-    strikethrough_size: i16,
-
-    underline_offset: i16,
-    underline_size: i16,
-}
-
-impl FontMetrics {
-    fn from(font: &skrifa::FontRef<'_>) -> Self {
-        use skrifa::raw::{TableProvider, tables::os2::SelectionFlags};
-        // NOTE: This _does not_ copy harfrust's metrics behaviour (https://github.com/harfbuzz/harfrust/blob/a38025fb336230b492366740c86021bb406bcd0d/src/hb/glyph_metrics.rs#L55-L60).
-
-        let units_per_em = font
-            .head()
-            .map(|h| h.units_per_em())
-            // TODO: Should we panic/return error instead?
-            .unwrap_or(2048);
-
-        let (underline_offset, underline_size) = {
-            let post = font.post().unwrap(); // TODO: Handle invalid font?
-            (
-                post.underline_position().to_i16(),
-                post.underline_thickness().to_i16(),
-            )
-        };
-
-        let mut strikethrough_offset = 0;
-
-        if let Ok(os2) = font.os2() {
-            strikethrough_offset = os2.y_strikeout_position();
-            if os2
-                .fs_selection()
-                .contains(SelectionFlags::USE_TYPO_METRICS)
-            {
-                return Self {
-                    ascent: os2.s_typo_ascender(),
-                    descent: os2.s_typo_descender(),
-                    leading: os2.s_typo_line_gap(),
-                    units_per_em,
-                    strikethrough_offset,
-                    strikethrough_size: os2.y_strikeout_size(),
-                    underline_offset,
-                    underline_size,
-                };
-            }
-        }
-        if let Ok(hhea) = font.hhea() {
-            return Self {
-                ascent: hhea.ascender().to_i16(),
-                descent: hhea.descender().to_i16(),
-                leading: hhea.line_gap().to_i16(),
-                units_per_em,
-                strikethrough_offset,
-                strikethrough_size: underline_size,
-                underline_offset,
-                underline_size,
-            };
-        }
-
-        // TODO: Handle invalid font?
-        panic!("Invalid font");
-    }
 }
