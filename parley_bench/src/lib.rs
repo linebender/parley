@@ -2,9 +2,16 @@
 //!
 //! This crate provides a benchmark for the Parley library.
 
-use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex, MutexGuard, OnceLock},
+};
 
-use parley::{FontContext, LayoutContext};
+use parley::{
+    FontContext, FontFamily, FontStack, LayoutContext, RangedBuilder, StyleProperty,
+    fontique::{Blob, Collection, CollectionOptions},
+};
 
 pub mod default_style;
 
@@ -28,9 +35,82 @@ pub fn get_contexts() -> (
     MutexGuard<'static, FontContext>,
     MutexGuard<'static, LayoutContext<ColorBrush>>,
 ) {
-    let font_cx = FONT_CX.get_or_init(|| Mutex::new(FontContext::new()));
+    let font_cx = FONT_CX.get_or_init(|| Mutex::new(create_font_context()));
     let layout_cx = LAYOUT_CX.get_or_init(|| Mutex::new(LayoutContext::new()));
     (font_cx.lock().unwrap(), layout_cx.lock().unwrap())
+}
+
+pub(crate) fn create_font_context() -> FontContext {
+    let mut collection = Collection::new(CollectionOptions {
+        shared: false,
+        system_fonts: false,
+    });
+    load_fonts(&mut collection, font_dirs()).unwrap();
+    for font in FONT_STACK {
+        if let FontFamily::Named(font_name) = font {
+            collection
+                .family_id(font_name)
+                .unwrap_or_else(|| panic!("{font_name} font not found"));
+        }
+    }
+    FontContext {
+        collection,
+        source_cache: Default::default(),
+    }
+}
+
+pub fn apply_default_style(builder: &mut RangedBuilder<'_, ColorBrush>) {
+    builder.push_default(StyleProperty::Brush(ColorBrush {}));
+    builder.push_default(StyleProperty::FontStack(FontStack::List(FONT_STACK.into())));
+}
+
+fn font_dirs() -> impl Iterator<Item = PathBuf> {
+    [
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("parley")
+            .join("tests")
+            .join("assets")
+            .join("roboto_fonts"),
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("parley")
+            .join("tests")
+            .join("assets")
+            .join("noto_fonts"),
+    ]
+    .into_iter()
+}
+
+pub(crate) const FONT_STACK: &[FontFamily<'_>] = &[
+    FontFamily::Named(Cow::Borrowed("Roboto")),
+    FontFamily::Named(Cow::Borrowed("Noto Kufi Arabic")),
+];
+
+pub(crate) fn load_fonts(
+    collection: &mut Collection,
+    font_dirs: impl Iterator<Item = PathBuf>,
+) -> std::io::Result<()> {
+    for dir in font_dirs {
+        let paths = std::fs::read_dir(dir)?;
+        for entry in paths {
+            let entry = entry?;
+            if !entry.metadata()?.is_file() {
+                continue;
+            }
+            let path = entry.path();
+            if path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .is_none_or(|ext| !["ttf", "otf", "ttc", "otc"].contains(&ext))
+            {
+                continue;
+            }
+            let font_data = std::fs::read(&path)?;
+            collection.register_fonts(Blob::new(Arc::new(font_data)), None);
+        }
+    }
+    Ok(())
 }
 
 /// A sample to be used for benchmarking.
@@ -59,31 +139,31 @@ pub fn get_samples() -> &'static [Sample] {
                 modification: "all",
                 text: arabic,
             },
-            //Sample {
-            //    name: "latin",
-            //    modification: "all",
-            //    text: latin,
-            //},
-            //Sample {
-            //    name: "japanese",
-            //    modification: "all",
-            //    text: japanese,
-            //},
-            //Sample {
-            //    name: "arabic",
-            //    modification: "1 paragraph",
-            //    text: arabic.lines().next().unwrap(),
-            //},
-            //Sample {
-            //    name: "latin",
-            //    modification: "1 paragraph",
-            //    text: latin.lines().next().unwrap(),
-            //},
-            //Sample {
-            //    name: "japanese",
-            //    modification: "1 paragraph",
-            //    text: japanese.lines().next().unwrap(),
-            //},
+            Sample {
+                name: "latin",
+                modification: "all",
+                text: latin,
+            },
+            Sample {
+                name: "japanese",
+                modification: "all",
+                text: japanese,
+            },
+            Sample {
+                name: "arabic",
+                modification: "1 paragraph",
+                text: arabic.lines().next().unwrap(),
+            },
+            Sample {
+                name: "latin",
+                modification: "1 paragraph",
+                text: latin.lines().next().unwrap(),
+            },
+            Sample {
+                name: "japanese",
+                modification: "1 paragraph",
+                text: japanese.lines().next().unwrap(),
+            },
         ]
     })
 }

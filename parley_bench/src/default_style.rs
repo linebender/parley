@@ -2,7 +2,7 @@
 //!
 //! This module provides a benchmark for the default style.
 
-use crate::{ColorBrush, get_contexts, get_samples};
+use crate::{ColorBrush, apply_default_style, get_contexts, get_samples};
 use parley::{Alignment, AlignmentOptions, Layout};
 use std::hint::black_box;
 use tango_bench::{Benchmark, benchmark_fn};
@@ -26,12 +26,13 @@ pub fn default_style() -> Vec<Benchmark> {
                         let text = sample.text;
                         let (mut font_cx_guard, mut layout_cx_guard) = get_contexts();
 
-                        let builder = layout_cx_guard.ranged_builder(
+                        let mut builder = layout_cx_guard.ranged_builder(
                             &mut font_cx_guard,
                             &text,
                             DISPLAY_SCALE,
                             QUANTIZE,
                         );
+                        apply_default_style(&mut builder);
                         let mut layout: Layout<ColorBrush> = builder.build(&text);
                         layout.break_all_lines(Some(MAX_ADVANCE));
                         layout.align(
