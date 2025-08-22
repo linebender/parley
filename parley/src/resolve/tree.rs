@@ -200,6 +200,13 @@ impl<B: Brush> TreeStyleBuilder<B> {
         styles.clear();
         styles.extend_from_slice(&self.flatted_styles);
 
+        if styles.is_empty() && self.text.is_empty() {
+            styles.push(RangedStyle {
+                style: self.tree[0].style.clone(),
+                range: 0..0,
+            });
+        }
+
         core::mem::take(&mut self.text)
     }
 }
