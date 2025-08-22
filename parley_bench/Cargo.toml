@@ -1,0 +1,22 @@
+[package]
+name = "parley_bench"
+description = "Benchmarking harness for parley."
+keywords = ["text", "layout"]
+categories = ["gui", "graphics"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+parley = { workspace = true, default-features = true }
+skrifa = { workspace = true }
+tango-bench = "0.6"
+
+[[bench]]
+name = "main"
+harness = false
+
+[lints]
+workspace = true

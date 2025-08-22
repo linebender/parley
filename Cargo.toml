@@ -4,6 +4,7 @@ members = [
     "attributed_text",
     "fontique",
     "parley",
+    "parley_bench",
     "parley_core",
     "examples/tiny_skia_render",
     "examples/swash_render",
