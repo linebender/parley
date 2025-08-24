@@ -613,8 +613,8 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
     //
     // `num_components` is the number of characters in the current cluster. Since source text's characters
     // were inserted into `HarfRust`'s buffer using their logical indices as the cluster ID, `HarfRust` will
-    // assign the first character's cluster ID (in logical order) to the merged cluster because `HarfRust`
-    // chooses the [minimum ID for merging](https://github.com/harfbuzz/harfrust/blob/a38025fb336230b492366740c86021bb406bcd0d/src/hb/buffer.rs#L920-L924).
+    // assign the first character's cluster ID (in logical order) to the merged cluster because the minimum
+    // ID is selected for [merging](https://github.com/harfbuzz/harfrust/blob/a38025fb336230b492366740c86021bb406bcd0d/src/hb/buffer.rs#L920-L924).
     //
     //  So, the number of components in a given cluster is dependent on `direction`.
     //   - In LTR, `num_components` is the difference between the next cluster and the current cluster.
