@@ -578,6 +578,7 @@ impl<B: Brush> LayoutData<B> {
 ///   with zero offsets may be inlined directly into `ClusterData`.
 ///
 /// ## Input Parameters:
+/// * `direction` - Direction of the text.
 /// * `scale_factor` - Scaling factor used to convert font units to the target size.
 /// * `glyph_infos` - `HarfRust` glyph information in visual order.
 /// * `glyph_positions` - `HarfRust` glyph positioning data in visual order.
