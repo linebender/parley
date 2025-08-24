@@ -645,16 +645,7 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
         // Flush previous cluster if we've reached a new cluster
         if cluster_id != glyph_info.cluster {
             run_advance += cluster_advance;
-            // If the difference between the current and new cluster is 1,
-            // but the num_components is greater than 1, then we have a
-            // ligature where 1 byte was expanded to multiple glyphs.
-            //
-            // So, for the purposes of `ClusterData`, this will be recorded
-            // as a single cluster (and so we want all the advance assigned)
-            // to it.
-            //
             let num_components = num_components(glyph_info.cluster, cluster_id, last_cluster_id);
-
             cluster_advance /= num_components as f32;
             let is_newline = to_whitespace(cluster_start_char.1) == Whitespace::Newline;
             let cluster_type = if num_components > 1 {
