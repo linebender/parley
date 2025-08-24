@@ -149,6 +149,7 @@ pub(crate) fn render_layout_with_clusters(
     config: &RenderingConfig,
     layout: &Layout<ColorBrush>,
     char_layouts: &HashMap<char, Layout<ColorBrush>>,
+    char_info_font_size: f32,
 ) -> Pixmap {
     let padding = 20;
     let line_extra_spacing = 60.0; // Extra space between lines for cluster info
@@ -281,7 +282,7 @@ pub(crate) fn render_layout_with_clusters(
                                 let glyph_id = GlyphId::from(glyph.id as u16);
                                 if let Some(glyph_outline) = outlines.get(glyph_id) {
                                     pen.set_origin(glyph_x, glyph_y);
-                                    pen.draw_glyph(&glyph_outline, 12.0, &[]);
+                                    pen.draw_glyph(&glyph_outline, char_info_font_size, &[]);
                                 }
                             }
                         }

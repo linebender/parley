@@ -325,7 +325,12 @@ impl TestEnv {
         self.check_image(&current_img);
     }
 
-    pub(crate) fn check_cluster_snapshot(&mut self, layout: &Layout<ColorBrush>, text: &str) {
+    pub(crate) fn check_cluster_snapshot(
+        &mut self,
+        layout: &Layout<ColorBrush>,
+        text: &str,
+        char_info_font_size: f32,
+    ) {
         let mut char_layouts = HashMap::new();
         for char in text.chars() {
             let char_text = char.to_string();
@@ -334,8 +339,12 @@ impl TestEnv {
             char_layouts.insert(char, layout);
         }
 
-        let current_img =
-            render_layout_with_clusters(&self.rendering_config, layout, &char_layouts);
+        let current_img = render_layout_with_clusters(
+            &self.rendering_config,
+            layout,
+            &char_layouts,
+            char_info_font_size,
+        );
         self.check_image(&current_img);
     }
 
@@ -346,12 +355,12 @@ impl TestEnv {
         let snapshot_path = snapshot_dir().join(&image_name);
         let comparison_path = current_imgs_dir().join(&image_name);
 
-        if let Err(err) = self.check_images(img, &snapshot_path) {
+        if let Err(e) = self.check_images(img, &snapshot_path) {
             if is_accept_mode() {
                 img.save_png(&snapshot_path).unwrap();
             } else {
                 img.save_png(&comparison_path).unwrap();
-                self.errors.push((comparison_path, err));
+                self.errors.push((comparison_path, e));
             }
         } else if is_generate_all_mode() {
             img.save_png(&comparison_path).unwrap();

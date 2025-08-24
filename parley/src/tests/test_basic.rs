@@ -493,41 +493,30 @@ fn test_cluster_info() {
     let test_name = test_name!();
     let mut env = TestEnv::new(test_name, Size::new(400.0, 200.0));
 
-    let create_layout = |env: &mut TestEnv, text: &str| {
+    let test_cluster_layout = |test: &str, text: &str, env: &mut TestEnv| {
         let mut builder = env.ranged_builder(text);
         builder.push_default(StyleProperty::FontSize(24.0));
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(400.0));
-        layout
+        env.with_name(test)
+            .check_cluster_snapshot(&layout, text, 12.0);
     };
 
     // Latin LTR with ligature
-    {
-        let text = "Hello Ligature: fi";
-        let layout = create_layout(&mut env, text);
-        env.with_name("latin").check_cluster_snapshot(&layout, text);
-    }
+    let text = "Hello Ligature: fi";
+    test_cluster_layout("latin", text, &mut env);
+
     // Arabic RTL with ligature
-    {
-        let text = "حداً ";
-        let layout = create_layout(&mut env, text);
-        env.with_name("arabic")
-            .check_cluster_snapshot(&layout, text);
-    }
+    let text = "حداً ";
+    test_cluster_layout("arabic", text, &mut env);
+
     // Mixed content with ligature
-    {
-        let text = "Hello Ligature: fi, Arabic: حداً";
-        let layout = create_layout(&mut env, text);
-        env.with_name("ltr_rtl_mixed")
-            .check_cluster_snapshot(&layout, text);
-    }
+    let text = "Hello Ligature: fi, Arabic: حداً";
+    test_cluster_layout("ltr_rtl_mixed", text, &mut env);
+
     // Newlines
-    {
-        let text = "Hello\nLigature:\nfi";
-        let layout = create_layout(&mut env, text);
-        env.with_name("newlines")
-            .check_cluster_snapshot(&layout, text);
-    }
+    let text = "Hello\nLigature:\nfi";
+    test_cluster_layout("newlines", text, &mut env);
 }
 
 #[test]
