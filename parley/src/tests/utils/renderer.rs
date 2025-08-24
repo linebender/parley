@@ -200,7 +200,7 @@ pub(crate) fn render_layout_with_clusters(
             }
         }
 
-        // Now render cluster information
+        // Now render cluster information below each line.
         for item in line.items() {
             if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
                 let run = glyph_run.run();
@@ -250,8 +250,8 @@ pub(crate) fn render_layout_with_clusters(
                             // Skip rendering whitespace
                         }
                         _ => {
-                            // Draw the character glyphs under the measurement line (these should appear
-                            // to be the same as the character in the source text).
+                            // Draw the cluster's character glyphs under the measurement line (these
+                            // should appear to be the same as the character in the source text).
                             let char_layout = char_layouts.get(&source_char).unwrap();
                             let line = char_layout.lines().next().unwrap();
                             let item = line.items().next().unwrap();
