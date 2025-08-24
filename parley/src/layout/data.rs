@@ -612,13 +612,15 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
     // the HarfBuzz docs on [clusters](https://harfbuzz.github.io/working-with-harfbuzz-clusters.html).
     //
     // `num_components` is the number of characters in the current cluster. Since source text's characters
-    // were inserted into `HarfRust`'s buffer using their indices as the cluster ID, `HarfRust` will assign
-    // the first character's cluster ID to the cluster because `HarfRust` chooses the [minimum ID for merging](https://github.com/harfbuzz/harfrust/blob/a38025fb336230b492366740c86021bb406bcd0d/src/hb/buffer.rs#L920-L924).
+    // were inserted into `HarfRust`'s buffer using their logical indices as the cluster ID, `HarfRust` will
+    // assign the first character's cluster ID (in logical order) to the merged cluster because `HarfRust`
+    // chooses the [minimum ID for merging](https://github.com/harfbuzz/harfrust/blob/a38025fb336230b492366740c86021bb406bcd0d/src/hb/buffer.rs#L920-L924).
     //
-    //  So, the number of components in a given cluster is dependent on `direction`. In LTR,  `num_components`
-    // is the difference between the next cluster and the current cluster. In RTL, it is the difference between
-    // the last cluster and the current cluster. This is because we must compare the current cluster its next
-    // larger ID (or last visual index, which is downstream in LTR and upstream in RTL).
+    //  So, the number of components in a given cluster is dependent on `direction`.
+    //   - In LTR, `num_components` is the difference between the next cluster and the current cluster.
+    //   - In RTL, `num_components` is the difference between the last cluster and the current cluster.
+    // This is because we must compare the current cluster to its next larger ID (in other words, the next
+    // logical index, which is visually downstream in LTR and visually upstream in RTL).
     //
     // For example, consider the LTR text for "afi" where "fi" form a ligature.
     //   Initial cluster values: 0, 1, 2 (logical + visual order)
@@ -627,8 +629,8 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
     //   `num_components`:       (1 - 0 =) 1, (3 - 1 =) 2
     //
     // Now consider the RTL text for "حداً".
-    //   Initial cluster values:  0, 1, 2, 3 (visal order)
-    //   Reversed cluster values: 3, 2, 1, 0 (logical order)
+    //   Initial cluster values:  0, 1, 2, 3 (logical, or in-memory, order)
+    //   Reversed cluster values: 3, 2, 1, 0 (visual order - the return order of `HarfRust` for RTL)
     //   `HarfRust` assignation:  3, 2, 0, 0
     //   Cluster count:           3
     //   `num_components`:        (4 - 3 =) 1, (3 - 2 =) 1, (2 - 0 =) 2
