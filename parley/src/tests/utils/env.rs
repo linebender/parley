@@ -1,13 +1,17 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::tests::utils::renderer::{ColorBrush, RenderingConfig, render_layout};
+use crate::tests::utils::renderer::{
+    ColorBrush, RenderingConfig, render_layout, render_layout_with_clusters,
+};
 use crate::{
     FontContext, FontFamily, FontStack, Layout, LayoutContext, LineHeight, PlainEditor,
-    PlainEditorDriver, RangedBuilder, Rect, StyleProperty, TextStyle, TreeBuilder,
+    PlainEditorDriver, PositionedLayoutItem, RangedBuilder, Rect, StyleProperty, TextStyle,
+    TreeBuilder,
 };
 use fontique::{Blob, Collection, CollectionOptions};
 use peniko::kurbo::Size;
+use std::collections::HashMap;
 use std::{
     borrow::Cow,
     path::{Path, PathBuf},
@@ -316,23 +320,41 @@ impl TestEnv {
         cursor_rect: Option<Rect>,
         selection_rects: &[(Rect, usize)],
     ) {
-        let test_case_name = std::mem::take(&mut self.next_test_case_name);
         let current_img =
             render_layout(&self.rendering_config, layout, cursor_rect, selection_rects);
+        self.check_image(&current_img);
+    }
+
+    pub(crate) fn check_cluster_snapshot(&mut self, layout: &Layout<ColorBrush>, text: &str) {
+        let mut char_layouts = HashMap::new();
+        for char in text.chars() {
+            let char_text = char.to_string();
+            let mut layout = self.ranged_builder(&char_text).build(&char_text);
+            layout.break_all_lines(Some(400.0));
+            char_layouts.insert(char, layout);
+        }
+
+        let current_img =
+            render_layout_with_clusters(&self.rendering_config, layout, &char_layouts);
+        self.check_image(&current_img);
+    }
+
+    fn check_image(&mut self, img: &Pixmap) {
+        let test_case_name = std::mem::take(&mut self.next_test_case_name);
         let image_name = self.image_name(&test_case_name);
 
         let snapshot_path = snapshot_dir().join(&image_name);
         let comparison_path = current_imgs_dir().join(&image_name);
 
-        if let Err(e) = self.check_images(&current_img, &snapshot_path) {
+        if let Err(err) = self.check_images(img, &snapshot_path) {
             if is_accept_mode() {
-                current_img.save_png(&snapshot_path).unwrap();
+                img.save_png(&snapshot_path).unwrap();
             } else {
-                current_img.save_png(&comparison_path).unwrap();
-                self.errors.push((comparison_path, e));
+                img.save_png(&comparison_path).unwrap();
+                self.errors.push((comparison_path, err));
             }
         } else if is_generate_all_mode() {
-            current_img.save_png(&comparison_path).unwrap();
+            img.save_png(&comparison_path).unwrap();
         }
     }
 }

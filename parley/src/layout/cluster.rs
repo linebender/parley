@@ -391,6 +391,12 @@ impl<'a, B: Brush> Cluster<'a, B> {
     pub(crate) fn info(&self) -> &data::ClusterInfo {
         &self.data.info
     }
+
+    /// Returns the text length of the cluster in bytes.
+    #[cfg(test)]
+    pub(crate) fn text_len(&self) -> u8 {
+        self.data.text_len
+    }
 }
 
 /// Determines how a cursor attaches to a cluster.

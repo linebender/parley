@@ -6,7 +6,6 @@ use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::nearly_zero;
 use crate::{Font, OverflowWrap};
-use core::iter;
 use core::ops::Range;
 
 use swash::text::cluster::{Boundary, Whitespace};
@@ -99,6 +98,11 @@ impl ClusterInfo {
     /// Returns if the cluster is any whitespace.
     pub(crate) fn is_whitespace(&self) -> bool {
         self.source_char.is_whitespace()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn source_char(&self) -> char {
+        self.source_char
     }
 }
 
@@ -437,6 +441,7 @@ impl<B: Brush> LayoutData<B> {
         let is_rtl = bidi_level & 1 == 1;
         if !is_rtl {
             run.advance = process_clusters(
+                Direction::Ltr,
                 &mut self.clusters,
                 &mut self.glyphs,
                 scale_factor,
@@ -447,6 +452,7 @@ impl<B: Brush> LayoutData<B> {
             );
         } else {
             run.advance = process_clusters(
+                Direction::Rtl,
                 &mut self.clusters,
                 &mut self.glyphs,
                 scale_factor,
@@ -579,6 +585,7 @@ impl<B: Brush> LayoutData<B> {
 /// * `char_indices_iter` - Iterator over (`byte_offset`, `char`) pairs from the source text.
 ///   Should be in logical order (forward for LTR, reverse for RTL).
 fn process_clusters<I: Iterator<Item = (usize, char)>>(
+    direction: Direction,
     clusters: &mut Vec<ClusterData>,
     glyphs: &mut Vec<Glyph>,
     scale_factor: f32,
@@ -600,19 +607,54 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
     // pushing the first glyph to `glyphs` because it might be inlined into `ClusterData`.
     let mut pending_inline_glyph: Option<Glyph> = None;
 
-    let text_len = |char: (usize, char), chars: &mut iter::Peekable<I>| {
-        let next = chars
-            .peek()
-            .map(|x| x.0)
-            .unwrap_or(char.0 + char.1.len_utf8());
-        char.0.abs_diff(next) as u8
+    // The mental model for understanding this function is best grasped by first reading
+    // the HarfBuzz docs on [clusters](https://harfbuzz.github.io/working-with-harfbuzz-clusters.html).
+    //
+    // `num_components` is the number of characters in the current cluster. Since source text's characters
+    // were inserted into `HarfRust`'s buffer using their indices as the cluster ID, `HarfRust` will assign
+    // the first character's cluster ID to the cluster because `HarfRust` chooses the [minimum ID for merging](https://github.com/harfbuzz/harfrust/blob/a38025fb336230b492366740c86021bb406bcd0d/src/hb/buffer.rs#L920-L924).
+    //
+    //  So, the number of components in a given cluster is dependent on `direction`. In LTR,  `num_components`
+    // is the difference between the next cluster and the current cluster. In RTL, it is the difference between
+    // the last cluster and the current cluster. This is because we must compare the current cluster its next
+    // larger ID (or last visual index, which is downstream in LTR and upstream in RTL).
+    //
+    // For example, consider the LTR text for "afi" where "fi" form a ligature.
+    //   Initial cluster values: 0, 1, 2 (logical + visual order)
+    //   `HarfRust` assignation: 0, 1, 1
+    //   Cluster count:          2
+    //   `num_components`:       (1 - 0 =) 1, (3 - 1 =) 2
+    //
+    // Now consider the RTL text for "حداً".
+    //   Initial cluster values:  0, 1, 2, 3 (visal order)
+    //   Reversed cluster values: 3, 2, 1, 0 (logical order)
+    //   `HarfRust` assignation:  3, 2, 0, 0
+    //   Cluster count:           3
+    //   `num_components`:        (4 - 3 =) 1, (3 - 2 =) 1, (2 - 0 =) 2
+    let num_components =
+        |next_cluster: u32, current_cluster: u32, last_cluster: u32| match direction {
+            Direction::Ltr => next_cluster - current_cluster,
+            Direction::Rtl => last_cluster - current_cluster,
+        };
+    let mut last_cluster_id: u32 = match direction {
+        Direction::Ltr => 0,
+        Direction::Rtl => char_infos.len() as u32,
     };
 
     for (glyph_info, glyph_pos) in glyph_infos.iter().zip(glyph_positions.iter()) {
         // Flush previous cluster if we've reached a new cluster
         if cluster_id != glyph_info.cluster {
-            let num_components = cluster_id.abs_diff(glyph_info.cluster);
             run_advance += cluster_advance;
+            // If the difference between the current and new cluster is 1,
+            // but the num_components is greater than 1, then we have a
+            // ligature where 1 byte was expanded to multiple glyphs.
+            //
+            // So, for the purposes of `ClusterData`, this will be recorded
+            // as a single cluster (and so we want all the advance assigned)
+            // to it.
+            //
+            let num_components = num_components(glyph_info.cluster, cluster_id, last_cluster_id);
+
             cluster_advance /= num_components as f32;
             let is_newline = to_whitespace(cluster_start_char.1) == Whitespace::Newline;
             let cluster_type = if num_components > 1 {
@@ -639,7 +681,6 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
             push_cluster(
                 clusters,
                 char_info,
-                text_len(cluster_start_char, &mut char_indices_iter),
                 cluster_start_char,
                 cluster_glyph_offset,
                 cluster_advance,
@@ -651,22 +692,18 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
 
             if num_components > 1 {
                 // Skip characters until we reach the current cluster
-                for i in 0..(num_components - 1) {
+                for i in 1..num_components {
                     cluster_start_char = char_indices_iter.next().unwrap();
                     if to_whitespace(cluster_start_char.1) == Whitespace::Space {
                         break;
                     }
-                    // Iterate in correct (LTR or RTL) order
-                    let char_info_ = if cluster_id < glyph_info.cluster {
-                        &char_infos[(cluster_id + i) as usize]
-                    } else {
-                        &char_infos[(cluster_id - 1) as usize]
+                    let char_info_ = match direction {
+                        Direction::Ltr => &char_infos[(cluster_id + i) as usize],
+                        Direction::Rtl => &char_infos[(cluster_id + num_components - i) as usize],
                     };
-
                     push_cluster(
                         clusters,
                         char_info_,
-                        text_len(cluster_start_char, &mut char_indices_iter),
                         cluster_start_char,
                         cluster_glyph_offset,
                         cluster_advance,
@@ -679,6 +716,7 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
             cluster_start_char = char_indices_iter.next().unwrap();
 
             cluster_advance = 0.0;
+            last_cluster_id = cluster_id;
             cluster_id = glyph_info.cluster;
             char_info = &char_infos[cluster_id as usize];
             pending_inline_glyph = None;
@@ -709,20 +747,23 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
 
     // Push the last cluster
     {
-        // Since this is the last cluster, it covers from cluster_id to the end of char_infos
-        let remaining_chars = char_infos.len() - cluster_id.abs_diff(start_cluster_id) as usize;
-        if remaining_chars > 1 {
+        // See comment above `num_components` for why we use `char_infos.len()` for LTR and 0 for RTL.
+        let next_cluster_id = match direction {
+            Direction::Ltr => char_infos.len() as u32,
+            Direction::Rtl => 0,
+        };
+        let num_components = num_components(next_cluster_id, cluster_id, last_cluster_id);
+        if num_components > 1 {
             // This is a ligature - create ligature start + ligature components
 
             if let Some(pending) = pending_inline_glyph.take() {
                 glyphs.push(pending);
                 total_glyphs += 1;
             }
-            let ligature_advance = cluster_advance / remaining_chars as f32;
+            let ligature_advance = cluster_advance / num_components as f32;
             push_cluster(
                 clusters,
                 char_info,
-                text_len(cluster_start_char, &mut char_indices_iter),
                 cluster_start_char,
                 cluster_glyph_offset,
                 ligature_advance,
@@ -735,21 +776,17 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
 
             // Create ligature component clusters for the remaining characters
             let mut i = 1;
-            while let Some(char) = char_indices_iter.next() {
+            for char in char_indices_iter {
                 if to_whitespace(char.1) == Whitespace::Space {
                     break;
                 }
-                // Iterate in correct (LTR or RTL) order
-                let component_char_info = if cluster_start_char.0 < char.0 {
-                    &char_infos[(cluster_id + i) as usize]
-                } else {
-                    &char_infos[(cluster_id - i) as usize]
+                let component_char_info = match direction {
+                    Direction::Ltr => &char_infos[(cluster_id + i) as usize],
+                    Direction::Rtl => &char_infos[(cluster_id + num_components - i) as usize],
                 };
-
                 push_cluster(
                     clusters,
                     component_char_info,
-                    text_len(char, &mut char_indices_iter),
                     char,
                     cluster_glyph_offset,
                     ligature_advance,
@@ -785,7 +822,6 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
             push_cluster(
                 clusters,
                 char_info,
-                text_len(cluster_start_char, &mut char_indices_iter),
                 cluster_start_char,
                 cluster_glyph_offset,
                 cluster_advance,
@@ -797,6 +833,12 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
     }
 
     run_advance
+}
+
+#[derive(PartialEq)]
+enum Direction {
+    Ltr,
+    Rtl,
 }
 
 enum ClusterType {
@@ -819,7 +861,6 @@ impl From<&ClusterType> for u16 {
 fn push_cluster(
     clusters: &mut Vec<ClusterData>,
     char_info: &(swash::text::cluster::CharInfo, u16),
-    text_len: u8,
     cluster_start_char: (usize, char),
     glyph_offset: u32,
     advance: f32,
@@ -857,7 +898,7 @@ fn push_cluster(
         flags: (&cluster_type).into(),
         style_index: char_info.1,
         glyph_len: final_glyph_len,
-        text_len,
+        text_len: cluster_start_char.1.len_utf8() as u8,
         glyph_offset: final_glyph_offset,
         text_offset: cluster_start_char.0 as u16,
         advance: final_advance,
