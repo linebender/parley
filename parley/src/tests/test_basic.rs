@@ -436,6 +436,7 @@ fn ligatures_ltr() {
         }
         last_advance = c.advance();
     });
+    env.check_layout_snapshot(&layout);
 }
 
 #[test]
@@ -486,6 +487,7 @@ fn ligatures_rtl() {
         }
         last_advance = c.advance();
     });
+    env.check_layout_snapshot(&layout);
 }
 
 #[test]
