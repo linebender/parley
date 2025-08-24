@@ -446,8 +446,10 @@ impl TinySkiaPen<'_> {
         pb.move_to(x1, y1);
         pb.line_to(x2, y2);
         if let Some(path) = pb.finish() {
-            let mut stroke = tiny_skia::Stroke::default();
-            stroke.width = 1.0;
+            let stroke = tiny_skia::Stroke {
+                width: 1.0,
+                ..tiny_skia::Stroke::default()
+            };
             self.pixmap
                 .stroke_path(&path, &self.paint, &stroke, Transform::identity(), None);
         }

@@ -397,8 +397,8 @@ fn ligatures_ltr() {
     let mut env = TestEnv::new(test_name!(), None);
 
     let text = "abfi";
-    let builder = env.ranged_builder(&text);
-    let mut layout = builder.build(&text);
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
     layout.break_all_lines(Some(100.0));
     layout.align(None, Alignment::Start, AlignmentOptions::default());
 
@@ -444,8 +444,8 @@ fn ligatures_rtl() {
     let mut env = TestEnv::new(test_name!(), None);
 
     let text = "احدً";
-    let builder = env.ranged_builder(&text);
-    let mut layout = builder.build(&text);
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
     layout.break_all_lines(Some(100.0));
     layout.align(None, Alignment::Start, AlignmentOptions::default());
 
@@ -478,10 +478,7 @@ fn ligatures_rtl() {
                 assert_eq!(c.advance(), last_advance);
                 // This cluster should contain the one glyph of the ligature whose advance
                 // is the sum of the advances of the component clusters.
-                assert_eq!(
-                    c.glyphs().skip(1).next().unwrap().advance,
-                    c.advance() * 2.0
-                );
+                assert_eq!(c.glyphs().nth(1).unwrap().advance, c.advance() * 2.0);
             }
             _ => unreachable!(),
         }

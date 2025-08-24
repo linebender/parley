@@ -6,8 +6,7 @@ use crate::tests::utils::renderer::{
 };
 use crate::{
     FontContext, FontFamily, FontStack, Layout, LayoutContext, LineHeight, PlainEditor,
-    PlainEditorDriver, PositionedLayoutItem, RangedBuilder, Rect, StyleProperty, TextStyle,
-    TreeBuilder,
+    PlainEditorDriver, RangedBuilder, Rect, StyleProperty, TextStyle, TreeBuilder,
 };
 use fontique::{Blob, Collection, CollectionOptions};
 use peniko::kurbo::Size;
