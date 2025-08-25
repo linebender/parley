@@ -17,7 +17,7 @@ env:
   # List of packages that can not target Wasm.
   NO_WASM_PKGS: "--exclude xtask --exclude parley_bench"
   # List of packages that can not target Android.
-  NO_ANDROID_PKGS: "--exclude xtask"
+  NO_ANDROID_PKGS: "--exclude xtask --exclude parley_bench"
 
 
 # Rationale
