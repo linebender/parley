@@ -56,6 +56,22 @@ pub fn styled() -> Vec<Benchmark> {
     const QUANTIZE: bool = true;
     const MAX_ADVANCE: f32 = 200.0 * DISPLAY_SCALE;
 
+    fn apply_style(
+        builder: &mut RangedBuilder<'_, ColorBrush>,
+        style_idx: usize,
+        range: std::ops::Range<usize>,
+    ) {
+        // Cycle through 5 different styles
+        match style_idx % 5 {
+            0 => builder.push(StyleProperty::FontStyle(FontStyle::Italic), range),
+            1 => builder.push(StyleProperty::FontWeight(FontWeight::BOLD), range),
+            2 => builder.push(StyleProperty::Underline(true), range),
+            3 => builder.push(StyleProperty::Strikethrough(true), range),
+            4 => {} // Default style
+            _ => unreachable!(),
+        }
+    }
+
     let samples = get_samples();
 
     samples
@@ -111,20 +127,4 @@ pub fn styled() -> Vec<Benchmark> {
             )
         })
         .collect()
-}
-
-fn apply_style(
-    builder: &mut RangedBuilder<'_, ColorBrush>,
-    style_idx: usize,
-    range: std::ops::Range<usize>,
-) {
-    // Cycle through 5 different styles
-    match style_idx % 5 {
-        0 => builder.push(StyleProperty::FontStyle(FontStyle::Italic), range),
-        1 => builder.push(StyleProperty::FontWeight(FontWeight::BOLD), range),
-        2 => builder.push(StyleProperty::Underline(true), range),
-        3 => builder.push(StyleProperty::Strikethrough(true), range),
-        4 => {} // Default style
-        _ => unreachable!(),
-    }
 }
