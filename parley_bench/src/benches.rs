@@ -1,3 +1,6 @@
+// Copyright 2025 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! # Default Style
 //!
 //! This module provides a benchmark for the default style.
