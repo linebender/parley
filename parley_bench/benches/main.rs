@@ -2,7 +2,7 @@
 
 use tango_bench::{tango_benchmarks, tango_main};
 
-use parley_bench::default_style::default_style;
+use parley_bench::benches::{defaults, styled};
 
-tango_benchmarks!(default_style());
+tango_benchmarks!(defaults(), styled());
 tango_main!();

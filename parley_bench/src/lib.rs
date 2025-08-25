@@ -13,7 +13,7 @@ use parley::{
     fontique::{Blob, Collection, CollectionOptions},
 };
 
-pub mod default_style;
+pub mod benches;
 
 /// A color brush.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -57,11 +57,6 @@ pub(crate) fn create_font_context() -> FontContext {
         collection,
         source_cache: Default::default(),
     }
-}
-
-pub(crate) fn apply_default_style(builder: &mut RangedBuilder<'_, ColorBrush>) {
-    builder.push_default(StyleProperty::Brush(ColorBrush {}));
-    builder.push_default(StyleProperty::FontStack(FontStack::List(FONT_STACK.into())));
 }
 
 pub(crate) const FONT_STACK: &[FontFamily<'_>] = &[
