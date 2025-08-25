@@ -19,14 +19,8 @@ use parley::{
 pub mod benches;
 
 /// A color brush.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ColorBrush {}
-
-impl Default for ColorBrush {
-    fn default() -> Self {
-        Self {}
-    }
-}
 
 /// Returns a tuple of font and layout contexts.
 pub fn get_contexts() -> (
