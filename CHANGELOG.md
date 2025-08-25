@@ -20,6 +20,7 @@ This release has an [MSRV] of 1.82.
 #### Parley
 
 - Shift-click support through `Selection::shift_click_extension` and `PlainEditorDriver::shift_click_extension`. ([#385][] by [@kekelp][])
+- Benchmarks ([#405]() by [@taj-p][])
 
 ### Changed
 
@@ -326,6 +327,7 @@ This release has an [MSRV][] of 1.70.
 [#390]: https://github.com/linebender/parley/pull/390
 [#400]: https://github.com/linebender/parley/pull/400
 [#402]: https://github.com/linebender/parley/pull/402
+[#405]: https://github.com/linebender/parley/pull/405
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/linebender/parley/compare/v0.4.0...v0.5.0
