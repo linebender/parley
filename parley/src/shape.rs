@@ -5,6 +5,7 @@
 //! and `swash` for text analysis.
 
 use core::mem;
+use core::ops::RangeInclusive;
 
 use alloc::vec::Vec;
 
@@ -20,7 +21,6 @@ use swash::text::cluster::{CharCluster, CharInfo, Token};
 use swash::text::{Language, Script};
 
 pub(crate) struct ShapeContext {
-    deferred_boxes: Vec<usize>,
     unicode_buffer: Option<harfrust::UnicodeBuffer>,
     features: Vec<harfrust::Feature>,
 }
@@ -28,7 +28,6 @@ pub(crate) struct ShapeContext {
 impl Default for ShapeContext {
     fn default() -> Self {
         Self {
-            deferred_boxes: Vec::new(),
             unicode_buffer: Some(harfrust::UnicodeBuffer::new()),
             features: Vec::new(),
         }
@@ -130,10 +129,15 @@ pub(crate) fn shape_text<'a, B: Brush>(
         //   - We loop because there may be multiple boxes at this index
         //   - We do this *before* processing the text run because we need to know whether we should
         //     break the run due to the presence of an inline box.
+        let mut deferred_boxes: Option<RangeInclusive<usize>> = None;
         while let Some((box_idx, inline_box)) = current_box {
             if inline_box.index == byte_index {
                 break_run = true;
-                scx.deferred_boxes.push(box_idx);
+                if let Some(boxes) = &mut deferred_boxes {
+                    deferred_boxes = Some((*boxes.start())..=box_idx);
+                } else {
+                    deferred_boxes = Some(box_idx..=box_idx);
+                };
                 // Update the current box to the next box
                 current_box = inline_box_iter.next();
             } else {
@@ -164,8 +168,10 @@ pub(crate) fn shape_text<'a, B: Brush>(
             char_range.start = char_range.end;
         }
 
-        for box_idx in scx.deferred_boxes.drain(..) {
-            layout.data.push_inline_box(box_idx);
+        if let Some(deferred_boxes) = deferred_boxes {
+            for box_idx in deferred_boxes {
+                layout.data.push_inline_box(box_idx);
+            }
         }
 
         text_range.end += ch.len_utf8();
