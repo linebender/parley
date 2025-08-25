@@ -1,6 +1,6 @@
 //! # Parley Bench
 //!
-//! This crate provides a benchmark for the Parley library.
+//! This crate provides benchmarks for the Parley library.
 
 use std::{
     borrow::Cow,
@@ -45,7 +45,7 @@ pub(crate) fn create_font_context() -> FontContext {
         shared: false,
         system_fonts: false,
     });
-    load_fonts(&mut collection, font_dirs()).unwrap();
+    load_fonts(&mut collection, parley_dev::font_dirs()).unwrap();
     for font in FONT_STACK {
         if let FontFamily::Named(font_name) = font {
             collection
@@ -59,27 +59,9 @@ pub(crate) fn create_font_context() -> FontContext {
     }
 }
 
-pub fn apply_default_style(builder: &mut RangedBuilder<'_, ColorBrush>) {
+pub(crate) fn apply_default_style(builder: &mut RangedBuilder<'_, ColorBrush>) {
     builder.push_default(StyleProperty::Brush(ColorBrush {}));
     builder.push_default(StyleProperty::FontStack(FontStack::List(FONT_STACK.into())));
-}
-
-fn font_dirs() -> impl Iterator<Item = PathBuf> {
-    [
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("parley")
-            .join("tests")
-            .join("assets")
-            .join("roboto_fonts"),
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join("parley")
-            .join("tests")
-            .join("assets")
-            .join("noto_fonts"),
-    ]
-    .into_iter()
 }
 
 pub(crate) const FONT_STACK: &[FontFamily<'_>] = &[
@@ -128,41 +110,39 @@ static SAMPLES: OnceLock<Vec<Sample>> = OnceLock::new();
 
 /// Returns a list of samples to be used for benchmarking.
 pub fn get_samples() -> &'static [Sample] {
-    let arabic = include_str!("../samples/arabic.txt");
-    let latin = include_str!("../samples/latin.txt");
-    let japanese = include_str!("../samples/japanese.txt");
+    let samples = parley_dev::TextSamples::new();
 
     SAMPLES.get_or_init(|| {
         vec![
             Sample {
-                name: "arabic",
+                name: samples.arabic.name,
                 modification: "all",
-                text: arabic,
+                text: samples.arabic.text,
             },
             Sample {
-                name: "latin",
+                name: samples.latin.name,
                 modification: "all",
-                text: latin,
+                text: samples.latin.text,
             },
             Sample {
-                name: "japanese",
+                name: samples.japanese.name,
                 modification: "all",
-                text: japanese,
+                text: samples.japanese.text,
             },
             Sample {
-                name: "arabic",
+                name: samples.arabic.name,
                 modification: "1 paragraph",
-                text: arabic.lines().next().unwrap(),
+                text: samples.arabic.text.lines().next().unwrap(),
             },
             Sample {
-                name: "latin",
+                name: samples.latin.name,
                 modification: "1 paragraph",
-                text: latin.lines().next().unwrap(),
+                text: samples.latin.text.lines().next().unwrap(),
             },
             Sample {
-                name: "japanese",
+                name: samples.japanese.name,
                 modification: "1 paragraph",
-                text: japanese.lines().next().unwrap(),
+                text: samples.japanese.text.lines().next().unwrap(),
             },
         ]
     })

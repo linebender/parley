@@ -2711,6 +2711,7 @@ dependencies = [
  "fontique",
  "harfrust",
  "hashbrown",
+ "parley_dev",
  "peniko",
  "skrifa",
  "swash",
@@ -2722,12 +2723,17 @@ name = "parley_bench"
 version = "0.0.0"
 dependencies = [
  "parley",
+ "parley_dev",
  "skrifa",
  "tango-bench",
 ]
 
 [[package]]
 name = "parley_core"
+version = "0.0.0"
+
+[[package]]
+name = "parley_dev"
 version = "0.0.0"
 
 [[package]]

@@ -22,7 +22,6 @@ pub fn default_style() -> Vec<Benchmark> {
                 format!("Default Style - {} {}", sample.name, sample.modification),
                 |b| {
                     b.iter(|| {
-                        // The text we are going to style and lay out
                         let text = sample.text;
                         let (mut font_cx_guard, mut layout_cx_guard) = get_contexts();
 

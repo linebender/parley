@@ -11,6 +11,7 @@ publish = false
 
 [dependencies]
 parley = { workspace = true, default-features = true }
+parley_dev = { workspace = true }
 skrifa = { workspace = true }
 tango-bench = "0.6"
 

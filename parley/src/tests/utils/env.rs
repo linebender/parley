@@ -46,24 +46,6 @@ fn snapshot_dir() -> PathBuf {
         .join("snapshots")
 }
 
-fn font_dirs() -> impl Iterator<Item = PathBuf> {
-    [
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests")
-            .join("assets")
-            .join("arimo_fonts"),
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests")
-            .join("assets")
-            .join("roboto_fonts"),
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests")
-            .join("assets")
-            .join("noto_fonts"),
-    ]
-    .into_iter()
-}
-
 pub(crate) const FONT_STACK: &[FontFamily<'_>] = &[
     FontFamily::Named(Cow::Borrowed("Roboto")),
     FontFamily::Named(Cow::Borrowed("Noto Kufi Arabic")),
@@ -126,7 +108,7 @@ pub(crate) fn create_font_context() -> FontContext {
         shared: false,
         system_fonts: false,
     });
-    load_fonts(&mut collection, font_dirs()).unwrap();
+    load_fonts(&mut collection, parley_dev::font_dirs()).unwrap();
     for font in FONT_STACK {
         if let FontFamily::Named(font_name) = font {
             collection

@@ -1,4 +1,6 @@
-use tango_bench::{IntoBenchmarks, benchmark_fn, tango_benchmarks, tango_main};
+//! Parley benchmarks.
+
+use tango_bench::{tango_benchmarks, tango_main};
 
 use parley_bench::default_style::default_style;
 
