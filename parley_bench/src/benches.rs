@@ -26,14 +26,10 @@ pub fn defaults() -> Vec<Benchmark> {
                 |b| {
                     b.iter(|| {
                         let text = &sample.text;
-                        let (mut font_cx_guard, mut layout_cx_guard) = get_contexts();
+                        let (mut font_cx, mut layout_cx) = get_contexts();
 
-                        let mut builder = layout_cx_guard.ranged_builder(
-                            &mut font_cx_guard,
-                            &text,
-                            DISPLAY_SCALE,
-                            QUANTIZE,
-                        );
+                        let mut builder =
+                            layout_cx.ranged_builder(&mut font_cx, &text, DISPLAY_SCALE, QUANTIZE);
                         builder.push_default(StyleProperty::FontStack(FontStack::List(
                             FONT_STACK.into(),
                         )));
@@ -71,14 +67,10 @@ pub fn styled() -> Vec<Benchmark> {
                     b.iter(|| {
                         let text = &sample.text;
 
-                        let (mut font_cx_guard, mut layout_cx_guard) = get_contexts();
+                        let (mut font_cx, mut layout_cx) = get_contexts();
 
-                        let mut builder = layout_cx_guard.ranged_builder(
-                            &mut font_cx_guard,
-                            &text,
-                            DISPLAY_SCALE,
-                            QUANTIZE,
-                        );
+                        let mut builder =
+                            layout_cx.ranged_builder(&mut font_cx, &text, DISPLAY_SCALE, QUANTIZE);
                         builder.push_default(StyleProperty::FontStack(FontStack::List(
                             FONT_STACK.into(),
                         )));

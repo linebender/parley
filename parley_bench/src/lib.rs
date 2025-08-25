@@ -25,18 +25,19 @@ impl Default for ColorBrush {
     }
 }
 
-// Since Tango runs benchmarks consecutively, no two benchmarks running from the same revision will have to
-// wait for the mutex to be available.
-static FONT_CX: OnceLock<Mutex<FontContext>> = OnceLock::new();
-static LAYOUT_CX: OnceLock<Mutex<LayoutContext<ColorBrush>>> = OnceLock::new();
-
 /// Returns a tuple of font and layout contexts.
 pub fn get_contexts() -> (
     MutexGuard<'static, FontContext>,
     MutexGuard<'static, LayoutContext<ColorBrush>>,
 ) {
+    // Since Tango runs benchmarks sequentially, no two benchmarks running from the same revision
+    // will have to wait for the mutex to be available.
+    static FONT_CX: OnceLock<Mutex<FontContext>> = OnceLock::new();
+    static LAYOUT_CX: OnceLock<Mutex<LayoutContext<ColorBrush>>> = OnceLock::new();
+
     let font_cx = FONT_CX.get_or_init(|| Mutex::new(create_font_context()));
     let layout_cx = LAYOUT_CX.get_or_init(|| Mutex::new(LayoutContext::new()));
+
     (font_cx.lock().unwrap(), layout_cx.lock().unwrap())
 }
 
