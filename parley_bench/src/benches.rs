@@ -10,6 +10,7 @@ use parley::{
 use std::hint::black_box;
 use tango_bench::{Benchmark, benchmark_fn};
 
+/// Benchmark for default style.
 pub fn defaults() -> Vec<Benchmark> {
     const DISPLAY_SCALE: f32 = 1.0;
     const QUANTIZE: bool = true;
@@ -24,7 +25,7 @@ pub fn defaults() -> Vec<Benchmark> {
                 format!("Default Style - {} {}", sample.name, sample.modification),
                 |b| {
                     b.iter(|| {
-                        let text = sample.text;
+                        let text = &sample.text;
                         let (mut font_cx_guard, mut layout_cx_guard) = get_contexts();
 
                         let mut builder = layout_cx_guard.ranged_builder(
@@ -53,6 +54,7 @@ pub fn defaults() -> Vec<Benchmark> {
         .collect()
 }
 
+/// Benchmark for styled text.
 pub fn styled() -> Vec<Benchmark> {
     const DISPLAY_SCALE: f32 = 1.0;
     const QUANTIZE: bool = true;
@@ -67,7 +69,8 @@ pub fn styled() -> Vec<Benchmark> {
                 format!("Styled - {} {}", sample.name, sample.modification),
                 |b| {
                     b.iter(|| {
-                        let text = sample.text;
+                        let text = &sample.text;
+
                         let (mut font_cx_guard, mut layout_cx_guard) = get_contexts();
 
                         let mut builder = layout_cx_guard.ranged_builder(
@@ -79,19 +82,27 @@ pub fn styled() -> Vec<Benchmark> {
                         builder.push_default(StyleProperty::FontStack(FontStack::List(
                             FONT_STACK.into(),
                         )));
-                        // Every 10 characters, push a new style
-                        let mut style = Style::Default;
-                        let mut char_indices = text.char_indices().peekable();
-                        let mut i = 0;
-                        while let Some((char_idx, _)) = char_indices.next() {
-                            let peeked = char_indices.peek();
-                            if let Some((peeked_idx, _)) = peeked {
-                                if i % 10 == 0 {
-                                    style = next_style(&style);
-                                    apply_style(&mut builder, &style, char_idx, *peeked_idx);
+
+                        // Apply different styles every `style_interval` characters
+                        let style_interval = (text.len() / 5).min(10);
+                        {
+                            let mut char_count = 0;
+                            let mut chunk_start = 0;
+                            let mut style_idx = 0;
+
+                            for (byte_idx, _) in text.char_indices() {
+                                if char_count != 0 && char_count % style_interval == 0 {
+                                    apply_style(&mut builder, style_idx, chunk_start..byte_idx);
+                                    chunk_start = byte_idx;
+                                    style_idx += 1;
                                 }
+                                char_count += 1;
                             }
-                            i += 1;
+
+                            // Apply style to the last chunk if there's remaining text
+                            if chunk_start < text.len() {
+                                apply_style(&mut builder, style_idx, chunk_start..text.len());
+                            }
                         }
 
                         let mut layout: Layout<ColorBrush> = builder.build(&text);
@@ -110,34 +121,18 @@ pub fn styled() -> Vec<Benchmark> {
         .collect()
 }
 
-enum Style {
-    Default,
-    Italic,
-    Bold,
-    Underline,
-    Strikethrough,
-}
-fn next_style(style: &Style) -> Style {
-    match *style {
-        Style::Default => Style::Italic,
-        Style::Italic => Style::Bold,
-        Style::Bold => Style::Underline,
-        Style::Underline => Style::Strikethrough,
-        Style::Strikethrough => Style::Default,
-    }
-}
 fn apply_style(
-    builder: &mut RangedBuilder<ColorBrush>,
-    style: &Style,
-    start_idx: usize,
-    end_idx: usize,
+    builder: &mut RangedBuilder<'_, ColorBrush>,
+    style_idx: usize,
+    range: std::ops::Range<usize>,
 ) {
-    let range = start_idx..end_idx;
-    match style {
-        Style::Default => {}
-        Style::Italic => builder.push(StyleProperty::FontStyle(FontStyle::Italic), range),
-        Style::Bold => builder.push(StyleProperty::FontWeight(FontWeight::BOLD), range),
-        Style::Underline => builder.push(StyleProperty::Underline(true), range),
-        Style::Strikethrough => builder.push(StyleProperty::Strikethrough(true), range),
+    // Cycle through 5 different styles
+    match style_idx % 5 {
+        0 => builder.push(StyleProperty::FontStyle(FontStyle::Italic), range),
+        1 => builder.push(StyleProperty::FontWeight(FontWeight::BOLD), range),
+        2 => builder.push(StyleProperty::Underline(true), range),
+        3 => builder.push(StyleProperty::Strikethrough(true), range),
+        4 => {} // Default style
+        _ => unreachable!(),
     }
 }

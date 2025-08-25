@@ -4,12 +4,12 @@
 
 use std::{
     borrow::Cow,
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{Arc, Mutex, MutexGuard, OnceLock},
 };
 
 use parley::{
-    FontContext, FontFamily, FontStack, LayoutContext, RangedBuilder, StyleProperty,
+    FontContext, FontFamily, LayoutContext,
     fontique::{Blob, Collection, CollectionOptions},
 };
 
@@ -98,7 +98,7 @@ pub struct Sample {
     /// The modification of the sample.
     pub modification: &'static str,
     /// The text of the sample.
-    pub text: &'static str,
+    pub text: String,
 }
 
 static SAMPLES: OnceLock<Vec<Sample>> = OnceLock::new();
@@ -111,33 +111,66 @@ pub fn get_samples() -> &'static [Sample] {
         vec![
             Sample {
                 name: samples.arabic.name,
-                modification: "all",
-                text: samples.arabic.text,
+                modification: "20 characters",
+                text: samples.arabic.text.chars().take(20).collect(),
             },
             Sample {
                 name: samples.latin.name,
-                modification: "all",
-                text: samples.latin.text,
+                modification: "20 characters",
+                text: samples.latin.text.chars().take(20).collect(),
             },
             Sample {
                 name: samples.japanese.name,
-                modification: "all",
-                text: samples.japanese.text,
+                modification: "20 characters",
+                text: samples.japanese.text.chars().take(20).collect(),
             },
             Sample {
                 name: samples.arabic.name,
                 modification: "1 paragraph",
-                text: samples.arabic.text.lines().next().unwrap(),
+                text: samples.arabic.text.lines().next().unwrap().to_string(),
             },
             Sample {
                 name: samples.latin.name,
                 modification: "1 paragraph",
-                text: samples.latin.text.lines().next().unwrap(),
+                text: samples.latin.text.lines().next().unwrap().to_string(),
             },
             Sample {
                 name: samples.japanese.name,
                 modification: "1 paragraph",
-                text: samples.japanese.text.lines().next().unwrap(),
+                text: samples.japanese.text.lines().next().unwrap().to_string(),
+            },
+            Sample {
+                name: samples.arabic.name,
+                modification: "4 paragraph",
+                text: samples
+                    .arabic
+                    .text
+                    .lines()
+                    .take(4)
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            },
+            Sample {
+                name: samples.latin.name,
+                modification: "4 paragraph",
+                text: samples
+                    .latin
+                    .text
+                    .lines()
+                    .take(4)
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            },
+            Sample {
+                name: samples.japanese.name,
+                modification: "4 paragraph",
+                text: samples
+                    .japanese
+                    .text
+                    .lines()
+                    .take(4)
+                    .collect::<Vec<_>>()
+                    .join("\n"),
             },
         ]
     })
