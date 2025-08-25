@@ -32,12 +32,12 @@ pub fn defaults() -> Vec<Benchmark> {
                         let (mut font_cx, mut layout_cx) = get_contexts();
 
                         let mut builder =
-                            layout_cx.ranged_builder(&mut font_cx, &text, DISPLAY_SCALE, QUANTIZE);
+                            layout_cx.ranged_builder(&mut font_cx, text, DISPLAY_SCALE, QUANTIZE);
                         builder.push_default(StyleProperty::FontStack(FontStack::List(
                             FONT_STACK.into(),
                         )));
 
-                        let mut layout: Layout<ColorBrush> = builder.build(&text);
+                        let mut layout: Layout<ColorBrush> = builder.build(text);
                         layout.break_all_lines(Some(MAX_ADVANCE));
                         layout.align(
                             Some(MAX_ADVANCE),
@@ -89,7 +89,7 @@ pub fn styled() -> Vec<Benchmark> {
                         let (mut font_cx, mut layout_cx) = get_contexts();
 
                         let mut builder =
-                            layout_cx.ranged_builder(&mut font_cx, &text, DISPLAY_SCALE, QUANTIZE);
+                            layout_cx.ranged_builder(&mut font_cx, text, DISPLAY_SCALE, QUANTIZE);
                         builder.push_default(StyleProperty::FontStack(FontStack::List(
                             FONT_STACK.into(),
                         )));
@@ -97,17 +97,15 @@ pub fn styled() -> Vec<Benchmark> {
                         // Apply different styles every `style_interval` characters
                         let style_interval = (text.len() / 5).min(10);
                         {
-                            let mut char_count = 0;
                             let mut chunk_start = 0;
                             let mut style_idx = 0;
 
-                            for (byte_idx, _) in text.char_indices() {
+                            for (char_count, (byte_idx, _)) in text.char_indices().enumerate() {
                                 if char_count != 0 && char_count % style_interval == 0 {
                                     apply_style(&mut builder, style_idx, chunk_start..byte_idx);
                                     chunk_start = byte_idx;
                                     style_idx += 1;
                                 }
-                                char_count += 1;
                             }
 
                             // Apply style to the last chunk if there's remaining text
@@ -116,7 +114,7 @@ pub fn styled() -> Vec<Benchmark> {
                             }
                         }
 
-                        let mut layout: Layout<ColorBrush> = builder.build(&text);
+                        let mut layout: Layout<ColorBrush> = builder.build(text);
                         layout.break_all_lines(Some(MAX_ADVANCE));
                         layout.align(
                             Some(MAX_ADVANCE),
