@@ -27,6 +27,7 @@ This release has an [MSRV] of 1.82.
 
 - `Alignment`` variants have been renamed to better match CSS. `Alignment::Justified` is now `Alignment::Justify` and `Alignment::Middle` is now `Alignment::Center`. ([#389][] by [@waywardmonkeys][])
 - Updated to `accesskit` 0.21. ([#390][] by [@mwcampbell][])
+- Uses `HarfRust` for text shaping ([[#400][] by [@taj-p][]).
 
 #### Fontique
 
@@ -38,6 +39,7 @@ This release has an [MSRV] of 1.82.
 
 - Selection extension moves the focus to the side being extended. ([#385][] by [@kekelp][])
 - Ranged builder default style not respecting `scale`. ([#368][] by [@xStrom][])
+- Cluster source character not correct ([[#402][] by [@taj-p][]).
 
 #### Fontique
 
@@ -244,6 +246,7 @@ This release has an [MSRV][] of 1.70.
 [@xStrom]: https://github.com/xStrom
 [@dhardy]: https://github.com/dhardy
 [@kekelp]: https://github.com/kekelp
+[@taj-p]: https://github.com/taj-p
 
 [#54]: https://github.com/linebender/parley/pull/54
 [#55]: https://github.com/linebender/parley/pull/55
@@ -321,6 +324,8 @@ This release has an [MSRV][] of 1.70.
 [#385]: https://github.com/linebender/parley/pull/385
 [#389]: https://github.com/linebender/parley/pull/389
 [#390]: https://github.com/linebender/parley/pull/390
+[#400]: https://github.com/linebender/parley/pull/400
+[#402]: https://github.com/linebender/parley/pull/402
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/linebender/parley/compare/v0.4.0...v0.5.0

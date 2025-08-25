@@ -393,49 +393,129 @@ fn inbox_content_width() {
 }
 
 #[test]
-fn ligatures() {
+fn ligatures_ltr() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    let text = "fi ".repeat(20);
-    let builder = env.ranged_builder(&text);
-    let mut layout = builder.build(&text);
+    let text = "abfi";
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
     layout.break_all_lines(Some(100.0));
     layout.align(None, Alignment::Start, AlignmentOptions::default());
 
-    // Check that every cluster is correctly classified as a ligature start, ligature continuation,
-    // or none with correct glyphs and advances.
-    for line in layout.lines() {
-        for item in line.items() {
-            if let crate::PositionedLayoutItem::GlyphRun(glyph_run) = item {
-                let mut last_advance = f32::MAX;
-                glyph_run.run().clusters().enumerate().for_each(|(i, c)| {
-                    match i % 3 {
-                        0 => {
-                            assert!(c.is_ligature_start());
-                            assert_eq!(c.glyphs().count(), 1);
-                            assert_eq!(c.text_range().len(), 1);
-                            assert_eq!(c.glyphs().next().unwrap().id, 444);
-                            // The glyph for this ligature lives in the start cluster and should
-                            // contain the whole ligature's advance.
-                            assert_eq!(c.glyphs().next().unwrap().advance, c.advance() * 2.0);
-                        }
-                        1 => {
-                            assert!(c.is_ligature_continuation());
-                            // A continuation shares its advance with the previous cluster.
-                            assert_eq!(c.advance(), last_advance);
-                            assert_eq!(c.text_range().len(), 1);
-                            assert_eq!(c.glyphs().count(), 0);
-                        }
-                        2 => assert!(!c.is_ligature_start() && !c.is_ligature_continuation()),
-                        _ => unreachable!(),
-                    }
-                    last_advance = c.advance();
-                });
+    let line = layout.lines().next().unwrap();
+    let item = line.items().next().unwrap();
+    let glyph_run = match item {
+        crate::PositionedLayoutItem::GlyphRun(glyph_run) => glyph_run,
+        crate::PositionedLayoutItem::InlineBox(_) => unreachable!(),
+    };
+    let mut last_advance = f32::MAX;
+    glyph_run.run().clusters().enumerate().for_each(|(i, c)| {
+        match i % 4 {
+            // 'a' and 'b' are not ligatures.
+            0 | 1 => assert!(!c.is_ligature_start() && !c.is_ligature_continuation()),
+            // "f" is the ligature start whose cluster contains the "fi" glyph.
+            2 => {
+                assert!(c.is_ligature_start());
+                assert_eq!(c.glyphs().count(), 1);
+                assert_eq!(c.text_range().len(), 1);
+                assert_eq!(c.glyphs().next().unwrap().id, 444);
+                // The glyph for this ligature lives in the start cluster and should
+                // contain the whole ligature's advance.
+                assert_eq!(c.glyphs().next().unwrap().advance, c.advance() * 2.0);
             }
+            // "i" is the ligature continuation whose cluster shares the advance with
+            // the ligature start.
+            3 => {
+                assert!(c.is_ligature_continuation());
+                // A continuation shares its advance with the previous cluster.
+                assert_eq!(c.advance(), last_advance);
+                assert_eq!(c.text_range().len(), 1);
+                assert_eq!(c.glyphs().count(), 0);
+            }
+            _ => unreachable!(),
         }
-    }
-
+        last_advance = c.advance();
+    });
     env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn ligatures_rtl() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "احدً";
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(100.0));
+    layout.align(None, Alignment::Start, AlignmentOptions::default());
+
+    let line = layout.lines().next().unwrap();
+    let item = line.items().next().unwrap();
+    let glyph_run = match item {
+        crate::PositionedLayoutItem::GlyphRun(glyph_run) => glyph_run,
+        crate::PositionedLayoutItem::InlineBox(_) => unreachable!(),
+    };
+    let mut last_advance = f32::MAX;
+    glyph_run.run().clusters().enumerate().for_each(|(i, c)| {
+        match i % 4 {
+            // "ح" and "د" are not ligatures.
+            0 | 1 => assert!(!c.is_ligature_start() && !c.is_ligature_continuation()),
+            // "د" is the ligature continuation whose cluster shares the advance with
+            // the ligature start.
+            2 => {
+                assert!(c.is_ligature_continuation());
+                assert_eq!(c.glyphs().count(), 0);
+                assert!(c.is_ligature_continuation());
+                assert_eq!(c.text_range().len(), 2);
+                assert_eq!(c.glyphs().count(), 0);
+            }
+            // The last visual character (i.e. the first logical character) is the ligature start.
+            3 => {
+                assert!(c.is_ligature_start());
+                assert_eq!(c.glyphs().count(), 2);
+                assert_eq!(c.text_range().len(), 2);
+                // The advance should be shared with the previous cluster of the ligature.
+                assert_eq!(c.advance(), last_advance);
+                // This cluster should contain the one glyph of the ligature whose advance
+                // is the sum of the advances of the component clusters.
+                assert_eq!(c.glyphs().nth(1).unwrap().advance, c.advance() * 2.0);
+            }
+            _ => unreachable!(),
+        }
+        last_advance = c.advance();
+    });
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn test_cluster_info() {
+    let test_name = test_name!();
+    let mut env = TestEnv::new(test_name, Size::new(400.0, 200.0));
+
+    let test_cluster_layout = |test: &str, text: &str, env: &mut TestEnv| {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::FontSize(24.0));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(400.0));
+        env.with_name(test)
+            .check_cluster_snapshot(&layout, text, 12.0);
+    };
+
+    // Latin LTR with ligature
+    let text = "Hello Ligature: fi";
+    test_cluster_layout("latin", text, &mut env);
+
+    // Arabic RTL with ligature
+    let text = "حداً ";
+    test_cluster_layout("arabic", text, &mut env);
+
+    // Mixed content with ligature
+    let text = "Hello Ligature: fi, Arabic: حداً";
+    test_cluster_layout("ltr_rtl_mixed", text, &mut env);
+
+    // Newlines
+    let text = "Hello\nLigature:\nfi";
+    test_cluster_layout("newlines", text, &mut env);
 }
 
 #[test]
