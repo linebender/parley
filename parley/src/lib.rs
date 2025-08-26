@@ -107,6 +107,7 @@ mod builder;
 mod context;
 mod font;
 mod inline_box;
+mod lru_cache;
 mod resolve;
 mod shape;
 mod swash_convert;
