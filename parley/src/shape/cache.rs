@@ -1,3 +1,6 @@
+// Copyright 2025 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use crate::{
     FontVariation,
     lru_cache::{LookupKey, LruCache},
@@ -58,7 +61,7 @@ impl<'a> LookupKey<ShapeInstanceId> for ShapeInstanceKey<'a> {
     fn to_id(self) -> ShapeInstanceId {
         (
             self.font_id,
-            self.synthesis.clone(),
+            *self.synthesis,
             self.variations.map(|v| v.to_vec().into()),
         )
     }
