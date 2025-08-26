@@ -2,6 +2,7 @@ use crate::{
     FontVariation,
     lru_cache::{LookupKey, LruCache},
 };
+use alloc::boxed::Box;
 
 /// A cache of `ShaperData` instances.
 pub(crate) type ShapeDataCache = LruCache<u64, harfrust::ShaperData>;

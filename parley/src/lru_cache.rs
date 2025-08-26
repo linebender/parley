@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+
 /// A lookup key is distinct from the ID type. This allows the lookup key
 /// to not require ownership of the underlying ID data, which could require
 /// allocations.
@@ -33,11 +35,7 @@ impl<ID, T> LruCache<ID, T> {
 
     /// Returns a reference to the entry with the given ID. If the entry is not
     /// found, it is created and returned using `make_data`.
-    pub(crate) fn entry<'a>(
-        &'a mut self,
-        id: impl LookupKey<ID>,
-        make_data: impl FnOnce() -> T,
-    ) -> &'a T {
+    pub(crate) fn entry(&mut self, id: impl LookupKey<ID>, make_data: impl FnOnce() -> T) -> &T {
         match self.find_entry(id, make_data) {
             (true, index) => {
                 let entry = &mut self.entries[index];

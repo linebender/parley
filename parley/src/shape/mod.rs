@@ -319,12 +319,7 @@ fn shape_item<'a, B: Brush>(
         };
         let script = swash_convert::script_to_harfrust(item.script);
         let language = if let Some(lang) = item.locale {
-            let lang_tag = lang.language();
-            if let Ok(harf_lang) = lang_tag.parse::<harfrust::Language>() {
-                Some(harf_lang)
-            } else {
-                None
-            }
+            lang.language().parse::<harfrust::Language>().ok()
         } else {
             None
         };
@@ -338,7 +333,7 @@ fn shape_item<'a, B: Brush>(
         }
         let harf_shaper = shaper_data
             .shaper(&font_ref)
-            .instance(Some(&instance))
+            .instance(Some(instance))
             .point_size(Some(item.size))
             .build();
         let shaper_plan = scx.shape_plan_cache.entry(
@@ -385,7 +380,7 @@ fn shape_item<'a, B: Brush>(
             buffer.set_language(lang);
         }
 
-        let glyph_buffer = harf_shaper.shape_with_plan(&shaper_plan, buffer, &scx.features);
+        let glyph_buffer = harf_shaper.shape_with_plan(shaper_plan, buffer, &scx.features);
 
         // Extract relevant CharInfo slice for this segment
         let char_start = char_range.start + item_text[..segment_start_offset].chars().count();
