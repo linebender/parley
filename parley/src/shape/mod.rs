@@ -310,8 +310,6 @@ fn shape_item<'a, B: Brush>(
             },
         );
 
-        // TODO: Cache `ShapePlan`
-
         let direction = if item.level & 1 != 0 {
             harfrust::Direction::RightToLeft
         } else {

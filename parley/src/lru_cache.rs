@@ -20,7 +20,7 @@ pub(crate) struct Entry<ID, T> {
 
 /// A least-recently-used cache. This cache uses a linear scan of its entries
 /// to find a given entry - it is optimised for a low number of entries. Preferably
-/// keep `max_entries` low in the order of tens.
+/// keep `max_entries` low - in the order of tens.
 pub(crate) struct LruCache<ID, T> {
     entries: Vec<Entry<ID, T>>,
     epoch: u64,
