@@ -1,35 +1,44 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::{
-    FontVariation,
-    lru_cache::{LookupKey, LruCache},
-};
+use crate::{FontVariation, lru_cache::LruCache};
 use alloc::boxed::Box;
+use harfrust::{ShapePlan, ShaperData, ShaperInstance};
+use hashbrown::Equivalent;
 
 /// A cache of `ShaperData` instances.
-pub(crate) type ShapeDataCache = LruCache<u64, harfrust::ShaperData>;
+pub(crate) type ShapeDataCache = LruCache<ShapeDataKey, ShaperData>;
+#[derive(PartialEq, Copy, Clone)]
 pub(crate) struct ShapeDataKey {
-    font_id: u64,
+    /// The font collection's blob ID.
+    font_blob_id: u64,
+    /// The font's index in the font collection.
+    font_index: u32,
 }
 
 impl ShapeDataKey {
-    pub(crate) fn new(font_id: u64) -> Self {
-        Self { font_id }
+    pub(crate) fn new(font_blob_id: u64, font_index: u32) -> Self {
+        Self {
+            font_blob_id,
+            font_index,
+        }
     }
 }
 
-impl LookupKey<u64> for ShapeDataKey {
-    fn eq(&self, other: &u64) -> bool {
-        self.font_id == *other
+impl Equivalent<ShapeDataKey> for ShapeDataKey {
+    fn equivalent(&self, key: &ShapeDataKey) -> bool {
+        self == key
     }
-    fn to_id(self) -> u64 {
-        self.font_id
+}
+
+impl Into<ShapeDataKey> for &ShapeDataKey {
+    fn into(self) -> ShapeDataKey {
+        *self
     }
 }
 
 /// A cache of `ShaperInstance` instances.
-pub(crate) type ShapeInstanceCache = LruCache<ShapeInstanceId, harfrust::ShaperInstance>;
+pub(crate) type ShapeInstanceCache = LruCache<ShapeInstanceId, ShaperInstance>;
 type ShapeInstanceId = (u64, fontique::Synthesis, Option<Box<[FontVariation]>>);
 
 pub(crate) struct ShapeInstanceKey<'a> {
@@ -52,13 +61,14 @@ impl<'a> ShapeInstanceKey<'a> {
     }
 }
 
-impl<'a> LookupKey<ShapeInstanceId> for ShapeInstanceKey<'a> {
-    fn eq(&self, other: &ShapeInstanceId) -> bool {
-        self.font_id == other.0
-            && *self.synthesis == other.1
-            && self.variations == other.2.as_deref()
+impl<'a> Equivalent<ShapeInstanceId> for ShapeInstanceKey<'a> {
+    fn equivalent(&self, key: &ShapeInstanceId) -> bool {
+        self.font_id == key.0 && *self.synthesis == key.1 && self.variations == key.2.as_deref()
     }
-    fn to_id(self) -> ShapeInstanceId {
+}
+
+impl<'a> Into<ShapeInstanceId> for ShapeInstanceKey<'a> {
+    fn into(self) -> ShapeInstanceId {
         (
             self.font_id,
             *self.synthesis,
@@ -68,7 +78,7 @@ impl<'a> LookupKey<ShapeInstanceId> for ShapeInstanceKey<'a> {
 }
 
 /// A cache of `ShapePlan` instances.
-pub(crate) type ShapePlanCache = LruCache<ShapePlanId, harfrust::ShapePlan>;
+pub(crate) type ShapePlanCache = LruCache<ShapePlanId, ShapePlan>;
 type ShapePlanId = (
     u64,
     harfrust::Direction,
@@ -103,20 +113,19 @@ impl<'a> ShapePlanKey<'a> {
     }
 }
 
-impl<'a> LookupKey<ShapePlanId> for ShapePlanKey<'a> {
-    fn eq(&self, other: &ShapePlanId) -> bool {
-        self.font_id == other.0
-            && self.direction == other.1
-            && self.script == other.2
-            && self.language == other.3
-            && self.features.len() == other.4.len()
-            && self
-                .features
-                .iter()
-                .zip(other.4.iter())
-                .all(|(a, b)| a == b)
+impl<'a> Equivalent<ShapePlanId> for ShapePlanKey<'a> {
+    fn equivalent(&self, key: &ShapePlanId) -> bool {
+        self.font_id == key.0
+            && self.direction == key.1
+            && self.script == key.2
+            && self.language == key.3
+            && self.features.len() == key.4.len()
+            && self.features.iter().zip(key.4.iter()).all(|(a, b)| a == b)
     }
-    fn to_id(self) -> ShapePlanId {
+}
+
+impl<'a> Into<ShapePlanId> for ShapePlanKey<'a> {
+    fn into(self) -> ShapePlanId {
         (
             self.font_id,
             self.direction,

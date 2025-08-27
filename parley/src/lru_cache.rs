@@ -2,14 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use alloc::vec::Vec;
-
-/// A lookup key is distinct from the ID type. This allows the lookup key
-/// to not require ownership of the underlying ID data, which could require
-/// allocations.
-pub(crate) trait LookupKey<ID> {
-    fn eq(&self, other: &ID) -> bool;
-    fn to_id(self) -> ID;
-}
+use hashbrown::Equivalent;
 
 /// An entry in the cache.
 pub(crate) struct Entry<ID, T> {
@@ -38,7 +31,13 @@ impl<ID, T> LruCache<ID, T> {
 
     /// Returns a reference to the entry with the given ID. If the entry is not
     /// found, it is created and returned using `make_data`.
-    pub(crate) fn entry(&mut self, id: impl LookupKey<ID>, make_data: impl FnOnce() -> T) -> &T {
+    ///
+    /// The lookup key must be `Equivalent` to ID for lookups and convertible `Into<ID>`
+    /// for creating new entries.
+    pub(crate) fn entry<K>(&mut self, id: K, make_data: impl FnOnce() -> T) -> &T
+    where
+        K: Equivalent<ID> + Into<ID>,
+    {
         match self.find_entry(id, make_data) {
             (true, index) => {
                 let entry = &mut self.entries[index];
@@ -54,16 +53,15 @@ impl<ID, T> LruCache<ID, T> {
         }
     }
 
-    fn find_entry(
-        &mut self,
-        id: impl LookupKey<ID>,
-        make_data: impl FnOnce() -> T,
-    ) -> (bool, usize) {
+    fn find_entry<K>(&mut self, id: K, make_data: impl FnOnce() -> T) -> (bool, usize)
+    where
+        K: Equivalent<ID> + Into<ID>,
+    {
         let epoch = self.epoch;
         let mut lowest_serial = epoch;
         let mut lowest_index = 0;
         for (i, entry) in self.entries.iter().enumerate() {
-            if id.eq(&entry.id) {
+            if id.equivalent(&entry.id) {
                 return (true, i);
             }
             if entry.epoch < lowest_serial {
@@ -75,13 +73,13 @@ impl<ID, T> LruCache<ID, T> {
             lowest_index = self.entries.len();
             self.entries.push(Entry {
                 epoch,
-                id: id.to_id(),
+                id: id.into(),
                 data: make_data(),
             });
         } else {
             let entry = &mut self.entries[lowest_index];
             entry.epoch = epoch;
-            entry.id = id.to_id();
+            entry.id = id.into();
             entry.data = make_data();
         }
         (false, lowest_index)
@@ -92,31 +90,25 @@ impl<ID, T> LruCache<ID, T> {
 mod tests {
     use super::*;
 
-    // Simple ID type for testing
     #[derive(Debug, Clone, PartialEq)]
     struct TestId(String);
-
-    // LookupKey implementation that allows &str to lookup TestId
     struct TestLookupKey<'a>(&'a str);
 
-    impl<'a> LookupKey<TestId> for TestLookupKey<'a> {
-        fn eq(&self, other: &TestId) -> bool {
-            self.0 == other.0.as_str()
+    impl<'a> Equivalent<TestId> for TestLookupKey<'a> {
+        fn equivalent(&self, key: &TestId) -> bool {
+            self.0 == key.0.as_str()
         }
+    }
 
-        fn to_id(self) -> TestId {
+    impl<'a> Into<TestId> for TestLookupKey<'a> {
+        fn into(self) -> TestId {
             TestId(self.0.to_string())
         }
     }
 
-    // Alternative implementation for owned strings
-    impl LookupKey<TestId> for TestId {
-        fn eq(&self, other: &TestId) -> bool {
-            self.0 == other.0
-        }
-
-        fn to_id(self) -> TestId {
-            self
+    impl Equivalent<TestId> for TestId {
+        fn equivalent(&self, key: &TestId) -> bool {
+            self.0 == key.0
         }
     }
 
