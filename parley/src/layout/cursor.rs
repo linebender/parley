@@ -250,14 +250,15 @@ impl Cursor {
     /// in logical order.
     #[must_use]
     pub fn next_logical_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
-        let [left, right] = self.logical_clusters(layout);
-        if let Some(cluster) = right.or(left) {
+        let [upstream, downstream] = self.logical_clusters(layout);
+        if let Some(cluster) = downstream.or(upstream) {
             let start = cluster.clone();
             let cluster = cluster.next_logical_word().unwrap_or(cluster);
             if cluster.path == start.path {
                 return Self::from_byte_index(layout, usize::MAX, Affinity::Downstream);
             }
-            return Self::from_cluster(layout, cluster, true);
+            let moving_right = !cluster.is_rtl();
+            return Self::from_cluster(layout, cluster, moving_right);
         }
         *self
     }
@@ -266,10 +267,11 @@ impl Cursor {
     /// in logical order.
     #[must_use]
     pub fn previous_logical_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
-        let [left, right] = self.logical_clusters(layout);
-        if let Some(cluster) = left.or(right) {
+        let [upstream, downstream] = self.logical_clusters(layout);
+        if let Some(cluster) = downstream.or(upstream) {
             let cluster = cluster.previous_logical_word().unwrap_or(cluster);
-            return Self::from_cluster(layout, cluster, true);
+            let moving_right = cluster.is_rtl();
+            return Self::from_cluster(layout, cluster, moving_right);
         }
         *self
     }
