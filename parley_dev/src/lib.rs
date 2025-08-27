@@ -26,6 +26,8 @@ pub const FONT_FAMILIES: &[&str] = &["Arimo", "Roboto", "Noto Kufi Arabic"];
 pub struct Sample {
     /// The name of the sample.
     pub name: &'static str,
+    /// The title of the sample.
+    pub title: &'static str,
     /// The text of the sample.
     pub text: &'static str,
 }
@@ -50,14 +52,17 @@ impl TextSamples {
         Self {
             arabic: Sample {
                 name: "arabic",
+                title: "Al-Kindi - First Philosophy",
                 text: arabic,
             },
             latin: Sample {
                 name: "latin",
+                title: "Moby Dick - First Chapter",
                 text: latin,
             },
             japanese: Sample {
                 name: "japanese",
+                title: "Tosa Diary",
                 text: japanese,
             },
         }
