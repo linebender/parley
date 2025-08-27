@@ -1,9 +1,8 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::{FontVariation, lru_cache::LruCache};
+use crate::FontVariation;
 use alloc::boxed::Box;
-use harfrust::{ShapePlan, ShaperData, ShaperInstance};
 use hashbrown::Equivalent;
 
 #[derive(PartialEq, Copy, Clone)]
