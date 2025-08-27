@@ -24,9 +24,9 @@ use swash::text::{Language, Script};
 mod cache;
 
 pub(crate) struct ShapeContext {
-    shape_data_cache: cache::ShapeDataCache,
-    shape_instance_cache: cache::ShapeInstanceCache,
-    shape_plan_cache: cache::ShapePlanCache,
+    shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::ShaperData>,
+    shape_instance_cache: LruCache<cache::ShapeInstanceId, harfrust::ShaperInstance>,
+    shape_plan_cache: LruCache<cache::ShapePlanId, harfrust::ShapePlan>,
     unicode_buffer: Option<harfrust::UnicodeBuffer>,
     features: Vec<harfrust::Feature>,
 }

@@ -6,8 +6,6 @@ use alloc::boxed::Box;
 use harfrust::{ShapePlan, ShaperData, ShaperInstance};
 use hashbrown::Equivalent;
 
-/// A cache of `ShaperData` instances.
-pub(crate) type ShapeDataCache = LruCache<ShapeDataKey, ShaperData>;
 #[derive(PartialEq, Copy, Clone)]
 pub(crate) struct ShapeDataKey {
     /// The font collection's blob ID.
@@ -37,9 +35,7 @@ impl Into<ShapeDataKey> for &ShapeDataKey {
     }
 }
 
-/// A cache of `ShaperInstance` instances.
-pub(crate) type ShapeInstanceCache = LruCache<ShapeInstanceId, ShaperInstance>;
-type ShapeInstanceId = (u64, u32, fontique::Synthesis, Option<Box<[FontVariation]>>);
+pub(crate) type ShapeInstanceId = (u64, u32, fontique::Synthesis, Option<Box<[FontVariation]>>);
 
 pub(crate) struct ShapeInstanceKey<'a> {
     font_blob_id: u64,
@@ -84,9 +80,7 @@ impl<'a> Into<ShapeInstanceId> for ShapeInstanceKey<'a> {
     }
 }
 
-/// A cache of `ShapePlan` instances.
-pub(crate) type ShapePlanCache = LruCache<ShapePlanId, ShapePlan>;
-type ShapePlanId = (
+pub(crate) type ShapePlanId = (
     u64,
     u32,
     harfrust::Direction,
