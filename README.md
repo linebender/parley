@@ -101,7 +101,7 @@ Licensed under either of
 
 at your option.
 
-Some files used for tests are under different licenses. See `./parley_dev/README.md` for details.
+Some files used for tests and benchmarks are under different licenses. See `./parley_dev/README.md` for details.
 
 
 [Rust code of conduct]: https://www.rust-lang.org/policies/code-of-conduct
