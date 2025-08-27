@@ -4,7 +4,10 @@ A suite of benchmarks used to evaluate Parley performance.
 
 ## Setup
 
-Install `cargo-export` via `cargo install cargo-export`.
+Install [`cargo-export`](https://crates.io/crates/cargo-export) via: 
+```sh
+$ cargo install cargo-export
+```
 
 ## Usage
 
