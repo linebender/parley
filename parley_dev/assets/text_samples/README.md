@@ -1,7 +1,5 @@
 # Sample Text Attribution
 
-All samples are licensed under the [Creative Commons Attribution-ShareAlike License](https://creativecommons.org/licenses/by-sa/4.0/) as copied to ./LICENSE.
-
 The sample text amendments, source, and title are as follows:
 
 | Sample            | Title                        | Amendments    | Source                                                                                                                                                               |
