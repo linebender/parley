@@ -34,7 +34,12 @@ impl Into<ShapeDataKey> for &ShapeDataKey {
     }
 }
 
-pub(crate) type ShapeInstanceId = (u64, u32, fontique::Synthesis, Option<Box<[FontVariation]>>);
+pub(crate) struct ShapeInstanceId {
+    font_blob_id: u64,
+    font_index: u32,
+    synthesis: fontique::Synthesis,
+    variations: Option<Box<[FontVariation]>>,
+}
 
 pub(crate) struct ShapeInstanceKey<'a> {
     font_blob_id: u64,
@@ -61,32 +66,32 @@ impl<'a> ShapeInstanceKey<'a> {
 
 impl<'a> Equivalent<ShapeInstanceId> for ShapeInstanceKey<'a> {
     fn equivalent(&self, key: &ShapeInstanceId) -> bool {
-        self.font_blob_id == key.0
-            && self.font_index == key.1
-            && *self.synthesis == key.2
-            && self.variations == key.3.as_deref()
+        self.font_blob_id == key.font_blob_id
+            && self.font_index == key.font_index
+            && *self.synthesis == key.synthesis
+            && self.variations == key.variations.as_deref()
     }
 }
 
 impl<'a> Into<ShapeInstanceId> for ShapeInstanceKey<'a> {
     fn into(self) -> ShapeInstanceId {
-        (
-            self.font_blob_id,
-            self.font_index,
-            *self.synthesis,
-            self.variations.map(|v| v.to_vec().into()),
-        )
+        ShapeInstanceId {
+            font_blob_id: self.font_blob_id,
+            font_index: self.font_index,
+            synthesis: *self.synthesis,
+            variations: self.variations.map(|v| v.to_vec().into()),
+        }
     }
 }
 
-pub(crate) type ShapePlanId = (
-    u64,
-    u32,
-    harfrust::Direction,
-    harfrust::Script,
-    Option<harfrust::Language>,
-    Box<[harfrust::Feature]>,
-);
+pub(crate) struct ShapePlanId {
+    font_blob_id: u64,
+    font_index: u32,
+    direction: harfrust::Direction,
+    script: harfrust::Script,
+    language: Option<harfrust::Language>,
+    features: Box<[harfrust::Feature]>,
+}
 
 pub(crate) struct ShapePlanKey<'a> {
     font_blob_id: u64,
@@ -119,25 +124,29 @@ impl<'a> ShapePlanKey<'a> {
 
 impl<'a> Equivalent<ShapePlanId> for ShapePlanKey<'a> {
     fn equivalent(&self, key: &ShapePlanId) -> bool {
-        self.font_blob_id == key.0
-            && self.font_index == key.1
-            && self.direction == key.2
-            && self.script == key.3
-            && self.language == key.4
-            && self.features.len() == key.5.len()
-            && self.features.iter().zip(key.5.iter()).all(|(a, b)| a == b)
+        self.font_blob_id == key.font_blob_id
+            && self.font_index == key.font_index
+            && self.direction == key.direction
+            && self.script == key.script
+            && self.language == key.language
+            && self.features.len() == key.features.len()
+            && self
+                .features
+                .iter()
+                .zip(key.features.iter())
+                .all(|(a, b)| a == b)
     }
 }
 
 impl<'a> Into<ShapePlanId> for ShapePlanKey<'a> {
     fn into(self) -> ShapePlanId {
-        (
-            self.font_blob_id,
-            self.font_index,
-            self.direction,
-            self.script,
-            self.language,
-            self.features.to_vec().into(),
-        )
+        ShapePlanId {
+            font_blob_id: self.font_blob_id,
+            font_index: self.font_index,
+            direction: self.direction,
+            script: self.script,
+            language: self.language,
+            features: self.features.to_vec().into(),
+        }
     }
 }
