@@ -35,7 +35,7 @@ pub(crate) fn locale_to_fontique(locale: swash::text::Language) -> Option<fontiq
             len += 1;
         }
     }
-    fontique::Language::try_from_bytes(&buf[..len]).ok()
+    fontique::Language::try_from_utf8(&buf[..len]).ok()
 }
 
 #[rustfmt::skip]
