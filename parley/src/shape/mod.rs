@@ -298,6 +298,7 @@ fn shape_item<'a, B: Brush>(
         let instance = scx.shape_instance_cache.entry(
             cache::ShapeInstanceKey::new(
                 font.font.blob.id(),
+                font.font.index,
                 &font.font.synthesis,
                 rcx.variations(item.variations),
             ),
@@ -334,6 +335,7 @@ fn shape_item<'a, B: Brush>(
         let shaper_plan = scx.shape_plan_cache.entry(
             cache::ShapePlanKey::new(
                 font.font.blob.id(),
+                font.font.index,
                 direction,
                 script,
                 language.clone(),
