@@ -51,3 +51,5 @@ Licensed under either of
 - MIT license ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 at your option.
+
+[Rust code of conduct]: https://www.rust-lang.org/policies/code-of-conduct
