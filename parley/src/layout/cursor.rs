@@ -25,9 +25,15 @@ impl Cursor {
     /// Creates a new cursor from the given byte index and affinity.
     pub fn from_byte_index<B: Brush>(layout: &Layout<B>, index: usize, affinity: Affinity) -> Self {
         if let Some(cluster) = Cluster::from_byte_index(layout, index) {
+            let index = cluster.text_range().start;
             Self {
-                index: cluster.text_range().start,
-                affinity,
+                index,
+                affinity: if index != 0 {
+                    affinity
+                } else {
+                    // There is no Upstream cluster of the 0 position so we force Downstream affinity.
+                    Affinity::Downstream
+                },
             }
         } else {
             Self {
