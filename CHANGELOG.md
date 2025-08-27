@@ -20,7 +20,7 @@ This release has an [MSRV] of 1.82.
 #### Parley
 
 - Shift-click support through `Selection::shift_click_extension` and `PlainEditorDriver::shift_click_extension`. ([#385][] by [@kekelp][])
-- Benchmarks ([#405]() by [@taj-p][])
+- Benchmarks. ([#405]() by [@taj-p][])
 
 ### Changed
 
