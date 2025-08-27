@@ -291,11 +291,10 @@ fn shape_item<'a, B: Brush>(
             harfrust::FontRef::from_index(font.font.blob.as_ref(), font.font.index).unwrap();
 
         // Create harfrust shaper
-        let shaper_data = scx
-            .shape_data_cache
-            .entry(cache::ShapeDataKey::new(font.font.blob.id()), || {
-                harfrust::ShaperData::new(&font_ref)
-            });
+        let shaper_data = scx.shape_data_cache.entry(
+            cache::ShapeDataKey::new(font.font.blob.id(), font.font.index),
+            || harfrust::ShaperData::new(&font_ref),
+        );
         let instance = scx.shape_instance_cache.entry(
             cache::ShapeInstanceKey::new(
                 font.font.blob.id(),
