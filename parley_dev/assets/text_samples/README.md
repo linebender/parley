@@ -1,6 +1,6 @@
 # Sample Text Attribution
 
-The sample text amendments, source, and title are as follows:
+The sample texts in this folder are all in the public domain, and were obtained from the linked pages (if modified, with the documented amendments):
 
 | Sample            | Title                        | Amendments    | Source                                                                                                                                                               |
 | ----------------- | ---------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
