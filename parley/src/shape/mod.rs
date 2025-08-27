@@ -316,11 +316,7 @@ fn shape_item<'a, B: Brush>(
             harfrust::Direction::LeftToRight
         };
         let script = swash_convert::script_to_harfrust(item.script);
-        let language = if let Some(lang) = item.locale {
-            lang.language().parse::<harfrust::Language>().ok()
-        } else {
-            None
-        };
+        let language = item.locale.and_then(|lang| lang.language().parse::<harfrust::Language>().ok());
         scx.features.clear();
         for feature in rcx.features(item.features).unwrap_or(&[]) {
             scx.features.push(harfrust::Feature::new(
