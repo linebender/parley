@@ -14,7 +14,7 @@ pub(crate) struct ShapeDataKey {
 }
 
 impl ShapeDataKey {
-    pub(crate) fn new(font_blob_id: u64, font_index: u32) -> Self {
+    pub(crate) const fn new(font_blob_id: u64, font_index: u32) -> Self {
         Self {
             font_blob_id,
             font_index,
@@ -23,12 +23,14 @@ impl ShapeDataKey {
 }
 
 impl Equivalent<ShapeDataKey> for ShapeDataKey {
+    #[inline(always)]
     fn equivalent(&self, key: &ShapeDataKey) -> bool {
         self == key
     }
 }
 
 impl Into<ShapeDataKey> for &ShapeDataKey {
+    #[inline(always)]
     fn into(self) -> ShapeDataKey {
         *self
     }
@@ -49,7 +51,7 @@ pub(crate) struct ShapeInstanceKey<'a> {
 }
 
 impl<'a> ShapeInstanceKey<'a> {
-    pub(crate) fn new(
+    pub(crate) const fn new(
         font_blob_id: u64,
         font_index: u32,
         synthesis: &'a fontique::Synthesis,
@@ -65,6 +67,7 @@ impl<'a> ShapeInstanceKey<'a> {
 }
 
 impl<'a> Equivalent<ShapeInstanceId> for ShapeInstanceKey<'a> {
+    #[inline(always)]
     fn equivalent(&self, key: &ShapeInstanceId) -> bool {
         self.font_blob_id == key.font_blob_id
             && self.font_index == key.font_index
@@ -74,6 +77,7 @@ impl<'a> Equivalent<ShapeInstanceId> for ShapeInstanceKey<'a> {
 }
 
 impl<'a> Into<ShapeInstanceId> for ShapeInstanceKey<'a> {
+    #[inline(always)]
     fn into(self) -> ShapeInstanceId {
         ShapeInstanceId {
             font_blob_id: self.font_blob_id,
@@ -103,7 +107,7 @@ pub(crate) struct ShapePlanKey<'a> {
 }
 
 impl<'a> ShapePlanKey<'a> {
-    pub(crate) fn new(
+    pub(crate) const fn new(
         font_blob_id: u64,
         font_index: u32,
         direction: harfrust::Direction,
@@ -123,6 +127,7 @@ impl<'a> ShapePlanKey<'a> {
 }
 
 impl<'a> Equivalent<ShapePlanId> for ShapePlanKey<'a> {
+    #[inline(always)]
     fn equivalent(&self, key: &ShapePlanId) -> bool {
         self.font_blob_id == key.font_blob_id
             && self.font_index == key.font_index
@@ -139,6 +144,7 @@ impl<'a> Equivalent<ShapePlanId> for ShapePlanKey<'a> {
 }
 
 impl<'a> Into<ShapePlanId> for ShapePlanKey<'a> {
+    #[inline(always)]
     fn into(self) -> ShapePlanId {
         ShapePlanId {
             font_blob_id: self.font_blob_id,
