@@ -37,14 +37,18 @@ impl Into<ShapeDataKey> for &ShapeDataKey {
 }
 
 pub(crate) struct ShapeInstanceId {
+    /// The font collection's blob ID.
     font_blob_id: u64,
+    /// The font's index in the font collection.
     font_index: u32,
     synthesis: fontique::Synthesis,
     variations: Option<Box<[FontVariation]>>,
 }
 
 pub(crate) struct ShapeInstanceKey<'a> {
+    /// The font collection's blob ID.
     font_blob_id: u64,
+    /// The font's index in the font collection.
     font_index: u32,
     synthesis: &'a fontique::Synthesis,
     variations: Option<&'a [FontVariation]>,
@@ -89,7 +93,9 @@ impl<'a> Into<ShapeInstanceId> for ShapeInstanceKey<'a> {
 }
 
 pub(crate) struct ShapePlanId {
+    /// The font collection's blob ID.
     font_blob_id: u64,
+    /// The font's index in the font collection.
     font_index: u32,
     direction: harfrust::Direction,
     script: harfrust::Script,
@@ -98,7 +104,9 @@ pub(crate) struct ShapePlanId {
 }
 
 pub(crate) struct ShapePlanKey<'a> {
+    /// The font collection's blob ID.
     font_blob_id: u64,
+    /// The font's index in the font collection.
     font_index: u32,
     direction: harfrust::Direction,
     script: harfrust::Script,
