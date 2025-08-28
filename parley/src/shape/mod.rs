@@ -336,10 +336,12 @@ fn shape_item<'a, B: Brush>(
             cache::ShapePlanKey::new(
                 font.font.blob.id(),
                 font.font.index,
+                &font.font.synthesis,
                 direction,
                 script,
                 language.clone(),
                 &scx.features,
+                rcx.variations(item.variations),
             ),
             || {
                 harfrust::ShapePlan::new(

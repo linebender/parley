@@ -97,10 +97,12 @@ pub(crate) struct ShapePlanId {
     font_blob_id: u64,
     /// The font's index in the font collection.
     font_index: u32,
+    synthesis: fontique::Synthesis,
     direction: harfrust::Direction,
     script: harfrust::Script,
     language: Option<harfrust::Language>,
     features: Box<[harfrust::Feature]>,
+    variations: Option<Box<[FontVariation]>>,
 }
 
 pub(crate) struct ShapePlanKey<'a> {
@@ -108,28 +110,34 @@ pub(crate) struct ShapePlanKey<'a> {
     font_blob_id: u64,
     /// The font's index in the font collection.
     font_index: u32,
+    synthesis: &'a fontique::Synthesis,
     direction: harfrust::Direction,
     script: harfrust::Script,
     language: Option<harfrust::Language>,
     features: &'a [harfrust::Feature],
+    variations: Option<&'a [FontVariation]>,
 }
 
 impl<'a> ShapePlanKey<'a> {
     pub(crate) const fn new(
         font_blob_id: u64,
         font_index: u32,
+        synthesis: &'a fontique::Synthesis,
         direction: harfrust::Direction,
         script: harfrust::Script,
         language: Option<harfrust::Language>,
         features: &'a [harfrust::Feature],
+        variations: Option<&'a [FontVariation]>,
     ) -> Self {
         Self {
             font_blob_id,
             font_index,
+            synthesis,
             direction,
             script,
             language,
             features,
+            variations,
         }
     }
 }
@@ -139,10 +147,12 @@ impl<'a> Equivalent<ShapePlanId> for ShapePlanKey<'a> {
     fn equivalent(&self, key: &ShapePlanId) -> bool {
         self.font_blob_id == key.font_blob_id
             && self.font_index == key.font_index
+            && *self.synthesis == key.synthesis
             && self.direction == key.direction
             && self.script == key.script
             && self.language == key.language
             && self.features.len() == key.features.len()
+            && self.variations == key.variations.as_deref()
             && self
                 .features
                 .iter()
@@ -157,10 +167,12 @@ impl<'a> From<ShapePlanKey<'a>> for ShapePlanId {
         Self {
             font_blob_id: key.font_blob_id,
             font_index: key.font_index,
+            synthesis: *key.synthesis,
             direction: key.direction,
             script: key.script,
             language: key.language,
             features: key.features.to_vec().into(),
+            variations: key.variations.map(|v| v.to_vec().into()),
         }
     }
 }
