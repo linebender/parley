@@ -100,14 +100,14 @@ mod tests {
         }
     }
 
-    impl<'a> Into<TestId> for TestLookupKey<'a> {
-        fn into(self) -> TestId {
-            TestId(self.0.to_string())
+    impl<'a> From<TestLookupKey<'a>> for TestId {
+        fn from(key: TestLookupKey<'a>) -> Self {
+            TestId(key.0.to_string())
         }
     }
 
-    impl Equivalent<TestId> for TestId {
-        fn equivalent(&self, key: &TestId) -> bool {
+    impl Equivalent<Self> for TestId {
+        fn equivalent(&self, key: &Self) -> bool {
             self.0 == key.0
         }
     }
