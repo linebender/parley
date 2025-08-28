@@ -29,9 +29,9 @@ impl Equivalent<Self> for ShapeDataKey {
     }
 }
 
-impl From<&ShapeDataKey> for ShapeDataKey {
+impl From<&Self> for ShapeDataKey {
     #[inline(always)]
-    fn from(key: &ShapeDataKey) -> Self {
+    fn from(key: &Self) -> Self {
         *key
     }
 }
@@ -83,7 +83,7 @@ impl<'a> Equivalent<ShapeInstanceId> for ShapeInstanceKey<'a> {
 impl<'a> From<ShapeInstanceKey<'a>> for ShapeInstanceId {
     #[inline(always)]
     fn from(key: ShapeInstanceKey<'a>) -> Self {
-        ShapeInstanceId {
+        Self {
             font_blob_id: key.font_blob_id,
             font_index: key.font_index,
             synthesis: *key.synthesis,
@@ -154,7 +154,7 @@ impl<'a> Equivalent<ShapePlanId> for ShapePlanKey<'a> {
 impl<'a> From<ShapePlanKey<'a>> for ShapePlanId {
     #[inline(always)]
     fn from(key: ShapePlanKey<'a>) -> Self {
-        ShapePlanId {
+        Self {
             font_blob_id: key.font_blob_id,
             font_index: key.font_index,
             direction: key.direction,
