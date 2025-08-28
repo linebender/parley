@@ -22,17 +22,17 @@ impl ShapeDataKey {
     }
 }
 
-impl Equivalent<ShapeDataKey> for ShapeDataKey {
+impl Equivalent<Self> for ShapeDataKey {
     #[inline(always)]
-    fn equivalent(&self, key: &ShapeDataKey) -> bool {
+    fn equivalent(&self, key: &Self) -> bool {
         self == key
     }
 }
 
-impl Into<ShapeDataKey> for &ShapeDataKey {
+impl From<&ShapeDataKey> for ShapeDataKey {
     #[inline(always)]
-    fn into(self) -> ShapeDataKey {
-        *self
+    fn from(key: &ShapeDataKey) -> Self {
+        *key
     }
 }
 
@@ -80,14 +80,14 @@ impl<'a> Equivalent<ShapeInstanceId> for ShapeInstanceKey<'a> {
     }
 }
 
-impl<'a> Into<ShapeInstanceId> for ShapeInstanceKey<'a> {
+impl<'a> From<ShapeInstanceKey<'a>> for ShapeInstanceId {
     #[inline(always)]
-    fn into(self) -> ShapeInstanceId {
+    fn from(key: ShapeInstanceKey<'a>) -> Self {
         ShapeInstanceId {
-            font_blob_id: self.font_blob_id,
-            font_index: self.font_index,
-            synthesis: *self.synthesis,
-            variations: self.variations.map(|v| v.to_vec().into()),
+            font_blob_id: key.font_blob_id,
+            font_index: key.font_index,
+            synthesis: *key.synthesis,
+            variations: key.variations.map(|v| v.to_vec().into()),
         }
     }
 }
@@ -151,16 +151,16 @@ impl<'a> Equivalent<ShapePlanId> for ShapePlanKey<'a> {
     }
 }
 
-impl<'a> Into<ShapePlanId> for ShapePlanKey<'a> {
+impl<'a> From<ShapePlanKey<'a>> for ShapePlanId {
     #[inline(always)]
-    fn into(self) -> ShapePlanId {
+    fn from(key: ShapePlanKey<'a>) -> Self {
         ShapePlanId {
-            font_blob_id: self.font_blob_id,
-            font_index: self.font_index,
-            direction: self.direction,
-            script: self.script,
-            language: self.language,
-            features: self.features.to_vec().into(),
+            font_blob_id: key.font_blob_id,
+            font_index: key.font_index,
+            direction: key.direction,
+            script: key.script,
+            language: key.language,
+            features: key.features.to_vec().into(),
         }
     }
 }
