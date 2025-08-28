@@ -102,7 +102,7 @@ mod tests {
 
     impl<'a> From<TestLookupKey<'a>> for TestId {
         fn from(key: TestLookupKey<'a>) -> Self {
-            TestId(key.0.to_string())
+            Self(key.0.to_string())
         }
     }
 
