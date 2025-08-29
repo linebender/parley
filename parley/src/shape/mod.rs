@@ -27,6 +27,8 @@ pub(crate) struct ShapeContext {
     shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::ShaperData>,
     shape_instance_cache: LruCache<cache::ShapeInstanceId, harfrust::ShaperInstance>,
     shape_plan_cache: LruCache<cache::ShapePlanId, harfrust::ShapePlan>,
+    charmap_cache: cache::CharmapCache,
+
     unicode_buffer: Option<harfrust::UnicodeBuffer>,
     features: Vec<harfrust::Feature>,
 }
@@ -38,6 +40,7 @@ impl Default for ShapeContext {
             shape_data_cache: LruCache::new(MAX_ENTRIES),
             shape_instance_cache: LruCache::new(MAX_ENTRIES),
             shape_plan_cache: LruCache::new(MAX_ENTRIES),
+            charmap_cache: cache::CharmapCache::new(MAX_ENTRIES),
             unicode_buffer: Some(harfrust::UnicodeBuffer::new()),
             features: Vec::new(),
         }
@@ -251,7 +254,7 @@ fn shape_item<'a, B: Brush>(
         return; // No clusters to process
     }
 
-    let mut current_font = font_selector.select_font(&mut cluster);
+    let mut current_font = font_selector.select_font(&mut cluster, &mut scx.charmap_cache);
 
     // Main segmentation loop (based on swash shape_clusters) - only within current item
     while let Some(font) = current_font.take() {
@@ -265,7 +268,8 @@ fn shape_item<'a, B: Brush>(
                 break;
             }
 
-            if let Some(next_font) = font_selector.select_font(&mut cluster) {
+            if let Some(next_font) = font_selector.select_font(&mut cluster, &mut scx.charmap_cache)
+            {
                 if next_font != font {
                     current_font = Some(next_font);
                     break;
@@ -482,7 +486,11 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         }
     }
 
-    fn select_font(&mut self, cluster: &mut CharCluster) -> Option<SelectedFont> {
+    fn select_font(
+        &mut self,
+        cluster: &mut CharCluster,
+        charmap_cache: &mut cache::CharmapCache,
+    ) -> Option<SelectedFont> {
         let style_index = cluster.user_data() as u16;
         let is_emoji = cluster.info().is_emoji();
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
@@ -516,14 +524,14 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         }
         let mut selected_font = None;
         self.query.matches_with(|font| {
-            use skrifa::MetadataProvider;
             use swash::text::cluster::Status as MapStatus;
 
             let Ok(font_ref) = skrifa::FontRef::from_index(font.blob.as_ref(), font.index) else {
                 return fontique::QueryStatus::Continue;
             };
 
-            let charmap = font_ref.charmap();
+            let charmap = charmap_cache.get(font.blob.id(), &font_ref);
+
             let map_status = cluster.map(|ch| {
                 charmap
                     .map(ch)
