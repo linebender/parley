@@ -292,6 +292,27 @@ fn overflow_alignment_rtl() {
 }
 
 #[test]
+fn justify() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text_one_line = "Lorem ipsum dolor.\n\nLorem ipsum dolor sit amet.";
+    let text_last_line_one_word = "Lorem ipsum dolor sit amet, incididunt ut labore et dolore aliqua.\n\nLorem ipsum dolor sit amet.";
+    let text_last_line_three_words = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ipsum dolor.\n\nLorem ipsum dolor sit amet.";
+
+    for (text, test_case_name) in [
+        (text_one_line, "one_lined_text_not_justified"),
+        (text_last_line_one_word, "last_line_one_word"),
+        (text_last_line_three_words, "last_line_three_words"),
+    ] {
+        let builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(150.0));
+        layout.align(None, Alignment::Justify, AlignmentOptions::default());
+        env.with_name(test_case_name).check_layout_snapshot(&layout);
+    }
+}
+
+#[test]
 fn content_widths() {
     let mut env = TestEnv::new(test_name!(), None);
 
