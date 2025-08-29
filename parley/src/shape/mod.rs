@@ -529,7 +529,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             let Ok(font_ref) = skrifa::FontRef::from_index(font.blob.as_ref(), font.index) else {
                 return fontique::QueryStatus::Continue;
             };
-
             let charmap = charmap_cache.get(font.blob.id(), &font_ref);
 
             let map_status = cluster.map(|ch| {
