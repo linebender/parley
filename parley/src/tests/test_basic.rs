@@ -292,15 +292,15 @@ fn overflow_alignment_rtl() {
 }
 
 #[test]
-fn justify() {
+fn issue_409_justified_text() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    let text_one_line = "Lorem ipsum dolor.\n\nLorem ipsum dolor sit amet.";
-    let text_last_line_one_word = "Lorem ipsum dolor sit amet, incididunt ut labore et dolore aliqua.\n\nLorem ipsum dolor sit amet.";
-    let text_last_line_three_words = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua ipsum dolor.\n\nLorem ipsum dolor sit amet.";
+    let text_one_line = "One line justified.\n";
+    let text_last_line_one_word = "The last word of this text falls on the last line.\n";
+    let text_last_line_three_words = "Three words of this text will end up on the last line.\n";
 
     for (text, test_case_name) in [
-        (text_one_line, "one_lined_text_not_justified"),
+        (text_one_line, "one_line"),
         (text_last_line_one_word, "last_line_one_word"),
         (text_last_line_three_words, "last_line_three_words"),
     ] {
