@@ -1,7 +1,7 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::FontVariation;
+use crate::{FontVariation, lru_cache::LruCache};
 use alloc::boxed::Box;
 use hashbrown::Equivalent;
 
@@ -174,5 +174,29 @@ impl<'a> From<ShapePlanKey<'a>> for ShapePlanId {
             features: key.features.to_vec().into(),
             variations: key.variations.map(|v| v.to_vec().into()),
         }
+    }
+}
+
+/// Cache for charmap mapping indices.
+pub(crate) struct CharmapCache {
+    cache: LruCache<u64, skrifa::charmap::MappingIndex>,
+}
+
+impl CharmapCache {
+    pub(crate) fn new(max_entries: usize) -> Self {
+        Self {
+            cache: LruCache::new(max_entries),
+        }
+    }
+
+    pub(crate) fn get<'a>(
+        &mut self,
+        blob_id: u64,
+        font_ref: &skrifa::FontRef<'a>,
+    ) -> skrifa::charmap::Charmap<'a> {
+        let index = self
+            .cache
+            .entry(blob_id, || skrifa::charmap::MappingIndex::new(font_ref));
+        index.charmap(font_ref)
     }
 }
