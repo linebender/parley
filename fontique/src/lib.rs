@@ -35,6 +35,7 @@ extern crate alloc;
 
 mod attributes;
 mod backend;
+mod charmap;
 mod collection;
 mod fallback;
 mod family;
@@ -52,6 +53,7 @@ pub use icu_locid::LanguageIdentifier as Language;
 pub use peniko::Blob;
 
 pub use attributes::{Attributes, FontStyle, FontWeight, FontWidth};
+pub use charmap::{Charmap, CharmapIndex};
 pub use collection::{Collection, CollectionOptions, Query, QueryFamily, QueryFont, QueryStatus};
 pub use fallback::FallbackKey;
 pub use family::{FamilyId, FamilyInfo};
