@@ -3,13 +3,12 @@
 
 //! Query support.
 
-use super::super::{Collection, SourceCache};
-
 use alloc::vec::Vec;
 
-use super::{
-    super::{Attributes, Blob, FallbackKey, FamilyId, FamilyInfo, GenericFamily, Synthesis},
-    Inner,
+use super::Inner;
+use crate::{
+    Attributes, Blob, Collection, FallbackKey, FamilyId, FamilyInfo, GenericFamily, SourceCache,
+    Synthesis, UnicodeRange,
 };
 
 #[derive(Clone, Default)]
@@ -34,6 +33,7 @@ pub struct Query<'a> {
     source_cache: &'a mut SourceCache,
     attributes: Attributes,
     fallbacks: Option<FallbackKey>,
+    range: Option<UnicodeRange>,
 }
 
 impl<'a> Query<'a> {
@@ -45,6 +45,7 @@ impl<'a> Query<'a> {
             source_cache,
             attributes: Attributes::default(),
             fallbacks: None,
+            range: None,
         }
     }
 
@@ -99,6 +100,14 @@ impl<'a> Query<'a> {
         }
     }
 
+    /// Sets the required [`UnicodeRange`]
+    ///
+    /// If set, only fonts claiming to be functional over this range will be
+    /// returned.
+    pub fn set_range(&mut self, ur: impl Into<Option<UnicodeRange>>) {
+        self.range = ur.into()
+    }
+
     /// Invokes the given callback with all fonts that match the current
     /// settings.
     ///
@@ -129,6 +138,7 @@ impl<'a> Query<'a> {
             let mut best_index = None;
             if let Some(font) = load_font(
                 family_info,
+                self.range,
                 self.attributes,
                 &mut family.best,
                 false,
@@ -146,6 +156,7 @@ impl<'a> Query<'a> {
             }
             if let Some(font) = load_font(
                 family_info,
+                self.range,
                 self.attributes,
                 &mut family.default,
                 true,
@@ -223,6 +234,7 @@ pub struct QueryFont {
 
 fn load_font<'a>(
     family: &FamilyInfo,
+    opt_range: Option<UnicodeRange>,
     attributes: Attributes,
     font: &'a mut Entry<QueryFont>,
     is_default: bool,
@@ -241,6 +253,12 @@ fn load_font<'a>(
                 family.match_index(attributes.width, attributes.style, attributes.weight, true)?
             };
             let font_info = family.fonts().get(family_index)?;
+            if let Some(range) = opt_range {
+                if !font_info.ranges().contains(range) {
+                    return None;
+                }
+            }
+
             let blob = font_info.load(Some(source_cache))?;
             let blob_index = font_info.index();
             let synthesis =

@@ -6,6 +6,7 @@
 use super::attributes::{FontStyle, FontWeight, FontWidth};
 use super::source::{SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
+use crate::UnicodeRanges;
 use core::fmt;
 use read_fonts::{FontRef, TableProvider as _, types::Tag};
 use smallvec::SmallVec;
@@ -15,6 +16,7 @@ type AxisVec = SmallVec<[AxisInfo; 1]>;
 /// Representation of a single font in a family.
 #[derive(Clone, Debug)]
 pub struct FontInfo {
+    ranges: UnicodeRanges,
     source: SourceInfo,
     index: u32,
     width: FontWidth,
@@ -40,6 +42,13 @@ impl FontInfo {
                 Self::from_font_ref(&font, source.clone(), index)
             }
         }
+    }
+
+    /// Returns the bit-map of contained ranges
+    ///
+    /// This represents Unicode characters over which the font is "functional".
+    pub fn ranges(&self) -> UnicodeRanges {
+        self.ranges
     }
 
     /// Returns an object describing how to locate the data containing this
@@ -199,7 +208,7 @@ impl FontInfo {
         source: SourceInfo,
         index: u32,
     ) -> Option<Self> {
-        let (width, style, weight) = read_attributes(font);
+        let (ranges, width, style, weight) = read_attributes(font);
         let (axes, attr_axes) = if let Ok(fvar_axes) = font.fvar().and_then(|fvar| fvar.axes()) {
             let mut axes = SmallVec::<[AxisInfo; 1]>::with_capacity(fvar_axes.len());
             let mut attrs_axes = 0_u8;
@@ -225,6 +234,7 @@ impl FontInfo {
             (Default::default(), Default::default())
         };
         Some(Self {
+            ranges,
             source,
             index,
             width,
@@ -368,7 +378,7 @@ impl fmt::Debug for Synthesis {
     }
 }
 
-fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
+fn read_attributes(font: &FontRef<'_>) -> (UnicodeRanges, FontWidth, FontStyle, FontWeight) {
     use read_fonts::{
         TableProvider,
         tables::{
@@ -392,7 +402,17 @@ fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
         })
     }
 
-    fn from_os2_post(os2: Os2<'_>, post: Option<Post<'_>>) -> (FontWidth, FontStyle, FontWeight) {
+    fn from_os2_post(
+        os2: Os2<'_>,
+        post: Option<Post<'_>>,
+    ) -> (UnicodeRanges, FontWidth, FontStyle, FontWeight) {
+        let ranges = UnicodeRanges::from([
+            os2.ul_unicode_range_1(),
+            os2.ul_unicode_range_2(),
+            os2.ul_unicode_range_3(),
+            os2.ul_unicode_range_4(),
+        ]);
+
         let width = width_from_width_class(os2.us_width_class());
         // Bits 1 and 9 of the fsSelection field signify italic and
         // oblique, respectively.
@@ -411,10 +431,10 @@ fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
         // have a value outside of that range.
         // See <https://learn.microsoft.com/en-us/typography/opentype/spec/os2#usweightclass>
         let weight = FontWeight::new(os2.us_weight_class() as f32);
-        (width, style, weight)
+        (ranges, width, style, weight)
     }
 
-    fn from_head(head: Head<'_>) -> (FontWidth, FontStyle, FontWeight) {
+    fn from_head(head: Head<'_>) -> (UnicodeRanges, FontWidth, FontStyle, FontWeight) {
         let mac_style = head.mac_style();
         let style = mac_style
             .contains(MacStyle::ITALIC)
@@ -424,7 +444,12 @@ fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
             .contains(MacStyle::BOLD)
             .then_some(700.0)
             .unwrap_or_default();
-        (FontWidth::default(), style, FontWeight::new(weight))
+        (
+            UnicodeRanges::default(),
+            FontWidth::default(),
+            style,
+            FontWeight::new(weight),
+        )
     }
 
     if let Ok(os2) = font.os2() {
@@ -436,6 +461,7 @@ fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
         from_head(head)
     } else {
         (
+            UnicodeRanges::default(),
             FontWidth::default(),
             FontStyle::Normal,
             FontWeight::default(),
