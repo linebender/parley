@@ -3,6 +3,8 @@
 
 //! Query support.
 
+use crate::{Charmap, CharmapIndex};
+
 use super::super::{Collection, SourceCache};
 
 use alloc::vec::Vec;
@@ -219,6 +221,15 @@ pub struct QueryFont {
     pub index: u32,
     /// Synthesis suggestions for this font based on the requested attributes.
     pub synthesis: Synthesis,
+    /// Data used for constructing a character map for this font.
+    pub charmap_index: CharmapIndex,
+}
+
+impl QueryFont {
+    /// Attempts to construct a [Charmap] for this font.
+    pub fn charmap(&self) -> Option<Charmap<'_>> {
+        self.charmap_index.charmap(self.blob.as_ref())
+    }
 }
 
 fn load_font<'a>(
@@ -250,6 +261,7 @@ fn load_font<'a>(
                 blob: blob.clone(),
                 index: blob_index,
                 synthesis,
+                charmap_index: font_info.charmap_index(),
             });
             if let Entry::Ok(font) = status {
                 Some(font)
