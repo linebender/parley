@@ -1,3 +1,6 @@
+// Copyright 2024 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use read_fonts::{
     FontData, FontRead, FontRef, TableProvider, TopLevelTable,
     tables::cmap::{Cmap, CmapSubtable},
