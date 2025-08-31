@@ -3,6 +3,8 @@
 
 //! Model for a font.
 
+use crate::CharmapIndex;
+
 use super::attributes::{FontStyle, FontWeight, FontWidth};
 use super::source::{SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
@@ -22,6 +24,7 @@ pub struct FontInfo {
     weight: FontWeight,
     axes: AxisVec,
     attr_axes: u8,
+    charmap_index: CharmapIndex,
 }
 
 impl FontInfo {
@@ -191,6 +194,13 @@ impl FontInfo {
     pub fn has_optical_size_axis(&self) -> bool {
         self.attr_axes & OPTICAL_SIZE_AXIS != 0
     }
+
+    /// Returns the index used for constructing a [Charmap] for this font.
+    ///
+    /// [Charmap]: crate::Charmap
+    pub fn charmap_index(&self) -> CharmapIndex {
+        self.charmap_index
+    }
 }
 
 impl FontInfo {
@@ -199,6 +209,9 @@ impl FontInfo {
         source: SourceInfo,
         index: u32,
     ) -> Option<Self> {
+        // It's probably not useful to retain fonts that don't have
+        // a valid cmap so just bail here if we fail.
+        let charmap_index = CharmapIndex::new(font)?;
         let (width, style, weight) = read_attributes(font);
         let (axes, attr_axes) = if let Ok(fvar_axes) = font.fvar().and_then(|fvar| fvar.axes()) {
             let mut axes = SmallVec::<[AxisInfo; 1]>::with_capacity(fvar_axes.len());
@@ -232,6 +245,7 @@ impl FontInfo {
             weight,
             axes,
             attr_axes,
+            charmap_index,
         })
     }
 
