@@ -22,6 +22,10 @@ This release has an [MSRV] of 1.82.
 - Shift-click support through `Selection::shift_click_extension` and `PlainEditorDriver::shift_click_extension`. ([#385][] by [@kekelp][])
 - Benchmarks. ([#405]() by [@taj-p][])
 
+#### Fontique
+
+- Cache character mapping metadata for each font to improve performance of font selection. ([#413][] by [@dfrg][])
+
 ### Changed
 
 #### Parley
@@ -328,6 +332,7 @@ This release has an [MSRV][] of 1.70.
 [#400]: https://github.com/linebender/parley/pull/400
 [#402]: https://github.com/linebender/parley/pull/402
 [#405]: https://github.com/linebender/parley/pull/405
+[#413]: https://github.com/linebender/parley/pull/413
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/linebender/parley/compare/v0.4.0...v0.5.0

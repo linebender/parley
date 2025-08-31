@@ -1,6 +1,11 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+//! Mapping codepoints to nominal glyph identifiers.
+
+// TODO(dfrg): move this code to read-fonts so it can be shared among other
+// crates.
+
 use read_fonts::{
     FontData, FontRead, FontRef, TableProvider, TopLevelTable,
     tables::cmap::{Cmap, CmapSubtable},
@@ -56,8 +61,11 @@ pub struct Charmap<'a> {
 impl Charmap<'_> {
     /// Returns the glyph identifier for the given codepoint.
     pub fn map(&self, codepoint: impl Into<u32>) -> Option<u32> {
+        const ASCII_MAX: u32 = 0x7F;
         let mut c = codepoint.into();
-        if self.is_mac_roman && c > 0x7F {
+        // The Mac Roman encoding requires special processing for codepoints
+        // above the ASCII range.
+        if self.is_mac_roman && c > ASCII_MAX {
             c = unicode_to_mac_roman(c);
         }
         let result = match &self.subtable {
@@ -65,14 +73,10 @@ impl Charmap<'_> {
             CmapSubtable::Format6(table) => table.map_codepoint(c),
             CmapSubtable::Format10(table) => {
                 if let Some(index) = c.checked_sub(table.start_char_code()) {
-                    if index < table.num_chars() {
-                        table
-                            .glyph_id_array()
-                            .get(index as usize)
-                            .map(|gid| GlyphId::from(gid.get()))
-                    } else {
-                        None
-                    }
+                    table
+                        .glyph_id_array()
+                        .get(index as usize)
+                        .map(|gid| GlyphId::from(gid.get()))
                 } else {
                     None
                 }

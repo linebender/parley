@@ -527,7 +527,11 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
                     .map(ch)
                     .map(|g| {
                         // HACK: in reality, we're only using swash to compute
-                        // coverage so the actual gid doesn't matter
+                        // coverage so we only care about whether the font
+                        // has a mapping for a particular glyph. Any non-zero
+                        // value indicates the existence of a glyph so we can
+                        // simplify this without a fallible conversion from u32
+                        // to u16.
                         (g != 0) as u16
                     })
                     .unwrap_or_default()
