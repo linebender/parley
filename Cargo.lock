@@ -1187,7 +1187,7 @@ dependencies = [
  "objc2-core-text",
  "objc2-foundation 0.3.1",
  "peniko",
- "read-fonts 0.29.3",
+ "read-fonts 0.34.0",
  "roxmltree",
  "smallvec",
  "unicode-script",
@@ -1465,14 +1465,14 @@ dependencies = [
 
 [[package]]
 name = "harfrust"
-version = "0.1.2"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca4253de099ee464aea026833ee8f3968c08bfe0065bfb4f47c6ac590d533590"
+checksum = "406a98b615ed380f2195fa8fb2ed3083e64b2a6329d710e06f95a42466f0f0c4"
 dependencies = [
  "bitflags 2.9.1",
  "bytemuck",
  "core_maths",
- "read-fonts 0.33.0",
+ "read-fonts 0.34.0",
  "smallvec",
 ]
 
@@ -2713,7 +2713,7 @@ dependencies = [
  "hashbrown",
  "parley_dev",
  "peniko",
- "skrifa",
+ "skrifa 0.36.0",
  "swash",
  "tiny-skia",
 ]
@@ -2724,7 +2724,7 @@ version = "0.0.0"
 dependencies = [
  "parley",
  "parley_dev",
- "skrifa",
+ "skrifa 0.36.0",
  "tango-bench",
 ]
 
@@ -3020,9 +3020,9 @@ dependencies = [
 
 [[package]]
 name = "read-fonts"
-version = "0.33.0"
+version = "0.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "149a62cd54cf1ef1ee79d2b987e01e29b29a16f5ae67d1eaf58653479397186a"
+checksum = "8941f8e9d5f8ad3aebea330d01ac68c0167600eb31a86ecd86e97be4d13b51f5"
 dependencies = [
  "bytemuck",
  "core_maths",
@@ -3276,6 +3276,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "skrifa"
+version = "0.36.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37004372610e83ee2a4c69c7d896b41f33da6a3dc1a4fe07dd9b2629a549b1dc"
+dependencies = [
+ "bytemuck",
+ "core_maths",
+ "read-fonts 0.34.0",
+]
+
+[[package]]
 name = "slab"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3420,7 +3431,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f745de914febc7c9ab4388dfaf94bbc87e69f57bb41133a9b0c84d4be49856f3"
 dependencies = [
  "core_maths",
- "skrifa",
+ "skrifa 0.31.3",
  "yazi",
  "zeno",
 ]
@@ -3431,7 +3442,7 @@ version = "0.1.0"
 dependencies = [
  "image",
  "parley",
- "skrifa",
+ "skrifa 0.36.0",
  "swash",
 ]
 
@@ -3594,7 +3605,7 @@ name = "tiny_skia_render"
 version = "0.1.0"
 dependencies = [
  "parley",
- "skrifa",
+ "skrifa 0.36.0",
  "tiny-skia",
 ]
 
@@ -3801,7 +3812,7 @@ dependencies = [
  "log",
  "peniko",
  "png",
- "skrifa",
+ "skrifa 0.31.3",
  "static_assertions",
  "thiserror 2.0.12",
  "vello_encoding",
@@ -3836,7 +3847,7 @@ dependencies = [
  "bytemuck",
  "guillotiere",
  "peniko",
- "skrifa",
+ "skrifa 0.31.3",
  "smallvec",
 ]
 
