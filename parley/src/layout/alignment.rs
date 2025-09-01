@@ -114,8 +114,7 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
                 // (`BreakReason::None`), (`BreakReason::Explicit`) or if there are no whitespace
                 // gaps to adjust. In that case, start-align, i.e., left-align for LTR text and
                 // right-align for RTL text.
-                if line.break_reason == BreakReason::None
-                    || line.break_reason == BreakReason::Explicit
+                if matches!(line.break_reason, BreakReason::None | BreakReason::Explicit)
                     || line.num_spaces == 0
                 {
                     if is_rtl {
