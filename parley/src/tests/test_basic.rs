@@ -292,6 +292,33 @@ fn overflow_alignment_rtl() {
 }
 
 #[test]
+fn issue_409_justified_text() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text_one_line = "One line justified.\n";
+    let text_last_line_one_word = "The last word of this text falls on the last line.\n";
+    let text_last_line_three_words = "Three words of this text will end up on the last line.\n";
+    let paragraphs = r#"A sentence across two lines.
+
+And another sentence that breaks across, hopefully, three lines.
+
+And, finally, yet another sentence."#;
+
+    for (text, test_case_name) in [
+        (text_one_line, "one_line"),
+        (text_last_line_one_word, "last_line_one_word"),
+        (text_last_line_three_words, "last_line_three_words"),
+        (paragraphs, "paragraphs"),
+    ] {
+        let builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(150.0));
+        layout.align(None, Alignment::Justify, AlignmentOptions::default());
+        env.with_name(test_case_name).check_layout_snapshot(&layout);
+    }
+}
+
+#[test]
 fn content_widths() {
     let mut env = TestEnv::new(test_name!(), None);
 
