@@ -17,8 +17,8 @@ workspace = true
 
 [features]
 default = ["system"]
-std = ["read-fonts/std", "peniko/std", "dep:memmap2"]
-libm = ["read-fonts/libm", "peniko/libm", "dep:core_maths"]
+std = ["read-fonts/std", "linebender_resource_handle/std", "dep:memmap2"]
+libm = ["read-fonts/libm", "dep:core_maths"]
 icu_properties = ["dep:icu_properties"]
 unicode_script = ["dep:unicode-script"]
 # Enables support for system font backends
@@ -37,7 +37,7 @@ system = [
 [dependencies]
 bytemuck = { workspace = true }
 read-fonts = { workspace = true }
-peniko = { workspace = true }
+linebender_resource_handle = { workspace = true }
 smallvec = "1.15.0"
 memmap2 = { version = "0.9.5", optional = true }
 unicode-script = { version = "0.5.7", optional = true }

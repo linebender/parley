@@ -50,7 +50,7 @@ mod source;
 mod source_cache;
 
 pub use icu_locale_core::LanguageIdentifier as Language;
-pub use peniko::Blob;
+pub use linebender_resource_handle::Blob;
 
 pub use attributes::{Attributes, FontStyle, FontWeight, FontWidth};
 pub use charmap::{Charmap, CharmapIndex};

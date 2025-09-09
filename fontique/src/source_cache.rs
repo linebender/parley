@@ -8,9 +8,9 @@ use super::source::SourceId;
 use super::source::{SourceInfo, SourceKind};
 #[cfg(feature = "std")]
 use hashbrown::HashMap;
-use peniko::Blob;
+use linebender_resource_handle::Blob;
 #[cfg(feature = "std")]
-use peniko::WeakBlob;
+use linebender_resource_handle::WeakBlob;
 #[cfg(feature = "std")]
 use std::{
     path::Path,

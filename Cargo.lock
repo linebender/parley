@@ -1181,12 +1181,12 @@ dependencies = [
  "hashbrown",
  "icu_locale_core",
  "icu_properties",
+ "linebender_resource_handle",
  "memmap2",
  "objc2 0.6.1",
  "objc2-core-foundation",
  "objc2-core-text",
  "objc2-foundation 0.3.1",
- "peniko",
  "read-fonts 0.34.0",
  "roxmltree",
  "smallvec",
@@ -1932,6 +1932,12 @@ dependencies = [
  "libc",
  "redox_syscall 0.5.12",
 ]
+
+[[package]]
+name = "linebender_resource_handle"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b443df28f3fa8b5bc32ada6daca59994b34ef37e061b4232f367db69408d83b6"
 
 [[package]]
 name = "linux-raw-sys"
@@ -2682,6 +2688,7 @@ dependencies = [
  "fontique",
  "harfrust",
  "hashbrown",
+ "linebender_resource_handle",
  "parley_dev",
  "peniko",
  "skrifa 0.36.0",
@@ -2715,12 +2722,13 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "peniko"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f9529efd019889b2a205193c14ffb6e2839b54ed9d2720674f10f4b04d87ac9"
+checksum = "9b44f9ddd2f480176b34278eb653ec1c8062f3b143a4e16eeff5ffac3334e288"
 dependencies = [
  "color",
  "kurbo",
+ "linebender_resource_handle",
  "smallvec",
 ]
 
