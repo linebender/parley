@@ -817,9 +817,6 @@ name = "color"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ae467d04a8a8aea5d9a49018a6ade2e4221d92968e8ce55a48c0b1164e5f698"
-dependencies = [
- "libm",
-]
 
 [[package]]
 name = "colorchoice"
@@ -1181,12 +1178,12 @@ dependencies = [
  "hashbrown",
  "icu_locid",
  "icu_properties",
+ "linebender_resource_handle",
  "memmap2",
  "objc2 0.6.1",
  "objc2-core-foundation",
  "objc2-core-text",
  "objc2-foundation 0.3.1",
- "peniko",
  "read-fonts 0.34.0",
  "roxmltree",
  "smallvec",
@@ -1907,7 +1904,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1077d333efea6170d9ccb96d3c3026f300ca0773da4938cc4c811daa6df68b0c"
 dependencies = [
  "arrayvec",
- "libm",
  "smallvec",
 ]
 
@@ -1961,6 +1957,12 @@ dependencies = [
  "libc",
  "redox_syscall 0.5.12",
 ]
+
+[[package]]
+name = "linebender_resource_handle"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b443df28f3fa8b5bc32ada6daca59994b34ef37e061b4232f367db69408d83b6"
 
 [[package]]
 name = "linux-raw-sys"
@@ -2711,8 +2713,8 @@ dependencies = [
  "fontique",
  "harfrust",
  "hashbrown",
+ "linebender_resource_handle",
  "parley_dev",
- "peniko",
  "skrifa 0.36.0",
  "swash",
  "tiny-skia",

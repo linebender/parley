@@ -39,6 +39,18 @@ pub struct Editor {
     blink_period: Duration,
 }
 
+fn convert_font(font: &parley::Font) -> peniko::Font {
+    let (data, id) = font.data.clone().into_raw_parts();
+    peniko::Font {
+        data: peniko::Blob::from_raw_parts(data, id),
+        index: font.index,
+    }
+}
+
+fn convert_rect(rect: &parley::Rect) -> peniko::kurbo::Rect {
+    peniko::kurbo::Rect::new(rect.x0, rect.y0, rect.x1, rect.y1)
+}
+
 impl Editor {
     pub fn new(text: &str) -> Self {
         let mut editor = PlainEditor::new(32.0);
@@ -337,12 +349,18 @@ impl Editor {
                 transform,
                 palette::css::STEEL_BLUE,
                 None,
-                &rect,
+                &convert_rect(&rect),
             );
         });
         if self.cursor_visible {
             if let Some(cursor) = self.editor.cursor_geometry(1.5) {
-                scene.fill(Fill::NonZero, transform, palette::css::WHITE, None, &cursor);
+                scene.fill(
+                    Fill::NonZero,
+                    transform,
+                    palette::css::WHITE,
+                    None,
+                    &convert_rect(&cursor),
+                );
             }
         }
         let layout = self.editor.layout(&mut self.font_cx, &mut self.layout_cx);
@@ -393,8 +411,9 @@ impl Editor {
                 let glyph_xform = synthesis
                     .skew()
                     .map(|angle| Affine::skew(angle.to_radians().tan() as f64, 0.0));
+
                 scene
-                    .draw_glyphs(font)
+                    .draw_glyphs(&convert_font(font))
                     .brush(&style.brush)
                     .hint(true)
                     .transform(transform)
