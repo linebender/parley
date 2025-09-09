@@ -66,8 +66,8 @@ fn draw_rect(pen: &mut TinySkiaPen<'_>, x: f32, y: f32, width: f32, height: f32,
 pub(crate) fn render_layout(
     config: &RenderingConfig,
     layout: &Layout<ColorBrush>,
-    cursor_rect: Option<crate::Rect>,
-    selection_rects: &[(crate::Rect, usize)],
+    cursor_rect: Option<crate::BoundingBox>,
+    selection_rects: &[(crate::BoundingBox, usize)],
 ) -> Pixmap {
     let padding = 20;
     let width = config
