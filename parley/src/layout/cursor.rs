@@ -6,11 +6,11 @@
 #[cfg(feature = "accesskit")]
 use super::LayoutAccessibility;
 use super::{Affinity, BreakReason, Brush, Cluster, ClusterSide, Layout, Line, LineItem};
+use crate::Rect;
 #[cfg(feature = "accesskit")]
 use accesskit::TextPosition;
 use alloc::vec::Vec;
 use core::ops::Range;
-use peniko::kurbo::Rect;
 #[cfg(feature = "accesskit")]
 use swash::text::cluster::Whitespace;
 

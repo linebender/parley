@@ -4,7 +4,7 @@
 //! Model for font data.
 
 use core::sync::atomic::{AtomicU64, Ordering};
-use peniko::Blob;
+use linebender_resource_handle::Blob;
 #[cfg(feature = "std")]
 use {
     hashbrown::HashMap,
