@@ -3,44 +3,70 @@
 
 //! Implementation of the CSS font matching algorithm.
 
+use core::ops::Deref;
+
 use super::attributes::{FontStyle, FontWeight, FontWidth};
 use super::font::FontInfo;
 use smallvec::SmallVec;
 
 const DEFAULT_OBLIQUE_ANGLE: f32 = 14.0;
 
+#[derive(Copy, Clone)]
+pub struct FontMatchingInfo {
+    width: i32,
+    style: FontStyle,
+    weight: f32,
+    has_slnt: bool,
+}
+
+impl From<&FontInfo> for FontMatchingInfo {
+    fn from(info: &FontInfo) -> Self {
+        Self {
+            width: (info.width().ratio() * 100.0) as i32,
+            style: info.style(),
+            weight: info.weight().value(),
+            has_slnt: info.has_slant_axis(),
+        }
+    }
+}
+
 pub fn match_font(
-    set: &[FontInfo],
+    set: impl IntoIterator<Item = impl Into<FontMatchingInfo>>,
     width: FontWidth,
     style: FontStyle,
     weight: FontWeight,
     synthesize_style: bool,
 ) -> Option<usize> {
     const OBLIQUE_THRESHOLD: f32 = DEFAULT_OBLIQUE_ANGLE;
+
+    #[derive(Copy, Clone)]
+    struct CandidateFont {
+        index: usize,
+        info: FontMatchingInfo,
+    }
+    impl Deref for CandidateFont {
+        type Target = FontMatchingInfo;
+        fn deref(&self) -> &Self::Target {
+            &self.info
+        }
+    }
+
+    let mut set: SmallVec<[CandidateFont; 16]> = set
+        .into_iter()
+        .enumerate()
+        .map(|(index, info)| CandidateFont {
+            index,
+            info: info.into(),
+        })
+        .collect();
+
+    // Early return for case of 0 or 1 fonts where matching is trivial
     match set.len() {
         0 => return None,
         1 => return Some(0),
         _ => {}
     }
-    #[derive(Copy, Clone)]
-    struct Candidate {
-        index: usize,
-        width: i32,
-        style: FontStyle,
-        weight: f32,
-        has_slnt: bool,
-    }
-    let mut set: SmallVec<[Candidate; 16]> = set
-        .iter()
-        .enumerate()
-        .map(|(i, font)| Candidate {
-            index: i,
-            width: (font.width().ratio() * 100.0) as i32,
-            style: font.style(),
-            weight: font.weight().value(),
-            has_slnt: font.has_slant_axis(),
-        })
-        .collect();
+
     let width = (width.ratio() * 100.0) as i32;
     let weight = weight.value();
     // font-width is tried first:
@@ -373,8 +399,8 @@ pub fn match_font(
     }
     set.retain(|f| f.style == use_style);
     // font-weight is matched next:
-    if let Some(f) = set.iter().find(|f| f.weight == weight) {
-        return Some(f.index);
+    if let Some(index) = set.iter().position(|f| f.weight == weight) {
+        return Some(index);
     } else {
         // If the desired weight is inclusively between 400 and 500...
         if (400.0..=500.0).contains(&weight) {
