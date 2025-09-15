@@ -1050,14 +1050,16 @@ enum AnchorBase {
 }
 
 fn cursor_rect<B: Brush>(cluster: &Cluster<'_, B>, at_end: bool, size: f32) -> Rect {
-    let line_x = (cluster.visual_offset().unwrap_or_default()
-        + at_end.then(|| cluster.advance()).unwrap_or_default()) as f64;
+    let mut line_x = cluster.visual_offset().unwrap_or_default();
+    if at_end {
+        line_x += cluster.advance();
+    }
     let line = cluster.line();
     let metrics = line.metrics();
     Rect::new(
-        line_x,
+        line_x as f64,
         metrics.min_coord as f64,
-        line_x + size as f64,
+        (line_x + size) as f64,
         metrics.max_coord as f64,
     )
 }

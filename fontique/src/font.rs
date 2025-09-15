@@ -430,14 +430,16 @@ fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
 
     fn from_head(head: Head<'_>) -> (FontWidth, FontStyle, FontWeight) {
         let mac_style = head.mac_style();
-        let style = mac_style
-            .contains(MacStyle::ITALIC)
-            .then_some(FontStyle::Italic)
-            .unwrap_or_default();
-        let weight = mac_style
-            .contains(MacStyle::BOLD)
-            .then_some(700.0)
-            .unwrap_or_default();
+        let style = if mac_style.contains(MacStyle::ITALIC) {
+            FontStyle::Italic
+        } else {
+            FontStyle::default()
+        };
+        let weight = if mac_style.contains(MacStyle::BOLD) {
+            700.0
+        } else {
+            0.0
+        };
         (FontWidth::default(), style, FontWeight::new(weight))
     }
 
