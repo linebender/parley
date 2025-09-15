@@ -69,16 +69,10 @@ impl CandidateFontSet {
         Self(inner)
     }
 
+    // Width methods
+
     fn has_width(&self, width: i32) -> bool {
         self.0.iter().any(|f| f.width == width)
-    }
-
-    fn has_style(&self, style: FontStyle) -> bool {
-        self.0.iter().any(|f| f.style == style)
-    }
-
-    fn has_variable_font_with_slnt_axis(&self) -> bool {
-        self.0.iter().any(|f| f.has_slnt)
     }
 
     fn max_width_below(&self, width: i32) -> Option<i32> {
@@ -97,6 +91,8 @@ impl CandidateFontSet {
             .map(|f| f.width)
     }
 
+    // Weight methods
+
     fn fonts_matching_weight(
         &self,
         predicate: impl Fn(f32) -> bool,
@@ -112,6 +108,16 @@ impl CandidateFontSet {
     fn min_weight_matching(&self, predicate: impl Fn(f32) -> bool) -> Option<&CandidateFont> {
         self.fonts_matching_weight(predicate)
             .min_by(|x, y| x.weight.partial_cmp(&y.weight).unwrap_or(Ordering::Less))
+    }
+
+    // Style methods
+
+    fn has_style(&self, style: FontStyle) -> bool {
+        self.0.iter().any(|f| f.style == style)
+    }
+
+    fn has_variable_font_with_slnt_axis(&self) -> bool {
+        self.0.iter().any(|f| f.has_slnt)
     }
 
     fn fonts_matching_oblique_angle(
@@ -156,6 +162,8 @@ impl CandidateFontSet {
             }
         }
     }
+
+    // Matching algorithm
 
     // Method consumes self because it mutates it's containing collection
     // which means that calling this twice could not work
