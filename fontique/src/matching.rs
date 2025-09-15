@@ -5,11 +5,9 @@
 
 use core::ops::{Deref, DerefMut};
 
-use super::attributes::{FontStyle, FontWeight, FontWidth};
+use super::attributes::{DEFAULT_OBLIQUE_ANGLE, FontStyle, FontWeight, FontWidth};
 use super::font::FontInfo;
 use smallvec::SmallVec;
-
-const DEFAULT_OBLIQUE_ANGLE: f32 = 14.0;
 
 #[derive(Copy, Clone)]
 pub struct FontMatchingInfo {
@@ -190,7 +188,7 @@ pub fn match_font(
             }
         }
         // If the value of font-style is oblique...
-        else if let Some(angle) = oblique_angle(style) {
+        else if let Some(angle) = style.oblique_angle() {
             // and the requested angle is greater than or equal to 14deg
             if angle >= OBLIQUE_THRESHOLD {
                 // oblique values greater than or equal to angle are checked in
@@ -460,13 +458,6 @@ pub fn match_font(
                 .or_else(|| set.max_weight_matching(|w| w < weight))
         }
         .map(|found| found.index)
-    }
-}
-
-fn oblique_angle(style: FontStyle) -> Option<f32> {
-    match style {
-        FontStyle::Oblique(angle) => Some(angle.unwrap_or(DEFAULT_OBLIQUE_ANGLE)),
-        _ => None,
     }
 }
 
