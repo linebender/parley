@@ -28,6 +28,7 @@ pub struct FontInfo {
     charmap_index: CharmapIndex,
 }
 
+#[allow(clippy::from_over_into)] // In future From won't be possible
 impl Into<FontMatchingInfo> for &FontInfo {
     fn into(self) -> FontMatchingInfo {
         FontMatchingInfo {
