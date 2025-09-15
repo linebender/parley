@@ -36,8 +36,6 @@ pub fn match_font(
     weight: FontWeight,
     synthesize_style: bool,
 ) -> Option<usize> {
-    const OBLIQUE_THRESHOLD: f32 = DEFAULT_OBLIQUE_ANGLE;
-
     #[derive(Copy, Clone)]
     struct CandidateFont {
         index: usize,
@@ -204,10 +202,12 @@ pub fn match_font(
     };
     set.retain(|f| f.width == use_width);
 
-    // font-style is tried next:
     // NOTE: this code uses an oblique threshold of 14deg rather than
     // the current value of 11deg in the spec.
     // See: https://github.com/w3c/csswg-drafts/issues/2295
+    const OBLIQUE_THRESHOLD: f32 = DEFAULT_OBLIQUE_ANGLE;
+
+    // font-style is tried next:
     let mut _use_slnt = false;
     let use_style = if set.has_style(style) {
         style
