@@ -436,11 +436,11 @@ fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
             FontStyle::default()
         };
         let weight = if mac_style.contains(MacStyle::BOLD) {
-            700.0
+            FontWeight::BOLD
         } else {
-            0.0
+            FontWeight::default()
         };
-        (FontWidth::default(), style, FontWeight::new(weight))
+        (FontWidth::default(), style, weight)
     }
 
     if let Ok(os2) = font.os2() {
