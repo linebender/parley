@@ -204,7 +204,7 @@ pub fn match_font(
 
     // font-style is tried next:
     // NOTE: this code uses an oblique threshold of 14deg rather than
-    // the current value of 20deg in the spec.
+    // the current value of 11deg in the spec.
     // See: https://github.com/w3c/csswg-drafts/issues/2295
     let mut _use_slnt = false;
     let use_style = if set.has_style(style) {
