@@ -4,6 +4,7 @@
 //! Model for a font.
 
 use crate::CharmapIndex;
+use crate::matching::FontMatchingInfo;
 
 use super::attributes::{FontStyle, FontWeight, FontWidth};
 use super::source::{SourceInfo, SourceKind};
@@ -25,6 +26,17 @@ pub struct FontInfo {
     axes: AxisVec,
     attr_axes: u8,
     charmap_index: CharmapIndex,
+}
+
+impl Into<FontMatchingInfo> for &FontInfo {
+    fn into(self) -> FontMatchingInfo {
+        FontMatchingInfo {
+            width: (self.width().ratio() * 100.0) as i32,
+            style: self.style(),
+            weight: self.weight().value(),
+            has_slnt: self.has_slant_axis(),
+        }
+    }
 }
 
 impl FontInfo {

@@ -6,7 +6,6 @@
 use core::ops::Deref;
 
 use super::attributes::{DEFAULT_OBLIQUE_ANGLE, FontStyle, FontWeight, FontWidth};
-use super::font::FontInfo;
 use core::cmp::Ordering;
 use smallvec::SmallVec;
 
@@ -14,10 +13,10 @@ use smallvec::SmallVec;
 
 #[derive(Copy, Clone)]
 pub struct FontMatchingInfo {
-    width: i32,
-    style: FontStyle,
-    weight: f32,
-    has_slnt: bool,
+    pub width: i32,
+    pub style: FontStyle,
+    pub weight: f32,
+    pub has_slnt: bool,
 }
 
 pub fn match_font(
@@ -32,17 +31,6 @@ pub fn match_font(
 }
 
 // Private implementation details
-
-impl From<&FontInfo> for FontMatchingInfo {
-    fn from(info: &FontInfo) -> Self {
-        Self {
-            width: (info.width().ratio() * 100.0) as i32,
-            style: info.style(),
-            weight: info.weight().value(),
-            has_slnt: info.has_slant_axis(),
-        }
-    }
-}
 
 #[derive(Copy, Clone)]
 struct CandidateFont {
