@@ -31,7 +31,7 @@ impl From<&FontInfo> for FontMatchingInfo {
 }
 
 pub fn match_font(
-    set: impl IntoIterator<Item = impl Into<FontMatchingInfo>>,
+    fonts: impl IntoIterator<Item = impl Into<FontMatchingInfo>>,
     width: FontWidth,
     style: FontStyle,
     weight: FontWeight,
@@ -66,6 +66,18 @@ pub fn match_font(
     }
 
     impl CandidateFontSet {
+        fn new(fonts: impl IntoIterator<Item = impl Into<FontMatchingInfo>>) -> Self {
+            let inner = fonts
+                .into_iter()
+                .enumerate()
+                .map(|(index, info)| CandidateFont {
+                    index,
+                    info: info.into(),
+                })
+                .collect();
+            Self(inner)
+        }
+
         fn has_width(&self, width: i32) -> bool {
             self.0.iter().any(|f| f.width == width)
         }
@@ -103,15 +115,7 @@ pub fn match_font(
         }
     }
 
-    let mut set = CandidateFontSet(
-        set.into_iter()
-            .enumerate()
-            .map(|(index, info)| CandidateFont {
-                index,
-                info: info.into(),
-            })
-            .collect(),
-    );
+    let mut set = CandidateFontSet::new(fonts);
 
     // Early return for case of 0 or 1 fonts where matching is trivial
     match set.len() {
