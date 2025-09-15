@@ -85,6 +85,22 @@ pub fn match_font(
                 .min_by_key(|f| f.width)
                 .map(|f| f.width)
         }
+
+        fn max_weight_matching(&self, predicate: impl Fn(f32) -> bool) -> Option<&CandidateFont> {
+            use core::cmp::Ordering::Less;
+            self.0
+                .iter()
+                .filter(|f| predicate(f.weight))
+                .max_by(|x, y| x.weight.partial_cmp(&y.weight).unwrap_or(Less))
+        }
+
+        fn min_weight_matching(&self, predicate: impl Fn(f32) -> bool) -> Option<&CandidateFont> {
+            use core::cmp::Ordering::Less;
+            self.0
+                .iter()
+                .filter(|f| predicate(f.weight))
+                .min_by(|x, y| x.weight.partial_cmp(&y.weight).unwrap_or(Less))
+        }
     }
 
     let mut set = CandidateFontSet(
@@ -409,81 +425,38 @@ pub fn match_font(
         }
     }
     set.retain(|f| f.style == use_style);
+
     // font-weight is matched next:
     if let Some(index) = set.iter().position(|f| f.weight == weight) {
-        return Some(index);
+        Some(index)
     } else {
         // If the desired weight is inclusively between 400 and 500...
         if (400.0..=500.0).contains(&weight) {
-            // weights greater than or equal to the target weight are checked in ascending
-            // order until 500 is hit and checked
-            if let Some(found) = set
-                .iter()
-                .enumerate()
-                .filter(|f| f.1.weight >= weight && f.1.weight <= 500.0)
-                .min_by(|x, y| x.1.weight.partial_cmp(&y.1.weight).unwrap_or(Less))
-            {
-                return Some(found.1.index);
-            }
-            // followed by weights less than the target weight in descending order
-            if let Some(found) = set
-                .iter()
-                .enumerate()
-                .filter(|f| f.1.weight < weight)
-                .max_by(|x, y| x.1.weight.partial_cmp(&y.1.weight).unwrap_or(Less))
-            {
-                return Some(found.1.index);
-            }
-            // followed by weights greater than 500, until a match is found.
-            if let Some(found) = set
-                .iter()
-                .enumerate()
-                .filter(|f| f.1.weight > 500.0)
-                .min_by(|x, y| x.1.weight.partial_cmp(&y.1.weight).unwrap_or(Less))
-            {
-                return Some(found.1.index);
-            }
+            set
+                // weights greater than or equal to the target weight are checked in ascending
+                // order until 500 is hit and checked
+                .min_weight_matching(|w| w >= weight && w <= 500.0)
+                // followed by weights less than the target weight in descending order
+                .or_else(|| set.max_weight_matching(|w| w < weight))
+                // followed by weights greater than 500, until a match is found.
+                .or_else(|| set.min_weight_matching(|w| w > 500.0))
         }
         // If the desired weight is less than 400...
         else if weight < 400.0 {
-            // weights less than or equal to the target weight are checked in descending
-            if let Some(found) = set
-                .iter()
-                .filter(|f| f.weight <= weight)
-                .max_by(|x, y| x.weight.partial_cmp(&y.weight).unwrap_or(Less))
-            {
-                return Some(found.index);
-            }
-            // followed by weights greater than the target weight in ascending order
-            if let Some(found) = set
-                .iter()
-                .filter(|f| f.weight > weight)
-                .min_by(|x, y| x.weight.partial_cmp(&y.weight).unwrap_or(Less))
-            {
-                return Some(found.index);
-            }
+            // weights less than or equal to the target weight are checked in descending order
+            set.max_weight_matching(|w| w < weight)
+                // followed by weights greater than the target weight in ascending order
+                .or_else(|| set.min_weight_matching(|w| w > weight))
         }
         // If the desired weight is greater than 500...
         else {
             // weights greater than or equal to the target weight are checked in ascending
-            if let Some(found) = set
-                .iter()
-                .filter(|f| f.weight >= weight)
-                .min_by(|x, y| x.weight.partial_cmp(&y.weight).unwrap_or(Less))
-            {
-                return Some(found.index);
-            }
-            // followed by weights less than the target weight in descending order
-            if let Some(found) = set
-                .iter()
-                .filter(|f| f.weight < weight)
-                .max_by(|x, y| x.weight.partial_cmp(&y.weight).unwrap_or(Less))
-            {
-                return Some(found.index);
-            }
+            set.min_weight_matching(|w| w >= weight)
+                // followed by weights less than the target weight in descending order
+                .or_else(|| set.max_weight_matching(|w| w < weight))
         }
+        .map(|found| found.index)
     }
-    None
 }
 
 fn oblique_angle(style: FontStyle) -> Option<f32> {
