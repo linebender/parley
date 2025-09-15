@@ -10,6 +10,8 @@ use super::font::FontInfo;
 use core::cmp::Ordering;
 use smallvec::SmallVec;
 
+// Public API
+
 #[derive(Copy, Clone)]
 pub struct FontMatchingInfo {
     width: i32,
