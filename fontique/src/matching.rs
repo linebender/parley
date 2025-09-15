@@ -7,6 +7,7 @@ use core::ops::{Deref, DerefMut};
 
 use super::attributes::{DEFAULT_OBLIQUE_ANGLE, FontStyle, FontWeight, FontWidth};
 use super::font::FontInfo;
+use core::cmp::Ordering;
 use smallvec::SmallVec;
 
 #[derive(Copy, Clone)]
@@ -103,44 +104,45 @@ pub fn match_font(
                 .map(|f| f.width)
         }
 
+        fn fonts_matching_weight(
+            &self,
+            predicate: impl Fn(f32) -> bool,
+        ) -> impl Iterator<Item = &CandidateFont> {
+            self.0.iter().filter(move |f| predicate(f.weight))
+        }
+
         fn max_weight_matching(&self, predicate: impl Fn(f32) -> bool) -> Option<&CandidateFont> {
-            use core::cmp::Ordering::Less;
-            self.0
-                .iter()
-                .filter(|f| predicate(f.weight))
-                .max_by(|x, y| x.weight.partial_cmp(&y.weight).unwrap_or(Less))
+            self.fonts_matching_weight(predicate)
+                .max_by(|x, y| x.weight.partial_cmp(&y.weight).unwrap_or(Ordering::Less))
         }
 
         fn min_weight_matching(&self, predicate: impl Fn(f32) -> bool) -> Option<&CandidateFont> {
-            use core::cmp::Ordering::Less;
+            self.fonts_matching_weight(predicate)
+                .min_by(|x, y| x.weight.partial_cmp(&y.weight).unwrap_or(Ordering::Less))
+        }
+
+        fn fonts_matching_oblique_angle(
+            &self,
+            predicate: impl Fn(f32) -> bool,
+        ) -> impl Iterator<Item = (&CandidateFont, f32)> {
             self.0
                 .iter()
-                .filter(|f| predicate(f.weight))
-                .min_by(|x, y| x.weight.partial_cmp(&y.weight).unwrap_or(Less))
+                .filter_map(move |f| match f.style.oblique_angle() {
+                    Some(a) if predicate(a) => Some((f, a)),
+                    _ => None,
+                })
         }
 
         fn min_oblique_angle_matching(&self, predicate: impl Fn(f32) -> bool) -> Option<FontStyle> {
-            use core::cmp::Ordering::Less;
-            self.0
-                .iter()
-                .filter_map(|f| match f.style.oblique_angle() {
-                    Some(a) if predicate(a) => Some((f.style, a)),
-                    _ => None,
-                })
-                .min_by(|x, y| x.1.partial_cmp(&y.1).unwrap_or(Less))
-                .map(|x| x.0)
+            self.fonts_matching_oblique_angle(predicate)
+                .min_by(|x, y| x.1.partial_cmp(&y.1).unwrap_or(Ordering::Less))
+                .map(|f| f.0.style)
         }
 
         fn max_oblique_angle_matching(&self, predicate: impl Fn(f32) -> bool) -> Option<FontStyle> {
-            use core::cmp::Ordering::Less;
-            self.0
-                .iter()
-                .filter_map(|f| match f.style.oblique_angle() {
-                    Some(a) if predicate(a) => Some((f.style, a)),
-                    _ => None,
-                })
-                .max_by(|x, y| x.1.partial_cmp(&y.1).unwrap_or(Less))
-                .map(|x| x.0)
+            self.fonts_matching_oblique_angle(predicate)
+                .max_by(|x, y| x.1.partial_cmp(&y.1).unwrap_or(Ordering::Less))
+                .map(|f| f.0.style)
         }
 
         fn fallback_style(
