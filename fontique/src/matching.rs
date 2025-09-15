@@ -3,7 +3,7 @@
 
 //! Implementation of the CSS font matching algorithm.
 
-use core::ops::Deref;
+use core::ops::{Deref, DerefMut};
 
 use super::attributes::{FontStyle, FontWeight, FontWidth};
 use super::font::FontInfo;
@@ -37,6 +37,7 @@ pub fn match_font(
     weight: FontWeight,
     synthesize_style: bool,
 ) -> Option<usize> {
+    use core::cmp::Ordering::Less;
     const OBLIQUE_THRESHOLD: f32 = DEFAULT_OBLIQUE_ANGLE;
 
     #[derive(Copy, Clone)]
@@ -51,14 +52,50 @@ pub fn match_font(
         }
     }
 
-    let mut set: SmallVec<[CandidateFont; 16]> = set
-        .into_iter()
-        .enumerate()
-        .map(|(index, info)| CandidateFont {
-            index,
-            info: info.into(),
-        })
-        .collect();
+    struct CandidateFontSet(SmallVec<[CandidateFont; 16]>);
+    impl Deref for CandidateFontSet {
+        type Target = SmallVec<[CandidateFont; 16]>;
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+    impl DerefMut for CandidateFontSet {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+        }
+    }
+
+    impl CandidateFontSet {
+        fn has_width(&self, width: i32) -> bool {
+            self.0.iter().any(|f| f.width == width)
+        }
+
+        fn max_width_below(&self, width: i32) -> Option<i32> {
+            self.0
+                .iter()
+                .filter(|f| f.width < width)
+                .max_by_key(|f| f.width)
+                .map(|f| f.width)
+        }
+
+        fn min_width_above(&self, width: i32) -> Option<i32> {
+            self.0
+                .iter()
+                .filter(|f| f.width > width)
+                .min_by_key(|f| f.width)
+                .map(|f| f.width)
+        }
+    }
+
+    let mut set = CandidateFontSet(
+        set.into_iter()
+            .enumerate()
+            .map(|(index, info)| CandidateFont {
+                index,
+                info: info.into(),
+            })
+            .collect(),
+    );
 
     // Early return for case of 0 or 1 fonts where matching is trivial
     match set.len() {
@@ -69,56 +106,30 @@ pub fn match_font(
 
     let width = (width.ratio() * 100.0) as i32;
     let weight = weight.value();
+
     // font-width is tried first:
-    let mut use_width = set[0].width;
-    if !set.iter().any(|f| f.width == width) {
-        // If the desired width value is less than or equal to 100%...
+    let use_width = if !set.has_width(width) {
+        // If the desired width value is less than or equal to 100% then...
         if width <= 100 {
-            // width values below the desired width value are checked in
-            // descending order...
-            if let Some(found) = set
-                .iter()
-                .filter(|f| f.width < width)
-                .max_by_key(|f| f.width)
-            {
-                use_width = found.width;
-            }
-            // followed by width values above the desired width value in
-            // ascending order until a match is found.
-            else if let Some(found) = set
-                .iter()
-                .filter(|f| f.width > width)
-                .min_by_key(|f| f.width)
-            {
-                use_width = found.width;
-            }
+            // Width values below the desired width value are checked in descending order followed by
+            // width values above the desired width value in ascending order until a match is found.
+            set.max_width_below(width)
+                .or_else(|| set.min_width_above(width))
+                .unwrap_or(width)
         }
-        // Otherwise, ...
+        // Otherwise...
         else {
-            // width values above the desired width value are checked in
-            // ascending order...
-            if let Some(found) = set
-                .iter()
-                .filter(|f| f.width > width)
-                .min_by_key(|f| f.width)
-            {
-                use_width = found.width;
-            }
-            // followed by width values below the desired width value in
-            // descending order until a match is found.
-            else if let Some(found) = set
-                .iter()
-                .filter(|f| f.width < width)
-                .max_by_key(|f| f.width)
-            {
-                use_width = found.width;
-            }
+            // Width values above the desired width value are checked in ascending order followed by
+            // width values below the desired width value in descending order until a match is found.
+            set.min_width_above(width)
+                .or_else(|| set.max_width_below(width))
+                .unwrap_or(width)
         }
     } else {
-        use_width = width;
-    }
+        width
+    };
     set.retain(|f| f.width == use_width);
-    use core::cmp::Ordering::*;
+
     let oblique_fonts = set.iter().filter_map(|f| oblique_style(f.style));
     // font-style is tried next:
     // NOTE: this code uses an oblique threshold of 14deg rather than
