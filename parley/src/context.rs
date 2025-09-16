@@ -178,6 +178,7 @@ impl<B: Brush> LayoutContext<B> {
         }
     }
 
+    // TODO(conor) consistent idx vs index naming
     pub(crate) fn analyze_text_icu(&mut self, text: &str) {
         fn swash_to_icu_lb(swash: WordBreakStrength) -> LineBreakWordOption {
             match swash {
@@ -252,23 +253,20 @@ impl<B: Brush> LayoutContext<B> {
             previous_word_break_style,
         ));
 
-        // icu: Word boundaries
-        // TODO(conor) avoid collect, group all word boundary logic together
-        let word_breaks = self.unicode_data_sources.word_segmenter.segment_str(text).collect::<Vec<_>>();
-
         // TODO(conor) - Try setting up an iterator for these instead, e.g.:
         /*fn script_iter(text: &str) -> impl Iterator<Item = (char, Script)> + '_ {
             let script_data = CodePointMapData::<Script>::new();
             text.chars().map(move |c| (c, script_data.get32(c as u32)))
         }*/
 
-        let mut script_data = Vec::new();
-        let mut line_break_data: Vec<LineBreak> = Vec::new();
-
+        // Fetch script and line break data in one iteration.
+        //
         // Shift line break data forward one, as line boundaries corresponding with line-breaking
         // characters (like '\n') exist at an index position one higher than the respective
         // character's index, but we need our iterators to align, and the rest are simply
         // character-indexed.
+        let mut script_data = Vec::new();
+        let mut line_break_data: Vec<LineBreak> = Vec::new();
         line_break_data.push(LineBreak::from_icu4c_value(0));
         text.chars().for_each(|ch| {
             script_data.push(self.unicode_data_sources.script.get(ch));
@@ -276,11 +274,17 @@ impl<B: Brush> LayoutContext<B> {
         });
 
         let mut all_boundaries_byte_indexed = vec![Boundary::None; text.len()];
-        // A word break after the final character is always included, we don't use this.
-        if let Some((_last, rest)) = word_breaks.split_last() {
-            rest.iter().for_each(|wb| all_boundaries_byte_indexed[*wb] = Boundary::Word);
+
+        // Word boundaries:
+        for wb in self.unicode_data_sources.word_segmenter.segment_str(text) {
+            // icu will produce a word boundary trailing the string, which we don't use.
+            if wb == text.len() {
+                continue;
+            }
+            all_boundaries_byte_indexed[wb] = Boundary::Word;
         }
 
+        // Line boundaries:
         let substring_count = contiguous_word_break_substrings.len();
         let mut global_offset = 0;
         for (substring_index, (substring, word_break_strength)) in contiguous_word_break_substrings.iter().enumerate() {
@@ -352,7 +356,7 @@ impl<B: Brush> LayoutContext<B> {
             }
         }
 
-        // Bidi levels
+        // BiDi embedding levels:
         let bidi_info = unicode_bidi::BidiInfo::new_with_data_source(&self.unicode_data_sources.bidi_class, text, None);
         let full_text_range = 0..text.len();
         let paragraph = ParagraphInfo {
