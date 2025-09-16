@@ -9,6 +9,8 @@ use core_maths::CoreFloat;
 
 use core::fmt;
 
+pub(crate) const DEFAULT_OBLIQUE_ANGLE: f32 = 14.0;
+
 /// Primary attributes for font matching: [`FontWidth`], [`FontStyle`] and [`FontWeight`].
 ///
 /// These are used to [configure] a [`Query`].
@@ -492,6 +494,13 @@ impl FontStyle {
             _ => Self::Normal,
         }
     }
+
+    pub(crate) fn oblique_angle(&self) -> Option<f32> {
+        match self {
+            Self::Oblique(angle) => Some(angle.unwrap_or(DEFAULT_OBLIQUE_ANGLE)),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for FontStyle {
@@ -500,7 +509,7 @@ impl fmt::Display for FontStyle {
             Self::Normal => "normal",
             Self::Italic => "italic",
             Self::Oblique(None) => "oblique",
-            Self::Oblique(Some(degrees)) if *degrees == 14.0 => "oblique",
+            Self::Oblique(Some(degrees)) if *degrees == DEFAULT_OBLIQUE_ANGLE => "oblique",
             Self::Oblique(Some(degrees)) => {
                 return write!(f, "oblique({degrees}deg)");
             }
