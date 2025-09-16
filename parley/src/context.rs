@@ -4,11 +4,12 @@
 //! Context for layout.
 
 use alloc::{vec, vec::Vec};
+use std::collections::HashMap;
 use icu::properties::props::BidiClass;
-use icu::segmenter::LineSegmenter;
-use icu::segmenter::options::{LineBreakOptions, LineBreakWordOption};
+use icu::segmenter::{LineSegmenter, LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed};
+use icu::segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakInvariantOptions};
 use icu_properties::CodePointMapDataBorrowed;
-use icu_properties::props::Script;
+use icu_properties::props::{LineBreak, Script};
 use self::tree::TreeStyleBuilder;
 
 use super::{icu_working, FontContext};
@@ -29,6 +30,10 @@ struct UnicodeDataSources {
     // TODO(conor) Review lifetime specifier
     script: CodePointMapDataBorrowed::<'static, Script>,
     bidi_class: CodePointMapDataBorrowed::<'static, BidiClass>,
+    line_break: CodePointMapDataBorrowed::<'static, LineBreak>,
+    word_segmenter: WordSegmenterBorrowed<'static>,
+    // Key: LineBreakWordOption as u8
+    line_segmenters: HashMap<u8, LineSegmenterBorrowed<'static>>,
 }
 
 impl UnicodeDataSources {
@@ -36,6 +41,9 @@ impl UnicodeDataSources {
         Self {
             script: CodePointMapDataBorrowed::<Script>::new(),
             bidi_class: CodePointMapDataBorrowed::<BidiClass>::new(),
+            line_break: CodePointMapDataBorrowed::<LineBreak>::new(),
+            word_segmenter: WordSegmenter::new_auto(WordBreakInvariantOptions::default()),
+            line_segmenters: HashMap::new(),
         }
     }
 }
@@ -57,6 +65,7 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) info_icu: Vec<(icu_working::CharInfo, u16)>,
     pub(crate) scx: ShapeContext,
 
+    // TODO(conor) revise name (*Segmenters are not as such), or decompose entirely?
     unicode_data_sources: UnicodeDataSources,
 }
 
@@ -169,25 +178,24 @@ impl<B: Brush> LayoutContext<B> {
         }
     }
 
-    fn swash_to_icu_lb(swash: WordBreakStrength) -> LineBreakWordOption {
-        match swash {
-            WordBreakStrength::Normal => LineBreakWordOption::Normal,
-            WordBreakStrength::BreakAll => LineBreakWordOption::BreakAll,
-            WordBreakStrength::KeepAll => LineBreakWordOption::KeepAll,
-        }
-    }
-
     pub(crate) fn analyze_text_icu(&mut self, text: &str) {
-        let text = if text.is_empty() { " " } else { text };
+        fn swash_to_icu_lb(swash: WordBreakStrength) -> LineBreakWordOption {
+            match swash {
+                WordBreakStrength::Normal => LineBreakWordOption::Normal,
+                WordBreakStrength::BreakAll => LineBreakWordOption::BreakAll,
+                WordBreakStrength::KeepAll => LineBreakWordOption::KeepAll,
+            }
+        }
 
-        // Bidi levels
-        let bidi_info = unicode_bidi::BidiInfo::new_with_data_source(&self.unicode_data_sources.bidi_class, text, None);
-        let full_text_range = 0..text.len();
-        let paragraph = ParagraphInfo {
-            range: full_text_range.clone(),
-            level: Level::ltr(),
-        };
-        let bidi_embed_levels = bidi_info.reordered_levels_per_char(&paragraph, full_text_range);
+        // See: https://github.com/unicode-org/icu4x/blob/ee5399a77a6b94efb5d4b60678bb458c5eedb25d/components/segmenter/src/line.rs#L338-L351
+        fn is_mandatory_line_break(line_break: LineBreak) -> bool {
+            matches!(line_break, LineBreak::MandatoryBreak
+                | LineBreak::CarriageReturn
+                | LineBreak::LineFeed
+                | LineBreak::NextLine)
+        }
+
+        let text = if text.is_empty() { " " } else { text };
 
         let Some((first_style, rest)) = self.styles.split_first() else {
             panic!("No style info");
@@ -205,6 +213,7 @@ impl<B: Brush> LayoutContext<B> {
 
         for style in rest {
             let style_start_index = style.range.start;
+            // TODO(conor) explain loop
             loop {
                 prev_char = current_char;
                 current_char = char_indices.next().unwrap();
@@ -212,6 +221,7 @@ impl<B: Brush> LayoutContext<B> {
                     break;
                 }
             }
+
             let (_, prev_size) = text.char_at(prev_char.0).unwrap();
 
             let current_word_break_style = style.style.word_break;
@@ -227,12 +237,10 @@ impl<B: Brush> LayoutContext<B> {
                 // Start one character early, to get the last character from the previous span,
                 // for all but the first span
                 // TODO(conor) optimise this away maybe. can we just use `building_range_start`?
-                // TODO(conor) also needs to look back by char utf8_len, not 1
                 previous_substring_end = style_start_index - prev_size;
             }
             // Start one character early, to get the last character from the previous span,
             // for all but the first span
-            // TODO(conor) also needs to look back by char utf8_len, not 1
             building_range_start = style_start_index - prev_size;
             previous_word_break_style = current_word_break_style;
         }
@@ -246,26 +254,39 @@ impl<B: Brush> LayoutContext<B> {
         //println!("======================================================================");
 
         // icu: Word boundaries
-        use icu::segmenter::{options::WordBreakInvariantOptions, WordSegmenter};
-        let word_segmenter = WordSegmenter::new_auto(WordBreakInvariantOptions::default());
-        let word_breaks = word_segmenter.segment_str(text).collect::<Vec<_>>();
+        let word_breaks = self.unicode_data_sources.word_segmenter.segment_str(text).collect::<Vec<_>>();
+
+        // TODO(conor) - Try setting up an iterator for these instead, e.g.:
+        /*fn script_iter(text: &str) -> impl Iterator<Item = (char, Script)> + '_ {
+            let script_data = CodePointMapData::<Script>::new();
+            text.chars().map(move |c| (c, script_data.get32(c as u32)))
+        }*/
 
         let mut script_data = Vec::new();
+        let mut line_break_data: Vec<LineBreak> = Vec::new();
+
+        // Shift line break data forward one, as line boundaries corresponding with line-breaking
+        // characters (like '\n') exist at an index position one higher than the respective
+        // character's index, but we need our iterators to align, and the rest are simply
+        // character-indexed.
+        line_break_data.push(LineBreak::from_icu4c_value(0));
         text.chars().for_each(|ch| {
-            let script = self.unicode_data_sources.script.get(ch);
-            script_data.push(script);
+            script_data.push(self.unicode_data_sources.script.get(ch));
+            line_break_data.push(self.unicode_data_sources.line_break.get(ch));
         });
 
-        let mut all_boundaries = vec![Boundary::None; text.len()];
+        let mut all_boundaries_byte_indexed = vec![Boundary::None; text.len()];
+        // A word break after the final character is always included, we don't use this.
         if let Some((_last, rest)) = word_breaks.split_last() {
-            rest.iter().for_each(|wb| all_boundaries[*wb] = Boundary::Word);
+            rest.iter().for_each(|wb| all_boundaries_byte_indexed[*wb] = Boundary::Word);
         }
         //println!("all_boundaries: {:?}", all_boundaries);
 
         //println!("======================================================================");
 
-        let mut global_offset = 0;
 
+        let substring_count = contiguous_word_break_substrings.len();
+        let mut global_offset = 0;
         for (substring_index, (substring, word_break_strength)) in contiguous_word_break_substrings.iter().enumerate() {
             let substring_len = substring.len();
 
@@ -286,15 +307,24 @@ impl<B: Brush> LayoutContext<B> {
             }
 
             // Boundaries
-            let mut line_break_opts: LineBreakOptions<'static> = Default::default();
-            line_break_opts.word_option = Some(Self::swash_to_icu_lb(*word_break_strength));
-            let line_segmenter = LineSegmenter::new_auto(line_break_opts);
-            // TODO(conor) avoid re-iteration
-            let line_boundaries: Vec<usize> = line_segmenter.segment_str(substring).collect();
+            // TODO(conor) Should we expose CSS line-breaking strictness as an option in Parley's style API?
+            //line_break_opts.strictness = LineBreakStrictness::Strict;
+            // TODO(conor) - Do we set this, to have it impact breaking? It doesn't look like Swash is
+            //  It seems like we'd want to - this could enable script-based line breaking.
+            //line_break_opts.content_locale = ?
             //println!("substring: '{}', line_boundaries: {:?}", substring, line_boundaries.iter().map(|v| v + global_offset).collect::<Vec<_>>());
 
+            let word_break_strength = swash_to_icu_lb(*word_break_strength);
+            let line_segmenter = &mut self.unicode_data_sources.line_segmenters.entry(word_break_strength as u8).or_insert({
+                let mut line_break_opts: LineBreakOptions<'static> = Default::default();
+                line_break_opts.word_option = Some(word_break_strength);
+                LineSegmenter::new_auto(line_break_opts)
+            });
+            let line_boundaries: Vec<usize> = line_segmenter.segment_str(substring).collect();
+
             // Fast path for text with a single word-break option.
-            if contiguous_word_break_substrings.len() == 1 {
+            if substring_count == 1 {
+                // icu adds leading and trailing line boundaries, which we don't use.
                 let Some((_first, rest)) = line_boundaries.split_first() else {
                     continue;
                 };
@@ -302,7 +332,7 @@ impl<B: Brush> LayoutContext<B> {
                     continue;
                 };
                 for &b in middle {
-                    all_boundaries[b] = Boundary::Line;
+                    all_boundaries_byte_indexed[b] = Boundary::Line;
                 }
                 break;
             }
@@ -326,7 +356,7 @@ impl<B: Brush> LayoutContext<B> {
                         //println!("[First Substring] ssi: {} idx: {}, not keeping {} (always drop index 0 icu line boundaries).", substring_index, lb_idx, pos + global_offset);
                         continue;
                     }
-                } else if substring_index == contiguous_word_break_substrings.len() - 1 {
+                } else if substring_index == substring_count - 1 {
                     // Last substring:
                     if lb_idx == 0 {
                         //println!("[Last Substring] ssi: {} idx: {}, not keeping {}.", substring_index, lb_idx, pos + global_offset);
@@ -351,33 +381,51 @@ impl<B: Brush> LayoutContext<B> {
                 // TODO-still need to ignore first index of first line break
                 //println!("!! -> New line boundary: {} ({} + go:{})", pos + global_offset, pos, global_offset);
                 // icu places a boundary at the index just beyond the string length, which we ignore
-                if pos + global_offset != all_boundaries.len() {
-                    all_boundaries[pos + global_offset] = Boundary::Line;
+                if pos + global_offset != all_boundaries_byte_indexed.len() {
+                    all_boundaries_byte_indexed[pos + global_offset] = Boundary::Line;
                 }
             }
 
-            if substring_index != contiguous_word_break_substrings.len() - 1 {
+            if substring_index != substring_count - 1 {
                 //println!("[GO calc] End of non-last substring, substring.len {} minus last char len {} added to GO", substring_len, last.len_utf8());
                 global_offset += substring_len - last.len_utf8();
             }
 
-            println!("---------------------------------------------------------------------------");
+            //println!("---------------------------------------------------------------------------");
         }
 
-        let mut all_boundaries_condensed = Vec::new();
+        // Bidi levels
+        let bidi_info = unicode_bidi::BidiInfo::new_with_data_source(&self.unicode_data_sources.bidi_class, text, None);
+        let full_text_range = 0..text.len();
+        let paragraph = ParagraphInfo {
+            range: full_text_range.clone(),
+            level: Level::ltr(),
+        };
+        let bidi_embed_levels_byte = bidi_info.reordered_levels(&paragraph, full_text_range);
+
+        // Condense byte indexes to character indexes.
+        let mut all_boundaries_char_indexed = Vec::new();
+        let mut bidi_embed_levels_char_indexed = Vec::new();
         text.char_indices().for_each(|(i, _)| {
-            all_boundaries_condensed.push(all_boundaries.get(i).unwrap())
+            all_boundaries_char_indexed.push(all_boundaries_byte_indexed.get(i).unwrap());
+            bidi_embed_levels_char_indexed.push(bidi_embed_levels_byte.get(i).unwrap());
         });
 
-        all_boundaries_condensed
+        all_boundaries_char_indexed
             .iter()
-            .zip(bidi_embed_levels)
+            .zip(bidi_embed_levels_char_indexed)
             .zip(script_data)
-            .for_each(|((boundary, embed_level), script)| {
-                let embed_level: BidiLevel = embed_level.into();
+            .zip(line_break_data)
+            .for_each(|(((boundary, embed_level), script), line_break)| {
+                let embed_level: BidiLevel = (*embed_level).into();
                 let swash_script: swash::text::Script = script_from_u8(script.to_icu4c_value() as u8).unwrap();
+                let boundary = if is_mandatory_line_break(line_break) {
+                    Boundary::Mandatory
+                } else {
+                    **boundary
+                };
                 self.info_icu.push((
-                    icu_working::CharInfo::new(**boundary, embed_level, swash_script),
+                    icu_working::CharInfo::new(boundary, embed_level, swash_script),
                     0
                 ));
             });
@@ -387,13 +435,6 @@ impl<B: Brush> LayoutContext<B> {
         let text = if text.is_empty() { " " } else { text };
         let mut a = swash::text::analyze(text.chars());
         _ = self.analyze_text_icu(text);
-
-        // TODO(conor) - Do we want to expose LineBreakStrictness in Parley's API?
-        //lbo.strictness = LineBreakStrictness::Strict; DEFAULT
-        // TODO(conor) - Do we set this, to have it impact breaking? It doesn't look like Swash is
-        //  It seems like we'd want to. If so, how is this sourced? Do we use script detection?
-        //  Would this be too expensive to justify here?
-        // lbo.content_locale = ?
 
         let mut word_break = Default::default();
         let mut style_idx = 0;
@@ -637,7 +678,7 @@ mod tests {
         pub font_context: FontContext,
     }
 
-    // TODO(conor) - Rework once Swash is fully removed
+    // TODO(conor) - Rework/rename once Swash is fully removed
     fn verify_swash_icu_equivalence(text: &str, configure_builder: impl for<'a> FnOnce(&mut RangedBuilder<'a, [u8; 4]>))
     {
         let mut test_context = TestContext::default();
@@ -710,9 +751,21 @@ mod tests {
     // ==================== Basic Tests ====================
 
     #[test]
-    fn test_single_char_keep_all() {
+    fn test_blank_string() {
+        verify_swash_icu_equivalence(" ", |_| {});
+    }
+
+    #[test]
+    fn test_single_char() {
         verify_swash_icu_equivalence("A", |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..1);
+        });
+    }
+
+    #[test]
+    fn test_single_char_multi_byte() {
+        verify_swash_icu_equivalence("€", |builder| {
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..3);
         });
     }
 
@@ -895,17 +948,25 @@ mod tests {
     // ==================== RTL and Bidirectional Tests ====================
 
     #[test]
-    fn test_mixed_ltr_rtl_text() {
-        verify_swash_icu_equivalence("Hello مرحبا World عالم Test اختبار", |builder| {
-            let text = "Hello مرحبا World عالم Test اختبار";
+    fn test_mixed_ltr_rtl_short() {
+        let text = "Hello مرحبا";
+        verify_swash_icu_equivalence(text, |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..text.len());
         });
     }
 
     #[test]
-    fn test_mixed_ltr_rtl_short() {
-        verify_swash_icu_equivalence("Hello مرحبا Wor", |builder| {
-            let text = "Hello مرحبا Wor";
+    fn test_mixed_ltr_rtl_text() {
+        let text = "Hello مرحبا World عالم Test اختبار";
+        verify_swash_icu_equivalence(text, |builder| {
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..text.len());
+        });
+    }
+
+    #[test]
+    fn test_mixed_ltr_rtl_nested_embedding() {
+        let text = "In Hebrew: שנת 2024 היא...";
+        verify_swash_icu_equivalence(text, |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..text.len());
         });
     }
