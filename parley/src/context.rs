@@ -204,7 +204,6 @@ impl<B: Brush> LayoutContext<B> {
 
         let mut building_range_start = first_style.range.start;
         // TODO(conor) only last iter. value used
-        let mut previous_substring_end = 0;
         let mut previous_word_break_style = first_style.style.word_break;
         let mut contiguous_word_break_substrings: Vec<(&str, WordBreakStrength)> = Vec::new();
 
@@ -218,7 +217,8 @@ impl<B: Brush> LayoutContext<B> {
         let mut prev_char;
         for style in rest {
             let style_start_index = style.range.start;
-            // TODO(conor) explain loop
+            // Loop until we know the first character of our span, and the previous character:
+            // the last character of the previous span.
             loop {
                 prev_char = current_char;
                 current_char = char_indices.next().unwrap();
@@ -238,10 +238,6 @@ impl<B: Brush> LayoutContext<B> {
                     text.subrange(building_range_start..style_start_index + size),
                     previous_word_break_style
                 ));
-                // Start one character early, to get the last character from the previous span,
-                // for all but the first span
-                // TODO(conor) optimise this away maybe. can we just use `building_range_start`?
-                previous_substring_end = style_start_index - prev_size;
             }
             // Start one character early, to get the last character from the previous span,
             // for all but the first span
@@ -249,7 +245,7 @@ impl<B: Brush> LayoutContext<B> {
             previous_word_break_style = current_word_break_style;
         }
         contiguous_word_break_substrings.push((
-            text.subrange(previous_substring_end..text.len()),
+            text.subrange(building_range_start..text.len()),
             previous_word_break_style,
         ));
 
