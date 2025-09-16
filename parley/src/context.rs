@@ -207,10 +207,14 @@ impl<B: Brush> LayoutContext<B> {
         let mut previous_word_break_style = first_style.style.word_break;
         let mut contiguous_word_break_substrings: Vec<(&str, WordBreakStrength)> = Vec::new();
 
+        // TODO(conor) can we improve fast path, so that the subsequent loop is unnecessary?
+        // icu doesn't support alternating the break configuration used in determining line
+        // boundaries across a string, which we support in Parley. This segments a string where
+        // line break options change, and looks forward/back one character in each, so that we have
+        // all the context we need for boundary calculation, per segment.
         let mut char_indices = text.char_indices();
         let mut current_char = char_indices.next().unwrap();
         let mut prev_char;
-
         for style in rest {
             let style_start_index = style.range.start;
             // TODO(conor) explain loop
@@ -226,7 +230,6 @@ impl<B: Brush> LayoutContext<B> {
 
             let current_word_break_style = style.style.word_break;
             if previous_word_break_style != current_word_break_style {
-                // TODO(conor) relies on unicode-bidi `char_at` impl to get utf8 len, maybe fine.
                 let (_, size) = text.char_at(style_start_index).unwrap();
                 contiguous_word_break_substrings.push((
                     // End one character late, to grab the first character from the next span,
@@ -249,11 +252,8 @@ impl<B: Brush> LayoutContext<B> {
             previous_word_break_style,
         ));
 
-        //println!("contiguous_word_break_substrings: {:?}", contiguous_word_break_substrings);
-
-        //println!("======================================================================");
-
         // icu: Word boundaries
+        // TODO(conor) avoid collect, group all word boundary logic together
         let word_breaks = self.unicode_data_sources.word_segmenter.segment_str(text).collect::<Vec<_>>();
 
         // TODO(conor) - Try setting up an iterator for these instead, e.g.:
@@ -280,10 +280,6 @@ impl<B: Brush> LayoutContext<B> {
         if let Some((_last, rest)) = word_breaks.split_last() {
             rest.iter().for_each(|wb| all_boundaries_byte_indexed[*wb] = Boundary::Word);
         }
-        //println!("all_boundaries: {:?}", all_boundaries);
-
-        //println!("======================================================================");
-
 
         let substring_count = contiguous_word_break_substrings.len();
         let mut global_offset = 0;
@@ -299,12 +295,6 @@ impl<B: Brush> LayoutContext<B> {
             let Some((last, _)) = rest.split_last() else {
                 continue;
             };
-            //println!("first: '{}'#{}, middle: '{:?}', last: '{}'#{}", first, first.len_utf8(), middle, last, last.len_utf8());
-
-            if substring_index != 0 {
-                //println!("[GO calc] Start of non-first substring, subtracing first char len {}", first.len_utf8());
-                global_offset -= first.len_utf8();
-            }
 
             // Boundaries
             // TODO(conor) Should we expose CSS line-breaking strictness as an option in Parley's style API?
@@ -312,7 +302,6 @@ impl<B: Brush> LayoutContext<B> {
             // TODO(conor) - Do we set this, to have it impact breaking? It doesn't look like Swash is
             //  It seems like we'd want to - this could enable script-based line breaking.
             //line_break_opts.content_locale = ?
-            //println!("substring: '{}', line_boundaries: {:?}", substring, line_boundaries.iter().map(|v| v + global_offset).collect::<Vec<_>>());
 
             let word_break_strength = swash_to_icu_lb(*word_break_strength);
             let line_segmenter = &mut self.unicode_data_sources.line_segmenters.entry(word_break_strength as u8).or_insert({
@@ -337,61 +326,30 @@ impl<B: Brush> LayoutContext<B> {
                 break;
             }
 
-            // Mark line boundaries (overriding word boundaries if present)
+            if substring_index != 0 {
+                global_offset -= first.len_utf8();
+            }
+
+            // Mark line boundaries (overriding word boundaries where present).
             for (lb_idx, &pos) in line_boundaries.iter().enumerate() {
-                // TODO(conor) simplify this down, currently expanded form for debugging
-                if substring_index == 0 {
-                    // First substring:
-                    // TODO(conor) -1 here should be -<byte length of last char>
-                    //  + test for this
-                    if pos == substring_len - last.len_utf8() { // also pos == substring later
-                        //println!("[First Substring] ssi: {} idx: {}, not keeping {} as it crosses into next substrings jurisdiction.", substring_index, lb_idx, pos + global_offset);
-                        continue;
-                    }
-                    if lb_idx == line_boundaries.len() - 1 {
-                        //println!("[First Substring] ssi: {} idx: {}, not keeping {} (drop icu tail boundary).", substring_index, lb_idx, pos + global_offset);
-                        continue;
-                    }
-                    if lb_idx == 0 {
-                        //println!("[First Substring] ssi: {} idx: {}, not keeping {} (always drop index 0 icu line boundaries).", substring_index, lb_idx, pos + global_offset);
-                        continue;
-                    }
-                } else if substring_index == substring_count - 1 {
-                    // Last substring:
-                    if lb_idx == 0 {
-                        //println!("[Last Substring] ssi: {} idx: {}, not keeping {}.", substring_index, lb_idx, pos + global_offset);
-                        continue;
-                    }
-                    if lb_idx == line_boundaries.len() - 1 {
-                        //println!("[Last Substring] ssi: {} idx: {}, not keeping (drop icu tail boundary) {}.", substring_index, lb_idx, pos + global_offset);
-                        continue;
-                    }
-                } else {
-                    // Middle substrings:
-                    if pos == substring_len - last.len_utf8() { // also pos == substring later
-                        //println!("[Middle Substring] ssi: {} idx: {}, not keeping {} as it crosses into next substrings jurisdiction.", substring_index, lb_idx, pos + global_offset);
-                        continue;
-                    }
-                    if lb_idx == 0 || lb_idx == line_boundaries.len() - 1 {
-                        //println!("[Middle Substring] ssi: {} idx: {}, not keeping {}.", substring_index, lb_idx, pos + global_offset);
-                        continue;
-                    }
+                // icu adds leading and trailing line boundaries, which we don't use.
+                if lb_idx == 0 || lb_idx == line_boundaries.len() - 1 {
+                    continue;
                 }
-                // TODO-when all done (if works), write out rule set above all logic
-                // TODO-still need to ignore first index of first line break
-                //println!("!! -> New line boundary: {} ({} + go:{})", pos + global_offset, pos, global_offset);
-                // icu places a boundary at the index just beyond the string length, which we ignore
-                if pos + global_offset != all_boundaries_byte_indexed.len() {
-                    all_boundaries_byte_indexed[pos + global_offset] = Boundary::Line;
+                let last_len = last.len_utf8();
+
+                // For all but the last substring, we ignore line boundaries caused by the last
+                // character, as this character is carried back from the next substring, and will be
+                // accounted for there.
+                if substring_index != substring_count - 1 && pos == substring_len - last_len {
+                    continue;
                 }
+                all_boundaries_byte_indexed[pos + global_offset] = Boundary::Line;
             }
 
             if substring_index != substring_count - 1 {
-                //println!("[GO calc] End of non-last substring, substring.len {} minus last char len {} added to GO", substring_len, last.len_utf8());
                 global_offset += substring_len - last.len_utf8();
             }
-
-            //println!("---------------------------------------------------------------------------");
         }
 
         // Bidi levels
@@ -751,14 +709,31 @@ mod tests {
     // ==================== Basic Tests ====================
 
     #[test]
-    fn test_blank_string() {
-        verify_swash_icu_equivalence(" ", |_| {});
+    fn test_blank() {
+        verify_swash_icu_equivalence("", |_| {});
+    }
+
+    #[test]
+    fn test_all_whitespace() {
+        verify_swash_icu_equivalence("   ", |_| {});
     }
 
     #[test]
     fn test_single_char() {
-        verify_swash_icu_equivalence("A", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..1);
+        verify_swash_icu_equivalence("A", |_| {});
+    }
+
+    #[test]
+    fn test_two_chars_keep_all() {
+        verify_swash_icu_equivalence("AB", |builder| {
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..2);
+        });
+    }
+
+    #[test]
+    fn test_three_chars() {
+        verify_swash_icu_equivalence("ABC", |builder| {
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..3);
         });
     }
 
@@ -770,50 +745,95 @@ mod tests {
     }
 
     #[test]
-    fn test_two_chars_keep_all() {
-        verify_swash_icu_equivalence("AB", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..2);
-        });
+    fn test_single_grapheme_multi_char() {
+        verify_swash_icu_equivalence("A e\u{0301} B", |_| {});
     }
 
     #[test]
-    fn test_abc_normal() {
-        verify_swash_icu_equivalence("ABC", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..3);
-        });
+    fn test_whitespace_contiguous_interspersed_in_latin() {
+        verify_swash_icu_equivalence("A  B  C D", |_| {});
     }
 
     #[test]
-    fn test_abc_mixed_break() {
-        verify_swash_icu_equivalence("ABC", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..2);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 2..3);
-        });
-    }
-
-    // ==================== Whitespace Boundary Tests ====================
-
-    #[test]
-    fn test_whitespace_boundary_mixed() {
-        // Drops expected line boundary on char 3 (just before F)
-        verify_swash_icu_equivalence("A  F  S d", |builder| {
+    fn test_whitespace_contiguous_interspersed_in_latin_mixed() {
+        // Drops expected line boundary on char 3 (just before B)
+        verify_swash_icu_equivalence("A  B  C D", |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..3);
             builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 3..9);
-        });
-    }
-
-    #[test]
-    fn test_whitespace_contiguous() {
-        verify_swash_icu_equivalence("A  F  S d", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..9);
         });
     }
 
     // ==================== Mixed Break Strength Tests ====================
 
     #[test]
+    fn test_latin_mixed_break_all_first() {
+        verify_swash_icu_equivalence("AB", |builder| {
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..1);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..2);
+        });
+    }
+
+    #[test]
+    fn test_latin_mixed_break_all_last() {
+        verify_swash_icu_equivalence("AB", |builder| {
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..1);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 1..2);
+        });
+    }
+
+    #[test]
+    fn test_latin_mixed_keep_all_first() {
+        verify_swash_icu_equivalence("AB", |builder| {
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..1);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..2);
+        });
+    }
+
+    #[test]
+    fn test_latin_mixed_keep_all_last() {
+        verify_swash_icu_equivalence("AB", |builder| {
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..1);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 1..2);
+        });
+    }
+
+    #[test]
+    fn test_latin_trailing_space_mixed() {
+        verify_swash_icu_equivalence("AB ", |builder| {
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..1);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..3);
+        });
+    }
+
+    #[test]
+    fn test_latin_leading_space_mixed() {
+        verify_swash_icu_equivalence(" AB", |builder| {
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..1);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..3);
+        });
+    }
+
+    #[test]
+    fn test_alternate_twice_within_word_normal_break_normal() {
+        verify_swash_icu_equivalence("ABC", |builder| {
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..1);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 1..2);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 2..3);
+        });
+    }
+
+    #[test]
+    fn test_alternate_twice_within_word_break_normal_break() {
+        verify_swash_icu_equivalence("ABC", |builder| {
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..1);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..2);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 2..3);
+        });
+    }
+
+    #[test]
     fn test_mixed_break_simple() {
-        verify_swash_icu_equivalence("TEST 123", |builder| {
+        verify_swash_icu_equivalence("ABCD 123", |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..1);
             builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 1..8);
         });
@@ -821,7 +841,7 @@ mod tests {
 
     #[test]
     fn test_mixed_break_four_segments() {
-        verify_swash_icu_equivalence("TEST 123", |builder| {
+        verify_swash_icu_equivalence("ABCD 123", |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..1);
             builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 1..2);
             builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 2..4);
@@ -830,8 +850,8 @@ mod tests {
     }
 
     #[test]
-    fn test_mixed_break_alternating() {
-        verify_swash_icu_equivalence("TEST 123", |builder| {
+    fn test_mixed_break_frequent_alternation() {
+        verify_swash_icu_equivalence("ABCD 123", |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..1);
             builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 1..2);
             builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 2..3);
@@ -843,64 +863,60 @@ mod tests {
         });
     }
 
-    // ==================== Bug Reproduction Tests ====================
-
     #[test]
-    fn test_st_break_all_then_normal() {
-        // Bug type 1
-        verify_swash_icu_equivalence("ST", |builder| {
+    fn test_single_grapheme_multi_char_mixed_break_all() {
+        verify_swash_icu_equivalence("A e\u{0301} B", |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..1);
             builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..2);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 2..5);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 5..6);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 6..7);
         });
     }
 
     #[test]
-    fn test_st_normal_then_break_all() {
-        // Reverse of bug
-        verify_swash_icu_equivalence("ST", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..1);
+    fn test_single_grapheme_multi_char_mixed_keep_all() {
+        verify_swash_icu_equivalence("A e\u{0301} B", |builder| {
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..1);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..2);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 2..5);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 5..6);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 6..7);
+        });
+    }
+
+    #[test]
+    fn test_single_grapheme_multi_char_mixed_break_and_keep_all() {
+        verify_swash_icu_equivalence("A e\u{0301} B", |builder| {
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..1);
             builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 1..2);
-        });
-    }
-
-    #[test]
-    fn test_st_with_space() {
-        verify_swash_icu_equivalence("ST ", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..3);
-        });
-    }
-
-    #[test]
-    fn test_gst_bug_type_1() {
-        verify_swash_icu_equivalence("GST", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 1..2);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 2..3);
-        });
-    }
-
-    #[test]
-    fn test_gst_bug_type_2() {
-        verify_swash_icu_equivalence("GST", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..3);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 2..5);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 5..6);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 6..7);
         });
     }
 
     // ==================== Newline Tests ====================
 
     #[test]
-    fn test_with_newline() {
-        verify_swash_icu_equivalence("ABC DEF\nS", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..9);
-        });
+    fn test_newline() {
+        verify_swash_icu_equivalence("\n", |_| {});
+    }
+
+    #[test]
+    fn test_two_newlines() {
+        verify_swash_icu_equivalence("\n\n", |_| {});
+    }
+
+    #[test]
+    fn test_mandatory_break_in_text() {
+        verify_swash_icu_equivalence("ABC DEF\nG", |_| {});
     }
 
     // ==================== Unicode Tests ====================
 
     #[test]
-    fn test_euro_chinese_pattern() {
+    fn test_multi_byte_chars_alternating_break_all() {
         verify_swash_icu_equivalence("€你€你AA", |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..3);
             builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 3..6);
@@ -912,7 +928,19 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_byte_chars_2_3_4_pattern() {
+    fn test_multi_byte_chars_alternating_keep_all() {
+        verify_swash_icu_equivalence("€你€你AA", |builder| {
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..3);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 3..6);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 6..9);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 9..12);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 12..13);
+            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 13..14);
+        });
+    }
+
+    #[test]
+    fn test_multi_byte_chars_varying_utf8_lengths() {
         // 2-3-4-3-2 byte pattern
         verify_swash_icu_equivalence("ß€𝓗你ą", |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..2);
@@ -924,8 +952,7 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_byte_chars_with_spaces() {
-        // 2-3-4-3-2 pattern with spaces
+    fn test_multi_byte_chars_varying_utf8_lengths_whitespace_separated() {
         verify_swash_icu_equivalence("ß € 𝓗 你 ą", |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..3);
             builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 3..7);
@@ -935,20 +962,10 @@ mod tests {
         });
     }
 
-    #[test]
-    fn test_multi_byte_subset() {
-        // 2-3-4 byte pattern
-        verify_swash_icu_equivalence("ß€𝓗", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..2);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 2..5);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 5..9);
-        });
-    }
-
     // ==================== RTL and Bidirectional Tests ====================
 
     #[test]
-    fn test_mixed_ltr_rtl_short() {
+    fn test_mixed_ltr_rtl() {
         let text = "Hello مرحبا";
         verify_swash_icu_equivalence(text, |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..text.len());
@@ -956,7 +973,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mixed_ltr_rtl_text() {
+    fn test_mixed_ltr_rtl_multiple_segments() {
         let text = "Hello مرحبا World عالم Test اختبار";
         verify_swash_icu_equivalence(text, |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..text.len());
