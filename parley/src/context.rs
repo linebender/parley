@@ -204,7 +204,6 @@ impl<B: Brush> LayoutContext<B> {
         };
 
         let mut building_range_start = first_style.range.start;
-        // TODO(conor) only last iter. value used
         let mut previous_word_break_style = first_style.style.word_break;
         let mut contiguous_word_break_substrings: Vec<(&str, WordBreakStrength)> = Vec::new();
 
