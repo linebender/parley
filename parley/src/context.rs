@@ -284,18 +284,6 @@ impl<B: Brush> LayoutContext<B> {
         let substring_count = contiguous_word_break_substrings.len();
         let mut global_offset = 0;
         for (substring_index, (substring, word_break_strength)) in contiguous_word_break_substrings.iter().enumerate() {
-            let substring_len = substring.len();
-
-            // TODO(conor) - if getting substr length works here, try including these with substring
-            //  (i.e. collect/keep from earlier) as an optimisation
-            let substring_chars: Vec<char> = substring.chars().collect();
-            let Some((first, rest)) = substring_chars.split_first() else {
-                continue;
-            };
-            let Some((last, _)) = rest.split_last() else {
-                continue;
-            };
-
             // Boundaries
             // TODO(conor) Should we expose CSS line-breaking strictness as an option in Parley's style API?
             //line_break_opts.strictness = LineBreakStrictness::Strict;
@@ -326,9 +314,13 @@ impl<B: Brush> LayoutContext<B> {
                 break;
             }
 
+            let mut substring_chars = substring.chars();
             if substring_index != 0 {
-                global_offset -= first.len_utf8();
+                global_offset -= substring_chars.next().unwrap().len_utf8();
             }
+            // There will always be at least two characters if we are not taking the fast path for
+            // a single word break style substring.
+            let last_len = substring_chars.next_back().unwrap().len_utf8();
 
             // Mark line boundaries (overriding word boundaries where present).
             for (lb_idx, &pos) in line_boundaries.iter().enumerate() {
@@ -336,19 +328,18 @@ impl<B: Brush> LayoutContext<B> {
                 if lb_idx == 0 || lb_idx == line_boundaries.len() - 1 {
                     continue;
                 }
-                let last_len = last.len_utf8();
 
                 // For all but the last substring, we ignore line boundaries caused by the last
                 // character, as this character is carried back from the next substring, and will be
                 // accounted for there.
-                if substring_index != substring_count - 1 && pos == substring_len - last_len {
+                if substring_index != substring_count - 1 && pos == substring.len() - last_len {
                     continue;
                 }
                 all_boundaries_byte_indexed[pos + global_offset] = Boundary::Line;
             }
 
             if substring_index != substring_count - 1 {
-                global_offset += substring_len - last.len_utf8();
+                global_offset += substring.len() - last_len;
             }
         }
 
