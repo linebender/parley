@@ -247,7 +247,6 @@ impl<B: Brush> LayoutContext<B> {
 
                 while let Some(style) = self.styles.next() {
                     let style_start_index = style.range.start;
-                    // TODO(conor) prev_char and current_char should just be char len
                     let mut prev_char_index = self.current_char_index;
 
                     // Find the character at the style boundary
