@@ -5,6 +5,7 @@
 
 use alloc::{vec, vec::Vec};
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use icu::collections::codepointtrie::TrieValue;
 use icu::properties::props::BidiClass;
 use icu::segmenter::{LineSegmenter, LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed};
@@ -197,92 +198,128 @@ impl<B: Brush> LayoutContext<B> {
                 | LineBreak::NextLine)
         }
 
-        let text = if text.is_empty() { " " } else { text };
+        struct WordBreakSegmentIter<'a, I: Iterator, B: Brush> {
+            text: &'a str,
+            styles: I,
+            char_indices: std::str::CharIndices<'a>,
+            current_char_details: (usize, char),
+            building_range_start: usize,
+            previous_word_break_style: WordBreakStrength,
+            done: bool,
+            _phantom: PhantomData<B>,
+        }
 
-        let Some((first_style, rest)) = self.styles.split_first() else {
-            panic!("No style info");
-        };
+        impl<'a, I, B: Brush + 'a> WordBreakSegmentIter<'a, I, B>
+        where
+            I: Iterator<Item = &'a RangedStyle<B>>
+        {
+            fn new(
+                text: &'a str,
+                styles: I,
+                first_style: &RangedStyle<B>
+            ) -> Self {
+                let mut char_indices = text.char_indices();
+                let current_char = char_indices.next().unwrap();
 
-        let mut building_range_start = first_style.range.start;
-        let mut previous_word_break_style = first_style.style.word_break;
-        let mut contiguous_word_break_substrings: Vec<(&str, WordBreakStrength)> = Vec::new();
-
-        // TODO(conor) can we improve fast path, so that the subsequent loop is unnecessary?
-        //  would it be better to check for single word break style config first (vast majority of cases)
-        //  and skip this work if so?
-        // icu doesn't support alternating the break configuration used in determining line
-        // boundaries across a string, which we support in Parley. This segments a string where
-        // line break options change, and looks forward/back one character in each, so that we have
-        // all the context we need for boundary calculation, per segment.
-        // TODO(conor) could this also be combined with the bidi/boundary iterator that consumes char_indices below?
-        let mut char_indices = text.char_indices();
-        let mut current_char = char_indices.next().unwrap();
-        let mut prev_char;
-        // TODO(conor) just produce iterator for `contiguous_word_break_substrings` and consume
-        //  in later loop
-        for style in rest {
-            let style_start_index = style.range.start;
-            // Loop until we know the first character of our span, and the previous character:
-            // the last character of the previous span.
-            loop {
-                prev_char = current_char;
-                current_char = char_indices.next().unwrap();
-                if style_start_index == current_char.0 {
-                    break;
+                Self {
+                    text,
+                    styles,
+                    char_indices,
+                    current_char_details: current_char,
+                    building_range_start: first_style.range.start,
+                    previous_word_break_style: first_style.style.word_break,
+                    done: false,
+                    _phantom: PhantomData,
                 }
             }
-
-            let (_, prev_size) = text.char_at(prev_char.0).unwrap();
-
-            let current_word_break_style = style.style.word_break;
-            if previous_word_break_style != current_word_break_style {
-                let (_, size) = text.char_at(style_start_index).unwrap();
-                contiguous_word_break_substrings.push((
-                    // End one character late, to grab the first character from the next span,
-                    // for all but the last span.
-                    text.subrange(building_range_start..style_start_index + size),
-                    previous_word_break_style
-                ));
-                // Start one character early, to get the last character from the previous span,
-                // for all but the first span
-                building_range_start = style_start_index - prev_size;
-            }
-            previous_word_break_style = current_word_break_style;
         }
-        let last_substring = if building_range_start == 0 {
-            // Don't allocate a new string if we aren't segmenting
-            text
-        } else {
-            text.subrange(building_range_start..text.len())
-        };
-        contiguous_word_break_substrings.push((
-            last_substring,
-            previous_word_break_style,
-        ));
+
+        impl<'a, I, B: Brush + 'a> Iterator for WordBreakSegmentIter<'a, I, B>
+        where
+            I: Iterator<Item = &'a RangedStyle<B>>
+        {
+            type Item = (&'a str, WordBreakStrength, bool);
+
+            fn next(&mut self) -> Option<Self::Item> {
+                if self.done {
+                    return None;
+                }
+
+                while let Some(style) = self.styles.next() {
+                    let style_start_index = style.range.start;
+                    // TODO(conor) prev_char and current_char should just be char len
+                    let mut prev_char = self.current_char_details;
+
+                    // Find the character at the style boundary
+                    while self.current_char_details.0 < style_start_index {
+                        prev_char = self.current_char_details;
+                        self.current_char_details = self.char_indices.next().unwrap();
+                    }
+
+                    let current_word_break_style = style.style.word_break;
+                    // Produce one substring for each different word break style run
+                    if self.previous_word_break_style != current_word_break_style {
+                        let (_, prev_size) = self.text.char_at(prev_char.0).unwrap();
+                        let (_, size) = self.text.char_at(style_start_index).unwrap();
+
+                        let substring = self.text.subrange(
+                            self.building_range_start..style_start_index + size
+                        );
+                        let result_style = self.previous_word_break_style;
+
+                        self.building_range_start = style_start_index - prev_size;
+                        self.previous_word_break_style = current_word_break_style;
+
+                        return Some((substring, result_style, false));
+                    }
+
+                    self.previous_word_break_style = current_word_break_style;
+                }
+
+                // Final segment
+                self.done = true;
+                let last_substring = if self.building_range_start == 0 {
+                    self.text
+                } else {
+                    self.text.subrange(self.building_range_start..self.text.len())
+                };
+                Some((last_substring, self.previous_word_break_style, true))
+            }
+        }
+
+        let text = if text.is_empty() { " " } else { text };
 
         let mut all_boundaries_byte_indexed = vec![Boundary::None; text.len()];
 
         // Word boundaries:
         for wb in self.unicode_data_sources.word_segmenter.segment_str(text) {
-            // icu will produce a word boundary trailing the string, which we don't use.
             if wb == text.len() {
                 continue;
             }
             all_boundaries_byte_indexed[wb] = Boundary::Word;
         }
 
-        // Line boundaries:
-        let substring_count = contiguous_word_break_substrings.len();
+        // Line boundaries (word break naming refers to the line boundary determination config).
+        //
+        // This breaks text into sequences with similar line boundary config (part of style
+        // information). If this config is consistent for all text, we use a fast path through this.
+        let Some((first_style, rest)) = self.styles.split_first() else {
+            panic!("No style info");
+        };
+        let contiguous_word_break_substrings = WordBreakSegmentIter::new(
+            text,
+            rest.iter(),
+            &first_style
+        );
         let mut global_offset = 0;
-        for (substring_index, (substring, word_break_strength)) in contiguous_word_break_substrings.iter().enumerate() {
-            // Boundaries
+        for (substring_index, (substring, word_break_strength, last)) in contiguous_word_break_substrings.enumerate() {
             // TODO(conor) Should we expose CSS line-breaking strictness as an option in Parley's style API?
             //line_break_opts.strictness = LineBreakStrictness::Strict;
             // TODO(conor) - Do we set this, to have it impact breaking? It doesn't look like Swash is
             //  It seems like we'd want to - this could enable script-based line breaking.
             //line_break_opts.content_locale = ?
 
-            let word_break_strength = swash_to_icu_lb(*word_break_strength);
+            let word_break_strength = swash_to_icu_lb(word_break_strength);
             let line_segmenter = &mut self.unicode_data_sources.line_segmenters.entry(word_break_strength as u8).or_insert({
                 let mut line_break_opts: LineBreakOptions<'static> = Default::default();
                 line_break_opts.word_option = Some(word_break_strength);
@@ -291,7 +328,7 @@ impl<B: Brush> LayoutContext<B> {
             let line_boundaries: Vec<usize> = line_segmenter.segment_str(substring).collect();
 
             // Fast path for text with a single word-break option.
-            if substring_count == 1 {
+            if substring_index == 0 && last {
                 // icu adds leading and trailing line boundaries, which we don't use.
                 let Some((_first, rest)) = line_boundaries.split_first() else {
                     continue;
@@ -323,13 +360,13 @@ impl<B: Brush> LayoutContext<B> {
                 // For all but the last substring, we ignore line boundaries caused by the last
                 // character, as this character is carried back from the next substring, and will be
                 // accounted for there.
-                if substring_index != substring_count - 1 && pos == substring.len() - last_len {
+                if !last && pos == substring.len() - last_len {
                     continue;
                 }
                 all_boundaries_byte_indexed[pos + global_offset] = Boundary::Line;
             }
 
-            if substring_index != substring_count - 1 {
+            if !last {
                 global_offset += substring.len() - last_len;
             }
         }
@@ -349,6 +386,7 @@ impl<B: Brush> LayoutContext<B> {
                 bidi_embed_levels_byte_indexed.get(byte_pos).unwrap()
             ));
 
+        // TODO(conor) zip with chars, not unicode data iterators
         fn unicode_data_iterator<'a, T: TrieValue>(text: &'a str, data_source: CodePointMapDataBorrowed::<'static, T>) -> impl Iterator<Item = T> + 'a {
             text.chars().map(move |c| (c, data_source.get32(c as u32)).1)
         }
