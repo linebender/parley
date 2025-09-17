@@ -249,6 +249,7 @@ impl<B: Brush> LayoutContext<B> {
             previous_word_break_style = current_word_break_style;
         }
         let last_substring = if building_range_start == 0 {
+            // Don't allocate a new string if we aren't segmenting
             text
         } else {
             text.subrange(building_range_start..text.len())
