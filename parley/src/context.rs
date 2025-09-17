@@ -180,7 +180,6 @@ impl<B: Brush> LayoutContext<B> {
         }
     }
 
-    // TODO(conor) consistent idx vs index naming
     pub(crate) fn analyze_text_icu(&mut self, text: &str) {
         fn swash_to_icu_lb(swash: WordBreakStrength) -> LineBreakWordOption {
             match swash {
@@ -350,9 +349,9 @@ impl<B: Brush> LayoutContext<B> {
             let last_len = substring_chars.next_back().unwrap().len_utf8();
 
             // Mark line boundaries (overriding word boundaries where present).
-            for (lb_idx, &pos) in line_boundaries.iter().enumerate() {
+            for (index, &pos) in line_boundaries.iter().enumerate() {
                 // icu adds leading and trailing line boundaries, which we don't use.
-                if lb_idx == 0 || lb_idx == line_boundaries.len() - 1 {
+                if index == 0 || index == line_boundaries.len() - 1 {
                     continue;
                 }
 
