@@ -291,6 +291,7 @@ impl<B: Brush> LayoutContext<B> {
 
         // Word boundaries:
         for wb in self.unicode_data_sources.word_segmenter.segment_str(text) {
+            // icu produces a word boundary trailing the string, which we don't use.
             if wb == text.len() {
                 continue;
             }
