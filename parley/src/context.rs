@@ -403,7 +403,6 @@ impl<B: Brush> LayoutContext<B> {
             self.info.push((CharInfo::new(properties, boundary), 0));
         }
 
-        // TODO(conor) - icu needs_bidi_resolution? IIUC this is an optimisation, so it's optional for now.
         // TODO(conor) - add back later, this is just to bring swash/icu test data to parity
         //if a.needs_bidi_resolution() {
             self.bidi.resolve(
