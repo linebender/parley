@@ -208,6 +208,8 @@ impl<B: Brush> LayoutContext<B> {
         let mut contiguous_word_break_substrings: Vec<(&str, WordBreakStrength)> = Vec::new();
 
         // TODO(conor) can we improve fast path, so that the subsequent loop is unnecessary?
+        //  would it be better to check for single word break style config first (vast majority of cases)
+        //  and skip this work if so?
         // icu doesn't support alternating the break configuration used in determining line
         // boundaries across a string, which we support in Parley. This segments a string where
         // line break options change, and looks forward/back one character in each, so that we have
@@ -240,14 +242,19 @@ impl<B: Brush> LayoutContext<B> {
                     text.subrange(building_range_start..style_start_index + size),
                     previous_word_break_style
                 ));
+                // Start one character early, to get the last character from the previous span,
+                // for all but the first span
+                building_range_start = style_start_index - prev_size;
             }
-            // Start one character early, to get the last character from the previous span,
-            // for all but the first span
-            building_range_start = style_start_index - prev_size;
             previous_word_break_style = current_word_break_style;
         }
+        let last_substring = if building_range_start == 0 {
+            text
+        } else {
+            text.subrange(building_range_start..text.len())
+        };
         contiguous_word_break_substrings.push((
-            text.subrange(building_range_start..text.len()),
+            last_substring,
             previous_word_break_style,
         ));
 
@@ -607,6 +614,7 @@ fn script_from_u8(value: u8) -> Option<swash::text::Script> {
 }
 
 mod tests {
+    use fontique::FontWeight;
     use swash::text::WordBreakStrength;
     use crate::{FontContext, FontStack, LayoutContext, LineHeight, RangedBuilder, StyleProperty};
 
@@ -725,7 +733,7 @@ mod tests {
     }
 
     #[test]
-    fn test_single_grapheme_multi_char() {
+    fn test_multi_char_grapheme() {
         verify_swash_icu_equivalence("A e\u{0301} B", |_| {});
     }
 
@@ -733,6 +741,18 @@ mod tests {
     fn test_whitespace_contiguous_interspersed_in_latin() {
         verify_swash_icu_equivalence("A  B  C D", |_| {});
     }
+
+    // ==================== Mixed Style Tests ====================
+
+    #[test]
+    fn test_mixed_style() {
+        verify_swash_icu_equivalence("A  B  C D", |builder| {
+            builder.push(StyleProperty::FontWeight(FontWeight::new(400.0)), 0..3);
+            builder.push(StyleProperty::FontWeight(FontWeight::new(700.0)), 3..9);
+        });
+    }
+
+    // ==================== Mixed Break Strength Tests ====================
 
     #[test]
     fn test_whitespace_contiguous_interspersed_in_latin_mixed() {
@@ -742,8 +762,6 @@ mod tests {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 3..9);
         });
     }
-
-    // ==================== Mixed Break Strength Tests ====================
 
     #[test]
     fn test_latin_mixed_break_all_first() {
@@ -844,7 +862,7 @@ mod tests {
     }
 
     #[test]
-    fn test_single_grapheme_multi_char_mixed_break_all() {
+    fn test_multi_char_grapheme_mixed_break_all() {
         verify_swash_icu_equivalence("A e\u{0301} B", |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..1);
             builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..2);
@@ -855,7 +873,7 @@ mod tests {
     }
 
     #[test]
-    fn test_single_grapheme_multi_char_mixed_keep_all() {
+    fn test_multi_char_grapheme_mixed_keep_all() {
         verify_swash_icu_equivalence("A e\u{0301} B", |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..1);
             builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..2);
@@ -866,7 +884,7 @@ mod tests {
     }
 
     #[test]
-    fn test_single_grapheme_multi_char_mixed_break_and_keep_all() {
+    fn test_multi_char_grapheme_mixed_break_and_keep_all() {
         verify_swash_icu_equivalence("A e\u{0301} B", |builder| {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..1);
             builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 1..2);
@@ -875,25 +893,6 @@ mod tests {
             builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 6..7);
         });
     }
-
-    // ==================== Newline Tests ====================
-
-    #[test]
-    fn test_newline() {
-        verify_swash_icu_equivalence("\n", |_| {});
-    }
-
-    #[test]
-    fn test_two_newlines() {
-        verify_swash_icu_equivalence("\n\n", |_| {});
-    }
-
-    #[test]
-    fn test_mandatory_break_in_text() {
-        verify_swash_icu_equivalence("ABC DEF\nG", |_| {});
-    }
-
-    // ==================== Unicode Tests ====================
 
     #[test]
     fn test_multi_byte_chars_alternating_break_all() {
@@ -942,29 +941,37 @@ mod tests {
         });
     }
 
+    // ==================== Newline Tests ====================
+
+    #[test]
+    fn test_newline() {
+        verify_swash_icu_equivalence("\n", |_| {});
+    }
+
+    #[test]
+    fn test_two_newlines() {
+        verify_swash_icu_equivalence("\n\n", |_| {});
+    }
+
+    #[test]
+    fn test_mandatory_break_in_text() {
+        verify_swash_icu_equivalence("ABC DEF\nG", |_| {});
+    }
+
     // ==================== RTL and Bidirectional Tests ====================
 
     #[test]
     fn test_mixed_ltr_rtl() {
-        let text = "Hello مرحبا";
-        verify_swash_icu_equivalence(text, |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..text.len());
-        });
+        verify_swash_icu_equivalence("Hello مرحبا", |_| {});
     }
 
     #[test]
     fn test_mixed_ltr_rtl_multiple_segments() {
-        let text = "Hello مرحبا World عالم Test اختبار";
-        verify_swash_icu_equivalence(text, |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..text.len());
-        });
+        verify_swash_icu_equivalence("Hello مرحبا World عالم Test اختبار", |_| {});
     }
 
     #[test]
     fn test_mixed_ltr_rtl_nested_embedding() {
-        let text = "In Hebrew: שנת 2024 היא...";
-        verify_swash_icu_equivalence(text, |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..text.len());
-        });
+        verify_swash_icu_equivalence("In Hebrew: שנת 2024 היא...", |_| {});
     }
 }
