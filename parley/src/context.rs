@@ -214,6 +214,7 @@ impl<B: Brush> LayoutContext<B> {
         // boundaries across a string, which we support in Parley. This segments a string where
         // line break options change, and looks forward/back one character in each, so that we have
         // all the context we need for boundary calculation, per segment.
+        // TODO(conor) could this also be combined with the bidi/boundary iterator that consumes char_indices below?
         let mut char_indices = text.char_indices();
         let mut current_char = char_indices.next().unwrap();
         let mut prev_char;
