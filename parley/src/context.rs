@@ -202,7 +202,7 @@ impl<B: Brush> LayoutContext<B> {
             text: &'a str,
             styles: I,
             char_indices: std::str::CharIndices<'a>,
-            current_char_details: (usize, char),
+            current_char_index: usize,
             building_range_start: usize,
             previous_word_break_style: WordBreakStrength,
             done: bool,
@@ -219,13 +219,13 @@ impl<B: Brush> LayoutContext<B> {
                 first_style: &RangedStyle<B>
             ) -> Self {
                 let mut char_indices = text.char_indices();
-                let current_char = char_indices.next().unwrap();
+                let current_char_len = char_indices.next().unwrap().0;
 
                 Self {
                     text,
                     styles,
                     char_indices,
-                    current_char_details: current_char,
+                    current_char_index: current_char_len,
                     building_range_start: first_style.range.start,
                     previous_word_break_style: first_style.style.word_break,
                     done: false,
@@ -248,18 +248,18 @@ impl<B: Brush> LayoutContext<B> {
                 while let Some(style) = self.styles.next() {
                     let style_start_index = style.range.start;
                     // TODO(conor) prev_char and current_char should just be char len
-                    let mut prev_char = self.current_char_details;
+                    let mut prev_char_index = self.current_char_index;
 
                     // Find the character at the style boundary
-                    while self.current_char_details.0 < style_start_index {
-                        prev_char = self.current_char_details;
-                        self.current_char_details = self.char_indices.next().unwrap();
+                    while self.current_char_index < style_start_index {
+                        prev_char_index = self.current_char_index;
+                        self.current_char_index = self.char_indices.next().unwrap().0;
                     }
 
                     let current_word_break_style = style.style.word_break;
                     // Produce one substring for each different word break style run
                     if self.previous_word_break_style != current_word_break_style {
-                        let (_, prev_size) = self.text.char_at(prev_char.0).unwrap();
+                        let (_, prev_size) = self.text.char_at(prev_char_index).unwrap();
                         let (_, size) = self.text.char_at(style_start_index).unwrap();
 
                         let substring = self.text.subrange(
