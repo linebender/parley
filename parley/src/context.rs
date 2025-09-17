@@ -339,22 +339,23 @@ impl<B: Brush> LayoutContext<B> {
             range: full_text_range.clone(),
             level: Level::ltr(),
         };
-        let bidi_embed_levels_byte = bidi_info.reordered_levels(&paragraph, full_text_range);
+        let bidi_embed_levels_byte_indexed = bidi_info.reordered_levels(&paragraph, full_text_range);
 
-        // Condense byte indexes to character indexes.
-        let mut all_boundaries_char_indexed = Vec::new();
-        let mut bidi_embed_levels_char_indexed = Vec::new();
-        text.char_indices().for_each(|(i, _)| {
-            all_boundaries_char_indexed.push(all_boundaries_byte_indexed.get(i).unwrap());
-            bidi_embed_levels_char_indexed.push(bidi_embed_levels_byte.get(i).unwrap());
+        // Condense sparse byte indexes to character indexes.
+        // The source lists only have entries at byte positions where characters start.
+        let mut all_boundaries_by_char_index = Vec::new();
+        let mut bidi_embed_levels_by_char_index = Vec::new();
+        text.char_indices().for_each(|(byte_pos, _)| {
+            all_boundaries_by_char_index.push(all_boundaries_byte_indexed.get(byte_pos).unwrap());
+            bidi_embed_levels_by_char_index.push(bidi_embed_levels_byte_indexed.get(byte_pos).unwrap());
         });
 
         fn unicode_data_iterator<'a, T: TrieValue>(text: &'a str, data_source: CodePointMapDataBorrowed::<'static, T>) -> impl Iterator<Item = T> + 'a {
             text.chars().map(move |c| (c, data_source.get32(c as u32)).1)
         }
-        all_boundaries_char_indexed
+        all_boundaries_by_char_index
             .iter()
-            .zip(bidi_embed_levels_char_indexed)
+            .zip(bidi_embed_levels_by_char_index)
             .zip(unicode_data_iterator(text, self.unicode_data_sources.script))
             // Shift line break data forward one, as line boundaries corresponding with line-breaking
             // characters (like '\n') exist at an index position one higher than the respective
