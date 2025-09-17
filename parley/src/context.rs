@@ -341,21 +341,16 @@ impl<B: Brush> LayoutContext<B> {
         };
         let bidi_embed_levels_byte_indexed = bidi_info.reordered_levels(&paragraph, full_text_range);
 
-        // Condense sparse byte indexes to character indexes.
-        // The source lists only have entries at byte positions where characters start.
-        let mut all_boundaries_by_char_index = Vec::new();
-        let mut bidi_embed_levels_by_char_index = Vec::new();
-        text.char_indices().for_each(|(byte_pos, _)| {
-            all_boundaries_by_char_index.push(all_boundaries_byte_indexed.get(byte_pos).unwrap());
-            bidi_embed_levels_by_char_index.push(bidi_embed_levels_byte_indexed.get(byte_pos).unwrap());
-        });
+        let boundaries_and_levels_iter = text.char_indices()
+            .map(|(byte_pos, _)| (
+                all_boundaries_byte_indexed.get(byte_pos).unwrap(),
+                bidi_embed_levels_byte_indexed.get(byte_pos).unwrap()
+            ));
 
         fn unicode_data_iterator<'a, T: TrieValue>(text: &'a str, data_source: CodePointMapDataBorrowed::<'static, T>) -> impl Iterator<Item = T> + 'a {
             text.chars().map(move |c| (c, data_source.get32(c as u32)).1)
         }
-        all_boundaries_by_char_index
-            .iter()
-            .zip(bidi_embed_levels_by_char_index)
+        boundaries_and_levels_iter
             .zip(unicode_data_iterator(text, self.unicode_data_sources.script))
             // Shift line break data forward one, as line boundaries corresponding with line-breaking
             // characters (like '\n') exist at an index position one higher than the respective
@@ -369,7 +364,7 @@ impl<B: Brush> LayoutContext<B> {
                 let boundary = if is_mandatory_line_break(line_break) {
                     Boundary::Mandatory
                 } else {
-                    **boundary
+                    *boundary
                 };
                 self.info_icu.push((
                     icu_working::CharInfo::new(boundary, embed_level, swash_script),
