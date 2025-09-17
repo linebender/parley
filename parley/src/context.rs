@@ -5,6 +5,7 @@
 
 use alloc::{vec, vec::Vec};
 use std::collections::HashMap;
+use icu::collections::codepointtrie::TrieValue;
 use icu::properties::props::BidiClass;
 use icu::segmenter::{LineSegmenter, LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed};
 use icu::segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakInvariantOptions};
@@ -215,6 +216,8 @@ impl<B: Brush> LayoutContext<B> {
         let mut char_indices = text.char_indices();
         let mut current_char = char_indices.next().unwrap();
         let mut prev_char;
+        // TODO(conor) just produce iterator for `contiguous_word_break_substrings` and consume
+        //  in later loop
         for style in rest {
             let style_start_index = style.range.start;
             // Loop until we know the first character of our span, and the previous character:
@@ -248,26 +251,6 @@ impl<B: Brush> LayoutContext<B> {
             text.subrange(building_range_start..text.len()),
             previous_word_break_style,
         ));
-
-        // TODO(conor) - Try setting up an iterator for these instead, e.g.:
-        /*fn script_iter(text: &str) -> impl Iterator<Item = (char, Script)> + '_ {
-            let script_data = CodePointMapData::<Script>::new();
-            text.chars().map(move |c| (c, script_data.get32(c as u32)))
-        }*/
-
-        // Fetch script and line break data in one iteration.
-        //
-        // Shift line break data forward one, as line boundaries corresponding with line-breaking
-        // characters (like '\n') exist at an index position one higher than the respective
-        // character's index, but we need our iterators to align, and the rest are simply
-        // character-indexed.
-        let mut script_data = Vec::new();
-        let mut line_break_data: Vec<LineBreak> = Vec::new();
-        line_break_data.push(LineBreak::from_icu4c_value(0));
-        text.chars().for_each(|ch| {
-            script_data.push(self.unicode_data_sources.script.get(ch));
-            line_break_data.push(self.unicode_data_sources.line_break.get(ch));
-        });
 
         let mut all_boundaries_byte_indexed = vec![Boundary::None; text.len()];
 
@@ -360,11 +343,19 @@ impl<B: Brush> LayoutContext<B> {
             bidi_embed_levels_char_indexed.push(bidi_embed_levels_byte.get(i).unwrap());
         });
 
+        fn unicode_data_iterator<'a, T: TrieValue>(text: &'a str, data_source: CodePointMapDataBorrowed::<'static, T>) -> impl Iterator<Item = T> + 'a {
+            text.chars().map(move |c| (c, data_source.get32(c as u32)).1)
+        }
         all_boundaries_char_indexed
             .iter()
             .zip(bidi_embed_levels_char_indexed)
-            .zip(script_data)
-            .zip(line_break_data)
+            .zip(unicode_data_iterator(text, self.unicode_data_sources.script))
+            // Shift line break data forward one, as line boundaries corresponding with line-breaking
+            // characters (like '\n') exist at an index position one higher than the respective
+            // character's index, but we need our iterators to align, and the rest are simply
+            // character-indexed.
+            // TODO(conor) have data iterator not resolve value unless its needed (line break data not always used)
+            .zip(std::iter::once(LineBreak::from_icu4c_value(0)).chain(unicode_data_iterator(text, self.unicode_data_sources.line_break)))
             .for_each(|(((boundary, embed_level), script), line_break)| {
                 let embed_level: BidiLevel = (*embed_level).into();
                 let swash_script: swash::text::Script = script_from_u8(script.to_icu4c_value() as u8).unwrap();
