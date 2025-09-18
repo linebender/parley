@@ -49,7 +49,7 @@ mod source;
 
 mod source_cache;
 
-pub use icu_locid::LanguageIdentifier as Language;
+pub use icu_locale_core::LanguageIdentifier as Language;
 pub use peniko::Blob;
 
 pub use attributes::{Attributes, FontStyle, FontWeight, FontWidth};
