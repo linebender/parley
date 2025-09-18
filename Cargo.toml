@@ -31,8 +31,8 @@ linebender_resource_handle = { version = "0.1.0", default-features = false }
 parley = { version = "0.5.0", default-features = false, path = "parley" }
 parley_dev = { version = "0.0.0", default-features = false, path = "parley_dev" }
 peniko = { version = "0.4.0", default-features = false }
-skrifa = { version = "0.36.0", default-features = false }
-read-fonts = { version = "0.34.0", default-features = false }
+skrifa = { git = "https://github.com/googlefonts/fontations", rev = "10d575a749b50bbbb40fe20be540ffee771fa07b", default-features = false }
+read-fonts = { git = "https://github.com/googlefonts/fontations", rev = "10d575a749b50bbbb40fe20be540ffee771fa07b", default-features = false }
 swash = { version = "0.2.5", default-features = false }
 
 [workspace.lints]
