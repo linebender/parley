@@ -8,7 +8,7 @@ use core::{convert::TryInto, fmt};
 /// Four byte tag representing a Unicode script.
 ///
 /// If the `"icu_properties"` feature is enabled, this can
-/// be created from a [`icu_properties::Script`].
+/// be created from a [`icu_properties::props::Script`].
 ///
 /// If the `"unicode_script"` feature is enabled this can
 /// be created from a [`unicode_script::Script`].
@@ -29,12 +29,12 @@ impl Script {
         SCRIPT_SAMPLES.get(ix).map(|entry| entry.1)
     }
 
-    /// Returns the associated [`icu_properties::Script`] value.
+    /// Returns the associated [`icu_properties::props::Script`] value.
     #[cfg(feature = "icu_properties")]
-    pub fn icu_script(self) -> Option<icu_properties::Script> {
-        let mapper = icu_properties::Script::name_to_enum_mapper();
+    pub fn icu_script(self) -> Option<icu_properties::props::Script> {
+        let parser = icu_properties::PropertyParser::<icu_properties::props::Script>::new();
         let s = core::str::from_utf8(&self.0).ok()?;
-        mapper.get_strict(s)
+        parser.get_strict(s)
     }
 
     /// Returns the associated [`unicode_script::Script`] value.
@@ -75,12 +75,13 @@ impl From<&str> for Script {
 }
 
 #[cfg(feature = "icu_properties")]
-impl From<icu_properties::Script> for Script {
-    fn from(value: icu_properties::Script) -> Self {
+impl From<icu_properties::props::Script> for Script {
+    fn from(value: icu_properties::props::Script) -> Self {
+        let names = icu_properties::PropertyNamesShort::new();
         Self(
-            icu_properties::Script::enum_to_short_name_mapper()
+            names
                 .get(value)
-                .map(|name| *name.all_bytes())
+                .map(|name| name.as_bytes().try_into().unwrap())
                 .unwrap_or_default(),
         )
     }
