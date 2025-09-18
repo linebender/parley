@@ -28,17 +28,16 @@ use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
 use crate::shape::ShapeContext;
 
-struct UnicodeDataSources {
-    // TODO(conor) Review lifetime specifier
+struct AnalysisDataSources {
     script: CodePointMapDataBorrowed::<'static, Script>,
     bidi_class: CodePointMapDataBorrowed::<'static, BidiClass>,
     line_break: CodePointMapDataBorrowed::<'static, LineBreak>,
     word_segmenter: WordSegmenterBorrowed<'static>,
-    // Key: LineBreakWordOption as u8
+    // Key: icu_segmenter::line::LineBreakWordOption as u8
     line_segmenters: HashMap<u8, LineSegmenterBorrowed<'static>>,
 }
 
-impl UnicodeDataSources {
+impl AnalysisDataSources {
     fn new() -> Self {
         Self {
             script: CodePointMapDataBorrowed::<Script>::new(),
@@ -67,8 +66,7 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) info_icu: Vec<(icu_working::CharInfo, u16)>,
     pub(crate) scx: ShapeContext,
 
-    // TODO(conor) revise name (*Segmenters are not as such), or decompose entirely?
-    unicode_data_sources: UnicodeDataSources,
+    unicode_data_sources: AnalysisDataSources,
 }
 
 impl<B: Brush> LayoutContext<B> {
@@ -81,7 +79,7 @@ impl<B: Brush> LayoutContext<B> {
             ranged_style_builder: RangedStyleBuilder::default(),
             tree_style_builder: TreeStyleBuilder::default(),
             info: vec![],
-            unicode_data_sources: UnicodeDataSources::new(),
+            unicode_data_sources: AnalysisDataSources::new(),
             info_icu: vec![],
             scx: ShapeContext::default(),
         }
@@ -385,7 +383,6 @@ impl<B: Brush> LayoutContext<B> {
                 bidi_embed_levels_byte_indexed.get(byte_pos).unwrap()
             ));
 
-        // TODO(conor) zip with chars, not unicode data iterators
         fn unicode_data_iterator<'a, T: TrieValue>(text: &'a str, data_source: CodePointMapDataBorrowed::<'static, T>) -> impl Iterator<Item = T> + 'a {
             text.chars().map(move |c| (c, data_source.get32(c as u32)).1)
         }
