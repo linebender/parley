@@ -35,6 +35,7 @@ extern crate alloc;
 
 mod attributes;
 mod backend;
+#[cfg(feature = "charmap_index")]
 mod charmap;
 mod collection;
 mod fallback;
@@ -53,7 +54,6 @@ pub use icu_locale_core::LanguageIdentifier as Language;
 pub use linebender_resource_handle::Blob;
 
 pub use attributes::{Attributes, FontStyle, FontWeight, FontWidth};
-pub use charmap::{Charmap, CharmapIndex};
 pub use collection::{Collection, CollectionOptions, Query, QueryFamily, QueryFont, QueryStatus};
 pub use fallback::FallbackKey;
 pub use family::{FamilyId, FamilyInfo};
@@ -65,3 +65,6 @@ pub use source::{SourceId, SourceInfo, SourceKind};
 #[cfg(all(feature = "system", target_vendor = "apple"))]
 use objc2 as _;
 pub use source_cache::{SourceCache, SourceCacheOptions};
+
+#[cfg(feature = "charmap_index")]
+pub use charmap::{Charmap, CharmapIndex};
