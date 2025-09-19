@@ -25,6 +25,7 @@ This release has an [MSRV] of 1.82.
 #### Fontique
 
 - Cache character mapping metadata for each font to improve performance of font selection. ([#413][] by [@dfrg][])
+- Upgrade `icu4x` dependencies to v2.x ([#418][] by [@nicoburns][])
 
 ### Changed
 
@@ -333,6 +334,7 @@ This release has an [MSRV][] of 1.70.
 [#402]: https://github.com/linebender/parley/pull/402
 [#405]: https://github.com/linebender/parley/pull/405
 [#413]: https://github.com/linebender/parley/pull/413
+[#418]: https://github.com/linebender/parley/pull/418
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/linebender/parley/compare/v0.4.0...v0.5.0

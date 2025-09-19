@@ -3,11 +3,12 @@
 
 //! Test line layouts, including the vertical size and positioning of the line box.
 
-use peniko::kurbo::{Rect, Size};
+use peniko::kurbo::Size;
 
 use super::utils::{ColorBrush, TestEnv};
 use crate::{
-    Affinity, Brush, Cursor, InlineBox, Layout, LineHeight, Selection, StyleProperty, test_name,
+    Affinity, Brush, Cursor, InlineBox, Layout, LineHeight, Rect, Selection, StyleProperty,
+    test_name,
 };
 
 const TEXT: &str = "Some text here. Let's make\n\
