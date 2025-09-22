@@ -23,8 +23,8 @@
 //!
 //! ```rust
 //! use parley::{
-//!    Alignment, AlignmentOptions, FontContext, FontWeight, InlineBox, Layout, LayoutContext,
-//!    LineHeight, PositionedLayoutItem, StyleProperty,
+//!    Alignment, AlignmentOptions, FontContext, FontWeight, InlineBox, InlineBoxKind, Layout,
+//!    LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty,
 //! };
 //!
 //! // Create a FontContext (font database) and LayoutContext (scratch space).
@@ -44,7 +44,7 @@
 //! builder.push(StyleProperty::FontWeight(FontWeight::new(600.0)), 0..4);
 //!
 //! // Add a box to be laid out inline with the text
-//! builder.push_inline_box(InlineBox { id: 0, index: 5, width: 50.0, height: 50.0 });
+//! builder.push_inline_box(InlineBox { id: 0, kind: InlineBoxKind::InFlow, index: 5, width: 50.0, height: 50.0 });
 //!
 //! // Build the builder into a Layout
 //! let mut layout: Layout<()> = builder.build(&TEXT);
@@ -52,7 +52,7 @@
 //! // Run line-breaking and alignment on the Layout
 //! const MAX_WIDTH : Option<f32> = Some(100.0);
 //! layout.break_all_lines(MAX_WIDTH);
-//! layout.align(MAX_WIDTH, Alignment::Start, AlignmentOptions::default());
+//! layout.align(Alignment::Start, AlignmentOptions::default());
 //!
 //! // Inspect computed layout (see examples for more details)
 //! let width = layout.width();
@@ -131,7 +131,7 @@ pub use util::BoundingBox;
 pub use builder::{RangedBuilder, TreeBuilder};
 pub use context::LayoutContext;
 pub use font::FontContext;
-pub use inline_box::InlineBox;
+pub use inline_box::{InlineBox, InlineBoxKind};
 #[doc(inline)]
 pub use layout::Layout;
 

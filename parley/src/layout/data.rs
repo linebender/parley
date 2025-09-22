@@ -5,7 +5,7 @@ use crate::inline_box::InlineBox;
 use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::nearly_zero;
-use crate::{FontData, LineHeight, OverflowWrap, TextWrapMode};
+use crate::{FontData, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode};
 use core::ops::Range;
 
 use alloc::vec::Vec;
@@ -572,13 +572,15 @@ impl<B: Brush> LayoutData<B> {
                 LayoutItemKind::InlineBox => {
                     let ibox = &self.inline_boxes[item.index];
                     running_max_width += ibox.width;
-                    if text_wrap_mode == TextWrapMode::Wrap {
-                        let trailing_whitespace = whitespace_advance(prev_cluster);
-                        min_width = min_width.max(running_min_width - trailing_whitespace);
-                        min_width = min_width.max(ibox.width);
-                        running_min_width = 0.0;
-                    } else {
-                        running_min_width += ibox.width;
+                    if ibox.kind == InlineBoxKind::InFlow {
+                        if text_wrap_mode == TextWrapMode::Wrap {
+                            let trailing_whitespace = whitespace_advance(prev_cluster);
+                            min_width = min_width.max(running_min_width - trailing_whitespace);
+                            min_width = min_width.max(ibox.width);
+                            running_min_width = 0.0;
+                        } else {
+                            running_min_width += ibox.width;
+                        }
                     }
                     prev_cluster = None;
                 }

@@ -19,7 +19,7 @@ fn issue_489() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(200.0));
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         assert!(layout.is_rtl());
     }
@@ -30,7 +30,7 @@ fn issue_489() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(200.0));
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         assert!(!layout.is_rtl());
 
@@ -79,7 +79,7 @@ And, finally, yet another sentence."#;
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(150.0));
-        layout.align(None, Alignment::Justify, AlignmentOptions::default());
+        layout.align(Alignment::Justify, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
@@ -110,7 +110,7 @@ Third line that ends with newlines\n\n";
     assert!(content_widths.max != 0.0);
 
     layout.break_all_lines(Some(content_widths.max));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
     env.with_name("max_context_with_mandatory_breaks")
         .check_layout_snapshot(&layout);
 }

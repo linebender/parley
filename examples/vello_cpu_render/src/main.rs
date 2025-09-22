@@ -8,7 +8,7 @@
 
 use parley::{
     Alignment, AlignmentOptions, FontContext, FontWeight, GenericFamily, GlyphRun, InlineBox,
-    Layout, LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty,
+    InlineBoxKind, Layout, LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty,
 };
 use parley_draw::{GlyphCaches, GlyphRunBuilder};
 use vello_cpu::{Pixmap, RenderContext, kurbo, peniko::Color};
@@ -80,6 +80,7 @@ fn main() {
 
     builder.push_inline_box(InlineBox {
         id: 0,
+        kind: InlineBoxKind::InFlow,
         index: 40,
         width: 50.0,
         height: 50.0,
@@ -90,7 +91,7 @@ fn main() {
 
     // Perform layout (including bidi resolution and shaping) with start alignment
     layout.break_all_lines(max_advance);
-    layout.align(max_advance, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
     let width = layout.width().ceil() as u16;
     let height = layout.height().ceil() as u16;
     let padded_width = width + padding * 2;

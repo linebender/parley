@@ -87,9 +87,9 @@ impl LayoutAccessibility {
 
                 node.set_bounds(accesskit::Rect {
                     x0: x_offset + run_offset as f64,
-                    y0: y_offset + metrics.min_coord as f64,
+                    y0: y_offset + metrics.block_min_coord as f64,
                     x1: x_offset + (run_offset + run.advance()) as f64,
-                    y1: y_offset + metrics.max_coord as f64,
+                    y1: y_offset + metrics.block_max_coord as f64,
                 });
                 node.set_text_direction(if run.is_rtl() {
                     TextDirection::RightToLeft

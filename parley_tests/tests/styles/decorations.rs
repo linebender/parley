@@ -22,7 +22,7 @@ fn style_underline() {
     builder.push_default(StyleProperty::Underline(true));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -38,7 +38,7 @@ fn style_underline_offset_values() {
         builder.push_default(StyleProperty::UnderlineOffset(Some(offset)));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         let name = if offset < 0.0 {
             format!("neg_{}", (-offset) as i32)
@@ -60,7 +60,7 @@ fn style_underline_size_values() {
         builder.push_default(StyleProperty::UnderlineSize(Some(size)));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         let name = format!("size_{}", (size * 10.0) as i32);
         env.with_name(&name).check_layout_snapshot(&layout);
@@ -76,7 +76,7 @@ fn style_underline_across_line_break() {
     builder.push_default(StyleProperty::Underline(true));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -91,7 +91,7 @@ fn style_underline_partial_text() {
     builder.push(StyleProperty::Underline(true), 6..11);
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -109,7 +109,7 @@ fn style_strikethrough() {
     builder.push_default(StyleProperty::Strikethrough(true));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -125,7 +125,7 @@ fn style_strikethrough_offset_values() {
         builder.push_default(StyleProperty::StrikethroughOffset(Some(offset)));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         let name = if offset < 0.0 {
             format!("neg_{}", (-offset) as i32)
@@ -147,7 +147,7 @@ fn style_strikethrough_size_values() {
         builder.push_default(StyleProperty::StrikethroughSize(Some(size)));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         let name = format!("size_{}", (size * 10.0) as i32);
         env.with_name(&name).check_layout_snapshot(&layout);
@@ -168,7 +168,7 @@ fn style_underline_and_strikethrough() {
     builder.push_default(StyleProperty::Strikethrough(true));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }

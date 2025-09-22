@@ -35,6 +35,11 @@ impl<B: Brush> Layout<B> {
         &self.data.styles
     }
 
+    /// Returns available width of the layout.
+    pub fn available_width(&self) -> f32 {
+        self.data.alignment_width
+    }
+
     /// Returns the width of the layout.
     pub fn width(&self) -> f32 {
         self.data.width
@@ -126,14 +131,9 @@ impl<B: Brush> Layout<B> {
     /// You must perform line breaking prior to aligning, through [`Layout::break_lines`] or
     /// [`Layout::break_all_lines`]. If `container_width` is not specified, the layout's
     /// [`Layout::width`] is used.
-    pub fn align(
-        &mut self,
-        container_width: Option<f32>,
-        alignment: Alignment,
-        options: AlignmentOptions,
-    ) {
+    pub fn align(&mut self, alignment: Alignment, options: AlignmentOptions) {
         unjustify(&mut self.data);
-        align(&mut self.data, container_width, alignment, options);
+        align(&mut self.data, alignment, options);
     }
 
     /// Returns the index and `Line` object for the line containing the
@@ -166,9 +166,9 @@ impl<B: Brush> Layout<B> {
             return Some((0, self.get(0)?));
         }
         let maybe_line_index = self.data.lines.binary_search_by(|line| {
-            if offset < line.metrics.min_coord {
+            if offset < line.metrics.block_min_coord {
                 Ordering::Greater
-            } else if offset >= line.metrics.max_coord {
+            } else if offset >= line.metrics.block_max_coord {
                 Ordering::Less
             } else {
                 Ordering::Equal
