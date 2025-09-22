@@ -19,7 +19,7 @@ fn build_indented_layout(
     let mut layout = builder.build(text);
     layout.set_text_indent(indent_amount, indent_options);
     layout.break_all_lines(Some(wrap_width));
-    layout.align(None, alignment, AlignmentOptions::default());
+    layout.align(alignment, AlignmentOptions::default());
     layout
 }
 
@@ -56,7 +56,7 @@ fn text_indent_no_wrap() {
         text,
         30.0,
         IndentOptions::default(),
-        500.0,
+        f32::INFINITY,
         Alignment::Start,
     );
 
@@ -495,7 +495,7 @@ fn text_indent_hit_testing() {
     );
 
     let line0 = layout.get(0).unwrap();
-    let line0_y = (line0.metrics().min_coord + line0.metrics().max_coord) / 2.0;
+    let line0_y = (line0.metrics().block_min_coord + line0.metrics().block_max_coord) / 2.0;
 
     let cursor_in_indent = Cursor::from_point(&layout, 5.0, line0_y);
     assert_eq!(
@@ -511,7 +511,7 @@ fn text_indent_hit_testing() {
     );
 
     let line1 = layout.get(1).unwrap();
-    let line1_y = (line1.metrics().min_coord + line1.metrics().max_coord) / 2.0;
+    let line1_y = (line1.metrics().block_min_coord + line1.metrics().block_max_coord) / 2.0;
     let line1_text_start = line1.text_range().start;
 
     let cursor_line2_start = Cursor::from_point(&layout, 5.0, line1_y);
@@ -545,7 +545,7 @@ fn text_indent_negative_hit_testing() {
     );
 
     let line0 = layout.get(0).unwrap();
-    let line0_y = (line0.metrics().min_coord + line0.metrics().max_coord) / 2.0;
+    let line0_y = (line0.metrics().block_min_coord + line0.metrics().block_max_coord) / 2.0;
     let cluster_in_overflow = Cluster::from_point(&layout, -10.0, line0_y);
     assert!(
         cluster_in_overflow.is_some(),
