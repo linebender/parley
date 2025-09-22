@@ -56,6 +56,25 @@ struct PrevBoundaryState {
     state: LineState,
 }
 
+/// Reason that the line breaker has yielded control flow
+pub enum YieldData {
+    /// Control flow was yielded because a line break was encountered
+    LineBreak(LineBreakData),
+    /// Control flow was yielded because an inline box with `break_on_box` set
+    /// to `true` was encountered
+    InlineBoxBreak(BoxBreakData),
+}
+
+pub struct LineBreakData {
+    pub reason: BreakReason,
+    pub advance: f32,
+    pub line_height: f32,
+}
+
+pub struct BoxBreakData {
+    pub inline_box_id: usize,
+}
+
 #[derive(Clone, Default)]
 struct BreakerState {
     /// The number of items that have been processed (used to revert state)
@@ -155,7 +174,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     }
 
     /// Reset state when a line has been committed
-    fn start_new_line(&mut self) -> Option<(f32, f32)> {
+    fn start_new_line(&mut self, reason: BreakReason) -> Option<YieldData> {
         let line_height = self.state.line.running_line_height;
 
         self.state.items = self.lines.line_items.len();
@@ -166,12 +185,16 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         self.state.emergency_boundary = None;
 
         self.finish_line(self.lines.lines.len() - 1, line_height);
-        self.last_line_data()
+        Some(YieldData::LineBreak(self.last_line_data(reason)))
     }
 
-    fn last_line_data(&self) -> Option<(f32, f32)> {
+    fn last_line_data(&self, reason: BreakReason) -> LineBreakData {
         let line = self.lines.lines.last().unwrap();
-        Some((line.metrics.advance, line.size()))
+        LineBreakData {
+            reason,
+            advance: line.metrics.advance,
+            line_height: line.size(),
+        }
     }
 
     /// Returns the y-coordinate of the top of the current line
@@ -186,7 +209,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
     /// Computes the next line in the paragraph. Returns the advance and size
     /// (width and height for horizontal layouts) of the line.
-    pub fn break_next(&mut self, max_advance: f32) -> Option<(f32, f32)> {
+    pub fn break_next(&mut self, max_advance: f32) -> Option<YieldData> {
+        self.break_next_line_or_box(max_advance)
+    }
+
+    /// Computes the next line in the paragraph. Returns the advance and size
+    /// (width and height for horizontal layouts) of the line.
+    fn break_next_line_or_box(&mut self, max_advance: f32) -> Option<YieldData> {
         // Maintain iterator state
         if self.done {
             return None;
@@ -263,12 +292,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 .append_inline_box_to_line(next_x, inline_box.height);
                             if try_commit_line!(BreakReason::Emergency) {
                                 self.state.item_idx += 1;
-                                return self.start_new_line();
+                                return self.start_new_line(BreakReason::Emergency);
                             }
                         } else {
                             // println!("BOX BREAK");
                             if try_commit_line!(BreakReason::Regular) {
-                                return self.start_new_line();
+                                return self.start_new_line(BreakReason::Regular);
                             }
                         }
                     }
@@ -316,7 +345,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             if try_commit_line!(BreakReason::Explicit) {
                                 // TODO: can this be hoisted out of the conditional?
                                 self.state.cluster_idx += 1;
-                                return self.start_new_line();
+                                return self.start_new_line(BreakReason::Explicit);
                             }
                         } else if
                         // This text can contribute "emergency" line breaks.
@@ -373,7 +402,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 if try_commit_line!(BreakReason::Regular) {
                                     // TODO: can this be hoisted out of the conditional?
                                     self.state.cluster_idx += 1;
-                                    return self.start_new_line();
+                                    return self.start_new_line(BreakReason::Regular);
                                 }
                             }
                             // Case: we have previously encountered a REGULAR line-breaking opportunity in the current line
@@ -392,7 +421,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     self.state.run_idx = prev.run_idx;
                                     self.state.cluster_idx = prev.cluster_idx;
 
-                                    return self.start_new_line();
+                                    return self.start_new_line(BreakReason::Regular);
                                 }
                             }
                             // Case: we have previously encountered an EMERGENCY line-breaking opportunity in the current line
@@ -409,7 +438,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     self.state.run_idx = prev_emergency.run_idx;
                                     self.state.cluster_idx = prev_emergency.cluster_idx;
 
-                                    return self.start_new_line();
+                                    return self.start_new_line(BreakReason::Emergency);
                                 }
                             }
                             // Case: no line-breaking opportunities available
@@ -436,7 +465,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
         if try_commit_line!(BreakReason::None) {
             self.done = true;
-            return self.start_new_line();
+            return self.start_new_line(BreakReason::None);
         }
 
         None

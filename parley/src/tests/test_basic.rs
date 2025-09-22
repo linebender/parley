@@ -42,6 +42,7 @@ fn placing_inboxes() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
+            break_on_box: false,
             index: position,
             width: 10.0,
             height: 10.0,
@@ -62,6 +63,7 @@ fn only_inboxes_wrap() {
     for id in 0..10 {
         builder.push_inline_box(InlineBox {
             id,
+            break_on_box: false,
             index: 0,
             width: 10.0,
             height: 10.0,
@@ -83,18 +85,21 @@ fn full_width_inbox() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
+            break_on_box: false,
             index: 1,
             width: 10.,
             height: 10.0,
         });
         builder.push_inline_box(InlineBox {
             id: 1,
+            break_on_box: false,
             index: 1,
             width,
             height: 10.0,
         });
         builder.push_inline_box(InlineBox {
             id: 2,
+            break_on_box: false,
             index: 2,
             width,
             height: 10.0,
@@ -113,6 +118,7 @@ fn inbox_separated_by_whitespace() {
     let mut builder = env.tree_builder();
     builder.push_inline_box(InlineBox {
         id: 0,
+        break_on_box: false,
         index: 0,
         width: 10.,
         height: 10.0,
@@ -120,6 +126,7 @@ fn inbox_separated_by_whitespace() {
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
         id: 1,
+        break_on_box: false,
         index: 1,
         width: 10.0,
         height: 10.0,
@@ -127,6 +134,7 @@ fn inbox_separated_by_whitespace() {
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
         id: 2,
+        break_on_box: false,
         index: 2,
         width: 10.0,
         height: 10.0,
@@ -134,6 +142,7 @@ fn inbox_separated_by_whitespace() {
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
         id: 3,
+        break_on_box: false,
         index: 3,
         width: 10.0,
         height: 10.0,
@@ -377,6 +386,7 @@ fn inbox_content_width() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
+            break_on_box: false,
             index: 3,
             width: 100.0,
             height: 10.0,
@@ -397,6 +407,7 @@ fn inbox_content_width() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
+            break_on_box: false,
             index: 2,
             width: 10.0,
             height: 10.0,
