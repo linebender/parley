@@ -57,11 +57,7 @@ fn build_layout(text: &str, underline: bool) -> Layout<ColorBrush> {
 
         let mut layout: Layout<ColorBrush> = builder.build(text);
         layout.break_all_lines(Some(MAX_ADVANCE));
-        layout.align(
-            Some(MAX_ADVANCE),
-            Alignment::Start,
-            AlignmentOptions::default(),
-        );
+        layout.align(Alignment::Start, AlignmentOptions::default());
         layout
     })
 }
