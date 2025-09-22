@@ -34,7 +34,7 @@ pub use cluster::{Affinity, ClusterPath, ClusterSide};
 pub use cursor::{Cursor, Selection};
 pub use data::BreakReason;
 pub(crate) use line::LineItem;
-pub use line::greedy::BreakLines;
+pub use line::greedy::{BoxBreakData, BreakLines, LineBreakData, YieldData};
 pub use line::{GlyphRun, LineMetrics, PositionedInlineBox, PositionedLayoutItem};
 pub use run::RunMetrics;
 
