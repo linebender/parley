@@ -13,7 +13,8 @@ use super::utils::{
 use crate::setting::{FontFeature, FontVariation};
 use crate::{
     Alignment, AlignmentOptions, ContentWidths, FontFamily, FontFeatures, FontVariations,
-    InlineBox, Layout, LineHeight, StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
+    InlineBox, InlineBoxKind, Layout, LineHeight, StyleProperty, TextStyle, WhiteSpaceCollapse,
+    test_name,
 };
 
 #[test]
@@ -24,7 +25,7 @@ fn plain_multiline_text() {
     let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -43,13 +44,14 @@ fn placing_inboxes() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
+            kind: InlineBoxKind::InFlow,
             index: position,
             width: 10.0,
             height: 10.0,
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
@@ -63,6 +65,7 @@ fn only_inboxes_wrap() {
     for id in 0..10 {
         builder.push_inline_box(InlineBox {
             id,
+            kind: InlineBoxKind::InFlow,
             index: 0,
             width: 10.0,
             height: 10.0,
@@ -70,7 +73,7 @@ fn only_inboxes_wrap() {
     }
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(40.0));
-    layout.align(None, Alignment::Center, AlignmentOptions::default());
+    layout.align(Alignment::Center, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -84,25 +87,28 @@ fn full_width_inbox() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
+            kind: InlineBoxKind::InFlow,
             index: 1,
             width: 10.,
             height: 10.0,
         });
         builder.push_inline_box(InlineBox {
             id: 1,
+            kind: InlineBoxKind::InFlow,
             index: 1,
             width,
             height: 10.0,
         });
         builder.push_inline_box(InlineBox {
             id: 2,
+            kind: InlineBoxKind::InFlow,
             index: 2,
             width,
             height: 10.0,
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(100.));
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
@@ -114,6 +120,7 @@ fn inbox_separated_by_whitespace() {
     let mut builder = env.tree_builder();
     builder.push_inline_box(InlineBox {
         id: 0,
+        kind: InlineBoxKind::InFlow,
         index: 0,
         width: 10.,
         height: 10.0,
@@ -121,6 +128,7 @@ fn inbox_separated_by_whitespace() {
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
         id: 1,
+        kind: InlineBoxKind::InFlow,
         index: 1,
         width: 10.0,
         height: 10.0,
@@ -128,6 +136,7 @@ fn inbox_separated_by_whitespace() {
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
         id: 2,
+        kind: InlineBoxKind::InFlow,
         index: 2,
         width: 10.0,
         height: 10.0,
@@ -135,13 +144,14 @@ fn inbox_separated_by_whitespace() {
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
         id: 3,
+        kind: InlineBoxKind::InFlow,
         index: 3,
         width: 10.0,
         height: 10.0,
     });
     let (mut layout, _text) = builder.build();
     layout.break_all_lines(Some(100.));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -154,7 +164,7 @@ fn trailing_whitespace_ltr() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(45.));
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name("soft_wrap").check_layout_snapshot(&layout);
     }
@@ -164,7 +174,7 @@ fn trailing_whitespace_ltr() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name("hard_wrap").check_layout_snapshot(&layout);
     }
@@ -179,7 +189,7 @@ fn trailing_whitespace_rtl() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(45.));
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name("soft_wrap").check_layout_snapshot(&layout);
     }
@@ -189,7 +199,7 @@ fn trailing_whitespace_rtl() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name("hard_wrap").check_layout_snapshot(&layout);
     }
@@ -207,7 +217,7 @@ fn trailing_whitespace_bidi() {
             let builder = env.ranged_builder(text);
             let mut layout = builder.build(text);
             layout.break_all_lines(Some(45.));
-            layout.align(None, Alignment::Start, AlignmentOptions::default());
+            layout.align(Alignment::Start, AlignmentOptions::default());
 
             env.with_name(test_case_name).check_layout_snapshot(&layout);
         }
@@ -221,7 +231,7 @@ fn trailing_whitespace_bidi() {
             let builder = env.ranged_builder(text);
             let mut layout = builder.build(text);
             layout.break_all_lines(None);
-            layout.align(None, Alignment::Start, AlignmentOptions::default());
+            layout.align(Alignment::Start, AlignmentOptions::default());
 
             env.with_name(test_case_name).check_layout_snapshot(&layout);
         }
@@ -247,7 +257,7 @@ fn leading_whitespace() {
         builder.push_text("  Line 2");
         let (mut layout, _) = builder.build();
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
@@ -318,7 +328,7 @@ fn base_level_alignment_ltr() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(150.0));
-        layout.align(Some(150.0), alignment, AlignmentOptions::default());
+        layout.align(alignment, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
@@ -337,7 +347,7 @@ fn base_level_alignment_rtl() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(150.0));
-        layout.align(None, alignment, AlignmentOptions::default());
+        layout.align(alignment, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
@@ -352,9 +362,36 @@ fn overflow_alignment_rtl() {
     let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(1000.0));
-    layout.align(Some(10.), Alignment::Center, AlignmentOptions::default());
+    layout.align(Alignment::Center, AlignmentOptions::default());
     env.rendering_config().size = Some(Size::new(10., layout.height().into()));
     env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn issue_409_justified_text() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text_one_line = "One line justified.\n";
+    let text_last_line_one_word = "The last word of this text falls on the last line.\n";
+    let text_last_line_three_words = "Three words of this text will end up on the last line.\n";
+    let paragraphs = r#"A sentence across two lines.
+
+And another sentence that breaks across, hopefully, three lines.
+
+And, finally, yet another sentence."#;
+
+    for (text, test_case_name) in [
+        (text_one_line, "one_line"),
+        (text_last_line_one_word, "last_line_one_word"),
+        (text_last_line_three_words, "last_line_three_words"),
+        (paragraphs, "paragraphs"),
+    ] {
+        let builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(150.0));
+        layout.align(Alignment::Justify, AlignmentOptions::default());
+        env.with_name(test_case_name).check_layout_snapshot(&layout);
+    }
 }
 
 #[test]
@@ -372,11 +409,11 @@ fn content_widths() {
     } = layout.calculate_content_widths();
 
     layout.break_all_lines(Some(min_content_width));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
     env.with_name("min").check_layout_snapshot(&layout);
 
     layout.break_all_lines(Some(max_content_width));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
     env.with_name("max").check_layout_snapshot(&layout);
 }
 
@@ -395,11 +432,11 @@ fn content_widths_rtl() {
     } = layout.calculate_content_widths();
 
     layout.break_all_lines(Some(min_content_width));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
     env.with_name("min").check_layout_snapshot(&layout);
 
     layout.break_all_lines(Some(max_content_width));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
     assert!(
         layout.width() <= max_content_width,
         "Layout should never be wider than the max content width"
@@ -416,6 +453,7 @@ fn inbox_content_width() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
+            kind: InlineBoxKind::InFlow,
             index: 3,
             width: 100.0,
             height: 10.0,
@@ -426,7 +464,7 @@ fn inbox_content_width() {
             ..
         } = layout.calculate_content_widths();
         layout.break_all_lines(Some(min_content_width));
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name("full_width").check_layout_snapshot(&layout);
     }
@@ -436,6 +474,7 @@ fn inbox_content_width() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
+            kind: InlineBoxKind::InFlow,
             index: 2,
             width: 10.0,
             height: 10.0,
@@ -446,7 +485,7 @@ fn inbox_content_width() {
             ..
         } = layout.calculate_content_widths();
         layout.break_all_lines(Some(max_content_width));
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         assert!(
             layout.width() <= max_content_width,
@@ -466,7 +505,7 @@ fn ligatures_ltr() {
     let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(100.0));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
 
     let line = layout.lines().next().unwrap();
     let item = line.items().next().unwrap();
@@ -513,7 +552,7 @@ fn ligatures_rtl() {
     let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(100.0));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
 
     let line = layout.lines().next().unwrap();
     let item = line.items().next().unwrap();
@@ -592,7 +631,7 @@ fn text_range_rtl() {
     let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(100.0));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
 
     for line in layout.lines() {
         for item in line.items() {
@@ -629,7 +668,7 @@ fn font_features() {
     );
     let mut layout = builder.build(&text);
     layout.break_all_lines(Some(100.0));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -648,7 +687,7 @@ fn variable_fonts() {
         )]));
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(100.0));
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.check_layout_snapshot(&layout);
     }
@@ -667,7 +706,7 @@ fn realign() {
         if [2, 3, 4].contains(&idx) {
             layout.break_all_lines(Some(150.0));
         }
-        layout.align(Some(150.), Alignment::Justify, AlignmentOptions::default());
+        layout.align(Alignment::Justify, AlignmentOptions::default());
     }
     env.check_layout_snapshot(&layout);
 }
@@ -721,7 +760,7 @@ fn realign_all() {
                 let builder = env.ranged_builder(text);
                 let mut layout = builder.build(text);
                 layout.break_all_lines(max_advance);
-                layout.align(Some(150.), alignment, opts);
+                layout.align(alignment, opts);
                 layouts.push(layout);
             }
         }
@@ -749,7 +788,7 @@ fn realign_all() {
                         if max_advance != top_max_advance {
                             top_layout.break_all_lines(top_max_advance);
                         }
-                        top_layout.align(Some(150.), top_alignment, top_opts);
+                        top_layout.align(top_alignment, top_opts);
 
                         let top_name = format!("{text_name}_{align_name}_{opts_name}_{ma_name}");
                         //env.with_name(&top_name).check_layout_snapshot(&top_layout);
