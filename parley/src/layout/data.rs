@@ -205,6 +205,11 @@ impl LineItemData {
         self.kind == LayoutItemKind::TextRun
     }
 
+    #[inline(always)]
+    pub(crate) fn is_rtl(&self) -> bool {
+        self.bidi_level & 1 != 0
+    }
+
     pub(crate) fn compute_line_height<B: Brush>(&self, layout: &LayoutData<B>) -> f32 {
         match self.kind {
             LayoutItemKind::TextRun => {
@@ -232,6 +237,41 @@ impl LineItemData {
             LayoutItemKind::InlineBox => {
                 // TODO: account for vertical alignment (e.g. baseline alignment)
                 layout.inline_boxes[self.index].height
+            }
+        }
+    }
+
+    /// If the item is a text run
+    ///   - Determine if it consists entirely of whitespace (`is_whitespace` property)
+    ///   - Determine if it has trailing whitespace (`has_trailing_whitespace` property)
+    pub(crate) fn compute_whitespace_properties<B: Brush>(&mut self, layout_data: &LayoutData<B>) {
+        // Skip items which are not text runs
+        if self.kind != LayoutItemKind::TextRun {
+            return;
+        }
+
+        self.is_whitespace = true;
+        if self.is_rtl() {
+            // RTL runs check for "trailing" whitespace at the front.
+            for cluster in layout_data.clusters[self.cluster_range.clone()].iter() {
+                if cluster.info.is_whitespace() {
+                    self.has_trailing_whitespace = true;
+                } else {
+                    self.is_whitespace = false;
+                    break;
+                }
+            }
+        } else {
+            for cluster in layout_data.clusters[self.cluster_range.clone()]
+                .iter()
+                .rev()
+            {
+                if cluster.info.is_whitespace() {
+                    self.has_trailing_whitespace = true;
+                } else {
+                    self.is_whitespace = false;
+                    break;
+                }
             }
         }
     }
