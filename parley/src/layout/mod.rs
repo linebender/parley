@@ -16,7 +16,7 @@ pub mod editor;
 use self::alignment::align;
 
 use super::style::Brush;
-use crate::{Font, InlineBox, OverflowWrap};
+use crate::{FontData, InlineBox, OverflowWrap};
 #[cfg(feature = "accesskit")]
 use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
 use alignment::unjustify;

@@ -15,7 +15,7 @@ use super::style::{Brush, FontFeature, FontVariation};
 use crate::inline_box::InlineBox;
 use crate::lru_cache::LruCache;
 use crate::util::nearly_eq;
-use crate::{Font, swash_convert};
+use crate::{FontData, swash_convert};
 
 use fontique::{self, Query, QueryFamily, QueryFont};
 use swash::text::cluster::{CharCluster, CharInfo, Token};
@@ -390,7 +390,7 @@ fn shape_item<'a, B: Brush>(
 
         // Push harfrust-shaped run for the entire segment
         layout.data.push_run(
-            Font::new(font.font.blob.clone(), font.font.index),
+            FontData::new(font.font.blob.clone(), font.font.index),
             item.size,
             font.font.synthesis,
             &glyph_buffer,

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use super::{
-    Brush, Cluster, ClusterPath, Font, Layout, LineItemData, Range, Run, RunData, Synthesis,
+    Brush, Cluster, ClusterPath, FontData, Layout, LineItemData, Range, Run, RunData, Synthesis,
 };
 
 impl<'a, B: Brush> Run<'a, B> {
@@ -28,7 +28,7 @@ impl<'a, B: Brush> Run<'a, B> {
     }
 
     /// Returns the font for the run.
-    pub fn font(&self) -> &Font {
+    pub fn font(&self) -> &FontData {
         self.layout.data.fonts.get(self.data.font_index).unwrap()
     }
 

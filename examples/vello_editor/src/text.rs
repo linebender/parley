@@ -337,12 +337,18 @@ impl Editor {
                 transform,
                 palette::css::STEEL_BLUE,
                 None,
-                &rect,
+                &vello::kurbo::Rect::new(rect.x0, rect.y0, rect.x1, rect.y1),
             );
         });
         if self.cursor_visible {
             if let Some(cursor) = self.editor.cursor_geometry(1.5) {
-                scene.fill(Fill::NonZero, transform, palette::css::WHITE, None, &cursor);
+                scene.fill(
+                    Fill::NonZero,
+                    transform,
+                    palette::css::WHITE,
+                    None,
+                    &vello::kurbo::Rect::new(cursor.x0, cursor.y0, cursor.x1, cursor.y1),
+                );
             }
         }
         let layout = self.editor.layout(&mut self.font_cx, &mut self.layout_cx);
