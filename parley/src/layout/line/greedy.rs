@@ -421,41 +421,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     pub fn finish(mut self) {
         // Whether metrics should be quantized to pixel boundaries
         let quantize = self.layout.data.quantize;
+
         // For each run (item which is a text run):
         //   - Determine if it consists entirely of whitespace (is_whitespace property)
         //   - Determine if it has trailing whitespace (has_trailing_whitespace property)
         for item in &mut self.lines.line_items {
-            // Skip items which are not text runs
-            if item.kind != LayoutItemKind::TextRun {
-                continue;
-            }
-
-            let run = item;
-            run.is_whitespace = true;
-            if run.bidi_level & 1 != 0 {
-                // RTL runs check for "trailing" whitespace at the front.
-                for cluster in self.layout.data.clusters[run.cluster_range.clone()].iter() {
-                    if cluster.info.is_whitespace() {
-                        run.has_trailing_whitespace = true;
-                    } else {
-                        run.is_whitespace = false;
-                        break;
-                    }
-                }
-            } else {
-                for cluster in self.layout.data.clusters[run.cluster_range.clone()]
-                    .iter()
-                    .rev()
-                {
-                    if cluster.info.is_whitespace() {
-                        run.has_trailing_whitespace = true;
-                    } else {
-                        run.is_whitespace = false;
-                        break;
-                    }
-                }
-            }
+            item.compute_whitespace_properties(&self.layout.data);
         }
+
         let mut y: f64 = 0.; // f32 causes test failures due to accumulated error
         let mut prev_line_metrics = None;
         for line in &mut self.lines.lines {
