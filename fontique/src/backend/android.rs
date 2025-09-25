@@ -4,7 +4,7 @@
 use std::{path::Path, str::FromStr, sync::Arc};
 
 use hashbrown::HashMap;
-use icu_locid::LanguageIdentifier;
+use icu_locale_core::LanguageIdentifier;
 use roxmltree::{Document, Node};
 
 use super::{
@@ -125,9 +125,7 @@ impl SystemFonts {
                                                     // Undefined lang for script-only fallbacks
                                                     script_fallback.push((scr.into(), *family));
                                                 } else if let Ok(locale) =
-                                                    LanguageIdentifier::try_from_bytes(
-                                                        lang.as_bytes(),
-                                                    )
+                                                    LanguageIdentifier::try_from_str(lang)
                                                 {
                                                     if let Some(scr) = locale.script {
                                                         // Also fallback for the script on its own
