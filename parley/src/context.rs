@@ -4,9 +4,11 @@
 //! Context for layout.
 
 use alloc::{vec, vec::Vec};
+use alloc::borrow::Cow;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use icu::collections::codepointtrie::TrieValue;
+use icu::normalizer::{ComposingNormalizerBorrowed, DecomposingNormalizerBorrowed};
 use icu::properties::props::BidiClass;
 use icu::segmenter::{LineSegmenter, LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed};
 use icu::segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakInvariantOptions};
@@ -383,9 +385,33 @@ impl<B: Brush> LayoutContext<B> {
                 bidi_embed_levels_byte_indexed.get(byte_pos).unwrap()
             ));
 
+        // Grapheme cluster boundaries:
+        /*let segmenter = GraphemeClusterSegmenter::new();
+        //segmenter.segment_str()
+        let mut clusters = segmenter.segment_str(text);
+
+        // Print the actual cluster boundaries
+        let boundaries: Vec<usize> = clusters.collect();
+        println!("cluster boundaries: {:?}", boundaries);
+
+        // Or to get the actual text segments:
+        let segmenter = GraphemeClusterSegmenter::new();
+        let clusters = segmenter.segment_str(text);
+        let mut last = 0;
+        for boundary in clusters {
+            println!("cluster: {:?}", &text[last..boundary]);
+            last = boundary;
+        }*/
+
         fn unicode_data_iterator<'a, T: TrieValue>(text: &'a str, data_source: CodePointMapDataBorrowed::<'static, T>) -> impl Iterator<Item = T> + 'a {
             text.chars().map(move |c| (c, data_source.get32(c as u32)).1)
         }
+
+        /*let gen_cat_source = CodePointMapDataBorrowed::<GeneralCategory>::new();
+        unicode_data_iterator(text, gen_cat_source).for_each(|c| {
+            println!("Cat: {:?}", c);
+        });*/
+
         boundaries_and_levels_iter
             .zip(unicode_data_iterator(text, self.unicode_data_sources.script))
             // Shift line break data forward one, as line boundaries corresponding with line-breaking

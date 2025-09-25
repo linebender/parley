@@ -190,6 +190,7 @@ fn build_into_layout<B: Brush>(
             &lcx.styles,
             &lcx.inline_boxes,
             &lcx.info,
+            &lcx.info_icu,
             lcx.bidi.levels(),
             &mut lcx.scx,
             text,
