@@ -600,6 +600,81 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             features,
         }
     }
+    
+    fn select_font_icu(&mut self, cluster: &mut crate::replace_swash::CharCluster) -> Option<SelectedFont> {
+        let style_index = cluster.style_index;
+        println!("[select_font] cluster: '{}'", cluster.chars.iter().map(|ch| ch.ch).collect::<String>());
+        let is_emoji = cluster.info.is_emoji;
+        println!("[select_font] is_emoji: '{}'", is_emoji);
+        if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
+            self.style_index = style_index;
+            let style = &self.styles[style_index as usize].style;
+
+            let fonts_id = style.font_stack.id();
+            let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
+            let fonts = fonts.iter().copied().map(QueryFamily::Id);
+            if is_emoji {
+                use core::iter::once;
+                let emoji_family = QueryFamily::Generic(fontique::GenericFamily::Emoji);
+                self.query.set_families(fonts.chain(once(emoji_family)));
+                self.fonts_id = None;
+            } else if self.fonts_id != Some(fonts_id) {
+                self.query.set_families(fonts);
+                self.fonts_id = Some(fonts_id);
+            }
+
+            let attrs = fontique::Attributes {
+                width: style.font_width,
+                weight: style.font_weight,
+                style: style.font_style,
+            };
+            if self.attrs != attrs {
+                self.query.set_attributes(attrs);
+                self.attrs = attrs;
+            }
+            self.variations = self.rcx.variations(style.font_variations).unwrap_or(&[]);
+            self.features = self.rcx.features(style.font_features).unwrap_or(&[]);
+        }
+        let mut selected_font = None;
+        self.query.matches_with(|font| {
+            use skrifa::MetadataProvider;
+            // use Status as MapStatus; // TODO(conor)
+
+            let Ok(font_ref) = skrifa::FontRef::from_index(font.blob.as_ref(), font.index) else {
+                return fontique::QueryStatus::Continue;
+            };
+
+            let charmap = font_ref.charmap();
+            let map_status: crate::replace_swash::Status = cluster.map(|ch| {
+                charmap
+                    .map(ch)
+                    .map(|g| {
+                        g.to_u32()
+                            .try_into()
+                            .expect("Swash requires u16 glyph, so we hope that the glyph fits")
+                    })
+                    .unwrap_or_default()
+            });
+
+            match map_status {
+                crate::replace_swash::Status::Complete => {
+                    selected_font = Some(font.into());
+                    fontique::QueryStatus::Stop
+                }
+                crate::replace_swash::Status::Keep => {
+                    selected_font = Some(font.into());
+                    fontique::QueryStatus::Continue
+                }
+                crate::replace_swash::Status::Discard => {
+                    if selected_font.is_none() {
+                        selected_font = Some(font.into());
+                    }
+                    fontique::QueryStatus::Continue
+                }
+            }
+        });
+        selected_font
+    }
 
     fn select_font(&mut self, cluster: &mut CharCluster) -> Option<SelectedFont> {
         let style_index = cluster.user_data() as u16;

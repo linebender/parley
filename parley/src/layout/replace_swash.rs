@@ -6,6 +6,7 @@ pub const MAX_CLUSTER_SIZE: usize = 32;
 pub(crate) struct CharCluster {
     pub info: ClusterInfo,
     pub chars: Vec<Char>, // [Char; MAX_CLUSTER_SIZE], TODO(conor)
+    pub style_index: u16,
     len: u8,
     map_len: u8,
     start: u32,
@@ -193,6 +194,7 @@ impl CharCluster {
         CharCluster {
             info,
             chars,
+            style_index: 0,
             len: 0,
             map_len: 0,
             start: 0, // TODO(conor) + end
@@ -205,12 +207,12 @@ impl CharCluster {
         }
     }
 
-    fn composed(&mut self) -> Option<&[swash::text::cluster::Char]> {
-        unreachable!();
+    fn composed(&mut self) -> Option<&[Char]> {
+        unimplemented!();
     }
 
-    fn decomposed(&mut self) -> Option<&[swash::text::cluster::Char]> {
-        unreachable!();
+    fn decomposed(&mut self) -> Option<&[Char]> {
+        unimplemented!();
     }
 
     pub fn map(&mut self, f: impl Fn(char) -> GlyphId) -> Status {
@@ -218,7 +220,7 @@ impl CharCluster {
         if len == 0 {
             return Status::Complete;
         }
-        let mut glyph_ids = [0u16; swash::text::cluster::MAX_CLUSTER_SIZE];
+        let mut glyph_ids = [0u16; MAX_CLUSTER_SIZE];
         let prev_ratio = self.best_ratio;
         let mut ratio;
         if self.force_normalize && self.composed().is_some() {
@@ -326,7 +328,7 @@ impl Form {
     fn map(
         &mut self,
         f: &impl Fn(char) -> u16,
-        glyphs: &mut [u16; swash::text::cluster::MAX_CLUSTER_SIZE],
+        glyphs: &mut [u16; MAX_CLUSTER_SIZE],
         best_ratio: f32,
     ) -> f32 {
         Mapper {
