@@ -125,7 +125,7 @@ pub use peniko::kurbo::Rect;
 pub use builder::{RangedBuilder, TreeBuilder};
 pub use context::LayoutContext;
 pub use font::FontContext;
-pub use inline_box::InlineBox;
+pub use inline_box::{InlineBox, InlineBoxKind};
 #[doc(inline)]
 pub use layout::Layout;
 

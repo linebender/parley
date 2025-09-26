@@ -7,6 +7,8 @@ pub struct InlineBox {
     /// User-specified identifier for the box, which can be used by the user to determine which box in
     /// parley's output corresponds to which box in its input.
     pub id: u64,
+    /// Whether the box is in-flow (takes up space in the layout) or out-of-flow (e.g. absolutely positioned or floated)
+    pub kind: InlineBoxKind,
     /// Whether layout should break on this box
     pub break_on_box: bool,
     /// The byte offset into the underlying text string at which the box should be placed.
@@ -16,4 +18,10 @@ pub struct InlineBox {
     pub width: f32,
     /// The height of the box in pixels
     pub height: f32,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum InlineBoxKind {
+    InFlow,
+    OutOfFlow,
 }
