@@ -44,7 +44,7 @@
 //! builder.push(StyleProperty::FontWeight(FontWeight::new(600.0)), 0..4);
 //!
 //! // Add a box to be laid out inline with the text
-//! builder.push_inline_box(InlineBox { id: 0, index: 5, width: 50.0, height: 50.0 });
+//! builder.push_inline_box(InlineBox { id: 0, break_on_box: false, index: 5, width: 50.0, height: 50.0 });
 //!
 //! // Build the builder into a Layout
 //! let mut layout: Layout<()> = builder.build(&TEXT);
@@ -125,7 +125,7 @@ pub use peniko::kurbo::Rect;
 pub use builder::{RangedBuilder, TreeBuilder};
 pub use context::LayoutContext;
 pub use font::FontContext;
-pub use inline_box::InlineBox;
+pub use inline_box::{InlineBox, InlineBoxKind};
 #[doc(inline)]
 pub use layout::Layout;
 
