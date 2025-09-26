@@ -17,7 +17,8 @@ use crate::layout::{
     LineMetrics, Run,
 };
 use crate::style::Brush;
-use crate::{OverflowWrap, TextWrapMode};
+use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
+use swash::text::cluster::Boundary;
 
 use core::ops::Range;
 
@@ -546,13 +547,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let item = &self.layout.data.inline_boxes[line_item.index];
 
                     // Advance is already computed in "commit line" for items
+                    if item.kind == InlineBoxKind::InFlow {
+                        // Default vertical alignment is to align the bottom of boxes with the text baseline.
+                        // This is equivalent to the entire height of the box being "ascent"
+                        line.metrics.ascent = line.metrics.ascent.max(item.height);
 
-                    // Default vertical alignment is to align the bottom of boxes with the text baseline.
-                    // This is equivalent to the entire height of the box being "ascent"
-                    line.metrics.ascent = line.metrics.ascent.max(item.height);
-
-                    // Mark us as having seen non-whitespace content on this line
-                    have_metrics = true;
+                        // Mark us as having seen non-whitespace content on this line
+                        have_metrics = true;
+                    }
                 }
                 LayoutItemKind::TextRun => {
                     line_item.compute_whitespace_properties(&self.layout.data);

@@ -10,7 +10,7 @@ use image::codecs::png::PngEncoder;
 use image::{self, Pixel, Rgba, RgbaImage};
 use parley::layout::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
 use parley::style::{FontStack, FontWeight, StyleProperty, TextStyle};
-use parley::{AlignmentOptions, FontContext, InlineBox, LayoutContext, LineHeight};
+use parley::{AlignmentOptions, FontContext, InlineBox, InlineBoxKind, LayoutContext, LineHeight};
 use std::fs::File;
 use swash::FontRef;
 use swash::scale::image::Content;
@@ -94,6 +94,7 @@ fn main() {
 
         builder.push_inline_box(InlineBox {
             id: 0,
+            kind: InlineBoxKind::InFlow,
             break_on_box: false,
             index: 0,
             width: 50.0,
@@ -104,6 +105,7 @@ fn main() {
 
         builder.push_inline_box(InlineBox {
             id: 1,
+            kind: InlineBoxKind::InFlow,
             break_on_box: false,
             index: 50,
             width: 50.0,
@@ -154,6 +156,7 @@ fn main() {
 
         builder.push_inline_box(InlineBox {
             id: 0,
+            kind: InlineBoxKind::InFlow,
             break_on_box: false,
             index: 40,
             width: 50.0,
@@ -161,6 +164,7 @@ fn main() {
         });
         builder.push_inline_box(InlineBox {
             id: 1,
+            kind: InlineBoxKind::InFlow,
             break_on_box: false,
             index: 50,
             width: 50.0,
