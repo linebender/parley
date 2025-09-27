@@ -294,7 +294,7 @@ impl Selection {
         let h_pos = self
             .h_pos
             .unwrap_or_else(|| self.focus.geometry(layout, 0.0).x0 as f32);
-        let y = line.metrics().max_coord - line.metrics().ascent * 0.5;
+        let y = line.metrics().block_max_coord - line.metrics().ascent * 0.5;
         let new_focus = Cursor::from_point(layout, h_pos, y);
         let h_pos = Some(h_pos);
         if extend {
@@ -531,8 +531,8 @@ impl Selection {
                 continue;
             };
             let metrics = line.metrics();
-            let line_min = metrics.min_coord as f64;
-            let line_max = metrics.max_coord as f64;
+            let line_min = metrics.block_min_coord as f64;
+            let line_max = metrics.block_max_coord as f64;
             // Trailing whitespace to indicate that the newline character at the
             // end of this line is selected. It's based on the ascent and
             // descent so it doesn't change with the line height.
