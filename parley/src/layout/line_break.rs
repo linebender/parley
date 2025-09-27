@@ -700,8 +700,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // Negative leadings are correct for baseline calculation, but not for min/max coords.
         // We clamp leading to zero for the purposes of min/max coords,
         // which in turn clamps the selection box minimum height to ascent + descent.
-        line.metrics.min_coord = line.metrics.baseline - ascent - leading_above.max(0.);
-        line.metrics.max_coord = line.metrics.baseline + descent + leading_below.max(0.);
+        line.metrics.block_min_coord = line.metrics.baseline - ascent - leading_above.max(0.);
+        line.metrics.block_max_coord = line.metrics.baseline + descent + leading_below.max(0.);
 
         self.state.committed_y += line.metrics.line_height as f64;
     }
