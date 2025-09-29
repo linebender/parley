@@ -10,7 +10,7 @@
 #![warn(unused_crate_dependencies)]
 #![warn(clippy::print_stdout, clippy::print_stderr)]
 // END LINEBENDER LINT SET
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(unsafe_code, reason = "We access platform libraries using ffi.")]
 #![allow(missing_docs, reason = "We have many as-yet undocumented items.")]
