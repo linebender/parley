@@ -29,7 +29,7 @@ pub use data::BreakReason;
 pub use glyph::Glyph;
 pub use layout::Layout;
 pub use line::{GlyphRun, Line, LineMetrics, PositionedInlineBox, PositionedLayoutItem};
-pub use line_break::{BoxBreakData, BreakLines, LineBreakData, YieldData};
+pub use line_break::{BoxBreakData, BreakLines, BreakerState, LineBreakData, YieldData};
 pub use run::{Run, RunMetrics};
 
 pub(crate) use data::{LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData};
