@@ -74,11 +74,14 @@ pub struct LineBreakData {
 }
 
 pub struct BoxBreakData {
-    pub inline_box_id: usize,
+    /// The user-supplied ID for the inline box
+    pub inline_box_id: u64,
+    // The index of the inline box within the inline_boxes `Vec`
+    pub inline_box_index: usize,
 }
 
 #[derive(Clone, Default)]
-struct BreakerState {
+pub struct BreakerState {
     /// The number of items that have been processed (used to revert state)
     items: usize,
     /// The number of lines that have been processed (used to revert state)
@@ -91,9 +94,16 @@ struct BreakerState {
     /// Iteration state: the current cluster (within the layout)
     cluster_idx: usize,
 
-    /// The y coordinate of the bottom of the last committed line (or else 0)
+    /// The x coordinate of the left/start of the current line
+    line_x: f32,
+    /// The y coordinate of the top/start of the current line
     /// Use of f64 here is important. f32 causes test failures due to accumulated error
-    committed_y: f64,
+    line_y: f64,
+
+    /// The max advance of the entire layout.
+    layout_max_advance: f32,
+    /// The max advance (max width) of the current line. This must be <= the `layout_max_advance`.
+    line_max_advance: f32,
 
     line: LineState,
     prev_boundary: Option<PrevBoundaryState>,
@@ -102,7 +112,7 @@ struct BreakerState {
 
 impl BreakerState {
     /// Add the cluster(s) currently being evaluated to the current line
-    fn append_cluster_to_line(&mut self, next_x: f32, clusters_height: f32) {
+    pub fn append_cluster_to_line(&mut self, next_x: f32, clusters_height: f32) {
         self.line.items.end = self.item_idx + 1;
         self.line.clusters.end = self.cluster_idx + 1;
         self.line.x = next_x;
@@ -112,7 +122,7 @@ impl BreakerState {
     }
 
     /// Add inline box to line
-    fn append_inline_box_to_line(&mut self, next_x: f32, box_height: f32) {
+    pub fn append_inline_box_to_line(&mut self, next_x: f32, box_height: f32) {
         // self.item_idx += 1;
         self.line.items.end += 1;
         self.line.x = next_x;
@@ -123,7 +133,7 @@ impl BreakerState {
 
     /// Store the current iteration state so that we can revert to it if we later want to take
     /// the line breaking opportunity at this point.
-    fn mark_line_break_opportunity(&mut self) {
+    pub fn mark_line_break_opportunity(&mut self) {
         self.prev_boundary = Some(PrevBoundaryState {
             item_idx: self.item_idx,
             run_idx: self.run_idx,
@@ -134,7 +144,7 @@ impl BreakerState {
 
     /// Store the current iteration state so that we can revert to it if we later want to take
     /// an *emergency* line breaking opportunity at this point.
-    fn mark_emergency_break_opportunity(&mut self) {
+    pub fn mark_emergency_break_opportunity(&mut self) {
         self.emergency_boundary = Some(PrevBoundaryState {
             item_idx: self.item_idx,
             run_idx: self.run_idx,
@@ -146,6 +156,28 @@ impl BreakerState {
     #[inline(always)]
     fn add_line_height(&mut self, height: f32) {
         self.line.running_line_height = self.line.running_line_height.max(height);
+    }
+
+    pub fn set_layout_max_advance(&mut self, advance: f32) {
+        self.layout_max_advance = advance;
+    }
+
+    pub fn set_line_max_advance(&mut self, advance: f32) {
+        self.line_max_advance = advance;
+    }
+
+    pub fn line_x(&self) -> f32 {
+        self.line_x
+    }
+    pub fn set_line_x(&mut self, x: f32) {
+        self.line_x = x;
+    }
+
+    pub fn line_y(&self) -> f64 {
+        self.line_y
+    }
+    pub fn set_line_y(&mut self, y: f64) {
+        self.line_y = y;
     }
 }
 
@@ -199,9 +231,35 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
     }
 
+    pub fn state(&self) -> &BreakerState {
+        &self.state
+    }
+
+    pub fn state_mut(&mut self) -> &mut BreakerState {
+        &mut self.state
+    }
+
+    /// Reverts the to an externally saved state.
+    pub fn revert_to(&mut self, state: BreakerState) {
+        self.state = state;
+        self.lines.lines.truncate(self.state.lines);
+        self.lines.line_items.truncate(self.state.items);
+        self.done = false;
+    }
+
+    /// Reverts the last computed line, returning to the previous state.
+    pub fn revert(&mut self) -> bool {
+        if let Some(state) = self.prev_state.take() {
+            self.revert_to(state);
+            true
+        } else {
+            false
+        }
+    }
+
     /// Returns the y-coordinate of the top of the current line
     pub fn committed_y(&self) -> f64 {
-        self.state.committed_y
+        self.state.line_y
     }
 
     /// Returns true if all the text has been placed into lines.
@@ -211,13 +269,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
     /// Computes the next line in the paragraph. Returns the advance and size
     /// (width and height for horizontal layouts) of the line.
-    pub fn break_next(&mut self, max_advance: f32) -> Option<YieldData> {
-        self.break_next_line_or_box(max_advance)
+    pub fn break_next(&mut self) -> Option<YieldData> {
+        self.break_next_line_or_box()
     }
 
     /// Computes the next line in the paragraph. Returns the advance and size
     /// (width and height for horizontal layouts) of the line.
-    fn break_next_line_or_box(&mut self, max_advance: f32) -> Option<YieldData> {
+    fn break_next_line_or_box(&mut self) -> Option<YieldData> {
         // Maintain iterator state
         if self.done {
             return None;
@@ -230,7 +288,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             if self.layout.data.text_len == 0 && self.layout.data.inline_boxes.is_empty() {
                 f32::MAX
             } else {
-                max_advance
+                self.state.line_max_advance
             };
 
         // This macro simply calls the `commit_line` with the provided arguments and some parts of self.
@@ -267,6 +325,15 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             match item.kind {
                 LayoutItemKind::InlineBox => {
                     let inline_box = &self.layout.data.inline_boxes[item.index];
+
+                    // If the box is marked as "break_on_box", then the assumption is that the caller will handle placement of the box.
+                    if inline_box.break_on_box {
+                        self.state.item_idx += 1;
+                        return Some(YieldData::InlineBoxBreak(BoxBreakData {
+                            inline_box_id: inline_box.id,
+                            inline_box_index: item.index,
+                        }));
+                    }
 
                     // Compute the x position of the content being currently processed
                     let next_x = self.state.line.x + inline_box.width;
@@ -473,19 +540,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         None
     }
 
-    /// Reverts the last computed line, returning to the previous state.
-    pub fn revert(&mut self) -> bool {
-        if let Some(state) = self.prev_state.take() {
-            self.state = state;
-            self.lines.lines.truncate(self.state.lines);
-            self.lines.line_items.truncate(self.state.items);
-            self.done = false;
-            true
-        } else {
-            false
-        }
-    }
-
     /// Breaks all remaining lines with the specified maximum advance. This
     /// consumes the line breaker.
     pub fn break_remaining(mut self, max_advance: f32) {
@@ -501,8 +555,17 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // }
 
         // println!("\nBREAK ALL");
-
-        while self.break_next(max_advance).is_some() {}
+        self.state.layout_max_advance = max_advance;
+        self.state.line_max_advance = max_advance;
+        while let Some(data) = self.break_next() {
+            match data {
+                YieldData::LineBreak(line_break_data) => {
+                    self.state.line_y += line_break_data.line_height as f64;
+                    continue;
+                }
+                YieldData::InlineBoxBreak(_) => continue,
+            }
+        }
         self.finish();
     }
 
@@ -699,7 +762,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             (line.metrics.leading * 0.5, line.metrics.leading * 0.5)
         };
 
-        let y = self.state.committed_y;
+        let y = self.state.line_y;
         line.metrics.baseline =
             ascent + leading_above + if quantize { y.round() as f32 } else { y as f32 };
 
@@ -710,7 +773,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.block_min_coord = line.metrics.baseline - ascent - leading_above.max(0.);
         line.metrics.block_max_coord = line.metrics.baseline + descent + leading_below.max(0.);
 
-        self.state.committed_y += line.metrics.line_height as f64;
+        line.metrics.inline_min_coord = self.state.line_x;
+        line.metrics.inline_max_coord = self.state.line_x + self.state.line_max_advance;
     }
 }
 
