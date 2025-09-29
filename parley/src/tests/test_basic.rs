@@ -12,7 +12,7 @@ use super::utils::{ColorBrush, FONT_STACK, TestEnv, asserts::assert_eq_layout_da
 use crate::setting::Setting;
 use crate::{
     Alignment, AlignmentOptions, ContentWidths, FontFamily, FontSettings, FontStack, InlineBox,
-    Layout, LineHeight, StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
+    InlineBoxKind, Layout, LineHeight, StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
 };
 
 #[test]
@@ -42,6 +42,7 @@ fn placing_inboxes() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
+            kind: InlineBoxKind::InFlow,
             break_on_box: false,
             index: position,
             width: 10.0,
@@ -63,6 +64,7 @@ fn only_inboxes_wrap() {
     for id in 0..10 {
         builder.push_inline_box(InlineBox {
             id,
+            kind: InlineBoxKind::InFlow,
             break_on_box: false,
             index: 0,
             width: 10.0,
@@ -85,6 +87,7 @@ fn full_width_inbox() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
+            kind: InlineBoxKind::InFlow,
             break_on_box: false,
             index: 1,
             width: 10.,
@@ -92,6 +95,7 @@ fn full_width_inbox() {
         });
         builder.push_inline_box(InlineBox {
             id: 1,
+            kind: InlineBoxKind::InFlow,
             break_on_box: false,
             index: 1,
             width,
@@ -99,6 +103,7 @@ fn full_width_inbox() {
         });
         builder.push_inline_box(InlineBox {
             id: 2,
+            kind: InlineBoxKind::InFlow,
             break_on_box: false,
             index: 2,
             width,
@@ -118,6 +123,7 @@ fn inbox_separated_by_whitespace() {
     let mut builder = env.tree_builder();
     builder.push_inline_box(InlineBox {
         id: 0,
+        kind: InlineBoxKind::InFlow,
         break_on_box: false,
         index: 0,
         width: 10.,
@@ -126,6 +132,7 @@ fn inbox_separated_by_whitespace() {
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
         id: 1,
+        kind: InlineBoxKind::InFlow,
         break_on_box: false,
         index: 1,
         width: 10.0,
@@ -134,6 +141,7 @@ fn inbox_separated_by_whitespace() {
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
         id: 2,
+        kind: InlineBoxKind::InFlow,
         break_on_box: false,
         index: 2,
         width: 10.0,
@@ -142,6 +150,7 @@ fn inbox_separated_by_whitespace() {
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
         id: 3,
+        kind: InlineBoxKind::InFlow,
         break_on_box: false,
         index: 3,
         width: 10.0,
@@ -424,6 +433,7 @@ fn inbox_content_width() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
+            kind: InlineBoxKind::InFlow,
             break_on_box: false,
             index: 3,
             width: 100.0,
@@ -445,6 +455,7 @@ fn inbox_content_width() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
+            kind: InlineBoxKind::InFlow,
             break_on_box: false,
             index: 2,
             width: 10.0,
