@@ -72,6 +72,7 @@ pub struct BoxBreakData {
     pub inline_box_id: u64,
     // The index of the inline box within the inline_boxes `Vec`
     pub inline_box_index: usize,
+    pub advance: f32,
 }
 
 #[derive(Clone, Default)]
@@ -326,6 +327,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         return Some(YieldData::InlineBoxBreak(BoxBreakData {
                             inline_box_id: inline_box.id,
                             inline_box_index: item.index,
+                            advance: self.state.line.x,
                         }));
                     }
 
