@@ -27,7 +27,7 @@ accesskit = ["dep:accesskit"]
 [dependencies]
 swash = { workspace = true }
 skrifa = { workspace = true }
-peniko = { workspace = true }
+linebender_resource_handle = { workspace = true }
 fontique = { workspace = true }
 core_maths = { version = "0.1.1", optional = true }
 accesskit = { workspace = true, optional = true }
@@ -36,4 +36,5 @@ harfrust = { workspace = true }
 
 [dev-dependencies]
 parley_dev = { workspace = true }
+peniko = { workspace = true }
 tiny-skia = "0.11.4"

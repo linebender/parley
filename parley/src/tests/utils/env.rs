@@ -5,8 +5,8 @@ use crate::tests::utils::renderer::{
     ColorBrush, RenderingConfig, render_layout, render_layout_with_clusters,
 };
 use crate::{
-    FontContext, FontFamily, FontStack, Layout, LayoutContext, LineHeight, PlainEditor,
-    PlainEditorDriver, RangedBuilder, Rect, StyleProperty, TextStyle, TreeBuilder,
+    BoundingBox, FontContext, FontFamily, FontStack, Layout, LayoutContext, LineHeight,
+    PlainEditor, PlainEditorDriver, RangedBuilder, StyleProperty, TextStyle, TreeBuilder,
 };
 use fontique::{Blob, Collection, CollectionOptions};
 use peniko::kurbo::Size;
@@ -298,8 +298,8 @@ impl TestEnv {
     pub(crate) fn render_and_check_snapshot(
         &mut self,
         layout: &Layout<ColorBrush>,
-        cursor_rect: Option<Rect>,
-        selection_rects: &[(Rect, usize)],
+        cursor_rect: Option<BoundingBox>,
+        selection_rects: &[(BoundingBox, usize)],
     ) {
         let current_img =
             render_layout(&self.rendering_config, layout, cursor_rect, selection_rects);

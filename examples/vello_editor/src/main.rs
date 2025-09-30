@@ -16,7 +16,6 @@ use anyhow::Result;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use ui_events_winit::{WindowEventReducer, WindowEventTranslation};
-use vello::kurbo;
 use vello::peniko::Color;
 use vello::util::{RenderContext, RenderSurface};
 use vello::wgpu;
@@ -100,7 +99,7 @@ struct SimpleVelloApp<'s> {
     last_drawn_generation: text::Generation,
 
     /// The IME cursor area we last sent to the platform.
-    last_sent_ime_cursor_area: kurbo::Rect,
+    last_sent_ime_cursor_area: parley::BoundingBox,
 
     /// The event loop proxy required by the AccessKit winit adapter.
     event_loop_proxy: EventLoopProxy<accesskit_winit::Event>,
@@ -405,7 +404,7 @@ fn main() -> Result<()> {
         scene: Scene::new(),
         editor: text::Editor::new(text::LOREM),
         last_drawn_generation: Default::default(),
-        last_sent_ime_cursor_area: kurbo::Rect::new(f64::NAN, f64::NAN, f64::NAN, f64::NAN),
+        last_sent_ime_cursor_area: parley::BoundingBox::new(f64::NAN, f64::NAN, f64::NAN, f64::NAN),
         event_loop_proxy: event_loop.create_proxy(),
         event_reducer: Default::default(),
     };

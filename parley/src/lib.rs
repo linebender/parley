@@ -119,8 +119,8 @@ pub mod style;
 #[cfg(test)]
 mod tests;
 
-pub use peniko::Font;
-pub use peniko::kurbo::Rect;
+pub use linebender_resource_handle::FontData as Font;
+pub use util::BoundingBox;
 
 pub use builder::{RangedBuilder, TreeBuilder};
 pub use context::LayoutContext;

@@ -6,11 +6,11 @@
 #[cfg(feature = "accesskit")]
 use super::LayoutAccessibility;
 use super::{Affinity, BreakReason, Brush, Cluster, ClusterSide, Layout, Line, LineItem};
+use crate::BoundingBox;
 #[cfg(feature = "accesskit")]
 use accesskit::TextPosition;
 use alloc::vec::Vec;
 use core::ops::Range;
-use peniko::kurbo::Rect;
 #[cfg(feature = "accesskit")]
 use swash::text::cluster::Whitespace;
 
@@ -278,7 +278,7 @@ impl Cursor {
     /// in layout space.
     ///
     /// The `width` parameter defines the width of the resulting rectangle.
-    pub fn geometry<B: Brush>(&self, layout: &Layout<B>, width: f32) -> Rect {
+    pub fn geometry<B: Brush>(&self, layout: &Layout<B>, width: f32) -> BoundingBox {
         match self.visual_clusters(layout) {
             [Some(left), Some(right)] => {
                 if left.is_end_of_line() {
@@ -903,7 +903,7 @@ impl Selection {
     /// lines to which they belong.
     ///
     /// This is a convenience method built on [`geometry_with`](Self::geometry_with).
-    pub fn geometry<B: Brush>(&self, layout: &Layout<B>) -> Vec<(Rect, usize)> {
+    pub fn geometry<B: Brush>(&self, layout: &Layout<B>) -> Vec<(BoundingBox, usize)> {
         let mut rects = Vec::new();
         self.geometry_with(layout, |rect, line_idx| rects.push((rect, line_idx)));
         rects
@@ -915,7 +915,11 @@ impl Selection {
     ///
     /// This avoids allocation if the intent is to render the rectangles
     /// immediately.
-    pub fn geometry_with<B: Brush>(&self, layout: &Layout<B>, mut f: impl FnMut(Rect, usize)) {
+    pub fn geometry_with<B: Brush>(
+        &self,
+        layout: &Layout<B>,
+        mut f: impl FnMut(BoundingBox, usize),
+    ) {
         const NEWLINE_WHITESPACE_WIDTH_RATIO: f64 = 0.25;
         if self.is_collapsed() {
             return;
@@ -969,7 +973,10 @@ impl Selection {
                                     cur_x += advance;
                                 } else {
                                     if cur_x != start_x {
-                                        f(Rect::new(start_x, line_min, cur_x, line_max), line_ix);
+                                        f(
+                                            BoundingBox::new(start_x, line_min, cur_x, line_max),
+                                            line_ix,
+                                        );
                                     }
                                     cur_x += advance;
                                     start_x = cur_x;
@@ -994,13 +1001,16 @@ impl Selection {
                     end_x += newline_whitespace;
                 }
                 if end_x != start_x {
-                    f(Rect::new(start_x, line_min, end_x, line_max), line_ix);
+                    f(
+                        BoundingBox::new(start_x, line_min, end_x, line_max),
+                        line_ix,
+                    );
                 }
             } else {
                 let x = metrics.offset as f64;
                 let width = metrics.advance as f64;
                 f(
-                    Rect::new(x, line_min, x + width + newline_whitespace, line_max),
+                    BoundingBox::new(x, line_min, x + width + newline_whitespace, line_max),
                     line_ix,
                 );
             }
@@ -1049,14 +1059,14 @@ enum AnchorBase {
     Line(Cursor, Cursor),
 }
 
-fn cursor_rect<B: Brush>(cluster: &Cluster<'_, B>, at_end: bool, size: f32) -> Rect {
+fn cursor_rect<B: Brush>(cluster: &Cluster<'_, B>, at_end: bool, size: f32) -> BoundingBox {
     let mut line_x = cluster.visual_offset().unwrap_or_default();
     if at_end {
         line_x += cluster.advance();
     }
     let line = cluster.line();
     let metrics = line.metrics();
-    Rect::new(
+    BoundingBox::new(
         line_x as f64,
         metrics.min_coord as f64,
         (line_x + size) as f64,
@@ -1064,17 +1074,17 @@ fn cursor_rect<B: Brush>(cluster: &Cluster<'_, B>, at_end: bool, size: f32) -> R
     )
 }
 
-fn last_line_cursor_rect<B: Brush>(layout: &Layout<B>, size: f32) -> Rect {
+fn last_line_cursor_rect<B: Brush>(layout: &Layout<B>, size: f32) -> BoundingBox {
     if let Some(line) = layout.get(layout.len().saturating_sub(1)) {
         let metrics = line.metrics();
-        Rect::new(
+        BoundingBox::new(
             0.0,
             metrics.min_coord as f64,
             size as f64,
             metrics.max_coord as f64,
         )
     } else {
-        Rect::default()
+        BoundingBox::default()
     }
 }
 
