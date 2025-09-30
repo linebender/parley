@@ -21,7 +21,6 @@ default = ["system"]
 std = [
     "fontique/std",
     "harfrust/std",
-    "linebender_resource_handle/std",
     "peniko/std",
     "skrifa/std",
     "swash/std",

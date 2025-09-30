@@ -17,7 +17,7 @@ workspace = true
 
 [features]
 default = ["system"]
-std = ["read-fonts/std", "linebender_resource_handle/std", "dep:memmap2"]
+std = ["read-fonts/std", "dep:memmap2"]
 libm = ["read-fonts/libm", "dep:core_maths"]
 icu_properties = ["dep:icu_properties"]
 unicode_script = ["dep:unicode-script"]
