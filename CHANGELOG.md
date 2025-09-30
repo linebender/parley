@@ -34,10 +34,14 @@ This release has an [MSRV] of 1.82.
 - `Alignment`` variants have been renamed to better match CSS. `Alignment::Justified` is now `Alignment::Justify` and `Alignment::Middle` is now `Alignment::Center`. ([#389][] by [@waywardmonkeys][])
 - Updated to `accesskit` 0.21. ([#390][] by [@mwcampbell][])
 - Uses `HarfRust` for text shaping ([[#400][] by [@taj-p][]).
+- Fontique no longer depends on `peniko` or `kurbo`:
+   - The use of `peniko::Font` has been replaced with `linebender_resource_handle::Font`. This is unlikely to affect users of the crate.
+   - The use of `kurbo::Rect` has been replaced with a new `parley::BoundingBox` type.
 
 #### Fontique
 
 - The fontconfig backend, used to enumerate system fonts on Linux, has been rewritten to call into the system's fontconfig library instead of parsing fontconfig's configuration files itself. This should significantly improve the behavior of system fonts and generic families on Linux. ([#378][] by [@valadaptive][])
+- Fontique no longer depends on `peniko`. The use of `peniko::Blob` has been replaced with `linebender_resource_handle::Blob`. This is unlikely to affect users of the crate.
 
 ### Fixed
 
