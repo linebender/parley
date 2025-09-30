@@ -285,7 +285,7 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                             glyph_start,
                             glyph_count,
                             offset: offset
-                                // + self.line.data.metrics.inline_min_coord
+                                + self.line.data.metrics.inline_min_coord
                                 + self.line.data.metrics.offset,
                             baseline: self.line.data.metrics.baseline,
                             advance,
