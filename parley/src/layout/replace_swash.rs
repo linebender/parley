@@ -1,9 +1,9 @@
-use crate::icu_working;
-
 /// The maximum number of characters in a single cluster.
 pub const MAX_CLUSTER_SIZE: usize = 32;
 
+#[derive(Debug)]
 pub(crate) struct CharCluster {
+    pub plain_text: String, // TODO(conor) temp
     pub info: ClusterInfo,
     pub chars: Vec<Char>, // [Char; MAX_CLUSTER_SIZE], TODO(conor)
     pub style_index: u16,
@@ -18,6 +18,7 @@ pub(crate) struct CharCluster {
     best_ratio: f32,
 }
 
+#[derive(Debug)]
 pub(crate) struct ClusterInfo {
     // Not used strictly in Parley:
     // - is_broken()
@@ -45,10 +46,12 @@ impl ClusterInfo {
     }*/
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct Char {
     /// The character.
     pub ch: char,
+    // Length of the character in code units (utf8 byte length)
+    pub len: u8, // TODO(conor) maybe just infer from `ch`?
     /// Offset of the character in code units.
     pub offset: u32,
     /// Shaping class of the character.
@@ -190,15 +193,24 @@ impl Default for ShapeClass {
 }*/
 
 impl CharCluster {
-    pub(crate) fn new(info: ClusterInfo, chars: Vec<Char>) -> Self {
+    pub(crate) fn new(
+        plain_text: String,
+        info: ClusterInfo,
+        chars: Vec<Char>,
+        len: u8,
+        map_len: u8,
+        start: u32,
+        end: u32
+    ) -> Self {
         CharCluster {
+            plain_text,
             info,
             chars,
             style_index: 0,
-            len: 0,
-            map_len: 0,
-            start: 0, // TODO(conor) + end
-            end: 0,
+            len,
+            map_len,
+            start,
+            end,
             force_normalize: false, // TODO(conor) ?
             comp: Form::new(),
             decomp: Form::new(),
@@ -207,17 +219,112 @@ impl CharCluster {
         }
     }
 
-    fn composed(&mut self) -> Option<&[Char]> {
-        unimplemented!();
+    fn decomposed(&mut self) -> Option<&[Char]> {
+        match self.decomp.state {
+            FormState::Invalid => None,
+            FormState::None => {
+                self.decomp.state = FormState::Invalid;
+
+                // Create a string from the original characters to normalize
+                let mut orig_str = String::with_capacity(self.len as usize * 4);
+                for ch in &self.chars[..self.len as usize] {
+                    orig_str.push(ch.ch);
+                }
+
+                // Get a normalizer for NFD (decomposed) form
+                let nfd = icu::normalizer::DecomposingNormalizerBorrowed::new_nfd();
+                let nfd_str = nfd.normalize(&orig_str);
+
+                // Copy the characters back to our form structure
+                let mut i = 0;
+                for c in nfd_str.chars() {
+                    if i == MAX_CLUSTER_SIZE {
+                        println!("[ICU decomposed] i == MAX_CLUSTER_SIZE None->Invalid: '{}'", Self::format_chars(&self.decomp.chars));
+                        return None;
+                    }
+
+                    // Use the first character as a template for other properties
+                    let mut copy = self.chars[0];
+                    copy.ch = c;
+                    self.decomp.chars[i] = copy;
+                    i += 1;
+                }
+
+                if i == 0 {
+                    println!("[ICU decomposed] i==0 None->Invalid: '{}'", Self::format_chars(&self.decomp.chars));
+                    return None;
+                }
+
+                self.decomp.len = i as u8;
+                println!("[ICU decomposed] None->Valid: '{}'", Self::format_chars(&self.decomp.chars));
+                self.decomp.state = FormState::Valid;
+                self.decomp.setup();
+                Some(self.decomp.chars())
+            }
+            FormState::Valid => Some(self.decomp.chars()),
+        }
     }
 
-    fn decomposed(&mut self) -> Option<&[Char]> {
-        unimplemented!();
+    fn composed(&mut self) -> Option<&[Char]> {
+        match self.comp.state {
+            FormState::Invalid => None,
+            FormState::None => {
+                // First, we need decomposed characters
+                if self.decomposed().map(|chars| chars.len()).unwrap_or(0) == 0 {
+                    self.comp.state = FormState::Invalid;
+                    println!("[ICU composed] None->Invalid");
+                    return None;
+                }
+                
+                self.comp.state = FormState::Invalid;
+                
+                // Create a string from the decomposed characters to normalize
+                let mut decomp_str = String::with_capacity(self.decomp.len as usize * 4);
+                for ch in &self.decomp.chars()[..self.decomp.len as usize] {
+                    decomp_str.push(ch.ch);
+                }
+                
+                // Get a normalizer for NFC (composed) form
+                let nfc = icu::normalizer::ComposingNormalizerBorrowed::new_nfc();
+                let nfc_str = nfc.normalize(&decomp_str);
+                
+                // Copy the characters back to our form structure
+                let mut i = 0;
+                for c in nfc_str.chars() {
+                    if i >= MAX_CLUSTER_SIZE {
+                        self.comp.state = FormState::Invalid;
+                        return None;
+                    }
+                    
+                    // Use the first decomposed character as a template for other properties
+                    let mut ch_copy = self.decomp.chars[0];
+                    ch_copy.ch = c;
+                    self.comp.chars[i] = ch_copy;
+                    i += 1;
+                }
+                
+                if i == 0 {
+                    return None;
+                }
+                
+                self.comp.len = i as u8;
+                println!("[ICU composed] None->Valid: '{}'", Self::format_chars(&self.comp.chars));
+                self.comp.state = FormState::Valid;
+                self.comp.setup();
+                Some(self.comp.chars())
+            }
+            FormState::Valid => Some(self.comp.chars()),
+        }
+    }
+
+    pub fn format_chars(chars: &[Char]) -> String {
+        chars.iter().map(|&ch| ch.ch).collect::<String>()
     }
 
     pub fn map(&mut self, f: impl Fn(char) -> GlyphId) -> Status {
         let len = self.len;
         if len == 0 {
+            println!("[ICU MAP CharCluster] returning Status::Complete (len == 0)");
             return Status::Complete;
         }
         let mut glyph_ids = [0u16; MAX_CLUSTER_SIZE];
@@ -226,9 +333,12 @@ impl CharCluster {
         if self.force_normalize && self.composed().is_some() {
             ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
+                println!("[ICU MAP CharCluster] updating self.best_ratio: {} -> {}", self.best_ratio, ratio);
                 self.best_ratio = ratio;
+                println!("[ICU MAP CharCluster] updating self.form to FormKind::NFC");
                 self.form = FormKind::NFC;
                 if ratio >= 1. {
+                    println!("[ICU MAP CharCluster] returning Status::Complete (NFC ratio >= 1.0)");
                     return Status::Complete;
                 }
             }
@@ -239,41 +349,52 @@ impl CharCluster {
         }
             .map(&f, &mut glyph_ids, self.best_ratio);
         if ratio > self.best_ratio {
+            println!("[ICU MAP CharCluster] updating self.best_ratio: {} -> {}", self.best_ratio, ratio);
             self.best_ratio = ratio;
+            println!("[ICU MAP CharCluster] updating self.form to FormKind::Original");
             self.form = FormKind::Original;
             if ratio >= 1. {
+                println!("[ICU MAP CharCluster] returning Status::Complete (Original ratio >= 1.0)");
                 return Status::Complete;
             }
         }
         if len > 1 && self.decomposed().is_some() {
             ratio = self.decomp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
+                println!("[ICU MAP CharCluster] updating self.best_ratio: {} -> {}", self.best_ratio, ratio);
                 self.best_ratio = ratio;
+                println!("[ICU MAP CharCluster] updating self.form to FormKind::NFD");
                 self.form = FormKind::NFD;
                 if ratio >= 1. {
+                    println!("[ICU MAP CharCluster] returning Status::Complete (NFD ratio >= 1.0)");
                     return Status::Complete;
                 }
             }
             if !self.force_normalize && self.composed().is_some() {
                 ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
                 if ratio > self.best_ratio {
+                    println!("[ICU MAP CharCluster] updating self.best_ratio: {} -> {}", self.best_ratio, ratio);
                     self.best_ratio = ratio;
+                    println!("[ICU MAP CharCluster] updating self.form to FormKind::NFC");
                     self.form = FormKind::NFC;
                     if ratio >= 1. {
+                        println!("[ICU MAP CharCluster] returning Status::Complete (NFC late ratio >= 1.0)");
                         return Status::Complete;
                     }
                 }
             }
         }
         if self.best_ratio > prev_ratio {
+            println!("[ICU MAP CharCluster] returning Status::Keep");
             Status::Keep
         } else {
+            println!("[ICU MAP CharCluster] returning Status::Discard");
             Status::Discard
         }
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[allow(clippy::upper_case_acronyms)]
 enum FormKind {
     Original,
@@ -281,14 +402,14 @@ enum FormKind {
     NFC,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum FormState {
     None,
     Valid,
     Invalid,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 struct Form {
     pub chars: [Char; MAX_CLUSTER_SIZE],
     pub len: u8,
@@ -352,13 +473,16 @@ impl<'a> Mapper<'a> {
         best_ratio: f32,
     ) -> f32 {
         if self.map_len == 0 {
+            println!("[ICU MAP Mapper] returning 1.0 (map_len == 0)");
             return 1.;
         }
         let mut mapped = 0;
+        println!("[ICU MAP Mapper] chars: {:?}", self.chars);
         for (c, g) in self.chars.iter().zip(glyphs.iter_mut()) {
             if !c.contributes_to_shaping {
                 *g = f(c.ch);
                 if self.map_len == 1 {
+                    println!("[ICU MAP Mapper] ch:{}, ch(uni): {}, gid:{}, mapped++", c.ch, c.ch.escape_unicode(), *g);
                     mapped += 1;
                 }
             } else {
@@ -366,24 +490,30 @@ impl<'a> Mapper<'a> {
                 *g = gid;
                 if gid != 0 {
                     mapped += 1;
+                    println!("[ICU MAP Mapper] ch:{}, ch(uni): {}, gid:{}, mapped++", c.ch, c.ch.escape_unicode(), gid);
+                } else {
+                    println!("[ICU MAP Mapper] ch:{}, ch(uni): {}, gid:{}, not touching `mapped`", c.ch, c.ch.escape_unicode(), gid);
                 }
             }
         }
         let ratio = mapped as f32 / self.map_len as f32;
         if ratio > best_ratio {
+            println!("[ICU MAP Mapper] updating chars glyph_ids (ratio {} > best_ratio {})", ratio, best_ratio);
             for (ch, glyph) in self.chars.iter_mut().zip(glyphs) {
                 ch.glyph_id = *glyph;
             }
         }
+        println!("[ICU MAP Mapper] returning ratio: {}", ratio);
         ratio
     }
 }
 
 const DEFAULT_CHAR: Char = Char {
     ch: ' ',
+    len: 0,
+    offset: 0,
     is_control_character: false,
     contributes_to_shaping: true,
     glyph_id: 0,
     data: 0,
-    offset: 0,
 };

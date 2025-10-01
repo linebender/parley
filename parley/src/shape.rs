@@ -21,6 +21,7 @@ use crate::{Font, swash_convert, layout, icu_working};
 use fontique::{self, Query, QueryFamily, QueryFont};
 use swash::text::cluster::{CharCluster, CharInfo, Status, Token};
 use swash::text::{Language, Script};
+use unicode_bidi::TextSource;
 use crate::replace_swash::ClusterInfo;
 
 pub(crate) struct ShapeContext {
@@ -278,6 +279,7 @@ fn shape_item<'a, B: Brush>(
     infos_icu: &[(icu_working::CharInfo, u16)],
     layout: &mut Layout<B>,
 ) {
+    println!("text: '{}', text_range: {:?}, char_range: {:?}", text, text_range, char_range);
     // Swash
     let item_text = &text[text_range.clone()];
     let item_infos = &infos[char_range.start..char_range.end]; // Only process current item
@@ -327,12 +329,13 @@ fn shape_item<'a, B: Brush>(
     let segmenter = GraphemeClusterSegmenter::new();
     let clusters = segmenter.segment_str(item_text);
     let mut last = 0;
-    let mut segments = vec![];
-    for boundary in clusters {
+    let mut char_clusters_icu = vec![];
+    let mut code_unit_offset_in_string = 0;
+    for boundary in clusters.skip(1) { // First boundary index is always zero
         let segment_text = &text[last..boundary];
 
         // For simple single-character emojis
-        let mut chars = segment_text.chars();
+        //let mut chars = segment_text.chars();
         let is_emoji = {
             is_emoji_grapheme(segment_text)
             // TODO(conor) more performant for single-chars, adopt mix of this and `is_emoji_grapheme`
@@ -345,29 +348,52 @@ fn shape_item<'a, B: Brush>(
                 is_emoji_grapheme(segment_text)
             }*/
         };
-        println!("[icu] {} is_emoji: {:?}", segment_text, is_emoji);
+        println!("[icu] '{}' is_emoji: {:?}", segment_text, is_emoji);
+
+        //let chars = segment_text.chars();
+        let mut len = 0;
+        let mut map_len = 0;
+        let start = code_unit_offset_in_string;
+        let chars = segment_text.char_indices().map(|(index, ch)| {
+            // TODO(conor) move back to analysis
+            let script = CodePointMapDataBorrowed::<icu_properties::props::Script>::new().get(ch);
+            let general_category = CodePointMapDataBorrowed::<GeneralCategory>::new().get(ch);
+
+            let contributes_to_shaping = !matches!(general_category, GeneralCategory::Control) || (matches!(general_category, GeneralCategory::Format) &&
+                !matches!(script, icu_properties::props::Script::Inherited));
+            map_len += contributes_to_shaping as u8;
+            len += 1;
+
+            let ch_len = ch.len_utf8();
+            code_unit_offset_in_string += ch_len;
+
+            let char = layout::replace_swash::Char {
+                ch,
+                len: ch_len as u8,
+                offset: (start + index) as u32,
+                contributes_to_shaping,
+                glyph_id: 0, // TODO(conor) - correct to default to zero?
+                data: 0, // TODO(conor) - needed?
+                is_control_character: matches!(general_category, GeneralCategory::Control),
+            };
+            println!("[icu - CharCluster] Made char: {:?}", char);
+            char
+        }).collect();
+        let end = code_unit_offset_in_string;
 
         let cluster_icu = layout::replace_swash::CharCluster::new(
+            segment_text.to_string(),
             ClusterInfo {
                 is_emoji
             },
-            chars.map(|ch| {
-                // TODO(conor) move back to analysis
-                let script = CodePointMapDataBorrowed::<icu_properties::props::Script>::new().get(ch);
-                let general_category = CodePointMapDataBorrowed::<GeneralCategory>::new().get(ch);
-                layout::replace_swash::Char {
-                    ch,
-                    offset: ch.len_utf8() as u32, // TODO(conor) - needed?
-                    contributes_to_shaping:
-                        matches!(general_category, GeneralCategory::Control) || (matches!(general_category, GeneralCategory::Format) &&
-                            !matches!(script, icu_properties::props::Script::Inherited)),
-                    glyph_id: 0, // TODO(conor) - correct to default to zero?
-                    data: 0, // TODO(conor) - needed?
-                    is_control_character: matches!(general_category, GeneralCategory::Control),
-                }
-            }).collect());
+            chars,
+            len,
+            map_len,
+            start as u32,
+            end as u32,
+        );
 
-        segments.push(cluster_icu);
+        char_clusters_icu.push(cluster_icu);
         //println!("cluster: {:?}", &text[last..boundary]);
         last = boundary;
     }
@@ -394,7 +420,15 @@ fn shape_item<'a, B: Brush>(
     }
     //print_cluster(cluster);
 
+    let mut first_cluster_icu = char_clusters_icu.first_mut().expect("first icu cluster");
+
+    println!("Calling select_font, site A");
+
+    let mut current_font_icu = font_selector.select_font_icu(&mut first_cluster_icu);
+    println!("END site A");
+
     let mut current_font = font_selector.select_font(&mut cluster);
+    //println!("END site A");
 
     // Main segmentation loop (based on swash shape_clusters) - only within current item
     while let Some(font) = current_font.take() {
@@ -411,6 +445,7 @@ fn shape_item<'a, B: Brush>(
             }
             print_cluster(cluster);
 
+            println!("Calling select_font, site B");
             if let Some(next_font) = font_selector.select_font(&mut cluster) {
                 if next_font != font {
                     current_font = Some(next_font);
@@ -600,7 +635,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             features,
         }
     }
-    
+
     fn select_font_icu(&mut self, cluster: &mut crate::replace_swash::CharCluster) -> Option<SelectedFont> {
         let style_index = cluster.style_index;
         println!("[select_font] cluster: '{}'", cluster.chars.iter().map(|ch| ch.ch).collect::<String>());
@@ -646,14 +681,16 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
 
             let charmap = font_ref.charmap();
             let map_status: crate::replace_swash::Status = cluster.map(|ch| {
-                charmap
+                let glyph_id = charmap
                     .map(ch)
                     .map(|g| {
                         g.to_u32()
                             .try_into()
                             .expect("Swash requires u16 glyph, so we hope that the glyph fits")
                     })
-                    .unwrap_or_default()
+                    .unwrap_or_default();
+                println!("[ICU GLYPH MAPPING] mapped char '{}' ({}) to gid:, {}", ch, ch.escape_unicode(), glyph_id);
+                glyph_id
             });
 
             match map_status {
@@ -721,14 +758,16 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
 
             let charmap = font_ref.charmap();
             let map_status: Status = cluster.map(|ch| {
-                charmap
+                let result = charmap
                     .map(ch)
                     .map(|g| {
                         g.to_u32()
                             .try_into()
                             .expect("Swash requires u16 glyph, so we hope that the glyph fits")
                     })
-                    .unwrap_or_default()
+                    .unwrap_or_default();
+                println!("[SWASH GLYPH MAPPING] mapped char '{}' ({}) to gid:, {}", ch, ch.escape_unicode(), result);
+                result
             });
 
             match map_status {
