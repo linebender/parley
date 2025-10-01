@@ -8,7 +8,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-vello = "0.5.0"
+vello = {git = "https://github.com/linebender/vello", rev = "3ff54c9"}
 anyhow = "1.0.98"
 pollster = "0.4.0"
 ui-events = "0.1"
