@@ -200,7 +200,8 @@ impl CharCluster {
         len: u8,
         map_len: u8,
         start: u32,
-        end: u32
+        end: u32,
+        force_normalize: bool,
     ) -> Self {
         CharCluster {
             plain_text,
@@ -211,7 +212,7 @@ impl CharCluster {
             map_len,
             start,
             end,
-            force_normalize: false, // TODO(conor) ?
+            force_normalize,
             comp: Form::new(),
             decomp: Form::new(),
             form: FormKind::Original,

@@ -10,7 +10,7 @@ use core::ops::RangeInclusive;
 use alloc::vec::Vec;
 use icu::segmenter::GraphemeClusterSegmenter;
 use icu_properties::{CodePointMapDataBorrowed, CodePointSetData, EmojiSetData};
-use icu_properties::props::{BasicEmoji, Emoji, ExtendedPictographic, GeneralCategory, VariationSelector};
+use icu_properties::props::{BasicEmoji, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, VariationSelector};
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
@@ -253,6 +253,7 @@ fn is_emoji_grapheme(grapheme: &str) -> bool {
     let mut has_zwj = false;
 
     for ch in grapheme.chars() {
+        // TODO(conor) use icu (GraphemeClusterBreak::ZWJ)?
         if ch == '\u{200D}' {
             has_zwj = true;
         }
@@ -265,6 +266,21 @@ fn is_emoji_grapheme(grapheme: &str) -> bool {
     // characters and ZWJ, it's likely an emoji ZWJ sequence.
     has_emoji && has_zwj
 }
+
+/*fn shape_item_icu<'a, B: Brush>(
+    fq: &mut Query<'a>,
+    rcx: &'a ResolveContext,
+    styles: &'a [RangedStyle<B>],
+    item: &Item,
+    scx: &mut ShapeContext,
+    text: &str,
+    text_range: &core::ops::Range<usize>,
+    char_range: &core::ops::Range<usize>,
+    infos: &[(icu_working::CharInfo, u16)],
+    layout: &mut Layout<B>,
+) {
+
+}*/
 
 fn shape_item<'a, B: Brush>(
     fq: &mut Query<'a>,
@@ -279,9 +295,9 @@ fn shape_item<'a, B: Brush>(
     infos_icu: &[(icu_working::CharInfo, u16)],
     layout: &mut Layout<B>,
 ) {
-    println!("text: '{}', text_range: {:?}, char_range: {:?}", text, text_range, char_range);
     // Swash
     let item_text = &text[text_range.clone()];
+    println!("[shape_item ENTRY] item_text: '{}', text: '{}', text_range: {:?}, char_range: {:?}", item_text, text, text_range, char_range);
     let item_infos = &infos[char_range.start..char_range.end]; // Only process current item
     let first_style_index = item_infos[0].1;
     let mut font_selector =
@@ -289,6 +305,7 @@ fn shape_item<'a, B: Brush>(
 
     // ICU
     let item_infos_icu = &infos_icu[char_range.start..char_range.end]; // Only process current item
+    println!("item_infos_icu: {:?}", item_infos_icu);
     let first_style_index_icu = item_infos[0].1;
 
     // Parse text into clusters of the current item
@@ -328,11 +345,14 @@ fn shape_item<'a, B: Brush>(
     //println!("segmenting item_text: '{}'", item_text);
     let segmenter = GraphemeClusterSegmenter::new();
     let clusters = segmenter.segment_str(item_text);
+    let clusters_2 = segmenter.segment_str(item_text);
     let mut last = 0;
     let mut char_clusters_icu = vec![];
     let mut code_unit_offset_in_string = 0;
+    println!("Clusters for item text: {}: {:?}", item_text, clusters_2.map(|c| c.to_string()).collect::<Vec<String>>());
     for boundary in clusters.skip(1) { // First boundary index is always zero
-        let segment_text = &text[last..boundary];
+        println!("boundary: {}", boundary);
+        let segment_text = &item_text[last..boundary];
 
         // For simple single-character emojis
         //let mut chars = segment_text.chars();
@@ -353,11 +373,19 @@ fn shape_item<'a, B: Brush>(
         //let chars = segment_text.chars();
         let mut len = 0;
         let mut map_len = 0;
+        let mut force_normalize = false;
         let start = code_unit_offset_in_string;
         let chars = segment_text.char_indices().map(|(index, ch)| {
             // TODO(conor) move back to analysis
             let script = CodePointMapDataBorrowed::<icu_properties::props::Script>::new().get(ch);
             let general_category = CodePointMapDataBorrowed::<GeneralCategory>::new().get(ch);
+            //let general_category = CodePointMapDataBorrowed::<GraphemeClusterBreak>::new().get(ch);
+
+            // TODO(conor) complete this:
+            // "Extend" break chars should be normalized first, with two exceptions
+            /*force_normalize = is_extend(char) && !is_zwnj(char) && !is_variation_selector(char);
+            // All spacing mark break chars should be normalized first.
+            force_normalize |= is_spacing_mark(char);*/
 
             let contributes_to_shaping = !matches!(general_category, GeneralCategory::Control) || (matches!(general_category, GeneralCategory::Format) &&
                 !matches!(script, icu_properties::props::Script::Inherited));
@@ -391,6 +419,7 @@ fn shape_item<'a, B: Brush>(
             map_len,
             start as u32,
             end as u32,
+            force_normalize
         );
 
         char_clusters_icu.push(cluster_icu);

@@ -1,7 +1,7 @@
 use swash::text::cluster::Boundary;
 use crate::bidi::BidiLevel;
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CharInfo {
     // TODO(conor) - Shift attribute comments up from `impl CharInfo`
     pub boundary: Boundary,
