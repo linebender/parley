@@ -23,14 +23,14 @@ repository = "https://github.com/linebender/parley"
 
 [workspace.dependencies]
 accesskit = "0.21.0"
-bytemuck = { version = "1.23.0", default-features = false }
+bytemuck = { version = "1.23.2", default-features = false }
 fontique = { version = "0.5.0", default-features = false, path = "fontique" }
 harfrust = { version = "0.3.1", default-features = false }
-hashbrown = "0.15.3"
-linebender_resource_handle = { version = "0.1.0", default-features = false }
+hashbrown = "0.15.5"
+linebender_resource_handle = { version = "0.1.1", default-features = false }
 parley = { version = "0.5.0", default-features = false, path = "parley" }
 parley_dev = { version = "0.0.0", default-features = false, path = "parley_dev" }
-peniko = { version = "0.4.0", default-features = false }
+peniko = { version = "0.4.1", default-features = false }
 skrifa = { version = "0.37.0", default-features = false }
 read-fonts = { version = "0.35.0", default-features = false }
 swash = { version = "0.2.6", default-features = false }
