@@ -38,11 +38,11 @@ system = [
 bytemuck = { workspace = true }
 read-fonts = { workspace = true }
 linebender_resource_handle = { workspace = true }
-smallvec = "1.15.0"
-memmap2 = { version = "0.9.5", optional = true }
+smallvec = "1.15.1"
+memmap2 = { version = "0.9.8", optional = true }
 unicode-script = { version = "0.5.7", optional = true }
 core_maths = { version = "0.1.1", optional = true }
-icu_properties = { version = "2.0.0", optional = true }
+icu_properties = { version = "2.0.1", optional = true }
 icu_locale_core = { version = "2.0.0", default-features = false, features = ["alloc"] }
 hashbrown = { workspace = true }
 
@@ -55,7 +55,7 @@ windows-core = { version = "0.58.0", optional = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
 # FIX: Enable relax-sign-encoding to prevent the bug described in this issue: https://github.com/madsmtm/objc2/issues/566
-objc2 = { version = "0.6.1", optional = true, features = ["std", "relax-sign-encoding"] }
+objc2 = { version = "0.6.2", optional = true, features = ["std", "relax-sign-encoding"] }
 # NOTE: When updating objc2-foundation, objc2-core-foundation, or objc2-core-text make sure to use the version of objc2
 # that they reference to prevent crate duplication.
 objc2-foundation = { version = "0.3.1", optional = true, default-features = false, features = [
