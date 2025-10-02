@@ -49,6 +49,15 @@ pub struct CollectionOptions {
     ///
     /// The default value is `true`.
     pub system_fonts: bool,
+    #[cfg(feature = "std")]
+    /// If true, the source cache will use a secondary shared cache
+    /// guaranteeing that all clones will use the same backing store.
+    ///
+    /// This is useful for ensuring that only one copy of font data is
+    /// loaded into memory in multi-threaded scenarios.
+    ///
+    /// The default value is `false`.
+    pub shared_source_cache: bool,
 }
 
 impl Default for CollectionOptions {
@@ -56,6 +65,8 @@ impl Default for CollectionOptions {
         Self {
             shared: false,
             system_fonts: true,
+            #[cfg(feature = "std")]
+            shared_source_cache: false,
         }
     }
 }
@@ -65,6 +76,7 @@ impl Default for CollectionOptions {
 pub struct Collection {
     inner: Inner,
     query_state: query::QueryState,
+    source_cache: SourceCache,
 }
 
 impl Collection {
@@ -81,6 +93,9 @@ impl Collection {
         Self {
             inner: Inner::new(options),
             query_state: Default::default(),
+            source_cache: SourceCache::new(crate::SourceCacheOptions {
+                shared: options.shared_source_cache,
+            }),
         }
     }
 
@@ -169,8 +184,8 @@ impl Collection {
     }
 
     /// Returns an object for selecting fonts from this collection.
-    pub fn query<'a>(&'a mut self, source_cache: &'a mut SourceCache) -> Query<'a> {
-        Query::new(self, source_cache)
+    pub fn query<'a>(&'a mut self) -> Query<'a> {
+        Query::new(self)
     }
 
     /// Registers all fonts that exist in the given data.
