@@ -10,10 +10,10 @@ use std::marker::PhantomData;
 use icu::collections::codepointtrie::TrieValue;
 use icu::normalizer::{ComposingNormalizerBorrowed, DecomposingNormalizerBorrowed};
 use icu::properties::props::BidiClass;
-use icu::segmenter::{LineSegmenter, LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed};
+use icu::segmenter::{GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter, LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed};
 use icu::segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakInvariantOptions};
-use icu_properties::CodePointMapDataBorrowed;
-use icu_properties::props::{LineBreak, Script};
+use icu_properties::{CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed, EmojiSetData, EmojiSetDataBorrowed};
+use icu_properties::props::{BasicEmoji, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, RegionalIndicator, Script, VariationSelector};
 use self::tree::TreeStyleBuilder;
 
 use super::{icu_working, FontContext};
@@ -30,10 +30,19 @@ use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
 use crate::shape::ShapeContext;
 
-struct AnalysisDataSources {
+pub(crate) struct AnalysisDataSources {
+    pub(crate) grapheme_segmenter: GraphemeClusterSegmenterBorrowed<'static>,
+    pub(crate) variation_selector: CodePointSetDataBorrowed<'static>,
+    pub(crate) basic_emoji: EmojiSetDataBorrowed<'static>,
+    pub(crate) emoji: CodePointSetDataBorrowed<'static>,
+    pub(crate) extended_pictographic: CodePointSetDataBorrowed<'static>,
+    pub(crate) regional_indicator: CodePointSetDataBorrowed<'static>,
+
     script: CodePointMapDataBorrowed::<'static, Script>,
+    general_category: CodePointMapDataBorrowed::<'static, GeneralCategory>,
     bidi_class: CodePointMapDataBorrowed::<'static, BidiClass>,
     line_break: CodePointMapDataBorrowed::<'static, LineBreak>,
+    grapheme_cluster_break: CodePointMapDataBorrowed::<'static, GraphemeClusterBreak>,
     word_segmenter: WordSegmenterBorrowed<'static>,
     // Key: icu_segmenter::line::LineBreakWordOption as u8
     line_segmenters: HashMap<u8, LineSegmenterBorrowed<'static>>,
@@ -42,9 +51,17 @@ struct AnalysisDataSources {
 impl AnalysisDataSources {
     fn new() -> Self {
         Self {
+            grapheme_segmenter: GraphemeClusterSegmenter::new(),
+            variation_selector: CodePointSetData::new::<VariationSelector>(),
+            basic_emoji: EmojiSetData::new::<BasicEmoji>(),
+            emoji: CodePointSetData::new::<Emoji>(),
+            extended_pictographic: CodePointSetData::new::<ExtendedPictographic>(),
+            regional_indicator: CodePointSetData::new::<RegionalIndicator>(),
             script: CodePointMapDataBorrowed::<Script>::new(),
+            general_category: CodePointMapDataBorrowed::<GeneralCategory>::new(),
             bidi_class: CodePointMapDataBorrowed::<BidiClass>::new(),
             line_break: CodePointMapDataBorrowed::<LineBreak>::new(),
+            grapheme_cluster_break: CodePointMapDataBorrowed::<GraphemeClusterBreak>::new(),
             word_segmenter: WordSegmenter::new_auto(WordBreakInvariantOptions::default()),
             line_segmenters: HashMap::new(),
         }
@@ -68,7 +85,8 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) info_icu: Vec<(icu_working::CharInfo, u16)>,
     pub(crate) scx: ShapeContext,
 
-    unicode_data_sources: AnalysisDataSources,
+    // Unicode analysis data sources (provided by icu)
+    pub(crate) analysis_data_sources: AnalysisDataSources,
 }
 
 impl<B: Brush> LayoutContext<B> {
@@ -81,7 +99,7 @@ impl<B: Brush> LayoutContext<B> {
             ranged_style_builder: RangedStyleBuilder::default(),
             tree_style_builder: TreeStyleBuilder::default(),
             info: vec![],
-            unicode_data_sources: AnalysisDataSources::new(),
+            analysis_data_sources: AnalysisDataSources::new(),
             info_icu: vec![],
             scx: ShapeContext::default(),
         }
@@ -290,7 +308,7 @@ impl<B: Brush> LayoutContext<B> {
         let mut all_boundaries_byte_indexed = vec![Boundary::None; text.len()];
 
         // Word boundaries:
-        for wb in self.unicode_data_sources.word_segmenter.segment_str(text) {
+        for wb in self.analysis_data_sources.word_segmenter.segment_str(text) {
             // icu produces a word boundary trailing the string, which we don't use.
             if wb == text.len() {
                 continue;
@@ -319,7 +337,7 @@ impl<B: Brush> LayoutContext<B> {
             //line_break_opts.content_locale = ?
 
             let word_break_strength = swash_to_icu_lb(word_break_strength);
-            let line_segmenter = &mut self.unicode_data_sources.line_segmenters.entry(word_break_strength as u8).or_insert({
+            let line_segmenter = &mut self.analysis_data_sources.line_segmenters.entry(word_break_strength as u8).or_insert({
                 let mut line_break_opts: LineBreakOptions<'static> = Default::default();
                 line_break_opts.word_option = Some(word_break_strength);
                 LineSegmenter::new_auto(line_break_opts)
@@ -371,7 +389,7 @@ impl<B: Brush> LayoutContext<B> {
         }
 
         // BiDi embedding levels:
-        let bidi_info = unicode_bidi::BidiInfo::new_with_data_source(&self.unicode_data_sources.bidi_class, text, None);
+        let bidi_info = unicode_bidi::BidiInfo::new_with_data_source(&self.analysis_data_sources.bidi_class, text, None);
         let full_text_range = 0..text.len();
         let paragraph = ParagraphInfo {
             range: full_text_range.clone(),
@@ -413,14 +431,17 @@ impl<B: Brush> LayoutContext<B> {
         });*/
 
         boundaries_and_levels_iter
-            .zip(unicode_data_iterator(text, self.unicode_data_sources.script))
+            .zip(text.chars())
+            .zip(unicode_data_iterator(text, self.analysis_data_sources.script))
+            .zip(unicode_data_iterator(text, self.analysis_data_sources.general_category))
+            .zip(unicode_data_iterator(text, self.analysis_data_sources.grapheme_cluster_break))
             // Shift line break data forward one, as line boundaries corresponding with line-breaking
             // characters (like '\n') exist at an index position one higher than the respective
             // character's index, but we need our iterators to align, and the rest are simply
             // character-indexed.
             // TODO(conor) have data iterator not resolve value unless its needed (line break data not always used)
-            .zip(std::iter::once(LineBreak::from_icu4c_value(0)).chain(unicode_data_iterator(text, self.unicode_data_sources.line_break)))
-            .for_each(|(((boundary, embed_level), script), line_break)| {
+            .zip(std::iter::once(LineBreak::from_icu4c_value(0)).chain(unicode_data_iterator(text, self.analysis_data_sources.line_break)))
+            .for_each(|(((((((boundary, embed_level), ch), script)), general_category), grapheme_cluster_break), line_break)| {
                 let embed_level: BidiLevel = (*embed_level).into();
                 let swash_script: swash::text::Script = script_from_u8(script.to_icu4c_value() as u8).unwrap();
                 let boundary = if is_mandatory_line_break(line_break) {
@@ -429,7 +450,7 @@ impl<B: Brush> LayoutContext<B> {
                     *boundary
                 };
                 self.info_icu.push((
-                    icu_working::CharInfo::new(boundary, embed_level, swash_script),
+                    icu_working::CharInfo::new(ch, boundary, embed_level, swash_script, script, general_category, grapheme_cluster_break),
                     0
                 ));
             });

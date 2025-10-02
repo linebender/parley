@@ -8,9 +8,7 @@ use core::mem;
 use core::ops::RangeInclusive;
 
 use alloc::vec::Vec;
-use icu::segmenter::GraphemeClusterSegmenter;
-use icu_properties::{CodePointMapDataBorrowed, CodePointSetData, EmojiSetData};
-use icu_properties::props::{BasicEmoji, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, VariationSelector};
+use icu_properties::props::{GeneralCategory, GraphemeClusterBreak};
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
@@ -21,8 +19,8 @@ use crate::{Font, swash_convert, layout, icu_working};
 use fontique::{self, Query, QueryFamily, QueryFont};
 use swash::text::cluster::{CharCluster, CharInfo, Status, Token};
 use swash::text::{Language, Script};
-use unicode_bidi::TextSource;
-use crate::replace_swash::ClusterInfo;
+use crate::context::AnalysisDataSources;
+use crate::replace_swash::{ClusterInfo, UserData};
 
 pub(crate) struct ShapeContext {
     unicode_buffer: Option<harfrust::UnicodeBuffer>,
@@ -62,6 +60,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     scx: &mut ShapeContext,
     mut text: &str,
     layout: &mut Layout<B>,
+    analysis_data_sources: &AnalysisDataSources,
 ) {
     // If we have both empty text and no inline boxes, shape with a fake space
     // to generate metrics that can be used to size a cursor.
@@ -163,6 +162,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 infos,
                 infos_icu,
                 layout,
+                analysis_data_sources,
             );
             item.size = style.font_size;
             item.level = level;
@@ -197,6 +197,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             infos,
             infos_icu,
             layout,
+            analysis_data_sources,
         );
     }
 
@@ -209,28 +210,28 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 }
 
-fn is_emoji_grapheme(grapheme: &str) -> bool {
-    let basic_emoji = EmojiSetData::new::<BasicEmoji>();
-    if basic_emoji.contains_str(grapheme) {
+fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str) -> bool {
+    if analysis_data_sources.basic_emoji.contains_str(grapheme) {
         return true;
     }
 
+    // TODO(conor) consuming iterator to get char count, not optimal
     if grapheme.chars().count() == 1 {
         let ch = grapheme.chars().next().unwrap();
-        return CodePointSetData::new::<Emoji>().contains(ch) ||
-            CodePointSetData::new::<ExtendedPictographic>().contains(ch);
+        return analysis_data_sources.emoji.contains(ch) ||
+            analysis_data_sources.extended_pictographic.contains(ch);
     }
 
     // For multi-character sequences not covered by BasicEmoji:
 
-    // Handle emojis using variation selectors (e.g. ❤︎/❤️)
+    // Handle emojis using variation selectors (e.g. ❤︎ vs ❤️)
     let mut chars = grapheme.chars().peekable();
     while let Some(ch) = chars.next() {
         // Check if this character is an emoji
-        if CodePointSetData::new::<Emoji>().contains(ch) {
+        if analysis_data_sources.emoji.contains(ch) {
             // Check if the next character is a variation selector
             if let Some(&next_ch) = chars.peek() {
-                if CodePointSetData::new::<VariationSelector>().contains(next_ch) {
+                if analysis_data_sources.variation_selector.contains(next_ch) {
                     return true;
                 }
             }
@@ -239,25 +240,24 @@ fn is_emoji_grapheme(grapheme: &str) -> bool {
 
     // TODO(conor) Swash doesn't cluster these correctly in select_font, and Harfrust doesn't seem
     //  to either (rendering is incorrect), should check the latter more thoroughly though.
-    /*// Check for flag emoji (two regional indicators)
-    let regional_indicator = CodePointSetData::new::<RegionalIndicator>();
+    // Check for flag emoji (two regional indicators)
+    // TODO(conor) use iterator for this
     let chars: Vec<char> = grapheme.chars().collect();
     if chars.len() == 2 &&
-        regional_indicator.contains(chars[0]) &&
-        regional_indicator.contains(chars[1]) {
+        analysis_data_sources.regional_indicator.contains(chars[0]) &&
+        analysis_data_sources.regional_indicator.contains(chars[1]) {
         return true;
-    }*/
+    }
 
     // Check for ZWJ-composed emoji graphemes (e.g. 👩‍👩‍👧‍👧)
     let mut has_emoji = false;
     let mut has_zwj = false;
 
     for ch in grapheme.chars() {
-        // TODO(conor) use icu (GraphemeClusterBreak::ZWJ)?
-        if ch == '\u{200D}' {
+        if ch as u32 == 0x200D {
             has_zwj = true;
         }
-        if CodePointSetData::new::<Emoji>().contains(ch) {
+        if analysis_data_sources.emoji.contains(ch) {
             has_emoji = true;
         }
     }
@@ -266,21 +266,6 @@ fn is_emoji_grapheme(grapheme: &str) -> bool {
     // characters and ZWJ, it's likely an emoji ZWJ sequence.
     has_emoji && has_zwj
 }
-
-/*fn shape_item_icu<'a, B: Brush>(
-    fq: &mut Query<'a>,
-    rcx: &'a ResolveContext,
-    styles: &'a [RangedStyle<B>],
-    item: &Item,
-    scx: &mut ShapeContext,
-    text: &str,
-    text_range: &core::ops::Range<usize>,
-    char_range: &core::ops::Range<usize>,
-    infos: &[(icu_working::CharInfo, u16)],
-    layout: &mut Layout<B>,
-) {
-
-}*/
 
 fn shape_item<'a, B: Brush>(
     fq: &mut Query<'a>,
@@ -294,6 +279,7 @@ fn shape_item<'a, B: Brush>(
     infos: &[(CharInfo, u16)],
     infos_icu: &[(icu_working::CharInfo, u16)],
     layout: &mut Layout<B>,
+    analysis_data_sources: &AnalysisDataSources,
 ) {
     // Swash
     let item_text = &text[text_range.clone()];
@@ -341,23 +327,31 @@ fn shape_item<'a, B: Brush>(
     //println!("Tokens: {:?}", tokens);
 
     // ICU
+
+    println!("START===================================");
+    println!("item: '{item_text}'");
+    item_infos_icu.iter().for_each(|info| println!(" info: {:?}", info));
+    println!("END  ===================================");
+
     // TODO(conor) parse during analysis, just provide iterator
     //println!("segmenting item_text: '{}'", item_text);
-    let segmenter = GraphemeClusterSegmenter::new();
-    let clusters = segmenter.segment_str(item_text);
-    let clusters_2 = segmenter.segment_str(item_text);
+    let clusters = analysis_data_sources.grapheme_segmenter.segment_str(item_text);
+    let clusters_2 = analysis_data_sources.grapheme_segmenter.segment_str(item_text);
     let mut last = 0;
     let mut char_clusters_icu = vec![];
     let mut code_unit_offset_in_string = 0;
+    let mut item_infos_icu_iter = item_infos_icu.iter();
     println!("Clusters for item text: {}: {:?}", item_text, clusters_2.map(|c| c.to_string()).collect::<Vec<String>>());
     for boundary in clusters.skip(1) { // First boundary index is always zero
         println!("boundary: {}", boundary);
         let segment_text = &item_text[last..boundary];
+        //let segment_info = &item_infos_icu[last..boundary];
+        //println!("segment_info: {:?}", segment_info);
 
         // For simple single-character emojis
         //let mut chars = segment_text.chars();
         let is_emoji = {
-            is_emoji_grapheme(segment_text)
+            is_emoji_grapheme(analysis_data_sources, segment_text)
             // TODO(conor) more performant for single-chars, adopt mix of this and `is_emoji_grapheme`
             /*if chars.next().is_some() && chars.next().is_none() {
                 // Exactly one character
@@ -375,20 +369,21 @@ fn shape_item<'a, B: Brush>(
         let mut map_len = 0;
         let mut force_normalize = false;
         let start = code_unit_offset_in_string;
-        let chars = segment_text.char_indices().map(|(index, ch)| {
-            // TODO(conor) move back to analysis
-            let script = CodePointMapDataBorrowed::<icu_properties::props::Script>::new().get(ch);
-            let general_category = CodePointMapDataBorrowed::<GeneralCategory>::new().get(ch);
+        let chars = segment_text.char_indices().zip(item_infos_icu_iter.by_ref()).map(|((index, ch), (info, style_index))| {
+            //let (info, _style_index) = item_infos_icu_iter.next().unwrap();
+            println!("[ICU CHAR->INFO] char:'{ch}' info: {info:?}");
             //let general_category = CodePointMapDataBorrowed::<GraphemeClusterBreak>::new().get(ch);
 
-            // TODO(conor) complete this:
             // "Extend" break chars should be normalized first, with two exceptions
-            /*force_normalize = is_extend(char) && !is_zwnj(char) && !is_variation_selector(char);
+            force_normalize |= matches!(info.grapheme_cluster_break, GraphemeClusterBreak::Extend) &&
+                !analysis_data_sources.variation_selector.contains(ch) &&
+                ch as u32 != 0x200C; // Is not a Zero Width Non-Joiner
             // All spacing mark break chars should be normalized first.
-            force_normalize |= is_spacing_mark(char);*/
+            force_normalize |= matches!(info.grapheme_cluster_break, GraphemeClusterBreak::SpacingMark);
 
-            let contributes_to_shaping = !matches!(general_category, GeneralCategory::Control) || (matches!(general_category, GeneralCategory::Format) &&
-                !matches!(script, icu_properties::props::Script::Inherited));
+            // TODO(conor) compute this in analysis?
+            let contributes_to_shaping = !matches!(info.general_category, GeneralCategory::Control) || (matches!(info.general_category, GeneralCategory::Format) &&
+                !matches!(info.script_icu, icu_properties::props::Script::Inherited));
             map_len += contributes_to_shaping as u8;
             len += 1;
 
@@ -401,8 +396,8 @@ fn shape_item<'a, B: Brush>(
                 offset: (start + index) as u32,
                 contributes_to_shaping,
                 glyph_id: 0, // TODO(conor) - correct to default to zero?
-                data: 0, // TODO(conor) - needed?
-                is_control_character: matches!(general_category, GeneralCategory::Control),
+                data: *style_index as UserData, // TODO(conor) - needed?
+                is_control_character: matches!(info.general_category, GeneralCategory::Control),
             };
             println!("[icu - CharCluster] Made char: {:?}", char);
             char
@@ -667,9 +662,9 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
 
     fn select_font_icu(&mut self, cluster: &mut crate::replace_swash::CharCluster) -> Option<SelectedFont> {
         let style_index = cluster.style_index;
-        println!("[select_font] cluster: '{}'", cluster.chars.iter().map(|ch| ch.ch).collect::<String>());
+        println!("[select_font_icu] cluster: '{}'", cluster.chars.iter().map(|ch| ch.ch).collect::<String>());
         let is_emoji = cluster.info.is_emoji;
-        println!("[select_font] is_emoji: '{}'", is_emoji);
+        println!("[select_font_icu] is_emoji: '{}'", is_emoji);
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize].style;
