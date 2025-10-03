@@ -8,12 +8,33 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 # Changelog
 
-The latest published Parley release is [0.5.0](#050---2025-06-01) which was released on 2025-06-01.
-You can find its changes [documented below](#050---2025-06-01).
+The latest published Parley release is [0.6.0](#060---2025-10-03) which was released on 2025-10-03.
+You can find its changes [documented below](#060---2025-10-03).
 
 ## [Unreleased]
 
 This release has an [MSRV] of 1.82.
+
+## [0.6.0] - 2025-10-03
+
+This release has an [MSRV] of 1.82.
+
+### Highlights
+
+Parley now uses [HarfRust](https://github.com/harfbuzz/harfrust) rather than [Swash](https://github.com/dfrg/swash). This means that
+Parley now has production-quality shaping for all scripts and can be recommended for general usage.
+
+### Migration
+
+As Parley now uses it's own `parley::BoundingBox` in place of `kurbo::Rect`, you may need to convert the type if you were
+previously passing one of these values into a function that expect `kurbo::Rect`. The following function may be used to
+perform this conversion:
+
+```rust
+fn convert_rect(rect: parley::BoundingBox) -> kurbo::Rect {
+    kurbo::Rect::new(rect.x0, rect.y0, rect.x1, rect.y1)
+}
+```
 
 ### Added
 
@@ -26,15 +47,17 @@ This release has an [MSRV] of 1.82.
 
 - Cache character mapping metadata for each font to improve performance of font selection. ([#413][] by [@dfrg][])
 - Upgrade `icu4x` dependencies to v2.x ([#418][] by [@nicoburns][])
+- Added an `unregister_font` method to remove a font from a collection ([#395][] by [@taj-p][])
 
 ### Changed
 
 #### Parley
 
-- `Alignment`` variants have been renamed to better match CSS. `Alignment::Justified` is now `Alignment::Justify` and `Alignment::Middle` is now `Alignment::Center`. ([#389][] by [@waywardmonkeys][])
+- `Alignment` variants have been renamed to better match CSS. `Alignment::Justified` is now `Alignment::Justify` and `Alignment::Middle` is now `Alignment::Center`. ([#389][] by [@waywardmonkeys][])
+- In the `PlainEditor`, triple-click now selects paragraphs rather than words ([#381][] by [@DJMcNab][])
 - Updated to `accesskit` 0.21. ([#390][] by [@mwcampbell][])
-- Uses `HarfRust` for text shaping ([[#400][] by [@taj-p][]).
-- Fontique no longer depends on `peniko` or `kurbo`:
+- Uses `HarfRust` for text shaping ([[#400][] by [@taj-p][])
+- Parley no longer depends on `peniko` or `kurbo`:
    - The use of `peniko::Font` has been replaced with `linebender_resource_handle::Font`. This is unlikely to affect users of the crate.
    - The use of `kurbo::Rect` has been replaced with a new `parley::BoundingBox` type.
 
@@ -49,7 +72,8 @@ This release has an [MSRV] of 1.82.
 
 - Selection extension moves the focus to the side being extended. ([#385][] by [@kekelp][])
 - Ranged builder default style not respecting `scale`. ([#368][] by [@xStrom][])
-- Cluster source character not correct ([[#402][] by [@taj-p][]).
+- Cluster source character not correct ([[#402][] by [@taj-p][])
+- Don't justify the last line of a paragraph ([[#410][] by [@taj-p][])
 
 #### Fontique
 
@@ -331,12 +355,15 @@ This release has an [MSRV][] of 1.70.
 [#369]: https://github.com/linebender/parley/pull/369
 [#378]: https://github.com/linebender/parley/pull/378
 [#380]: https://github.com/linebender/parley/pull/380
+[#381]: https://github.com/linebender/parley/pull/381
 [#385]: https://github.com/linebender/parley/pull/385
 [#389]: https://github.com/linebender/parley/pull/389
 [#390]: https://github.com/linebender/parley/pull/390
+[#395]: https://github.com/linebender/parley/pull/395
 [#400]: https://github.com/linebender/parley/pull/400
 [#402]: https://github.com/linebender/parley/pull/402
 [#405]: https://github.com/linebender/parley/pull/405
+[#410]: https://github.com/linebender/parley/pull/410
 [#413]: https://github.com/linebender/parley/pull/413
 [#418]: https://github.com/linebender/parley/pull/418
 
