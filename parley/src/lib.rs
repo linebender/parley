@@ -119,7 +119,7 @@ pub mod style;
 #[cfg(test)]
 mod tests;
 
-pub use linebender_resource_handle::FontData as Font;
+pub use linebender_resource_handle::FontData;
 pub use util::BoundingBox;
 
 pub use builder::{RangedBuilder, TreeBuilder};
