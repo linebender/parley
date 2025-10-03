@@ -46,8 +46,8 @@ fn bounding_box_to_rect(bb: parley::BoundingBox) -> kurbo::Rect {
 #### Fontique
 
 - Cache character mapping metadata for each font to improve performance of font selection. ([#413][] by [@dfrg][])
-- Upgrade `icu4x` dependencies to v2.x ([#418][] by [@nicoburns][])
-- Added an `unregister_font` method to remove a font from a collection ([#395][] by [@taj-p][])
+- Upgrade `icu4x` dependencies to v2.x. ([#418][] by [@nicoburns][])
+- Added an `unregister_font` method to remove a font from a collection. ([#395][] by [@taj-p][])
 
 ### Changed
 
@@ -56,15 +56,15 @@ fn bounding_box_to_rect(bb: parley::BoundingBox) -> kurbo::Rect {
 - `Alignment` variants have been renamed to better match CSS. `Alignment::Justified` is now `Alignment::Justify` and `Alignment::Middle` is now `Alignment::Center`. ([#389][] by [@waywardmonkeys][])
 - In the `PlainEditor`, triple-click now selects paragraphs rather than words ([#381][] by [@DJMcNab][])
 - Updated to `accesskit` 0.21. ([#390][] by [@mwcampbell][])
-- Uses `HarfRust` for text shaping ([[#400][] by [@taj-p][])
-- Parley no longer depends on `peniko` or `kurbo`:
+- Uses `HarfRust` for text shaping ([#400][] by [@taj-p][])
+- Parley no longer depends on `peniko` or `kurbo`. ([#414][] by [@nicoburns][]):
    - The use of `peniko::Font` has been replaced with `linebender_resource_handle::Font`. This is unlikely to affect users of the crate.
    - The use of `kurbo::Rect` has been replaced with a new `parley::BoundingBox` type.
 
 #### Fontique
 
 - The fontconfig backend, used to enumerate system fonts on Linux, has been rewritten to call into the system's fontconfig library instead of parsing fontconfig's configuration files itself. This should significantly improve the behavior of system fonts and generic families on Linux. ([#378][] by [@valadaptive][])
-- Fontique no longer depends on `peniko`. The use of `peniko::Blob` has been replaced with `linebender_resource_handle::Blob`. This is unlikely to affect users of the crate.
+- Fontique no longer depends on `peniko`. The use of `peniko::Blob` has been replaced with `linebender_resource_handle::Blob`. This is unlikely to affect users of the crate. ([#414][] by [@nicoburns][])
 
 ### Fixed
 
@@ -72,8 +72,8 @@ fn bounding_box_to_rect(bb: parley::BoundingBox) -> kurbo::Rect {
 
 - Selection extension moves the focus to the side being extended. ([#385][] by [@kekelp][])
 - Ranged builder default style not respecting `scale`. ([#368][] by [@xStrom][])
-- Cluster source character not correct ([[#402][] by [@taj-p][])
-- Don't justify the last line of a paragraph ([[#410][] by [@taj-p][])
+- Cluster source character not correct. ([#402][] by [@taj-p][])
+- Don't justify the last line of a paragraph. ([#410][] by [@taj-p][])
 
 #### Fontique
 
