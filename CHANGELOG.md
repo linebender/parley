@@ -58,8 +58,9 @@ fn bounding_box_to_rect(bb: parley::BoundingBox) -> kurbo::Rect {
 - Updated to `accesskit` 0.21. ([#390][] by [@mwcampbell][])
 - Uses `HarfRust` for text shaping. ([#400][] by [@taj-p][])
 - Parley no longer depends on `peniko` or `kurbo`. ([#414][] by [@nicoburns][]):
-   - The use of `peniko::Font` has been replaced with `linebender_resource_handle::Font`. This is unlikely to affect users of the crate.
-   - Breaking change: The use of `kurbo::Rect` has been replaced with a new `parley::BoundingBox` type.
+  - Breaking change: The use of `peniko::Font` has been replaced with `linebender_resource_handle::FontData`, as such `parley::Font` is now called `Parley::FontData`.
+    Note that this is the same type as in previous releases, and so is fully backwards-compatible, just with a different name.
+  - Breaking change: The use of `kurbo::Rect` has been replaced with a new `parley::BoundingBox` type.
 
 #### Fontique
 

@@ -5,7 +5,7 @@ use crate::inline_box::InlineBox;
 use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::nearly_zero;
-use crate::{Font, OverflowWrap};
+use crate::{FontData, OverflowWrap};
 use core::ops::Range;
 
 use swash::text::cluster::{Boundary, Whitespace};
@@ -263,7 +263,7 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) width: f32,
     pub(crate) full_width: f32,
     pub(crate) height: f32,
-    pub(crate) fonts: Vec<Font>,
+    pub(crate) fonts: Vec<FontData>,
     pub(crate) coords: Vec<i16>,
 
     // Input (/ output of style resolution)
@@ -351,7 +351,7 @@ impl<B: Brush> LayoutData<B> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn push_run(
         &mut self,
-        font: Font,
+        font: FontData,
         font_size: f32,
         synthesis: fontique::Synthesis,
         glyph_buffer: &harfrust::GlyphBuffer,

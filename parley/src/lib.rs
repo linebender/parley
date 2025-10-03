@@ -119,7 +119,7 @@ pub mod style;
 #[cfg(test)]
 mod tests;
 
-pub use linebender_resource_handle::FontData as Font;
+pub use linebender_resource_handle::FontData;
 pub use util::BoundingBox;
 
 pub use builder::{RangedBuilder, TreeBuilder};
@@ -133,3 +133,9 @@ pub use layout::editor::{PlainEditor, PlainEditorDriver};
 
 pub use layout::*;
 pub use style::*;
+
+#[deprecated(
+    note = "Old name for this type, use `parley::FontData` instead.",
+    since = "0.6.0"
+)]
+pub type Font = FontData;
