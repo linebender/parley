@@ -267,21 +267,21 @@ This release has an [MSRV][] of 1.70.
 [MSRV]: README.md#minimum-supported-rust-version-msrv
 
 [@dfrg]: https://github.com/dfrg
+[@dhardy]: https://github.com/dhardy
 [@DJMcNab]: https://github.com/DJMcNab
+[@kekelp]: https://github.com/kekelp
 [@mwcampbell]: https://github.com/mwcampbell
 [@nicoburns]: https://github.com/nicoburns
 [@NoahR02]: https://github.com/NoahR02
+[@richardhozak]: https://github.com/richardhozak
 [@spirali]: https://github.com/spirali
+[@taj-p]: https://github.com/taj-p
 [@tomcur]: https://github.com/tomcur
 [@valadaptive]: https://github.com/valadaptive
 [@waywardmonkeys]: https://github.com/waywardmonkeys
 [@wfdewith]: https://github.com/wfdewith
 [@xorgy]: https://github.com/xorgy
 [@xStrom]: https://github.com/xStrom
-[@dhardy]: https://github.com/dhardy
-[@kekelp]: https://github.com/kekelp
-[@taj-p]: https://github.com/taj-p
-[@richardhozak]: https://github.com/richardhozak
 
 [#54]: https://github.com/linebender/parley/pull/54
 [#55]: https://github.com/linebender/parley/pull/55
