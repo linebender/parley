@@ -133,3 +133,9 @@ pub use layout::editor::{PlainEditor, PlainEditorDriver};
 
 pub use layout::*;
 pub use style::*;
+
+#[deprecated(
+    note = "Old name for this type, use `parley::FontData` instead.",
+    since = "0.6.0"
+)]
+pub type Font = FontData;
