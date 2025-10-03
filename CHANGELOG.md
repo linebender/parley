@@ -27,12 +27,12 @@ Parley now has production-quality shaping for all scripts and can be recommended
 ### Migration
 
 As Parley now uses it's own `parley::BoundingBox` in place of `kurbo::Rect`, you may need to convert the type if you were
-previously passing one of these values into a function that expect `kurbo::Rect`. The following function may be used to
-perform this conversion:
+previously passing one of these values into a function that expects `kurbo::Rect`.
+The following function may be used to perform this conversion:
 
 ```rust
-fn convert_rect(rect: parley::BoundingBox) -> kurbo::Rect {
-    kurbo::Rect::new(rect.x0, rect.y0, rect.x1, rect.y1)
+fn bounding_box_to_rect(bb: parley::BoundingBox) -> kurbo::Rect {
+    kurbo::Rect::new(bb.x0, bb.y0, bb.x1, bb.y1)
 }
 ```
 
