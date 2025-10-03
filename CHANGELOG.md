@@ -41,7 +41,7 @@ fn bounding_box_to_rect(bb: parley::BoundingBox) -> kurbo::Rect {
 #### Parley
 
 - Shift-click support through `Selection::shift_click_extension` and `PlainEditorDriver::shift_click_extension`. ([#385][] by [@kekelp][])
-- Benchmarks. ([#405]() by [@taj-p][])
+- Add some benchmarks using [Tango](https://github.com/bazhenov/tango). ([#405][] by [@taj-p][])
 
 #### Fontique
 
