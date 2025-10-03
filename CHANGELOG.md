@@ -8,14 +8,10 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 # Changelog
 
-The latest published Parley release is [0.6.0](#060---2025-10-03) which was released on 2025-10-03.
-You can find its changes [documented below](#060---2025-10-03).
+The latest published Parley release is [0.5.0](#050---2025-06-01) which was released on 2025-06-01.
+You can find its changes [documented below](#050---2025-06-01).
 
 ## [Unreleased]
-
-This release has an [MSRV] of 1.82.
-
-## [0.6.0] - 2025-10-03
 
 This release has an [MSRV] of 1.82.
 
@@ -312,7 +308,6 @@ This release has an [MSRV][] of 1.70.
 [#188]: https://github.com/linebender/parley/pull/188
 [#191]: https://github.com/linebender/parley/pull/191
 [#192]: https://github.com/linebender/parley/pull/192
-[#194]: https://github.com/linebender/parley/pull/194
 [#198]: https://github.com/linebender/parley/pull/198
 [#201]: https://github.com/linebender/parley/pull/201
 [#202]: https://github.com/linebender/parley/pull/202
