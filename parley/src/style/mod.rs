@@ -7,7 +7,7 @@ mod brush;
 mod font;
 mod styleset;
 
-use alloc::borrow::Cow;
+use alloc::{borrow::Cow, string::String, sync::Arc};
 
 pub use brush::*;
 pub use font::{
@@ -140,6 +140,8 @@ pub enum StyleProperty<'a, B: Brush> {
     WordBreak(WordBreakStrength),
     /// Control over "emergency" line-breaking.
     OverflowWrap(OverflowWrap),
+    /// Replace graphemes with another grapheme.
+    GraphemeReplacement(Option<Arc<String>>),
 }
 
 /// Unresolved styles.
@@ -189,6 +191,8 @@ pub struct TextStyle<'a, B: Brush> {
     pub word_break: WordBreakStrength,
     /// Control over "emergency" line-breaking.
     pub overflow_wrap: OverflowWrap,
+    /// Replace graphemes with another grapheme.
+    pub grapheme_replacement: Option<Arc<String>>,
 }
 
 impl<B: Brush> Default for TextStyle<'_, B> {
@@ -216,6 +220,7 @@ impl<B: Brush> Default for TextStyle<'_, B> {
             letter_spacing: Default::default(),
             word_break: Default::default(),
             overflow_wrap: Default::default(),
+            grapheme_replacement: Default::default(),
         }
     }
 }

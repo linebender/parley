@@ -8,7 +8,7 @@ pub(crate) mod tree;
 
 pub(crate) use range::RangedStyleBuilder;
 
-use alloc::{vec, vec::Vec};
+use alloc::{string::String, sync::Arc, vec, vec::Vec};
 
 use super::style::{
     Brush, FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontVariation, FontWeight,
@@ -157,6 +157,7 @@ impl ResolveContext {
             StyleProperty::LetterSpacing(value) => LetterSpacing(*value * scale),
             StyleProperty::WordBreak(value) => WordBreak(*value),
             StyleProperty::OverflowWrap(value) => OverflowWrap(*value),
+            StyleProperty::GraphemeReplacement(value) => GraphemeReplacement(value.clone()),
         }
     }
 
@@ -193,6 +194,7 @@ impl ResolveContext {
             letter_spacing: raw_style.letter_spacing * scale,
             word_break: raw_style.word_break,
             overflow_wrap: raw_style.overflow_wrap,
+            grapheme_replacement: raw_style.grapheme_replacement.clone(),
         }
     }
 
@@ -374,6 +376,8 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     WordBreak(WordBreakStrength),
     /// Control over "emergency" line-breaking.
     OverflowWrap(OverflowWrap),
+    /// Replace graphemes with another grapheme.
+    GraphemeReplacement(Option<Arc<String>>),
 }
 
 /// Flattened group of style properties.
@@ -411,6 +415,8 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     pub(crate) word_break: WordBreakStrength,
     /// Control over "emergency" line-breaking.
     pub(crate) overflow_wrap: OverflowWrap,
+    /// Replace graphemes with another grapheme.
+    pub(crate) grapheme_replacement: Option<Arc<String>>,
 }
 
 impl<B: Brush> ResolvedStyle<B> {
@@ -440,6 +446,7 @@ impl<B: Brush> ResolvedStyle<B> {
             LetterSpacing(value) => self.letter_spacing = value,
             WordBreak(value) => self.word_break = value,
             OverflowWrap(value) => self.overflow_wrap = value,
+            GraphemeReplacement(value) => self.grapheme_replacement = value,
         }
     }
 
@@ -468,6 +475,7 @@ impl<B: Brush> ResolvedStyle<B> {
             LetterSpacing(value) => nearly_eq(self.letter_spacing, *value),
             WordBreak(value) => self.word_break == *value,
             OverflowWrap(value) => self.overflow_wrap == *value,
+            GraphemeReplacement(value) => self.grapheme_replacement == *value,
         }
     }
 
@@ -478,6 +486,7 @@ impl<B: Brush> ResolvedStyle<B> {
             strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
             line_height: self.line_height.resolve(self.font_size),
             overflow_wrap: self.overflow_wrap,
+            grapheme_replacement: self.grapheme_replacement.clone(),
         }
     }
 }

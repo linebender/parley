@@ -184,6 +184,7 @@ fn create_root_style() -> TextStyle<'static, ColorBrush> {
         letter_spacing: 1.5,
         word_break: WordBreakStrength::BreakAll,
         overflow_wrap: OverflowWrap::Anywhere,
+        grapheme_replacement: None, // TODO: Set a non-default value
     }
 }
 
