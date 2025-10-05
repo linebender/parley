@@ -262,8 +262,13 @@ impl<B: Brush> LayoutContext<B> {
                     return None;
                 }
 
+                // TODO(conor) avoid `while`, twice
                 while let Some(style) = self.styles.next() {
                     let style_start_index = style.range.start;
+                    if style_start_index == style.range.end {
+                        // Skip empty style ranges
+                        continue;
+                    }
                     let mut prev_char_index = self.current_char_index;
 
                     // Find the character at the style boundary
