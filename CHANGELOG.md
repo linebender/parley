@@ -8,10 +8,14 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 # Changelog
 
-The latest published Parley release is [0.5.0](#050---2025-06-01) which was released on 2025-06-01.
-You can find its changes [documented below](#050---2025-06-01).
+The latest published Parley release is [0.6.0](#060---2025-10-06) which was released on 2025-10-06.
+You can find its changes [documented below](#060---2025-10-06).
 
 ## [Unreleased]
+
+This release has an [MSRV] of 1.82.
+
+## [0.6.0] - 2025-10-06
 
 This release has an [MSRV] of 1.82.
 
