@@ -15,6 +15,7 @@ use alloc::vec::Vec;
 #[cfg(feature = "libm")]
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
+use crate::icu_working::CharInfo;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct ClusterData {
@@ -359,7 +360,7 @@ impl<B: Brush> LayoutData<B> {
         word_spacing: f32,
         letter_spacing: f32,
         source_text: &str,
-        char_infos: &[(swash::text::cluster::CharInfo, u16)], // From text analysis
+        char_infos: &[(CharInfo, u16)], // From text analysis
         text_range: Range<usize>,                             // The text range this run covers
         coords: &[harfrust::NormalizedCoord],
     ) {
@@ -592,7 +593,7 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
     scale_factor: f32,
     glyph_infos: &[harfrust::GlyphInfo],
     glyph_positions: &[harfrust::GlyphPosition],
-    char_infos: &[(swash::text::cluster::CharInfo, u16)],
+    char_infos: &[(CharInfo, u16)],
     char_indices_iter: I,
 ) -> f32 {
     let mut char_indices_iter = char_indices_iter.peekable();
@@ -854,7 +855,7 @@ impl From<&ClusterType> for u16 {
 
 fn push_cluster(
     clusters: &mut Vec<ClusterData>,
-    char_info: &(swash::text::cluster::CharInfo, u16),
+    char_info: &(CharInfo, u16),
     cluster_start_char: (usize, char),
     glyph_offset: u32,
     advance: f32,
@@ -888,7 +889,7 @@ fn push_cluster(
     };
 
     clusters.push(ClusterData {
-        info: ClusterInfo::new(char_info.0.boundary(), cluster_start_char.1),
+        info: ClusterInfo::new(char_info.0.boundary, cluster_start_char.1),
         flags: (&cluster_type).into(),
         style_index: char_info.1,
         glyph_len: final_glyph_len,

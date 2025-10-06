@@ -99,8 +99,8 @@ impl<B: Brush> LayoutContext<B> {
             ranged_style_builder: RangedStyleBuilder::default(),
             tree_style_builder: TreeStyleBuilder::default(),
             info: vec![],
-            analysis_data_sources: AnalysisDataSources::new(),
             info_icu: vec![],
+            analysis_data_sources: AnalysisDataSources::new(),
             scx: ShapeContext::default(),
         }
     }
@@ -398,7 +398,7 @@ impl<B: Brush> LayoutContext<B> {
         let full_text_range = 0..text.len();
         let paragraph = ParagraphInfo {
             range: full_text_range.clone(),
-            level: Level::ltr(),
+            level: Level::ltr(), // TODO(conor) Is it always correct to start as LTR?
         };
         let bidi_embed_levels_byte_indexed = bidi_info.reordered_levels(&paragraph, full_text_range);
 
@@ -509,6 +509,7 @@ impl<B: Brush> LayoutContext<B> {
         self.styles.clear();
         self.inline_boxes.clear();
         self.info.clear();
+        self.info_icu.clear();
         self.bidi.clear();
     }
 }

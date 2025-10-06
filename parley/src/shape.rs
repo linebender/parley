@@ -41,6 +41,7 @@ struct Item {
     size: f32,
     script: Script,
     level: u8,
+    // TODO(conor) - Language/FontFeature/FontVariation are Swash types
     locale: Option<Language>,
     variations: Resolved<FontVariation>,
     features: Resolved<FontFeature>,
@@ -62,6 +63,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     layout: &mut Layout<B>,
     analysis_data_sources: &AnalysisDataSources,
 ) {
+    println!("[BIDI] [shape_text] levels: {:?}", levels);
     // If we have both empty text and no inline boxes, shape with a fake space
     // to generate metrics that can be used to size a cursor.
     if text.is_empty() && inline_boxes.is_empty() {
@@ -96,6 +98,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     };
     let mut char_range = 0..0;
     let mut text_range = 0..0;
+    println!("creating text_range: {:?}", text_range);
 
     let mut inline_box_iter = inline_boxes.iter().enumerate();
     let mut current_box = inline_box_iter.next();
@@ -109,7 +112,9 @@ pub(crate) fn shape_text<'a, B: Brush>(
         if !real_script(script) {
             script = item.script;
         }
-        let level = levels.get(char_index).copied().unwrap_or(0);
+        let level_swash = levels.get(char_index).copied().unwrap_or(0);
+        let level = infos_icu.get(char_index).unwrap().0.bidi_embed_level;
+        println!("[BIDI] [shape_text] level: {}, level_swash: {}", level, level_swash);
         if item.style_index != *style_index {
             item.style_index = *style_index;
             style = &styles[*style_index as usize].style;
@@ -150,7 +155,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
         }
 
         if break_run && !text_range.is_empty() {
-            shape_item(
+            println!("calling shape_item_icu, text_range: {:?}", text_range);
+            shape_item_icu(
                 &mut fq,
                 rcx,
                 styles,
@@ -159,18 +165,19 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 text,
                 &text_range,
                 &char_range,
-                infos,
                 infos_icu,
                 layout,
                 analysis_data_sources,
             );
             item.size = style.font_size;
+            println!("[BIDI] [shape_text], set level level: {}, level_swash: {}", level, level_swash);
             item.level = level;
             item.script = script;
             item.locale = style.locale;
             item.variations = style.font_variations;
             item.features = style.font_features;
             text_range.start = text_range.end;
+            println!("text_range: {:?}", text_range);
             char_range.start = char_range.end;
         }
 
@@ -185,7 +192,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 
     if !text_range.is_empty() {
-        shape_item(
+        shape_item_icu(
             &mut fq,
             rcx,
             styles,
@@ -194,7 +201,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
             text,
             &text_range,
             &char_range,
-            infos,
             infos_icu,
             layout,
             analysis_data_sources,
@@ -267,7 +273,7 @@ fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str
     has_emoji && has_zwj
 }
 
-fn shape_item<'a, B: Brush>(
+/*fn shape_item<'a, B: Brush>(
     fq: &mut Query<'a>,
     rcx: &'a ResolveContext,
     styles: &'a [RangedStyle<B>],
@@ -565,8 +571,290 @@ fn shape_item<'a, B: Brush>(
         let segment_char_count = segment_text.chars().count();
         let segment_infos =
             &item_infos[segment_char_start..(segment_char_start + segment_char_count)];
+        let segment_infos_icu =
+            &item_infos_icu[segment_char_start..(segment_char_start + segment_char_count)];
+
+        assert_eq!(segment_infos_icu.len(), segment_infos.len());
+        fn format_swash_info(swash_info: &CharInfo) -> String {
+            format!("script: {:?} boundary: {:?}, category: {:?}", swash_info.script(), swash_info.boundary(), swash_info.category())
+        }
+        for ((i_s, x1), (i_i, x2)) in segment_infos.iter().zip(segment_infos_icu) {
+            println!("=== CHAR INFO (in final segment) ===");
+            println!("SWASH: {:?}", format_swash_info(i_s));
+            println!("ICU: {:?}", i_i);
+        }
+        //println!("segment_infos: {:?}", s egment_infos);
+        //println!("segment_infos_icu: {:?}", segment_infos_icu);
 
         // Push harfrust-shaped run for the entire segment
+        layout.data.push_run(
+            Font::new(font.font.blob.clone(), font.font.index),
+            item.size,
+            font.font.synthesis,
+            &glyph_buffer,
+            item.level,
+            item.word_spacing,
+            item.letter_spacing,
+            segment_text,
+            segment_infos,
+            (text_range.start + segment_start_offset)..(text_range.start + segment_end_offset),
+            harf_shaper.coords(),
+        );
+
+        // Replace buffer to reuse allocation in next iteration.
+        scx.unicode_buffer = Some(glyph_buffer.clear());
+    }
+}*/
+
+fn shape_item_icu<'a, B: Brush>(
+    fq: &mut Query<'a>,
+    rcx: &'a ResolveContext,
+    styles: &'a [RangedStyle<B>],
+    item: &Item,
+    scx: &mut ShapeContext,
+    text: &str,
+    text_range: &core::ops::Range<usize>,
+    char_range: &core::ops::Range<usize>,
+    infos: &[(icu_working::CharInfo, u16)],
+    layout: &mut Layout<B>,
+    analysis_data_sources: &AnalysisDataSources,
+) {
+    let item_text = &text[text_range.clone()];
+    println!("[shape_item ENTRY] item_text: '{}', text: '{}', text_range: {:?}, char_range: {:?}", item_text, text, text_range, char_range);
+    let item_infos = &infos[char_range.start..char_range.end]; // Only process current item
+    let first_style_index = item_infos[0].1;
+    let mut font_selector =
+        FontSelector::new(fq, rcx, styles, first_style_index, item.script, item.locale);
+
+    // ICU
+    let item_infos_icu = &infos[char_range.start..char_range.end]; // Only process current item
+
+    // TODO(conor) parse during analysis, just provide iterator
+    //println!("segmenting item_text: '{}'", item_text);
+    //let clusters_2 = analysis_data_sources.grapheme_segmenter.segment_str(item_text);
+    // TODO(conor) as iterator
+    let mut clusters = vec![];
+    let mut last = 0;
+    let mut code_unit_offset_in_string = text_range.start;
+    let mut item_infos_icu_iter = item_infos_icu.iter();
+    let grapheme_cluster_boundaries = analysis_data_sources.grapheme_segmenter.segment_str(item_text);
+    //println!("Clusters for item text: {}: {:?}", item_text, clusters_2.map(|c| c.to_string()).collect::<Vec<String>>());
+    for boundary in grapheme_cluster_boundaries.skip(1) { // First boundary index is always zero
+        println!("boundary: {}", boundary);
+        let segment_text = &item_text[last..boundary];
+
+        // For simple single-character emojis
+        //let mut chars = segment_text.chars();
+        let is_emoji = {
+            is_emoji_grapheme(analysis_data_sources, segment_text)
+            // TODO(conor) more performant for single-chars, adopt mix of this and `is_emoji_grapheme`
+            /*if chars.next().is_some() && chars.next().is_none() {
+                // Exactly one character
+                let ch = segment_text.chars().next().unwrap();
+                basic_emoji.contains(ch)
+            } else {
+                // For emoji sequences, check if the string itself is an emoji
+                is_emoji_grapheme(segment_text)
+            }*/
+        };
+        println!("[icu] '{}' is_emoji: {:?}", segment_text, is_emoji);
+
+        let mut len = 0;
+        let mut map_len = 0;
+        let mut force_normalize = false;
+        let start = code_unit_offset_in_string;
+        let chars = segment_text.char_indices().zip(item_infos_icu_iter.by_ref()).map(|((index, ch), (info, style_index))| {
+            println!("[ICU CHAR->INFO] char:'{ch}' info: {info:?}, style_index:: {style_index}");
+
+            // "Extend" break chars should be normalized first, with two exceptions
+            force_normalize |= matches!(info.grapheme_cluster_break, GraphemeClusterBreak::Extend) &&
+                !analysis_data_sources.variation_selector.contains(ch) &&
+                ch as u32 != 0x200C; // Is not a Zero Width Non-Joiner
+            // All spacing mark break chars should be normalized first.
+            force_normalize |= matches!(info.grapheme_cluster_break, GraphemeClusterBreak::SpacingMark);
+
+            // TODO(conor) compute this in analysis?
+            let contributes_to_shaping = !matches!(info.general_category, GeneralCategory::Control) || (matches!(info.general_category, GeneralCategory::Format) &&
+                !matches!(info.script_icu, icu_properties::props::Script::Inherited));
+            map_len += contributes_to_shaping as u8;
+            len += 1;
+
+            let ch_len = ch.len_utf8();
+            code_unit_offset_in_string += ch_len;
+
+            let char = layout::replace_swash::Char {
+                ch,
+                len: ch_len as u8,
+                offset: (start + index) as u32,
+                contributes_to_shaping,
+                glyph_id: 0, // TODO(conor) - correct to default to zero?
+                data: *style_index as UserData, // TODO(conor) - needed?
+                is_control_character: matches!(info.general_category, GeneralCategory::Control),
+            };
+            println!("[icu - CharCluster] Made char: {:?}", char);
+            char
+        }).collect();
+        let end = code_unit_offset_in_string;
+
+        let cluster_icu = layout::replace_swash::CharCluster::new(
+            segment_text.to_string(),
+            ClusterInfo {
+                is_emoji
+            },
+            chars,
+            len,
+            map_len,
+            start as u32,
+            end as u32,
+            force_normalize
+        );
+
+        clusters.push(cluster_icu);
+        last = boundary;
+    }
+
+    let mut clusters_iter = clusters.iter_mut();
+    let mut cluster = clusters_iter.next().expect("one cluster");
+
+    println!("Calling select_font, site A");
+    let mut current_font = font_selector.select_font_icu(cluster);
+    println!("END site A");
+
+    // Main segmentation loop (based on swash shape_clusters) - only within current item
+    while let Some(font) = current_font.take() {
+        // Collect all clusters for this font segment
+        println!("[CURRENT_FONT] range: {}..{}, text_range.start: {}", cluster.range().start, cluster.range().end, text_range.start);
+        let segment_start_offset = cluster.range().start as usize - text_range.start;
+        println!("[CURRENT_FONT] segment_start_offset: {}", segment_start_offset);
+        let mut segment_end_offset = cluster.range().end as usize - text_range.start;
+        println!("[CURRENT_FONT] segment_end_offset: {}", segment_end_offset);
+
+        loop {
+            //println!("calling parser.next [2]");
+            let maybe_cluster = clusters_iter.next();
+            if maybe_cluster.is_none()  {
+                // End of current item - process final segment
+                //println!("cluster parser break [2]");
+                break;
+            } else {
+                cluster = maybe_cluster.unwrap();
+            }
+
+            println!("Calling select_font, site B");
+            if let Some(next_font) = font_selector.select_font_icu(cluster) {
+                if next_font != font {
+                    println!("[CURRENT_FONT] next_font");
+                    current_font = Some(next_font);
+                    break;
+                } else {
+                    // Same font - add to current segment
+                    segment_end_offset = cluster.range().end as usize - text_range.start;
+                    println!("[CURRENT_FONT] segment_end_offset: {}", segment_end_offset);
+                }
+            } else {
+                let maybe_cluster = clusters_iter.next();
+                if maybe_cluster.is_none()  {
+                    // End of current item - process final segment
+                    //println!("cluster parser break [2]");
+                    break;
+                } else {
+                    cluster = maybe_cluster.unwrap();
+                }
+            }
+        }
+
+        // Shape this font segment with harfrust
+        let segment_text = &item_text[segment_start_offset..segment_end_offset];
+        //println!("shape_item: segment_text: '{}'", segment_text);
+        // Shape the entire segment text including newlines
+        // The line breaking algorithm will handle newlines automatically
+
+        // TODO: How do we want to handle errors like this?
+        let font_ref =
+            harfrust::FontRef::from_index(font.font.blob.as_ref(), font.font.index).unwrap();
+
+        // Create harfrust shaper
+        // TODO: cache this upstream?
+        let shaper_data = harfrust::ShaperData::new(&font_ref);
+        let instance = harfrust::ShaperInstance::from_variations(
+            &font_ref,
+            variations_iter(&font.font.synthesis, rcx.variations(item.variations)),
+        );
+        // TODO: Don't create a new shaper for each segment.
+        let harf_shaper = shaper_data
+            .shaper(&font_ref)
+            .instance(Some(&instance))
+            .point_size(Some(item.size))
+            .build();
+
+        // Prepare harfrust buffer
+        let mut buffer = mem::take(&mut scx.unicode_buffer).unwrap();
+        buffer.clear();
+
+        // Use the entire segment text including newlines
+        buffer.reserve(segment_text.len());
+        for (i, ch) in segment_text.chars().enumerate() {
+            //println!("shape_item: ch: '{}'", ch);
+            // Ensure that each cluster's index matches the index into `infos`. This is required
+            // for efficient cluster lookup within `data.rs`.
+            //
+            // In other words, instead of using `buffer.push_str`, which iterates `segment_text`
+            // with `char_indices`, push each char individually via `.chars` with a cluster index
+            // that matches its `infos` counterpart. This allows us to lookup `infos` via cluster
+            // index in `data.rs`.
+            buffer.add(ch, i as u32);
+        }
+
+        let direction = if item.level & 1 != 0 {
+            harfrust::Direction::RightToLeft
+        } else {
+            harfrust::Direction::LeftToRight
+        };
+        buffer.set_direction(direction);
+
+        let script = swash_convert::script_to_harfrust(item.script);
+        buffer.set_script(script);
+
+        if let Some(lang) = item.locale {
+            let lang_tag = lang.language();
+            if let Ok(harf_lang) = lang_tag.parse::<harfrust::Language>() {
+                println!("[LANGUAGE]: {:?}", harf_lang);
+                buffer.set_language(harf_lang);
+            }
+        }
+
+        scx.features.clear();
+        for feature in rcx.features(item.features).unwrap_or(&[]) {
+            scx.features.push(harfrust::Feature::new(
+                harfrust::Tag::from_u32(feature.tag),
+                feature.value as u32,
+                0..buffer.len(),
+            ));
+        }
+
+        let glyph_buffer = harf_shaper.shape(buffer, &scx.features);
+
+        // Extract relevant CharInfo slice for this segment
+        let char_start = char_range.start + item_text[..segment_start_offset].chars().count();
+        let segment_char_start = char_start - char_range.start;
+        let segment_char_count = segment_text.chars().count();
+        let segment_infos =
+            &item_infos[segment_char_start..(segment_char_start + segment_char_count)];
+
+        assert_eq!(segment_infos.len(), segment_infos.len());
+        fn format_swash_info(swash_info: &CharInfo) -> String {
+            format!("script: {:?} boundary: {:?}, category: {:?}", swash_info.script(), swash_info.boundary(), swash_info.category())
+        }
+        for ((i_s, x1), (i_i, x2)) in segment_infos.iter().zip(segment_infos) {
+            println!("=== CHAR INFO (in final segment) ===");
+            //println!("SWASH: {:?}", format_swash_info(i_s));
+            println!("ICU: {:?}", i_i);
+        }
+        //println!("segment_infos: {:?}", s egment_infos);
+        //println!("segment_infos_icu: {:?}", segment_infos_icu);
+
+        // Push harfrust-shaped run for the entire segment
+        println!("[FONT INDEX] {}", font.font.index);
         layout.data.push_run(
             Font::new(font.font.blob.clone(), font.font.index),
             item.size,
@@ -661,7 +949,8 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
     }
 
     fn select_font_icu(&mut self, cluster: &mut crate::replace_swash::CharCluster) -> Option<SelectedFont> {
-        let style_index = cluster.style_index;
+        println!("[select_font_icu] self.style index: {}, cluster.style_index: {}", self.style_index, cluster.style_index);
+        let style_index = cluster.user_data() as u16;
         println!("[select_font_icu] cluster: '{}'", cluster.chars.iter().map(|ch| ch.ch).collect::<String>());
         let is_emoji = cluster.info.is_emoji;
         println!("[select_font_icu] is_emoji: '{}'", is_emoji);
@@ -710,6 +999,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
                     .map(|g| {
                         g.to_u32()
                             .try_into()
+                            // TODO(conor) understand this error message, and is it irrelevant now?
                             .expect("Swash requires u16 glyph, so we hope that the glyph fits")
                     })
                     .unwrap_or_default();

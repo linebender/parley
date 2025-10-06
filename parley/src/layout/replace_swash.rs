@@ -18,6 +18,22 @@ pub(crate) struct CharCluster {
     best_ratio: f32,
 }
 
+impl CharCluster {
+    pub(crate) fn range(&self) -> SourceRange {
+        SourceRange {
+            start: self.start,
+            end: self.end,
+        }
+    }
+}
+
+/// Source range of a cluster in code units.
+#[derive(Copy, Clone)]
+pub struct SourceRange {
+    pub start: u32,
+    pub end: u32,
+}
+
 #[derive(Debug)]
 pub(crate) struct ClusterInfo {
     // Not used strictly in Parley:
@@ -61,6 +77,8 @@ pub(crate) struct Char {
     pub contributes_to_shaping: bool,
     /// Nominal glyph identifier.
     pub glyph_id: GlyphId,
+
+    // TODO(conor) - rename this to style_index, and for CharCluster method too
     /// Arbitrary user data.
     pub data: UserData,
 
@@ -220,6 +238,11 @@ impl CharCluster {
         }
     }
 
+    /// Returns the primary user data for the cluster.
+    pub fn user_data(&self) -> UserData {
+        self.chars[0].data
+    }
+
     fn decomposed(&mut self) -> Option<&[Char]> {
         match self.decomp.state {
             FormState::Invalid => None,
@@ -332,6 +355,7 @@ impl CharCluster {
         let prev_ratio = self.best_ratio;
         let mut ratio;
         if self.force_normalize && self.composed().is_some() {
+            println!("[ICU MAP CharCluster] force_normalize=true");
             ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
                 println!("[ICU MAP CharCluster] updating self.best_ratio: {} -> {}", self.best_ratio, ratio);

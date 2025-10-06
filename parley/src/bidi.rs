@@ -158,6 +158,7 @@ impl BidiResolver {
     }
 
     fn default_level(types: &[BidiClass]) -> u8 {
+        println!("[BIDI] [default_level]");
         let mut isolates = 0;
         for ty in types {
             let ty = *ty;
