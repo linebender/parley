@@ -34,7 +34,7 @@ pub use cluster::{Affinity, ClusterPath, ClusterSide};
 pub use cursor::{Cursor, Selection};
 pub use data::BreakReason;
 pub(crate) use line::LineItem;
-pub use line::greedy::BreakLines;
+pub use line::greedy::{BoxBreakData, BreakLines, BreakerState, LineBreakData, YieldData};
 pub use line::{GlyphRun, LineMetrics, PositionedInlineBox, PositionedLayoutItem};
 pub use run::RunMetrics;
 
@@ -216,9 +216,9 @@ impl<B: Brush> Layout<B> {
             return Some((0, self.get(0)?));
         }
         let maybe_line_index = self.data.lines.binary_search_by(|line| {
-            if offset < line.metrics.min_coord {
+            if offset < line.metrics.block_min_coord {
                 Ordering::Greater
-            } else if offset >= line.metrics.max_coord {
+            } else if offset >= line.metrics.block_max_coord {
                 Ordering::Less
             } else {
                 Ordering::Equal
@@ -409,9 +409,9 @@ impl LayoutAccessibility {
 
                 node.set_bounds(accesskit::Rect {
                     x0: x_offset + run_offset as f64,
-                    y0: y_offset + metrics.min_coord as f64,
+                    y0: y_offset + metrics.block_min_coord as f64,
                     x1: x_offset + (run_offset + run.advance()) as f64,
-                    y1: y_offset + metrics.max_coord as f64,
+                    y1: y_offset + metrics.block_max_coord as f64,
                 });
                 node.set_text_direction(if run.is_rtl() {
                     TextDirection::RightToLeft
