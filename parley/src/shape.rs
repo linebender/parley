@@ -20,7 +20,6 @@ use crate::{Font, swash_convert, layout, icu_working};
 use fontique::{self, Query, QueryFamily, QueryFont};
 use swash::text::cluster::CharInfo;
 use crate::context::AnalysisDataSources;
-use crate::replace_swash::UserData;
 
 pub(crate) struct ShapeContext {
     unicode_buffer: Option<harfrust::UnicodeBuffer>,
@@ -354,7 +353,7 @@ fn shape_item<'a, B: Brush>(
                 offset: (start + index) as u32,
                 contributes_to_shaping,
                 glyph_id: 0,
-                data: *style_index as UserData, // TODO(conor) - needed?
+                style_index: *style_index, // TODO(conor) - needed?
                 is_control_character: matches!(info.general_category, GeneralCategory::Control),
             };
             println!("[icu - CharCluster] Made char: {:?}", char);
@@ -363,7 +362,6 @@ fn shape_item<'a, B: Brush>(
         let end = code_unit_offset_in_string;
 
         let cluster_icu = layout::replace_swash::CharCluster::new(
-            segment_text.to_string(),
             chars,
             is_emoji_grapheme(analysis_data_sources, segment_text),
             len,
@@ -601,7 +599,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
 
     fn select_font_icu(&mut self, cluster: &mut crate::replace_swash::CharCluster) -> Option<SelectedFont> {
         println!("[select_font_icu] self.style index: {}, cluster.style_index: {}", self.style_index, cluster.style_index);
-        let style_index = cluster.user_data() as u16;
+        let style_index = cluster.style_index();
         println!("[select_font_icu] cluster: '{}'", cluster.chars.iter().map(|ch| ch.ch).collect::<String>());
         let is_emoji = cluster.is_emoji;
         println!("[select_font_icu] is_emoji: '{}'", is_emoji);

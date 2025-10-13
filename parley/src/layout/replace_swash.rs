@@ -3,7 +3,6 @@ pub const MAX_CLUSTER_SIZE: usize = 32;
 
 #[derive(Debug)]
 pub(crate) struct CharCluster {
-    pub plain_text: String, // TODO(conor) temp
     pub chars: Vec<Char>, // [Char; MAX_CLUSTER_SIZE], TODO(conor)
     pub style_index: u16,
     pub is_emoji: bool,
@@ -34,34 +33,6 @@ pub struct SourceRange {
     pub end: u32,
 }
 
-#[derive(Debug)]
-pub(crate) struct ClusterInfo {
-    // Not used strictly in Parley:
-    // - is_broken()
-    // - emoji()
-    // - is_boundary()
-    // - boundary() - fully replaced by Parley's internal ClusterInfo type
-    // - set_space_from_char()
-    // - set_broken
-    // - set_emoji
-    // - set_space
-    // - merge_boundary
-
-    // Used in Parley:
-    // - is_emoji() (emoji font selection per-cluster, editing
-    // - is_whitespace() - line breaking algorithm (greedy.rs)
-    // - whitespace() - data.rs, cluster.rs, alignment.rs (carries with it Swash's Whitespace type)
-        // this isn't using Swash's implementation after all?
-    pub is_emoji: bool,
-    //whitespace: Whitespace,
-}
-
-impl ClusterInfo {
-    /*fn is_whitespace(&self) -> bool {
-        !matches!(self.whitespace, Whitespace::None)
-    }*/
-}
-
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct Char {
     /// The character.
@@ -77,34 +48,12 @@ pub(crate) struct Char {
     pub contributes_to_shaping: bool,
     /// Nominal glyph identifier.
     pub glyph_id: GlyphId,
-
-    // TODO(conor) - rename this to style_index, and for CharCluster method too
-    /// Arbitrary user data.
-    pub data: UserData,
-
-    // Only used by Swash shaping:
-    // Joining type of the character.
-    //pub joining_type: JoiningType,
-    // True if the character is ignorable.
-    //pub ignorable: bool,
+    /// Indexes into the list of styles for the containing text run, to find the style applicable
+    /// to this character.
+    pub style_index: u16,
 }
 
-/*pub(crate) struct Token {
-    /// The character.
-    pub ch: char,
-    /// Offset of the character in code units.
-    pub offset: u32,
-    /// Length of the character in code units.
-    pub len: u8,
-    /// Character information.
-    pub info: icu_working::CharInfo,
-    /// Arbitrary user data.
-    pub data: UserData,
-}*/
-
 pub type GlyphId = u16;
-
-pub type UserData = u32;
 
 /// Whitespace content of a cluster.
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
@@ -129,19 +78,6 @@ impl Whitespace {
     pub fn is_space_or_nbsp(self) -> bool {
         matches!(self, Self::Space | Self::NoBreakSpace)
     }
-
-    /*#[inline]
-    fn from_raw(bits: u16) -> Self {
-        match bits & 0b111 {
-            0 => Self::None,
-            1 => Self::Space,
-            2 => Self::NoBreakSpace,
-            3 => Self::Tab,
-            4 => Self::Newline,
-            5 => Self::Other,
-            _ => Self::None,
-        }
-    }*/
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -167,52 +103,8 @@ pub enum Status {
     Complete,
 }
 
-/*#[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
-#[repr(u8)]
-pub enum ShapeClass {
-    /// Reph form.
-    Reph,
-    /// Pre-base form.
-    Pref,
-    /// Myanmar three character prefix.
-    Kinzi,
-    /// Base character.
-    Base,
-    /// Mark character.
-    Mark,
-    /// Halant modifier.
-    Halant,
-    /// Medial consonant Ra.
-    MedialRa,
-    /// Pre-base vowel modifier.
-    VMPre,
-    /// Pre-base dependent vowel.
-    VPre,
-    /// Below base dependent vowel.
-    VBlw,
-    /// Anusvara class.
-    Anusvara,
-    /// Zero width joiner.
-    Zwj,
-    /// Zero width non-joiner.
-    Zwnj,
-    /// Control character.
-    Control,
-    /// Variation selector.
-    Vs,
-    /// Other character.
-    Other,
-}
-
-impl Default for ShapeClass {
-    fn default() -> Self {
-        Self::Base
-    }
-}*/
-
 impl CharCluster {
     pub(crate) fn new(
-        plain_text: String,
         chars: Vec<Char>,
         is_emoji: bool,
         len: u8,
@@ -222,7 +114,6 @@ impl CharCluster {
         force_normalize: bool,
     ) -> Self {
         CharCluster {
-            plain_text,
             chars,
             style_index: 0,
             is_emoji,
@@ -238,9 +129,9 @@ impl CharCluster {
         }
     }
 
-    /// Returns the primary user data for the cluster.
-    pub fn user_data(&self) -> UserData {
-        self.chars[0].data
+    /// Returns the primary style index for the cluster.
+    pub fn style_index(&self) -> u16 {
+        self.chars[0].style_index
     }
 
     fn decomposed(&mut self) -> Option<&[Char]> {
@@ -540,5 +431,5 @@ const DEFAULT_CHAR: Char = Char {
     is_control_character: false,
     contributes_to_shaping: true,
     glyph_id: 0,
-    data: 0,
+    style_index: 0,
 };
