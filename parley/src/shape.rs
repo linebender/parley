@@ -251,7 +251,7 @@ fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str
         let emoji_data_source_contains_char = analysis_data_sources.emoji.contains(ch);
         if emoji_data_source_contains_char {
             // Check if the next character is a variation selector
-            if let Some((char_index, next_ch)) = chars_iter.peek() {
+            if let Some((_, next_ch)) = chars_iter.peek() {
                 if analysis_data_sources.variation_selector.contains(*next_ch) {
                     println!("[is_emoji] TESTING: var selector");
                     return true;
@@ -310,9 +310,6 @@ fn shape_item<'a, B: Brush>(
     // ICU
     let item_infos_icu = &infos[char_range.start..char_range.end]; // Only process current item
 
-    // TODO(conor) parse during analysis, just provide iterator
-    //println!("segmenting item_text: '{}'", item_text);
-    //let clusters_2 = analysis_data_sources.grapheme_segmenter.segment_str(item_text);
     // TODO(conor) as iterator
     let mut clusters = vec![];
     let mut last = 0;
@@ -341,19 +338,17 @@ fn shape_item<'a, B: Brush>(
             // TODO(conor) compute this in analysis?
             let contributes_to_shaping = !matches!(info.general_category, GeneralCategory::Control) || (matches!(info.general_category, GeneralCategory::Format) &&
                 !matches!(info.script_icu, Script::Inherited));
-            map_len += contributes_to_shaping as u8;
             len += 1;
+            map_len += contributes_to_shaping as u8;
 
             let ch_len = ch.len_utf8();
             code_unit_offset_in_string += ch_len;
 
             let char = layout::replace_swash::Char {
                 ch,
-                len: ch_len as u8,
-                offset: (start + index) as u32,
                 contributes_to_shaping,
                 glyph_id: 0,
-                style_index: *style_index, // TODO(conor) - needed?
+                style_index: *style_index,
                 is_control_character: matches!(info.general_category, GeneralCategory::Control),
             };
             println!("[icu - CharCluster] Made char: {:?}", char);

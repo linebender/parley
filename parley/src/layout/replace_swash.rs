@@ -37,12 +37,7 @@ pub struct SourceRange {
 pub(crate) struct Char {
     /// The character.
     pub ch: char,
-    // Length of the character in code units (utf8 byte length)
-    pub len: u8, // TODO(conor) maybe just infer from `ch`?
-    /// Offset of the character in code units.
-    pub offset: u32,
-    /// Shaping class of the character.
-    //pub shape_class: ShapeClass,
+    /// Whether the character
     pub is_control_character: bool,
     /// True if the character should be considered when mapping glyphs.
     pub contributes_to_shaping: bool,
@@ -130,7 +125,7 @@ impl CharCluster {
     }
 
     /// Returns the primary style index for the cluster.
-    pub fn style_index(&self) -> u16 {
+    pub(crate) fn style_index(&self) -> u16 {
         self.chars[0].style_index
     }
 
@@ -232,11 +227,12 @@ impl CharCluster {
         }
     }
 
-    pub fn format_chars(chars: &[Char]) -> String {
+    // TODO(conor) remove - debug only
+    pub(crate) fn format_chars(chars: &[Char]) -> String {
         chars.iter().map(|&ch| ch.ch).collect::<String>()
     }
 
-    pub fn map(&mut self, f: impl Fn(char) -> GlyphId) -> Status {
+    pub(crate) fn map(&mut self, f: impl Fn(char) -> GlyphId) -> Status {
         let len = self.len;
         if len == 0 {
             println!("[ICU MAP CharCluster] returning Status::Complete (len == 0)");
@@ -343,12 +339,6 @@ impl Form {
         }
     }
 
-    fn clear(&mut self) {
-        self.len = 0;
-        self.map_len = 0;
-        self.state = FormState::None;
-    }
-
     fn chars(&self) -> &[Char] {
         &self.chars[..self.len as usize]
     }
@@ -426,8 +416,6 @@ impl<'a> Mapper<'a> {
 
 const DEFAULT_CHAR: Char = Char {
     ch: ' ',
-    len: 0,
-    offset: 0,
     is_control_character: false,
     contributes_to_shaping: true,
     glyph_id: 0,
