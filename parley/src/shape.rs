@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Text shaping implementation using `harfrust`for shaping
-//! and `swash` for text analysis.
+//! and `icu` for text analysis.
 
 use core::mem;
 use core::ops::RangeInclusive;
@@ -18,7 +18,6 @@ use crate::util::nearly_eq;
 use crate::{Font, swash_convert, layout, icu_working};
 
 use fontique::{self, Query, QueryFamily, QueryFont};
-use swash::text::cluster::CharInfo;
 use crate::context::AnalysisDataSources;
 
 pub(crate) struct ShapeContext {
@@ -53,15 +52,12 @@ pub(crate) fn shape_text<'a, B: Brush>(
     mut fq: Query<'a>,
     styles: &'a [RangedStyle<B>],
     inline_boxes: &[InlineBox],
-    infos: &[(CharInfo, u16)],
-    infos_icu: &[(icu_working::CharInfo, u16)],
-    levels: &[u8], // TODO(conor) - remove
+    infos: &[(icu_working::CharInfo, u16)],
     scx: &mut ShapeContext,
     mut text: &str,
     layout: &mut Layout<B>,
     analysis_data_sources: &AnalysisDataSources,
 ) {
-    println!("[BIDI] [shape_text] levels: {:?}", levels);
     // If we have both empty text and no inline boxes, shape with a fake space
     // to generate metrics that can be used to size a cursor.
     if text.is_empty() && inline_boxes.is_empty() {
@@ -82,8 +78,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
     let mut item = Item {
         style_index: 0,
         size: style.font_size,
-        level: levels.first().copied().unwrap_or(0),
-        script: infos_icu
+        level: infos[0].0.bidi_embed_level,
+        script: infos
             .iter()
             .map(|x| x.0.script)
             .find(|&script| real_script(script))
@@ -112,16 +108,16 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
     // Iterate over characters in the text
     for ((char_index, (byte_index, ch)), (info, style_index)) in
-        text.char_indices().enumerate().zip(infos_icu)
+        text.char_indices().enumerate().zip(infos)
     {
         let mut break_run = false;
         let mut script = info.script;
         if !real_script(script) {
             script = item.script;
         }
-        let level_swash = levels.get(char_index).copied().unwrap_or(0);
+        //let level_swash = levels.get(char_index).copied().unwrap_or(0);
         let mut level = info.bidi_embed_level;
-        println!("[BIDI] [shape_text] level: {}, level_swash: {}", level, level_swash);
+        //println!("[BIDI] [shape_text] level: {}, level_swash: {}", level, level_swash);
         if item.style_index != *style_index {
             item.style_index = *style_index;
             style = &styles[*style_index as usize].style;
@@ -172,12 +168,11 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 text,
                 &text_range,
                 &char_range,
-                infos_icu,
+                infos,
                 layout,
                 analysis_data_sources,
             );
             item.size = style.font_size;
-            println!("[BIDI] [shape_text], set level level: {}, level_swash: {}", level, level_swash);
             item.level = level;
             item.script = script;
             item.locale = style.locale.clone();
@@ -208,7 +203,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             text,
             &text_range,
             &char_range,
-            infos_icu,
+            infos,
             layout,
             analysis_data_sources,
         );
