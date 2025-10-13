@@ -8,7 +8,8 @@ use core::mem;
 use core::ops::RangeInclusive;
 
 use alloc::vec::Vec;
-use icu_properties::props::{GeneralCategory, GraphemeClusterBreak};
+use icu::locale::LanguageIdentifier;
+use icu_properties::props::{GeneralCategory, GraphemeClusterBreak, Script};
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
@@ -18,7 +19,6 @@ use crate::{Font, swash_convert, layout, icu_working};
 
 use fontique::{self, Query, QueryFamily, QueryFont};
 use swash::text::cluster::{CharCluster, CharInfo, Status, Token};
-use swash::text::{Language, Script};
 use crate::context::AnalysisDataSources;
 use crate::replace_swash::{ClusterInfo, UserData};
 
@@ -41,8 +41,7 @@ struct Item {
     size: f32,
     script: Script,
     level: u8,
-    // TODO(conor) - Language/FontFeature/FontVariation are Swash types
-    locale: Option<Language>,
+    locale: Option<LanguageIdentifier>,
     variations: Resolved<FontVariation>,
     features: Resolved<FontFeature>,
     word_spacing: f32,
@@ -85,17 +84,26 @@ pub(crate) fn shape_text<'a, B: Brush>(
         style_index: 0,
         size: style.font_size,
         level: levels.first().copied().unwrap_or(0),
-        script: infos
+        script: infos_icu
             .iter()
-            .map(|x| x.0.script())
+            .map(|x| { println!("script swash: {:?}", x.0.script_icu); x.0.script_icu })
             .find(|&script| real_script(script))
             .unwrap_or(Script::Latin),
-        locale: style.locale,
+        locale: style.locale.clone(),
         variations: style.font_variations,
         features: style.font_features,
         word_spacing: style.word_spacing,
         letter_spacing: style.letter_spacing,
     };
+    fn print_locale(lang: Option<LanguageIdentifier>) {
+        if let Some(lang) = lang {
+            println!("[icu::Language] Language:{}, Script:{:?}, Region:{:?}", lang.language, lang.script, lang.region);
+        } else {
+            println!("[icu::Language] Language: NONE");
+        }
+    }
+    print_locale(style.locale.clone());
+
     let mut char_range = 0..0;
     let mut text_range = 0..0;
     println!("creating text_range: {:?}", text_range);
@@ -108,11 +116,13 @@ pub(crate) fn shape_text<'a, B: Brush>(
         text.char_indices().enumerate().zip(infos)
     {
         let mut break_run = false;
-        let mut script = info.script();
+        // TODO(conor) get this through the infos iterator
+        let mut script = infos_icu.get(char_index).unwrap().0.script_icu;
         if !real_script(script) {
             script = item.script;
         }
         let level_swash = levels.get(char_index).copied().unwrap_or(0);
+        // TODO(conor) get this through the infos iterator
         let level = infos_icu.get(char_index).unwrap().0.bidi_embed_level;
         println!("[BIDI] [shape_text] level: {}, level_swash: {}", level, level_swash);
         if item.style_index != *style_index {
@@ -173,7 +183,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             println!("[BIDI] [shape_text], set level level: {}, level_swash: {}", level, level_swash);
             item.level = level;
             item.script = script;
-            item.locale = style.locale;
+            item.locale = style.locale.clone();
             item.variations = style.font_variations;
             item.features = style.font_features;
             text_range.start = text_range.end;
@@ -389,7 +399,7 @@ fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str
 
             // TODO(conor) compute this in analysis?
             let contributes_to_shaping = !matches!(info.general_category, GeneralCategory::Control) || (matches!(info.general_category, GeneralCategory::Format) &&
-                !matches!(info.script_icu, icu_properties::props::Script::Inherited));
+                !matches!(info.script_icu, Script::Inherited));
             map_len += contributes_to_shaping as u8;
             len += 1;
 
@@ -624,7 +634,7 @@ fn shape_item_icu<'a, B: Brush>(
     let item_infos = &infos[char_range.start..char_range.end]; // Only process current item
     let first_style_index = item_infos[0].1;
     let mut font_selector =
-        FontSelector::new(fq, rcx, styles, first_style_index, item.script, item.locale);
+        FontSelector::new(fq, rcx, styles, first_style_index, item.script, item.locale.clone());
 
     // ICU
     let item_infos_icu = &infos[char_range.start..char_range.end]; // Only process current item
@@ -675,7 +685,7 @@ fn shape_item_icu<'a, B: Brush>(
 
             // TODO(conor) compute this in analysis?
             let contributes_to_shaping = !matches!(info.general_category, GeneralCategory::Control) || (matches!(info.general_category, GeneralCategory::Format) &&
-                !matches!(info.script_icu, icu_properties::props::Script::Inherited));
+                !matches!(info.script_icu, Script::Inherited));
             map_len += contributes_to_shaping as u8;
             len += 1;
 
@@ -812,12 +822,11 @@ fn shape_item_icu<'a, B: Brush>(
         };
         buffer.set_direction(direction);
 
-        let script = swash_convert::script_to_harfrust(item.script);
+        let script = swash_convert::script_icu_to_harfrust(item.script);
         buffer.set_script(script);
 
-        if let Some(lang) = item.locale {
-            let lang_tag = lang.language();
-            if let Ok(harf_lang) = lang_tag.parse::<harfrust::Language>() {
+        if let Some(lang) = item.locale.clone() {
+            if let Ok(harf_lang) = lang.language.as_str().parse::<harfrust::Language>() {
                 println!("[LANGUAGE]: {:?}", harf_lang);
                 buffer.set_language(harf_lang);
             }
@@ -917,7 +926,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         styles: &'a [RangedStyle<B>],
         style_index: u16,
         script: Script,
-        locale: Option<Language>,
+        locale: Option<LanguageIdentifier>,
     ) -> Self {
         let style = &styles[style_index as usize].style;
         let fonts_id = style.font_stack.id();
@@ -931,8 +940,8 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         let features = rcx.features(style.font_features).unwrap_or(&[]);
         query.set_families(fonts.iter().copied());
 
-        let fb_script = crate::swash_convert::script_to_fontique(script);
-        let fb_language = locale.and_then(crate::swash_convert::locale_to_fontique);
+        let fb_script = swash_convert::script_to_fontique(script);
+        let fb_language = locale.and_then(swash_convert::locale_icu_to_fontique);
         query.set_fallbacks(fontique::FallbackKey::new(fb_script, fb_language.as_ref()));
         query.set_attributes(attrs);
 
