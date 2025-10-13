@@ -4,8 +4,11 @@
 // TODO(conor) Rename to icu_convert
 
 pub(crate) fn script_to_fontique(script: icu_properties::props::Script) -> fontique::Script {
-    let swash_script = script_from_u8(script.to_icu4c_value() as u8).unwrap();
-    fontique::Script(*FONTIQUE_SCRIPT_TAGS.get(swash_script as usize).unwrap_or(b"Zzzz"))
+    fontique::Script(*FONTIQUE_SCRIPT_TAGS.get(script_icu_to_swash(script) as usize).unwrap_or(b"Zzzz"))
+}
+
+pub(crate) fn script_icu_to_swash(script: icu_properties::props::Script) -> swash::text::Script {
+    script_from_u8(script.to_icu4c_value() as u8).unwrap()
 }
 
 pub(crate) fn script_to_harfrust(script: swash::text::Script) -> harfrust::Script {
@@ -16,9 +19,8 @@ pub(crate) fn script_to_harfrust(script: swash::text::Script) -> harfrust::Scrip
 }
 
 pub(crate) fn script_icu_to_harfrust(script: icu_properties::props::Script) -> harfrust::Script {
-    let swash_script = script_from_u8(script.to_icu4c_value() as u8).unwrap();
     harfrust::Script::from_iso15924_tag(harfrust::Tag::new(
-        FONTIQUE_SCRIPT_TAGS.get(swash_script as usize).unwrap_or(b"Zzzz"),
+        FONTIQUE_SCRIPT_TAGS.get(script_icu_to_swash(script) as usize).unwrap_or(b"Zzzz"),
     ))
     .unwrap_or(harfrust::script::UNKNOWN)
 }

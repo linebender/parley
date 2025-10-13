@@ -8,10 +8,11 @@ pub(crate) struct CharInfo {
     pub ch: char, // TODO(conor) temporary, most likely
     pub boundary: Boundary,
     pub bidi_embed_level: BidiLevel,
-    pub script: swash::text::Script,
-    pub script_icu: Script,
-    pub general_category: GeneralCategory,
+    pub script: Script,
     pub grapheme_cluster_break: GraphemeClusterBreak,
+    pub is_control: bool,
+    pub contributes_to_shaping: bool,
+    pub force_normalize: bool,
 }
 
 impl CharInfo {
@@ -20,19 +21,21 @@ impl CharInfo {
         ch: char,
         boundary: Boundary,
         bidi_embed_level: BidiLevel,
-        script: swash::text::Script,
-        script_icu: Script,
-        general_category: GeneralCategory,
+        script: Script,
         grapheme_cluster_break: GraphemeClusterBreak,
+        is_control: bool,
+        contributes_to_shaping: bool,
+        force_normalize: bool,
     ) -> Self {
         Self {
             ch,
             boundary,
             bidi_embed_level,
             script,
-            script_icu,
-            general_category,
             grapheme_cluster_break,
+            is_control,
+            contributes_to_shaping,
+            force_normalize,
         }
     }
 }

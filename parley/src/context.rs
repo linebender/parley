@@ -4,27 +4,25 @@
 //! Context for layout.
 
 use alloc::{vec, vec::Vec};
-use alloc::borrow::Cow;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use icu::collections::codepointtrie::TrieValue;
-use icu::normalizer::{ComposingNormalizerBorrowed, DecomposingNormalizerBorrowed};
 use icu::properties::props::BidiClass;
 use icu::segmenter::{GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter, LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed};
 use icu::segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakInvariantOptions};
 use icu_properties::{CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed, EmojiSetData, EmojiSetDataBorrowed};
 use icu_properties::props::{BasicEmoji, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, RegionalIndicator, Script, VariationSelector};
-use self::tree::TreeStyleBuilder;
 
 use super::{icu_working, FontContext};
 use super::bidi;
 use super::builder::RangedBuilder;
-use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle, tree};
+use super::resolve::tree::TreeStyleBuilder;
+use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle };
 use super::style::{Brush, TextStyle};
 
 use swash::text::cluster::{Boundary, CharInfo};
 use swash::text::WordBreakStrength;
-use unicode_bidi::{Level, ParagraphInfo, TextSource};
+use unicode_bidi::TextSource;
 use crate::bidi::BidiLevel;
 use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
@@ -436,16 +434,32 @@ impl<B: Brush> LayoutContext<B> {
             // character-indexed.
             // TODO(conor) have data iterator not resolve value unless its needed (line break data not always used)
             .zip(std::iter::once(LineBreak::from_icu4c_value(0)).chain(unicode_data_iterator(text, self.analysis_data_sources.line_break)))
-            .for_each(|(((((((boundary, embed_level), ch), script)), general_category), grapheme_cluster_break), line_break)| {
+            .for_each(|((((((boundary, embed_level), ch), script), general_category), grapheme_cluster_break), line_break)| {
                 let embed_level: BidiLevel = (*embed_level).into();
-                let swash_script: swash::text::Script = script_from_u8(script.to_icu4c_value() as u8).unwrap();
                 let boundary = if is_mandatory_line_break(line_break) {
                     Boundary::Mandatory
                 } else {
                     *boundary
                 };
+                let is_control = matches!(general_category, GeneralCategory::Control);
+                let contributes_to_shaping = !is_control || (matches!(general_category, GeneralCategory::Format) &&
+                    !matches!(script, Script::Inherited));
+
+                let force_normalize = {
+                    // "Extend" break chars should be normalized first, with two exceptions
+                    if matches!(grapheme_cluster_break, GraphemeClusterBreak::Extend) &&
+                        ch as u32 != 0x200C && // Is not a Zero Width Non-Joiner &&
+                        !self.analysis_data_sources.variation_selector.contains(ch)
+                    {
+                        true
+                    } else {
+                        // All spacing mark break chars should be normalized first.
+                        matches!(grapheme_cluster_break, GraphemeClusterBreak::SpacingMark)
+                    }
+                };
+
                 self.info_icu.push((
-                    icu_working::CharInfo::new(ch, boundary, embed_level, swash_script, script, general_category, grapheme_cluster_break),
+                    icu_working::CharInfo::new(ch, boundary, embed_level, script, grapheme_cluster_break, is_control, contributes_to_shaping, force_normalize),
                     0 // Style index is populated later
                 ));
             });
@@ -517,191 +531,21 @@ impl<B: Brush> Clone for LayoutContext<B> {
     }
 }
 
-fn script_from_u8(value: u8) -> Option<swash::text::Script> {
-    match value {
-        0 => Some(swash::text::Script::Common),
-        1 => Some(swash::text::Script::Inherited),
-        2 => Some(swash::text::Script::Arabic),
-        3 => Some(swash::text::Script::Armenian),
-        4 => Some(swash::text::Script::Bengali),
-        5 => Some(swash::text::Script::Bopomofo),
-        6 => Some(swash::text::Script::Cherokee),
-        7 => Some(swash::text::Script::Coptic),
-        8 => Some(swash::text::Script::Cyrillic),
-        9 => Some(swash::text::Script::Deseret),
-        10 => Some(swash::text::Script::Devanagari),
-        11 => Some(swash::text::Script::Ethiopic),
-        12 => Some(swash::text::Script::Georgian),
-        13 => Some(swash::text::Script::Gothic),
-        14 => Some(swash::text::Script::Greek),
-        15 => Some(swash::text::Script::Gujarati),
-        16 => Some(swash::text::Script::Gurmukhi),
-        17 => Some(swash::text::Script::Han),
-        18 => Some(swash::text::Script::Hangul),
-        19 => Some(swash::text::Script::Hebrew),
-        20 => Some(swash::text::Script::Hiragana),
-        21 => Some(swash::text::Script::Kannada),
-        22 => Some(swash::text::Script::Katakana),
-        23 => Some(swash::text::Script::Khmer),
-        24 => Some(swash::text::Script::Lao),
-        25 => Some(swash::text::Script::Latin),
-        26 => Some(swash::text::Script::Malayalam),
-        27 => Some(swash::text::Script::Mongolian),
-        28 => Some(swash::text::Script::Myanmar),
-        29 => Some(swash::text::Script::Ogham),
-        30 => Some(swash::text::Script::OldItalic),
-        31 => Some(swash::text::Script::Oriya),
-        32 => Some(swash::text::Script::Runic),
-        33 => Some(swash::text::Script::Sinhala),
-        34 => Some(swash::text::Script::Syriac),
-        35 => Some(swash::text::Script::Tamil),
-        36 => Some(swash::text::Script::Telugu),
-        37 => Some(swash::text::Script::Thaana),
-        38 => Some(swash::text::Script::Thai),
-        39 => Some(swash::text::Script::Tibetan),
-        40 => Some(swash::text::Script::CanadianAboriginal),
-        41 => Some(swash::text::Script::Yi),
-        42 => Some(swash::text::Script::Tagalog),
-        43 => Some(swash::text::Script::Hanunoo),
-        44 => Some(swash::text::Script::Buhid),
-        45 => Some(swash::text::Script::Tagbanwa),
-        46 => Some(swash::text::Script::Braille),
-        47 => Some(swash::text::Script::Cypriot),
-        48 => Some(swash::text::Script::Limbu),
-        49 => Some(swash::text::Script::LinearB),
-        50 => Some(swash::text::Script::Osmanya),
-        51 => Some(swash::text::Script::Shavian),
-        52 => Some(swash::text::Script::TaiLe),
-        53 => Some(swash::text::Script::Ugaritic),
-        55 => Some(swash::text::Script::Buginese),
-        56 => Some(swash::text::Script::Glagolitic),
-        57 => Some(swash::text::Script::Kharoshthi),
-        58 => Some(swash::text::Script::SylotiNagri),
-        59 => Some(swash::text::Script::NewTaiLue),
-        60 => Some(swash::text::Script::Tifinagh),
-        61 => Some(swash::text::Script::OldPersian),
-        62 => Some(swash::text::Script::Balinese),
-        63 => Some(swash::text::Script::Batak),
-        65 => Some(swash::text::Script::Brahmi),
-        66 => Some(swash::text::Script::Cham),
-        71 => Some(swash::text::Script::EgyptianHieroglyphs),
-        75 => Some(swash::text::Script::PahawhHmong),
-        76 => Some(swash::text::Script::OldHungarian),
-        78 => Some(swash::text::Script::Javanese),
-        79 => Some(swash::text::Script::KayahLi),
-        82 => Some(swash::text::Script::Lepcha),
-        83 => Some(swash::text::Script::LinearA),
-        84 => Some(swash::text::Script::Mandaic),
-        86 => Some(swash::text::Script::MeroiticHieroglyphs),
-        87 => Some(swash::text::Script::Nko),
-        88 => Some(swash::text::Script::OldTurkic),
-        89 => Some(swash::text::Script::OldPermic),
-        90 => Some(swash::text::Script::PhagsPa),
-        91 => Some(swash::text::Script::Phoenician),
-        92 => Some(swash::text::Script::Miao),
-        99 => Some(swash::text::Script::Vai),
-        101 => Some(swash::text::Script::Cuneiform),
-        103 => Some(swash::text::Script::Unknown),
-        104 => Some(swash::text::Script::Carian),
-        106 => Some(swash::text::Script::TaiTham),
-        107 => Some(swash::text::Script::Lycian),
-        108 => Some(swash::text::Script::Lydian),
-        109 => Some(swash::text::Script::OlChiki),
-        110 => Some(swash::text::Script::Rejang),
-        111 => Some(swash::text::Script::Saurashtra),
-        112 => Some(swash::text::Script::SignWriting),
-        113 => Some(swash::text::Script::Sundanese),
-        115 => Some(swash::text::Script::MeeteiMayek),
-        116 => Some(swash::text::Script::ImperialAramaic),
-        117 => Some(swash::text::Script::Avestan),
-        118 => Some(swash::text::Script::Chakma),
-        120 => Some(swash::text::Script::Kaithi),
-        121 => Some(swash::text::Script::Manichaean),
-        122 => Some(swash::text::Script::InscriptionalPahlavi),
-        123 => Some(swash::text::Script::PsalterPahlavi),
-        125 => Some(swash::text::Script::InscriptionalParthian),
-        126 => Some(swash::text::Script::Samaritan),
-        127 => Some(swash::text::Script::TaiViet),
-        130 => Some(swash::text::Script::Bamum),
-        131 => Some(swash::text::Script::Lisu),
-        133 => Some(swash::text::Script::OldSouthArabian),
-        134 => Some(swash::text::Script::BassaVah),
-        135 => Some(swash::text::Script::Duployan),
-        136 => Some(swash::text::Script::Elbasan),
-        137 => Some(swash::text::Script::Grantha),
-        140 => Some(swash::text::Script::MendeKikakui),
-        141 => Some(swash::text::Script::MeroiticCursive),
-        142 => Some(swash::text::Script::OldNorthArabian),
-        143 => Some(swash::text::Script::Nabataean),
-        144 => Some(swash::text::Script::Palmyrene),
-        145 => Some(swash::text::Script::Khudawadi),
-        146 => Some(swash::text::Script::WarangCiti),
-        149 => Some(swash::text::Script::Mro),
-        150 => Some(swash::text::Script::Nushu),
-        151 => Some(swash::text::Script::Sharada),
-        152 => Some(swash::text::Script::SoraSompeng),
-        153 => Some(swash::text::Script::Takri),
-        154 => Some(swash::text::Script::Tangut),
-        156 => Some(swash::text::Script::AnatolianHieroglyphs),
-        157 => Some(swash::text::Script::Khojki),
-        158 => Some(swash::text::Script::Tirhuta),
-        159 => Some(swash::text::Script::CaucasianAlbanian),
-        160 => Some(swash::text::Script::Mahajani),
-        161 => Some(swash::text::Script::Ahom),
-        162 => Some(swash::text::Script::Hatran),
-        163 => Some(swash::text::Script::Modi),
-        164 => Some(swash::text::Script::Multani),
-        165 => Some(swash::text::Script::PauCinHau),
-        166 => Some(swash::text::Script::Siddham),
-        167 => Some(swash::text::Script::Adlam),
-        168 => Some(swash::text::Script::Bhaiksuki),
-        169 => Some(swash::text::Script::Marchen),
-        170 => Some(swash::text::Script::Newa),
-        171 => Some(swash::text::Script::Osage),
-        175 => Some(swash::text::Script::MasaramGondi),
-        176 => Some(swash::text::Script::Soyombo),
-        177 => Some(swash::text::Script::ZanabazarSquare),
-        178 => Some(swash::text::Script::Dogra),
-        179 => Some(swash::text::Script::GunjalaGondi),
-        180 => Some(swash::text::Script::Makasar),
-        181 => Some(swash::text::Script::Medefaidrin),
-        182 => Some(swash::text::Script::HanifiRohingya),
-        183 => Some(swash::text::Script::Sogdian),
-        184 => Some(swash::text::Script::OldSogdian),
-        185 => Some(swash::text::Script::Elymaic),
-        186 => Some(swash::text::Script::NyiakengPuachueHmong),
-        187 => Some(swash::text::Script::Nandinagari),
-        188 => Some(swash::text::Script::Wancho),
-        189 => Some(swash::text::Script::Chorasmian),
-        190 => Some(swash::text::Script::DivesAkuru),
-        191 => Some(swash::text::Script::KhitanSmallScript),
-        192 => Some(swash::text::Script::Yezidi),
-        // 193 => Some(swash::text::Script::Cypro),
-        // 194 => Some(swash::text::Script::OldUyghur),
-        // 195 => Some(swash::text::Script::Tangsa),
-        // 196 => Some(swash::text::Script::Toto),
-        // 197 => Some(swash::text::Script::Vithkuqi),
-        // 198 => Some(swash::text::Script::Kawi),
-        // 199 => Some(swash::text::Script::NagMundari),
-        // 200 => Some(swash::text::Script::Nastaliq),
-        _ => None,
-    }
-}
-
+#[cfg(test)]
 mod tests {
     use fontique::FontWeight;
     use swash::text::WordBreakStrength;
     use crate::{FontContext, FontStack, LayoutContext, LineHeight, RangedBuilder, StyleProperty};
 
-    #[derive(Default)]
-    struct TestContext {
-        pub layout_context: LayoutContext,
-        pub font_context: FontContext,
-    }
-
     // TODO(conor) - Rework/rename once Swash is fully removed
     fn verify_swash_icu_equivalence(text: &str, configure_builder: impl for<'a> FnOnce(&mut RangedBuilder<'a, [u8; 4]>))
     {
+        #[derive(Default)]
+        struct TestContext {
+            pub layout_context: LayoutContext,
+            pub font_context: FontContext,
+        }
+
         let mut test_context = TestContext::default();
 
         {
@@ -744,7 +588,7 @@ mod tests {
                 bidi_level,  // SWASH bidi level
                 icu_info.bidi_embed_level,  // ICU4X bidi level
                 swash_info.script(),
-                icu_info.script
+                crate::swash_convert::script_icu_to_swash(icu_info.script), // TODO(conor)
             );
 
             // Assert equality
@@ -762,7 +606,7 @@ mod tests {
             );
             assert_eq!(
                 swash_info.script(),
-                icu_info.script,
+                crate::swash_convert::script_icu_to_swash(icu_info.script), // TODO(conor)
                 "Script mismatch at character position {} in text: '{}'",
                 idx, text
             );

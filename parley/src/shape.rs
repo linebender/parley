@@ -85,7 +85,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         level: levels.first().copied().unwrap_or(0),
         script: infos_icu
             .iter()
-            .map(|x| { println!("script swash: {:?}", x.0.script_icu); x.0.script_icu })
+            .map(|x| x.0.script)
             .find(|&script| real_script(script))
             .unwrap_or(Script::Latin),
         locale: style.locale.clone(),
@@ -115,17 +115,12 @@ pub(crate) fn shape_text<'a, B: Brush>(
         text.char_indices().enumerate().zip(infos_icu)
     {
         let mut break_run = false;
-        //let mut script = infos_icu.get(char_index).unwrap().0.script_icu;
-        let mut script = info.script_icu;
+        let mut script = info.script;
         if !real_script(script) {
             script = item.script;
         }
         let level_swash = levels.get(char_index).copied().unwrap_or(0);
-        //let level = infos_icu.get(char_index).unwrap().0.bidi_embed_level;
         let mut level = info.bidi_embed_level;
-        if level_swash != level {
-            //level = level_swash;
-        }
         println!("[BIDI] [shape_text] level: {}, level_swash: {}", level, level_swash);
         if item.style_index != *style_index {
             item.style_index = *style_index;
@@ -328,28 +323,17 @@ fn shape_item<'a, B: Brush>(
         let chars = segment_text.char_indices().zip(item_infos_icu_iter.by_ref()).map(|((index, ch), (info, style_index))| {
             println!("[ICU CHAR->INFO] char:'{ch}' info: {info:?}, style_index:: {style_index}");
 
-            // "Extend" break chars should be normalized first, with two exceptions
-            force_normalize |= matches!(info.grapheme_cluster_break, GraphemeClusterBreak::Extend) &&
-                !analysis_data_sources.variation_selector.contains(ch) &&
-                ch as u32 != 0x200C; // Is not a Zero Width Non-Joiner
-            // All spacing mark break chars should be normalized first.
-            force_normalize |= matches!(info.grapheme_cluster_break, GraphemeClusterBreak::SpacingMark);
-
-            // TODO(conor) compute this in analysis?
-            let contributes_to_shaping = !matches!(info.general_category, GeneralCategory::Control) || (matches!(info.general_category, GeneralCategory::Format) &&
-                !matches!(info.script_icu, Script::Inherited));
+            force_normalize |= info.force_normalize;
             len += 1;
-            map_len += contributes_to_shaping as u8;
-
-            let ch_len = ch.len_utf8();
-            code_unit_offset_in_string += ch_len;
+            map_len += info.contributes_to_shaping as u8;
+            code_unit_offset_in_string += ch.len_utf8();
 
             let char = layout::replace_swash::Char {
                 ch,
-                contributes_to_shaping,
+                contributes_to_shaping: info.contributes_to_shaping,
                 glyph_id: 0,
                 style_index: *style_index,
-                is_control_character: matches!(info.general_category, GeneralCategory::Control),
+                is_control_character: info.is_control,
             };
             println!("[icu - CharCluster] Made char: {:?}", char);
             char
@@ -381,21 +365,17 @@ fn shape_item<'a, B: Brush>(
     while let Some(font) = current_font.take() {
         // Collect all clusters for this font segment
         println!("[CURRENT_FONT] range: {}..{}, text_range.start: {}", cluster.range().start, cluster.range().end, text_range.start);
-        let segment_start_offset = cluster.range().start as usize - text_range.start;
+        let cluster_range = cluster.range();
+        let segment_start_offset = cluster_range.start as usize - text_range.start;
         println!("[CURRENT_FONT] segment_start_offset: {}", segment_start_offset);
-        let mut segment_end_offset = cluster.range().end as usize - text_range.start;
+        let mut segment_end_offset = cluster_range.end as usize - text_range.start;
         println!("[CURRENT_FONT] segment_end_offset: {}", segment_end_offset);
 
         loop {
-            //println!("calling parser.next [2]");
-            let maybe_cluster = clusters_iter.next();
-            if maybe_cluster.is_none()  {
-                // End of current item - process final segment
-                //println!("cluster parser break [2]");
-                break;
-            } else {
-                cluster = maybe_cluster.unwrap();
-            }
+            cluster = match clusters_iter.next() {
+                Some(c) => c,
+                None => break, // End of current item - process final segment
+            };
 
             println!("Calling select_font, site B");
             if let Some(next_font) = font_selector.select_font_icu(cluster) {
@@ -409,14 +389,10 @@ fn shape_item<'a, B: Brush>(
                     println!("[CURRENT_FONT] segment_end_offset: {}", segment_end_offset);
                 }
             } else {
-                let maybe_cluster = clusters_iter.next();
-                if maybe_cluster.is_none()  {
-                    // End of current item - process final segment
-                    //println!("cluster parser break [2]");
-                    break;
-                } else {
-                    cluster = maybe_cluster.unwrap();
-                }
+                cluster = match clusters_iter.next() {
+                    Some(c) => c,
+                    None => break, // End of current item - process final segment
+                };
             }
         }
 
