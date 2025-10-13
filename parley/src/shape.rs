@@ -229,60 +229,62 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 }
 
+// TODO(conor) order matters here for performance - assess
 fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str) -> bool {
     if analysis_data_sources.basic_emoji.contains_str(grapheme) {
+        println!("[is_emoji] TESTING: basic emoji contains grapheme");
         return true;
     }
 
-    // TODO(conor) consuming iterator to get char count, not optimal
-    if grapheme.chars().count() == 1 {
-        let ch = grapheme.chars().next().unwrap();
-        return analysis_data_sources.emoji.contains(ch) ||
-            analysis_data_sources.extended_pictographic.contains(ch);
-    }
+    let mut chars_iter = grapheme.char_indices().peekable();
+    let mut first_and_previous_char = None; // Set only for the second iteration
+    let mut has_emoji = false;
+    let mut has_zwj = false;
+    while let Some((char_index, ch)) = chars_iter.next() {
+        // Handle single-character graphemes
+        if char_index == 0 && chars_iter.peek().is_none() {
+            println!("[is_emoji] TESTING: single char");
+            return analysis_data_sources.emoji.contains(ch) ||
+                analysis_data_sources.extended_pictographic.contains(ch);
+        }
 
-    // For multi-character sequences not covered by BasicEmoji:
-
-    // Handle emojis using variation selectors (e.g. ❤︎ vs ❤️)
-    let mut chars = grapheme.chars().peekable();
-    while let Some(ch) = chars.next() {
         // Check if this character is an emoji
-        if analysis_data_sources.emoji.contains(ch) {
+        let emoji_data_source_contains_char = analysis_data_sources.emoji.contains(ch);
+        if emoji_data_source_contains_char {
             // Check if the next character is a variation selector
-            if let Some(&next_ch) = chars.peek() {
-                if analysis_data_sources.variation_selector.contains(next_ch) {
+            if let Some((char_index, next_ch)) = chars_iter.peek() {
+                if analysis_data_sources.variation_selector.contains(*next_ch) {
+                    println!("[is_emoji] TESTING: var selector");
                     return true;
                 }
             }
         }
-    }
 
-    // TODO(conor) Swash doesn't cluster these correctly in select_font, and Harfrust doesn't seem
-    //  to either (rendering is incorrect), should check the latter more thoroughly though.
-    // Check for flag emoji (two regional indicators)
-    // TODO(conor) use iterator for this
-    let chars: Vec<char> = grapheme.chars().collect();
-    if chars.len() == 2 &&
-        analysis_data_sources.regional_indicator.contains(chars[0]) &&
-        analysis_data_sources.regional_indicator.contains(chars[1]) {
-        return true;
-    }
+        // Check for flag emoji (two regional indicators), must be a two-character grapheme.
+        // TODO(conor) Swash doesn't cluster these correctly in select_font, acknowledge this
+        if let Some(first_char) = first_and_previous_char {
+            if chars_iter.peek().is_none() &&
+                analysis_data_sources.regional_indicator.contains(first_char) &&
+                analysis_data_sources.regional_indicator.contains(ch) {
+                println!("[is_emoji] TESTING: regional indicator");
+                return true;
+            }
+        }
 
-    // Check for ZWJ-composed emoji graphemes (e.g. 👩‍👩‍👧‍👧)
-    let mut has_emoji = false;
-    let mut has_zwj = false;
-
-    for ch in grapheme.chars() {
+        // Check for ZWJ-composed emoji graphemes (e.g. 👩‍👩‍👧‍👧)
         if ch as u32 == 0x200D {
             has_zwj = true;
         }
-        if analysis_data_sources.emoji.contains(ch) {
-            has_emoji = true;
-        }
+        has_emoji |= emoji_data_source_contains_char;
+
+        first_and_previous_char = if char_index == 0 { Some(ch) } else { None };
     }
 
     // If the grapheme (already segmented by icu, so it is a valid grapheme) has both emoji
     // characters and ZWJ, it's likely an emoji ZWJ sequence.
+    if has_emoji && has_zwj {
+        println!("[is_emoji] TESTING: emoji with zwj");
+    }
     has_emoji && has_zwj
 }
 
@@ -323,22 +325,6 @@ fn shape_item<'a, B: Brush>(
         println!("boundary: {}", boundary);
         let segment_text = &item_text[last..boundary];
 
-        // For simple single-character emojis
-        //let mut chars = segment_text.chars();
-        let is_emoji = {
-            is_emoji_grapheme(analysis_data_sources, segment_text)
-            // TODO(conor) more performant for single-chars, adopt mix of this and `is_emoji_grapheme`
-            /*if chars.next().is_some() && chars.next().is_none() {
-                // Exactly one character
-                let ch = segment_text.chars().next().unwrap();
-                basic_emoji.contains(ch)
-            } else {
-                // For emoji sequences, check if the string itself is an emoji
-                is_emoji_grapheme(segment_text)
-            }*/
-        };
-        println!("[icu] '{}' is_emoji: {:?}", segment_text, is_emoji);
-
         let mut len = 0;
         let mut map_len = 0;
         let mut force_normalize = false;
@@ -367,7 +353,7 @@ fn shape_item<'a, B: Brush>(
                 len: ch_len as u8,
                 offset: (start + index) as u32,
                 contributes_to_shaping,
-                glyph_id: 0, // TODO(conor) - correct to default to zero?
+                glyph_id: 0,
                 data: *style_index as UserData, // TODO(conor) - needed?
                 is_control_character: matches!(info.general_category, GeneralCategory::Control),
             };
@@ -379,7 +365,7 @@ fn shape_item<'a, B: Brush>(
         let cluster_icu = layout::replace_swash::CharCluster::new(
             segment_text.to_string(),
             chars,
-            is_emoji,
+            is_emoji_grapheme(analysis_data_sources, segment_text),
             len,
             map_len,
             start as u32,
