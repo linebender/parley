@@ -82,6 +82,7 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) tree_style_builder: TreeStyleBuilder<B>,
 
     pub(crate) info: Vec<(CharInfo, u16)>,
+    // u16: style index for character
     pub(crate) info_icu: Vec<(icu_working::CharInfo, u16)>,
     pub(crate) scx: ShapeContext,
 
@@ -394,18 +395,12 @@ impl<B: Brush> LayoutContext<B> {
         }
 
         // BiDi embedding levels:
-        let bidi_info = unicode_bidi::BidiInfo::new_with_data_source(&self.analysis_data_sources.bidi_class, text, None);
-        let full_text_range = 0..text.len();
-        let paragraph = ParagraphInfo {
-            range: full_text_range.clone(),
-            level: Level::ltr(), // TODO(conor) Is it always correct to start as LTR?
-        };
-        let bidi_embed_levels_byte_indexed = bidi_info.reordered_levels(&paragraph, full_text_range);
+        let bidi_embedding_levels = unicode_bidi::BidiInfo::new_with_data_source(&self.analysis_data_sources.bidi_class, text, None).levels;
 
         let boundaries_and_levels_iter = text.char_indices()
             .map(|(byte_pos, _)| (
                 all_boundaries_byte_indexed.get(byte_pos).unwrap(),
-                bidi_embed_levels_byte_indexed.get(byte_pos).unwrap()
+                bidi_embedding_levels.get(byte_pos).unwrap()
             ));
 
         // Grapheme cluster boundaries:
@@ -430,11 +425,6 @@ impl<B: Brush> LayoutContext<B> {
             text.chars().map(move |c| (c, data_source.get32(c as u32)).1)
         }
 
-        /*let gen_cat_source = CodePointMapDataBorrowed::<GeneralCategory>::new();
-        unicode_data_iterator(text, gen_cat_source).for_each(|c| {
-            println!("Cat: {:?}", c);
-        });*/
-
         boundaries_and_levels_iter
             .zip(text.chars())
             .zip(unicode_data_iterator(text, self.analysis_data_sources.script))
@@ -456,7 +446,7 @@ impl<B: Brush> LayoutContext<B> {
                 };
                 self.info_icu.push((
                     icu_working::CharInfo::new(ch, boundary, embed_level, swash_script, script, general_category, grapheme_cluster_break),
-                    0
+                    0 // Style index is populated later
                 ));
             });
     }
@@ -1041,6 +1031,20 @@ mod tests {
     #[test]
     fn test_mandatory_break_in_text() {
         verify_swash_icu_equivalence("ABC DEF\nG", |_| {});
+    }
+
+    #[test]
+    fn test_rtl_paragraph_with_non_authoritative_logical_first_character() {
+        verify_swash_icu_equivalence("حداً ", |_| {});
+    }
+    #[test]
+    fn test_rtl_paragraph_with_non_authoritative_logical_first_char_two_paragraphs() {
+        verify_swash_icu_equivalence("حداً \nحداً ", |_| {});
+    }
+
+    #[test]
+    fn test_multi_paragraph_bidi() {
+        verify_swash_icu_equivalence("Hello مرحبا \nTest اختبار", |_| {});
     }
 
     // ==================== RTL and Bidirectional Tests ====================

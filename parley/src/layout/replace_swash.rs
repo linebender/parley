@@ -4,9 +4,9 @@ pub const MAX_CLUSTER_SIZE: usize = 32;
 #[derive(Debug)]
 pub(crate) struct CharCluster {
     pub plain_text: String, // TODO(conor) temp
-    pub info: ClusterInfo,
     pub chars: Vec<Char>, // [Char; MAX_CLUSTER_SIZE], TODO(conor)
     pub style_index: u16,
+    pub is_emoji: bool,
     len: u8,
     map_len: u8,
     start: u32,
@@ -213,8 +213,8 @@ impl Default for ShapeClass {
 impl CharCluster {
     pub(crate) fn new(
         plain_text: String,
-        info: ClusterInfo,
         chars: Vec<Char>,
+        is_emoji: bool,
         len: u8,
         map_len: u8,
         start: u32,
@@ -223,9 +223,9 @@ impl CharCluster {
     ) -> Self {
         CharCluster {
             plain_text,
-            info,
             chars,
             style_index: 0,
+            is_emoji,
             len,
             map_len,
             start,
