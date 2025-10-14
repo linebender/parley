@@ -12,7 +12,6 @@ pub(crate) mod data;
 
 pub mod cursor;
 pub mod editor;
-pub mod replace_swash;
 
 use self::alignment::align;
 

@@ -1,5 +1,5 @@
 /// The maximum number of characters in a single cluster.
-pub const MAX_CLUSTER_SIZE: usize = 32;
+const MAX_CLUSTER_SIZE: usize = 32;
 
 #[derive(Debug)]
 pub(crate) struct CharCluster {
@@ -185,19 +185,19 @@ impl CharCluster {
                     println!("[ICU composed] None->Invalid");
                     return None;
                 }
-                
+
                 self.comp.state = FormState::Invalid;
-                
+
                 // Create a string from the decomposed characters to normalize
                 let mut decomp_str = String::with_capacity(self.decomp.len as usize * 4);
                 for ch in &self.decomp.chars()[..self.decomp.len as usize] {
                     decomp_str.push(ch.ch);
                 }
-                
+
                 // Get a normalizer for NFC (composed) form
                 let nfc = icu::normalizer::ComposingNormalizerBorrowed::new_nfc();
                 let nfc_str = nfc.normalize(&decomp_str);
-                
+
                 // Copy the characters back to our form structure
                 let mut i = 0;
                 for c in nfc_str.chars() {
@@ -205,18 +205,18 @@ impl CharCluster {
                         self.comp.state = FormState::Invalid;
                         return None;
                     }
-                    
+
                     // Use the first decomposed character as a template for other properties
                     let mut ch_copy = self.decomp.chars[0];
                     ch_copy.ch = c;
                     self.comp.chars[i] = ch_copy;
                     i += 1;
                 }
-                
+
                 if i == 0 {
                     return None;
                 }
-                
+
                 self.comp.len = i as u8;
                 println!("[ICU composed] None->Valid: '{}'", Self::format_chars(&self.comp.chars));
                 self.comp.state = FormState::Valid;

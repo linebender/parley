@@ -1,4 +1,4 @@
-mod cluster;
+pub(crate) mod cluster;
 
 use std::collections::HashMap;
 use std::marker::PhantomData;

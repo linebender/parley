@@ -107,8 +107,6 @@ mod bidi;
 mod builder;
 mod context;
 mod font;
-// TODO(conor) - Temporary
-mod icu_working;
 mod inline_box;
 mod resolve;
 mod shape;

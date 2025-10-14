@@ -13,10 +13,11 @@ use icu_properties::props::Script;
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
+use crate::analysis::cluster::{Char, CharCluster, Status};
 use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::inline_box::InlineBox;
 use crate::util::nearly_eq;
-use crate::{Font, swash_convert, layout, icu_working};
+use crate::{Font, swash_convert};
 
 use fontique::{self, Query, QueryFamily, QueryFont};
 
@@ -319,7 +320,7 @@ fn shape_item<'a, B: Brush>(
                       map_len += info.contributes_to_shaping as u8;
                       **code_unit_offset += ch.len_utf8();
 
-                      let char = layout::replace_swash::Char {
+                      let char = Char {
                           ch,
                           contributes_to_shaping: info.contributes_to_shaping,
                           glyph_id: 0,
@@ -332,7 +333,7 @@ fn shape_item<'a, B: Brush>(
 
                   let end = **code_unit_offset;
 
-                  let cluster = layout::replace_swash::CharCluster::new(
+                  let cluster = CharCluster::new(
                       chars,
                       is_emoji_grapheme(analysis_data_sources, segment_text),
                       len,
@@ -559,7 +560,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         }
     }
 
-    fn select_font(&mut self, cluster: &mut crate::replace_swash::CharCluster) -> Option<SelectedFont> {
+    fn select_font(&mut self, cluster: &mut CharCluster) -> Option<SelectedFont> {
         println!("[select_font_icu] self.style index: {}, cluster.style_index: {}", self.style_index, cluster.style_index);
         let style_index = cluster.style_index();
         println!("[select_font_icu] cluster: '{}'", cluster.chars.iter().map(|ch| ch.ch).collect::<String>());
@@ -603,7 +604,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             };
 
             let charmap = font_ref.charmap();
-            let map_status: crate::replace_swash::Status = cluster.map(|ch| {
+            let map_status: Status = cluster.map(|ch| {
                 let glyph_id = charmap
                     .map(ch)
                     .map(|g| {
@@ -617,15 +618,15 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             });
 
             match map_status {
-                crate::replace_swash::Status::Complete => {
+                Status::Complete => {
                     selected_font = Some(font.into());
                     fontique::QueryStatus::Stop
                 }
-                crate::replace_swash::Status::Keep => {
+                Status::Keep => {
                     selected_font = Some(font.into());
                     fontique::QueryStatus::Continue
                 }
-                crate::replace_swash::Status::Discard => {
+                Status::Discard => {
                     if selected_font.is_none() {
                         selected_font = Some(font.into());
                     }
