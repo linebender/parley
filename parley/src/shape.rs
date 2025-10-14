@@ -9,7 +9,7 @@ use core::ops::RangeInclusive;
 
 use alloc::vec::Vec;
 use icu::locale::LanguageIdentifier;
-use icu_properties::props::{GeneralCategory, GraphemeClusterBreak, Script};
+use icu_properties::props::Script;
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
@@ -107,7 +107,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     let mut current_box = inline_box_iter.next();
 
     // Iterate over characters in the text
-    for ((char_index, (byte_index, ch)), (info, style_index)) in
+    for ((_, (byte_index, ch)), (info, style_index)) in
         text.char_indices().enumerate().zip(infos)
     {
         let mut break_run = false;
@@ -116,7 +116,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             script = item.script;
         }
         //let level_swash = levels.get(char_index).copied().unwrap_or(0);
-        let mut level = info.bidi_embed_level;
+        let level = info.bidi_embed_level;
         //println!("[BIDI] [shape_text] level: {}, level_swash: {}", level, level_swash);
         if item.style_index != *style_index {
             item.style_index = *style_index;
@@ -297,14 +297,11 @@ fn shape_item<'a, B: Brush>(
     let mut font_selector =
         FontSelector::new(fq, rcx, styles, first_style_index, item.script, item.locale.clone());
 
-    // ICU
-    let item_infos_icu = &infos[char_range.start..char_range.end]; // Only process current item
-
     // TODO(conor) as iterator
     let mut clusters = vec![];
     let mut last = 0;
     let mut code_unit_offset_in_string = text_range.start;
-    let mut item_infos_icu_iter = item_infos_icu.iter();
+    let mut item_infos_icu_iter = item_infos.iter();
     let grapheme_cluster_boundaries = analysis_data_sources.grapheme_segmenter.segment_str(item_text);
     //println!("Clusters for item text: {}: {:?}", item_text, clusters_2.map(|c| c.to_string()).collect::<Vec<String>>());
     for boundary in grapheme_cluster_boundaries.skip(1) { // First boundary index is always zero
@@ -315,7 +312,7 @@ fn shape_item<'a, B: Brush>(
         let mut map_len = 0;
         let mut force_normalize = false;
         let start = code_unit_offset_in_string;
-        let chars = segment_text.char_indices().zip(item_infos_icu_iter.by_ref()).map(|((index, ch), (info, style_index))| {
+        let chars = segment_text.char_indices().zip(item_infos_icu_iter.by_ref()).map(|((_, ch), (info, style_index))| {
             println!("[ICU CHAR->INFO] char:'{ch}' info: {info:?}, style_index:: {style_index}");
 
             force_normalize |= info.force_normalize;

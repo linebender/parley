@@ -3,7 +3,7 @@ pub const MAX_CLUSTER_SIZE: usize = 32;
 
 #[derive(Debug)]
 pub(crate) struct CharCluster {
-    pub chars: Vec<Char>, // [Char; MAX_CLUSTER_SIZE], TODO(conor)
+    pub chars: Vec<Char>,
     pub style_index: u16,
     pub is_emoji: bool,
     len: u8,
