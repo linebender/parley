@@ -301,7 +301,7 @@ fn shape_item<'a, B: Brush>(
     let mut clusters = vec![];
     let mut last = 0;
     let mut code_unit_offset_in_string = text_range.start;
-    let mut item_infos_icu_iter = item_infos.iter();
+    let mut item_infos_iter = item_infos.iter();
     let grapheme_cluster_boundaries = analysis_data_sources.grapheme_segmenter.segment_str(item_text);
     //println!("Clusters for item text: {}: {:?}", item_text, clusters_2.map(|c| c.to_string()).collect::<Vec<String>>());
     for boundary in grapheme_cluster_boundaries.skip(1) { // First boundary index is always zero
@@ -312,7 +312,7 @@ fn shape_item<'a, B: Brush>(
         let mut map_len = 0;
         let mut force_normalize = false;
         let start = code_unit_offset_in_string;
-        let chars = segment_text.char_indices().zip(item_infos_icu_iter.by_ref()).map(|((_, ch), (info, style_index))| {
+        let chars = segment_text.char_indices().zip(item_infos_iter.by_ref()).map(|((_, ch), (info, style_index))| {
             println!("[ICU CHAR->INFO] char:'{ch}' info: {info:?}, style_index:: {style_index}");
 
             force_normalize |= info.force_normalize;
@@ -332,7 +332,7 @@ fn shape_item<'a, B: Brush>(
         }).collect();
         let end = code_unit_offset_in_string;
 
-        let cluster_icu = layout::replace_swash::CharCluster::new(
+        clusters.push(layout::replace_swash::CharCluster::new(
             chars,
             is_emoji_grapheme(analysis_data_sources, segment_text),
             len,
@@ -340,9 +340,7 @@ fn shape_item<'a, B: Brush>(
             start as u32,
             end as u32,
             force_normalize
-        );
-
-        clusters.push(cluster_icu);
+        ));
         last = boundary;
     }
 
@@ -350,7 +348,7 @@ fn shape_item<'a, B: Brush>(
     let mut cluster = clusters_iter.next().expect("one cluster");
 
     println!("Calling select_font, site A");
-    let mut current_font = font_selector.select_font_icu(cluster);
+    let mut current_font = font_selector.select_font(cluster);
     println!("END site A");
 
     // Main segmentation loop (based on swash shape_clusters) - only within current item
@@ -370,7 +368,7 @@ fn shape_item<'a, B: Brush>(
             };
 
             println!("Calling select_font, site B");
-            if let Some(next_font) = font_selector.select_font_icu(cluster) {
+            if let Some(next_font) = font_selector.select_font(cluster) {
                 if next_font != font {
                     println!("[CURRENT_FONT] next_font");
                     current_font = Some(next_font);
@@ -560,7 +558,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         }
     }
 
-    fn select_font_icu(&mut self, cluster: &mut crate::replace_swash::CharCluster) -> Option<SelectedFont> {
+    fn select_font(&mut self, cluster: &mut crate::replace_swash::CharCluster) -> Option<SelectedFont> {
         println!("[select_font_icu] self.style index: {}, cluster.style_index: {}", self.style_index, cluster.style_index);
         let style_index = cluster.style_index();
         println!("[select_font_icu] cluster: '{}'", cluster.chars.iter().map(|ch| ch.ch).collect::<String>());
