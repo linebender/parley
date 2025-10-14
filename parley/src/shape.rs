@@ -13,12 +13,12 @@ use icu_properties::props::Script;
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
+use crate::analysis::AnalysisDataSources;
 use crate::inline_box::InlineBox;
 use crate::util::nearly_eq;
 use crate::{Font, swash_convert, layout, icu_working};
 
 use fontique::{self, Query, QueryFamily, QueryFont};
-use crate::context::AnalysisDataSources;
 
 pub(crate) struct ShapeContext {
     unicode_buffer: Option<harfrust::UnicodeBuffer>,

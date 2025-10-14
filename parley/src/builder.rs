@@ -155,7 +155,7 @@ fn build_into_layout<B: Brush>(
     lcx: &mut LayoutContext<B>,
     fcx: &mut FontContext,
 ) {
-    lcx.analyze_text(text);
+    crate::analysis::analyze_text(lcx, text);
 
     layout.data.clear();
     layout.data.scale = scale;
@@ -169,7 +169,6 @@ fn build_into_layout<B: Brush>(
     let mut char_index = 0;
     for (i, style) in lcx.styles.iter().enumerate() {
         for _ in text[style.range.clone()].chars() {
-            lcx.info[char_index].1 = i as u16;
             lcx.info_icu[char_index].1 = i as u16;
             char_index += 1;
         }
