@@ -297,58 +297,60 @@ fn shape_item<'a, B: Brush>(
     let mut font_selector =
         FontSelector::new(fq, rcx, styles, first_style_index, item.script, item.locale.clone());
 
-    // TODO(conor) as iterator
-    let mut clusters = vec![];
-    let mut last = 0;
-    let mut code_unit_offset_in_string = text_range.start;
-    let mut item_infos_iter = item_infos.iter();
     let grapheme_cluster_boundaries = analysis_data_sources.grapheme_segmenter.segment_str(item_text);
-    //println!("Clusters for item text: {}: {:?}", item_text, clusters_2.map(|c| c.to_string()).collect::<Vec<String>>());
-    for boundary in grapheme_cluster_boundaries.skip(1) { // First boundary index is always zero
-        println!("boundary: {}", boundary);
-        let segment_text = &item_text[last..boundary];
+    let mut item_infos_iter = item_infos.iter();
+    let mut code_unit_offset_in_string = text_range.start;
+    let mut clusters_iter = grapheme_cluster_boundaries
+        .skip(1) // First boundary index is always zero
+        .scan((0usize, &mut item_infos_iter, &mut code_unit_offset_in_string),
+              |(last, item_infos_iter, code_unit_offset), boundary| {
+                  println!("boundary: {}", boundary);
+                  let segment_text = &item_text[*last..boundary];
 
-        let mut len = 0;
-        let mut map_len = 0;
-        let mut force_normalize = false;
-        let start = code_unit_offset_in_string;
-        let chars = segment_text.char_indices().zip(item_infos_iter.by_ref()).map(|((_, ch), (info, style_index))| {
-            println!("[ICU CHAR->INFO] char:'{ch}' info: {info:?}, style_index:: {style_index}");
+                  let mut len = 0;
+                  let mut map_len = 0;
+                  let mut force_normalize = false;
+                  let start = **code_unit_offset;
 
-            force_normalize |= info.force_normalize;
-            len += 1;
-            map_len += info.contributes_to_shaping as u8;
-            code_unit_offset_in_string += ch.len_utf8();
+                  let chars = segment_text.char_indices().zip(item_infos_iter.by_ref()).map(|((_, ch), (info, style_index))| {
+                      println!("[ICU CHAR->INFO] char:'{ch}' info: {info:?}, style_index:: {style_index}");
 
-            let char = layout::replace_swash::Char {
-                ch,
-                contributes_to_shaping: info.contributes_to_shaping,
-                glyph_id: 0,
-                style_index: *style_index,
-                is_control_character: info.is_control,
-            };
-            println!("[icu - CharCluster] Made char: {:?}", char);
-            char
-        }).collect();
-        let end = code_unit_offset_in_string;
+                      force_normalize |= info.force_normalize;
+                      len += 1;
+                      map_len += info.contributes_to_shaping as u8;
+                      **code_unit_offset += ch.len_utf8();
 
-        clusters.push(layout::replace_swash::CharCluster::new(
-            chars,
-            is_emoji_grapheme(analysis_data_sources, segment_text),
-            len,
-            map_len,
-            start as u32,
-            end as u32,
-            force_normalize
-        ));
-        last = boundary;
-    }
+                      let char = layout::replace_swash::Char {
+                          ch,
+                          contributes_to_shaping: info.contributes_to_shaping,
+                          glyph_id: 0,
+                          style_index: *style_index,
+                          is_control_character: info.is_control,
+                      };
+                      println!("[icu - CharCluster] Made char: {:?}", char);
+                      char
+                  }).collect();
 
-    let mut clusters_iter = clusters.iter_mut();
+                  let end = **code_unit_offset;
+
+                  let cluster = layout::replace_swash::CharCluster::new(
+                      chars,
+                      is_emoji_grapheme(analysis_data_sources, segment_text),
+                      len,
+                      map_len,
+                      start as u32,
+                      end as u32,
+                      force_normalize
+                  );
+
+                  *last = boundary;
+                  Some(cluster)
+              });
+
     let mut cluster = clusters_iter.next().expect("one cluster");
 
     println!("Calling select_font, site A");
-    let mut current_font = font_selector.select_font(cluster);
+    let mut current_font = font_selector.select_font(&mut cluster);
     println!("END site A");
 
     // Main segmentation loop (based on swash shape_clusters) - only within current item
@@ -368,7 +370,7 @@ fn shape_item<'a, B: Brush>(
             };
 
             println!("Calling select_font, site B");
-            if let Some(next_font) = font_selector.select_font(cluster) {
+            if let Some(next_font) = font_selector.select_font(&mut cluster) {
                 if next_font != font {
                     println!("[CURRENT_FONT] next_font");
                     current_font = Some(next_font);
