@@ -261,7 +261,6 @@ impl<B: Brush> LayoutContext<B> {
                     return None;
                 }
 
-                // TODO(conor) avoid `while`, twice
                 while let Some(style) = self.styles.next() {
                     let style_start_index = style.range.start;
                     if style_start_index == style.range.end {
@@ -334,12 +333,6 @@ impl<B: Brush> LayoutContext<B> {
         );
         let mut global_offset = 0;
         for (substring_index, (substring, word_break_strength, last)) in contiguous_word_break_substrings.enumerate() {
-            // TODO(conor) Should we expose CSS line-breaking strictness as an option in Parley's style API?
-            //line_break_opts.strictness = LineBreakStrictness::Strict;
-            // TODO(conor) - Do we set this, to have it impact breaking? It doesn't look like Swash is
-            //  It seems like we'd want to - this could enable script-based line breaking.
-            //line_break_opts.content_locale = ?
-
             let word_break_strength = swash_to_icu_lb(word_break_strength);
             let line_segmenter = &mut self.analysis_data_sources.line_segmenters.entry(word_break_strength as u8).or_insert({
                 let mut line_break_opts: LineBreakOptions<'static> = Default::default();
@@ -401,24 +394,6 @@ impl<B: Brush> LayoutContext<B> {
                 bidi_embedding_levels.get(byte_pos).unwrap()
             ));
 
-        // Grapheme cluster boundaries:
-        /*let segmenter = GraphemeClusterSegmenter::new();
-        //segmenter.segment_str()
-        let mut clusters = segmenter.segment_str(text);
-
-        // Print the actual cluster boundaries
-        let boundaries: Vec<usize> = clusters.collect();
-        println!("cluster boundaries: {:?}", boundaries);
-
-        // Or to get the actual text segments:
-        let segmenter = GraphemeClusterSegmenter::new();
-        let clusters = segmenter.segment_str(text);
-        let mut last = 0;
-        for boundary in clusters {
-            println!("cluster: {:?}", &text[last..boundary]);
-            last = boundary;
-        }*/
-
         fn unicode_data_iterator<'a, T: TrieValue>(text: &'a str, data_source: CodePointMapDataBorrowed::<'static, T>) -> impl Iterator<Item = T> + 'a {
             text.chars().map(move |c| (c, data_source.get32(c as u32)).1)
         }
@@ -432,19 +407,19 @@ impl<B: Brush> LayoutContext<B> {
             // characters (like '\n') exist at an index position one higher than the respective
             // character's index, but we need our iterators to align, and the rest are simply
             // character-indexed.
-            // TODO(conor) have data iterator not resolve value unless its needed (line break data not always used)
             .zip(std::iter::once(LineBreak::from_icu4c_value(0)).chain(unicode_data_iterator(text, self.analysis_data_sources.line_break)))
             .for_each(|((((((boundary, embed_level), ch), script), general_category), grapheme_cluster_break), line_break)| {
                 let embed_level: BidiLevel = (*embed_level).into();
+
                 let boundary = if is_mandatory_line_break(line_break) {
                     Boundary::Mandatory
                 } else {
                     *boundary
                 };
+
                 let is_control = matches!(general_category, GeneralCategory::Control);
                 let contributes_to_shaping = !is_control || (matches!(general_category, GeneralCategory::Format) &&
                     !matches!(script, Script::Inherited));
-
                 let force_normalize = {
                     // "Extend" break chars should be normalized first, with two exceptions
                     if matches!(grapheme_cluster_break, GraphemeClusterBreak::Extend) &&
@@ -459,7 +434,7 @@ impl<B: Brush> LayoutContext<B> {
                 };
 
                 self.info_icu.push((
-                    icu_working::CharInfo::new(ch, boundary, embed_level, script, grapheme_cluster_break, is_control, contributes_to_shaping, force_normalize),
+                    icu_working::CharInfo::new(boundary, embed_level, script, grapheme_cluster_break, is_control, contributes_to_shaping, force_normalize),
                     0 // Style index is populated later
                 ));
             });
@@ -556,13 +531,6 @@ mod tests {
                 1.,
                 true
             );
-
-            // TODO(conor) Remove this if really not needed
-            let font_stack = FontStack::from("system-ui");
-            builder.push_default(StyleProperty::Brush(Default::default()));
-            builder.push_default(font_stack);
-            builder.push_default(StyleProperty::FontSize(24.0));
-            builder.push_default(LineHeight::FontSizeRelative(1.3));
 
             // Apply test-specific configuration
             configure_builder(&mut builder);

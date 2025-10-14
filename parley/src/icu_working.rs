@@ -5,7 +5,6 @@ use crate::bidi::BidiLevel;
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CharInfo {
     // TODO(conor) - Shift attribute comments up from `impl CharInfo`
-    pub ch: char, // TODO(conor) temporary, most likely
     pub boundary: Boundary,
     pub bidi_embed_level: BidiLevel,
     pub script: Script,
@@ -18,7 +17,6 @@ pub(crate) struct CharInfo {
 impl CharInfo {
     // TODO(conor) Simpler construction, avoid impl?
     pub(crate) fn new(
-        ch: char,
         boundary: Boundary,
         bidi_embed_level: BidiLevel,
         script: Script,
@@ -28,7 +26,6 @@ impl CharInfo {
         force_normalize: bool,
     ) -> Self {
         Self {
-            ch,
             boundary,
             bidi_embed_level,
             script,

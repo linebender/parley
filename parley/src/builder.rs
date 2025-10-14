@@ -187,8 +187,6 @@ fn build_into_layout<B: Brush>(
 
     {
         let query = fcx.collection.query(&mut fcx.source_cache);
-        // TODO(conor) bidi approach:
-        //  bidi.levels() redundant, this data is in info_icu
         super::shape::shape_text(
             &lcx.rcx,
             query,

@@ -250,7 +250,6 @@ fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str
         }
 
         // Check for flag emoji (two regional indicators), must be a two-character grapheme.
-        // TODO(conor) Swash doesn't cluster these correctly in select_font, acknowledge this
         if let Some(first_char) = first_and_previous_char {
             if chars_iter.peek().is_none() &&
                 analysis_data_sources.regional_indicator.contains(first_char) &&
@@ -598,7 +597,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         let mut selected_font = None;
         self.query.matches_with(|font| {
             use skrifa::MetadataProvider;
-            // use Status as MapStatus; // TODO(conor)
 
             let Ok(font_ref) = skrifa::FontRef::from_index(font.blob.as_ref(), font.index) else {
                 return fontique::QueryStatus::Continue;
@@ -611,7 +609,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
                     .map(|g| {
                         g.to_u32()
                             .try_into()
-                            // TODO(conor) understand this error message, and is it irrelevant now?
                             .expect("Swash requires u16 glyph, so we hope that the glyph fits")
                     })
                     .unwrap_or_default();
