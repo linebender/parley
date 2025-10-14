@@ -13,7 +13,7 @@ use icu_properties::props::Script;
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
-use crate::analysis::AnalysisDataSources;
+use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::inline_box::InlineBox;
 use crate::util::nearly_eq;
 use crate::{Font, swash_convert, layout, icu_working};
@@ -52,7 +52,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     mut fq: Query<'a>,
     styles: &'a [RangedStyle<B>],
     inline_boxes: &[InlineBox],
-    infos: &[(icu_working::CharInfo, u16)],
+    infos: &[(CharInfo, u16)],
     scx: &mut ShapeContext,
     mut text: &str,
     layout: &mut Layout<B>,
@@ -285,7 +285,7 @@ fn shape_item<'a, B: Brush>(
     text: &str,
     text_range: &core::ops::Range<usize>,
     char_range: &core::ops::Range<usize>,
-    infos: &[(icu_working::CharInfo, u16)],
+    infos: &[(CharInfo, u16)],
     layout: &mut Layout<B>,
     analysis_data_sources: &AnalysisDataSources,
 ) {

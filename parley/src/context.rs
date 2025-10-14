@@ -5,16 +5,14 @@
 
 use alloc::{vec, vec::Vec};
 
-use super::{icu_working, FontContext};
+use super::FontContext;
 use super::bidi;
 use super::builder::RangedBuilder;
 use super::resolve::tree::TreeStyleBuilder;
 use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle };
 use super::style::{Brush, TextStyle};
 
-use swash::text::cluster::CharInfo;
-
-use crate::analysis::AnalysisDataSources;
+use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
 use crate::shape::ShapeContext;
@@ -32,9 +30,9 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) ranged_style_builder: RangedStyleBuilder<B>,
     pub(crate) tree_style_builder: TreeStyleBuilder<B>,
 
-    pub(crate) info: Vec<(CharInfo, u16)>,
+    pub(crate) info: Vec<(swash::text::cluster::CharInfo, u16)>,
     // u16: style index for character
-    pub(crate) info_icu: Vec<(icu_working::CharInfo, u16)>,
+    pub(crate) info_icu: Vec<(CharInfo, u16)>,
     pub(crate) scx: ShapeContext,
 
     // Unicode analysis data sources (provided by icu)

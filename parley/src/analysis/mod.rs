@@ -7,11 +7,11 @@ use icu::segmenter::{GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed,
 use icu::segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakInvariantOptions};
 use icu_properties::{CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed, EmojiSetData, EmojiSetDataBorrowed};
 use icu_properties::props::{BasicEmoji, BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, RegionalIndicator, Script, VariationSelector};
-use swash::text::cluster::{Boundary, CharInfo};
+use swash::text::cluster::Boundary;
 use swash::text::WordBreakStrength;
 use unicode_bidi::TextSource;
 use crate::bidi::BidiLevel;
-use crate::{icu_working, Brush, LayoutContext};
+use crate::{Brush, LayoutContext};
 use crate::resolve::RangedStyle;
 
 pub(crate) struct AnalysisDataSources {
@@ -50,6 +50,25 @@ impl AnalysisDataSources {
             line_segmenters: HashMap::new(),
         }
     }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct CharInfo {
+    /// The line/word breaking boundary classification of this character.
+    pub boundary: Boundary,
+    /// The bidirectional embedding level of the character (even = LTR, odd = RTL).
+    pub bidi_embed_level: BidiLevel,
+    /// The Unicode script this character belongs to.
+    pub script: Script,
+    /// The grapheme cluster boundary property of this character.
+    pub grapheme_cluster_break: GraphemeClusterBreak,
+    /// Whether this character belongs to the "Control" general category in Unicode.
+    pub is_control: bool,
+    /// Whether this character contributes to text shaping in Parley.
+    pub contributes_to_shaping: bool,
+    /// Whether to apply NFC normalization before attempting cluster form variations during
+    /// Parley's font selection.
+    pub force_normalize: bool,
 }
 
 pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
@@ -289,7 +308,7 @@ pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str)
             };
 
             lcx.info_icu.push((
-                icu_working::CharInfo {
+                CharInfo {
                     boundary,
                     bidi_embed_level,
                     script,
@@ -332,7 +351,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
             break;
         };
 
-        lcx.info.push((CharInfo::new(properties, boundary), 0));
+        lcx.info.push((swash::text::cluster::CharInfo::new(properties, boundary), 0));
     }
 
     // TODO(conor) - add back later, this is just to bring swash/icu test data to parity
