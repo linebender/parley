@@ -11,13 +11,6 @@ pub(crate) fn script_icu_to_swash(script: icu_properties::props::Script) -> swas
     script_from_u8(script.to_icu4c_value() as u8).unwrap()
 }
 
-pub(crate) fn script_to_harfrust(script: swash::text::Script) -> harfrust::Script {
-    harfrust::Script::from_iso15924_tag(harfrust::Tag::new(
-        FONTIQUE_SCRIPT_TAGS.get(script as usize).unwrap_or(b"Zzzz"),
-    ))
-    .unwrap_or(harfrust::script::UNKNOWN)
-}
-
 pub(crate) fn script_icu_to_harfrust(script: icu_properties::props::Script) -> harfrust::Script {
     harfrust::Script::from_iso15924_tag(harfrust::Tag::new(
         FONTIQUE_SCRIPT_TAGS.get(script_icu_to_swash(script) as usize).unwrap_or(b"Zzzz"),

@@ -161,7 +161,7 @@ fn build_into_layout<B: Brush>(
     layout.data.scale = scale;
     layout.data.quantize = quantize;
     //layout.data.has_bidi = !lcx.bidi.levels().is_empty();
-    layout.data.base_level = lcx.info_icu.first().map(|i| i.0.bidi_embed_level as u8).unwrap_or(0);
+    layout.data.base_level = lcx.info_icu.first().map(|i| i.0.bidi_embed_level).unwrap_or(0);
     println!("[BIDI] [build_into_layout] base_level: {}", layout.data.base_level);
     //println!("[BIDI] [build_into_layout] base_level (icu): {:?}", base_level);
     layout.data.text_len = text.len();

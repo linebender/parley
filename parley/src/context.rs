@@ -409,7 +409,7 @@ impl<B: Brush> LayoutContext<B> {
             // character-indexed.
             .zip(std::iter::once(LineBreak::from_icu4c_value(0)).chain(unicode_data_iterator(text, self.analysis_data_sources.line_break)))
             .for_each(|((((((boundary, embed_level), ch), script), general_category), grapheme_cluster_break), line_break)| {
-                let embed_level: BidiLevel = (*embed_level).into();
+                let bidi_embed_level: BidiLevel = (*embed_level).into();
 
                 let boundary = if is_mandatory_line_break(line_break) {
                     Boundary::Mandatory
@@ -434,7 +434,15 @@ impl<B: Brush> LayoutContext<B> {
                 };
 
                 self.info_icu.push((
-                    icu_working::CharInfo::new(boundary, embed_level, script, grapheme_cluster_break, is_control, contributes_to_shaping, force_normalize),
+                    icu_working::CharInfo {
+                        boundary,
+                        bidi_embed_level,
+                        script,
+                        grapheme_cluster_break,
+                        is_control,
+                        contributes_to_shaping,
+                        force_normalize
+                    },
                     0 // Style index is populated later
                 ));
             });
@@ -510,7 +518,7 @@ impl<B: Brush> Clone for LayoutContext<B> {
 mod tests {
     use fontique::FontWeight;
     use swash::text::WordBreakStrength;
-    use crate::{FontContext, FontStack, LayoutContext, LineHeight, RangedBuilder, StyleProperty};
+    use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty};
 
     // TODO(conor) - Rework/rename once Swash is fully removed
     fn verify_swash_icu_equivalence(text: &str, configure_builder: impl for<'a> FnOnce(&mut RangedBuilder<'a, [u8; 4]>))
