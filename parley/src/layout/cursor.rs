@@ -12,7 +12,7 @@ use alloc::vec::Vec;
 use core::ops::Range;
 use peniko::kurbo::Rect;
 #[cfg(feature = "accesskit")]
-use swash::text::cluster::Whitespace;
+use crate::analysis::cluster::Whitespace;
 
 /// Defines a position with a text layout.
 #[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]

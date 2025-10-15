@@ -4,7 +4,6 @@
 //! Greedy line breaking.
 
 use alloc::vec::Vec;
-use swash::text::cluster::Whitespace;
 
 #[cfg(feature = "libm")]
 #[allow(unused_imports)]
@@ -18,6 +17,7 @@ use crate::layout::{
 use crate::style::Brush;
 
 use core::ops::Range;
+use crate::analysis::cluster::Whitespace;
 
 #[derive(Default)]
 struct LineLayout {

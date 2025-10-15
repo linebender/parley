@@ -8,7 +8,7 @@ use crate::util::nearly_zero;
 use crate::{Font, OverflowWrap};
 use core::ops::Range;
 
-use swash::text::cluster::{Boundary, Whitespace};
+use swash::text::cluster::Boundary;
 
 use alloc::vec::Vec;
 
@@ -16,6 +16,7 @@ use alloc::vec::Vec;
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 use crate::analysis::CharInfo;
+use crate::analysis::cluster::Whitespace;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct ClusterData {
