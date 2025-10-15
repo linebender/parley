@@ -126,14 +126,9 @@ impl<B: Brush> Layout<B> {
     /// You must perform line breaking prior to aligning, through [`Layout::break_lines`] or
     /// [`Layout::break_all_lines`]. If `container_width` is not specified, the layout's
     /// [`Layout::width`] is used.
-    pub fn align(
-        &mut self,
-        container_width: Option<f32>,
-        alignment: Alignment,
-        options: AlignmentOptions,
-    ) {
+    pub fn align(&mut self, alignment: Alignment, options: AlignmentOptions) {
         unjustify(&mut self.data);
-        align(&mut self.data, container_width, alignment, options);
+        align(&mut self.data, alignment, options);
     }
 
     /// Returns the index and `Line` object for the line containing the
