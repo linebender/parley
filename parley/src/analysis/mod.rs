@@ -7,7 +7,6 @@ use icu::segmenter::{GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed,
 use icu::segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakInvariantOptions};
 use icu_properties::{CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed, EmojiSetData, EmojiSetDataBorrowed};
 use icu_properties::props::{BasicEmoji, BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, RegionalIndicator, Script, VariationSelector};
-use swash::text::WordBreakStrength;
 use unicode_bidi::TextSource;
 use crate::bidi::BidiLevel;
 use crate::{Brush, LayoutContext};
@@ -85,14 +84,6 @@ pub enum Boundary {
 }
 
 pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
-    fn swash_to_icu_lb(swash: WordBreakStrength) -> LineBreakWordOption {
-        match swash {
-            WordBreakStrength::Normal => LineBreakWordOption::Normal,
-            WordBreakStrength::BreakAll => LineBreakWordOption::BreakAll,
-            WordBreakStrength::KeepAll => LineBreakWordOption::KeepAll,
-        }
-    }
-
     // See: https://github.com/unicode-org/icu4x/blob/ee5399a77a6b94efb5d4b60678bb458c5eedb25d/components/segmenter/src/line.rs#L338-L351
     fn is_mandatory_line_break(line_break: LineBreak) -> bool {
         matches!(line_break, LineBreak::MandatoryBreak
@@ -107,7 +98,7 @@ pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str)
         char_indices: std::str::CharIndices<'a>,
         current_char_index: usize,
         building_range_start: usize,
-        previous_word_break_style: WordBreakStrength,
+        previous_word_break_style: LineBreakWordOption,
         done: bool,
         _phantom: PhantomData<B>,
     }
@@ -141,7 +132,7 @@ pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str)
     where
         I: Iterator<Item = &'a RangedStyle<B>>
     {
-        type Item = (&'a str, WordBreakStrength, bool);
+        type Item = (&'a str, LineBreakWordOption, bool);
 
         fn next(&mut self) -> Option<Self::Item> {
             if self.done {
@@ -220,7 +211,6 @@ pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str)
     );
     let mut global_offset = 0;
     for (substring_index, (substring, word_break_strength, last)) in contiguous_word_break_substrings.enumerate() {
-        let word_break_strength = swash_to_icu_lb(word_break_strength);
         let line_segmenter = &mut lcx.analysis_data_sources.line_segmenters.entry(word_break_strength as u8).or_insert({
             let mut line_break_opts: LineBreakOptions<'static> = Default::default();
             line_break_opts.word_option = Some(word_break_strength);
@@ -336,6 +326,14 @@ pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str)
 }
 
 pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
+    fn icu_to_swash_lb(icu: LineBreakWordOption) -> swash::text::WordBreakStrength {
+        match icu {
+            LineBreakWordOption::BreakAll => swash::text::WordBreakStrength::BreakAll,
+            LineBreakWordOption::KeepAll => swash::text::WordBreakStrength::KeepAll,
+            _ => swash::text::WordBreakStrength::Normal,
+        }
+    }
+
     let text = if text.is_empty() { " " } else { text };
     let mut a = swash::text::analyze(text.chars());
     _ = analyze_text_icu(lcx, text);
@@ -358,7 +356,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
             }
             style_idx += 1;
         }
-        a.set_break_strength(word_break);
+        a.set_break_strength(icu_to_swash_lb(word_break));
 
         let Some((properties, boundary)) = a.next() else {
             break;
@@ -380,8 +378,8 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
 
 #[cfg(test)]
 mod tests {
+    use icu::segmenter::options::LineBreakWordOption;
     use fontique::FontWeight;
-    use swash::text::WordBreakStrength;
     use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty};
 
     // TODO(conor) - Rework/rename once Swash is fully removed
@@ -472,21 +470,21 @@ mod tests {
     #[test]
     fn test_two_chars_keep_all() {
         verify_swash_icu_equivalence("AB", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..2);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..2);
         });
     }
 
     #[test]
     fn test_three_chars() {
         verify_swash_icu_equivalence("ABC", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..3);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..3);
         });
     }
 
     #[test]
     fn test_single_char_multi_byte() {
         verify_swash_icu_equivalence("€", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..3);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..3);
         });
     }
 
@@ -516,163 +514,163 @@ mod tests {
     fn test_whitespace_contiguous_interspersed_in_latin_mixed() {
         // Drops expected line boundary on char 3 (just before B)
         verify_swash_icu_equivalence("A  B  C D", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..3);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 3..9);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..3);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 3..9);
         });
     }
 
     #[test]
     fn test_latin_mixed_break_all_first() {
         verify_swash_icu_equivalence("AB", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..2);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 0..1);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..2);
         });
     }
 
     #[test]
     fn test_latin_mixed_break_all_last() {
         verify_swash_icu_equivalence("AB", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 1..2);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..1);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 1..2);
         });
     }
 
     #[test]
     fn test_latin_mixed_keep_all_first() {
         verify_swash_icu_equivalence("AB", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..2);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..1);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..2);
         });
     }
 
     #[test]
     fn test_latin_mixed_keep_all_last() {
         verify_swash_icu_equivalence("AB", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 1..2);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..1);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 1..2);
         });
     }
 
     #[test]
     fn test_latin_trailing_space_mixed() {
         verify_swash_icu_equivalence("AB ", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..3);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 0..1);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..3);
         });
     }
 
     #[test]
     fn test_latin_leading_space_mixed() {
         verify_swash_icu_equivalence(" AB", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..3);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 0..1);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..3);
         });
     }
 
     #[test]
     fn test_alternate_twice_within_word_normal_break_normal() {
         verify_swash_icu_equivalence("ABC", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 1..2);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 2..3);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..1);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 1..2);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 2..3);
         });
     }
 
     #[test]
     fn test_alternate_twice_within_word_break_normal_break() {
         verify_swash_icu_equivalence("ABC", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..2);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 2..3);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 0..1);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..2);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 2..3);
         });
     }
 
     #[test]
     fn test_mixed_break_simple() {
         verify_swash_icu_equivalence("ABCD 123", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 1..8);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..1);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 1..8);
         });
     }
 
     #[test]
     fn test_mixed_break_four_segments() {
         verify_swash_icu_equivalence("ABCD 123", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 1..2);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 2..4);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 4..8);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..1);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 1..2);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 2..4);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 4..8);
         });
     }
 
     #[test]
     fn test_mixed_break_frequent_alternation() {
         verify_swash_icu_equivalence("ABCD 123", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 1..2);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 2..3);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 3..4);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 4..5);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 5..6);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 6..7);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 7..8);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..1);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 1..2);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 2..3);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 3..4);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 4..5);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 5..6);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 6..7);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 7..8);
         });
     }
 
     #[test]
     fn test_multi_char_grapheme_mixed_break_all() {
         verify_swash_icu_equivalence("A e\u{0301} B", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..2);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 2..5);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 5..6);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 6..7);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 0..1);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..2);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 2..5);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 5..6);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 6..7);
         });
     }
 
     #[test]
     fn test_multi_char_grapheme_mixed_keep_all() {
         verify_swash_icu_equivalence("A e\u{0301} B", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 1..2);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 2..5);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 5..6);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 6..7);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..1);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..2);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 2..5);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 5..6);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 6..7);
         });
     }
 
     #[test]
     fn test_multi_char_grapheme_mixed_break_and_keep_all() {
         verify_swash_icu_equivalence("A e\u{0301} B", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..1);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 1..2);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 2..5);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 5..6);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 6..7);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..1);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 1..2);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 2..5);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 5..6);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 6..7);
         });
     }
 
     #[test]
     fn test_multi_byte_chars_alternating_break_all() {
         verify_swash_icu_equivalence("€你€你AA", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..3);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 3..6);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 6..9);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 9..12);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 12..13);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 13..14);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 0..3);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 3..6);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 6..9);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 9..12);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 12..13);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 13..14);
         });
     }
 
     #[test]
     fn test_multi_byte_chars_alternating_keep_all() {
         verify_swash_icu_equivalence("€你€你AA", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 0..3);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 3..6);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 6..9);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 9..12);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::KeepAll), 12..13);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 13..14);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..3);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 3..6);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 6..9);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 9..12);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 12..13);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 13..14);
         });
     }
 
@@ -680,22 +678,22 @@ mod tests {
     fn test_multi_byte_chars_varying_utf8_lengths() {
         // 2-3-4-3-2 byte pattern
         verify_swash_icu_equivalence("ß€𝓗你ą", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..2);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 2..5);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 5..9);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 9..12);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 12..14);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 0..2);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 2..5);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 5..9);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 9..12);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 12..14);
         });
     }
 
     #[test]
     fn test_multi_byte_chars_varying_utf8_lengths_whitespace_separated() {
         verify_swash_icu_equivalence("ß € 𝓗 你 ą", |builder| {
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 0..3);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 3..7);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 7..12);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::Normal), 12..16);
-            builder.push(StyleProperty::WordBreak(WordBreakStrength::BreakAll), 16..19);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 0..3);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 3..7);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 7..12);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 12..16);
+            builder.push(StyleProperty::WordBreak(LineBreakWordOption::BreakAll), 16..19);
         });
     }
 

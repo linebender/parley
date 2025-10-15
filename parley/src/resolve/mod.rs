@@ -17,7 +17,7 @@ use super::style::{
 use crate::font::FontContext;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
-use crate::{LineHeight, OverflowWrap, WordBreakStrength, layout};
+use crate::{LineBreakWordOption, LineHeight, OverflowWrap, layout};
 use core::borrow::Borrow;
 use core::ops::Range;
 use icu::locale::LanguageIdentifier;
@@ -371,7 +371,7 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     /// Extra spacing between letters.
     LetterSpacing(f32),
     /// Control over where words can wrap.
-    WordBreak(WordBreakStrength),
+    WordBreak(LineBreakWordOption),
     /// Control over "emergency" line-breaking.
     OverflowWrap(OverflowWrap),
 }
@@ -408,7 +408,7 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     /// Extra spacing between letters.
     pub(crate) letter_spacing: f32,
     /// Control over where words can wrap.
-    pub(crate) word_break: WordBreakStrength,
+    pub(crate) word_break: LineBreakWordOption,
     /// Control over "emergency" line-breaking.
     pub(crate) overflow_wrap: OverflowWrap,
 }
