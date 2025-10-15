@@ -40,7 +40,6 @@ pub(crate) use line::LineItem;
 pub use crate::editing::{Cursor, Selection};
 
 // TODO - Move the following to `style` module and submodules.
-
 use crate::OverflowWrap;
 use crate::style::Brush;
 
