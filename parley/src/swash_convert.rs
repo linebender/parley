@@ -3,12 +3,23 @@
 
 // TODO(conor) Rename to icu_convert
 
+use crate::analysis::Boundary;
+
 pub(crate) fn script_to_fontique(script: icu_properties::props::Script) -> fontique::Script {
     fontique::Script(*FONTIQUE_SCRIPT_TAGS.get(script_icu_to_swash(script) as usize).unwrap_or(b"Zzzz"))
 }
 
 pub(crate) fn script_icu_to_swash(script: icu_properties::props::Script) -> swash::text::Script {
     script_from_u8(script.to_icu4c_value() as u8).unwrap()
+}
+
+pub(crate) fn boundary_swash_to_parley(boundary: swash::text::cluster::Boundary) -> Boundary {
+    match boundary {
+        swash::text::cluster::Boundary::None => Boundary::None,
+        swash::text::cluster::Boundary::Word => Boundary::Word,
+        swash::text::cluster::Boundary::Line => Boundary::Line,
+        swash::text::cluster::Boundary::Mandatory => Boundary::Mandatory,
+    }
 }
 
 pub(crate) fn script_icu_to_harfrust(script: icu_properties::props::Script) -> harfrust::Script {

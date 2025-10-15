@@ -7,7 +7,6 @@ use icu::segmenter::{GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed,
 use icu::segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakInvariantOptions};
 use icu_properties::{CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed, EmojiSetData, EmojiSetDataBorrowed};
 use icu_properties::props::{BasicEmoji, BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, RegionalIndicator, Script, VariationSelector};
-use swash::text::cluster::Boundary;
 use swash::text::WordBreakStrength;
 use unicode_bidi::TextSource;
 use crate::bidi::BidiLevel;
@@ -69,6 +68,20 @@ pub(crate) struct CharInfo {
     /// Whether to apply NFC normalization before attempting cluster form variations during
     /// Parley's font selection.
     pub force_normalize: bool,
+}
+
+/// Boundary type of a character or cluster.
+#[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
+#[repr(u8)]
+pub enum Boundary {
+    /// Not a boundary.
+    None = 0,
+    /// Start of a word.
+    Word = 1,
+    /// Potential line break.
+    Line = 2,
+    /// Mandatory line break.
+    Mandatory = 3,
 }
 
 pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
@@ -419,7 +432,7 @@ mod tests {
 
             // Assert equality
             assert_eq!(
-                swash_info.boundary(),
+                crate::swash_convert::boundary_swash_to_parley(swash_info.boundary()),
                 icu_info.boundary,
                 "Boundary mismatch at character position {} in text: '{}'",
                 idx, text
