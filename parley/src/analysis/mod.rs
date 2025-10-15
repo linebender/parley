@@ -20,11 +20,11 @@ pub(crate) struct AnalysisDataSources {
     pub(crate) extended_pictographic: CodePointSetDataBorrowed<'static>,
     pub(crate) regional_indicator: CodePointSetDataBorrowed<'static>,
 
-    script: CodePointMapDataBorrowed::<'static, Script>,
-    general_category: CodePointMapDataBorrowed::<'static, GeneralCategory>,
-    bidi_class: CodePointMapDataBorrowed::<'static, BidiClass>,
-    line_break: CodePointMapDataBorrowed::<'static, LineBreak>,
-    grapheme_cluster_break: CodePointMapDataBorrowed::<'static, GraphemeClusterBreak>,
+    script: CodePointMapDataBorrowed<'static, Script>,
+    general_category: CodePointMapDataBorrowed<'static, GeneralCategory>,
+    bidi_class: CodePointMapDataBorrowed<'static, BidiClass>,
+    line_break: CodePointMapDataBorrowed<'static, LineBreak>,
+    grapheme_cluster_break: CodePointMapDataBorrowed<'static, GraphemeClusterBreak>,
     word_segmenter: WordSegmenterBorrowed<'static>,
     // Key: icu_segmenter::line::LineBreakWordOption as u8
     line_segmenters: HashMap<u8, LineSegmenterBorrowed<'static>>,
@@ -72,7 +72,7 @@ pub(crate) struct CharInfo {
 /// Boundary type of a character or cluster.
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
 #[repr(u8)]
-pub enum Boundary {
+pub(crate) enum Boundary {
     /// Not a boundary.
     None = 0,
     /// Start of a word.
@@ -271,7 +271,7 @@ pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str)
             bidi_embedding_levels.get(byte_pos).unwrap()
         ));
 
-    fn unicode_data_iterator<'a, T: TrieValue>(text: &'a str, data_source: CodePointMapDataBorrowed::<'static, T>) -> impl Iterator<Item = T> + 'a {
+    fn unicode_data_iterator<'a, T: TrieValue>(text: &'a str, data_source: CodePointMapDataBorrowed<'static, T>) -> impl Iterator<Item = T> + 'a {
         text.chars().map(move |c| (c, data_source.get32(c as u32)).1)
     }
 
