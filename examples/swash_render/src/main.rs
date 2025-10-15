@@ -179,7 +179,7 @@ fn main() {
 
     // Perform layout (including bidi resolution and shaping) with start alignment
     layout.break_all_lines(max_advance);
-    layout.align(max_advance, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
 
     // Create image to render into
     let width = layout.width().ceil() as u32 + (padding * 2);
