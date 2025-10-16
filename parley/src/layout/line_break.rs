@@ -762,13 +762,20 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
             height += line.metrics.line_height as f64;
         }
 
+        // Don't include the last line's line_height in the layout's height if the last line is empty
+        if let Some(last_line) = self.lines.lines.last() {
+            if last_line.item_range.is_empty() {
+                height -= last_line.metrics.line_height as f64;
+            }
+        }
+
         // Save the computed widths/height to the layout
         self.layout.data.width = width;
         self.layout.data.full_width = full_width;
         self.layout.data.height = height as f32;
 
         // for (i, line) in self.lines.lines.iter().enumerate() {
-        //     println!("LINE {i}");
+        //     println!("LINE {i} (h:{})", line.metrics.line_height);
         //     for item_idx in line.item_range.clone() {
         //         let item = &self.lines.line_items[item_idx];
         //         println!("  ITEM {:?} ({})", item.kind, item.advance);
