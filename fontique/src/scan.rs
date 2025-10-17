@@ -70,7 +70,7 @@ pub fn scan_paths(
 /// discovered.
 pub fn scan_memory<'a>(buf: &'a [u8], mut f: impl FnMut(&ScannedFont<'a>)) {
     #[allow(clippy::unit_arg)]
-    scan_memory_impl(buf, Default::default(), &mut f);
+    scan_memory_impl(buf, Option::default(), &mut f);
 }
 
 #[cfg(feature = "std")]
@@ -79,7 +79,7 @@ fn scan_collection(
     max_depth: u32,
 ) -> ScannedCollection {
     let mut collection = ScannedCollection::default();
-    let mut families: HashMap<FamilyId, (FamilyName, SmallVec<[FontInfo; 4]>)> = Default::default();
+    let mut families: HashMap<FamilyId, (FamilyName, SmallVec<[FontInfo; 4]>)> = HashMap::default();
     let mut postscript_name = String::default();
     let mut name_pool = vec![];
     let mut names = vec![];
@@ -127,7 +127,7 @@ fn scan_collection(
             .insert(postscript_name.clone(), name.id());
         families
             .entry(name.id())
-            .or_insert_with(|| (name.clone(), Default::default()))
+            .or_insert_with(|| (name.clone(), SmallVec::default()))
             .1
             .push(font);
     });

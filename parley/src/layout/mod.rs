@@ -235,7 +235,7 @@ impl<B: Brush> Layout<B> {
 impl<B: Brush> Default for Layout<B> {
     fn default() -> Self {
         Self {
-            data: Default::default(),
+            data: LayoutData::default(),
         }
     }
 }

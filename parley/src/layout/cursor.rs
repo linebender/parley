@@ -443,7 +443,7 @@ impl Selection {
         Self {
             anchor,
             focus,
-            anchor_base: Default::default(),
+            anchor_base: AnchorBase::default(),
             h_pos: None,
         }
     }

@@ -84,7 +84,7 @@ fn main() {
             font_stack,
             line_height: LineHeight::FontSizeRelative(1.3),
             font_size: 16.0,
-            ..Default::default()
+            ..TextStyle::default()
         };
 
         let mut builder =

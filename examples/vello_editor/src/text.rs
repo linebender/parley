@@ -55,9 +55,10 @@ impl Editor {
             font_cx: FontContext::default(),
             layout_cx: LayoutContext::default(),
             editor,
-            cursor_visible: Default::default(),
-            start_time: Option::default(),
-            blink_period: Duration::default(),
+            cursor_visible: false,
+            start_time: None,
+            // TODO: Why initialize to zero?
+            blink_period: Duration::ZERO,
         }
     }
 

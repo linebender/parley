@@ -43,9 +43,9 @@ impl FamilyInfo {
         let fonts: SmallVec<[FontInfo; 4]> = fonts.into_iter().collect();
         let default_font = super::matching::match_font(
             &fonts[..],
-            Default::default(),
-            Default::default(),
-            Default::default(),
+            FontWidth::default(),
+            FontStyle::default(),
+            FontWeight::default(),
             false,
         )
         .unwrap_or(0);
