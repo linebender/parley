@@ -91,6 +91,49 @@ impl<'source> IntoIterator for SplitString<'source> {
     }
 }
 
+/// Represents modifications to text as returned by [`PlainEditor::raw_text`].
+///
+/// The ranges are in UTF-8 bytes like [`str::len`] and include the IME preedit region.
+///
+/// Use [`PlainEditor::raw_compose`] to manually exclude the IME preedit region.
+#[derive(Default, Clone, PartialEq, Eq)]
+pub struct TextModification {
+    /// The range of the old text.
+    ///
+    /// If the length is zero, this represents an insertion.
+    pub old: Range<usize>,
+    /// The range of the new text.
+    ///
+    /// If the length is zero, this represents a deletion.
+    pub new: Range<usize>,
+}
+impl TextModification {
+    /// Returns true if there is no modification.
+    pub fn is_empty(&self) -> bool {
+        self.old.is_empty() && self.new.is_empty()
+    }
+
+    /// Wrapper over [`String::replace_range()`] that returns a [`TextModification`].
+    #[must_use]
+    fn replace_range(buffer: &mut String, range: Range<usize>, replace_with: &str) -> Self {
+        buffer.replace_range(range.clone(), replace_with);
+        Self {
+            old: range.clone(),
+            new: range.start..(range.start + replace_with.len()),
+        }
+    }
+
+    /// Wrapper over [`String::insert_str()`] that returns a [`TextModification`].
+    #[must_use]
+    fn insert_str(buffer: &mut String, idx: usize, new_string: &str) -> Self {
+        buffer.insert_str(idx, new_string);
+        Self {
+            old: idx..idx,
+            new: idx..(idx + new_string.len()),
+        }
+    }
+}
+
 /// Basic plain text editor with a single style applied to the entire text.
 ///
 /// Internally, this is a wrapper around a string buffer and its corresponding [`Layout`],
@@ -178,14 +221,14 @@ where
 {
     // --- MARK: Forced relayout ---
     /// Insert at cursor, or replace selection.
-    pub fn insert_or_replace_selection(&mut self, s: &str) {
+    pub fn insert_or_replace_selection(&mut self, s: &str) -> TextModification {
         self.editor
-            .replace_selection(self.font_cx, self.layout_cx, s);
+            .replace_selection(self.font_cx, self.layout_cx, s)
     }
 
     /// Delete the selection.
-    pub fn delete_selection(&mut self) {
-        self.insert_or_replace_selection("");
+    pub fn delete_selection(&mut self) -> TextModification {
+        self.insert_or_replace_selection("")
     }
 
     /// Delete the specified numbers of bytes before the selection.
@@ -194,14 +237,14 @@ where
     ///
     /// The deleted range is clamped to the start of the buffer.
     /// No-op if the start of the range is not a char boundary.
-    pub fn delete_bytes_before_selection(&mut self, len: NonZeroUsize) {
+    pub fn delete_bytes_before_selection(&mut self, len: NonZeroUsize) -> TextModification {
         let old_selection = self.editor.selection;
         let selection_range = old_selection.text_range();
         let range = selection_range.start.saturating_sub(len.get())..selection_range.start;
         if range.is_empty() || !self.editor.buffer.is_char_boundary(range.start) {
-            return;
+            return TextModification::default();
         }
-        self.editor.buffer.replace_range(range.clone(), "");
+        let tmod = self.editor.buffer_replace_range(range.clone(), "");
         self.editor
             .update_compose_for_replaced_range(range.clone(), 0);
         self.update_layout();
@@ -226,6 +269,7 @@ where
                 focus_affinity,
             ),
         ));
+        tmod
     }
 
     /// Delete the specified numbers of bytes after the selection.
@@ -233,7 +277,7 @@ where
     ///
     /// The deleted range is clamped to the end of the buffer.
     /// No-op if the end of the range is not a char boundary.
-    pub fn delete_bytes_after_selection(&mut self, len: NonZeroUsize) {
+    pub fn delete_bytes_after_selection(&mut self, len: NonZeroUsize) -> TextModification {
         let selection_range = self.editor.selection.text_range();
         let range = selection_range.end
             ..selection_range
@@ -241,15 +285,16 @@ where
                 .saturating_add(len.get())
                 .min(self.editor.buffer.len());
         if range.is_empty() || !self.editor.buffer.is_char_boundary(range.end) {
-            return;
+            return TextModification::default();
         }
-        self.editor.buffer.replace_range(range.clone(), "");
+        let tmod = self.editor.buffer_replace_range(range.clone(), "");
         self.editor.update_compose_for_replaced_range(range, 0);
         self.update_layout();
+        tmod
     }
 
     /// Delete the selection or the next cluster (typical ‘delete’ behavior).
-    pub fn delete(&mut self) {
+    pub fn delete(&mut self) -> TextModification {
         if self.editor.selection.is_collapsed() {
             // Upstream cluster range
             if let Some(range) = self
@@ -261,37 +306,43 @@ where
                 .map(|cluster| cluster.text_range())
                 .and_then(|range| (!range.is_empty()).then_some(range))
             {
-                self.editor.buffer.replace_range(range.clone(), "");
+                let tmod = self.editor.buffer_replace_range(range.clone(), "");
                 self.editor.update_compose_for_replaced_range(range, 0);
                 self.update_layout();
+                tmod
+            } else {
+                TextModification::default()
             }
         } else {
-            self.delete_selection();
+            self.delete_selection()
         }
     }
 
     /// Delete the selection or up to the next word boundary (typical ‘ctrl + delete’ behavior).
-    pub fn delete_word(&mut self) {
+    pub fn delete_word(&mut self) -> TextModification {
         if self.editor.selection.is_collapsed() {
             let focus = self.editor.selection.focus();
             let start = focus.index();
             let end = focus.next_logical_word(&self.editor.layout).index();
             if self.editor.buffer.get(start..end).is_some() {
-                self.editor.buffer.replace_range(start..end, "");
+                let tmod = self.editor.buffer_replace_range(start..end, "");
                 self.editor.update_compose_for_replaced_range(start..end, 0);
                 self.update_layout();
                 self.editor.set_selection(
                     Cursor::from_byte_index(&self.editor.layout, start, Affinity::Downstream)
                         .into(),
                 );
+                tmod
+            } else {
+                TextModification::default()
             }
         } else {
-            self.delete_selection();
+            self.delete_selection()
         }
     }
 
     /// Delete the selection or the previous cluster (typical ‘backspace’ behavior).
-    pub fn backdelete(&mut self) {
+    pub fn backdelete(&mut self) -> TextModification {
         if self.editor.selection.is_collapsed() {
             // Upstream cluster
             if let Some(cluster) = self
@@ -314,40 +365,46 @@ where
                         .get(..end)
                         .and_then(|str| str.char_indices().next_back())
                     else {
-                        return;
+                        return TextModification::default();
                     };
                     start
                 };
-                self.editor.buffer.replace_range(start..end, "");
+                let tmod = self.editor.buffer_replace_range(start..end, "");
                 self.editor.update_compose_for_replaced_range(start..end, 0);
                 self.update_layout();
                 self.editor.set_selection(
                     Cursor::from_byte_index(&self.editor.layout, start, Affinity::Downstream)
                         .into(),
                 );
+                tmod
+            } else {
+                TextModification::default()
             }
         } else {
-            self.delete_selection();
+            self.delete_selection()
         }
     }
 
     /// Delete the selection or back to the previous word boundary (typical ‘ctrl + backspace’ behavior).
-    pub fn backdelete_word(&mut self) {
+    pub fn backdelete_word(&mut self) -> TextModification {
         if self.editor.selection.is_collapsed() {
             let focus = self.editor.selection.focus();
             let end = focus.index();
             let start = focus.previous_logical_word(&self.editor.layout).index();
             if self.editor.buffer.get(start..end).is_some() {
-                self.editor.buffer.replace_range(start..end, "");
+                let tmod = self.editor.buffer_replace_range(start..end, "");
                 self.editor.update_compose_for_replaced_range(start..end, 0);
                 self.update_layout();
                 self.editor.set_selection(
                     Cursor::from_byte_index(&self.editor.layout, start, Affinity::Downstream)
                         .into(),
                 );
+                tmod
+            } else {
+                TextModification::default()
             }
         } else {
-            self.delete_selection();
+            self.delete_selection()
         }
     }
 
@@ -364,27 +421,21 @@ where
     ///
     /// The selection is updated based on `cursor`, which contains the byte offsets relative to the
     /// start of the preedit text. If `cursor` is `None`, the selection and caret are hidden.
-    pub fn set_compose(&mut self, text: &str, cursor: Option<(usize, usize)>) {
+    pub fn set_compose(&mut self, text: &str, cursor: Option<(usize, usize)>) -> TextModification {
         debug_assert!(!text.is_empty());
         debug_assert!(cursor.map(|cursor| cursor.1 <= text.len()).unwrap_or(true));
 
-        let start = if let Some(preedit_range) = &self.editor.compose {
+        let tmod = if let Some(preedit_range) = self.editor.compose.clone() {
+            self.editor.buffer_replace_range(preedit_range, text)
+        } else if self.editor.selection.is_collapsed() {
             self.editor
-                .buffer
-                .replace_range(preedit_range.clone(), text);
-            preedit_range.start
+                .buffer_insert_str(self.editor.selection.text_range().start, text)
         } else {
-            if self.editor.selection.is_collapsed() {
-                self.editor
-                    .buffer
-                    .insert_str(self.editor.selection.text_range().start, text);
-            } else {
-                self.editor
-                    .buffer
-                    .replace_range(self.editor.selection.text_range(), text);
-            }
-            self.editor.selection.text_range().start
+            self.editor
+                .buffer_replace_range(self.editor.selection.text_range(), text)
         };
+
+        let start = tmod.old.start;
         self.editor.compose = Some(start..start + text.len());
         self.editor.show_cursor = cursor.is_some();
         self.update_layout();
@@ -397,6 +448,7 @@ where
             self.editor.cursor_at(start + cursor.0),
             self.editor.cursor_at(start + cursor.1),
         ));
+        tmod
     }
 
     /// Set the preedit range to a range of byte indices.
@@ -414,14 +466,17 @@ where
     ///
     /// This removes the IME preedit text, shows the cursor if it was hidden,
     /// and moves the cursor to the start of the former preedit region.
-    pub fn clear_compose(&mut self) {
+    pub fn clear_compose(&mut self) -> TextModification {
         if let Some(preedit_range) = self.editor.compose.take() {
-            self.editor.buffer.replace_range(preedit_range.clone(), "");
+            let tmod = self.editor.buffer_replace_range(preedit_range.clone(), "");
             self.editor.show_cursor = true;
             self.update_layout();
 
             self.editor
                 .set_selection(self.editor.cursor_at(preedit_range.start).into());
+            tmod
+        } else {
+            TextModification::default()
         }
     }
 
@@ -972,11 +1027,15 @@ where
     }
 
     /// Replace the whole text buffer.
-    pub fn set_text(&mut self, is: &str) {
+    pub fn set_text(&mut self, is: &str) -> TextModification {
+        let old = 0..self.buffer.len();
         self.buffer.clear();
         self.buffer.push_str(is);
+        let new = 0..self.buffer.len();
+
         self.layout_dirty = true;
         self.compose = None;
+        TextModification { old, new }
     }
 
     /// Set the width of the layout.
@@ -1143,14 +1202,14 @@ where
         font_cx: &mut FontContext,
         layout_cx: &mut LayoutContext<T>,
         s: &str,
-    ) {
+    ) -> TextModification {
         let range = self.selection.text_range();
         let start = range.start;
-        if self.selection.is_collapsed() {
-            self.buffer.insert_str(start, s);
+        let tmod = if self.selection.is_collapsed() {
+            self.buffer_insert_str(start, s)
         } else {
-            self.buffer.replace_range(range.clone(), s);
-        }
+            self.buffer_replace_range(range.clone(), s)
+        };
         self.update_compose_for_replaced_range(range, s.len());
 
         self.update_layout(font_cx, layout_cx);
@@ -1161,6 +1220,7 @@ where
             Affinity::Upstream
         };
         self.set_selection(Cursor::from_byte_index(&self.layout, new_index, affinity).into());
+        tmod
     }
 
     /// Update the selection, and nudge the `Generation` if something other than `h_pos` changed.
@@ -1257,5 +1317,21 @@ where
             node.clear_text_selection();
         }
         node.add_action(accesskit::Action::SetTextSelection);
+    }
+
+    /// Wrapper over [`Self::buffer`].[`replace_range`()](String::replace_range) that returns a [`TextModification`].
+    #[must_use]
+    fn buffer_replace_range(
+        &mut self,
+        range: Range<usize>,
+        replace_with: &str,
+    ) -> TextModification {
+        TextModification::replace_range(&mut self.buffer, range, replace_with)
+    }
+
+    /// Wrapper over [`Self::buffer`].[`insert_str`()](String::insert_str) that returns a [`TextModification`].
+    #[must_use]
+    fn buffer_insert_str(&mut self, idx: usize, string: &str) -> TextModification {
+        TextModification::insert_str(&mut self.buffer, idx, string)
     }
 }
