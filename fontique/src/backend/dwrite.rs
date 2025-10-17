@@ -17,7 +17,7 @@ use windows::{
         IDWriteFontFamily, IDWriteFontFile, IDWriteLocalFontFileLoader, IDWriteNumberSubstitution,
         IDWriteTextAnalysisSource, IDWriteTextAnalysisSource_Impl,
     },
-    core::{BOOL, Interface, PCWSTR, implement},
+    core::{Interface, PCWSTR, implement},
 };
 
 use super::{
