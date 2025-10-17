@@ -67,28 +67,28 @@ impl Default for LineHeight {
 }
 
 impl LineHeight {
-    pub(crate) fn nearly_eq(&self, other: &Self) -> bool {
+    pub(crate) fn nearly_eq(self, other: Self) -> bool {
         match (self, other) {
             (Self::MetricsRelative(a), Self::MetricsRelative(b))
             | (Self::FontSizeRelative(a), Self::FontSizeRelative(b))
-            | (Self::Absolute(a), Self::Absolute(b)) => nearly_eq(*a, *b),
+            | (Self::Absolute(a), Self::Absolute(b)) => nearly_eq(a, b),
             _ => false,
         }
     }
 
-    pub(crate) fn scale(&self, scale: f32) -> Self {
+    pub(crate) fn scale(self, scale: f32) -> Self {
         match self {
-            Self::Absolute(value) => Self::Absolute(*value * scale),
+            Self::Absolute(value) => Self::Absolute(value * scale),
             // The other variants are relative to the font size, so scaling here needn't do anything
-            value => *value,
+            value => value,
         }
     }
 
-    pub(crate) fn resolve(&self, font_size: f32) -> LayoutLineHeight {
+    pub(crate) fn resolve(self, font_size: f32) -> LayoutLineHeight {
         match self {
-            Self::MetricsRelative(value) => LayoutLineHeight::MetricsRelative(*value),
-            Self::FontSizeRelative(value) => LayoutLineHeight::Absolute(*value * font_size),
-            Self::Absolute(value) => LayoutLineHeight::Absolute(*value),
+            Self::MetricsRelative(value) => LayoutLineHeight::MetricsRelative(value),
+            Self::FontSizeRelative(value) => LayoutLineHeight::Absolute(value * font_size),
+            Self::Absolute(value) => LayoutLineHeight::Absolute(value),
         }
     }
 }

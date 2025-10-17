@@ -463,7 +463,7 @@ impl<B: Brush> ResolvedStyle<B> {
             StrikethroughOffset(value) => self.strikethrough.offset == *value,
             StrikethroughSize(value) => self.strikethrough.size == *value,
             StrikethroughBrush(value) => self.strikethrough.brush == *value,
-            LineHeight(value) => self.line_height.nearly_eq(value),
+            LineHeight(value) => self.line_height.nearly_eq(*value),
             WordSpacing(value) => nearly_eq(self.word_spacing, *value),
             LetterSpacing(value) => nearly_eq(self.letter_spacing, *value),
             WordBreak(value) => self.word_break == *value,
