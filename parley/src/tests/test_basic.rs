@@ -620,7 +620,7 @@ fn variable_fonts() {
 }
 
 #[test]
-/// Layouts can be re-line-breaked and re-aligned.
+/// Layouts can be re-line-broken and re-aligned.
 fn realign() {
     let mut env = TestEnv::new(test_name!(), None);
 
