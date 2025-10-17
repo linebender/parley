@@ -70,7 +70,7 @@ pub fn scan_paths(
 /// discovered.
 pub fn scan_memory<'a>(buf: &'a [u8], mut f: impl FnMut(&ScannedFont<'a>)) {
     #[allow(clippy::unit_arg)]
-    scan_memory_impl(buf, Option::default(), &mut f);
+    scan_memory_impl(buf, ScanMemoryPathType::default(), &mut f);
 }
 
 #[cfg(feature = "std")]
