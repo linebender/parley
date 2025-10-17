@@ -88,7 +88,6 @@
     clippy::allow_attributes_without_reason,
     clippy::cast_possible_truncation,
     clippy::missing_assert_message,
-    clippy::shadow_unrelated,
     reason = "Deferred"
 )]
 #![expect(

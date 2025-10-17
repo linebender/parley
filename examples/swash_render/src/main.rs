@@ -4,11 +4,7 @@
 //! A simple example that lays out some text using Parley, rasterises the glyph using Swash
 //! and and then renders it into a PNG using the `image` crate.
 
-#![expect(
-    clippy::cast_possible_truncation,
-    clippy::shadow_unrelated,
-    reason = "Deferred"
-)]
+#![expect(clippy::cast_possible_truncation, reason = "Deferred")]
 
 use image::codecs::png::PngEncoder;
 use image::{self, Pixel, Rgba, RgbaImage};
