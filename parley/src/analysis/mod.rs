@@ -425,12 +425,12 @@ mod tests {
                 bidi_level,  // SWASH bidi level
                 icu_info.bidi_embed_level,  // ICU4X bidi level
                 swash_info.script(),
-                crate::swash_convert::script_icu_to_swash(icu_info.script), // TODO(conor)
+                crate::icu_convert::icu_to_swash(icu_info.script).unwrap(),
             );
 
             // Assert equality
             assert_eq!(
-                crate::swash_convert::boundary_swash_to_parley(swash_info.boundary()),
+                crate::icu_convert::boundary_swash_to_parley(swash_info.boundary()),
                 icu_info.boundary,
                 "Boundary mismatch at character position {} in text: '{}'",
                 idx, text
@@ -443,7 +443,7 @@ mod tests {
             );
             assert_eq!(
                 swash_info.script(),
-                crate::swash_convert::script_icu_to_swash(icu_info.script), // TODO(conor)
+                crate::icu_convert::icu_to_swash(icu_info.script).unwrap(),
                 "Script mismatch at character position {} in text: '{}'",
                 idx, text
             );

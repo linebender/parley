@@ -107,10 +107,10 @@ mod bidi;
 mod builder;
 mod context;
 mod font;
+mod icu_convert;
 mod inline_box;
 mod resolve;
 mod shape;
-mod swash_convert;
 mod util;
 
 pub mod layout;

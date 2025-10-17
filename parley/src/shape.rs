@@ -17,7 +17,7 @@ use crate::analysis::cluster::{Char, CharCluster, Status};
 use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::inline_box::InlineBox;
 use crate::util::nearly_eq;
-use crate::{Font, swash_convert};
+use crate::{Font, icu_convert};
 
 use fontique::{self, Query, QueryFamily, QueryFont};
 
@@ -437,7 +437,7 @@ fn shape_item<'a, B: Brush>(
         };
         buffer.set_direction(direction);
 
-        let script = swash_convert::script_icu_to_harfrust(item.script);
+        let script = icu_convert::script_to_harfrust(item.script);
         buffer.set_script(script);
 
         if let Some(lang) = item.locale.clone() {
@@ -543,8 +543,9 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         let features = rcx.features(style.font_features).unwrap_or(&[]);
         query.set_families(fonts.iter().copied());
 
-        let fb_script = swash_convert::script_to_fontique(script);
-        let fb_language = locale.and_then(swash_convert::locale_icu_to_fontique);
+        let fb_script = icu_convert::script_to_fontique(script);
+        let fb_language = locale.and_then(icu_convert::locale_to_fontique);
+        println!("[FontSelector::new]: Fontique language: '{:?}'", fb_language);
         query.set_fallbacks(fontique::FallbackKey::new(fb_script, fb_language.as_ref()));
         query.set_attributes(attrs);
 
