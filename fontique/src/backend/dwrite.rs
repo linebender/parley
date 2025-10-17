@@ -165,7 +165,14 @@ impl DWriteSystemFonts {
 
     fn family_by_name(&self, name: &str) -> Option<DWriteFontFamily> {
         let mut index = 0;
-        let mut exists = BOOL::default();
+        #[expect(
+            clippy::default_trait_access,
+            reason = "The type this resolves to doesn't seem to be nameable."
+        )]
+        // The documentation for `FindFamilyName` seems to be:
+        // https://microsoft.github.io/windows-docs-rs/doc/windows/Win32/Graphics/DirectWrite/trait.IDWriteFontCollection_Impl.html#tymethod.FindFamilyName
+        // And we need a value of type BOOL, which you'll notice is allegedly not actually public (i.e. it has no link).
+        let mut exists = Default::default();
         let mut name_buf = smallvec::SmallVec::<[u16; 128]>::default();
         name_buf.extend(name.encode_utf16());
         name_buf.push(0);
