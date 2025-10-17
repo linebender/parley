@@ -17,7 +17,7 @@ use windows::{
         IDWriteFontFamily, IDWriteFontFile, IDWriteLocalFontFileLoader, IDWriteNumberSubstitution,
         IDWriteTextAnalysisSource, IDWriteTextAnalysisSource_Impl,
     },
-    core::{Interface, PCWSTR, implement},
+    core::{BOOL, Interface, PCWSTR, implement},
 };
 
 use super::{
@@ -165,7 +165,7 @@ impl DWriteSystemFonts {
 
     fn family_by_name(&self, name: &str) -> Option<DWriteFontFamily> {
         let mut index = 0;
-        let mut exists = 0;
+        let mut exists = BOOL::default();
         let mut name_buf = smallvec::SmallVec::<[u16; 128]>::default();
         name_buf.extend(name.encode_utf16());
         name_buf.push(0);
