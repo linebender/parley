@@ -87,7 +87,7 @@ impl SystemFonts {
             _ => {}
         }
         let name = self.name_map.get_by_id(id)?;
-        let mut fonts: smallvec::SmallVec<[FontInfo; 4]> = SmallVec::default();
+        let mut fonts = smallvec::SmallVec::<[FontInfo; 4]>::default();
         if let Some(family) = self.dwrite_fonts.family_by_name(name.name()) {
             for font in family.fonts() {
                 if let Some(font) = FontInfo::from_dwrite(&font, &mut self.source_cache) {
@@ -166,7 +166,7 @@ impl DWriteSystemFonts {
     fn family_by_name(&self, name: &str) -> Option<DWriteFontFamily> {
         let mut index = 0;
         let mut exists = false;
-        let mut name_buf: smallvec::SmallVec<[u16; 128]> = SmallVec::default();
+        let mut name_buf = smallvec::SmallVec::<[u16; 128]>::default();
         name_buf.extend(name.encode_utf16());
         name_buf.push(0);
         unsafe {
@@ -221,7 +221,7 @@ impl DWriteSystemFonts {
                         let family = font.GetFontFamily().ok()?;
                         let names = family.GetFamilyNames().ok()?;
                         let name_len = names.GetStringLength(0).ok()? as usize;
-                        let mut name_buf: smallvec::SmallVec<[u16; 128]> = SmallVec::default();
+                        let mut name_buf = smallvec::SmallVec::<[u16; 128]>::default();
                         name_buf.resize(name_len + 1, 0);
                         names.GetString(0, &mut name_buf).ok()?;
                         name_buf.pop();
