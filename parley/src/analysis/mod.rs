@@ -490,8 +490,6 @@ mod tests {
         test_context
     }
 
-    // ==================== Updated Tests ====================
-
     #[test]
     fn test_latin_mixed_keep_all_last() {
         verify_analysis("AB", |builder| {
@@ -645,30 +643,6 @@ mod tests {
             .expect_boundary_list(vec![
                 Boundary::Word,
                 Boundary::None,
-            ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-            ])
-            .expect_script_list(vec![
-                Script::from_icu4c_value(25),
-                Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
             ]);
     }
 
@@ -689,66 +663,6 @@ mod tests {
                 Boundary::Line,
                 Boundary::None,
                 Boundary::None,
-            ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-            ])
-            .expect_script_list(vec![
-                Script::from_icu4c_value(25),
-                Script::from_icu4c_value(25),
-                Script::from_icu4c_value(25),
-                Script::from_icu4c_value(25),
-                Script::from_icu4c_value(0),
-                Script::from_icu4c_value(0),
-                Script::from_icu4c_value(0),
-                Script::from_icu4c_value(0),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -763,36 +677,6 @@ mod tests {
                 Boundary::Word,
                 Boundary::Line,
                 Boundary::None,
-            ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-                0,
-            ])
-            .expect_script_list(vec![
-                Script::from_icu4c_value(25),
-                Script::from_icu4c_value(25),
-                Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -807,36 +691,6 @@ mod tests {
                 Boundary::Word,
                 Boundary::None,
                 Boundary::Line,
-            ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-                0,
-            ])
-            .expect_script_list(vec![
-                Script::from_icu4c_value(25),
-                Script::from_icu4c_value(25),
-                Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -860,26 +714,6 @@ mod tests {
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(0),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -903,26 +737,6 @@ mod tests {
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -935,30 +749,6 @@ mod tests {
             .expect_boundary_list(vec![
                 Boundary::Word,
                 Boundary::Line,
-            ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-            ])
-            .expect_script_list(vec![
-                Script::from_icu4c_value(25),
-                Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
             ]);
     }
 
@@ -971,30 +761,6 @@ mod tests {
             .expect_boundary_list(vec![
                 Boundary::Word,
                 Boundary::None,
-            ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-            ])
-            .expect_script_list(vec![
-                Script::from_icu4c_value(25),
-                Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
             ]);
     }
 
@@ -1015,26 +781,6 @@ mod tests {
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(0),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -1048,14 +794,6 @@ mod tests {
                 Boundary::None,
                 Boundary::Word,
                 Boundary::Line,
-            ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
             ])
             .expect_script_list(vec![
                 Script::from_icu4c_value(25),
@@ -1121,16 +859,6 @@ mod tests {
                 Boundary::None,
                 Boundary::None,
             ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-            ])
             .expect_script_list(vec![
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(25),
@@ -1140,46 +868,6 @@ mod tests {
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(0),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -1200,17 +888,6 @@ mod tests {
                 Boundary::Word,
                 Boundary::Line,
             ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-            ])
             .expect_script_list(vec![
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(0),
@@ -1221,50 +898,6 @@ mod tests {
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -1309,58 +942,6 @@ mod tests {
                 Script::from_icu4c_value(2),
                 Script::from_icu4c_value(2),
                 Script::from_icu4c_value(2),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -1382,14 +963,6 @@ mod tests {
                 Boundary::Line,
                 Boundary::None,
             ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-            ])
             .expect_script_list(vec![
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(17),
@@ -1397,38 +970,6 @@ mod tests {
                 Script::from_icu4c_value(17),
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -1452,17 +993,6 @@ mod tests {
                 Boundary::Word,
                 Boundary::Line,
             ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-            ])
             .expect_script_list(vec![
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(0),
@@ -1473,50 +1003,6 @@ mod tests {
                 Script::from_icu4c_value(17),
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -1536,47 +1022,12 @@ mod tests {
                 Boundary::Line,
                 Boundary::Line,
             ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-                0,
-                0,
-                0,
-            ])
             .expect_script_list(vec![
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(17),
                 Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -1666,118 +1117,6 @@ mod tests {
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(0),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -1797,16 +1136,6 @@ mod tests {
                 Boundary::None,
                 Boundary::None,
             ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-            ])
             .expect_script_list(vec![
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(25),
@@ -1816,46 +1145,6 @@ mod tests {
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(0),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -1944,14 +1233,6 @@ mod tests {
                 Boundary::Word,
                 Boundary::None,
             ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-            ])
             .expect_script_list(vec![
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(17),
@@ -1959,38 +1240,6 @@ mod tests {
                 Script::from_icu4c_value(17),
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -2140,114 +1389,6 @@ mod tests {
                 GraphemeClusterBreak::from_icu4c_value(0),
                 GraphemeClusterBreak::from_icu4c_value(0),
                 GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -2543,32 +1684,6 @@ mod tests {
                 true,
                 true,
                 true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -2577,24 +1692,6 @@ mod tests {
         verify_analysis("A", |_| {})
             .expect_boundary_list(vec![
                 Boundary::Word,
-            ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-            ])
-            .expect_script_list(vec![
-                Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
             ]);
     }
 
@@ -2703,36 +1800,6 @@ mod tests {
                 Boundary::Word,
                 Boundary::None,
                 Boundary::None,
-            ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-                0,
-            ])
-            .expect_script_list(vec![
-                Script::from_icu4c_value(25),
-                Script::from_icu4c_value(25),
-                Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -2752,15 +1819,6 @@ mod tests {
             ])
             .expect_grapheme_cluster_break_list(vec![
                 GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
             ]);
     }
 
@@ -2836,18 +1894,6 @@ mod tests {
             .expect_grapheme_cluster_break_list(vec![
                 GraphemeClusterBreak::from_icu4c_value(5),
                 GraphemeClusterBreak::from_icu4c_value(5),
-            ])
-            .expect_is_control_list(vec![
-                true,
-                true,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                false,
-                false,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
             ]);
     }
 
@@ -2865,15 +1911,6 @@ mod tests {
             ])
             .expect_grapheme_cluster_break_list(vec![
                 GraphemeClusterBreak::from_icu4c_value(5),
-            ])
-            .expect_is_control_list(vec![
-                true,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                false,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
             ]);
     }
 
@@ -2893,22 +1930,6 @@ mod tests {
             .expect_script_list(vec![
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
             ]);
     }
 
@@ -2926,17 +1947,6 @@ mod tests {
                 Boundary::Word,
                 Boundary::Line,
             ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-            ])
             .expect_script_list(vec![
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(0),
@@ -2947,50 +1957,6 @@ mod tests {
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
             ]);
     }
 
@@ -3011,17 +1977,6 @@ mod tests {
                 Boundary::Word,
                 Boundary::Line,
             ])
-            .expect_bidi_embed_level_list(vec![
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-                0,
-            ])
             .expect_script_list(vec![
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(0),
@@ -3032,50 +1987,6 @@ mod tests {
                 Script::from_icu4c_value(25),
                 Script::from_icu4c_value(0),
                 Script::from_icu4c_value(25),
-            ])
-            .expect_grapheme_cluster_break_list(vec![
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-                GraphemeClusterBreak::from_icu4c_value(0),
-            ])
-            .expect_is_control_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-            ])
-            .expect_contributes_to_shaping_list(vec![
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-                true,
-            ])
-            .expect_force_normalize_list(vec![
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
             ]);
     }
 }
