@@ -165,7 +165,7 @@ impl DWriteSystemFonts {
 
     fn family_by_name(&self, name: &str) -> Option<DWriteFontFamily> {
         let mut index = 0;
-        let mut exists = false;
+        let mut exists = 0;
         let mut name_buf = smallvec::SmallVec::<[u16; 128]>::default();
         name_buf.extend(name.encode_utf16());
         name_buf.push(0);
