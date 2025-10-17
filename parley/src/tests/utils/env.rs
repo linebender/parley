@@ -8,7 +8,7 @@ use crate::{
     BoundingBox, FontContext, FontFamily, FontStack, Layout, LayoutContext, LineHeight,
     PlainEditor, PlainEditorDriver, RangedBuilder, StyleProperty, TextStyle, TreeBuilder,
 };
-use fontique::{Blob, Collection, CollectionOptions};
+use fontique::{Blob, Collection, CollectionOptions, SourceCache};
 use peniko::kurbo::Size;
 use std::collections::HashMap;
 use std::{
@@ -118,7 +118,7 @@ pub(crate) fn create_font_context() -> FontContext {
     }
     FontContext {
         collection,
-        source_cache: Default::default(),
+        source_cache: SourceCache::default(),
     }
 }
 

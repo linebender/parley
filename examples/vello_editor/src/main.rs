@@ -7,7 +7,6 @@
     unreachable_pub,
     clippy::allow_attributes_without_reason,
     clippy::cast_possible_truncation,
-    clippy::shadow_unrelated,
     reason = "Deferred"
 )]
 
@@ -403,10 +402,10 @@ fn main() -> Result<()> {
         state: RenderState::Suspended(None),
         scene: Scene::new(),
         editor: text::Editor::new(text::LOREM),
-        last_drawn_generation: Default::default(),
+        last_drawn_generation: text::Generation::default(),
         last_sent_ime_cursor_area: parley::BoundingBox::new(f64::NAN, f64::NAN, f64::NAN, f64::NAN),
         event_loop_proxy: event_loop.create_proxy(),
-        event_reducer: Default::default(),
+        event_reducer: WindowEventReducer::default(),
     };
 
     // Run the winit event loop

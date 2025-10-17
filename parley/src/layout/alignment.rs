@@ -50,7 +50,7 @@ pub(crate) fn align<B: Brush>(
 /// layout.
 pub(crate) fn unjustify<B: Brush>(layout: &mut LayoutData<B>) {
     if layout.is_aligned_justified {
-        align_impl::<_, true>(layout, Alignment::Justify, Default::default());
+        align_impl::<_, true>(layout, Alignment::Justify, AlignmentOptions::default());
         layout.is_aligned_justified = false;
     }
 }

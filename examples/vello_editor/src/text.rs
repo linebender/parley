@@ -52,12 +52,13 @@ impl Editor {
         styles.insert(GenericFamily::SystemUi.into());
         styles.insert(StyleProperty::Brush(palette::css::WHITE.into()));
         Self {
-            font_cx: Default::default(),
-            layout_cx: Default::default(),
+            font_cx: FontContext::default(),
+            layout_cx: LayoutContext::default(),
             editor,
-            cursor_visible: Default::default(),
-            start_time: Default::default(),
-            blink_period: Default::default(),
+            cursor_visible: false,
+            start_time: None,
+            // TODO: Why initialize to zero?
+            blink_period: Duration::ZERO,
         }
     }
 

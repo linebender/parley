@@ -433,14 +433,14 @@ impl SystemFonts {
         // `None` and shouldn't attempt any FFI calls because the first thing we
         // do is check for `config`.
         if !library_exists {
-            return Default::default();
+            return Self::default();
         }
 
         // Initialize the config
         let config = unsafe { (LIB.FcInitLoadConfig)() };
         // fontconfig returns a new config object each time we call FcInitLoadConfig
         let Some(config) = (unsafe { Config::from_raw(config, Ownership::Application) }) else {
-            return Default::default();
+            return Self::default();
         };
         unsafe {
             (LIB.FcConfigBuildFonts)(config.inner.as_ptr());
@@ -463,7 +463,7 @@ impl SystemFonts {
                 Ownership::Fontconfig,
             )
         }) else {
-            return Default::default();
+            return Self::default();
         };
 
         // Populate the family name map.
@@ -527,10 +527,10 @@ impl SystemFonts {
         Self {
             name_map: Arc::new(name_map),
             generic_families: Arc::new(generic_families),
-            source_cache: Default::default(),
-            family_map: Default::default(),
+            source_cache: SourcePathMap::default(),
+            family_map: HashMap::default(),
             config: Some(config),
-            script_charsets: Default::default(),
+            script_charsets: ScriptCharSetMap::default(),
         }
     }
 

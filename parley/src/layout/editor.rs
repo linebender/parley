@@ -138,11 +138,11 @@ where
     pub fn new(font_size: f32) -> Self {
         Self {
             default_style: StyleSet::new(font_size),
-            buffer: Default::default(),
-            layout: Default::default(),
+            buffer: String::default(),
+            layout: Layout::default(),
             #[cfg(feature = "accesskit")]
-            layout_access: Default::default(),
-            selection: Default::default(),
+            layout_access: LayoutAccessibility::default(),
+            selection: Selection::default(),
             compose: None,
             show_cursor: true,
             width: None,

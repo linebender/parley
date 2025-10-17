@@ -53,7 +53,7 @@ impl SourceCache {
         #[cfg(feature = "std")]
         if options.shared {
             return Self {
-                cache: Default::default(),
+                cache: HashMap::default(),
                 serial: 0,
                 shared: Some(Arc::new(Mutex::new(Shared::default()))),
             };
@@ -71,7 +71,7 @@ impl SourceCache {
     #[cfg(feature = "std")]
     pub fn new_shared() -> Self {
         Self {
-            cache: Default::default(),
+            cache: HashMap::default(),
             serial: 0,
             shared: Some(Arc::new(Mutex::new(Shared::default()))),
         }
