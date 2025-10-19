@@ -1099,7 +1099,7 @@ where
 
     // --- MARK: Internal Helpers ---
     /// Make a cursor at a given byte index.
-    fn cursor_at(&self, index: usize) -> Cursor {
+    pub fn cursor_at(&self, index: usize) -> Cursor {
         // TODO: Do we need to be non-dirty?
         // FIXME: `Selection` should make this easier
         if index >= self.buffer.len() {
@@ -1164,7 +1164,7 @@ where
     }
 
     /// Update the selection, and nudge the `Generation` if something other than `h_pos` changed.
-    fn set_selection(&mut self, new_sel: Selection) {
+    pub fn set_selection(&mut self, new_sel: Selection) {
         if new_sel.focus() != self.selection.focus() || new_sel.anchor() != self.selection.anchor()
         {
             self.generation.nudge();
