@@ -16,7 +16,7 @@ pub mod editor;
 use self::alignment::align;
 
 use super::style::Brush;
-use crate::{Font, InlineBox, OverflowWrap};
+use crate::{FontData, InlineBox, OverflowWrap};
 #[cfg(feature = "accesskit")]
 use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
 use alignment::unjustify;
@@ -234,7 +234,7 @@ impl<B: Brush> Layout<B> {
 impl<B: Brush> Default for Layout<B> {
     fn default() -> Self {
         Self {
-            data: Default::default(),
+            data: LayoutData::default(),
         }
     }
 }
@@ -289,12 +289,12 @@ pub(crate) enum LayoutLineHeight {
 }
 
 impl LayoutLineHeight {
-    pub(crate) fn resolve(&self, run: &RunData) -> f32 {
+    pub(crate) fn resolve(self, run: &RunData) -> f32 {
         match self {
             Self::MetricsRelative(value) => {
                 (run.metrics.ascent + run.metrics.descent + run.metrics.leading) * value
             }
-            Self::Absolute(value) => *value,
+            Self::Absolute(value) => value,
         }
     }
 }

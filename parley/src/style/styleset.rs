@@ -25,7 +25,7 @@ impl<Brush: crate::Brush> StyleSet<Brush> {
     /// The font size will be `font_size`, and can be overwritten at runtime by
     /// [inserting](Self::insert) a new [`FontSize`](crate::StyleProperty::FontSize).
     pub fn new(font_size: f32) -> Self {
-        let mut this = Self(Default::default());
+        let mut this = Self(HashMap::default());
         this.insert(StyleProperty::FontSize(font_size));
         this
     }

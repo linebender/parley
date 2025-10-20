@@ -39,6 +39,10 @@ pub struct Editor {
     blink_period: Duration,
 }
 
+fn convert_rect(rect: &parley::BoundingBox) -> peniko::kurbo::Rect {
+    peniko::kurbo::Rect::new(rect.x0, rect.y0, rect.x1, rect.y1)
+}
+
 impl Editor {
     pub fn new(text: &str) -> Self {
         let mut editor = PlainEditor::new(32.0);
@@ -48,12 +52,13 @@ impl Editor {
         styles.insert(GenericFamily::SystemUi.into());
         styles.insert(StyleProperty::Brush(palette::css::WHITE.into()));
         Self {
-            font_cx: Default::default(),
-            layout_cx: Default::default(),
+            font_cx: FontContext::default(),
+            layout_cx: LayoutContext::default(),
             editor,
-            cursor_visible: Default::default(),
-            start_time: Default::default(),
-            blink_period: Default::default(),
+            cursor_visible: false,
+            start_time: None,
+            // TODO: Why initialize to zero?
+            blink_period: Duration::ZERO,
         }
     }
 
@@ -337,12 +342,18 @@ impl Editor {
                 transform,
                 palette::css::STEEL_BLUE,
                 None,
-                &rect,
+                &convert_rect(&rect),
             );
         });
         if self.cursor_visible {
             if let Some(cursor) = self.editor.cursor_geometry(1.5) {
-                scene.fill(Fill::NonZero, transform, palette::css::WHITE, None, &cursor);
+                scene.fill(
+                    Fill::NonZero,
+                    transform,
+                    palette::css::WHITE,
+                    None,
+                    &convert_rect(&cursor),
+                );
             }
         }
         let layout = self.editor.layout(&mut self.font_cx, &mut self.layout_cx);

@@ -16,19 +16,29 @@ use super::style::{Brush, FontFeature, FontVariation};
 use crate::analysis::cluster::{Char, CharCluster, Status};
 use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::inline_box::InlineBox;
+use crate::lru_cache::LruCache;
 use crate::util::nearly_eq;
-use crate::{Font, icu_convert};
+use crate::{FontData, icu_convert};
 
 use fontique::{self, Query, QueryFamily, QueryFont};
 
+mod cache;
+
 pub(crate) struct ShapeContext {
+    shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::ShaperData>,
+    shape_instance_cache: LruCache<cache::ShapeInstanceId, harfrust::ShaperInstance>,
+    shape_plan_cache: LruCache<cache::ShapePlanId, harfrust::ShapePlan>,
     unicode_buffer: Option<harfrust::UnicodeBuffer>,
     features: Vec<harfrust::Feature>,
 }
 
 impl Default for ShapeContext {
     fn default() -> Self {
+        const MAX_ENTRIES: usize = 16;
         Self {
+            shape_data_cache: LruCache::new(MAX_ENTRIES),
+            shape_instance_cache: LruCache::new(MAX_ENTRIES),
+            shape_plan_cache: LruCache::new(MAX_ENTRIES),
             unicode_buffer: Some(harfrust::UnicodeBuffer::new()),
             features: Vec::new(),
         }
@@ -398,18 +408,69 @@ fn shape_item<'a, B: Brush>(
             harfrust::FontRef::from_index(font.font.blob.as_ref(), font.font.index).unwrap();
 
         // Create harfrust shaper
-        // TODO: cache this upstream?
-        let shaper_data = harfrust::ShaperData::new(&font_ref);
-        let instance = harfrust::ShaperInstance::from_variations(
-            &font_ref,
-            variations_iter(&font.font.synthesis, rcx.variations(item.variations)),
+        let shaper_data = scx.shape_data_cache.entry(
+            cache::ShapeDataKey::new(font.font.blob.id(), font.font.index),
+            || harfrust::ShaperData::new(&font_ref),
         );
-        // TODO: Don't create a new shaper for each segment.
+        let instance = scx.shape_instance_cache.entry(
+            cache::ShapeInstanceKey::new(
+                font.font.blob.id(),
+                font.font.index,
+                &font.font.synthesis,
+                rcx.variations(item.variations),
+            ),
+            || {
+                harfrust::ShaperInstance::from_variations(
+                    &font_ref,
+                    variations_iter(&font.font.synthesis, rcx.variations(item.variations)),
+                )
+            },
+        );
+
+        let direction = if item.level & 1 != 0 {
+            harfrust::Direction::RightToLeft
+        } else {
+            harfrust::Direction::LeftToRight
+        };
+        let script = icu_convert::script_to_harfrust(item.script);
+        let language = item
+            .locale
+            .as_ref()
+            .and_then(|lang| lang.language.as_str().parse::<harfrust::Language>().ok());
+        scx.features.clear();
+        for feature in rcx.features(item.features).unwrap_or(&[]) {
+            scx.features.push(harfrust::Feature::new(
+                harfrust::Tag::from_u32(feature.tag),
+                feature.value as u32,
+                ..,
+            ));
+        }
         let harf_shaper = shaper_data
             .shaper(&font_ref)
-            .instance(Some(&instance))
+            .instance(Some(instance))
             .point_size(Some(item.size))
             .build();
+        let shaper_plan = scx.shape_plan_cache.entry(
+            cache::ShapePlanKey::new(
+                font.font.blob.id(),
+                font.font.index,
+                &font.font.synthesis,
+                direction,
+                script,
+                language.clone(),
+                &scx.features,
+                rcx.variations(item.variations),
+            ),
+            || {
+                harfrust::ShapePlan::new(
+                    &harf_shaper,
+                    direction,
+                    Some(script),
+                    language.as_ref(),
+                    &scx.features,
+                )
+            },
+        );
 
         // Prepare harfrust buffer
         let mut buffer = mem::take(&mut scx.unicode_buffer).unwrap();
@@ -429,33 +490,15 @@ fn shape_item<'a, B: Brush>(
             buffer.add(ch, i as u32);
         }
 
-        let direction = if item.level & 1 != 0 {
-            harfrust::Direction::RightToLeft
-        } else {
-            harfrust::Direction::LeftToRight
-        };
         buffer.set_direction(direction);
 
-        let script = icu_convert::script_to_harfrust(item.script);
         buffer.set_script(script);
 
-        if let Some(lang) = item.locale.clone() {
-            if let Ok(harf_lang) = lang.language.as_str().parse::<harfrust::Language>() {
-                println!("[LANGUAGE]: {:?}", harf_lang);
-                buffer.set_language(harf_lang);
-            }
+        if let Some(lang) = language {
+            buffer.set_language(lang);
         }
 
-        scx.features.clear();
-        for feature in rcx.features(item.features).unwrap_or(&[]) {
-            scx.features.push(harfrust::Feature::new(
-                harfrust::Tag::from_u32(feature.tag),
-                feature.value as u32,
-                0..buffer.len(),
-            ));
-        }
-
-        let glyph_buffer = harf_shaper.shape(buffer, &scx.features);
+        let glyph_buffer = harf_shaper.shape_with_plan(shaper_plan, buffer, &scx.features);
 
         // Extract relevant CharInfo slice for this segment
         let char_start = char_range.start + item_text[..segment_start_offset].chars().count();
@@ -467,7 +510,7 @@ fn shape_item<'a, B: Brush>(
         // Push harfrust-shaped run for the entire segment
         println!("[FONT INDEX] {}", font.font.index);
         layout.data.push_run(
-            Font::new(font.font.blob.clone(), font.font.index),
+            FontData::new(font.font.blob.clone(), font.font.index),
             item.size,
             font.font.synthesis,
             &glyph_buffer,
@@ -544,7 +587,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
 
         let fb_script = icu_convert::script_to_fontique(script);
         let fb_language = locale.and_then(icu_convert::locale_to_fontique);
-        println!("[FontSelector::new]: Fontique language: '{:?}'", fb_language);
         query.set_fallbacks(fontique::FallbackKey::new(fb_script, fb_language.as_ref()));
         query.set_attributes(attrs);
 
@@ -597,24 +639,23 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         }
         let mut selected_font = None;
         self.query.matches_with(|font| {
-            use skrifa::MetadataProvider;
-
-            let Ok(font_ref) = skrifa::FontRef::from_index(font.blob.as_ref(), font.index) else {
+            let Some(charmap) = font.charmap() else {
                 return fontique::QueryStatus::Continue;
             };
 
-            let charmap = font_ref.charmap();
-            let map_status: Status = cluster.map(|ch| {
-                let glyph_id = charmap
+            let map_status = cluster.map(|ch| {
+                charmap
                     .map(ch)
                     .map(|g| {
-                        g.to_u32()
-                            .try_into()
-                            .expect("Swash requires u16 glyph, so we hope that the glyph fits")
+                        // HACK: in reality, we're only using swash to compute
+                        // coverage so we only care about whether the font
+                        // has a mapping for a particular glyph. Any non-zero
+                        // value indicates the existence of a glyph so we can
+                        // simplify this without a fallible conversion from u32
+                        // to u16.
+                        (g != 0) as u16
                     })
-                    .unwrap_or_default();
-                println!("[ICU GLYPH MAPPING] mapped char '{}' ({}) to gid:, {}", ch, ch.escape_unicode(), glyph_id);
-                glyph_id
+                    .unwrap_or_default()
             });
 
             match map_status {

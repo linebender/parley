@@ -59,7 +59,7 @@ fn overflow_wrap_off() {
     test_wrap(
         &mut env,
         None,
-        StyleProperty::OverflowWrap(Default::default()),
+        StyleProperty::OverflowWrap(OverflowWrap::default()),
         ColorBrush::default(),
         120.0,
     );

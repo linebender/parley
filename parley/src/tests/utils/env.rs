@@ -5,10 +5,10 @@ use crate::tests::utils::renderer::{
     ColorBrush, RenderingConfig, render_layout, render_layout_with_clusters,
 };
 use crate::{
-    FontContext, FontFamily, FontStack, Layout, LayoutContext, LineHeight, PlainEditor,
-    PlainEditorDriver, RangedBuilder, Rect, StyleProperty, TextStyle, TreeBuilder,
+    BoundingBox, FontContext, FontFamily, FontStack, Layout, LayoutContext, LineHeight,
+    PlainEditor, PlainEditorDriver, RangedBuilder, StyleProperty, TextStyle, TreeBuilder,
 };
-use fontique::{Blob, Collection, CollectionOptions};
+use fontique::{Blob, Collection, CollectionOptions, SourceCache};
 use peniko::kurbo::Size;
 use std::collections::HashMap;
 use std::{
@@ -44,24 +44,6 @@ fn snapshot_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("snapshots")
-}
-
-fn font_dirs() -> impl Iterator<Item = PathBuf> {
-    [
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests")
-            .join("assets")
-            .join("arimo_fonts"),
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests")
-            .join("assets")
-            .join("roboto_fonts"),
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests")
-            .join("assets")
-            .join("noto_fonts"),
-    ]
-    .into_iter()
 }
 
 pub(crate) const FONT_STACK: &[FontFamily<'_>] = &[
@@ -126,7 +108,7 @@ pub(crate) fn create_font_context() -> FontContext {
         shared: false,
         system_fonts: false,
     });
-    load_fonts(&mut collection, font_dirs()).unwrap();
+    load_fonts(&mut collection, parley_dev::font_dirs()).unwrap();
     for font in FONT_STACK {
         if let FontFamily::Named(font_name) = font {
             collection
@@ -136,7 +118,7 @@ pub(crate) fn create_font_context() -> FontContext {
     }
     FontContext {
         collection,
-        source_cache: Default::default(),
+        source_cache: SourceCache::default(),
     }
 }
 
@@ -316,8 +298,8 @@ impl TestEnv {
     pub(crate) fn render_and_check_snapshot(
         &mut self,
         layout: &Layout<ColorBrush>,
-        cursor_rect: Option<Rect>,
-        selection_rects: &[(Rect, usize)],
+        cursor_rect: Option<BoundingBox>,
+        selection_rects: &[(BoundingBox, usize)],
     ) {
         let current_img =
             render_layout(&self.rendering_config, layout, cursor_rect, selection_rects);

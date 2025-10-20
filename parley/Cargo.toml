@@ -1,6 +1,6 @@
 [package]
 name = "parley"
-version = "0.5.0"
+version = "0.6.0"
 description = "Parley provides an API for implementing rich text layout."
 keywords = ["text", "layout"]
 categories = ["gui", "graphics"]
@@ -27,7 +27,7 @@ accesskit = ["dep:accesskit"]
 [dependencies]
 swash = { workspace = true }
 skrifa = { workspace = true }
-peniko = { workspace = true }
+linebender_resource_handle = { workspace = true }
 fontique = { workspace = true }
 core_maths = { version = "0.1.1", optional = true }
 accesskit = { workspace = true, optional = true }
@@ -46,4 +46,6 @@ icu_provider_export = "2.0.0"
 icu_provider_source = "2.0.0"
 
 [dev-dependencies]
+parley_dev = { workspace = true }
+peniko = { workspace = true }
 tiny-skia = "0.11.4"

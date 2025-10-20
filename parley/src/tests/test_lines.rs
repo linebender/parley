@@ -3,11 +3,12 @@
 
 //! Test line layouts, including the vertical size and positioning of the line box.
 
-use peniko::kurbo::{Rect, Size};
+use peniko::kurbo::Size;
 
 use super::utils::{ColorBrush, TestEnv};
 use crate::{
-    Affinity, Brush, Cursor, InlineBox, Layout, LineHeight, Selection, StyleProperty, test_name,
+    Affinity, BoundingBox, Brush, Cursor, InlineBox, Layout, LineHeight, Selection, StyleProperty,
+    test_name,
 };
 
 const TEXT: &str = "Some text here. Let's make\n\
@@ -49,7 +50,7 @@ fn ascent_descent_box_height(font_size: f32, line_height_px: f32) -> (f32, f32, 
 }
 
 /// Returns selection geometry such that every line is covered.
-fn get_selections<B: Brush>(layout: &Layout<B>) -> Vec<(Rect, usize)> {
+fn get_selections<B: Brush>(layout: &Layout<B>) -> Vec<(BoundingBox, usize)> {
     let selection_parts = [
         ("Some text here.", 4),
         ("a bit longer", 8),
@@ -125,7 +126,7 @@ fn compute(
     test_name: &str,
     font_size: f32,
     line_height_px: f32,
-) -> (TestEnv, Layout<ColorBrush>, Vec<(Rect, usize)>) {
+) -> (TestEnv, Layout<ColorBrush>, Vec<(BoundingBox, usize)>) {
     // Use max advance as the target width to ensure consistency in case of early line breaks
     let width = max_advance(font_size);
     // Calculate precise total height based on requested line height,

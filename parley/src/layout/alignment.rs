@@ -50,7 +50,7 @@ pub(crate) fn align<B: Brush>(
 /// layout.
 pub(crate) fn unjustify<B: Brush>(layout: &mut LayoutData<B>) {
     if layout.is_aligned_justified {
-        align_impl::<_, true>(layout, Alignment::Justify, Default::default());
+        align_impl::<_, true>(layout, Alignment::Justify, AlignmentOptions::default());
         layout.is_aligned_justified = false;
     }
 }
@@ -111,9 +111,12 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
                 }
 
                 // Justified alignment doesn't apply to the last line of a paragraph
-                // (`BreakReason::None`) or if there are no whitespace gaps to adjust. In that
-                // case, start-align, i.e., left-align for LTR text and right-align for RTL text.
-                if line.break_reason == BreakReason::None || line.num_spaces == 0 {
+                // (`BreakReason::None`), (`BreakReason::Explicit`) or if there are no whitespace
+                // gaps to adjust. In that case, start-align, i.e., left-align for LTR text and
+                // right-align for RTL text.
+                if matches!(line.break_reason, BreakReason::None | BreakReason::Explicit)
+                    || line.num_spaces == 0
+                {
                     if is_rtl {
                         line.metrics.offset += free_space;
                     }

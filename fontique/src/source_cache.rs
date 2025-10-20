@@ -8,9 +8,9 @@ use super::source::SourceId;
 use super::source::{SourceInfo, SourceKind};
 #[cfg(feature = "std")]
 use hashbrown::HashMap;
-use peniko::Blob;
+use linebender_resource_handle::Blob;
 #[cfg(feature = "std")]
-use peniko::WeakBlob;
+use linebender_resource_handle::WeakBlob;
 #[cfg(feature = "std")]
 use std::{
     path::Path,
@@ -53,7 +53,7 @@ impl SourceCache {
         #[cfg(feature = "std")]
         if options.shared {
             return Self {
-                cache: Default::default(),
+                cache: HashMap::default(),
                 serial: 0,
                 shared: Some(Arc::new(Mutex::new(Shared::default()))),
             };
@@ -71,7 +71,7 @@ impl SourceCache {
     #[cfg(feature = "std")]
     pub fn new_shared() -> Self {
         Self {
-            cache: Default::default(),
+            cache: HashMap::default(),
             serial: 0,
             shared: Some(Arc::new(Mutex::new(Shared::default()))),
         }

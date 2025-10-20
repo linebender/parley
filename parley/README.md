@@ -13,7 +13,7 @@
 </div>
 
 Parley provides an API for implementing rich text layout.
-It is backed by [Swash](https://github.com/dfrg/swash).
+It is backed by [HarfRust](https://github.com/harfbuzz/harfrust) for text shaping.
 
 ## Minimum supported Rust Version (MSRV)
 
@@ -51,9 +51,5 @@ Licensed under either of
 - MIT license ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 at your option.
-
-Some files used for tests are under different licenses:
-
-- The font file `Roboto-Regular.ttf` in `/parley/tests/assets/roboto_fonts/` is licensed solely as documented in that folder (and is licensed under the Apache License, Version 2.0).
 
 [Rust code of conduct]: https://www.rust-lang.org/policies/code-of-conduct

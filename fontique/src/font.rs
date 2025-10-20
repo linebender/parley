@@ -3,6 +3,8 @@
 
 //! Model for a font.
 
+use crate::CharmapIndex;
+
 use super::attributes::{FontStyle, FontWeight, FontWidth};
 use super::source::{SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
@@ -22,6 +24,7 @@ pub struct FontInfo {
     weight: FontWeight,
     axes: AxisVec,
     attr_axes: u8,
+    charmap_index: CharmapIndex,
 }
 
 impl FontInfo {
@@ -191,6 +194,13 @@ impl FontInfo {
     pub fn has_optical_size_axis(&self) -> bool {
         self.attr_axes & OPTICAL_SIZE_AXIS != 0
     }
+
+    /// Returns the index used for constructing a [Charmap] for this font.
+    ///
+    /// [Charmap]: crate::Charmap
+    pub fn charmap_index(&self) -> CharmapIndex {
+        self.charmap_index
+    }
 }
 
 impl FontInfo {
@@ -199,6 +209,9 @@ impl FontInfo {
         source: SourceInfo,
         index: u32,
     ) -> Option<Self> {
+        // It's probably not useful to retain fonts that don't have
+        // a valid cmap so just bail here if we fail.
+        let charmap_index = CharmapIndex::new(font)?;
         let (width, style, weight) = read_attributes(font);
         let (axes, attr_axes) = if let Ok(fvar_axes) = font.fvar().and_then(|fvar| fvar.axes()) {
             let mut axes = SmallVec::<[AxisInfo; 1]>::with_capacity(fvar_axes.len());
@@ -222,7 +235,7 @@ impl FontInfo {
             }
             (axes, attrs_axes)
         } else {
-            (Default::default(), Default::default())
+            (SmallVec::default(), 0)
         };
         Some(Self {
             source,
@@ -232,6 +245,7 @@ impl FontInfo {
             weight,
             axes,
             attr_axes,
+            charmap_index,
         })
     }
 
@@ -416,15 +430,17 @@ fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
 
     fn from_head(head: Head<'_>) -> (FontWidth, FontStyle, FontWeight) {
         let mac_style = head.mac_style();
-        let style = mac_style
-            .contains(MacStyle::ITALIC)
-            .then_some(FontStyle::Italic)
-            .unwrap_or_default();
-        let weight = mac_style
-            .contains(MacStyle::BOLD)
-            .then_some(700.0)
-            .unwrap_or_default();
-        (FontWidth::default(), style, FontWeight::new(weight))
+        let style = if mac_style.contains(MacStyle::ITALIC) {
+            FontStyle::Italic
+        } else {
+            FontStyle::default()
+        };
+        let weight = if mac_style.contains(MacStyle::BOLD) {
+            FontWeight::BOLD
+        } else {
+            FontWeight::default()
+        };
+        (FontWidth::default(), style, weight)
     }
 
     if let Ok(os2) = font.os2() {

@@ -8,30 +8,64 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 # Changelog
 
-The latest published Parley release is [0.5.0](#050---2025-06-01) which was released on 2025-06-01.
-You can find its changes [documented below](#050---2025-06-01).
+The latest published Parley release is [0.6.0](#060---2025-10-06) which was released on 2025-10-06.
+You can find its changes [documented below](#060---2025-10-06).
 
 ## [Unreleased]
 
 This release has an [MSRV] of 1.82.
+
+## [0.6.0] - 2025-10-06
+
+This release has an [MSRV] of 1.82.
+
+### Highlights
+
+Parley now uses [HarfRust](https://github.com/harfbuzz/harfrust) rather than [Swash](https://github.com/dfrg/swash). This means that
+Parley now has production-quality shaping for all scripts and can be recommended for general usage.
+
+### Migration
+
+As Parley now uses it's own `parley::BoundingBox` in place of `kurbo::Rect`, you may need to convert the type if you were
+previously passing one of these values into a function that expects `kurbo::Rect`.
+The following function may be used to perform this conversion:
+
+```rust
+fn bounding_box_to_rect(bb: parley::BoundingBox) -> kurbo::Rect {
+    kurbo::Rect::new(bb.x0, bb.y0, bb.x1, bb.y1)
+}
+```
 
 ### Added
 
 #### Parley
 
 - Shift-click support through `Selection::shift_click_extension` and `PlainEditorDriver::shift_click_extension`. ([#385][] by [@kekelp][])
+- Add some benchmarks using [Tango](https://github.com/bazhenov/tango). ([#405][] by [@taj-p][])
+
+#### Fontique
+
+- Cache character mapping metadata for each font to improve performance of font selection. ([#413][] by [@dfrg][])
+- Upgrade `icu4x` dependencies to v2.x. ([#418][] by [@nicoburns][])
+- Added an `unregister_font` method to remove a font from a collection. ([#395][] by [@taj-p][])
 
 ### Changed
 
 #### Parley
 
-- `Alignment`` variants have been renamed to better match CSS. `Alignment::Justified` is now `Alignment::Justify` and `Alignment::Middle` is now `Alignment::Center`. ([#389][] by [@waywardmonkeys][])
+- Breaking change: `Alignment` variants have been renamed to better match CSS. `Alignment::Justified` is now `Alignment::Justify` and `Alignment::Middle` is now `Alignment::Center`. ([#389][] by [@waywardmonkeys][])
+- In the `PlainEditor`, triple-click now selects paragraphs rather than words ([#381][] by [@DJMcNab][])
 - Updated to `accesskit` 0.21. ([#390][] by [@mwcampbell][])
-- Uses `HarfRust` for text shaping ([[#400][] by [@taj-p][]).
+- Uses `HarfRust` for text shaping. ([#400][] by [@taj-p][])
+- Parley no longer depends on `peniko` or `kurbo`. ([#414][] by [@nicoburns][]):
+  - Breaking change: The use of `peniko::Font` has been replaced with `linebender_resource_handle::FontData`, as such `parley::Font` is now called `Parley::FontData`.
+    Note that this is the same type as in previous releases, and so is fully backwards-compatible, just with a different name.
+  - Breaking change: The use of `kurbo::Rect` has been replaced with a new `parley::BoundingBox` type.
 
 #### Fontique
 
 - The fontconfig backend, used to enumerate system fonts on Linux, has been rewritten to call into the system's fontconfig library instead of parsing fontconfig's configuration files itself. This should significantly improve the behavior of system fonts and generic families on Linux. ([#378][] by [@valadaptive][])
+- Fontique no longer depends on `peniko`. The use of `peniko::Blob` has been replaced with `linebender_resource_handle::Blob`. This is unlikely to affect users of the crate. ([#414][] by [@nicoburns][])
 
 ### Fixed
 
@@ -39,7 +73,8 @@ This release has an [MSRV] of 1.82.
 
 - Selection extension moves the focus to the side being extended. ([#385][] by [@kekelp][])
 - Ranged builder default style not respecting `scale`. ([#368][] by [@xStrom][])
-- Cluster source character not correct ([[#402][] by [@taj-p][]).
+- Cluster source character not correct. ([#402][] by [@taj-p][])
+- Don't justify the last line of a paragraph. ([#410][] by [@taj-p][])
 
 #### Fontique
 
@@ -233,20 +268,21 @@ This release has an [MSRV][] of 1.70.
 [MSRV]: README.md#minimum-supported-rust-version-msrv
 
 [@dfrg]: https://github.com/dfrg
+[@dhardy]: https://github.com/dhardy
 [@DJMcNab]: https://github.com/DJMcNab
+[@kekelp]: https://github.com/kekelp
 [@mwcampbell]: https://github.com/mwcampbell
 [@nicoburns]: https://github.com/nicoburns
 [@NoahR02]: https://github.com/NoahR02
+[@richardhozak]: https://github.com/richardhozak
 [@spirali]: https://github.com/spirali
+[@taj-p]: https://github.com/taj-p
 [@tomcur]: https://github.com/tomcur
 [@valadaptive]: https://github.com/valadaptive
 [@waywardmonkeys]: https://github.com/waywardmonkeys
 [@wfdewith]: https://github.com/wfdewith
 [@xorgy]: https://github.com/xorgy
 [@xStrom]: https://github.com/xStrom
-[@dhardy]: https://github.com/dhardy
-[@kekelp]: https://github.com/kekelp
-[@taj-p]: https://github.com/taj-p
 
 [#54]: https://github.com/linebender/parley/pull/54
 [#55]: https://github.com/linebender/parley/pull/55
@@ -276,7 +312,6 @@ This release has an [MSRV][] of 1.70.
 [#188]: https://github.com/linebender/parley/pull/188
 [#191]: https://github.com/linebender/parley/pull/191
 [#192]: https://github.com/linebender/parley/pull/192
-[#194]: https://github.com/linebender/parley/pull/194
 [#198]: https://github.com/linebender/parley/pull/198
 [#201]: https://github.com/linebender/parley/pull/201
 [#202]: https://github.com/linebender/parley/pull/202
@@ -321,11 +356,18 @@ This release has an [MSRV][] of 1.70.
 [#369]: https://github.com/linebender/parley/pull/369
 [#378]: https://github.com/linebender/parley/pull/378
 [#380]: https://github.com/linebender/parley/pull/380
+[#381]: https://github.com/linebender/parley/pull/381
 [#385]: https://github.com/linebender/parley/pull/385
 [#389]: https://github.com/linebender/parley/pull/389
 [#390]: https://github.com/linebender/parley/pull/390
+[#395]: https://github.com/linebender/parley/pull/395
 [#400]: https://github.com/linebender/parley/pull/400
 [#402]: https://github.com/linebender/parley/pull/402
+[#405]: https://github.com/linebender/parley/pull/405
+[#410]: https://github.com/linebender/parley/pull/410
+[#413]: https://github.com/linebender/parley/pull/413
+[#414]: https://github.com/linebender/parley/pull/414
+[#418]: https://github.com/linebender/parley/pull/418
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/linebender/parley/compare/v0.4.0...v0.5.0

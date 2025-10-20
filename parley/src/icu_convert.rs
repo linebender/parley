@@ -15,7 +15,7 @@ pub(crate) fn script_to_harfrust(script: Script) -> harfrust::Script {
 }
 
 pub(crate) fn locale_to_fontique(locale: icu::locale::LanguageIdentifier) -> Option<fontique::Language> {
-    fontique::Language::try_from_locale_bytes(locale.to_string().as_bytes()).ok()
+    fontique::Language::try_from_utf8(locale.to_string().as_bytes()).ok()
 }
 
 #[rustfmt::skip]

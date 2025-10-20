@@ -13,18 +13,10 @@
 </div>
 
 Parley provides an API for implementing rich text layout.
-It is backed by [Swash](https://github.com/dfrg/swash).
 
 ## The Parley text stack
 
-Currently, Parley directly depends on five crates: Fontique, HarfRust, Swash, Skrifa, and Peniko.
-These crates cover different pieces of the text-rendering process.
-
-### Peniko
-
-Peniko builds on top of [kurbo](https://crates.io/crates/kurbo) and provides vocabulary types for 2D rendering.
-
-Peniko mostly just exports types like `Blob`, `Color`, `Gradient`, `Brush`, `Point`, `Rect`, `Vec2`, etc.
+Parley has four key dependencies: Fontique, HarfRust, Skrifa, and Swash. These crates cover different pieces of the text-rendering process.
 
 ### Fontique
 
@@ -101,11 +93,7 @@ Licensed under either of
 
 at your option.
 
-Some files used for tests are under different licenses:
-
-- The font file `Arimo-VariableFont_wght.ttf` in `/parley/tests/assets/arimo_fonts/` is licensed solely as documented in that folder (and is licensed under the Apache License, Version 2.0).
-- The font file `Roboto-Regular.ttf` in `/parley/tests/assets/roboto_fonts/` is licensed solely as documented in that folder (and is licensed under the Apache License, Version 2.0).
-- The font file `NotoKufiArabic-Regular.otf` in `/parley/tests/assets/noto_fonts/` is licensed solely as documented in that folder (and is licensed under the SIL Open Font License, Version 1.1).
+Some files used for tests and benchmarks are under different licenses. See `./parley_dev/README.md` for details.
 
 
 [Rust code of conduct]: https://www.rust-lang.org/policies/code-of-conduct
