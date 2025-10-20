@@ -103,7 +103,6 @@ pub use fontique;
 pub use swash;
 
 mod analysis;
-mod bidi;
 mod builder;
 mod context;
 mod font;

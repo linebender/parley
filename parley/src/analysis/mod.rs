@@ -9,7 +9,6 @@ use icu::segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakOp
 use icu_properties::{CodePointMapData, CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed, EmojiSetData, EmojiSetDataBorrowed};
 use icu_properties::props::{BasicEmoji, BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, RegionalIndicator, Script, VariationSelector};
 use unicode_bidi::TextSource;
-use crate::bidi::BidiLevel;
 use crate::{Brush, LayoutContext};
 use crate::analysis::provider::PROVIDER;
 use crate::resolve::RangedStyle;
@@ -106,6 +105,8 @@ impl AnalysisDataSources {
     }
 }
 
+type BidiLevel = u8;
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CharInfo {
     /// The line/word breaking boundary classification of this character.
@@ -139,7 +140,7 @@ pub(crate) enum Boundary {
     Mandatory = 3,
 }
 
-pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
+pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
     // See: https://github.com/unicode-org/icu4x/blob/ee5399a77a6b94efb5d4b60678bb458c5eedb25d/components/segmenter/src/line.rs#L338-L351
     fn is_mandatory_line_break(line_break: LineBreak) -> bool {
         matches!(line_break, LineBreak::MandatoryBreak
@@ -367,7 +368,7 @@ pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str)
                 }
             };
 
-            lcx.info_icu.push((
+            lcx.info.push((
                 CharInfo {
                     boundary,
                     bidi_embed_level,
@@ -382,65 +383,13 @@ pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str)
         });
 }
 
-pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
-    fn icu_to_swash_lb(icu: LineBreakWordOption) -> swash::text::WordBreakStrength {
-        match icu {
-            LineBreakWordOption::BreakAll => swash::text::WordBreakStrength::BreakAll,
-            LineBreakWordOption::KeepAll => swash::text::WordBreakStrength::KeepAll,
-            _ => swash::text::WordBreakStrength::Normal,
-        }
-    }
-
-    let text = if text.is_empty() { " " } else { text };
-    let mut a = swash::text::analyze(text.chars());
-    _ = analyze_text_icu(lcx, text);
-
-    let mut word_break = Default::default();
-    let mut style_idx = 0;
-
-    let mut char_indices = text.char_indices();
-    loop {
-        let Some((char_idx, _)) = char_indices.next() else {
-            break;
-        };
-
-        // Find the style for this character. If the text is empty, we may not have any styles. Otherwise,
-        // self.styles should span the entire range of the text.
-        while let Some(style) = lcx.styles.get(style_idx) {
-            if style.range.end > char_idx {
-                word_break = style.style.word_break;
-                break;
-            }
-            style_idx += 1;
-        }
-        a.set_break_strength(icu_to_swash_lb(word_break));
-
-        let Some((properties, boundary)) = a.next() else {
-            break;
-        };
-
-        lcx.info.push((swash::text::cluster::CharInfo::new(properties, boundary), 0));
-    }
-
-    // TODO(conor) - add back later, this is just to bring swash/icu test data to parity
-    //if a.needs_bidi_resolution() {
-    lcx.bidi.resolve(
-        text.chars()
-            .zip(lcx.info.iter().map(|info| info.0.bidi_class())),
-        None,
-    );
-    println!("{:?}", lcx.bidi.levels());
-    //}
-}
-
 #[cfg(test)]
 mod tests {
     use icu::segmenter::options::LineBreakWordOption;
     use icu_properties::props::{GraphemeClusterBreak, Script};
     use fontique::FontWeight;
     use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty};
-    use crate::analysis::Boundary;
-    use crate::bidi::BidiLevel;
+    use crate::analysis::{BidiLevel, Boundary};
 
     #[derive(Default)]
     struct TestContext {
@@ -450,7 +399,7 @@ mod tests {
 
     impl TestContext {
         fn expect_boundary_list(self, expected: Vec<Boundary>) -> Self {
-            let actual: Vec<_> = self.layout_context.info_icu.iter()
+            let actual: Vec<_> = self.layout_context.info.iter()
                 .map(|(info, _)| info.boundary)
                 .collect();
             assert_eq!(
@@ -461,7 +410,7 @@ mod tests {
         }
 
         fn expect_bidi_embed_level_list(self, expected: Vec<BidiLevel>) -> Self {
-            let actual: Vec<_> = self.layout_context.info_icu.iter()
+            let actual: Vec<_> = self.layout_context.info.iter()
                 .map(|(info, _)| info.bidi_embed_level)
                 .collect();
             assert_eq!(
@@ -472,7 +421,7 @@ mod tests {
         }
 
         fn expect_script_list(self, expected: Vec<Script>) -> Self {
-            let actual: Vec<_> = self.layout_context.info_icu.iter()
+            let actual: Vec<_> = self.layout_context.info.iter()
                 .map(|(info, _)| info.script)
                 .collect();
             assert_eq!(
@@ -483,7 +432,7 @@ mod tests {
         }
 
         fn expect_grapheme_cluster_break_list(self, expected: Vec<GraphemeClusterBreak>) -> Self {
-            let actual: Vec<_> = self.layout_context.info_icu.iter()
+            let actual: Vec<_> = self.layout_context.info.iter()
                 .map(|(info, _)| info.grapheme_cluster_break)
                 .collect();
             assert_eq!(
@@ -494,7 +443,7 @@ mod tests {
         }
 
         fn expect_is_control_list(self, expected: Vec<bool>) -> Self {
-            let actual: Vec<_> = self.layout_context.info_icu.iter()
+            let actual: Vec<_> = self.layout_context.info.iter()
                 .map(|(info, _)| info.is_control)
                 .collect();
             assert_eq!(
@@ -505,7 +454,7 @@ mod tests {
         }
 
         fn expect_contributes_to_shaping_list(self, expected: Vec<bool>) -> Self {
-            let actual: Vec<_> = self.layout_context.info_icu.iter()
+            let actual: Vec<_> = self.layout_context.info.iter()
                 .map(|(info, _)| info.contributes_to_shaping)
                 .collect();
             assert_eq!(
@@ -516,7 +465,7 @@ mod tests {
         }
 
         fn expect_force_normalize_list(self, expected: Vec<bool>) -> Self {
-            let actual: Vec<_> = self.layout_context.info_icu.iter()
+            let actual: Vec<_> = self.layout_context.info.iter()
                 .map(|(info, _)| info.force_normalize)
                 .collect();
             assert_eq!(

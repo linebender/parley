@@ -6,7 +6,6 @@
 use alloc::{vec, vec::Vec};
 
 use super::FontContext;
-use super::bidi;
 use super::builder::RangedBuilder;
 use super::resolve::tree::TreeStyleBuilder;
 use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle };
@@ -21,7 +20,6 @@ use crate::shape::ShapeContext;
 ///
 /// This type is designed to be a global resource with only one per-application (or per-thread).
 pub struct LayoutContext<B: Brush = [u8; 4]> {
-    pub(crate) bidi: bidi::BidiResolver,
     pub(crate) rcx: ResolveContext,
     pub(crate) styles: Vec<RangedStyle<B>>,
     pub(crate) inline_boxes: Vec<InlineBox>,
@@ -30,9 +28,8 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) ranged_style_builder: RangedStyleBuilder<B>,
     pub(crate) tree_style_builder: TreeStyleBuilder<B>,
 
-    pub(crate) info: Vec<(swash::text::cluster::CharInfo, u16)>,
     // u16: style index for character
-    pub(crate) info_icu: Vec<(CharInfo, u16)>,
+    pub(crate) info: Vec<(CharInfo, u16)>,
     pub(crate) scx: ShapeContext,
 
     // Unicode analysis data sources (provided by icu)
@@ -42,14 +39,12 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
 impl<B: Brush> LayoutContext<B> {
     pub fn new() -> Self {
         Self {
-            bidi: bidi::BidiResolver::new(),
             rcx: ResolveContext::default(),
             styles: vec![],
             inline_boxes: vec![],
             ranged_style_builder: RangedStyleBuilder::default(),
             tree_style_builder: TreeStyleBuilder::default(),
             info: vec![],
-            info_icu: vec![],
             analysis_data_sources: AnalysisDataSources::new(),
             scx: ShapeContext::default(),
         }
@@ -153,8 +148,6 @@ impl<B: Brush> LayoutContext<B> {
         self.styles.clear();
         self.inline_boxes.clear();
         self.info.clear();
-        self.info_icu.clear();
-        self.bidi.clear();
     }
 }
 
