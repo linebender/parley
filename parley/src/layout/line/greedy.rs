@@ -10,6 +10,8 @@ use alloc::vec::Vec;
 use core_maths::CoreFloat;
 
 use crate::OverflowWrap;
+use crate::analysis::Boundary;
+use crate::analysis::cluster::Whitespace;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -17,8 +19,6 @@ use crate::layout::{
 use crate::style::Brush;
 
 use core::ops::Range;
-use crate::analysis::Boundary;
-use crate::analysis::cluster::Whitespace;
 
 #[derive(Default)]
 struct LineLayout {
