@@ -101,18 +101,9 @@ pub(crate) fn shape_text<'a, B: Brush>(
         word_spacing: style.word_spacing,
         letter_spacing: style.letter_spacing,
     };
-    fn print_locale(lang: Option<LanguageIdentifier>) {
-        if let Some(lang) = lang {
-            println!("[icu::Language] Language:{}, Script:{:?}, Region:{:?}", lang.language, lang.script, lang.region);
-        } else {
-            println!("[icu::Language] Language: NONE");
-        }
-    }
-    print_locale(style.locale.clone());
 
     let mut char_range = 0..0;
     let mut text_range = 0..0;
-    println!("creating text_range: {:?}", text_range);
 
     let mut inline_box_iter = inline_boxes.iter().enumerate();
     let mut current_box = inline_box_iter.next();
@@ -126,9 +117,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         if !real_script(script) {
             script = item.script;
         }
-        //let level_swash = levels.get(char_index).copied().unwrap_or(0);
         let level = info.bidi_embed_level;
-        //println!("[BIDI] [shape_text] level: {}, level_swash: {}", level, level_swash);
         if item.style_index != *style_index {
             item.style_index = *style_index;
             style = &styles[*style_index as usize].style;
@@ -169,7 +158,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
         }
 
         if break_run && !text_range.is_empty() {
-            println!("calling shape_item_icu, text_range: {:?}", text_range);
             shape_item(
                 &mut fq,
                 rcx,
@@ -190,7 +178,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
             item.variations = style.font_variations;
             item.features = style.font_features;
             text_range.start = text_range.end;
-            println!("text_range: {:?}", text_range);
             char_range.start = char_range.end;
         }
 
@@ -231,7 +218,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
 fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str) -> bool {
     if analysis_data_sources.basic_emoji().contains_str(grapheme) {
-        println!("[is_emoji] TESTING: basic emoji contains grapheme");
         return true;
     }
 
@@ -242,7 +228,6 @@ fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str
     while let Some((char_index, ch)) = chars_iter.next() {
         // Handle single-character graphemes
         if char_index == 0 && chars_iter.peek().is_none() {
-            println!("[is_emoji] TESTING: single char");
             return analysis_data_sources.emoji().contains(ch) ||
                 analysis_data_sources.extended_pictographic().contains(ch);
         }
@@ -253,7 +238,6 @@ fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str
             // Check if the next character is a variation selector
             if let Some((_, next_ch)) = chars_iter.peek() {
                 if analysis_data_sources.variation_selector().contains(*next_ch) {
-                    println!("[is_emoji] TESTING: var selector");
                     return true;
                 }
             }
@@ -264,7 +248,6 @@ fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str
             if chars_iter.peek().is_none() &&
                 analysis_data_sources.regional_indicator().contains(first_char) &&
                 analysis_data_sources.regional_indicator().contains(ch) {
-                println!("[is_emoji] TESTING: regional indicator");
                 return true;
             }
         }
@@ -281,7 +264,6 @@ fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str
     // If the grapheme (already segmented by icu, so it is a valid grapheme) has both emoji
     // characters and ZWJ, it's likely an emoji ZWJ sequence.
     if has_emoji && has_zwj {
-        println!("[is_emoji] TESTING: emoji with zwj");
     }
     has_emoji && has_zwj
 }
@@ -300,7 +282,6 @@ fn shape_item<'a, B: Brush>(
     analysis_data_sources: &AnalysisDataSources,
 ) {
     let item_text = &text[text_range.clone()];
-    println!("[shape_item ENTRY] item_text: '{}', text: '{}', text_range: {:?}, char_range: {:?}", item_text, text, text_range, char_range);
     let item_infos = &infos[char_range.start..char_range.end]; // Only process current item
     let first_style_index = item_infos[0].1;
     let mut font_selector =
@@ -313,7 +294,6 @@ fn shape_item<'a, B: Brush>(
         .skip(1) // First boundary index is always zero
         .scan((0usize, &mut item_infos_iter, &mut code_unit_offset_in_string),
               |(last, item_infos_iter, code_unit_offset), boundary| {
-                  println!("boundary: {}", boundary);
                   let segment_text = &item_text[*last..boundary];
 
                   let mut len = 0;
@@ -322,22 +302,18 @@ fn shape_item<'a, B: Brush>(
                   let start = **code_unit_offset;
 
                   let chars = segment_text.char_indices().zip(item_infos_iter.by_ref()).map(|((_, ch), (info, style_index))| {
-                      println!("[ICU CHAR->INFO] char:'{ch}' info: {info:?}, style_index:: {style_index}");
-
                       force_normalize |= info.force_normalize;
                       len += 1;
                       map_len += info.contributes_to_shaping as u8;
                       **code_unit_offset += ch.len_utf8();
 
-                      let char = Char {
+                      Char {
                           ch,
                           contributes_to_shaping: info.contributes_to_shaping,
                           glyph_id: 0,
                           style_index: *style_index,
                           is_control_character: info.is_control,
-                      };
-                      println!("[icu - CharCluster] Made char: {:?}", char);
-                      char
+                      }
                   }).collect();
 
                   let end = **code_unit_offset;
@@ -358,19 +334,14 @@ fn shape_item<'a, B: Brush>(
 
     let mut cluster = clusters_iter.next().expect("one cluster");
 
-    println!("Calling select_font, site A");
     let mut current_font = font_selector.select_font(&mut cluster);
-    println!("END site A");
 
     // Main segmentation loop (based on swash shape_clusters) - only within current item
     while let Some(font) = current_font.take() {
         // Collect all clusters for this font segment
-        println!("[CURRENT_FONT] range: {}..{}, text_range.start: {}", cluster.range().start, cluster.range().end, text_range.start);
         let cluster_range = cluster.range();
         let segment_start_offset = cluster_range.start as usize - text_range.start;
-        println!("[CURRENT_FONT] segment_start_offset: {}", segment_start_offset);
         let mut segment_end_offset = cluster_range.end as usize - text_range.start;
-        println!("[CURRENT_FONT] segment_end_offset: {}", segment_end_offset);
 
         loop {
             cluster = match clusters_iter.next() {
@@ -378,16 +349,13 @@ fn shape_item<'a, B: Brush>(
                 None => break, // End of current item - process final segment
             };
 
-            println!("Calling select_font, site B");
             if let Some(next_font) = font_selector.select_font(&mut cluster) {
                 if next_font != font {
-                    println!("[CURRENT_FONT] next_font");
                     current_font = Some(next_font);
                     break;
                 } else {
                     // Same font - add to current segment
                     segment_end_offset = cluster.range().end as usize - text_range.start;
-                    println!("[CURRENT_FONT] segment_end_offset: {}", segment_end_offset);
                 }
             } else {
                 cluster = match clusters_iter.next() {
@@ -399,7 +367,6 @@ fn shape_item<'a, B: Brush>(
 
         // Shape this font segment with harfrust
         let segment_text = &item_text[segment_start_offset..segment_end_offset];
-        //println!("shape_item: segment_text: '{}'", segment_text);
         // Shape the entire segment text including newlines
         // The line breaking algorithm will handle newlines automatically
 
@@ -479,7 +446,6 @@ fn shape_item<'a, B: Brush>(
         // Use the entire segment text including newlines
         buffer.reserve(segment_text.len());
         for (i, ch) in segment_text.chars().enumerate() {
-            //println!("shape_item: ch: '{}'", ch);
             // Ensure that each cluster's index matches the index into `infos`. This is required
             // for efficient cluster lookup within `data.rs`.
             //
@@ -508,7 +474,6 @@ fn shape_item<'a, B: Brush>(
             &item_infos[segment_char_start..(segment_char_start + segment_char_count)];
 
         // Push harfrust-shaped run for the entire segment
-        println!("[FONT INDEX] {}", font.font.index);
         layout.data.push_run(
             FontData::new(font.font.blob.clone(), font.font.index),
             item.size,
@@ -603,11 +568,8 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
     }
 
     fn select_font(&mut self, cluster: &mut CharCluster) -> Option<SelectedFont> {
-        println!("[select_font_icu] self.style index: {}, cluster.style_index: {}", self.style_index, cluster.style_index);
         let style_index = cluster.style_index();
-        println!("[select_font_icu] cluster: '{}'", cluster.chars.iter().map(|ch| ch.ch).collect::<String>());
         let is_emoji = cluster.is_emoji;
-        println!("[select_font_icu] is_emoji: '{}'", is_emoji);
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize].style;

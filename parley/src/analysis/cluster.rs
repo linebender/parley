@@ -135,7 +135,6 @@ impl CharCluster {
                 let mut i = 0;
                 for c in nfd_str.chars() {
                     if i == MAX_CLUSTER_SIZE {
-                        println!("[ICU decomposed] i == MAX_CLUSTER_SIZE None->Invalid: '{}'", Self::format_chars(&self.decomp.chars));
                         return None;
                     }
 
@@ -147,12 +146,10 @@ impl CharCluster {
                 }
 
                 if i == 0 {
-                    println!("[ICU decomposed] i==0 None->Invalid: '{}'", Self::format_chars(&self.decomp.chars));
                     return None;
                 }
 
                 self.decomp.len = i as u8;
-                println!("[ICU decomposed] None->Valid: '{}'", Self::format_chars(&self.decomp.chars));
                 self.decomp.state = FormState::Valid;
                 self.decomp.setup();
                 Some(self.decomp.chars())
@@ -168,7 +165,6 @@ impl CharCluster {
                 // First, we need decomposed characters
                 if self.decomposed().map(|chars| chars.len()).unwrap_or(0) == 0 {
                     self.comp.state = FormState::Invalid;
-                    println!("[ICU composed] None->Invalid");
                     return None;
                 }
 
@@ -204,7 +200,6 @@ impl CharCluster {
                 }
 
                 self.comp.len = i as u8;
-                println!("[ICU composed] None->Valid: '{}'", Self::format_chars(&self.comp.chars));
                 self.comp.state = FormState::Valid;
                 self.comp.setup();
                 Some(self.comp.chars())
@@ -213,30 +208,20 @@ impl CharCluster {
         }
     }
 
-    // TODO(conor) remove - debug only
-    pub(crate) fn format_chars(chars: &[Char]) -> String {
-        chars.iter().map(|&ch| ch.ch).collect::<String>()
-    }
-
     pub(crate) fn map(&mut self, f: impl Fn(char) -> GlyphId) -> Status {
         let len = self.len;
         if len == 0 {
-            println!("[ICU MAP CharCluster] returning Status::Complete (len == 0)");
             return Status::Complete;
         }
         let mut glyph_ids = [0u16; MAX_CLUSTER_SIZE];
         let prev_ratio = self.best_ratio;
         let mut ratio;
         if self.force_normalize && self.composed().is_some() {
-            println!("[ICU MAP CharCluster] force_normalize=true");
             ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
-                println!("[ICU MAP CharCluster] updating self.best_ratio: {} -> {}", self.best_ratio, ratio);
                 self.best_ratio = ratio;
-                println!("[ICU MAP CharCluster] updating self.form to FormKind::NFC");
                 self.form = FormKind::NFC;
                 if ratio >= 1. {
-                    println!("[ICU MAP CharCluster] returning Status::Complete (NFC ratio >= 1.0)");
                     return Status::Complete;
                 }
             }
@@ -247,46 +232,35 @@ impl CharCluster {
         }
             .map(&f, &mut glyph_ids, self.best_ratio);
         if ratio > self.best_ratio {
-            println!("[ICU MAP CharCluster] updating self.best_ratio: {} -> {}", self.best_ratio, ratio);
             self.best_ratio = ratio;
-            println!("[ICU MAP CharCluster] updating self.form to FormKind::Original");
             self.form = FormKind::Original;
             if ratio >= 1. {
-                println!("[ICU MAP CharCluster] returning Status::Complete (Original ratio >= 1.0)");
                 return Status::Complete;
             }
         }
         if len > 1 && self.decomposed().is_some() {
             ratio = self.decomp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
-                println!("[ICU MAP CharCluster] updating self.best_ratio: {} -> {}", self.best_ratio, ratio);
                 self.best_ratio = ratio;
-                println!("[ICU MAP CharCluster] updating self.form to FormKind::NFD");
                 self.form = FormKind::NFD;
                 if ratio >= 1. {
-                    println!("[ICU MAP CharCluster] returning Status::Complete (NFD ratio >= 1.0)");
                     return Status::Complete;
                 }
             }
             if !self.force_normalize && self.composed().is_some() {
                 ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
                 if ratio > self.best_ratio {
-                    println!("[ICU MAP CharCluster] updating self.best_ratio: {} -> {}", self.best_ratio, ratio);
                     self.best_ratio = ratio;
-                    println!("[ICU MAP CharCluster] updating self.form to FormKind::NFC");
                     self.form = FormKind::NFC;
                     if ratio >= 1. {
-                        println!("[ICU MAP CharCluster] returning Status::Complete (NFC late ratio >= 1.0)");
                         return Status::Complete;
                     }
                 }
             }
         }
         if self.best_ratio > prev_ratio {
-            println!("[ICU MAP CharCluster] returning Status::Keep");
             Status::Keep
         } else {
-            println!("[ICU MAP CharCluster] returning Status::Discard");
             Status::Discard
         }
     }
@@ -365,16 +339,13 @@ impl<'a> Mapper<'a> {
         best_ratio: f32,
     ) -> f32 {
         if self.map_len == 0 {
-            println!("[ICU MAP Mapper] returning 1.0 (map_len == 0)");
             return 1.;
         }
         let mut mapped = 0;
-        println!("[ICU MAP Mapper] chars: {:?}", self.chars);
         for (c, g) in self.chars.iter().zip(glyphs.iter_mut()) {
             if !c.contributes_to_shaping {
                 *g = f(c.ch);
                 if self.map_len == 1 {
-                    println!("[ICU MAP Mapper] ch:{}, ch(uni): {}, gid:{}, mapped++", c.ch, c.ch.escape_unicode(), *g);
                     mapped += 1;
                 }
             } else {
@@ -382,20 +353,15 @@ impl<'a> Mapper<'a> {
                 *g = gid;
                 if gid != 0 {
                     mapped += 1;
-                    println!("[ICU MAP Mapper] ch:{}, ch(uni): {}, gid:{}, mapped++", c.ch, c.ch.escape_unicode(), gid);
-                } else {
-                    println!("[ICU MAP Mapper] ch:{}, ch(uni): {}, gid:{}, not touching `mapped`", c.ch, c.ch.escape_unicode(), gid);
                 }
             }
         }
         let ratio = mapped as f32 / self.map_len as f32;
         if ratio > best_ratio {
-            println!("[ICU MAP Mapper] updating chars glyph_ids (ratio {} > best_ratio {})", ratio, best_ratio);
             for (ch, glyph) in self.chars.iter_mut().zip(glyphs) {
                 ch.glyph_id = *glyph;
             }
         }
-        println!("[ICU MAP Mapper] returning ratio: {}", ratio);
         ratio
     }
 }
