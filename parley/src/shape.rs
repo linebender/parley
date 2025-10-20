@@ -219,7 +219,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 }
 
-// TODO(conor) order matters here for performance - assess
 fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str) -> bool {
     if analysis_data_sources.basic_emoji().contains_str(grapheme) {
         println!("[is_emoji] TESTING: basic emoji contains grapheme");
