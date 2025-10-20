@@ -34,10 +34,16 @@ accesskit = { workspace = true, optional = true }
 hashbrown = { workspace = true }
 harfrust = { workspace = true }
 icu = { version = "2.0.0"}
-# unicode_bidi: unicode_bidi::BidiDataSource implementation for CodePointMapData(Borrowed)<BidiClass>
-icu_properties = { version = "2.0.1", features = ["unicode_bidi"]}
-# TODO(conor) - ?
+icu_properties = { version = "2.0.0", features = ["unicode_bidi"]}
+icu_provider = "2.0.0"
 unicode-bidi = "0.3.18"
+# Used in ICU4X baked data sources
+zerovec = "0.11.4"
+
+[build-dependencies]
+icu = { version = "2.0.0"}
+icu_provider_export = "2.0.0"
+icu_provider_source = "2.0.0"
 
 [dev-dependencies]
 tiny-skia = "0.11.4"

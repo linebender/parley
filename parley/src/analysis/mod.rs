@@ -1,52 +1,108 @@
 pub(crate) mod cluster;
+mod provider;
 
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use icu::collections::codepointtrie::TrieValue;
 use icu::segmenter::{GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter, LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed};
-use icu::segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakInvariantOptions};
-use icu_properties::{CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed, EmojiSetData, EmojiSetDataBorrowed};
+use icu::segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakOptions};
+use icu_properties::{CodePointMapData, CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed, EmojiSetData, EmojiSetDataBorrowed};
 use icu_properties::props::{BasicEmoji, BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, RegionalIndicator, Script, VariationSelector};
 use unicode_bidi::TextSource;
 use crate::bidi::BidiLevel;
 use crate::{Brush, LayoutContext};
+use crate::analysis::provider::PROVIDER;
 use crate::resolve::RangedStyle;
 
 pub(crate) struct AnalysisDataSources {
-    pub(crate) grapheme_segmenter: GraphemeClusterSegmenterBorrowed<'static>,
-    pub(crate) variation_selector: CodePointSetDataBorrowed<'static>,
-    pub(crate) basic_emoji: EmojiSetDataBorrowed<'static>,
-    pub(crate) emoji: CodePointSetDataBorrowed<'static>,
-    pub(crate) extended_pictographic: CodePointSetDataBorrowed<'static>,
-    pub(crate) regional_indicator: CodePointSetDataBorrowed<'static>,
-
-    script: CodePointMapDataBorrowed<'static, Script>,
-    general_category: CodePointMapDataBorrowed<'static, GeneralCategory>,
-    bidi_class: CodePointMapDataBorrowed<'static, BidiClass>,
-    line_break: CodePointMapDataBorrowed<'static, LineBreak>,
-    grapheme_cluster_break: CodePointMapDataBorrowed<'static, GraphemeClusterBreak>,
-    word_segmenter: WordSegmenterBorrowed<'static>,
-    // Key: icu_segmenter::line::LineBreakWordOption as u8
-    line_segmenters: HashMap<u8, LineSegmenterBorrowed<'static>>,
+    grapheme_segmenter: GraphemeClusterSegmenter,
+    variation_selector: CodePointSetData,
+    basic_emoji: EmojiSetData,
+    emoji: CodePointSetData,
+    extended_pictographic: CodePointSetData,
+    regional_indicator: CodePointSetData,
+    script: CodePointMapData<Script>,
+    general_category: CodePointMapData<GeneralCategory>,
+    bidi_class: CodePointMapData<BidiClass>,
+    line_break: CodePointMapData<LineBreak>,
+    grapheme_cluster_break: CodePointMapData<GraphemeClusterBreak>,
+    word_segmenter: WordSegmenter,
+    line_segmenters: HashMap<u8, LineSegmenter>,
 }
 
 impl AnalysisDataSources {
     pub(crate) fn new() -> Self {
         Self {
-            grapheme_segmenter: GraphemeClusterSegmenter::new(),
-            variation_selector: CodePointSetData::new::<VariationSelector>(),
-            basic_emoji: EmojiSetData::new::<BasicEmoji>(),
-            emoji: CodePointSetData::new::<Emoji>(),
-            extended_pictographic: CodePointSetData::new::<ExtendedPictographic>(),
-            regional_indicator: CodePointSetData::new::<RegionalIndicator>(),
-            script: CodePointMapDataBorrowed::<Script>::new(),
-            general_category: CodePointMapDataBorrowed::<GeneralCategory>::new(),
-            bidi_class: CodePointMapDataBorrowed::<BidiClass>::new(),
-            line_break: CodePointMapDataBorrowed::<LineBreak>::new(),
-            grapheme_cluster_break: CodePointMapDataBorrowed::<GraphemeClusterBreak>::new(),
-            word_segmenter: WordSegmenter::new_auto(WordBreakInvariantOptions::default()),
+            grapheme_segmenter: GraphemeClusterSegmenter::try_new_unstable(&PROVIDER).unwrap(),
+            variation_selector: CodePointSetData::try_new_unstable::<VariationSelector>(&PROVIDER).unwrap(),
+            basic_emoji: EmojiSetData::try_new_unstable::<BasicEmoji>(&PROVIDER).unwrap(),
+            emoji: CodePointSetData::try_new_unstable::<Emoji>(&PROVIDER).unwrap(),
+            extended_pictographic: CodePointSetData::try_new_unstable::<ExtendedPictographic>(&PROVIDER).unwrap(),
+            regional_indicator: CodePointSetData::try_new_unstable::<RegionalIndicator>(&PROVIDER).unwrap(),
+            script: CodePointMapData::<Script>::try_new_unstable(&PROVIDER).unwrap(),
+            general_category: CodePointMapData::<GeneralCategory>::try_new_unstable(&PROVIDER).unwrap(),
+            bidi_class: CodePointMapData::<BidiClass>::try_new_unstable(&PROVIDER).unwrap(),
+            line_break: CodePointMapData::<LineBreak>::try_new_unstable(&PROVIDER).unwrap(),
+            grapheme_cluster_break: CodePointMapData::<GraphemeClusterBreak>::try_new_unstable(&PROVIDER).unwrap(),
+            word_segmenter: WordSegmenter::try_new_auto_unstable(&PROVIDER, WordBreakOptions::default()).unwrap(),
             line_segmenters: HashMap::new(),
         }
+    }
+
+    pub(crate) fn grapheme_segmenter(&self) -> GraphemeClusterSegmenterBorrowed<'_> {
+        self.grapheme_segmenter.as_borrowed()
+    }
+
+    pub(crate) fn variation_selector(&self) -> CodePointSetDataBorrowed<'_> {
+        self.variation_selector.as_borrowed()
+    }
+
+    pub(crate) fn basic_emoji(&self) -> EmojiSetDataBorrowed<'_> {
+        self.basic_emoji.as_borrowed()
+    }
+
+    pub(crate) fn emoji(&self) -> CodePointSetDataBorrowed<'_> {
+        self.emoji.as_borrowed()
+    }
+
+    pub(crate) fn extended_pictographic(&self) -> CodePointSetDataBorrowed<'_> {
+        self.extended_pictographic.as_borrowed()
+    }
+
+    pub(crate) fn regional_indicator(&self) -> CodePointSetDataBorrowed<'_> {
+        self.regional_indicator.as_borrowed()
+    }
+
+    fn script(&self) -> CodePointMapDataBorrowed<'_, Script> {
+        self.script.as_borrowed()
+    }
+
+    fn general_category(&self) -> CodePointMapDataBorrowed<'_, GeneralCategory> {
+        self.general_category.as_borrowed()
+    }
+
+    fn bidi_class(&self) -> CodePointMapDataBorrowed<'_, BidiClass> {
+        self.bidi_class.as_borrowed()
+    }
+
+    fn line_break(&self) -> CodePointMapDataBorrowed<'_, LineBreak> {
+        self.line_break.as_borrowed()
+    }
+
+    fn grapheme_cluster_break(&self) -> CodePointMapDataBorrowed<'_, GraphemeClusterBreak> {
+        self.grapheme_cluster_break.as_borrowed()
+    }
+
+    fn word_segmenter(&self) -> WordSegmenterBorrowed<'_> {
+        self.word_segmenter.as_borrowed()
+    }
+
+    fn line_segmenter(&mut self, word_break_strength: LineBreakWordOption) -> LineSegmenterBorrowed<'_> {
+        self.line_segmenters.entry(word_break_strength as u8).or_insert({
+            let mut line_break_opts: LineBreakOptions<'static> = Default::default();
+            line_break_opts.word_option = Some(word_break_strength);
+            LineSegmenter::try_new_auto_unstable(&PROVIDER, line_break_opts).unwrap()
+        }).as_borrowed()
     }
 }
 
@@ -189,7 +245,7 @@ pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str)
     let mut all_boundaries_byte_indexed = vec![Boundary::None; text.len()];
 
     // Word boundaries:
-    for wb in lcx.analysis_data_sources.word_segmenter.segment_str(text) {
+    for wb in lcx.analysis_data_sources.word_segmenter().segment_str(text) {
         // icu produces a word boundary trailing the string, which we don't use.
         if wb == text.len() {
             continue;
@@ -211,12 +267,10 @@ pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str)
     );
     let mut global_offset = 0;
     for (substring_index, (substring, word_break_strength, last)) in contiguous_word_break_substrings.enumerate() {
-        let line_segmenter = &mut lcx.analysis_data_sources.line_segmenters.entry(word_break_strength as u8).or_insert({
-            let mut line_break_opts: LineBreakOptions<'static> = Default::default();
-            line_break_opts.word_option = Some(word_break_strength);
-            LineSegmenter::new_auto(line_break_opts)
-        });
-        let line_boundaries: Vec<usize> = line_segmenter.segment_str(substring).collect();
+        let line_boundaries: Vec<usize> = lcx.analysis_data_sources
+            .line_segmenter(word_break_strength)
+            .segment_str(substring)
+            .collect();
 
         // Fast path for text with a single word-break option.
         if substring_index == 0 && last {
@@ -263,7 +317,7 @@ pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str)
     }
 
     // BiDi embedding levels:
-    let bidi_embedding_levels = unicode_bidi::BidiInfo::new_with_data_source(&lcx.analysis_data_sources.bidi_class, text, None).levels;
+    let bidi_embedding_levels = unicode_bidi::BidiInfo::new_with_data_source(&lcx.analysis_data_sources.bidi_class(), text, None).levels;
 
     let boundaries_and_levels_iter = text.char_indices()
         .map(|(byte_pos, _)| (
@@ -271,20 +325,23 @@ pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str)
             bidi_embedding_levels.get(byte_pos).unwrap()
         ));
 
-    fn unicode_data_iterator<'a, T: TrieValue>(text: &'a str, data_source: CodePointMapDataBorrowed<'static, T>) -> impl Iterator<Item = T> + 'a {
-        text.chars().map(move |c| (c, data_source.get32(c as u32)).1)
+    fn unicode_data_iterator<'a, T: TrieValue>(
+        text: &'a str,
+        data_source: CodePointMapDataBorrowed<'a, T>
+    ) -> impl Iterator<Item = T> + 'a {
+        text.chars().map(move |c| data_source.get32(c as u32))
     }
 
     boundaries_and_levels_iter
         .zip(text.chars())
-        .zip(unicode_data_iterator(text, lcx.analysis_data_sources.script))
-        .zip(unicode_data_iterator(text, lcx.analysis_data_sources.general_category))
-        .zip(unicode_data_iterator(text, lcx.analysis_data_sources.grapheme_cluster_break))
+        .zip(unicode_data_iterator(text, lcx.analysis_data_sources.script()))
+        .zip(unicode_data_iterator(text, lcx.analysis_data_sources.general_category()))
+        .zip(unicode_data_iterator(text, lcx.analysis_data_sources.grapheme_cluster_break()))
         // Shift line break data forward one, as line boundaries corresponding with line-breaking
         // characters (like '\n') exist at an index position one higher than the respective
         // character's index, but we need our iterators to align, and the rest are simply
         // character-indexed.
-        .zip(std::iter::once(LineBreak::from_icu4c_value(0)).chain(unicode_data_iterator(text, lcx.analysis_data_sources.line_break)))
+        .zip(std::iter::once(LineBreak::from_icu4c_value(0)).chain(unicode_data_iterator(text, lcx.analysis_data_sources.line_break())))
         .for_each(|((((((boundary, embed_level), ch), script), general_category), grapheme_cluster_break), line_break)| {
             let bidi_embed_level: BidiLevel = (*embed_level).into();
 
@@ -301,7 +358,7 @@ pub(crate) fn analyze_text_icu<B: Brush>(lcx: &mut LayoutContext<B>, text: &str)
                 // "Extend" break chars should be normalized first, with two exceptions
                 if matches!(grapheme_cluster_break, GraphemeClusterBreak::Extend) &&
                     ch as u32 != 0x200C && // Is not a Zero Width Non-Joiner &&
-                    !lcx.analysis_data_sources.variation_selector.contains(ch)
+                    !lcx.analysis_data_sources.variation_selector().contains(ch)
                 {
                     true
                 } else {

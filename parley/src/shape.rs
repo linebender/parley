@@ -221,7 +221,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
 // TODO(conor) order matters here for performance - assess
 fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str) -> bool {
-    if analysis_data_sources.basic_emoji.contains_str(grapheme) {
+    if analysis_data_sources.basic_emoji().contains_str(grapheme) {
         println!("[is_emoji] TESTING: basic emoji contains grapheme");
         return true;
     }
@@ -234,16 +234,16 @@ fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str
         // Handle single-character graphemes
         if char_index == 0 && chars_iter.peek().is_none() {
             println!("[is_emoji] TESTING: single char");
-            return analysis_data_sources.emoji.contains(ch) ||
-                analysis_data_sources.extended_pictographic.contains(ch);
+            return analysis_data_sources.emoji().contains(ch) ||
+                analysis_data_sources.extended_pictographic().contains(ch);
         }
 
         // Check if this character is an emoji
-        let emoji_data_source_contains_char = analysis_data_sources.emoji.contains(ch);
+        let emoji_data_source_contains_char = analysis_data_sources.emoji().contains(ch);
         if emoji_data_source_contains_char {
             // Check if the next character is a variation selector
             if let Some((_, next_ch)) = chars_iter.peek() {
-                if analysis_data_sources.variation_selector.contains(*next_ch) {
+                if analysis_data_sources.variation_selector().contains(*next_ch) {
                     println!("[is_emoji] TESTING: var selector");
                     return true;
                 }
@@ -253,8 +253,8 @@ fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str
         // Check for flag emoji (two regional indicators), must be a two-character grapheme.
         if let Some(first_char) = first_and_previous_char {
             if chars_iter.peek().is_none() &&
-                analysis_data_sources.regional_indicator.contains(first_char) &&
-                analysis_data_sources.regional_indicator.contains(ch) {
+                analysis_data_sources.regional_indicator().contains(first_char) &&
+                analysis_data_sources.regional_indicator().contains(ch) {
                 println!("[is_emoji] TESTING: regional indicator");
                 return true;
             }
@@ -297,7 +297,7 @@ fn shape_item<'a, B: Brush>(
     let mut font_selector =
         FontSelector::new(fq, rcx, styles, first_style_index, item.script, item.locale.clone());
 
-    let grapheme_cluster_boundaries = analysis_data_sources.grapheme_segmenter.segment_str(item_text);
+    let grapheme_cluster_boundaries = analysis_data_sources.grapheme_segmenter().segment_str(item_text);
     let mut item_infos_iter = item_infos.iter();
     let mut code_unit_offset_in_string = text_range.start;
     let mut clusters_iter = grapheme_cluster_boundaries
