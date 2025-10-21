@@ -33,23 +33,23 @@ core_maths = { version = "0.1.1", optional = true }
 accesskit = { workspace = true, optional = true }
 hashbrown = { workspace = true }
 harfrust = { workspace = true }
-icu_collections = { version = "2.0.0", default-features = false }
+icu_collections = { workspace = true }
 # Used in ICU4X baked data sources, which depend on compiled data, but just locale fallback rules.
-icu_locale = { version = "2.0.0", default-features = false, features = ["compiled_data"] }
-icu_normalizer = { version = "2.0.0", default-features = false }
-icu_properties = { version = "2.0.0", default-features = false, features = ["unicode_bidi"] }
-icu_provider = { version = "2.0.0", default-features = false, features = ["baked"] }
-icu_segmenter = { version = "2.0.0", default-features = false, features = ["auto"] }
-unicode-bidi = "0.3.18"
+icu_locale = { workspace = true }
+icu_normalizer = { workspace = true }
+icu_properties = { workspace = true, features = ["unicode_bidi"] }
+icu_provider = { workspace = true }
+icu_segmenter = { workspace = true, features = ["auto"] }
+unicode-bidi = { workspace = true }
 # Used in ICU4X baked data sources
-zerovec = "0.11.4"
+zerovec = { workspace = true }
 
 [build-dependencies]
-icu_normalizer = { version = "2.0.0", default-features = false }
-icu_properties = { version = "2.0.0", default-features = false }
-icu_provider_export = { version = "2.0.0", default-features = false, features = ["baked_exporter"] }
-icu_provider_source = { version = "2.0.0" }
-icu_segmenter = { version = "2.0.0", default-features = false }
+icu_normalizer = { workspace = true }
+icu_properties = { workspace = true }
+icu_provider_export = { workspace = true }
+icu_provider_source = { workspace = true }
+icu_segmenter = { workspace = true }
 
 [dev-dependencies]
 parley_dev = { workspace = true }
