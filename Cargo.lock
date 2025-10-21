@@ -3374,8 +3374,6 @@ dependencies = [
 name = "parley_bench"
 version = "0.0.0"
 dependencies = [
- "icu_properties",
- "icu_provider",
  "parley",
  "parley_dev",
  "skrifa 0.37.0",

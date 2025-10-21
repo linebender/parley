@@ -15,7 +15,9 @@ fn main() {
     let source = icu_provider_source::SourceDataProvider::new();
 
     ExportDriver::new(
-        [DataLocaleFamily::FULL],
+        [
+            DataLocaleFamily::single(locale!("en").into()),
+        ],
         DeduplicationStrategy::Maximal.into(),
         LocaleFallbacker::new_without_data(),
     )
