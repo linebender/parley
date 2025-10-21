@@ -8,8 +8,9 @@ use core::mem;
 use core::ops::RangeInclusive;
 
 use alloc::vec::Vec;
-use icu::locale::LanguageIdentifier;
+
 use icu_properties::props::Script;
+use icu_provider::prelude::icu_locale_core::LanguageIdentifier;
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
@@ -334,7 +335,7 @@ fn shape_item<'a, B: Brush>(
 
     let mut cluster = clusters_iter.next().expect("one cluster");
 
-    let mut current_font = font_selector.select_font(&mut cluster);
+    let mut current_font = font_selector.select_font(&mut cluster, analysis_data_sources);
 
     // Main segmentation loop (based on swash shape_clusters) - only within current item
     while let Some(font) = current_font.take() {
@@ -349,7 +350,7 @@ fn shape_item<'a, B: Brush>(
                 None => break, // End of current item - process final segment
             };
 
-            if let Some(next_font) = font_selector.select_font(&mut cluster) {
+            if let Some(next_font) = font_selector.select_font(&mut cluster, analysis_data_sources) {
                 if next_font != font {
                     current_font = Some(next_font);
                     break;
@@ -567,7 +568,11 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         }
     }
 
-    fn select_font(&mut self, cluster: &mut CharCluster) -> Option<SelectedFont> {
+    fn select_font(
+        &mut self,
+        cluster: &mut CharCluster,
+        analysis_data_sources: &AnalysisDataSources,
+    ) -> Option<SelectedFont> {
         let style_index = cluster.style_index();
         let is_emoji = cluster.is_emoji;
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
@@ -618,7 +623,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
                         (g != 0) as u16
                     })
                     .unwrap_or_default()
-            });
+            }, analysis_data_sources);
 
             match map_status {
                 Status::Complete => {

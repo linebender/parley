@@ -1,10 +1,11 @@
+use crate::analysis::AnalysisDataSources;
+
 /// The maximum number of characters in a single cluster.
 const MAX_CLUSTER_SIZE: usize = 32;
 
 #[derive(Debug)]
 pub(crate) struct CharCluster {
     pub chars: Vec<Char>,
-    pub style_index: u16,
     pub is_emoji: bool,
     len: u8,
     map_len: u8,
@@ -96,7 +97,6 @@ impl CharCluster {
     ) -> Self {
         CharCluster {
             chars,
-            style_index: 0,
             is_emoji,
             len,
             map_len,
@@ -115,7 +115,7 @@ impl CharCluster {
         self.chars[0].style_index
     }
 
-    fn decomposed(&mut self) -> Option<&[Char]> {
+    fn decomposed(&mut self, analysis_data_sources: &AnalysisDataSources) -> Option<&[Char]> {
         match self.decomp.state {
             FormState::Invalid => None,
             FormState::None => {
@@ -127,9 +127,8 @@ impl CharCluster {
                     orig_str.push(ch.ch);
                 }
 
-                // Get a normalizer for NFD (decomposed) form
-                let nfd = icu::normalizer::DecomposingNormalizerBorrowed::new_nfd();
-                let nfd_str = nfd.normalize(&orig_str);
+                // Normalize to NFD (decomposed) form
+                let nfd_str = analysis_data_sources.decomposing_normalizer().normalize(&orig_str);
 
                 // Copy the characters back to our form structure
                 let mut i = 0;
@@ -158,12 +157,12 @@ impl CharCluster {
         }
     }
 
-    fn composed(&mut self) -> Option<&[Char]> {
+    fn composed(&mut self, analysis_data_sources: &AnalysisDataSources) -> Option<&[Char]> {
         match self.comp.state {
             FormState::Invalid => None,
             FormState::None => {
                 // First, we need decomposed characters
-                if self.decomposed().map(|chars| chars.len()).unwrap_or(0) == 0 {
+                if self.decomposed(analysis_data_sources).map(|chars| chars.len()).unwrap_or(0) == 0 {
                     self.comp.state = FormState::Invalid;
                     return None;
                 }
@@ -176,9 +175,8 @@ impl CharCluster {
                     decomp_str.push(ch.ch);
                 }
 
-                // Get a normalizer for NFC (composed) form
-                let nfc = icu::normalizer::ComposingNormalizerBorrowed::new_nfc();
-                let nfc_str = nfc.normalize(&decomp_str);
+                // Normalize to NFC (composed) form
+                let nfc_str = analysis_data_sources.composing_normalizer().normalize(&decomp_str);
 
                 // Copy the characters back to our form structure
                 let mut i = 0;
@@ -208,7 +206,11 @@ impl CharCluster {
         }
     }
 
-    pub(crate) fn map(&mut self, f: impl Fn(char) -> GlyphId) -> Status {
+    pub(crate) fn map(
+        &mut self,
+        f: impl Fn(char) -> GlyphId,
+        analysis_data_sources: &AnalysisDataSources,
+    ) -> Status {
         let len = self.len;
         if len == 0 {
             return Status::Complete;
@@ -216,7 +218,7 @@ impl CharCluster {
         let mut glyph_ids = [0u16; MAX_CLUSTER_SIZE];
         let prev_ratio = self.best_ratio;
         let mut ratio;
-        if self.force_normalize && self.composed().is_some() {
+        if self.force_normalize && self.composed(analysis_data_sources).is_some() {
             ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
@@ -238,7 +240,7 @@ impl CharCluster {
                 return Status::Complete;
             }
         }
-        if len > 1 && self.decomposed().is_some() {
+        if len > 1 && self.decomposed(analysis_data_sources).is_some() {
             ratio = self.decomp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
@@ -247,7 +249,7 @@ impl CharCluster {
                     return Status::Complete;
                 }
             }
-            if !self.force_normalize && self.composed().is_some() {
+            if !self.force_normalize && self.composed(analysis_data_sources).is_some() {
                 ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
                 if ratio > self.best_ratio {
                     self.best_ratio = ratio;

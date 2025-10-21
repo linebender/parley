@@ -3,11 +3,12 @@ mod provider;
 
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use icu::collections::codepointtrie::TrieValue;
-use icu::segmenter::{GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter, LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed};
-use icu::segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakOptions};
+use icu_collections::codepointtrie::TrieValue;
+use icu_normalizer::{ComposingNormalizer, ComposingNormalizerBorrowed, DecomposingNormalizer, DecomposingNormalizerBorrowed};
 use icu_properties::{CodePointMapData, CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed, EmojiSetData, EmojiSetDataBorrowed};
 use icu_properties::props::{BasicEmoji, BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, RegionalIndicator, Script, VariationSelector};
+use icu_segmenter::{GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter, LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed};
+use icu_segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakOptions};
 use unicode_bidi::TextSource;
 use crate::{Brush, LayoutContext};
 use crate::analysis::provider::PROVIDER;
@@ -27,6 +28,8 @@ pub(crate) struct AnalysisDataSources {
     grapheme_cluster_break: CodePointMapData<GraphemeClusterBreak>,
     word_segmenter: WordSegmenter,
     line_segmenters: HashMap<u8, LineSegmenter>,
+    composing_normalizer: ComposingNormalizer,
+    decomposing_normalizer: DecomposingNormalizer,
 }
 
 impl AnalysisDataSources {
@@ -45,6 +48,8 @@ impl AnalysisDataSources {
             grapheme_cluster_break: CodePointMapData::<GraphemeClusterBreak>::try_new_unstable(&PROVIDER).unwrap(),
             word_segmenter: WordSegmenter::try_new_auto_unstable(&PROVIDER, WordBreakOptions::default()).unwrap(),
             line_segmenters: HashMap::new(),
+            composing_normalizer: ComposingNormalizer::try_new_nfc_unstable(&PROVIDER).unwrap(),
+            decomposing_normalizer: DecomposingNormalizer::try_new_nfd_unstable(&PROVIDER).unwrap(),
         }
     }
 
@@ -102,6 +107,14 @@ impl AnalysisDataSources {
             line_break_opts.word_option = Some(word_break_strength);
             LineSegmenter::try_new_auto_unstable(&PROVIDER, line_break_opts).unwrap()
         }).as_borrowed()
+    }
+
+    fn composing_normalizer(&self) -> ComposingNormalizerBorrowed<'_> {
+        self.composing_normalizer.as_borrowed()
+    }
+
+    fn decomposing_normalizer(&self) -> DecomposingNormalizerBorrowed<'_> {
+        self.decomposing_normalizer.as_borrowed()
     }
 }
 
@@ -385,8 +398,8 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
 
 #[cfg(test)]
 mod tests {
-    use icu::segmenter::options::LineBreakWordOption;
     use icu_properties::props::{GraphemeClusterBreak, Script};
+    use icu_segmenter::options::LineBreakWordOption;
     use fontique::FontWeight;
     use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty};
     use crate::analysis::{BidiLevel, Boundary};

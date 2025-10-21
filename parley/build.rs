@@ -21,32 +21,38 @@ fn main() {
     )
         .with_markers([
             // Properties - Map data
-            icu::properties::provider::PropertyEnumScriptV1::INFO,
-            icu::properties::provider::PropertyEnumGeneralCategoryV1::INFO,
-            icu::properties::provider::PropertyEnumBidiClassV1::INFO,
-            icu::properties::provider::PropertyEnumLineBreakV1::INFO,
-            icu::properties::provider::PropertyEnumGraphemeClusterBreakV1::INFO,
+            icu_properties::provider::PropertyEnumScriptV1::INFO,
+            icu_properties::provider::PropertyEnumGeneralCategoryV1::INFO,
+            icu_properties::provider::PropertyEnumBidiClassV1::INFO,
+            icu_properties::provider::PropertyEnumLineBreakV1::INFO,
+            icu_properties::provider::PropertyEnumGraphemeClusterBreakV1::INFO,
 
             // Properties - Set data
-            icu::properties::provider::PropertyBinaryVariationSelectorV1::INFO,
-            icu::properties::provider::PropertyBinaryBasicEmojiV1::INFO,
-            icu::properties::provider::PropertyBinaryEmojiV1::INFO,
-            icu::properties::provider::PropertyBinaryExtendedPictographicV1::INFO,
-            icu::properties::provider::PropertyBinaryRegionalIndicatorV1::INFO,
+            icu_properties::provider::PropertyBinaryVariationSelectorV1::INFO,
+            icu_properties::provider::PropertyBinaryBasicEmojiV1::INFO,
+            icu_properties::provider::PropertyBinaryEmojiV1::INFO,
+            icu_properties::provider::PropertyBinaryExtendedPictographicV1::INFO,
+            icu_properties::provider::PropertyBinaryRegionalIndicatorV1::INFO,
 
             // Segmenters
-            icu::segmenter::provider::SegmenterBreakGraphemeClusterV1::INFO,
-            icu::segmenter::provider::SegmenterBreakWordOverrideV1::INFO,
-            icu::segmenter::provider::SegmenterDictionaryAutoV1::INFO,
-            icu::segmenter::provider::SegmenterLstmAutoV1::INFO,
-            icu::segmenter::provider::SegmenterBreakWordV1::INFO,
-            icu::segmenter::provider::SegmenterBreakLineV1::INFO,
+            icu_segmenter::provider::SegmenterBreakGraphemeClusterV1::INFO,
+            icu_segmenter::provider::SegmenterBreakWordOverrideV1::INFO,
+            icu_segmenter::provider::SegmenterDictionaryAutoV1::INFO,
+            icu_segmenter::provider::SegmenterLstmAutoV1::INFO,
+            icu_segmenter::provider::SegmenterBreakWordV1::INFO,
+            icu_segmenter::provider::SegmenterBreakLineV1::INFO,
+
+            // Normalisation
+            icu_normalizer::provider::NormalizerNfcV1::INFO,
+            icu_normalizer::provider::NormalizerNfdDataV1::INFO,
+            icu_normalizer::provider::NormalizerNfdTablesV1::INFO,
         ])
         .export(
             &source,
             BakedExporter::new(mod_directory.clone(), {
                 let mut options = Options::default();
                 options.overwrite = true;
+                options.use_separate_crates = true;
                 options
             })
                 .unwrap(),

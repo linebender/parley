@@ -10,7 +10,7 @@ mod styleset;
 use alloc::borrow::Cow;
 
 pub use brush::*;
-pub use icu::segmenter::options::LineBreakWordOption;
+pub use icu_segmenter::options::LineBreakWordOption;
 pub use font::{
     FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontVariation, FontWeight,
     FontWidth, GenericFamily,

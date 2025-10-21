@@ -4,7 +4,7 @@
 //! Test that the various builders produce the same results.
 
 use std::borrow::Cow;
-use icu::segmenter::options::LineBreakWordOption;
+use icu_segmenter::options::LineBreakWordOption;
 use fontique::{FontStyle, FontWeight, FontWidth};
 use peniko::color::palette;
 

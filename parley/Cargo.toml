@@ -33,17 +33,23 @@ core_maths = { version = "0.1.1", optional = true }
 accesskit = { workspace = true, optional = true }
 hashbrown = { workspace = true }
 harfrust = { workspace = true }
-icu = { version = "2.0.0"}
-icu_properties = { version = "2.0.0", features = ["unicode_bidi"]}
-icu_provider = "2.0.0"
+icu_collections = { version = "2.0.0", default-features = false }
+# Used in ICU4X baked data sources, which depend on compiled data, but just locale fallback rules.
+icu_locale = { version = "2.0.0", default-features = false, features = ["compiled_data"] }
+icu_normalizer = { version = "2.0.0", default-features = false }
+icu_properties = { version = "2.0.0", default-features = false, features = ["unicode_bidi"] }
+icu_provider = { version = "2.0.0", default-features = false, features = ["baked"] }
+icu_segmenter = { version = "2.0.0", default-features = false, features = ["auto"] }
 unicode-bidi = "0.3.18"
 # Used in ICU4X baked data sources
 zerovec = "0.11.4"
 
 [build-dependencies]
-icu = { version = "2.0.0"}
-icu_provider_export = "2.0.0"
-icu_provider_source = "2.0.0"
+icu_normalizer = { version = "2.0.0", default-features = false }
+icu_properties = { version = "2.0.0", default-features = false }
+icu_provider_export = { version = "2.0.0", default-features = false, features = ["baked_exporter"] }
+icu_provider_source = { version = "2.0.0" }
+icu_segmenter = { version = "2.0.0", default-features = false }
 
 [dev-dependencies]
 parley_dev = { workspace = true }

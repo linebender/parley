@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use icu_properties::props::Script;
+use icu_provider::prelude::icu_locale_core::LanguageIdentifier;
 
 pub(crate) fn script_to_fontique(script: Script) -> fontique::Script {
     fontique::Script(*FONTIQUE_SCRIPT_TAGS.get(script.to_icu4c_value() as usize).unwrap_or(b"Zzzz"))
@@ -14,7 +15,7 @@ pub(crate) fn script_to_harfrust(script: Script) -> harfrust::Script {
         .unwrap_or(harfrust::script::UNKNOWN)
 }
 
-pub(crate) fn locale_to_fontique(locale: icu::locale::LanguageIdentifier) -> Option<fontique::Language> {
+pub(crate) fn locale_to_fontique(locale: LanguageIdentifier) -> Option<fontique::Language> {
     fontique::Language::try_from_utf8(locale.to_string().as_bytes()).ok()
 }
 

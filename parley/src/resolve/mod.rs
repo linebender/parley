@@ -20,8 +20,8 @@ use crate::util::nearly_eq;
 use crate::{LineBreakWordOption, LineHeight, OverflowWrap, layout};
 use core::borrow::Borrow;
 use core::ops::Range;
-use icu::locale::LanguageIdentifier;
 use fontique::FamilyId;
+use icu_provider::prelude::icu_locale_core::LanguageIdentifier;
 
 /// Style with an associated range.
 #[derive(Debug, Clone)]
