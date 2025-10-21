@@ -18,14 +18,13 @@ workspace = true
 
 [features]
 default = ["system"]
-std = ["fontique/std", "harfrust/std", "peniko/std", "skrifa/std", "swash/std"]
-libm = ["fontique/libm", "peniko/libm", "skrifa/libm", "swash/libm", "dep:core_maths"]
+std = ["fontique/std", "harfrust/std", "peniko/std", "skrifa/std"]
+libm = ["fontique/libm", "peniko/libm", "skrifa/libm", "dep:core_maths"]
 # Enables support for system font backends
 system = ["std", "fontique/system"]
 accesskit = ["dep:accesskit"]
 
 [dependencies]
-swash = { workspace = true }
 skrifa = { workspace = true }
 linebender_resource_handle = { workspace = true }
 fontique = { workspace = true }

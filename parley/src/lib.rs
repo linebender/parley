@@ -101,7 +101,6 @@ compile_error!("parley requires either the `std` or `libm` feature to be enabled
 extern crate alloc;
 
 pub use fontique;
-pub use swash;
 
 mod analysis;
 mod builder;
@@ -119,6 +118,7 @@ pub mod style;
 
 #[cfg(test)]
 mod tests;
+mod setting;
 
 pub use linebender_resource_handle::FontData;
 pub use util::BoundingBox;

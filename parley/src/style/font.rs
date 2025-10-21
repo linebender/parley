@@ -5,13 +5,15 @@ use alloc::borrow::Cow;
 use alloc::borrow::ToOwned;
 use core::fmt;
 
+use crate::setting::Setting;
+
 pub use fontique::{FontStyle, FontWeight, FontWidth, GenericFamily};
 
 /// Setting for a font variation.
-pub type FontVariation = swash::Setting<f32>;
+pub type FontVariation = Setting<f32>;
 
 /// Setting for a font feature.
-pub type FontFeature = swash::Setting<u16>;
+pub type FontFeature = Setting<u16>;
 
 /// Prioritized sequence of font families.
 ///
