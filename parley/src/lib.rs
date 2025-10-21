@@ -114,11 +114,11 @@ mod shape;
 mod util;
 
 pub mod layout;
+pub mod setting;
 pub mod style;
 
 #[cfg(test)]
 mod tests;
-mod setting;
 
 pub use linebender_resource_handle::FontData;
 pub use util::BoundingBox;

@@ -12,9 +12,9 @@ use alloc::borrow::Cow;
 pub use brush::*;
 pub use icu_segmenter::options::LineBreakWordOption;
 pub use font::{
-    FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontVariation, FontWeight,
-    FontWidth, GenericFamily,
+    FontFamily, FontSettings, FontStack, FontStyle, FontWeight, FontWidth, GenericFamily,
 };
+pub(crate) use font::{FontFeature, FontVariation};
 pub use styleset::StyleSet;
 
 use crate::{LayoutLineHeight, util::nearly_eq};

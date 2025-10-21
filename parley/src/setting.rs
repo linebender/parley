@@ -1,8 +1,6 @@
-use core::fmt;
-
 type Tag = u32;
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
-pub(crate) struct Setting<T> {
+pub struct Setting<T> {
     /// The tag that identifies the setting.
     pub tag: Tag,
     /// The value for the setting.
@@ -10,13 +8,13 @@ pub(crate) struct Setting<T> {
 }
 
 /// Creates a tag from four bytes.
-pub const fn tag_from_bytes(bytes: &[u8; 4]) -> Tag {
+pub(crate) const fn tag_from_bytes(bytes: &[u8; 4]) -> Tag {
     (bytes[0] as u32) << 24 | (bytes[1] as u32) << 16 | (bytes[2] as u32) << 8 | bytes[3] as u32
 }
 
 /// Creates a tag from the first four bytes of a string, inserting
 /// spaces for any missing bytes.
-pub fn tag_from_str_lossy(s: &str) -> Tag {
+fn tag_from_str_lossy(s: &str) -> Tag {
     let mut bytes = [b' '; 4];
     for (i, b) in s.as_bytes().iter().enumerate().take(4) {
         bytes[i] = *b;
@@ -24,23 +22,10 @@ pub fn tag_from_str_lossy(s: &str) -> Tag {
     tag_from_bytes(&bytes)
 }
 
-/*impl<T: fmt::Display> fmt::Display for Setting<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let bytes = self.tag.to_be_bytes();
-        let tag_name = core::str::from_utf8(&bytes).unwrap_or("");
-        write!(f, "\"{}\" {}", tag_name, self.value)
-    }
-}*/
-
 impl Setting<u16> {
-    /*/// Parses a feature setting according to the CSS grammar.
-    pub fn parse(s: &str) -> Option<Self> {
-        Self::parse_list(s).next()
-    }*/
-
     /// Parses a comma separated list of feature settings according to the CSS
     /// grammar.
-    pub fn parse_list(s: &str) -> impl Iterator<Item = Self> + '_ + Clone {
+    pub(crate) fn parse_list(s: &str) -> impl Iterator<Item = Self> + '_ + Clone {
         ParseList::new(s)
             .map(|(_, tag, value_str)| {
                 let (ok, value) = match value_str {
@@ -59,14 +44,9 @@ impl Setting<u16> {
 }
 
 impl Setting<f32> {
-    /// Parses a variation setting according to the CSS grammar.
-    /*pub fn parse(s: &str) -> Option<Self> {
-        Self::parse_list(s).next()
-    }*/
-
     /// Parses a comma separated list of variation settings according to the
     /// CSS grammar.
-    pub fn parse_list(s: &str) -> impl Iterator<Item = Self> + '_ + Clone {
+    pub(crate) fn parse_list(s: &str) -> impl Iterator<Item = Self> + '_ + Clone {
         ParseList::new(s)
             .map(|(_, tag, value_str)| {
                 let (ok, value) = match value_str.parse::<f32>() {
@@ -79,60 +59,6 @@ impl Setting<f32> {
             .map(|(_, tag, value)| Self { tag, value })
     }
 }
-
-/*impl<T> From<(Tag, T)> for Setting<T> {
-    fn from(v: (Tag, T)) -> Self {
-        Self {
-            tag: v.0,
-            value: v.1,
-        }
-    }
-}
-
-impl<T: Copy> From<&(Tag, T)> for Setting<T> {
-    fn from(v: &(Tag, T)) -> Self {
-        Self {
-            tag: v.0,
-            value: v.1,
-        }
-    }
-}
-
-impl<T: Copy> From<&([u8; 4], T)> for Setting<T> {
-    fn from(v: &([u8; 4], T)) -> Self {
-        Self {
-            tag: tag_from_bytes(&v.0),
-            value: v.1,
-        }
-    }
-}
-
-impl<T: Copy> From<&(&[u8; 4], T)> for Setting<T> {
-    fn from(v: &(&[u8; 4], T)) -> Self {
-        Self {
-            tag: tag_from_bytes(v.0),
-            value: v.1,
-        }
-    }
-}
-
-impl<T> From<(&str, T)> for Setting<T> {
-    fn from(v: (&str, T)) -> Self {
-        Self {
-            tag: tag_from_str_lossy(v.0),
-            value: v.1,
-        }
-    }
-}
-
-impl<T: Copy> From<&(&str, T)> for Setting<T> {
-    fn from(v: &(&str, T)) -> Self {
-        Self {
-            tag: tag_from_str_lossy(v.0),
-            value: v.1,
-        }
-    }
-}*/
 
 #[derive(Clone)]
 struct ParseList<'a> {

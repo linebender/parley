@@ -10,10 +10,10 @@ use crate::setting::Setting;
 pub use fontique::{FontStyle, FontWeight, FontWidth, GenericFamily};
 
 /// Setting for a font variation.
-pub type FontVariation = Setting<f32>;
+pub(crate) type FontVariation = Setting<f32>;
 
 /// Setting for a font feature.
-pub type FontFeature = Setting<u16>;
+pub(crate) type FontFeature = Setting<u16>;
 
 /// Prioritized sequence of font families.
 ///
