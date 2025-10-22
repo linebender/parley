@@ -35,10 +35,9 @@ impl Default for ColorBrush {
 }
 
 fn main() {
+    let samples = parley_dev::TextSamples::new();
     // The text we are going to style and lay out
-    let text = String::from(
-        "Some text here. Let's make it a bit longer so that line wrapping kicks in 😊. And also some اللغة العربية arabic text.\nThis is underline and strikethrough text",
-    );
+    let text = samples.latin.text;
 
     // The display scale for HiDPI rendering
     let display_scale = 1.0;
@@ -63,85 +62,73 @@ fn main() {
     let mut font_cx = FontContext::new();
     let mut layout_cx = LayoutContext::new();
 
-    // Create a RangedBuilder
-    let mut builder = layout_cx.ranged_builder(&mut font_cx, &text, display_scale, quantize);
+    for _ in 0..1 {
+        // Create a RangedBuilder
+        let mut builder = layout_cx.ranged_builder(&mut font_cx, &text, display_scale, quantize);
 
-    // Set default text colour styles (set foreground text color)
-    let foreground_brush = ColorBrush {
-        color: foreground_color,
-    };
-    let brush_style = StyleProperty::Brush(foreground_brush);
-    builder.push_default(brush_style);
+        // Set default text colour styles (set foreground text color)
+        let foreground_brush = ColorBrush {
+            color: foreground_color,
+        };
+        let brush_style = StyleProperty::Brush(foreground_brush);
+        builder.push_default(brush_style);
 
-    // Set default font family
-    builder.push_default(GenericFamily::SystemUi);
-    builder.push_default(LineHeight::FontSizeRelative(1.3));
-    builder.push_default(StyleProperty::FontSize(16.0));
+        // Set default font family
+        builder.push_default(GenericFamily::SystemUi);
+        builder.push_default(LineHeight::FontSizeRelative(1.3));
+        builder.push_default(StyleProperty::FontSize(16.0));
 
-    // Set the first 4 characters to bold
-    let bold = FontWeight::new(600.0);
-    builder.push(StyleProperty::FontWeight(bold), 0..4);
+        // Build the builder into a Layout
+        let mut layout: Layout<ColorBrush> = builder.build(&text);
 
-    // Set the underline & strikethrough style
-    builder.push(StyleProperty::Underline(true), 141..150);
-    builder.push(StyleProperty::Strikethrough(true), 155..168);
-
-    builder.push_inline_box(InlineBox {
-        id: 0,
-        index: 40,
-        width: 50.0,
-        height: 50.0,
-    });
-
-    // Build the builder into a Layout
-    let mut layout: Layout<ColorBrush> = builder.build(&text);
-
-    // Perform layout (including bidi resolution and shaping) with start alignment
-    layout.break_all_lines(max_advance);
-    layout.align(max_advance, Alignment::Start, AlignmentOptions::default());
-    let width = layout.width().ceil() as u32;
-    let height = layout.height().ceil() as u32;
-    let padded_width = width + padding * 2;
-    let padded_height = height + padding * 2;
-
-    // Create TinySkia Pixmap
-    let mut img = Pixmap::new(padded_width, padded_height).unwrap();
-
-    // Fill background color
-    img.fill(background_color);
-
-    // Wrap Pixmap in a type that implements skrifa::OutlinePen
-    let mut pen = TinySkiaPen::new(img.as_mut());
-
-    // Render each glyph run
-    for line in layout.lines() {
-        for item in line.items() {
-            match item {
-                PositionedLayoutItem::GlyphRun(glyph_run) => {
-                    render_glyph_run(&glyph_run, &mut pen, padding);
-                }
-                PositionedLayoutItem::InlineBox(inline_box) => {
-                    pen.set_origin(inline_box.x + padding as f32, inline_box.y + padding as f32);
-                    pen.set_color(foreground_color);
-                    pen.fill_rect(inline_box.width, inline_box.height);
-                }
-            }
-        }
+        // Perform layout (including bidi resolution and shaping) with start alignment
+        layout.break_all_lines(max_advance);
+        layout.align(max_advance, Alignment::Start, AlignmentOptions::default());
     }
 
-    // Write image to PNG file in examples/_output dir
-    let output_path = {
-        let path = std::path::PathBuf::from(file!());
-        let mut path = std::fs::canonicalize(path).unwrap();
-        path.pop();
-        path.pop();
-        path.pop();
-        path.push("_output");
-        drop(std::fs::create_dir(path.clone()));
-        path.push("tiny_skia_render.png");
-        path
-    };
-    img.save_png(output_path).unwrap();
+    //let width = layout.width().ceil() as u32;
+    //let height = layout.height().ceil() as u32;
+    //let padded_width = width + padding * 2;
+    //let padded_height = height + padding * 2;
+
+    //// Create TinySkia Pixmap
+    //let mut img = Pixmap::new(padded_width, padded_height).unwrap();
+
+    //// Fill background color
+    //img.fill(background_color);
+
+    //// Wrap Pixmap in a type that implements skrifa::OutlinePen
+    //let mut pen = TinySkiaPen::new(img.as_mut());
+
+    //// Render each glyph run
+    //for line in layout.lines() {
+    //    for item in line.items() {
+    //        match item {
+    //            PositionedLayoutItem::GlyphRun(glyph_run) => {
+    //                render_glyph_run(&glyph_run, &mut pen, padding);
+    //            }
+    //            PositionedLayoutItem::InlineBox(inline_box) => {
+    //                pen.set_origin(inline_box.x + padding as f32, inline_box.y + padding as f32);
+    //                pen.set_color(foreground_color);
+    //                pen.fill_rect(inline_box.width, inline_box.height);
+    //            }
+    //        }
+    //    }
+    //}
+
+    //// Write image to PNG file in examples/_output dir
+    //let output_path = {
+    //    let path = std::path::PathBuf::from(file!());
+    //    let mut path = std::fs::canonicalize(path).unwrap();
+    //    path.pop();
+    //    path.pop();
+    //    path.pop();
+    //    path.push("_output");
+    //    drop(std::fs::create_dir(path.clone()));
+    //    path.push("tiny_skia_render.png");
+    //    path
+    //};
+    //img.save_png(output_path).unwrap();
 }
 
 fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<'_>, padding: u32) {

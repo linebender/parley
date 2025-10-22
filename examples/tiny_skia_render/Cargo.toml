@@ -11,6 +11,11 @@ publish = false
 parley = { workspace = true, default-features = true }
 skrifa = { workspace = true }
 tiny-skia = "0.11.4"
+parley_dev = { workspace = true }
 
 [lints]
 workspace = true
+
+
+[profile.release]
+debug = true

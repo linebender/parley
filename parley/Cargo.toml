@@ -32,6 +32,7 @@ core_maths = { version = "0.1.1", optional = true }
 accesskit = { workspace = true, optional = true }
 hashbrown = { workspace = true }
 harfrust = { workspace = true }
+smallvec = { workspace = true }
 icu_collections = { workspace = true }
 # Used in ICU4X baked data sources, which depend on compiled data, but just locale fallback rules.
 icu_locale = { workspace = true }

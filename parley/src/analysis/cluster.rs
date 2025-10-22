@@ -1,3 +1,5 @@
+use smallvec::SmallVec;
+
 use crate::analysis::AnalysisDataSources;
 
 /// The maximum number of characters in a single cluster.
@@ -5,7 +7,7 @@ const MAX_CLUSTER_SIZE: usize = 32;
 
 #[derive(Debug)]
 pub(crate) struct CharCluster {
-    pub chars: Vec<Char>,
+    pub chars: SmallVec<[Char; 2]>,
     pub is_emoji: bool,
     len: u8,
     map_len: u8,
@@ -87,7 +89,7 @@ pub(crate) enum Status {
 
 impl CharCluster {
     pub(crate) fn new(
-        chars: Vec<Char>,
+        chars: smallvec::SmallVec<[Char; 2]>,
         is_emoji: bool,
         len: u8,
         map_len: u8,
@@ -140,7 +142,11 @@ impl CharCluster {
                     // Use the first character as a template for other properties
                     let mut copy = self.chars[0];
                     copy.ch = c;
-                    self.decomp.chars[i] = copy;
+                    if i >= self.decomp.chars.len() {
+                        self.decomp.chars.push(copy);
+                    } else {
+                        self.decomp.chars[i] = copy;
+                    }
                     i += 1;
                 }
 
@@ -189,7 +195,11 @@ impl CharCluster {
                     // Use the first decomposed character as a template for other properties
                     let mut ch_copy = self.decomp.chars[0];
                     ch_copy.ch = c;
-                    self.comp.chars[i] = ch_copy;
+                    if i >= self.comp.chars.len() {
+                        self.comp.chars.push(ch_copy);
+                    } else {
+                        self.comp.chars[i] = ch_copy;
+                    }
                     i += 1;
                 }
 
@@ -283,9 +293,9 @@ enum FormState {
     Invalid,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 struct Form {
-    pub chars: [Char; MAX_CLUSTER_SIZE],
+    pub chars: SmallVec<[Char; 1]>,
     pub len: u8,
     pub map_len: u8,
     pub state: FormState,
@@ -294,7 +304,7 @@ struct Form {
 impl Form {
     fn new() -> Self {
         Self {
-            chars: [DEFAULT_CHAR; MAX_CLUSTER_SIZE],
+            chars: smallvec::smallvec![DEFAULT_CHAR; 1],
             len: 0,
             map_len: 0,
             state: FormState::None,

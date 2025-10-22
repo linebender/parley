@@ -1,7 +1,6 @@
 pub(crate) mod cluster;
 mod provider;
 
-use std::collections::HashMap;
 use std::marker::PhantomData;
 use icu_collections::codepointtrie::TrieValue;
 use icu_normalizer::{ComposingNormalizer, ComposingNormalizerBorrowed, DecomposingNormalizer, DecomposingNormalizerBorrowed};
@@ -27,9 +26,36 @@ pub(crate) struct AnalysisDataSources {
     line_break: CodePointMapData<LineBreak>,
     grapheme_cluster_break: CodePointMapData<GraphemeClusterBreak>,
     word_segmenter: WordSegmenter,
-    line_segmenters: HashMap<u8, LineSegmenter>,
+    line_segmenters: LineSegmenters,
     composing_normalizer: ComposingNormalizer,
     decomposing_normalizer: DecomposingNormalizer,
+}
+
+#[derive(Default)]
+struct LineSegmenters {
+    normal: Option<LineSegmenter>,
+    keep_all: Option<LineSegmenter>,
+    break_all: Option<LineSegmenter>
+}
+
+impl LineSegmenters {
+    fn get(&mut self, word_break_strength: LineBreakWordOption) -> LineSegmenterBorrowed<'_> {
+        let segmenter = match word_break_strength {
+            LineBreakWordOption::Normal => &mut self.normal,
+            LineBreakWordOption::KeepAll => &mut self.keep_all,
+            LineBreakWordOption::BreakAll => &mut self.break_all,
+            _ => unreachable!(),
+        };
+
+        segmenter
+            .get_or_insert_with(|| {
+                let mut line_break_opts = LineBreakOptions::default();
+                line_break_opts.word_option = Some(word_break_strength);
+                LineSegmenter::try_new_auto_unstable(&PROVIDER, line_break_opts)
+                    .expect("Failed to create LineSegmenter")
+            })
+            .as_borrowed()
+    }
 }
 
 impl AnalysisDataSources {
@@ -47,7 +73,7 @@ impl AnalysisDataSources {
             line_break: CodePointMapData::<LineBreak>::try_new_unstable(&PROVIDER).unwrap(),
             grapheme_cluster_break: CodePointMapData::<GraphemeClusterBreak>::try_new_unstable(&PROVIDER).unwrap(),
             word_segmenter: WordSegmenter::try_new_auto_unstable(&PROVIDER, WordBreakOptions::default()).unwrap(),
-            line_segmenters: HashMap::new(),
+            line_segmenters: LineSegmenters::default(),
             composing_normalizer: ComposingNormalizer::try_new_nfc_unstable(&PROVIDER).unwrap(),
             decomposing_normalizer: DecomposingNormalizer::try_new_nfd_unstable(&PROVIDER).unwrap(),
         }
@@ -102,11 +128,7 @@ impl AnalysisDataSources {
     }
 
     fn line_segmenter(&mut self, word_break_strength: LineBreakWordOption) -> LineSegmenterBorrowed<'_> {
-        self.line_segmenters.entry(word_break_strength as u8).or_insert({
-            let mut line_break_opts: LineBreakOptions<'static> = Default::default();
-            line_break_opts.word_option = Some(word_break_strength);
-            LineSegmenter::try_new_auto_unstable(&PROVIDER, line_break_opts).unwrap()
-        }).as_borrowed()
+        self.line_segmenters.get(word_break_strength)
     }
 
     fn composing_normalizer(&self) -> ComposingNormalizerBorrowed<'_> {
@@ -166,7 +188,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
         text: &'a str,
         styles: I,
         char_indices: std::str::CharIndices<'a>,
-        current_char_index: usize,
+        current_char: (usize, char),
         building_range_start: usize,
         previous_word_break_style: LineBreakWordOption,
         done: bool,
@@ -183,13 +205,13 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
             first_style: &RangedStyle<B>
         ) -> Self {
             let mut char_indices = text.char_indices();
-            let current_char_len = char_indices.next().unwrap().0;
+            let current_char_len = char_indices.next().unwrap();
 
             Self {
                 text,
                 styles,
                 char_indices,
-                current_char_index: current_char_len,
+                current_char: current_char_len,
                 building_range_start: first_style.range.start,
                 previous_word_break_style: first_style.style.word_break,
                 done: false,
@@ -210,62 +232,56 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
             }
 
             while let Some(style) = self.styles.next() {
+                assert!(style.range.start < style.range.end);
                 let style_start_index = style.range.start;
-                if style_start_index == style.range.end {
-                    // Skip empty style ranges
-                    continue;
-                }
-                let mut prev_char_index = self.current_char_index;
+                let mut prev_char_index = self.current_char;
 
                 // Find the character at the style boundary
-                while self.current_char_index < style_start_index {
-                    prev_char_index = self.current_char_index;
-                    self.current_char_index = self.char_indices.next().unwrap().0;
+                while self.current_char.0 < style_start_index {
+                    prev_char_index = self.current_char;
+                    self.current_char = self.char_indices.next().unwrap();
                 }
 
                 let current_word_break_style = style.style.word_break;
-                // Produce one substring for each different word break style run
-                if self.previous_word_break_style != current_word_break_style {
-                    let (_, prev_size) = self.text.char_at(prev_char_index).unwrap();
-                    let (_, size) = self.text.char_at(style_start_index).unwrap();
-
-                    let substring = self.text.subrange(
-                        self.building_range_start..style_start_index + size
-                    );
-                    let result_style = self.previous_word_break_style;
-
-                    self.building_range_start = style_start_index - prev_size;
-                    self.previous_word_break_style = current_word_break_style;
-
-                    return Some((substring, result_style, false));
+                if self.previous_word_break_style == current_word_break_style {
+                    continue;
                 }
 
+                // Produce one substring for each different word break style run
+                let prev_size = prev_char_index.1.len_utf8();
+                let size = self.current_char.1.len_utf8();
+
+                let substring = self.text.subrange(
+                    self.building_range_start..style_start_index + size
+                );
+                let result_style = self.previous_word_break_style;
+
+                self.building_range_start = style_start_index - prev_size;
                 self.previous_word_break_style = current_word_break_style;
+
+                return Some((substring, result_style, false));
             }
 
             // Final segment
             self.done = true;
-            let last_substring = if self.building_range_start == 0 {
-                self.text
-            } else {
-                self.text.subrange(self.building_range_start..self.text.len())
-            };
+            let last_substring = self.text.subrange(self.building_range_start..self.text.len());
             Some((last_substring, self.previous_word_break_style, true))
         }
     }
 
     let text = if text.is_empty() { " " } else { text };
+    
+    let mut line_segmenters = core::mem::take(&mut lcx.analysis_data_sources.line_segmenters);
 
-    let mut all_boundaries_byte_indexed = vec![Boundary::None; text.len()];
-
-    // Word boundaries:
-    for wb in lcx.analysis_data_sources.word_segmenter().segment_str(text) {
+    // Collect boundary byte positions compactly
+    let mut wb_iter =  lcx.analysis_data_sources.word_segmenter().segment_str(text).filter_map(|wb| {
         // icu produces a word boundary trailing the string, which we don't use.
         if wb == text.len() {
-            continue;
+            None
+        } else {
+            Some(wb)
         }
-        all_boundaries_byte_indexed[wb] = Boundary::Word;
-    }
+    }).peekable();
 
     // Line boundaries (word break naming refers to the line boundary determination config).
     //
@@ -274,32 +290,64 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
     let Some((first_style, rest)) = lcx.styles.split_first() else {
         panic!("No style info");
     };
+    // We don't need to iterate through the characters if there's no WordBreak style changes.
+
+    if lcx.styles.iter().any(|s| s.style.word_break != LineBreakWordOption::Normal) {
     let contiguous_word_break_substrings = WordBreakSegmentIter::new(
         text,
         rest.iter(),
         &first_style
     );
     let mut global_offset = 0;
+    let mut line_boundary_positions: Vec<usize> = Vec::new();
+    // LINE BOUNDARIES COLLECTION
     for (substring_index, (substring, word_break_strength, last)) in contiguous_word_break_substrings.enumerate() {
-        let line_boundaries: Vec<usize> = lcx.analysis_data_sources
-            .line_segmenter(word_break_strength)
-            .segment_str(substring)
-            .collect();
+        // Do work
 
+    }
+    } else {
+        // Fast path
+    }
+
+
+    let contiguous_word_break_substrings = WordBreakSegmentIter::new(
+        text,
+        rest.iter(),
+        &first_style
+    );
+    let mut global_offset = 0;
+    let mut line_boundary_positions: Vec<usize> = Vec::new();
+    // LINE BOUNDARIES COLLECTION
+    for (substring_index, (substring, word_break_strength, last)) in contiguous_word_break_substrings.enumerate() {
         // Fast path for text with a single word-break option.
         if substring_index == 0 && last {
-            // icu adds leading and trailing line boundaries, which we don't use.
-            let Some((_first, rest)) = line_boundaries.split_first() else {
+            let mut lb_iter = line_segmenters.get(word_break_strength).segment_str(substring);
+
+            let _first = lb_iter.next();
+            let second = lb_iter.next();
+
+            if second.is_none() {
                 continue;
-            };
-            let Some((_last, middle)) = rest.split_last() else {
+            }
+
+            let third = lb_iter.next();
+
+            if third.is_none() {
                 continue;
-            };
-            for &b in middle {
-                all_boundaries_byte_indexed[b] = Boundary::Line;
+            }
+
+            let iter = [second.unwrap(), third.unwrap()].into_iter().chain(lb_iter);
+
+            for b in iter {
+                if b == substring.len() {
+                    continue;
+                }
+                line_boundary_positions.push(b);
             }
             break;
         }
+
+        let line_boundaries_iter = line_segmenters.get(word_break_strength).segment_str(substring);
 
         let mut substring_chars = substring.chars();
         if substring_index != 0 {
@@ -310,9 +358,9 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
         let last_len = substring_chars.next_back().unwrap().len_utf8();
 
         // Mark line boundaries (overriding word boundaries where present).
-        for (index, &pos) in line_boundaries.iter().enumerate() {
+        for (index, pos) in line_boundaries_iter.enumerate() {
             // icu adds leading and trailing line boundaries, which we don't use.
-            if index == 0 || index == line_boundaries.len() - 1 {
+            if index == 0 || pos == substring.len() {
                 continue;
             }
 
@@ -322,7 +370,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
             if !last && pos == substring.len() - last_len {
                 continue;
             }
-            all_boundaries_byte_indexed[pos + global_offset] = Boundary::Line;
+            line_boundary_positions.push(pos + global_offset);
         }
 
         if !last {
@@ -333,11 +381,35 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
     // BiDi embedding levels:
     let bidi_embedding_levels = unicode_bidi::BidiInfo::new_with_data_source(&lcx.analysis_data_sources.bidi_class(), text, None).levels;
 
+    // Merge boundaries - line takes precedence over word
+    let mut lb_iter = line_boundary_positions.iter().peekable();
     let boundaries_and_levels_iter = text.char_indices()
-        .map(|(byte_pos, _)| (
-            all_boundaries_byte_indexed.get(byte_pos).unwrap(),
-            bidi_embedding_levels.get(byte_pos).unwrap()
-        ));
+        .map(|(byte_pos, _)| {
+            // advance any stale word boundary positions
+            while let Some(&w) = wb_iter.peek() {
+                if w < byte_pos { _ = wb_iter.next(); } else { break; }
+            }
+            // advance any stale line boundary positions
+            while let Some(&l) = lb_iter.peek() {
+                if *l < byte_pos { _ = lb_iter.next(); } else { break; }
+            }
+
+            let mut boundary = Boundary::None;
+            if let Some(&w) = wb_iter.peek() {
+                if w == byte_pos {
+                    boundary = Boundary::Word;
+                    _ = wb_iter.next();
+                }
+            }
+            if let Some(&l) = lb_iter.peek() {
+                if *l == byte_pos {
+                    boundary = Boundary::Line;
+                    _ = lb_iter.next();
+                }
+            }
+
+            (boundary, bidi_embedding_levels.get(byte_pos).unwrap())
+        });
 
     fn unicode_data_iterator<'a, T: TrieValue>(
         text: &'a str,
@@ -362,7 +434,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
             let boundary = if is_mandatory_line_break(line_break) {
                 Boundary::Mandatory
             } else {
-                *boundary
+                boundary
             };
 
             let is_control = matches!(general_category, GeneralCategory::Control);
@@ -394,6 +466,9 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
                 0 // Style index is populated later
             ));
         });
+
+    // Restore line segmenters
+    lcx.analysis_data_sources.line_segmenters = line_segmenters;
 }
 
 #[cfg(test)]
