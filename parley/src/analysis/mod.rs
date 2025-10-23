@@ -6,7 +6,6 @@ use icu_collections::codepointtrie::TrieValue;
 use icu_normalizer::{ComposingNormalizer, ComposingNormalizerBorrowed, DecomposingNormalizer, DecomposingNormalizerBorrowed};
 use icu_properties::{CodePointMapData, CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed, EmojiSetData, EmojiSetDataBorrowed};
 use icu_properties::props::{BasicEmoji, BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, RegionalIndicator, Script, VariationSelector};
-use icu_provider::prelude::yoke::Yokeable;
 use icu_provider::{DataRequest, DataResponse, DynamicDataProvider};
 use icu_segmenter::{GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter, LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed};
 use icu_segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakOptions};
@@ -25,11 +24,7 @@ pub(crate) struct AnalysisDataSources {
     emoji: CodePointSetData,
     extended_pictographic: CodePointSetData,
     regional_indicator: CodePointSetData,
-    script: CodePointMapData<Script>,
-    general_category: CodePointMapData<GeneralCategory>,
     bidi_class: CodePointMapData<BidiClass>,
-    line_break: CodePointMapData<LineBreak>,
-    grapheme_cluster_break: CodePointMapData<GraphemeClusterBreak>,
     word_segmenter: WordSegmenter,
     line_segmenters: LineSegmenters,
     composing_normalizer: ComposingNormalizer,
@@ -82,11 +77,7 @@ impl AnalysisDataSources {
             emoji: CodePointSetData::try_new_unstable::<Emoji>(&PROVIDER).unwrap(),
             extended_pictographic: CodePointSetData::try_new_unstable::<ExtendedPictographic>(&PROVIDER).unwrap(),
             regional_indicator: CodePointSetData::try_new_unstable::<RegionalIndicator>(&PROVIDER).unwrap(),
-            script: CodePointMapData::<Script>::try_new_unstable(&PROVIDER).unwrap(),
-            general_category: CodePointMapData::<GeneralCategory>::try_new_unstable(&PROVIDER).unwrap(),
             bidi_class: CodePointMapData::<BidiClass>::try_new_unstable(&PROVIDER).unwrap(),
-            line_break: CodePointMapData::<LineBreak>::try_new_unstable(&PROVIDER).unwrap(),
-            grapheme_cluster_break: CodePointMapData::<GraphemeClusterBreak>::try_new_unstable(&PROVIDER).unwrap(),
             word_segmenter: WordSegmenter::try_new_auto_unstable(&PROVIDER, WordBreakOptions::default()).unwrap(),
             line_segmenters: LineSegmenters::default(),
             composing_normalizer: ComposingNormalizer::try_new_nfc_unstable(&PROVIDER).unwrap(),
@@ -123,32 +114,12 @@ impl AnalysisDataSources {
         self.regional_indicator.as_borrowed()
     }
 
-    fn script(&self) -> CodePointMapDataBorrowed<'_, Script> {
-        self.script.as_borrowed()
-    }
-
-    fn general_category(&self) -> CodePointMapDataBorrowed<'_, GeneralCategory> {
-        self.general_category.as_borrowed()
-    }
-
     fn bidi_class(&self) -> CodePointMapDataBorrowed<'_, BidiClass> {
         self.bidi_class.as_borrowed()
     }
 
-    fn line_break(&self) -> CodePointMapDataBorrowed<'_, LineBreak> {
-        self.line_break.as_borrowed()
-    }
-
-    fn grapheme_cluster_break(&self) -> CodePointMapDataBorrowed<'_, GraphemeClusterBreak> {
-        self.grapheme_cluster_break.as_borrowed()
-    }
-
     fn word_segmenter(&self) -> WordSegmenterBorrowed<'_> {
         self.word_segmenter.as_borrowed()
-    }
-
-    fn line_segmenter(&mut self, word_break_strength: LineBreakWordOption) -> LineSegmenterBorrowed<'_> {
-        self.line_segmenters.get(word_break_strength)
     }
 
     fn composing_normalizer(&self) -> ComposingNormalizerBorrowed<'_> {
@@ -174,6 +145,8 @@ pub(crate) struct CharInfo {
     pub grapheme_cluster_break: GraphemeClusterBreak,
     /// Whether this character belongs to the "Control" general category in Unicode.
     pub is_control: bool,
+
+    pub is_emoji_or_pictograph: bool,
     /// Whether this character contributes to text shaping in Parley.
     pub contributes_to_shaping: bool,
     /// Whether to apply NFC normalization before attempting cluster form variations during
@@ -196,14 +169,6 @@ pub(crate) enum Boundary {
 }
 
 pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
-    // See: https://github.com/unicode-org/icu4x/blob/ee5399a77a6b94efb5d4b60678bb458c5eedb25d/components/segmenter/src/line.rs#L338-L351
-    fn is_mandatory_line_break(line_break: LineBreak) -> bool {
-        matches!(line_break, LineBreak::MandatoryBreak
-                | LineBreak::CarriageReturn
-                | LineBreak::LineFeed
-                | LineBreak::NextLine)
-    }
-
     struct WordBreakSegmentIter<'a, I: Iterator, B: Brush> {
         text: &'a str,
         styles: I,
@@ -310,25 +275,6 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
     let Some((first_style, rest)) = lcx.styles.split_first() else {
         panic!("No style info");
     };
-    // We don't need to iterate through the characters if there's no WordBreak style changes.
-
-    if lcx.styles.iter().any(|s| s.style.word_break != LineBreakWordOption::Normal) {
-    let contiguous_word_break_substrings = WordBreakSegmentIter::new(
-        text,
-        rest.iter(),
-        &first_style
-    );
-    let mut global_offset = 0;
-    let mut line_boundary_positions: Vec<usize> = Vec::new();
-    // LINE BOUNDARIES COLLECTION
-    for (substring_index, (substring, word_break_strength, last)) in contiguous_word_break_substrings.enumerate() {
-        // Do work
-
-    }
-    } else {
-        // Fast path
-    }
-
 
     let contiguous_word_break_substrings = WordBreakSegmentIter::new(
         text,
@@ -438,20 +384,25 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
         text.chars().map(move |c| data_source.get32(c as u32))
     }
 
+    let composite = lcx.analysis_data_sources.composite();
+
     boundaries_and_levels_iter
         .zip(text.chars())
-        .zip(unicode_data_iterator(text, lcx.analysis_data_sources.script()))
-        .zip(unicode_data_iterator(text, lcx.analysis_data_sources.general_category()))
-        .zip(unicode_data_iterator(text, lcx.analysis_data_sources.grapheme_cluster_break()))
         // Shift line break data forward one, as line boundaries corresponding with line-breaking
         // characters (like '\n') exist at an index position one higher than the respective
         // character's index, but we need our iterators to align, and the rest are simply
         // character-indexed.
-        .zip(std::iter::once(LineBreak::from_icu4c_value(0)).chain(unicode_data_iterator(text, lcx.analysis_data_sources.line_break())))
-        .for_each(|((((((boundary, embed_level), ch), script), general_category), grapheme_cluster_break), line_break)| {
+        // TODO: This isn't quite correct.
+        //.zip(std::iter::once(LineBreak::from_icu4c_value(0)).chain(unicode_data_iterator(text, lcx.analysis_data_sources.line_break())))
+        .for_each(|((boundary, embed_level), ch)| {
+            let composite_data = composite.trie.get32(ch as u32);
+            let grapheme_cluster_break = composite_props_marker::unpack::grapheme_cluster_break(composite_data);
+            let general_category = composite_props_marker::unpack::general_category(composite_data);
+            let script = composite_props_marker::unpack::script(composite_data);
+            let is_emoji_or_pictograph = composite_props_marker::unpack::is_emoji_or_pictograph(composite_data);
             let bidi_embed_level: BidiLevel = (*embed_level).into();
 
-            let boundary = if is_mandatory_line_break(line_break) {
+            let boundary = if composite_props_marker::unpack::is_mandatory_linebreak(composite_data) {
                 Boundary::Mandatory
             } else {
                 boundary
@@ -480,6 +431,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
                     script,
                     grapheme_cluster_break,
                     is_control,
+                    is_emoji_or_pictograph,
                     contributes_to_shaping,
                     force_normalize
                 },
