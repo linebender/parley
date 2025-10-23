@@ -7,6 +7,8 @@ use icu::properties::{CodePointMapData, props::{Script, GeneralCategory, Graphem
 use icu::collections::codepointtrie::TrieType;
 use databake::Bake;
 use icu_codepointtrie_builder::{CodePointTrieBuilder, CodePointTrieBuilderData};
+use icu_properties::props::{Emoji, ExtendedPictographic};
+use icu_properties::CodePointSetData;
 use icu_provider::prelude::*;
 use icu_provider_adapters::fork::ForkByMarkerProvider;
 use icu_provider_export::blob_exporter::BlobExporter;
@@ -15,18 +17,26 @@ use icu_provider_source::SourceDataProvider;
 
 use composite_props_marker::{CompositePropsV1, CompositePropsV1Data};
 
-fn pack(script: Script, gc: GeneralCategory, gcb: GraphemeClusterBreak, bidi: BidiClass, lb: LineBreak) -> u32 {
-    const SCRIPT_BITS: u32 = 10;
+fn pack(script: Script, gc: GeneralCategory, gcb: GraphemeClusterBreak, bidi: BidiClass, lb: LineBreak,
+
+    is_emoji_or_pictographic: bool,
+    is_mandatory_linebreak: bool,
+) -> u32 {
+    const SCRIPT_BITS: u32 = 8;
     const GC_BITS: u32 = 5;
     const GCB_BITS: u32 = 5;
     const BIDI_BITS: u32 = 5;
     const LB_BITS: u32 = 6;
+    const IS_EMOJI_OR_PICTOGRAPH_BITS: u32 = 1;
+    const IS_MANDATORY_LINE_BREAK_BITS: u32 = 1;
 
     const SCRIPT_SHIFT: u32 = 0;
     const GC_SHIFT: u32 = SCRIPT_SHIFT + SCRIPT_BITS;
     const GCB_SHIFT: u32 = GC_SHIFT + GC_BITS;
     const BIDI_SHIFT: u32 = GCB_SHIFT + GCB_BITS;
     const LB_SHIFT: u32 = BIDI_SHIFT + BIDI_BITS;
+    const IS_EMOJI_OR_PICTOGRAPH_SHIFT: u32 = LB_SHIFT + LB_BITS;
+    const IS_MANDATORY_LINE_BREAK_SHIFT: u32 = IS_EMOJI_OR_PICTOGRAPH_SHIFT + IS_EMOJI_OR_PICTOGRAPH_BITS;
 
     let s = script.to_icu4c_value() as u32;
     let gc = gc as u32;
@@ -39,6 +49,8 @@ fn pack(script: Script, gc: GeneralCategory, gcb: GraphemeClusterBreak, bidi: Bi
         | (gcb << GCB_SHIFT)
         | (bidi << BIDI_SHIFT)
         | (lb << LB_SHIFT)
+        | ((is_emoji_or_pictographic as u32) << IS_EMOJI_OR_PICTOGRAPH_SHIFT)
+        | ((is_mandatory_linebreak as u32) << IS_MANDATORY_LINE_BREAK_SHIFT)
 }
 
 struct CompositePropsProvider {
@@ -58,6 +70,9 @@ impl DataProvider<CompositePropsV1> for CompositePropsProvider {
         let gcb_source = CodePointMapData::<GraphemeClusterBreak>::try_new_unstable(&self.source)?;
         let bidi_source = CodePointMapData::<BidiClass>::try_new_unstable(&self.source)?;
         let lb_source = CodePointMapData::<LineBreak>::try_new_unstable(&self.source)?;
+        let emoji_source = CodePointSetData::try_new_unstable::<Emoji>(&self.source).unwrap();
+        let extended_pictographic_source = CodePointSetData::try_new_unstable::<ExtendedPictographic>(&self.source).unwrap();
+        let linebreak_source = CodePointMapData::<LineBreak>::try_new_unstable(&self.source).unwrap();
 
         // Load the individual properties from the source provider
         let script = script_source.as_borrowed();
@@ -65,6 +80,9 @@ impl DataProvider<CompositePropsV1> for CompositePropsProvider {
         let gcb = gcb_source.as_borrowed();
         let bidi = bidi_source.as_borrowed();
         let lb = lb_source.as_borrowed();
+        let emoji = emoji_source.as_borrowed();
+        let extended_pictographic = extended_pictographic_source.as_borrowed();
+        let linebreak = linebreak_source.as_borrowed();
 
         // Dense values table for 0..=0x10FFFF
         let mut values = Vec::<u32>::with_capacity(0x110000);
@@ -75,11 +93,16 @@ impl DataProvider<CompositePropsV1> for CompositePropsProvider {
                 gcb.get32(cp),
                 bidi.get32(cp),
                 lb.get32(cp),
+                emoji.contains32(cp) || extended_pictographic.contains32(cp),
+    // See: https://github.com/unicode-org/icu4x/blob/ee5399a77a6b94efb5d4b60678bb458c5eedb25d/components/segmenter/src/line.rs#L338-L351
+        matches!(linebreak.get32(cp), LineBreak::MandatoryBreak
+                | LineBreak::CarriageReturn
+                | LineBreak::LineFeed
+                | LineBreak::NextLine)
             );
             values.push(v);
         }
 
-        // Build trie; `wasm` feature avoids external ICU4C at build-time
         let trie = CodePointTrieBuilder {
             data: CodePointTrieBuilderData::ValuesByCodePoint(&values),
             default_value: 0, // not observed; we filled all entries
@@ -90,7 +113,7 @@ impl DataProvider<CompositePropsV1> for CompositePropsProvider {
         Ok(DataResponse {
             metadata: Default::default(),
             payload: DataPayload::from_owned(CompositePropsV1Data {
-                trie: icu_properties::provider::PropertyCodePointMap::CodePointTrie(trie),
+                trie,
             }),
         })
     }
@@ -173,6 +196,6 @@ fn main() {
         // Generate a small Rust file to embed the blob bytes
         std::fs::write(
             out.join("composite_blob.rs"),
-            "pub const COMPOSITE_BLOB: &[u8] = include_bytes!(concat!(env!(\"OUT_DIR\"), \"/composite.postcard\"));"
+            "pub const COMPOSITE_BLOB: &[u8] = include_bytes!(concat!(env!(\"OUT_DIR\"), \"/baked_data/composite.postcard\"));"
         ).unwrap();
 }
