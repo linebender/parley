@@ -31,6 +31,7 @@ pub(crate) struct ShapeContext {
     shape_plan_cache: LruCache<cache::ShapePlanId, harfrust::ShapePlan>,
     unicode_buffer: Option<harfrust::UnicodeBuffer>,
     features: Vec<harfrust::Feature>,
+    scratch_string: String,
 }
 
 impl Default for ShapeContext {
@@ -42,6 +43,7 @@ impl Default for ShapeContext {
             shape_plan_cache: LruCache::new(MAX_ENTRIES),
             unicode_buffer: Some(harfrust::UnicodeBuffer::new()),
             features: Vec::new(),
+            scratch_string: String::new(),
         }
     }
 }
@@ -218,6 +220,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
 }
 
 fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str) -> bool {
+    // TODO: Optimise this since we have `is_emoji_or_pictograph` in the composite props
     if analysis_data_sources.basic_emoji().contains_str(grapheme) {
         return true;
     }
@@ -302,11 +305,14 @@ fn shape_item<'a, B: Brush>(
                   let mut force_normalize = false;
                   let start = **code_unit_offset;
 
+                  let mut is_emoji_or_pictograph = false;
+
                   let chars = segment_text.char_indices().zip(item_infos_iter.by_ref()).map(|((_, ch), (info, style_index))| {
                       force_normalize |= info.force_normalize;
                       len += 1;
                       map_len += info.contributes_to_shaping as u8;
                       **code_unit_offset += ch.len_utf8();
+                      is_emoji_or_pictograph |= info.is_emoji_or_pictograph;
 
                       Char {
                           ch,
@@ -321,7 +327,7 @@ fn shape_item<'a, B: Brush>(
 
                   let cluster = CharCluster::new(
                       chars,
-                      is_emoji_grapheme(analysis_data_sources, segment_text),
+                      is_emoji_or_pictograph || if (segment_text.len() > 1) {is_emoji_grapheme(analysis_data_sources, segment_text) } else { false },
                       len,
                       map_len,
                       start as u32,
@@ -335,7 +341,7 @@ fn shape_item<'a, B: Brush>(
 
     let mut cluster = clusters_iter.next().expect("one cluster");
 
-    let mut current_font = font_selector.select_font(&mut cluster, analysis_data_sources);
+    let mut current_font = font_selector.select_font(&mut cluster, analysis_data_sources, &mut scx.scratch_string);
 
     // Main segmentation loop (based on swash shape_clusters) - only within current item
     while let Some(font) = current_font.take() {
@@ -350,7 +356,7 @@ fn shape_item<'a, B: Brush>(
                 None => break, // End of current item - process final segment
             };
 
-            if let Some(next_font) = font_selector.select_font(&mut cluster, analysis_data_sources) {
+            if let Some(next_font) = font_selector.select_font(&mut cluster, analysis_data_sources, &mut scx.scratch_string) {
                 if next_font != font {
                     current_font = Some(next_font);
                     break;
@@ -572,6 +578,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         &mut self,
         cluster: &mut CharCluster,
         analysis_data_sources: &AnalysisDataSources,
+        scratch_string: &mut String,
     ) -> Option<SelectedFont> {
         let style_index = cluster.style_index();
         let is_emoji = cluster.is_emoji;
@@ -622,7 +629,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
                         (g != 0) as u16
                     })
                     .unwrap_or_default()
-            }, analysis_data_sources);
+            }, analysis_data_sources, scratch_string);
 
             match map_status {
                 Status::Complete => {
