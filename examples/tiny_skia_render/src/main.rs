@@ -62,7 +62,7 @@ fn main() {
     let mut font_cx = FontContext::new();
     let mut layout_cx = LayoutContext::new();
 
-    for _ in 0..1 {
+    for _ in 0..1000 {
         // Create a RangedBuilder
         let mut builder = layout_cx.ranged_builder(&mut font_cx, &text, display_scale, quantize);
 

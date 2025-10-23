@@ -6,12 +6,17 @@ use icu_collections::codepointtrie::TrieValue;
 use icu_normalizer::{ComposingNormalizer, ComposingNormalizerBorrowed, DecomposingNormalizer, DecomposingNormalizerBorrowed};
 use icu_properties::{CodePointMapData, CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed, EmojiSetData, EmojiSetDataBorrowed};
 use icu_properties::props::{BasicEmoji, BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, RegionalIndicator, Script, VariationSelector};
+use icu_provider::prelude::yoke::Yokeable;
+use icu_provider::{DataRequest, DataResponse, DynamicDataProvider};
 use icu_segmenter::{GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter, LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed};
 use icu_segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakOptions};
 use unicode_bidi::TextSource;
 use crate::{Brush, LayoutContext};
-use crate::analysis::provider::PROVIDER;
+use crate::analysis::provider::{COMPOSITE_BLOB, PROVIDER};
 use crate::resolve::RangedStyle;
+use icu_provider::buf::AsDeserializingBufferProvider;
+use icu_provider::DataMarker;
+use composite_props_marker::{CompositePropsV1, CompositePropsV1Data};
 
 pub(crate) struct AnalysisDataSources {
     grapheme_segmenter: GraphemeClusterSegmenter,
@@ -29,6 +34,8 @@ pub(crate) struct AnalysisDataSources {
     line_segmenters: LineSegmenters,
     composing_normalizer: ComposingNormalizer,
     decomposing_normalizer: DecomposingNormalizer,
+
+    composite: DataResponse<CompositePropsV1>,
 }
 
 #[derive(Default)]
@@ -60,6 +67,14 @@ impl LineSegmenters {
 
 impl AnalysisDataSources {
     pub(crate) fn new() -> Self {
+        let blob = icu_provider_blob::BlobDataProvider::try_new_from_static_blob(COMPOSITE_BLOB).unwrap();
+        //let composite_props = blob.load_data(CompositePropsV1::INFO, DataRequest::default()).unwrap();
+        // Convert blob (BufferProvider) to a typed DataProvider via deserialization:
+        let dp = blob.as_deserializing();
+
+        // Load typed data:
+        let composite: DataResponse<CompositePropsV1> = dp.load_data(CompositePropsV1::INFO, DataRequest::default()).unwrap();
+
         Self {
             grapheme_segmenter: GraphemeClusterSegmenter::try_new_unstable(&PROVIDER).unwrap(),
             variation_selector: CodePointSetData::try_new_unstable::<VariationSelector>(&PROVIDER).unwrap(),
@@ -76,7 +91,12 @@ impl AnalysisDataSources {
             line_segmenters: LineSegmenters::default(),
             composing_normalizer: ComposingNormalizer::try_new_nfc_unstable(&PROVIDER).unwrap(),
             decomposing_normalizer: DecomposingNormalizer::try_new_nfd_unstable(&PROVIDER).unwrap(),
+            composite: composite,
         }
+    }
+
+    pub(crate) fn composite(&self) -> &CompositePropsV1Data<'_> {
+        self.composite.payload.get()
     }
 
     pub(crate) fn grapheme_segmenter(&self) -> GraphemeClusterSegmenterBorrowed<'_> {
