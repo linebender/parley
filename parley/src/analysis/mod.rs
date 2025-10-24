@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use icu_collections::codepointtrie::TrieValue;
 use icu_normalizer::{ComposingNormalizer, ComposingNormalizerBorrowed, DecomposingNormalizer, DecomposingNormalizerBorrowed};
-use icu_properties::{CodePointMapData, CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed, EmojiSetData, EmojiSetDataBorrowed};
+use icu_properties::{CodePointMapData, CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed, EmojiSetData, EmojiSetDataBorrowed, PropertyNamesShort, PropertyNamesShortBorrowed};
 use icu_properties::props::{BasicEmoji, BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, RegionalIndicator, Script, VariationSelector};
 use icu_segmenter::{GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter, LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed};
 use icu_segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakOptions};
@@ -22,6 +22,7 @@ pub(crate) struct AnalysisDataSources {
     extended_pictographic: CodePointSetData,
     regional_indicator: CodePointSetData,
     script: CodePointMapData<Script>,
+    script_short_name: PropertyNamesShort<Script>,
     general_category: CodePointMapData<GeneralCategory>,
     bidi_class: CodePointMapData<BidiClass>,
     line_break: CodePointMapData<LineBreak>,
@@ -42,6 +43,7 @@ impl AnalysisDataSources {
             extended_pictographic: CodePointSetData::try_new_unstable::<ExtendedPictographic>(&PROVIDER).unwrap(),
             regional_indicator: CodePointSetData::try_new_unstable::<RegionalIndicator>(&PROVIDER).unwrap(),
             script: CodePointMapData::<Script>::try_new_unstable(&PROVIDER).unwrap(),
+            script_short_name: PropertyNamesShort::<Script>::try_new_unstable(&PROVIDER).unwrap(),
             general_category: CodePointMapData::<GeneralCategory>::try_new_unstable(&PROVIDER).unwrap(),
             bidi_class: CodePointMapData::<BidiClass>::try_new_unstable(&PROVIDER).unwrap(),
             line_break: CodePointMapData::<LineBreak>::try_new_unstable(&PROVIDER).unwrap(),
@@ -79,6 +81,10 @@ impl AnalysisDataSources {
 
     fn script(&self) -> CodePointMapDataBorrowed<'_, Script> {
         self.script.as_borrowed()
+    }
+
+    pub fn script_short_name(&self) -> PropertyNamesShortBorrowed<'_, Script> {
+        self.script_short_name.as_borrowed()
     }
 
     fn general_category(&self) -> CodePointMapDataBorrowed<'_, GeneralCategory> {

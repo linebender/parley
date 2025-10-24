@@ -29,6 +29,9 @@ fn main() {
             icu_properties::provider::PropertyEnumLineBreakV1::INFO,
             icu_properties::provider::PropertyEnumGraphemeClusterBreakV1::INFO,
 
+            // Script - short name
+            icu_properties::provider::PropertyNameShortScriptV1::INFO,
+
             // Properties - Set data
             icu_properties::provider::PropertyBinaryVariationSelectorV1::INFO,
             icu_properties::provider::PropertyBinaryBasicEmojiV1::INFO,
