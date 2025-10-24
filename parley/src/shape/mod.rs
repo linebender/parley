@@ -346,11 +346,8 @@ fn shape_item<'a, B: Brush>(
         let segment_start_offset = cluster_range.start as usize - text_range.start;
         let mut segment_end_offset = cluster_range.end as usize - text_range.start;
 
-        loop {
-            cluster = match clusters_iter.next() {
-                Some(c) => c,
-                None => break, // End of current item - process final segment
-            };
+        while let Some(next_cluster) = clusters_iter.next() {
+            cluster = next_cluster;
 
             if let Some(next_font) = font_selector.select_font(&mut cluster, analysis_data_sources) {
                 if next_font != font {
