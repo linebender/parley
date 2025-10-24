@@ -9,6 +9,7 @@ use crate::{
     PlainEditor, PlainEditorDriver, RangedBuilder, StyleProperty, TextStyle, TreeBuilder,
 };
 use fontique::{Blob, Collection, CollectionOptions, SourceCache};
+use oxipng::{Options, optimize_from_memory};
 use peniko::kurbo::Size;
 use std::collections::HashMap;
 use std::{
@@ -63,6 +64,7 @@ pub(crate) struct TestEnv {
     // TODO: Add core::panic::Location for case.
     errors: Vec<(PathBuf, String)>,
     next_test_case_name: String,
+    max_screenshot_size: Option<usize>,
 }
 
 fn is_accept_mode() -> bool {
@@ -158,11 +160,16 @@ impl TestEnv {
             cursor_size: 2.0,
             errors: Vec::new(),
             next_test_case_name: String::new(),
+            max_screenshot_size: Some(8 * 1024),
         }
     }
 
     pub(crate) fn rendering_config(&mut self) -> &mut RenderingConfig {
         &mut self.rendering_config
+    }
+
+    pub(crate) fn max_screenshot_size(&mut self) -> &mut Option<usize> {
+        &mut self.max_screenshot_size
     }
 
     fn default_style(&self) -> [StyleProperty<'static, ColorBrush>; 3] {
@@ -336,15 +343,37 @@ impl TestEnv {
         let snapshot_path = snapshot_dir().join(&image_name);
         let comparison_path = current_imgs_dir().join(&image_name);
 
+        #[track_caller]
+        fn save_image(image: &Pixmap, path: &PathBuf, max_size: Option<usize>) {
+            let image_data = image.encode_png().unwrap();
+
+            let data = optimize_from_memory(&image_data, &Options::from_preset(5)).unwrap();
+            let saved_len = data.len();
+
+            // Whenever we save a file, we optimise it just in case.
+            // In some cases this is redundant with what kompari already does,
+            // but it's simpler to cover all cases.
+            std::fs::write(path, data).unwrap();
+
+            if let Some(max_size) = max_size {
+                if saved_len > max_size {
+                    panic!(
+                        "New screenshot file ({saved_len} bytes) was larger than the supported file size ({max_size} bytes).",
+                    );
+                }
+            }
+        }
+
+        let max_size = self.max_screenshot_size;
         if let Err(e) = self.check_images(img, &snapshot_path) {
             if is_accept_mode() {
-                img.save_png(&snapshot_path).unwrap();
+                save_image(&img, &snapshot_path, max_size);
             } else {
-                img.save_png(&comparison_path).unwrap();
+                save_image(&img, &comparison_path, max_size);
                 self.errors.push((comparison_path, e));
             }
         } else if is_generate_all_mode() {
-            img.save_png(&comparison_path).unwrap();
+            save_image(&img, &comparison_path, max_size);
         }
     }
 }

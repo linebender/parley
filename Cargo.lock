@@ -2757,6 +2757,7 @@ dependencies = [
  "harfrust",
  "hashbrown 0.15.5",
  "linebender_resource_handle",
+ "oxipng",
  "parley_dev",
  "peniko",
  "skrifa 0.37.0",
