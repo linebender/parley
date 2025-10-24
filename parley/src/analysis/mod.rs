@@ -83,7 +83,7 @@ impl AnalysisDataSources {
         self.script.as_borrowed()
     }
 
-    pub fn script_short_name(&self) -> PropertyNamesShortBorrowed<'_, Script> {
+    pub(crate) fn script_short_name(&self) -> PropertyNamesShortBorrowed<'_, Script> {
         self.script_short_name.as_borrowed()
     }
 
