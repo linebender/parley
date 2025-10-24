@@ -304,12 +304,9 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
 
             let iter = [second.unwrap(), third.unwrap()].into_iter().chain(lb_iter);
 
-            for b in iter {
-                if b == substring.len() {
-                    continue;
-                }
-                line_boundary_positions.push(b);
-            }
+            line_boundary_positions.extend(iter);
+            // Remove the unnescessary boundary added by ICU4X.
+            line_boundary_positions.pop();
             break;
         }
 
