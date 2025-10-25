@@ -38,4 +38,4 @@ harfrust = { workspace = true }
 parley_dev = { workspace = true }
 peniko = { workspace = true }
 tiny-skia = "0.11.4"
-oxipng = { version = "9.1.5", default-features = false, features = ["freestanding"] }
+oxipng = { version = "9.1.5", features = ["freestanding"] }
