@@ -369,13 +369,13 @@ impl TestEnv {
         let max_size = self.max_screenshot_size;
         if let Err(e) = self.check_images(img, &snapshot_path) {
             if is_accept_mode() {
-                save_image(&img, &snapshot_path, max_size);
+                save_image(img, &snapshot_path, max_size);
             } else {
-                save_image(&img, &comparison_path, max_size);
+                save_image(img, &comparison_path, max_size);
                 self.errors.push((comparison_path, e));
             }
         } else if is_generate_all_mode() {
-            save_image(&img, &comparison_path, max_size);
+            save_image(img, &comparison_path, max_size);
         } else {
             let reference_size = snapshot_path.metadata().unwrap().len() as usize;
             if let Some(max_size) = max_size {
