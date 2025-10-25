@@ -64,6 +64,7 @@ pub(crate) struct TestEnv {
     // TODO: Add core::panic::Location for case.
     errors: Vec<(PathBuf, String)>,
     next_test_case_name: String,
+    /// Max size a screenshot can have, in bytes.
     max_screenshot_size: Option<usize>,
 }
 
@@ -358,12 +359,13 @@ impl TestEnv {
             if let Some(max_size) = max_size {
                 if saved_len > max_size {
                     panic!(
-                        "New screenshot file ({saved_len} bytes) was larger than the supported file size ({max_size} bytes).",
+                        "New screenshot file size ({saved_len}b) was larger than the supported file size ({max_size}b). See TestEnv::max_screenshot_size to change the maximum.",
                     );
                 }
             }
         }
 
+        // Max size a screenshot can have, in bytes.
         let max_size = self.max_screenshot_size;
         if let Err(e) = self.check_images(img, &snapshot_path) {
             if is_accept_mode() {
@@ -374,6 +376,15 @@ impl TestEnv {
             }
         } else if is_generate_all_mode() {
             save_image(&img, &comparison_path, max_size);
+        } else {
+            let reference_size = snapshot_path.metadata().unwrap().len() as usize;
+            if let Some(max_size) = max_size {
+                if reference_size > max_size {
+                    panic!(
+                        "Existing file size ({reference_size}b) was larger than the supported file size ({max_size}b). See TestEnv::max_screenshot_size to change the maximum."
+                    );
+                }
+            }
         }
     }
 }
