@@ -9,7 +9,6 @@ use crate::{
     PlainEditor, PlainEditorDriver, RangedBuilder, StyleProperty, TextStyle, TreeBuilder,
 };
 use fontique::{Blob, Collection, CollectionOptions, SourceCache};
-use oxipng::{Options, optimize_from_memory};
 use peniko::kurbo::Size;
 use std::collections::HashMap;
 use std::{
@@ -344,8 +343,11 @@ impl TestEnv {
         let snapshot_path = snapshot_dir().join(&image_name);
         let comparison_path = current_imgs_dir().join(&image_name);
 
+        #[cfg(not(target_os = "android"))]
         #[track_caller]
         fn save_image(image: &Pixmap, path: &PathBuf, max_size: Option<usize>) {
+            use oxipng::{Options, optimize_from_memory};
+
             let image_data = image.encode_png().unwrap();
 
             let data = optimize_from_memory(&image_data, &Options::from_preset(5)).unwrap();
@@ -363,6 +365,12 @@ impl TestEnv {
                     );
                 }
             }
+        }
+
+        // We special-case android targets because oxipng doesn't build in Android CI.
+        #[cfg(target_os = "android")]
+        fn save_image(_image: &Pixmap, _path: &PathBuf, _max_size: Option<usize>) {
+            panic!("Saving screenshots is not supported on wasm targets");
         }
 
         // Max size a screenshot can have, in bytes.
