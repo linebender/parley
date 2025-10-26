@@ -265,8 +265,6 @@ fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str
 
     // If the grapheme (already segmented by icu, so it is a valid grapheme) has both emoji
     // characters and ZWJ, it's likely an emoji ZWJ sequence.
-    if has_emoji && has_zwj {
-    }
     has_emoji && has_zwj
 }
 
