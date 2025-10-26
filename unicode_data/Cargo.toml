@@ -20,24 +20,24 @@ build = [
 ]
 
 [dependencies]
-icu = { version = "2", features = ["datagen"] }
-icu_properties = { version = "2", features = ["datagen"] }
-icu_collections = { version = "2", features = ["databake", "serde"] }
+icu_locale = { workspace = true }
+icu_properties = { workspace = true, features = ["datagen"] }
+icu_collections = { workspace = true, features = ["databake", "serde"] }
 icu_provider = { workspace = true }
 icu_provider_source = { workspace = true, optional = true }
-yoke = { version = "0.8", features = ["derive"] }
-zerofrom = "0.1"
+yoke = { workspace = true }
+zerofrom = { workspace = true }
 unicode-bidi = { workspace = true, features = ["smallvec"] }
 icu_normalizer = { workspace = true, optional = true }
 icu_segmenter = { workspace = true, optional = true }
-icu_provider_export = { version = "2", features = [
+icu_provider_export = { workspace = true, features = [
     "baked_exporter",
     "blob_exporter",
 ], optional = true }
-serde = { version = "1", features = ["derive"] }
-databake = { version = "0.2", features = ["derive"] }
-icu_codepointtrie_builder = { version = "0.5.0", features = ["wasm"], optional = true }
-icu_provider_adapters = { version = "2.0.0", features = ["export"], optional = true }
+serde = { workspace = true, features = ["derive"] }
+databake = { workspace = true, features = ["derive"] }
+icu_codepointtrie_builder = { workspace = true, features = ["wasm"], optional = true }
+icu_provider_adapters = { workspace = true, features = ["export"], optional = true }
 
 [lints]
 workspace = true

@@ -4963,9 +4963,9 @@ name = "unicode_data"
 version = "0.0.0"
 dependencies = [
  "databake 0.2.0",
- "icu",
  "icu_codepointtrie_builder",
  "icu_collections",
+ "icu_locale",
  "icu_normalizer",
  "icu_properties",
  "icu_provider",
