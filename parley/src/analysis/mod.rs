@@ -387,17 +387,9 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
         }
     }
 
-    // BiDi embedding levels:
-    let bidi_embedding_levels = unicode_bidi::BidiInfo::new_with_data_source(
-        lcx.analysis_data_sources.composite(),
-        text,
-        None,
-    )
-    .levels;
-
     // Merge boundaries - line takes precedence over word
     let mut lb_iter = line_boundary_positions.iter().peekable();
-    let boundaries_and_levels_iter = text.char_indices().map(|(byte_pos, _)| {
+    let boundary_iter = text.char_indices().map(|(byte_pos, _)| {
         // advance any stale word boundary positions
         while let Some(&w) = wb_iter.peek() {
             if w < byte_pos {
@@ -429,72 +421,87 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
             }
         }
 
-        (boundary, *bidi_embedding_levels.get(byte_pos).unwrap())
+        boundary
     });
 
     let composite = lcx.analysis_data_sources.composite();
 
+    let mut needs_bidi_resolution = false;
+
     lcx.info.reserve(text.len());
-    boundaries_and_levels_iter
+    boundary_iter
         .zip(text.chars())
         // Shift line break data forward one, as line boundaries corresponding with line-breaking
         // characters (like '\n') exist at an index position one higher than the respective
         // character's index, but we need our iterators to align, and the rest are simply
         // character-indexed.
-        .fold(
-            false,
-            |is_mandatory_linebreak, ((boundary, embed_level), ch)| {
-                let properties = composite.properties(ch as u32);
-                let grapheme_cluster_break = properties.grapheme_cluster_break();
-                let general_category = properties.general_category();
-                let script = properties.script();
-                let is_emoji_or_pictograph = properties.is_emoji_or_pictograph();
-                let is_variation_selector = properties.is_variation_selector();
-                let is_region_indicator = properties.is_region_indicator();
-                let bidi_embed_level: BidiLevel = (embed_level).into();
-                let next_mandatory_linebreak = properties.is_mandatory_linebreak();
+        .fold(false, |is_mandatory_linebreak, (boundary, ch)| {
+            let properties = composite.properties(ch as u32);
+            let grapheme_cluster_break = properties.grapheme_cluster_break();
+            let general_category = properties.general_category();
+            let script = properties.script();
+            let is_emoji_or_pictograph = properties.is_emoji_or_pictograph();
+            let is_variation_selector = properties.is_variation_selector();
+            let is_region_indicator = properties.is_region_indicator();
+            let bidi_embed_level: BidiLevel = 0;
+            let next_mandatory_linebreak = properties.is_mandatory_linebreak();
 
-                let boundary = if is_mandatory_linebreak {
-                    Boundary::Mandatory
-                } else {
-                    boundary
-                };
+            let boundary = if is_mandatory_linebreak {
+                Boundary::Mandatory
+            } else {
+                boundary
+            };
 
-                let is_control = matches!(general_category, GeneralCategory::Control);
-                let contributes_to_shaping = !is_control
-                    || (matches!(general_category, GeneralCategory::Format)
-                        && !matches!(script, Script::Inherited));
-                let force_normalize = {
-                    // "Extend" break chars should be normalized first, with two exceptions
-                    if matches!(grapheme_cluster_break, GraphemeClusterBreak::Extend) &&
+            let is_control = matches!(general_category, GeneralCategory::Control);
+            let contributes_to_shaping = !is_control
+                || (matches!(general_category, GeneralCategory::Format)
+                    && !matches!(script, Script::Inherited));
+            let force_normalize = {
+                // "Extend" break chars should be normalized first, with two exceptions
+                if matches!(grapheme_cluster_break, GraphemeClusterBreak::Extend) &&
                     ch as u32 != 0x200C && // Is not a Zero Width Non-Joiner &&
                     !is_variation_selector
-                    {
-                        true
-                    } else {
-                        // All spacing mark break chars should be normalized first.
-                        matches!(grapheme_cluster_break, GraphemeClusterBreak::SpacingMark)
-                    }
-                };
+                {
+                    true
+                } else {
+                    // All spacing mark break chars should be normalized first.
+                    matches!(grapheme_cluster_break, GraphemeClusterBreak::SpacingMark)
+                }
+            };
 
-                lcx.info.push((
-                    CharInfo::new(
-                        boundary,
-                        bidi_embed_level,
-                        script,
-                        grapheme_cluster_break,
-                        is_variation_selector,
-                        is_region_indicator,
-                        is_control,
-                        is_emoji_or_pictograph,
-                        contributes_to_shaping,
-                        force_normalize,
-                    ),
-                    0, // Style index is populated later
-                ));
-                return next_mandatory_linebreak;
-            },
-        );
+            lcx.info.push((
+                CharInfo::new(
+                    boundary,
+                    bidi_embed_level,
+                    script,
+                    grapheme_cluster_break,
+                    is_variation_selector,
+                    is_region_indicator,
+                    is_control,
+                    is_emoji_or_pictograph,
+                    contributes_to_shaping,
+                    force_normalize,
+                ),
+                0, // Style index is populated later
+            ));
+
+            needs_bidi_resolution |= properties.needs_bidi_resolution();
+
+            return next_mandatory_linebreak;
+        });
+
+    if needs_bidi_resolution {
+        let bidi_embedding_levels = unicode_bidi::BidiInfo::new_with_data_source(
+            lcx.analysis_data_sources.composite(),
+            text,
+            None,
+        )
+        .levels;
+
+        for ((byte_pos, _), (info, _)) in text.char_indices().zip(lcx.info.iter_mut()) {
+            info.bidi_embed_level = bidi_embedding_levels[byte_pos].into();
+        }
+    }
 
     // Restore line segmenters
     lcx.analysis_data_sources.line_segmenters = line_segmenters;
@@ -564,7 +571,7 @@ mod tests {
                 .layout_context
                 .info
                 .iter()
-                .map(|(info, _)| info.is_control)
+                .map(|(info, _)| info.is_control())
                 .collect();
             assert_eq!(actual, expected, "Is control list mismatch");
             self
@@ -575,7 +582,7 @@ mod tests {
                 .layout_context
                 .info
                 .iter()
-                .map(|(info, _)| info.contributes_to_shaping)
+                .map(|(info, _)| info.contributes_to_shaping())
                 .collect();
             assert_eq!(actual, expected, "Contributes to shaping list mismatch");
             self
@@ -586,7 +593,7 @@ mod tests {
                 .layout_context
                 .info
                 .iter()
-                .map(|(info, _)| info.force_normalize)
+                .map(|(info, _)| info.force_normalize())
                 .collect();
             assert_eq!(actual, expected, "Force normalize list mismatch");
             self
