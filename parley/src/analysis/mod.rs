@@ -126,19 +126,80 @@ pub(crate) struct CharInfo {
     pub script: Script,
     /// The grapheme cluster boundary property of this character.
     pub grapheme_cluster_break: GraphemeClusterBreak,
-    /// Whether this character is a variation selector.
-    pub is_variation_selector: bool,
-    /// Whether this character is a region indicator.
-    pub is_region_indicator: bool,
-    /// Whether this character belongs to the "Control" general category in Unicode.
-    pub is_control: bool,
 
-    pub is_emoji_or_pictograph: bool,
-    /// Whether this character contributes to text shaping in Parley.
-    pub contributes_to_shaping: bool,
-    /// Whether to apply NFC normalization before attempting cluster form variations during
-    /// Parley's font selection.
-    pub force_normalize: bool,
+    flags: u8,
+}
+
+impl CharInfo {
+    const VARIATION_SELECTOR_SHIFT: u8 = 0;
+    const REGION_INDICATOR_SHIFT: u8 = 1;
+    const CONTROL_SHIFT: u8 = 2;
+    const EMOJI_OR_PICTOGRAPH_SHIFT: u8 = 3;
+    const CONTRIBUTES_TO_SHAPING_SHIFT: u8 = 4;
+    const FORCE_NORMALIZE_SHIFT: u8 = 5;
+
+    const VARIATION_SELECTOR_MASK: u8 = 1 << Self::VARIATION_SELECTOR_SHIFT;
+    const REGION_INDICATOR_MASK: u8 = 1 << Self::REGION_INDICATOR_SHIFT;
+    const CONTROL_MASK: u8 = 1 << Self::CONTROL_SHIFT;
+    const EMOJI_OR_PICTOGRAPH_MASK: u8 = 1 << Self::EMOJI_OR_PICTOGRAPH_SHIFT;
+    const CONTRIBUTES_TO_SHAPING_MASK: u8 = 1 << Self::CONTRIBUTES_TO_SHAPING_SHIFT;
+    const FORCE_NORMALIZE_MASK: u8 = 1 << Self::FORCE_NORMALIZE_SHIFT;
+
+    fn new(
+        boundary: Boundary,
+        bidi_embed_level: BidiLevel,
+        script: Script,
+        grapheme_cluster_break: GraphemeClusterBreak,
+        is_variation_selector: bool,
+        is_region_indicator: bool,
+        is_control: bool,
+        is_emoji_or_pictograph: bool,
+        contributes_to_shaping: bool,
+        force_normalize: bool,
+    ) -> Self {
+        Self {
+            boundary,
+            bidi_embed_level,
+            script,
+            grapheme_cluster_break,
+            flags: (is_variation_selector as u8) << Self::VARIATION_SELECTOR_SHIFT
+                | (is_region_indicator as u8) << Self::REGION_INDICATOR_SHIFT
+                | (is_control as u8) << Self::CONTROL_SHIFT
+                | (is_emoji_or_pictograph as u8) << Self::EMOJI_OR_PICTOGRAPH_SHIFT
+                | (contributes_to_shaping as u8) << Self::CONTRIBUTES_TO_SHAPING_SHIFT
+                | (force_normalize as u8) << Self::FORCE_NORMALIZE_SHIFT,
+        }
+    }
+
+    #[inline(always)]
+    pub fn is_variation_selector(&self) -> bool {
+        self.flags & Self::VARIATION_SELECTOR_MASK != 0
+    }
+
+    #[inline(always)]
+    pub fn is_region_indicator(&self) -> bool {
+        self.flags & Self::REGION_INDICATOR_MASK != 0
+    }
+
+    #[inline(always)]
+    pub fn is_control(&self) -> bool {
+        self.flags & Self::CONTROL_MASK != 0
+    }
+
+    #[inline(always)]
+    pub fn is_emoji_or_pictograph(&self) -> bool {
+        self.flags & Self::EMOJI_OR_PICTOGRAPH_MASK != 0
+    }
+
+    #[inline(always)]
+    pub fn contributes_to_shaping(&self) -> bool {
+        self.flags & Self::CONTRIBUTES_TO_SHAPING_MASK != 0
+    }
+
+    #[inline(always)]
+    pub fn force_normalize(&self) -> bool {
+        self.flags & Self::FORCE_NORMALIZE_MASK != 0
+    }
 }
 
 /// Boundary type of a character or cluster.
@@ -373,6 +434,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
 
     let composite = lcx.analysis_data_sources.composite();
 
+    lcx.info.reserve(text.len());
     boundaries_and_levels_iter
         .zip(text.chars())
         // Shift line break data forward one, as line boundaries corresponding with line-breaking
@@ -416,7 +478,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
                 };
 
                 lcx.info.push((
-                    CharInfo {
+                    CharInfo::new(
                         boundary,
                         bidi_embed_level,
                         script,
@@ -427,7 +489,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
                         is_emoji_or_pictograph,
                         contributes_to_shaping,
                         force_normalize,
-                    },
+                    ),
                     0, // Style index is populated later
                 ));
                 return next_mandatory_linebreak;
