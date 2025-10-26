@@ -1,12 +1,8 @@
 //! Unicode data as required by the Parley crate for efficient text analysis.
 
-// TODO: Add variation selector to composite props
-// TODO: Add bidi class into the trie (and pass it to unicode-bidi)
-// TODO: I think region indicator is just a range... I can just encode that.
-
 use databake::Bake;
-use icu::properties::props::{BidiClass, GeneralCategory, GraphemeClusterBreak, LineBreak, Script};
 use icu_collections::codepointtrie::CodePointTrie;
+use icu_properties::props::{GeneralCategory, GraphemeClusterBreak, Script};
 use zerofrom::ZeroFrom;
 
 #[cfg(feature = "build")]
@@ -37,7 +33,6 @@ impl CompositePropsV1Data<'_> {
 }
 
 impl unicode_bidi::BidiDataSource for CompositePropsV1Data<'_> {
-    // TODO: Store unicode_bidi::BidiClass in the trie instead...
     fn bidi_class(&self, cp: char) -> unicode_bidi::BidiClass {
         self.properties(cp as u32).bidi_class()
     }
@@ -72,22 +67,22 @@ impl Properties {
         (self.0 >> shift) & ((1 << bits) - 1)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn script(&self) -> Script {
         Script::from_icu4c_value(self.get(Self::SCRIPT_SHIFT, Self::SCRIPT_BITS) as u16)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn general_category(&self) -> GeneralCategory {
         GeneralCategory::try_from(self.get(Self::GC_SHIFT, Self::GC_BITS) as u8).unwrap()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn grapheme_cluster_break(&self) -> GraphemeClusterBreak {
         GraphemeClusterBreak::from_icu4c_value(self.get(Self::GCB_SHIFT, Self::GCB_BITS) as u8)
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn bidi_class(&self) -> unicode_bidi::BidiClass {
         #[allow(unsafe_code)]
         unsafe {
@@ -95,7 +90,7 @@ impl Properties {
         }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn needs_bidi_resolution(&self) -> bool {
         use unicode_bidi::BidiClass::*;
         let bidi_class = self.bidi_class();
@@ -111,7 +106,7 @@ impl Properties {
         (bidi_mask & BIDI_MASK) != 0
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_emoji_or_pictograph(&self) -> bool {
         self.get(
             Self::IS_EMOJI_OR_PICTOGRAPH_SHIFT,
@@ -119,7 +114,7 @@ impl Properties {
         ) != 0
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_variation_selector(&self) -> bool {
         self.get(
             Self::IS_VARIATION_SELECTOR_SHIFT,
@@ -127,7 +122,7 @@ impl Properties {
         ) != 0
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_region_indicator(&self) -> bool {
         self.get(
             Self::IS_REGION_INDICATOR_SHIFT,
@@ -135,7 +130,7 @@ impl Properties {
         ) != 0
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_mandatory_linebreak(&self) -> bool {
         self.get(
             Self::IS_MANDATORY_LINE_BREAK_SHIFT,
