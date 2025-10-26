@@ -3550,7 +3550,6 @@ dependencies = [
  "parley_dev",
  "peniko",
  "skrifa 0.37.0",
- "smallvec",
  "tiny-skia",
  "unicode-bidi",
  "unicode_data",

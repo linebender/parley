@@ -323,7 +323,6 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
         WordBreakSegmentIter::new(text, rest.iter(), &first_style);
     let mut global_offset = 0;
     let mut line_boundary_positions: Vec<usize> = Vec::new();
-    // LINE BOUNDARIES COLLECTION
     for (substring_index, (substring, word_break_strength, last)) in
         contiguous_word_break_substrings.enumerate()
     {
@@ -335,13 +334,10 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
 
             let _first = lb_iter.next();
             let second = lb_iter.next();
-
             if second.is_none() {
                 continue;
             }
-
             let third = lb_iter.next();
-
             if third.is_none() {
                 continue;
             }
@@ -349,7 +345,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
             let iter = [second.unwrap(), third.unwrap()].into_iter().chain(lb_iter);
 
             line_boundary_positions.extend(iter);
-            // Remove the unnescessary boundary added by ICU4X.
+            // Remove the unnescessary boundary at the end added by ICU4X.
             line_boundary_positions.pop();
             break;
         }

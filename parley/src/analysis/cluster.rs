@@ -1,5 +1,3 @@
-use smallvec::SmallVec;
-
 use crate::analysis::AnalysisDataSources;
 
 /// The maximum number of characters in a single cluster.
@@ -14,10 +12,10 @@ pub(crate) struct CharCluster {
     pub start: u32,
     pub end: u32,
     pub force_normalize: bool,
-    pub comp: Form,
-    pub decomp: Form,
-    pub form: FormKind,
-    pub best_ratio: f32,
+    comp: Form,
+    decomp: Form,
+    form: FormKind,
+    best_ratio: f32,
 }
 
 impl CharCluster {

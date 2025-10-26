@@ -221,7 +221,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
 // Rebuilds the provided `char_cluster` in-place using the existing allocation
 // for the given grapheme `segment_text`, consuming items from `item_infos_iter`.
-// This avoids allocating a fresh Vec for every grapheme cluster.
 fn fill_cluster_in_place(
     segment_text: &str,
     item_infos_iter: &mut core::slice::Iter<(CharInfo, u16)>,
@@ -235,7 +234,6 @@ fn fill_cluster_in_place(
     let mut is_emoji_or_pictograph = false;
     let start = *code_unit_offset_in_string as u32;
 
-    // Fill chars in-place, updating offsets and flags
     for ((_, ch), (info, style_index)) in segment_text.char_indices().zip(item_infos_iter.by_ref())
     {
         force_normalize |= info.force_normalize();
@@ -255,8 +253,6 @@ fn fill_cluster_in_place(
     let end = *code_unit_offset_in_string as u32;
     char_cluster.is_emoji = is_emoji_or_pictograph;
     char_cluster.len = char_cluster.chars.len() as u8;
-    // Preserve previous behavior: original map_len was effectively 0, and
-    // CharCluster::map uses map_len.max(1) when mapping.
     char_cluster.map_len = 0;
     char_cluster.start = start;
     char_cluster.end = end;

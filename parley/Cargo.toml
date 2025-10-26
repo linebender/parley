@@ -33,7 +33,6 @@ unicode_data = { workspace = true }
 accesskit = { workspace = true, optional = true }
 hashbrown = { workspace = true }
 harfrust = { workspace = true }
-smallvec = { workspace = true }
 icu_collections = { workspace = true }
 # Used in ICU4X baked data sources, which depend on compiled data, but just locale fallback rules.
 icu_locale = { workspace = true }
