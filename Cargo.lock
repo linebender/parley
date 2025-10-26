@@ -883,20 +883,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "composite_props_marker"
-version = "0.1.0"
-dependencies = [
- "databake 0.2.0",
- "icu",
- "icu_collections",
- "icu_properties",
- "icu_provider",
- "serde",
- "yoke",
- "zerofrom",
-]
-
-[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3543,7 +3529,6 @@ name = "parley"
 version = "0.6.0"
 dependencies = [
  "accesskit",
- "composite_props_marker",
  "core_maths",
  "databake 0.1.8",
  "fontique",
@@ -3568,6 +3553,7 @@ dependencies = [
  "smallvec",
  "tiny-skia",
  "unicode-bidi",
+ "unicode_data",
  "zerovec",
 ]
 
@@ -4933,6 +4919,9 @@ name = "unicode-bidi"
 version = "0.3.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c1cb5db39152898a79168971543b1cb5020dff7fe43c8dc468b0885f5e29df5"
+dependencies = [
+ "smallvec",
+]
 
 [[package]]
 name = "unicode-ident"
@@ -4969,6 +4958,27 @@ name = "unicode-xid"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
+
+[[package]]
+name = "unicode_data"
+version = "0.0.0"
+dependencies = [
+ "databake 0.2.0",
+ "icu",
+ "icu_codepointtrie_builder",
+ "icu_collections",
+ "icu_normalizer",
+ "icu_properties",
+ "icu_provider",
+ "icu_provider_adapters",
+ "icu_provider_export",
+ "icu_provider_source",
+ "icu_segmenter",
+ "serde",
+ "unicode-bidi",
+ "yoke",
+ "zerofrom",
+]
 
 [[package]]
 name = "untrusted"

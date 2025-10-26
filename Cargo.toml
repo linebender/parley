@@ -7,7 +7,7 @@ members = [
     "parley_bench",
     "parley_core",
     "parley_dev",
-    "unicode_props",
+    "unicode_data",
     "examples/tiny_skia_render",
     "examples/swash_render",
     "examples/vello_editor",
@@ -39,7 +39,7 @@ icu_provider_source = { version = "2.0.0" }
 icu_segmenter = { version = "2.0.0", default-features = false }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
 parley = { version = "0.6.0", default-features = false, path = "parley" }
-composite_props_marker = { path = "unicode_props" }
+unicode_data = { path = "unicode_data" }
 parley_dev = { default-features = false, path = "parley_dev" }
 peniko = { version = "0.4.1", default-features = false }
 skrifa = { version = "0.37.0", default-features = false }

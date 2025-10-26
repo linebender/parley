@@ -9,8 +9,6 @@ use core::ops::RangeInclusive;
 
 use alloc::vec::Vec;
 
-use icu_properties::props::Script;
-use icu_provider::prelude::icu_locale_core::LanguageIdentifier;
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
@@ -20,6 +18,8 @@ use crate::inline_box::InlineBox;
 use crate::lru_cache::LruCache;
 use crate::util::nearly_eq;
 use crate::{FontData, icu_convert};
+use icu_properties::props::Script;
+use icu_provider::prelude::icu_locale_core::LanguageIdentifier;
 
 use fontique::{self, Query, QueryFamily, QueryFont};
 
@@ -112,9 +112,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     let mut current_box = inline_box_iter.next();
 
     // Iterate over characters in the text
-    for ((_, (byte_index, ch)), (info, style_index)) in
-        text.char_indices().enumerate().zip(infos)
-    {
+    for ((_, (byte_index, ch)), (info, style_index)) in text.char_indices().enumerate().zip(infos) {
         let mut break_run = false;
         let mut script = info.script;
         if !real_script(script) {
@@ -220,56 +218,58 @@ pub(crate) fn shape_text<'a, B: Brush>(
 }
 
 fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str) -> bool {
-    // TODO: Optimise this since we have `is_emoji_or_pictograph` in the composite props
-    if analysis_data_sources.basic_emoji().contains_str(grapheme) {
-        return true;
-    }
+    // TODO: Optimise and test this function
+    return false;
+    // // TODO: Optimise this since we have `is_emoji_or_pictograph` in the composite props
+    // if analysis_data_sources.basic_emoji().contains_str(grapheme) {
+    //     return true;
+    // }
 
-    let mut chars_iter = grapheme.char_indices().peekable();
-    let mut first_and_previous_char = None; // Set only for the second iteration
-    let mut has_emoji = false;
-    let mut has_zwj = false;
-    while let Some((char_index, ch)) = chars_iter.next() {
-        // Handle single-character graphemes
-        if char_index == 0 && chars_iter.peek().is_none() {
-            return analysis_data_sources.emoji().contains(ch) ||
-                analysis_data_sources.extended_pictographic().contains(ch);
-        }
+    // let mut chars_iter = grapheme.char_indices().peekable();
+    // let mut first_and_previous_char = None; // Set only for the second iteration
+    // let mut has_emoji = false;
+    // let mut has_zwj = false;
+    // while let Some((char_index, ch)) = chars_iter.next() {
+    //     // Handle single-character graphemes
+    //     if char_index == 0 && chars_iter.peek().is_none() {
+    //         return analysis_data_sources.emoji().contains(ch) ||
+    //             analysis_data_sources.extended_pictographic().contains(ch);
+    //     }
 
-        // Check if this character is an emoji
-        let emoji_data_source_contains_char = analysis_data_sources.emoji().contains(ch);
-        if emoji_data_source_contains_char {
-            // Check if the next character is a variation selector
-            if let Some((_, next_ch)) = chars_iter.peek() {
-                if analysis_data_sources.variation_selector().contains(*next_ch) {
-                    return true;
-                }
-            }
-        }
+    //     // Check if this character is an emoji
+    //     let emoji_data_source_contains_char = analysis_data_sources.emoji().contains(ch);
+    //     if emoji_data_source_contains_char {
+    //         // Check if the next character is a variation selector
+    //         if let Some((_, next_ch)) = chars_iter.peek() {
+    //             if analysis_data_sources.variation_selector().contains(*next_ch) {
+    //                 return true;
+    //             }
+    //         }
+    //     }
 
-        // Check for flag emoji (two regional indicators), must be a two-character grapheme.
-        if let Some(first_char) = first_and_previous_char {
-            if chars_iter.peek().is_none() &&
-                analysis_data_sources.regional_indicator().contains(first_char) &&
-                analysis_data_sources.regional_indicator().contains(ch) {
-                return true;
-            }
-        }
+    //     // Check for flag emoji (two regional indicators), must be a two-character grapheme.
+    //     if let Some(first_char) = first_and_previous_char {
+    //         if chars_iter.peek().is_none() &&
+    //             analysis_data_sources.regional_indicator().contains(first_char) &&
+    //             analysis_data_sources.regional_indicator().contains(ch) {
+    //             return true;
+    //         }
+    //     }
 
-        // Check for ZWJ-composed emoji graphemes (e.g. 👩‍👩‍👧‍👧)
-        if ch as u32 == 0x200D {
-            has_zwj = true;
-        }
-        has_emoji |= emoji_data_source_contains_char;
+    //     // Check for ZWJ-composed emoji graphemes (e.g. 👩‍👩‍👧‍👧)
+    //     if ch as u32 == 0x200D {
+    //         has_zwj = true;
+    //     }
+    //     has_emoji |= emoji_data_source_contains_char;
 
-        first_and_previous_char = if char_index == 0 { Some(ch) } else { None };
-    }
+    //     first_and_previous_char = if char_index == 0 { Some(ch) } else { None };
+    // }
 
-    // If the grapheme (already segmented by icu, so it is a valid grapheme) has both emoji
-    // characters and ZWJ, it's likely an emoji ZWJ sequence.
-    if has_emoji && has_zwj {
-    }
-    has_emoji && has_zwj
+    // // If the grapheme (already segmented by icu, so it is a valid grapheme) has both emoji
+    // // characters and ZWJ, it's likely an emoji ZWJ sequence.
+    // if has_emoji && has_zwj {
+    // }
+    // has_emoji && has_zwj
 }
 
 fn shape_item<'a, B: Brush>(
@@ -288,60 +288,84 @@ fn shape_item<'a, B: Brush>(
     let item_text = &text[text_range.clone()];
     let item_infos = &infos[char_range.start..char_range.end]; // Only process current item
     let first_style_index = item_infos[0].1;
-    let mut font_selector =
-        FontSelector::new(fq, rcx, styles, first_style_index, item.script, item.locale.clone());
+    let mut font_selector = FontSelector::new(
+        fq,
+        rcx,
+        styles,
+        first_style_index,
+        item.script,
+        item.locale.clone(),
+    );
 
-    let grapheme_cluster_boundaries = analysis_data_sources.grapheme_segmenter().segment_str(item_text);
+    let grapheme_cluster_boundaries = analysis_data_sources
+        .grapheme_segmenter()
+        .segment_str(item_text);
     let mut item_infos_iter = item_infos.iter();
     let mut code_unit_offset_in_string = text_range.start;
     let mut clusters_iter = grapheme_cluster_boundaries
         .skip(1) // First boundary index is always zero
-        .scan((0usize, &mut item_infos_iter, &mut code_unit_offset_in_string),
-              |(last, item_infos_iter, code_unit_offset), boundary| {
-                  let segment_text = &item_text[*last..boundary];
+        .scan(
+            (
+                0usize,
+                &mut item_infos_iter,
+                &mut code_unit_offset_in_string,
+            ),
+            |(last, item_infos_iter, code_unit_offset), boundary| {
+                let segment_text = &item_text[*last..boundary];
 
-                  let mut len = 0;
-                  let mut map_len = 0;
-                  let mut force_normalize = false;
-                  let start = **code_unit_offset;
+                let mut len = 0;
+                let mut map_len = 0;
+                let mut force_normalize = false;
+                let start = **code_unit_offset;
 
-                  let mut is_emoji_or_pictograph = false;
+                let mut is_emoji_or_pictograph = false;
 
-                  let chars = segment_text.char_indices().zip(item_infos_iter.by_ref()).map(|((_, ch), (info, style_index))| {
-                      force_normalize |= info.force_normalize;
-                      len += 1;
-                      map_len += info.contributes_to_shaping as u8;
-                      **code_unit_offset += ch.len_utf8();
-                      is_emoji_or_pictograph |= info.is_emoji_or_pictograph;
+                let chars = segment_text
+                    .char_indices()
+                    .zip(item_infos_iter.by_ref())
+                    .map(|((_, ch), (info, style_index))| {
+                        force_normalize |= info.force_normalize;
+                        len += 1;
+                        map_len.saturating_add(info.contributes_to_shaping as u8);
+                        **code_unit_offset += ch.len_utf8();
+                        is_emoji_or_pictograph |= info.is_emoji_or_pictograph;
 
-                      Char {
-                          ch,
-                          contributes_to_shaping: info.contributes_to_shaping,
-                          glyph_id: 0,
-                          style_index: *style_index,
-                          is_control_character: info.is_control,
-                      }
-                  }).collect();
+                        Char {
+                            ch,
+                            contributes_to_shaping: info.contributes_to_shaping,
+                            glyph_id: 0,
+                            style_index: *style_index,
+                            is_control_character: info.is_control,
+                        }
+                    })
+                    .collect();
 
-                  let end = **code_unit_offset;
+                let end = **code_unit_offset;
 
-                  let cluster = CharCluster::new(
-                      chars,
-                      is_emoji_or_pictograph || if (segment_text.len() > 1) {is_emoji_grapheme(analysis_data_sources, segment_text) } else { false },
-                      len,
-                      map_len,
-                      start as u32,
-                      end as u32,
-                      force_normalize
-                  );
+                let cluster = CharCluster::new(
+                    chars,
+                    is_emoji_or_pictograph
+                        || if (segment_text.len() > 1) {
+                            is_emoji_grapheme(analysis_data_sources, segment_text)
+                        } else {
+                            false
+                        },
+                    len,
+                    map_len,
+                    start as u32,
+                    end as u32,
+                    force_normalize,
+                );
 
-                  *last = boundary;
-                  Some(cluster)
-              });
+                *last = boundary;
+                Some(cluster)
+            },
+        );
 
     let mut cluster = clusters_iter.next().expect("one cluster");
 
-    let mut current_font = font_selector.select_font(&mut cluster, analysis_data_sources, &mut scx.scratch_string);
+    let mut current_font =
+        font_selector.select_font(&mut cluster, analysis_data_sources, &mut scx.scratch_string);
 
     // Main segmentation loop (based on swash shape_clusters) - only within current item
     while let Some(font) = current_font.take() {
@@ -356,7 +380,11 @@ fn shape_item<'a, B: Brush>(
                 None => break, // End of current item - process final segment
             };
 
-            if let Some(next_font) = font_selector.select_font(&mut cluster, analysis_data_sources, &mut scx.scratch_string) {
+            if let Some(next_font) = font_selector.select_font(
+                &mut cluster,
+                analysis_data_sources,
+                &mut scx.scratch_string,
+            ) {
                 if next_font != font {
                     current_font = Some(next_font);
                     break;
@@ -617,19 +645,23 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
                 return fontique::QueryStatus::Continue;
             };
 
-            let map_status = cluster.map(|ch| {
-                charmap
-                    .map(ch)
-                    .map(|g| {
-                        // HACK: in reality, we're only computing coverage, so
-                        // we only care about whether the font  has a mapping 
-                        // for a particular glyph. Any non-zero value indicates
-                        // the existence of a glyph so we can simplify this 
-                        // without a fallible conversion from u32 to u16.
-                        (g != 0) as u16
-                    })
-                    .unwrap_or_default()
-            }, analysis_data_sources, scratch_string);
+            let map_status = cluster.map(
+                |ch| {
+                    charmap
+                        .map(ch)
+                        .map(|g| {
+                            // HACK: in reality, we're only computing coverage, so
+                            // we only care about whether the font  has a mapping
+                            // for a particular glyph. Any non-zero value indicates
+                            // the existence of a glyph so we can simplify this
+                            // without a fallible conversion from u32 to u16.
+                            (g != 0) as u16
+                        })
+                        .unwrap_or_default()
+                },
+                analysis_data_sources,
+                scratch_string,
+            );
 
             match map_status {
                 Status::Complete => {
