@@ -1,10 +1,10 @@
-use icu::locale::{LocaleFallbacker, locale};
 use icu_codepointtrie_builder::{CodePointTrieBuilder, CodePointTrieBuilderData};
 use icu_collections::codepointtrie::TrieType;
+use icu_locale::LocaleFallbacker;
 use icu_properties::{
     CodePointMapData, CodePointSetData,
     props::{
-        BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak,
+        BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak,
         RegionalIndicator, Script, VariationSelector,
     },
 };
