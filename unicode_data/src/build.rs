@@ -1,3 +1,5 @@
+//! Exposes functionality that allows for building ICU4X data providers.
+
 use icu_codepointtrie_builder::{CodePointTrieBuilder, CodePointTrieBuilderData};
 use icu_collections::codepointtrie::TrieType;
 use icu_locale::LocaleFallbacker;
@@ -73,6 +75,8 @@ fn unicode_to_unicode_bidi(bidi: BidiClass) -> unicode_bidi::BidiClass {
     }
 }
 
+/// A data provider that provides composite properties for a given character.
+#[derive(Debug)]
 pub struct CompositePropsProvider {
     source: SourceDataProvider,
 }
@@ -158,6 +162,19 @@ impl IterableDataProvider<CompositePropsV1> for CompositePropsProvider {
 
 icu_provider::export::make_exportable_provider!(CompositePropsProvider, [CompositePropsV1,]);
 
+/// Exports ICU data provider as Rust code into the `out` directory.
+///
+/// After running this function in your `build.rs`, you can access it for consumption via:
+///
+/// ```rs
+/// include!(concat!(env!("OUT_DIR"), "/baked_data/mod.rs"));
+/// include!(concat!(env!("OUT_DIR"), "/baked_data/composite_blob.rs"));
+///
+/// pub struct BakedProvider;
+/// impl_data_provider!(BakedProvider);
+///
+/// pub(crate) static PROVIDER: BakedProvider = BakedProvider;
+/// ```
 pub fn bake(out: std::path::PathBuf) {
     let icu4x_source_provider = SourceDataProvider::new();
     let custom_source_provider = CompositePropsProvider::new(icu4x_source_provider.clone());
