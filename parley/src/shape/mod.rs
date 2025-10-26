@@ -219,66 +219,10 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 }
 
-fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str) -> bool {
-    // TODO: Optimise and test this function
-    return false;
-    // // TODO: Optimise this since we have `is_emoji_or_pictograph` in the composite props
-    // if analysis_data_sources.basic_emoji().contains_str(grapheme) {
-    //     return true;
-    // }
-
-    // let mut chars_iter = grapheme.char_indices().peekable();
-    // let mut first_and_previous_char = None; // Set only for the second iteration
-    // let mut has_emoji = false;
-    // let mut has_zwj = false;
-    // while let Some((char_index, ch)) = chars_iter.next() {
-    //     // Handle single-character graphemes
-    //     if char_index == 0 && chars_iter.peek().is_none() {
-    //         return analysis_data_sources.emoji().contains(ch) ||
-    //             analysis_data_sources.extended_pictographic().contains(ch);
-    //     }
-
-    //     // Check if this character is an emoji
-    //     let emoji_data_source_contains_char = analysis_data_sources.emoji().contains(ch);
-    //     if emoji_data_source_contains_char {
-    //         // Check if the next character is a variation selector
-    //         if let Some((_, next_ch)) = chars_iter.peek() {
-    //             if analysis_data_sources.variation_selector().contains(*next_ch) {
-    //                 return true;
-    //             }
-    //         }
-    //     }
-
-    //     // Check for flag emoji (two regional indicators), must be a two-character grapheme.
-    //     if let Some(first_char) = first_and_previous_char {
-    //         if chars_iter.peek().is_none() &&
-    //             analysis_data_sources.regional_indicator().contains(first_char) &&
-    //             analysis_data_sources.regional_indicator().contains(ch) {
-    //             return true;
-    //         }
-    //     }
-
-    //     // Check for ZWJ-composed emoji graphemes (e.g. 👩‍👩‍👧‍👧)
-    //     if ch as u32 == 0x200D {
-    //         has_zwj = true;
-    //     }
-    //     has_emoji |= emoji_data_source_contains_char;
-
-    //     first_and_previous_char = if char_index == 0 { Some(ch) } else { None };
-    // }
-
-    // // If the grapheme (already segmented by icu, so it is a valid grapheme) has both emoji
-    // // characters and ZWJ, it's likely an emoji ZWJ sequence.
-    // if has_emoji && has_zwj {
-    // }
-    // has_emoji && has_zwj
-}
-
 // Rebuilds the provided `char_cluster` in-place using the existing allocation
 // for the given grapheme `segment_text`, consuming items from `item_infos_iter`.
 // This avoids allocating a fresh Vec for every grapheme cluster.
 fn fill_cluster_in_place(
-    analysis_data_sources: &AnalysisDataSources,
     segment_text: &str,
     item_infos_iter: &mut core::slice::Iter<(CharInfo, u16)>,
     code_unit_offset_in_string: &mut usize,
@@ -309,12 +253,7 @@ fn fill_cluster_in_place(
 
     // Finalize cluster metadata
     let end = *code_unit_offset_in_string as u32;
-    char_cluster.is_emoji = is_emoji_or_pictograph
-        || if (segment_text.len() > 1) {
-            is_emoji_grapheme(analysis_data_sources, segment_text)
-        } else {
-            false
-        };
+    char_cluster.is_emoji = is_emoji_or_pictograph;
     char_cluster.len = char_cluster.chars.len() as u8;
     // Preserve previous behavior: original map_len was effectively 0, and
     // CharCluster::map uses map_len.max(1) when mapping.
@@ -364,7 +303,6 @@ fn shape_item<'a, B: Brush>(
     };
 
     fill_cluster_in_place(
-        analysis_data_sources,
         &item_text[last_boundary..current_boundary],
         &mut item_infos_iter,
         &mut code_unit_offset_in_string,
@@ -390,7 +328,6 @@ fn shape_item<'a, B: Brush>(
             last_boundary = current_boundary;
             current_boundary = next_boundary;
             fill_cluster_in_place(
-                analysis_data_sources,
                 &item_text[last_boundary..current_boundary],
                 &mut item_infos_iter,
                 &mut code_unit_offset_in_string,
