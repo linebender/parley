@@ -163,8 +163,7 @@ pub fn bake(out: std::path::PathBuf) {
     let custom_source_provider = CompositePropsProvider::new(icu4x_source_provider.clone());
 
     ExportDriver::new(
-        // Your project is singleton-only; this family is ignored for singletons
-        [DataLocaleFamily::single(locale!("en").into())],
+        [DataLocaleFamily::FULL],
         DeduplicationStrategy::Maximal.into(),
         LocaleFallbacker::new_without_data(),
     )
@@ -194,7 +193,7 @@ pub fn bake(out: std::path::PathBuf) {
     let blob_path = out.clone().join("composite.postcard");
 
     ExportDriver::new(
-        [DataLocaleFamily::single(locale!("en").into())],
+        [DataLocaleFamily::FULL],
         DeduplicationStrategy::None.into(),
         LocaleFallbacker::new_without_data(),
     )

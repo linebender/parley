@@ -97,7 +97,3 @@ clippy.negative_feature_names = "warn"
 clippy.redundant_feature_names = "warn"
 clippy.wildcard_dependencies = "warn"
 # END LINEBENDER LINT SET
-
-
-[profile.release]
-debug = true
