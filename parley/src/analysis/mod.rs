@@ -390,6 +390,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
                 let is_variation_selector = properties.is_variation_selector();
                 let is_region_indicator = properties.is_region_indicator();
                 let bidi_embed_level: BidiLevel = (embed_level).into();
+                let next_mandatory_linebreak = properties.is_mandatory_linebreak();
 
                 let boundary = if is_mandatory_linebreak {
                     Boundary::Mandatory
@@ -429,7 +430,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
                     },
                     0, // Style index is populated later
                 ));
-                return properties.is_mandatory_linebreak();
+                return next_mandatory_linebreak;
             },
         );
 

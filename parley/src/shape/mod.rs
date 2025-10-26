@@ -32,6 +32,7 @@ pub(crate) struct ShapeContext {
     unicode_buffer: Option<harfrust::UnicodeBuffer>,
     features: Vec<harfrust::Feature>,
     scratch_string: String,
+    char_cluster: CharCluster,
 }
 
 impl Default for ShapeContext {
@@ -44,6 +45,7 @@ impl Default for ShapeContext {
             unicode_buffer: Some(harfrust::UnicodeBuffer::new()),
             features: Vec::new(),
             scratch_string: String::new(),
+            char_cluster: CharCluster::default(),
         }
     }
 }
@@ -272,6 +274,56 @@ fn is_emoji_grapheme(analysis_data_sources: &AnalysisDataSources, grapheme: &str
     // has_emoji && has_zwj
 }
 
+// Rebuilds the provided `char_cluster` in-place using the existing allocation
+// for the given grapheme `segment_text`, consuming items from `item_infos_iter`.
+// This avoids allocating a fresh Vec for every grapheme cluster.
+fn fill_cluster_in_place(
+    analysis_data_sources: &AnalysisDataSources,
+    segment_text: &str,
+    item_infos_iter: &mut core::slice::Iter<(CharInfo, u16)>,
+    code_unit_offset_in_string: &mut usize,
+    char_cluster: &mut CharCluster,
+) {
+    // Reset cluster but keep allocation
+    char_cluster.clear();
+
+    let mut force_normalize = false;
+    let mut is_emoji_or_pictograph = false;
+    let start = *code_unit_offset_in_string as u32;
+
+    // Fill chars in-place, updating offsets and flags
+    for ((_, ch), (info, style_index)) in segment_text.char_indices().zip(item_infos_iter.by_ref())
+    {
+        force_normalize |= info.force_normalize;
+        is_emoji_or_pictograph |= info.is_emoji_or_pictograph;
+        *code_unit_offset_in_string += ch.len_utf8();
+
+        char_cluster.chars.push(Char {
+            ch,
+            contributes_to_shaping: info.contributes_to_shaping,
+            glyph_id: 0,
+            style_index: *style_index,
+            is_control_character: info.is_control,
+        });
+    }
+
+    // Finalize cluster metadata
+    let end = *code_unit_offset_in_string as u32;
+    char_cluster.is_emoji = is_emoji_or_pictograph
+        || if (segment_text.len() > 1) {
+            is_emoji_grapheme(analysis_data_sources, segment_text)
+        } else {
+            false
+        };
+    char_cluster.len = char_cluster.chars.len() as u8;
+    // Preserve previous behavior: original map_len was effectively 0, and
+    // CharCluster::map uses map_len.max(1) when mapping.
+    char_cluster.map_len = 0;
+    char_cluster.start = start;
+    char_cluster.end = end;
+    char_cluster.force_normalize = force_normalize;
+}
+
 fn shape_item<'a, B: Brush>(
     fq: &mut Query<'a>,
     rcx: &'a ResolveContext,
@@ -302,86 +354,51 @@ fn shape_item<'a, B: Brush>(
         .segment_str(item_text);
     let mut item_infos_iter = item_infos.iter();
     let mut code_unit_offset_in_string = text_range.start;
-    let mut clusters_iter = grapheme_cluster_boundaries
-        .skip(1) // First boundary index is always zero
-        .scan(
-            (
-                0usize,
-                &mut item_infos_iter,
-                &mut code_unit_offset_in_string,
-            ),
-            |(last, item_infos_iter, code_unit_offset), boundary| {
-                let segment_text = &item_text[*last..boundary];
+    let char_cluster = &mut scx.char_cluster;
 
-                let mut len = 0;
-                let mut map_len = 0;
-                let mut force_normalize = false;
-                let start = **code_unit_offset;
+    // Build an iterator of boundaries and consume the first segment to seed the loop
+    let mut boundaries_iter = grapheme_cluster_boundaries.skip(1);
+    let mut last_boundary = 0usize;
+    let Some(mut current_boundary) = boundaries_iter.next() else {
+        return; // No clusters
+    };
 
-                let mut is_emoji_or_pictograph = false;
-
-                let chars = segment_text
-                    .char_indices()
-                    .zip(item_infos_iter.by_ref())
-                    .map(|((_, ch), (info, style_index))| {
-                        force_normalize |= info.force_normalize;
-                        len += 1;
-                        map_len.saturating_add(info.contributes_to_shaping as u8);
-                        **code_unit_offset += ch.len_utf8();
-                        is_emoji_or_pictograph |= info.is_emoji_or_pictograph;
-
-                        Char {
-                            ch,
-                            contributes_to_shaping: info.contributes_to_shaping,
-                            glyph_id: 0,
-                            style_index: *style_index,
-                            is_control_character: info.is_control,
-                        }
-                    })
-                    .collect();
-
-                let end = **code_unit_offset;
-
-                let cluster = CharCluster::new(
-                    chars,
-                    is_emoji_or_pictograph
-                        || if (segment_text.len() > 1) {
-                            is_emoji_grapheme(analysis_data_sources, segment_text)
-                        } else {
-                            false
-                        },
-                    len,
-                    map_len,
-                    start as u32,
-                    end as u32,
-                    force_normalize,
-                );
-
-                *last = boundary;
-                Some(cluster)
-            },
-        );
-
-    let mut cluster = clusters_iter.next().expect("one cluster");
+    fill_cluster_in_place(
+        analysis_data_sources,
+        &item_text[last_boundary..current_boundary],
+        &mut item_infos_iter,
+        &mut code_unit_offset_in_string,
+        char_cluster,
+    );
 
     let mut current_font =
-        font_selector.select_font(&mut cluster, analysis_data_sources, &mut scx.scratch_string);
+        font_selector.select_font(char_cluster, analysis_data_sources, &mut scx.scratch_string);
 
     // Main segmentation loop (based on swash shape_clusters) - only within current item
     while let Some(font) = current_font.take() {
         // Collect all clusters for this font segment
-        let cluster_range = cluster.range();
+        let cluster_range = char_cluster.range();
         let segment_start_offset = cluster_range.start as usize - text_range.start;
         let mut segment_end_offset = cluster_range.end as usize - text_range.start;
 
         loop {
-            cluster = match clusters_iter.next() {
-                Some(c) => c,
-                None => break, // End of current item - process final segment
+            let Some(next_boundary) = boundaries_iter.next() else {
+                break; // End of current item - process final segment
             };
 
+            // Build next cluster in-place
+            last_boundary = current_boundary;
+            current_boundary = next_boundary;
+            fill_cluster_in_place(
+                analysis_data_sources,
+                &item_text[last_boundary..current_boundary],
+                &mut item_infos_iter,
+                &mut code_unit_offset_in_string,
+                char_cluster,
+            );
+
             if let Some(next_font) = font_selector.select_font(
-                &mut cluster,
+                char_cluster,
                 analysis_data_sources,
                 &mut scx.scratch_string,
             ) {
@@ -390,13 +407,11 @@ fn shape_item<'a, B: Brush>(
                     break;
                 } else {
                     // Same font - add to current segment
-                    segment_end_offset = cluster.range().end as usize - text_range.start;
+                    segment_end_offset = char_cluster.range().end as usize - text_range.start;
                 }
             } else {
-                cluster = match clusters_iter.next() {
-                    Some(c) => c,
-                    None => break, // End of current item - process final segment
-                };
+                // No font determined, continue to next cluster
+                continue;
             }
         }
 
