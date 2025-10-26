@@ -294,16 +294,16 @@ fn fill_cluster_in_place(
     // Fill chars in-place, updating offsets and flags
     for ((_, ch), (info, style_index)) in segment_text.char_indices().zip(item_infos_iter.by_ref())
     {
-        force_normalize |= info.force_normalize;
-        is_emoji_or_pictograph |= info.is_emoji_or_pictograph;
+        force_normalize |= info.force_normalize();
+        is_emoji_or_pictograph |= info.is_emoji_or_pictograph();
         *code_unit_offset_in_string += ch.len_utf8();
 
         char_cluster.chars.push(Char {
             ch,
-            contributes_to_shaping: info.contributes_to_shaping,
+            contributes_to_shaping: info.contributes_to_shaping(),
             glyph_id: 0,
             style_index: *style_index,
-            is_control_character: info.is_control,
+            is_control_character: info.is_control(),
         });
     }
 
