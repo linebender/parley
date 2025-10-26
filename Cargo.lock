@@ -4696,7 +4696,6 @@ name = "tiny_skia_render"
 version = "0.1.0"
 dependencies = [
  "parley",
- "parley_dev",
  "skrifa 0.37.0",
  "tiny-skia",
 ]
