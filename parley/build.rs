@@ -1,4 +1,4 @@
-//! Doco
+//! Builds ICU4X data providers for Parley (via `unicode_data`).
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
