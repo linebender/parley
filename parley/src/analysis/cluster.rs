@@ -7,7 +7,6 @@ const MAX_CLUSTER_SIZE: usize = 32;
 pub(crate) struct CharCluster {
     pub chars: Vec<Char>,
     pub is_emoji: bool,
-    pub len: u8,
     pub map_len: u8,
     pub start: u32,
     pub end: u32,
@@ -89,7 +88,6 @@ impl CharCluster {
     pub(crate) fn clear(&mut self) {
         self.chars.clear();
         self.is_emoji = false;
-        self.len = 0;
         self.map_len = 0;
         self.start = 0;
         self.end = 0;
@@ -98,6 +96,10 @@ impl CharCluster {
         self.decomp.clear();
         self.form = FormKind::Original;
         self.best_ratio = 0.;
+    }
+
+    fn len(&self) -> usize {
+        self.chars.len()
     }
 
     /// Returns the primary style index for the cluster.
@@ -117,7 +119,7 @@ impl CharCluster {
 
                 // Create a string from the original characters to normalize
                 scratch_string.clear();
-                for ch in &self.chars[..self.len as usize] {
+                for ch in &self.chars[..self.len()] {
                     scratch_string.push(ch.ch);
                 }
 
@@ -227,7 +229,7 @@ impl CharCluster {
         analysis_data_sources: &AnalysisDataSources,
         scratch_string: &mut String,
     ) -> Status {
-        let len = self.len;
+        let len = self.len();
         if len == 0 {
             return Status::Complete;
         }
@@ -249,7 +251,7 @@ impl CharCluster {
             }
         }
         ratio = Mapper {
-            chars: &mut self.chars[..self.len as usize],
+            chars: &mut self.chars[..len],
             map_len: self.map_len.max(1),
         }
         .map(&f, &mut glyph_ids, self.best_ratio);
