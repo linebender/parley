@@ -1,22 +1,20 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use icu_locale_core::LanguageIdentifier;
 use icu_properties::props::Script;
-use icu_provider::prelude::icu_locale_core::LanguageIdentifier;
 
 pub(crate) fn script_to_fontique(script: Script) -> fontique::Script {
     fontique::Script(*FONTIQUE_SCRIPT_TAGS.get(script.to_icu4c_value() as usize).unwrap_or(b"Zzzz"))
 }
 
-pub(crate) fn script_to_harfrust(script: Script) -> harfrust::Script {
-    harfrust::Script::from_iso15924_tag(harfrust::Tag::new(
-        FONTIQUE_SCRIPT_TAGS.get(script.to_icu4c_value() as usize).unwrap_or(b"Zzzz"),
-    ))
-        .unwrap_or(harfrust::script::UNKNOWN)
-}
-
 pub(crate) fn locale_to_fontique(locale: LanguageIdentifier) -> Option<fontique::Language> {
     fontique::Language::try_from_utf8(locale.to_string().as_bytes()).ok()
+}
+
+pub(crate) fn script_to_harfrust(script: fontique::Script) -> harfrust::Script {
+    harfrust::Script::from_iso15924_tag(harfrust::Tag::new(&script.0))
+        .unwrap_or(harfrust::script::UNKNOWN)
 }
 
 #[rustfmt::skip]

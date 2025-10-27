@@ -14,12 +14,13 @@ use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
 use crate::analysis::cluster::{Char, CharCluster, Status};
 use crate::analysis::{AnalysisDataSources, CharInfo};
+use crate::icu_convert::script_to_harfrust;
 use crate::inline_box::InlineBox;
 use crate::lru_cache::LruCache;
 use crate::util::nearly_eq;
 use crate::{FontData, icu_convert};
+use icu_locale_core::LanguageIdentifier;
 use icu_properties::props::Script;
-use icu_provider::prelude::icu_locale_core::LanguageIdentifier;
 
 use fontique::{self, Query, QueryFamily, QueryFont};
 
@@ -275,12 +276,13 @@ fn shape_item<'a, B: Brush>(
     let item_text = &text[text_range.clone()];
     let item_infos = &infos[char_range.start..char_range.end]; // Only process current item
     let first_style_index = item_infos[0].1;
+    let fb_script = icu_convert::script_to_fontique(item.script);
     let mut font_selector = FontSelector::new(
         fq,
         rcx,
         styles,
         first_style_index,
-        item.script,
+        fb_script,
         item.locale.clone(),
     );
 
@@ -382,7 +384,7 @@ fn shape_item<'a, B: Brush>(
         } else {
             harfrust::Direction::LeftToRight
         };
-        let script = icu_convert::script_to_harfrust(item.script);
+        let hb_script = script_to_harfrust(fb_script);
         let language = item
             .locale
             .as_ref()
@@ -406,7 +408,7 @@ fn shape_item<'a, B: Brush>(
                 font.font.index,
                 &font.font.synthesis,
                 direction,
-                script,
+                hb_script,
                 language.clone(),
                 &scx.features,
                 rcx.variations(item.variations),
@@ -415,7 +417,7 @@ fn shape_item<'a, B: Brush>(
                 harfrust::ShapePlan::new(
                     &harf_shaper,
                     direction,
-                    Some(script),
+                    Some(hb_script),
                     language.as_ref(),
                     &scx.features,
                 )
@@ -441,7 +443,7 @@ fn shape_item<'a, B: Brush>(
 
         buffer.set_direction(direction);
 
-        buffer.set_script(script);
+        buffer.set_script(hb_script);
 
         if let Some(lang) = language {
             buffer.set_language(lang);
@@ -518,7 +520,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         rcx: &'a ResolveContext,
         styles: &'a [RangedStyle<B>],
         style_index: u16,
-        script: Script,
+        fb_script: fontique::Script,
         locale: Option<LanguageIdentifier>,
     ) -> Self {
         let style = &styles[style_index as usize].style;
@@ -533,7 +535,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         let features = rcx.features(style.font_features).unwrap_or(&[]);
         query.set_families(fonts.iter().copied());
 
-        let fb_script = icu_convert::script_to_fontique(script);
         let fb_language = locale.and_then(icu_convert::locale_to_fontique);
         query.set_fallbacks(fontique::FallbackKey::new(fb_script, fb_language.as_ref()));
         query.set_attributes(attrs);

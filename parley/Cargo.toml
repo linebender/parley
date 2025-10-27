@@ -34,8 +34,7 @@ accesskit = { workspace = true, optional = true }
 hashbrown = { workspace = true }
 harfrust = { workspace = true }
 icu_collections = { workspace = true }
-# Used in ICU4X baked data sources, which depend on compiled data, but just locale fallback rules.
-icu_locale = { workspace = true }
+icu_locale_core = { workspace = true }
 icu_normalizer = { workspace = true }
 icu_properties = { workspace = true, features = ["unicode_bidi"] }
 icu_provider = { workspace = true }
