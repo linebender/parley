@@ -38,14 +38,28 @@ impl<B: Brush> RangedStyleBuilder<B> {
     }
 
     /// Change a property of the root style, which covers the full range of text.
+    ///
+    /// # Panics
+    ///
+    /// If [`begin`](Self::begin) has not been called before using this method.
     pub(crate) fn push_default(&mut self, property: ResolvedProperty<B>) {
-        assert!(self.len != !0);
+        assert!(
+            self.len != !0,
+            "Internal error: Must call `begin` before setting properties on a `RangedStyleBuilder`."
+        );
         self.root_style.apply(property);
     }
 
     /// Override a property for the specified range of text.
+    ///
+    /// # Panics
+    ///
+    /// If [`begin`](Self::begin) has not been called before using this method.
     pub(crate) fn push(&mut self, property: ResolvedProperty<B>, range: impl RangeBounds<usize>) {
-        assert!(self.len != !0);
+        assert!(
+            self.len != !0,
+            "Internal error: Must call `begin` before setting properties on a `RangedStyleBuilder`."
+        );
         let range = resolve_range(range, self.len);
         self.properties.push(RangedProperty { property, range });
     }
