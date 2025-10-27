@@ -42,18 +42,22 @@ impl ClusterData {
     pub(crate) const LIGATURE_COMPONENT: u16 = 2;
     pub(crate) const DIVERGENT_STYLES: u16 = 4;
 
+    #[inline(always)]
     pub(crate) fn is_ligature_start(self) -> bool {
         self.flags & Self::LIGATURE_START != 0
     }
 
+    #[inline(always)]
     pub(crate) fn is_ligature_component(self) -> bool {
         self.flags & Self::LIGATURE_COMPONENT != 0
     }
 
+    #[inline(always)]
     pub(crate) fn has_divergent_styles(self) -> bool {
         self.flags & Self::DIVERGENT_STYLES != 0
     }
 
+    #[inline(always)]
     pub(crate) fn text_range(self, run: &RunData) -> Range<usize> {
         let start = run.text_range.start + self.text_offset as usize;
         start..start + self.text_len as usize
