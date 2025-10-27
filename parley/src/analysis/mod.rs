@@ -1,7 +1,5 @@
 pub(crate) mod cluster;
 mod provider;
-#[cfg(test)]
-mod tests;
 
 use crate::analysis::provider::{COMPOSITE_BLOB, PROVIDER};
 use crate::resolve::RangedStyle;
@@ -108,7 +106,7 @@ impl AnalysisDataSources {
     }
 }
 
-type BidiLevel = u8;
+pub(crate) type BidiLevel = u8;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CharInfo {
