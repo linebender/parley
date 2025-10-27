@@ -370,7 +370,7 @@ impl TestEnv {
         // We special-case android targets because oxipng doesn't build in Android CI.
         #[cfg(target_os = "android")]
         fn save_image(_image: &Pixmap, _path: &PathBuf, _max_size: Option<usize>) {
-            panic!("Saving screenshots is not supported on wasm targets");
+            panic!("Saving screenshots is not supported on Android targets");
         }
 
         // Max size a screenshot can have, in bytes.
