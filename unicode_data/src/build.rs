@@ -11,6 +11,7 @@ use icu_properties::{
     },
 };
 use icu_provider::prelude::*;
+use icu_provider::prelude::icu_locale_core::locale;
 use icu_provider_adapters::fork::ForkByMarkerProvider;
 use icu_provider_export::{
     DataLocaleFamily, DeduplicationStrategy, ExportDriver, blob_exporter::BlobExporter,
@@ -180,7 +181,7 @@ pub fn bake(out: std::path::PathBuf) {
     let custom_source_provider = CompositePropsProvider::new(icu4x_source_provider.clone());
 
     ExportDriver::new(
-        [DataLocaleFamily::FULL],
+        [DataLocaleFamily::single(locale!("en").into())],
         DeduplicationStrategy::Maximal.into(),
         LocaleFallbacker::new_without_data(),
     )
@@ -210,7 +211,7 @@ pub fn bake(out: std::path::PathBuf) {
     let blob_path = out.clone().join("composite.postcard");
 
     ExportDriver::new(
-        [DataLocaleFamily::FULL],
+        [DataLocaleFamily::single(locale!("en").into())],
         DeduplicationStrategy::None.into(),
         LocaleFallbacker::new_without_data(),
     )

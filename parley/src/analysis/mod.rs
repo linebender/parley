@@ -345,7 +345,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
             let iter = [second.unwrap(), third.unwrap()].into_iter().chain(lb_iter);
 
             line_boundary_positions.extend(iter);
-            // Remove the unnescessary boundary at the end added by ICU4X.
+            // Remove the unnecessary boundary at the end added by ICU4X.
             line_boundary_positions.pop();
             break;
         }
