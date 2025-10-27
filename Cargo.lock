@@ -1993,7 +1993,6 @@ dependencies = [
  "displaydoc",
  "icu_collections",
  "icu_locale_core",
- "icu_locale_data",
  "icu_provider",
  "potential_utf",
  "serde",
@@ -2015,12 +2014,6 @@ dependencies = [
  "writeable",
  "zerovec",
 ]
-
-[[package]]
-name = "icu_locale_data"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fdef0c124749d06a743c69e938350816554eb63ac979166590e2b4ee4252765"
 
 [[package]]
 name = "icu_normalizer"
@@ -3354,7 +3347,7 @@ dependencies = [
  "harfrust",
  "hashbrown 0.15.5",
  "icu_collections",
- "icu_locale",
+ "icu_locale_core",
  "icu_normalizer",
  "icu_properties",
  "icu_provider",

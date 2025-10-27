@@ -3,9 +3,8 @@
 
 use crate::analysis::AnalysisDataSources;
 
+use icu_locale_core::LanguageIdentifier;
 use icu_properties::props::Script;
-use icu_provider::prelude::icu_locale_core::LanguageIdentifier;
-
 
 pub(crate) fn script_to_fontique(
     script: Script,

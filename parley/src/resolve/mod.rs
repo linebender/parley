@@ -21,7 +21,7 @@ use crate::{LineBreakWordOption, LineHeight, OverflowWrap, layout};
 use core::borrow::Borrow;
 use core::ops::Range;
 use fontique::FamilyId;
-use icu_provider::prelude::icu_locale_core::LanguageIdentifier;
+use icu_locale_core::LanguageIdentifier;
 
 /// Style with an associated range.
 #[derive(Debug, Clone)]

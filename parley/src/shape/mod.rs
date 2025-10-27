@@ -9,8 +9,8 @@ use core::ops::RangeInclusive;
 
 use alloc::vec::Vec;
 
+use icu_locale_core::LanguageIdentifier;
 use icu_properties::props::Script;
-use icu_provider::prelude::icu_locale_core::LanguageIdentifier;
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
