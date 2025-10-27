@@ -216,11 +216,10 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
             }
 
             while let Some(style) = self.styles.next() {
+                // Empty style ranges are disallowed.
+                assert!(style.range.start < style.range.end);
+
                 let style_start_index = style.range.start;
-                if style_start_index == style.range.end {
-                    // Skip empty style ranges
-                    continue;
-                }
                 let mut prev_char_index = self.current_char_index;
 
                 // Find the character at the style boundary
