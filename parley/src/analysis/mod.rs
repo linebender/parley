@@ -383,7 +383,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
 
     // Merge boundaries - line takes precedence over word
     let mut lb_iter = line_boundary_positions.iter().peekable();
-    let boundary_iter = text.char_indices().map(|(byte_pos, _)| {
+    let boundary_iter = text.char_indices().map(|(byte_pos, ch)| {
         // advance any stale word boundary positions
         while let Some(&w) = wb_iter.peek() {
             if w < byte_pos {
@@ -415,7 +415,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
             }
         }
 
-        boundary
+        (boundary, ch)
     });
 
     let composite = lcx.analysis_data_sources.composite();
@@ -424,7 +424,6 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
 
     lcx.info.reserve(text.len());
     boundary_iter
-        .zip(text.chars())
         // Shift line break data forward one, as line boundaries corresponding with line-breaking
         // characters (like '\n') exist at an index position one higher than the respective
         // character's index, but we need our iterators to align, and the rest are simply
