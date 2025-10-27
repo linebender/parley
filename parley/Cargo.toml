@@ -39,7 +39,6 @@ icu_normalizer = { workspace = true }
 icu_properties = { workspace = true, features = ["unicode_bidi"] }
 icu_provider = { workspace = true }
 icu_provider_blob = { workspace = true }
-icu_provider_adapters = { version = "2.0.0", default-features = false }
 icu_segmenter = { workspace = true, features = ["auto"] }
 unicode-bidi = { workspace = true, features = ["smallvec"] }
 # Used in ICU4X baked data sources

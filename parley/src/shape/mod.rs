@@ -224,7 +224,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
 // for the given grapheme `segment_text`, consuming items from `item_infos_iter`.
 fn fill_cluster_in_place(
     segment_text: &str,
-    item_infos_iter: &mut core::slice::Iter<(CharInfo, u16)>,
+    item_infos_iter: &mut core::slice::Iter<'_, (CharInfo, u16)>,
     code_unit_offset_in_string: &mut usize,
     char_cluster: &mut CharCluster,
 ) {

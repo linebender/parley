@@ -4,19 +4,11 @@ mod provider;
 use crate::analysis::provider::{COMPOSITE_BLOB, PROVIDER};
 use crate::resolve::RangedStyle;
 use crate::{Brush, LayoutContext};
-use icu_collections::codepointtrie::TrieValue;
 use icu_normalizer::{
     ComposingNormalizer, ComposingNormalizerBorrowed, DecomposingNormalizer,
     DecomposingNormalizerBorrowed,
 };
-use icu_properties::props::{
-    BasicEmoji, BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak,
-    LineBreak, RegionalIndicator, Script, VariationSelector,
-};
-use icu_properties::{
-    CodePointMapData, CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed,
-    EmojiSetData, EmojiSetDataBorrowed,
-};
+use icu_properties::props::{GeneralCategory, GraphemeClusterBreak, Script};
 use icu_provider::DataMarker;
 use icu_provider::buf::AsDeserializingBufferProvider;
 use icu_provider::{DataRequest, DataResponse, DynamicDataProvider};
@@ -172,32 +164,32 @@ impl CharInfo {
     }
 
     #[inline(always)]
-    pub fn is_variation_selector(&self) -> bool {
+    pub(crate) fn is_variation_selector(&self) -> bool {
         self.flags & Self::VARIATION_SELECTOR_MASK != 0
     }
 
     #[inline(always)]
-    pub fn is_region_indicator(&self) -> bool {
+    pub(crate) fn is_region_indicator(&self) -> bool {
         self.flags & Self::REGION_INDICATOR_MASK != 0
     }
 
     #[inline(always)]
-    pub fn is_control(&self) -> bool {
+    pub(crate) fn is_control(&self) -> bool {
         self.flags & Self::CONTROL_MASK != 0
     }
 
     #[inline(always)]
-    pub fn is_emoji_or_pictograph(&self) -> bool {
+    pub(crate) fn is_emoji_or_pictograph(&self) -> bool {
         self.flags & Self::EMOJI_OR_PICTOGRAPH_MASK != 0
     }
 
     #[inline(always)]
-    pub fn contributes_to_shaping(&self) -> bool {
+    pub(crate) fn contributes_to_shaping(&self) -> bool {
         self.flags & Self::CONTRIBUTES_TO_SHAPING_MASK != 0
     }
 
     #[inline(always)]
-    pub fn force_normalize(&self) -> bool {
+    pub(crate) fn force_normalize(&self) -> bool {
         self.flags & Self::FORCE_NORMALIZE_MASK != 0
     }
 }

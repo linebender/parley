@@ -86,31 +86,7 @@ pub(crate) enum Status {
 }
 
 impl CharCluster {
-    pub(crate) fn new(
-        chars: Vec<Char>,
-        is_emoji: bool,
-        len: u8,
-        map_len: u8,
-        start: u32,
-        end: u32,
-        force_normalize: bool,
-    ) -> Self {
-        CharCluster {
-            chars,
-            is_emoji,
-            len,
-            map_len,
-            start,
-            end,
-            force_normalize,
-            comp: Form::new(),
-            decomp: Form::new(),
-            form: FormKind::Original,
-            best_ratio: 0.,
-        }
-    }
-
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.chars.clear();
         self.is_emoji = false;
         self.len = 0;
@@ -343,10 +319,10 @@ enum FormState {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Form {
-    pub chars: Vec<Char>,
-    pub len: u8,
-    pub map_len: u8,
-    pub state: FormState,
+    chars: Vec<Char>,
+    len: u8,
+    map_len: u8,
+    state: FormState,
 }
 
 impl Default for Form {
@@ -438,11 +414,3 @@ impl<'a> Mapper<'a> {
         ratio
     }
 }
-
-const DEFAULT_CHAR: Char = Char {
-    ch: ' ',
-    is_control_character: false,
-    contributes_to_shaping: true,
-    glyph_id: 0,
-    style_index: 0,
-};
