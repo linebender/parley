@@ -9,9 +9,9 @@ type StyleProperty<Brush> = crate::StyleProperty<'static, Brush>;
 /// A long-lived collection of [`StyleProperties`](super::StyleProperty), containing at
 /// most one of each property.
 ///
-/// This is used by [`PlainEditor`](crate::editor::PlainEditor) to provide a reasonably ergonomic
+/// This is used by [`PlainEditor`](crate::editing::PlainEditor) to provide a reasonably ergonomic
 /// mutable API for styles applied to all text managed by it.
-/// This can be accessed using [`PlainEditor::edit_styles`](crate::editor::PlainEditor::edit_styles).
+/// This can be accessed using [`PlainEditor::edit_styles`](crate::editing::PlainEditor::edit_styles).
 ///
 /// These styles do not have a corresponding range, and are generally unsuited for rich text.
 #[derive(Clone, Debug)]
@@ -25,7 +25,7 @@ impl<Brush: crate::Brush> StyleSet<Brush> {
     /// The font size will be `font_size`, and can be overwritten at runtime by
     /// [inserting](Self::insert) a new [`FontSize`](crate::StyleProperty::FontSize).
     pub fn new(font_size: f32) -> Self {
-        let mut this = Self(Default::default());
+        let mut this = Self(HashMap::default());
         this.insert(StyleProperty::FontSize(font_size));
         this
     }

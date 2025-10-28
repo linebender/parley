@@ -15,7 +15,7 @@ use super::style::{Brush, FontFeature, FontVariation};
 use crate::inline_box::InlineBox;
 use crate::lru_cache::LruCache;
 use crate::util::nearly_eq;
-use crate::{Font, swash_convert};
+use crate::{FontData, swash_convert};
 
 use fontique::{self, Query, QueryFamily, QueryFont};
 use swash::text::cluster::{CharCluster, CharInfo, Token};
@@ -390,7 +390,7 @@ fn shape_item<'a, B: Brush>(
 
         // Push harfrust-shaped run for the entire segment
         layout.data.push_run(
-            Font::new(font.font.blob.clone(), font.font.index),
+            FontData::new(font.font.blob.clone(), font.font.index),
             item.size,
             font.font.synthesis,
             &glyph_buffer,
@@ -465,8 +465,8 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         let features = rcx.features(style.font_features).unwrap_or(&[]);
         query.set_families(fonts.iter().copied());
 
-        let fb_script = crate::swash_convert::script_to_fontique(script);
-        let fb_language = locale.and_then(crate::swash_convert::locale_to_fontique);
+        let fb_script = swash_convert::script_to_fontique(script);
+        let fb_language = locale.and_then(swash_convert::locale_to_fontique);
         query.set_fallbacks(fontique::FallbackKey::new(fb_script, fb_language.as_ref()));
         query.set_attributes(attrs);
 

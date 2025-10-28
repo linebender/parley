@@ -10,13 +10,10 @@ mod run;
 
 pub(crate) mod data;
 
-pub mod cursor;
-pub mod editor;
-
 use self::alignment::align;
 
-use super::style::Brush;
-use crate::{Font, InlineBox, OverflowWrap};
+use crate::style::Brush;
+use crate::{FontData, InlineBox, OverflowWrap};
 #[cfg(feature = "accesskit")]
 use accesskit::{Node, NodeId, Role, TextDirection, TreeUpdate};
 use alignment::unjustify;
@@ -31,12 +28,15 @@ use swash::text::cluster::Boundary;
 
 pub use alignment::AlignmentOptions;
 pub use cluster::{Affinity, ClusterPath, ClusterSide};
-pub use cursor::{Cursor, Selection};
 pub use data::BreakReason;
 pub(crate) use line::LineItem;
 pub use line::greedy::BreakLines;
 pub use line::{GlyphRun, LineMetrics, PositionedInlineBox, PositionedLayoutItem};
 pub use run::RunMetrics;
+
+// TODO - Deprecation not yet active to ease internal code migration.
+#[deprecated(since = "TBD", note = "Access from the `editing` module instead.")]
+pub use crate::editing::{Cursor, Selection};
 
 /// Alignment of a layout.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
@@ -235,7 +235,7 @@ impl<B: Brush> Layout<B> {
 impl<B: Brush> Default for Layout<B> {
     fn default() -> Self {
         Self {
-            data: Default::default(),
+            data: LayoutData::default(),
         }
     }
 }
@@ -253,9 +253,9 @@ pub struct Run<'a, B: Brush> {
 /// Atomic unit of text.
 #[derive(Copy, Clone)]
 pub struct Cluster<'a, B: Brush> {
-    path: ClusterPath,
-    run: Run<'a, B>,
-    data: &'a ClusterData,
+    pub(crate) path: ClusterPath,
+    pub(crate) run: Run<'a, B>,
+    pub(crate) data: &'a ClusterData,
 }
 
 /// Glyph with an offset and advance.
@@ -290,12 +290,12 @@ pub(crate) enum LayoutLineHeight {
 }
 
 impl LayoutLineHeight {
-    pub(crate) fn resolve(&self, run: &RunData) -> f32 {
+    pub(crate) fn resolve(self, run: &RunData) -> f32 {
         match self {
             Self::MetricsRelative(value) => {
                 (run.metrics.ascent + run.metrics.descent + run.metrics.leading) * value
             }
-            Self::Absolute(value) => *value,
+            Self::Absolute(value) => value,
         }
     }
 }

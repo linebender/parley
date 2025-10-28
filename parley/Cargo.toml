@@ -1,6 +1,6 @@
 [package]
 name = "parley"
-version = "0.5.0"
+version = "0.6.0"
 description = "Parley provides an API for implementing rich text layout."
 keywords = ["text", "layout"]
 categories = ["gui", "graphics"]
@@ -38,3 +38,7 @@ harfrust = { workspace = true }
 parley_dev = { workspace = true }
 peniko = { workspace = true }
 tiny-skia = "0.11.4"
+
+# We special-case android targets because oxipng doesn't build in Android CI.
+[target.'cfg(not(target_os = "android"))'.dev-dependencies]
+oxipng = { version = "9.1.5", default-features = false, features = ["freestanding"] }

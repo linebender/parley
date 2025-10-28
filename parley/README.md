@@ -13,7 +13,7 @@
 </div>
 
 Parley provides an API for implementing rich text layout.
-It is backed by [Swash](https://github.com/dfrg/swash).
+It is backed by [HarfRust](https://github.com/harfbuzz/harfrust) for text shaping.
 
 ## Minimum supported Rust Version (MSRV)
 

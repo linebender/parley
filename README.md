@@ -13,18 +13,10 @@
 </div>
 
 Parley provides an API for implementing rich text layout.
-It is backed by [Swash](https://github.com/dfrg/swash).
 
 ## The Parley text stack
 
-Currently, Parley directly depends on five crates: Fontique, HarfRust, Swash, Skrifa, and Peniko.
-These crates cover different pieces of the text-rendering process.
-
-### Peniko
-
-Peniko builds on top of [kurbo](https://crates.io/crates/kurbo) and provides vocabulary types for 2D rendering.
-
-Peniko mostly just exports types like `Blob`, `Color`, `Gradient`, `Brush`, `Point`, `Rect`, `Vec2`, etc.
+Parley has four key dependencies: Fontique, HarfRust, Skrifa, and Swash. These crates cover different pieces of the text-rendering process.
 
 ### Fontique
 

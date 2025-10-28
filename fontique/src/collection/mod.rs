@@ -80,7 +80,7 @@ impl Collection {
     pub fn new(options: CollectionOptions) -> Self {
         Self {
             inner: Inner::new(options),
-            query_state: Default::default(),
+            query_state: query::QueryState::default(),
         }
     }
 
@@ -210,7 +210,7 @@ impl Collection {
 
 impl Default for Collection {
     fn default() -> Self {
-        Self::new(Default::default())
+        Self::new(CollectionOptions::default())
     }
 }
 
@@ -236,7 +236,7 @@ impl Inner {
             data: CommonData::default(),
             shared,
             shared_version: 0,
-            fallback_cache: Default::default(),
+            fallback_cache: FallbackCache::default(),
         }
     }
 
@@ -632,7 +632,7 @@ impl CommonData {
         data: Blob<u8>,
         info_override: Option<FontInfoOverride<'_>>,
     ) -> Vec<(FamilyId, Vec<FontInfo>)> {
-        let mut families: HashMap<FamilyId, (FamilyName, Vec<FontInfo>)> = Default::default();
+        let mut families: HashMap<FamilyId, (FamilyName, Vec<FontInfo>)> = HashMap::default();
         let mut family_name = String::default();
         let data_id = SourceId::new();
         super::scan::scan_memory(data.as_ref(), |scanned_font| {
@@ -673,7 +673,7 @@ impl CommonData {
             let name = self.family_names.get_or_insert(family_name);
             families
                 .entry(name.id())
-                .or_insert_with(|| (name, Default::default()))
+                .or_insert_with(|| (name, Vec::default()))
                 .1
                 .push(font);
         });
@@ -713,7 +713,7 @@ impl CommonData {
     }
 
     fn clear(&mut self) {
-        *self = Default::default();
+        *self = Self::default();
     }
 }
 

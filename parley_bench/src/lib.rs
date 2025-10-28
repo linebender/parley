@@ -13,7 +13,7 @@ use std::{
 
 use parley::{
     FontContext, FontFamily, LayoutContext,
-    fontique::{Blob, Collection, CollectionOptions},
+    fontique::{Blob, Collection, CollectionOptions, SourceCache},
 };
 
 pub mod benches;
@@ -53,7 +53,7 @@ pub(crate) fn create_font_context() -> FontContext {
     }
     FontContext {
         collection,
-        source_cache: Default::default(),
+        source_cache: SourceCache::default(),
     }
 }
 

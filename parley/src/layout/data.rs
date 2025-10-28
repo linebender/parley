@@ -5,7 +5,7 @@ use crate::inline_box::InlineBox;
 use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::nearly_zero;
-use crate::{Font, OverflowWrap};
+use crate::{FontData, OverflowWrap};
 use core::ops::Range;
 
 use swash::text::cluster::{Boundary, Whitespace};
@@ -75,33 +75,33 @@ impl ClusterInfo {
     }
 
     // Returns the boundary type of the cluster.
-    pub(crate) fn boundary(&self) -> Boundary {
+    pub(crate) fn boundary(self) -> Boundary {
         self.boundary
     }
 
     // Returns the whitespace type of the cluster.
-    pub(crate) fn whitespace(&self) -> Whitespace {
+    pub(crate) fn whitespace(self) -> Whitespace {
         to_whitespace(self.source_char)
     }
 
     /// Returns if the cluster is a line boundary.
-    pub(crate) fn is_boundary(&self) -> bool {
+    pub(crate) fn is_boundary(self) -> bool {
         self.boundary != Boundary::None
     }
 
     /// Returns if the cluster is an emoji.
-    pub(crate) fn is_emoji(&self) -> bool {
+    pub(crate) fn is_emoji(self) -> bool {
         // TODO: Defer to ICU4X properties (see: https://docs.rs/icu/latest/icu/properties/props/struct.Emoji.html).
         matches!(self.source_char as u32, 0x1F600..=0x1F64F | 0x1F300..=0x1F5FF | 0x1F680..=0x1F6FF | 0x2600..=0x26FF | 0x2700..=0x27BF)
     }
 
     /// Returns if the cluster is any whitespace.
-    pub(crate) fn is_whitespace(&self) -> bool {
+    pub(crate) fn is_whitespace(self) -> bool {
         self.source_char.is_whitespace()
     }
 
     #[cfg(test)]
-    pub(crate) fn source_char(&self) -> char {
+    pub(crate) fn source_char(self) -> char {
         self.source_char
     }
 }
@@ -303,7 +303,7 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) width: f32,
     pub(crate) full_width: f32,
     pub(crate) height: f32,
-    pub(crate) fonts: Vec<Font>,
+    pub(crate) fonts: Vec<FontData>,
     pub(crate) coords: Vec<i16>,
 
     // Input (/ output of style resolution)
@@ -391,7 +391,7 @@ impl<B: Brush> LayoutData<B> {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn push_run(
         &mut self,
-        font: Font,
+        font: FontData,
         font_size: f32,
         synthesis: fontique::Synthesis,
         glyph_buffer: &harfrust::GlyphBuffer,
@@ -641,7 +641,7 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
     let mut cluster_glyph_offset: u32 = 0;
     let start_cluster_id = glyph_infos.first().unwrap().cluster;
     let mut cluster_id = start_cluster_id;
-    let mut char_info = &char_infos[cluster_id as usize];
+    let mut char_info = char_infos[cluster_id as usize];
     let mut run_advance = 0.0;
     let mut cluster_advance = 0.0;
     // If the current cluster might be a single-glyph, zero-offset cluster, we defer
@@ -732,8 +732,8 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
                         break;
                     }
                     let char_info_ = match direction {
-                        Direction::Ltr => &char_infos[(cluster_id + i) as usize],
-                        Direction::Rtl => &char_infos[(cluster_id + num_components - i) as usize],
+                        Direction::Ltr => char_infos[(cluster_id + i) as usize],
+                        Direction::Rtl => char_infos[(cluster_id + num_components - i) as usize],
                     };
                     push_cluster(
                         clusters,
@@ -752,7 +752,7 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
             cluster_advance = 0.0;
             last_cluster_id = cluster_id;
             cluster_id = glyph_info.cluster;
-            char_info = &char_infos[cluster_id as usize];
+            char_info = char_infos[cluster_id as usize];
             pending_inline_glyph = None;
         }
 
@@ -815,8 +815,8 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
                     break;
                 }
                 let component_char_info = match direction {
-                    Direction::Ltr => &char_infos[(cluster_id + i) as usize],
-                    Direction::Rtl => &char_infos[(cluster_id + num_components - i) as usize],
+                    Direction::Ltr => char_infos[(cluster_id + i) as usize],
+                    Direction::Rtl => char_infos[(cluster_id + num_components - i) as usize],
                 };
                 push_cluster(
                     clusters,
@@ -894,7 +894,7 @@ impl From<&ClusterType> for u16 {
 
 fn push_cluster(
     clusters: &mut Vec<ClusterData>,
-    char_info: &(swash::text::cluster::CharInfo, u16),
+    char_info: (swash::text::cluster::CharInfo, u16),
     cluster_start_char: (usize, char),
     glyph_offset: u32,
     advance: f32,
