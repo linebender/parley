@@ -42,18 +42,22 @@ impl ClusterData {
     pub(crate) const LIGATURE_COMPONENT: u16 = 2;
     pub(crate) const DIVERGENT_STYLES: u16 = 4;
 
+    #[inline(always)]
     pub(crate) fn is_ligature_start(self) -> bool {
         self.flags & Self::LIGATURE_START != 0
     }
 
+    #[inline(always)]
     pub(crate) fn is_ligature_component(self) -> bool {
         self.flags & Self::LIGATURE_COMPONENT != 0
     }
 
+    #[inline(always)]
     pub(crate) fn has_divergent_styles(self) -> bool {
         self.flags & Self::DIVERGENT_STYLES != 0
     }
 
+    #[inline(always)]
     pub(crate) fn text_range(self, run: &RunData) -> Range<usize> {
         let start = run.text_range.start + self.text_offset as usize;
         start..start + self.text_len as usize
@@ -208,37 +212,6 @@ impl LineItemData {
     #[inline(always)]
     pub(crate) fn is_rtl(&self) -> bool {
         self.bidi_level & 1 != 0
-    }
-
-    pub(crate) fn compute_line_height<B: Brush>(&self, layout: &LayoutData<B>) -> f32 {
-        match self.kind {
-            LayoutItemKind::TextRun => {
-                let mut line_height = 0_f32;
-                let run = &layout.runs[self.index];
-                let glyph_start = run.glyph_start;
-                for cluster in &layout.clusters[run.cluster_range.clone()] {
-                    if cluster.glyph_len != 0xFF && cluster.has_divergent_styles() {
-                        let start = glyph_start + cluster.glyph_offset as usize;
-                        let end = start + cluster.glyph_len as usize;
-                        for glyph in &layout.glyphs[start..end] {
-                            line_height = line_height
-                                .max(layout.styles[glyph.style_index()].line_height.resolve(run));
-                        }
-                    } else {
-                        line_height = line_height.max(
-                            layout.styles[cluster.style_index as usize]
-                                .line_height
-                                .resolve(run),
-                        );
-                    }
-                }
-                line_height
-            }
-            LayoutItemKind::InlineBox => {
-                // TODO: account for vertical alignment (e.g. baseline alignment)
-                layout.inline_boxes[self.index].height
-            }
-        }
     }
 
     /// If the item is a text run

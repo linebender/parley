@@ -290,11 +290,9 @@ pub(crate) enum LayoutLineHeight {
 }
 
 impl LayoutLineHeight {
-    pub(crate) fn resolve(self, run: &RunData) -> f32 {
+    pub(crate) fn resolve(self, run_height: f32) -> f32 {
         match self {
-            Self::MetricsRelative(value) => {
-                (run.metrics.ascent + run.metrics.descent + run.metrics.leading) * value
-            }
+            Self::MetricsRelative(value) => run_height * value,
             Self::Absolute(value) => value,
         }
     }

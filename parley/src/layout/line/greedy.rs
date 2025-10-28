@@ -10,7 +10,8 @@ use swash::text::cluster::Whitespace;
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 
-use crate::OverflowWrap;
+use crate::data::{ClusterData, RunData};
+use crate::{Cluster, OverflowWrap};
 use crate::layout::{
     Boundary, BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -66,6 +67,9 @@ struct BreakerState {
     /// Use of f64 here is important. f32 causes test failures due to accumulated error
     committed_y: f64,
 
+
+    running_line_height: f32,
+
     line: LineState,
     prev_boundary: Option<PrevBoundaryState>,
     emergency_boundary: Option<PrevBoundaryState>,
@@ -111,6 +115,10 @@ impl BreakerState {
             state: self.line.clone(),
         });
     }
+
+    fn add_line_height(&mut self, height: f32) {
+        self.running_line_height = self.running_line_height.max(height);
+    }
 }
 
 /// Line breaking support for a paragraph.
@@ -146,8 +154,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         self.state.line.x = 0.;
         self.state.prev_boundary = None; // Added by Nico
         self.state.emergency_boundary = None;
+        let line_height = self.state.running_line_height;
+        self.state.running_line_height = 0.;
 
-        self.finish_line(self.lines.lines.len() - 1);
+        self.finish_line(self.lines.lines.len() - 1, line_height);
         self.last_line_data()
     }
 
@@ -234,11 +244,15 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         // We can always line break after an inline box
                         self.state.mark_line_break_opportunity();
+
+                        self.state.add_line_height(inline_box.height);
+
                     } else {
                         // If we're at the start of the line, this box will never fit, so consume it and accept the overflow.
                         if self.state.line.x == 0.0 {
                             // println!("BOX EMERGENCY BREAK");
                             self.state.append_inline_box_to_line(next_x);
+                            self.state.add_line_height(inline_box.height);
                             if try_commit_line!(BreakReason::Emergency) {
                                 self.state.item_idx += 1;
                                 return self.start_new_line();
@@ -287,6 +301,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             if try_commit_line!(BreakReason::Explicit) {
                                 // TODO: can this be hoisted out of the conditional?
                                 self.state.cluster_idx += 1;
+                                self.state.add_line_height(cluster_height(&self.layout.data, cluster.data, &run.data));
                                 return self.start_new_line();
                             }
                         } else if
@@ -298,6 +313,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.state.mark_emergency_break_opportunity();
                         }
 
+                        let mut line_height = cluster_height(&self.layout.data, cluster.data, &run.data);
+
                         // If current cluster is the start of a ligature, then advance state to include
                         // the remaining clusters that make up the ligature
                         let mut advance = cluster.advance();
@@ -308,6 +325,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 } else {
                                     advance += cluster.advance();
                                     self.state.cluster_idx += 1;
+                                    line_height = line_height.max(cluster_height(&self.layout.data, cluster.data, &run.data));
                                 }
                             }
                         }
@@ -325,6 +343,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         if next_x <= max_advance {
                             self.state.append_cluster_to_line(next_x);
                             self.state.cluster_idx += 1;
+                            self.state.add_line_height(line_height);
                             if is_space {
                                 self.state.line.num_spaces += 1;
                             }
@@ -337,6 +356,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 if try_commit_line!(BreakReason::Regular) {
                                     // TODO: can this be hoisted out of the conditional?
                                     self.state.cluster_idx += 1;
+                                    self.state.add_line_height(line_height);
                                     return self.start_new_line();
                                 }
                             }
@@ -350,6 +370,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                                 // Q: Why do we revert the line state here, but only revert the indexes if the commit succeeds?
                                 self.state.line = prev.state;
+                                self.state.add_line_height(line_height);
                                 if try_commit_line!(BreakReason::Regular) {
                                     // Revert boundary state to prev state
                                     self.state.item_idx = prev.item_idx;
@@ -375,6 +396,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             } else {
                                 self.state.append_cluster_to_line(next_x);
                                 self.state.cluster_idx += 1;
+                                self.state.add_line_height(line_height);
                             }
                         }
                     }
@@ -438,7 +460,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
     }
 
-    fn finish_line(&mut self, line_idx: usize) {
+    fn finish_line(&mut self, line_idx: usize, line_height: f32) {
         let prev_line_metrics = match line_idx {
             0 => None,
             idx => Some(self.lines.lines[idx - 1].metrics),
@@ -498,7 +520,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     }
 
                     let run = &self.layout.data.runs[line_item.index];
-                    let line_height = line_item.compute_line_height(&self.layout.data);
                     line.metrics.line_height = line.metrics.line_height.max(line_height);
 
                     // Compute the run's advance by summing the advances of its constituent clusters
@@ -914,4 +935,25 @@ fn reorder_line_items(runs: &mut [LineItemData]) {
             i += 1;
         }
     }
+}
+
+fn cluster_height<B: Brush>(layout: &LayoutData<B>, cluster: &ClusterData, run: &RunData) -> f32 {
+    let mut height: f32 = 0.;
+    let glyph_start = run.glyph_start;
+    let run_height = run.metrics.ascent + run.metrics.descent + run.metrics.leading;
+    if cluster.glyph_len != 0xFF && cluster.has_divergent_styles() {
+        let start = glyph_start + cluster.glyph_offset as usize;
+        let end = start + cluster.glyph_len as usize;
+        for glyph in &layout.glyphs[start..end] {
+            height = height
+                .max(layout.styles[glyph.style_index()].line_height.resolve(run_height));
+        }
+    } else {
+        height = height.max(
+            layout.styles[cluster.style_index as usize]
+                .line_height
+                .resolve(run_height),
+        );
+    }
+    height
 }
