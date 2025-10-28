@@ -34,7 +34,8 @@ pub use line::greedy::BreakLines;
 pub use line::{GlyphRun, LineMetrics, PositionedInlineBox, PositionedLayoutItem};
 pub use run::RunMetrics;
 
-// TODO - Remove
+// TODO - Deprecation not yet active to ease internal code migration.
+#[deprecated(since="TBD", note="Access from the `editing` module instead.")]
 pub use crate::editing::{Cursor, Selection};
 
 /// Alignment of a layout.
