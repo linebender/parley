@@ -18,21 +18,44 @@ workspace = true
 
 [features]
 default = ["system"]
-std = ["fontique/std", "harfrust/std", "peniko/std", "skrifa/std", "swash/std"]
-libm = ["fontique/libm", "peniko/libm", "skrifa/libm", "swash/libm", "dep:core_maths"]
+std = ["fontique/std", "harfrust/std", "peniko/std", "skrifa/std"]
+libm = ["fontique/libm", "peniko/libm", "skrifa/libm", "dep:core_maths"]
 # Enables support for system font backends
 system = ["std", "fontique/system"]
 accesskit = ["dep:accesskit"]
 
 [dependencies]
-swash = { workspace = true }
 skrifa = { workspace = true }
 linebender_resource_handle = { workspace = true }
 fontique = { workspace = true }
 core_maths = { version = "0.1.1", optional = true }
+unicode_data = { workspace = true }
 accesskit = { workspace = true, optional = true }
 hashbrown = { workspace = true }
 harfrust = { workspace = true }
+icu_collections = { workspace = true }
+icu_locale_core = { workspace = true }
+icu_normalizer = { workspace = true }
+icu_properties = { workspace = true, features = ["unicode_bidi"] }
+icu_provider = { workspace = true }
+icu_provider_blob = { workspace = true }
+icu_segmenter = { workspace = true, features = ["auto"] }
+unicode-bidi = { workspace = true, features = ["smallvec"] }
+# Used in ICU4X baked data sources
+zerovec = { workspace = true }
+
+[build-dependencies]
+icu_normalizer = { workspace = true }
+icu_properties = { workspace = true }
+icu_provider = { workspace = true }
+icu = { version = "2" }
+databake = { version = "0.1", features = ["derive"] }
+icu_provider_export = { version = "2", features = ["baked_exporter", "blob_exporter"] }
+icu_provider_source = { workspace = true }
+icu_segmenter = { workspace = true }
+unicode_data = { workspace = true, features = ["build"] }
+icu_codepointtrie_builder = { version = "0.5.0", features = ["wasm"] }
+icu_provider_adapters = { version = "2.0.0", features = ["export"] }
 
 [dev-dependencies]
 parley_dev = { workspace = true }

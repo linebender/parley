@@ -16,7 +16,7 @@ Parley provides an API for implementing rich text layout.
 
 ## The Parley text stack
 
-Parley has four key dependencies: Fontique, HarfRust, Skrifa, and Swash. These crates cover different pieces of the text-rendering process.
+Parley has four key dependencies: Fontique, HarfRust, Skrifa, and ICU4X. These crates cover different pieces of the text-rendering process.
 
 ### Fontique
 
@@ -45,9 +45,10 @@ It is built on top of the [read-fonts](https://github.com/googlefonts/fontations
 Skrifa provides higher level metrics on top of read-fonts.
 Notably it converts the raw glyph representations in font files into scaled, hinted vector paths suitable for rasterisation.
 
-### Swash
+### ICU4X
 
-Within the context of Parley, Swash implements [some miscellaneous Unicode-related features](https://github.com/dfrg/swash#text-analysis).
+ICU4X enables text analysis and internationalisation. For Parley, this includes locale and language recognition, 
+bidirectional text evaluation, text segmentation, emoji recognition, NFC/NFD normalisation and other Unicode character information.
 
 ### Parley
 

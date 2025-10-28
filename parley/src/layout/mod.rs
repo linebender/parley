@@ -27,7 +27,6 @@ use data::{ClusterData, LayoutData, LayoutItem, LayoutItemKind, LineData, LineIt
 use fontique::Synthesis;
 #[cfg(feature = "accesskit")]
 use hashbrown::{HashMap, HashSet};
-use swash::text::cluster::Boundary;
 
 pub use alignment::AlignmentOptions;
 pub use cluster::{Affinity, ClusterPath, ClusterSide};

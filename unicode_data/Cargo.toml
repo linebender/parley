@@ -1,0 +1,43 @@
+[package]
+name = "unicode_data"
+keywords = ["text", "layout"]
+categories = ["gui", "graphics"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[features]
+default = ["build"]
+build = [
+    "icu_provider_source",
+    "icu_codepointtrie_builder",
+    "icu_provider_export",
+    "icu_normalizer",
+    "icu_segmenter",
+    "icu_provider_adapters",
+]
+
+[dependencies]
+icu_locale = { workspace = true }
+icu_properties = { workspace = true, features = ["datagen"] }
+icu_collections = { workspace = true, features = ["databake", "serde"] }
+icu_provider = { workspace = true }
+icu_provider_source = { workspace = true, optional = true }
+yoke = { workspace = true }
+zerofrom = { workspace = true }
+unicode-bidi = { workspace = true, features = ["smallvec"] }
+icu_normalizer = { workspace = true, optional = true }
+icu_segmenter = { workspace = true, optional = true }
+icu_provider_export = { workspace = true, features = [
+    "baked_exporter",
+    "blob_exporter",
+], optional = true }
+serde = { workspace = true, features = ["derive"] }
+databake = { workspace = true, features = ["derive"] }
+icu_codepointtrie_builder = { workspace = true, features = ["wasm"], optional = true }
+icu_provider_adapters = { workspace = true, features = ["export"], optional = true }
+
+[lints]
+workspace = true

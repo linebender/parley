@@ -10,12 +10,11 @@ mod styleset;
 use alloc::borrow::Cow;
 
 pub use brush::*;
+pub use icu_segmenter::options::LineBreakWordOption;
 pub use font::{
-    FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontVariation, FontWeight,
-    FontWidth, GenericFamily,
+    FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontWeight, FontWidth, FontVariation, GenericFamily,
 };
 pub use styleset::StyleSet;
-pub use swash::text::WordBreakStrength;
 
 use crate::{LayoutLineHeight, util::nearly_eq};
 
@@ -32,7 +31,7 @@ pub enum WhiteSpaceCollapse {
 #[repr(u8)]
 pub enum OverflowWrap {
     /// Even with extremely long words, lines can only break at places specified in
-    /// [`WordBreakStrength`].
+    /// [`LineBreakWordOption`].
     #[default]
     Normal,
     /// Words may be broken at an arbitrary point if there are no other places in the line to break
@@ -137,7 +136,7 @@ pub enum StyleProperty<'a, B: Brush> {
     /// Extra spacing between letters.
     LetterSpacing(f32),
     /// Control over where words can wrap.
-    WordBreak(WordBreakStrength),
+    WordBreak(LineBreakWordOption),
     /// Control over "emergency" line-breaking.
     OverflowWrap(OverflowWrap),
 }
@@ -186,7 +185,7 @@ pub struct TextStyle<'a, B: Brush> {
     /// Extra spacing between letters.
     pub letter_spacing: f32,
     /// Control over where words can wrap.
-    pub word_break: WordBreakStrength,
+    pub word_break: LineBreakWordOption,
     /// Control over "emergency" line-breaking.
     pub overflow_wrap: OverflowWrap,
 }
@@ -214,7 +213,7 @@ impl<B: Brush> Default for TextStyle<'_, B> {
             line_height: LineHeight::default(),
             word_spacing: 0.0,
             letter_spacing: 0.0,
-            word_break: WordBreakStrength::default(),
+            word_break: LineBreakWordOption::default(),
             overflow_wrap: OverflowWrap::default(),
         }
     }
