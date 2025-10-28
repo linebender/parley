@@ -3,14 +3,6 @@
 
 //! A simple plain text editor and related types.
 
-use crate::{
-    BoundingBox, FontContext, LayoutContext, StyleProperty, StyleSet,
-    layout::{
-        Affinity, Alignment, AlignmentOptions, Layout,
-        cursor::{Cursor, Selection},
-    },
-    style::Brush,
-};
 use alloc::{borrow::ToOwned, string::String, vec::Vec};
 use core::{
     cmp::PartialEq,
@@ -19,6 +11,11 @@ use core::{
     num::NonZeroUsize,
     ops::Range,
 };
+
+use crate::editing::{Cursor, Selection};
+use crate::layout::{Affinity, Alignment, AlignmentOptions, Layout};
+use crate::style::Brush;
+use crate::{BoundingBox, FontContext, LayoutContext, StyleProperty, StyleSet};
 
 #[cfg(feature = "accesskit")]
 use crate::layout::LayoutAccessibility;
