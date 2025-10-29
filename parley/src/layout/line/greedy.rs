@@ -11,7 +11,7 @@ use swash::text::cluster::Whitespace;
 use core_maths::CoreFloat;
 
 use crate::data::{ClusterData, RunData};
-use crate::{Cluster, OverflowWrap};
+use crate::OverflowWrap;
 use crate::layout::{
     Boundary, BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -47,6 +47,7 @@ struct PrevBoundaryState {
     run_idx: usize,
     cluster_idx: usize,
     state: LineState,
+    running_line_height: f32,
 }
 
 #[derive(Clone, Default)]
@@ -102,6 +103,7 @@ impl BreakerState {
             run_idx: self.run_idx,
             cluster_idx: self.cluster_idx,
             state: self.line.clone(),
+            running_line_height: self.running_line_height,
         });
     }
 
@@ -113,6 +115,7 @@ impl BreakerState {
             run_idx: self.run_idx,
             cluster_idx: self.cluster_idx,
             state: self.line.clone(),
+            running_line_height: self.running_line_height,
         });
     }
 
@@ -371,7 +374,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                                 // Q: Why do we revert the line state here, but only revert the indexes if the commit succeeds?
                                 self.state.line = prev.state;
-                                self.state.add_line_height(line_height);
+                                self.state.running_line_height = prev.running_line_height;
                                 if try_commit_line!(BreakReason::Regular) {
                                     // Revert boundary state to prev state
                                     self.state.item_idx = prev.item_idx;
@@ -386,6 +389,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 self.state.emergency_boundary.take()
                             {
                                 self.state.line = prev_emergency.state;
+                                self.state.running_line_height = prev_emergency.running_line_height;
                                 if try_commit_line!(BreakReason::Emergency) {
                                     // Revert boundary state to prev state
                                     self.state.item_idx = prev_emergency.item_idx;
