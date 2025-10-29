@@ -445,10 +445,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         };
         let line = &mut self.lines.lines[line_idx];
 
-        // Whether metrics should be quantized to pixel boundaries
-        let quantize = self.layout.data.quantize;
-        let y = self.state.committed_y;
-
         // Reset metrics for line
         line.metrics.ascent = 0.;
         line.metrics.descent = 0.;
@@ -481,9 +477,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     have_metrics = true;
                 }
                 LayoutItemKind::TextRun => {
-                    // Compute text run whitespace properties
-                    //   - Determine if it consists entirely of whitespace (`is_whitespace` property)
-                    //   - Determine if it has trailing whitespace (`has_trailing_whitespace` property)
                     line_item.compute_whitespace_properties(&self.layout.data);
 
                     // Compute the text range for the line
@@ -598,6 +591,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.leading =
             line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
 
+        // Whether metrics should be quantized to pixel boundaries
+        let quantize = self.layout.data.quantize;
+
         let (ascent, descent) = if quantize {
             // We mimic Chrome in rounding ascent and descent separately,
             // before calculating the rest.
@@ -621,6 +617,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             (line.metrics.leading * 0.5, line.metrics.leading * 0.5)
         };
 
+        let y = self.state.committed_y;
         line.metrics.baseline =
             ascent + leading_above + if quantize { y.round() as f32 } else { y as f32 };
 
