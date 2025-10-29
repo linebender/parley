@@ -244,8 +244,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // println!("BOX FITS");
 
                         self.state.item_idx += 1;
-                        self.state.append_inline_box_to_line(next_x);
                         self.state.add_line_height(inline_box.height);
+                        self.state.append_inline_box_to_line(next_x);
 
                         // We can always line break after an inline box
                         self.state.mark_line_break_opportunity();
@@ -254,9 +254,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         if self.state.line.x == 0.0 {
                             // println!("BOX EMERGENCY BREAK");
                             self.state.append_inline_box_to_line(next_x);
-                            self.state.add_line_height(inline_box.height);
                             if try_commit_line!(BreakReason::Emergency) {
                                 self.state.item_idx += 1;
+                                self.state.add_line_height(inline_box.height);
                                 return self.start_new_line();
                             }
                         } else {
