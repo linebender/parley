@@ -306,7 +306,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 self.state.add_line_height(cluster_height(
                                     &self.layout.data,
                                     cluster.data,
-                                    &run.data,
+                                    run.data,
                                 ));
                                 return self.start_new_line();
                             }
@@ -320,7 +320,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         }
 
                         let mut line_height =
-                            cluster_height(&self.layout.data, cluster.data, &run.data);
+                            cluster_height(&self.layout.data, cluster.data, run.data);
 
                         // If current cluster is the start of a ligature, then advance state to include
                         // the remaining clusters that make up the ligature
@@ -335,7 +335,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     line_height = line_height.max(cluster_height(
                                         &self.layout.data,
                                         cluster.data,
-                                        &run.data,
+                                        run.data,
                                     ));
                                 }
                             }
