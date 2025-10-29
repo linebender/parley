@@ -67,7 +67,7 @@ struct BreakerState {
     /// Use of f64 here is important. f32 causes test failures due to accumulated error
     committed_y: f64,
 
-
+    /// Of the line currently being built, the maximum line height seen so far.
     running_line_height: f32,
 
     line: LineState,
@@ -116,6 +116,7 @@ impl BreakerState {
         });
     }
 
+    #[inline(always)]
     fn add_line_height(&mut self, height: f32) {
         self.running_line_height = self.running_line_height.max(height);
     }
@@ -241,11 +242,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         self.state.item_idx += 1;
                         self.state.append_inline_box_to_line(next_x);
+                        self.state.add_line_height(inline_box.height);
 
                         // We can always line break after an inline box
                         self.state.mark_line_break_opportunity();
 
-                        self.state.add_line_height(inline_box.height);
 
                     } else {
                         // If we're at the start of the line, this box will never fit, so consume it and accept the overflow.
@@ -474,6 +475,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.offset = 0.;
         line.text_range.start = usize::MAX;
 
+        line.metrics.line_height = line_height;
+
         if line.item_range.is_empty() {
             line.text_range = self.layout.data.text_len..self.layout.data.text_len;
         }
@@ -493,7 +496,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // Default vertical alignment is to align the bottom of boxes with the text baseline.
                     // This is equivalent to the entire height of the box being "ascent"
                     line.metrics.ascent = line.metrics.ascent.max(item.height);
-                    line.metrics.line_height = line.metrics.line_height.max(item.height);
 
                     // Mark us as having seen non-whitespace content on this line
                     have_metrics = true;
@@ -512,9 +514,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         needs_reorder = true;
                     }
 
-                    let run = &self.layout.data.runs[line_item.index];
-                    line.metrics.line_height = line.metrics.line_height.max(line_height);
-
                     // Compute the run's advance by summing the advances of its constituent clusters
                     line_item.advance = self.layout.data.clusters[line_item.cluster_range.clone()]
                         .iter()
@@ -528,6 +527,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     }
 
                     // Compute the run's vertical metrics
+                    let run = &self.layout.data.runs[line_item.index];
                     line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent);
                     line.metrics.descent = line.metrics.descent.max(run.metrics.descent);
 
@@ -937,19 +937,18 @@ fn reorder_line_items(runs: &mut [LineItemData]) {
 fn cluster_height<B: Brush>(layout: &LayoutData<B>, cluster: &ClusterData, run: &RunData) -> f32 {
     let mut height: f32 = 0.;
     let glyph_start = run.glyph_start;
-    let run_height = run.metrics.ascent + run.metrics.descent + run.metrics.leading;
     if cluster.glyph_len != 0xFF && cluster.has_divergent_styles() {
         let start = glyph_start + cluster.glyph_offset as usize;
         let end = start + cluster.glyph_len as usize;
         for glyph in &layout.glyphs[start..end] {
             height = height
-                .max(layout.styles[glyph.style_index()].line_height.resolve(run_height));
+                .max(layout.styles[glyph.style_index()].line_height.resolve(run));
         }
     } else {
         height = height.max(
             layout.styles[cluster.style_index as usize]
                 .line_height
-                .resolve(run_height),
+                .resolve(run),
         );
     }
     height
