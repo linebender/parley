@@ -89,18 +89,13 @@ jobs:
       - name: Run taplo fmt
         run: taplo fmt --check --diff
 
-      - name: install ripgrep
-        run: |
-          sudo apt update
-          sudo apt install ripgrep
+      - name: Install ripgrep+cargo-rdme
+        uses: taiki-e/install-action@v2
+        with:
+          tool: ripgrep@15.1.0,cargo-rdme@1.4.8
 
       - name: check copyright headers
         run: bash .github/copyright.sh
-
-      - name: Install cargo-rdme
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-rdme@1.4.8
 
       - name: Run cargo rdme (attributed_text)
         run: cargo rdme --check --heading-base-level=0 --workspace-project=attributed_text
