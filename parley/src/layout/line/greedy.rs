@@ -10,8 +10,8 @@ use swash::text::cluster::Whitespace;
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 
-use crate::data::{ClusterData, RunData};
 use crate::OverflowWrap;
+use crate::data::{ClusterData, RunData};
 use crate::layout::{
     Boundary, BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -249,8 +249,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         // We can always line break after an inline box
                         self.state.mark_line_break_opportunity();
-
-
                     } else {
                         // If we're at the start of the line, this box will never fit, so consume it and accept the overflow.
                         if self.state.line.x == 0.0 {
@@ -305,7 +303,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             if try_commit_line!(BreakReason::Explicit) {
                                 // TODO: can this be hoisted out of the conditional?
                                 self.state.cluster_idx += 1;
-                                self.state.add_line_height(cluster_height(&self.layout.data, cluster.data, &run.data));
+                                self.state.add_line_height(cluster_height(
+                                    &self.layout.data,
+                                    cluster.data,
+                                    &run.data,
+                                ));
                                 return self.start_new_line();
                             }
                         } else if
@@ -317,7 +319,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.state.mark_emergency_break_opportunity();
                         }
 
-                        let mut line_height = cluster_height(&self.layout.data, cluster.data, &run.data);
+                        let mut line_height =
+                            cluster_height(&self.layout.data, cluster.data, &run.data);
 
                         // If current cluster is the start of a ligature, then advance state to include
                         // the remaining clusters that make up the ligature
@@ -329,7 +332,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 } else {
                                     advance += cluster.advance();
                                     self.state.cluster_idx += 1;
-                                    line_height = line_height.max(cluster_height(&self.layout.data, cluster.data, &run.data));
+                                    line_height = line_height.max(cluster_height(
+                                        &self.layout.data,
+                                        cluster.data,
+                                        &run.data,
+                                    ));
                                 }
                             }
                         }
@@ -938,22 +945,19 @@ fn reorder_line_items(runs: &mut [LineItemData]) {
     }
 }
 
+/// Compute the height of a cluster, taking into account divergent styles.
 fn cluster_height<B: Brush>(layout: &LayoutData<B>, cluster: &ClusterData, run: &RunData) -> f32 {
-    let mut height: f32 = 0.;
-    let glyph_start = run.glyph_start;
     if cluster.glyph_len != 0xFF && cluster.has_divergent_styles() {
-        let start = glyph_start + cluster.glyph_offset as usize;
+        let mut height: f32 = 0.;
+        let start = run.glyph_start + cluster.glyph_offset as usize;
         let end = start + cluster.glyph_len as usize;
         for glyph in &layout.glyphs[start..end] {
-            height = height
-                .max(layout.styles[glyph.style_index()].line_height.resolve(run));
+            height = height.max(layout.styles[glyph.style_index()].line_height.resolve(run));
         }
+        height
     } else {
-        height = height.max(
-            layout.styles[cluster.style_index as usize]
-                .line_height
-                .resolve(run),
-        );
+        layout.styles[cluster.style_index as usize]
+            .line_height
+            .resolve(run)
     }
-    height
 }
