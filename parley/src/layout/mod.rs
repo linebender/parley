@@ -12,6 +12,7 @@ mod line;
 mod line_break;
 mod run;
 
+#[expect(clippy::module_inception, reason = "TODO - rename parent module")]
 mod layout;
 
 pub(crate) mod data;
