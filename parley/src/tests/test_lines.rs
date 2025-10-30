@@ -558,11 +558,7 @@ fn lines_line_height_metrics_relative() {
     let mut layout = builder.build(TEXT);
 
     layout.break_all_lines(None);
-    layout.align(
-        None,
-        crate::Alignment::Start,
-        crate::AlignmentOptions::default(),
-    );
+    layout.align(crate::Alignment::Start, crate::AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -576,11 +572,7 @@ fn lines_line_height_size_relative() {
     let mut layout = builder.build(TEXT);
 
     layout.break_all_lines(None);
-    layout.align(
-        None,
-        crate::Alignment::Start,
-        crate::AlignmentOptions::default(),
-    );
+    layout.align(crate::Alignment::Start, crate::AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -594,10 +586,6 @@ fn lines_line_height_absolute() {
     let mut layout = builder.build(TEXT);
 
     layout.break_all_lines(None);
-    layout.align(
-        None,
-        crate::Alignment::Start,
-        crate::AlignmentOptions::default(),
-    );
+    layout.align(crate::Alignment::Start, crate::AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
