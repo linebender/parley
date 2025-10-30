@@ -1,8 +1,24 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::{BreakReason, Brush, Cluster, Glyph, Layout, Line, LineItem, Range, Run, Style, data};
+use crate::layout::Style;
+use crate::layout::data::BreakReason;
+use crate::layout::data::ClusterData;
+use crate::layout::glyph::Glyph;
+use crate::layout::layout::Layout;
+use crate::layout::line::{Line, LineItem};
+use crate::layout::run::Run;
+use crate::style::Brush;
+use core::ops::Range;
 use swash::text::cluster::Whitespace;
+
+/// Atomic unit of text.
+#[derive(Copy, Clone)]
+pub struct Cluster<'a, B: Brush> {
+    pub(crate) path: ClusterPath,
+    pub(crate) run: Run<'a, B>,
+    pub(crate) data: &'a ClusterData,
+}
 
 /// Defines the visual side of the cluster for hit testing.
 ///
@@ -388,7 +404,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
         Some(offset)
     }
 
-    pub(crate) fn info(&self) -> &data::ClusterInfo {
+    pub(crate) fn info(&self) -> &super::data::ClusterInfo {
         &self.data.info
     }
 
