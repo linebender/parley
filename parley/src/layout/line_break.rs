@@ -744,7 +744,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.block_min_coord = line.metrics.baseline - ascent - leading_above.max(0.);
         line.metrics.block_max_coord = line.metrics.baseline + descent + leading_below.max(0.);
 
-        let max_advance = if self.state.line_max_advance.is_finite() {
+        let max_advance = if self.state.line_max_advance < f32::MAX {
             self.state.line_max_advance
         } else {
             line.metrics.advance - line.metrics.trailing_whitespace
@@ -770,7 +770,7 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
 
         // If laying out with infinite width constraint, then set all lines' "max_width"
         // to the measured width of the longest line.
-        if self.state.layout_max_advance == f32::INFINITY {
+        if self.state.layout_max_advance >= f32::MAX {
             self.layout.data.alignment_width = full_width;
             for line in &mut self.lines.lines {
                 line.metrics.inline_max_coord = line.metrics.inline_min_coord + width;
