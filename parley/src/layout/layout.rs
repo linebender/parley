@@ -35,6 +35,11 @@ impl<B: Brush> Layout<B> {
         &self.data.styles
     }
 
+    /// Returns available width of the layout.
+    pub fn available_width(&self) -> f32 {
+        self.data.alignment_width
+    }
+
     /// Returns the width of the layout.
     pub fn width(&self) -> f32 {
         self.data.width
