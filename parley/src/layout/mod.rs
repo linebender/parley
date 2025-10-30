@@ -12,7 +12,11 @@ mod line;
 mod line_break;
 mod run;
 
-#[expect(clippy::module_inception, reason = "TODO - rename parent module")]
+// TODO - Add to allowed lint set?
+#[expect(
+    clippy::module_inception,
+    reason = "Private inner module for code organisation"
+)]
 mod layout;
 
 pub(crate) mod data;
