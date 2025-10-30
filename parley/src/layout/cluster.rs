@@ -53,8 +53,29 @@ impl<'a, B: Brush> Cluster<'a, B> {
         None
     }
 
-    /// Returns the cluster and side for the given layout and point.
+    /// Returns the cluster and side which is at the specified position in the given layout. If no cluster is
+    /// under the specified point then None will be returned.
+    ///
+    /// This is usually the expected behaviour when hit-testing clusters for "hover" or "click" functionality.
+    pub fn from_point_exact(layout: &'a Layout<B>, x: f32, y: f32) -> Option<(Self, ClusterSide)> {
+        Cluster::from_point_impl(layout, x, y, true)
+    }
+
+    /// Returns the cluster and side which is at the specified position in the given layout. If no cluster is
+    /// under the specified point but the point is within the overall layout area then it will return the nearest.
+    ///
+    /// This is usually the expected behaviour when hit-testing clusers for text selection or caret positioning.
     pub fn from_point(layout: &'a Layout<B>, x: f32, y: f32) -> Option<(Self, ClusterSide)> {
+        Cluster::from_point_impl(layout, x, y, false)
+    }
+
+    /// Returns the cluster and side for the given layout and point.
+    fn from_point_impl(
+        layout: &'a Layout<B>,
+        x: f32,
+        y: f32,
+        exact: bool,
+    ) -> Option<(Self, ClusterSide)> {
         let mut path = ClusterPath::default();
         if let Some((line_index, line)) = layout.line_for_offset(y) {
             path.line_index = line_index as u32;
@@ -67,7 +88,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
                         let run_advance = run.advance();
                         path.run_index = run.index;
                         path.logical_index = 0;
-                        if x > offset + run_advance && !is_last_run {
+                        if x > offset + run_advance && (exact || !is_last_run) {
                             offset += run_advance;
                             continue;
                         }
@@ -79,7 +100,10 @@ impl<'a, B: Brush> Cluster<'a, B> {
                             let cluster_advance = cluster.advance();
                             let edge = offset;
                             offset += cluster_advance;
-                            if x > offset && !is_last_cluster {
+                            if x > offset && (exact || !is_last_cluster) {
+                                continue;
+                            }
+                            if x < edge && exact {
                                 continue;
                             }
                             let side = if x <= edge + cluster_advance * 0.5 {
@@ -96,7 +120,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
                 }
             }
         }
-        if y <= 0.0 {
+        if y <= 0.0 && !exact {
             Some((path.cluster(layout)?, ClusterSide::Left))
         } else {
             None
