@@ -744,8 +744,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.block_min_coord = line.metrics.baseline - ascent - leading_above.max(0.);
         line.metrics.block_max_coord = line.metrics.baseline + descent + leading_below.max(0.);
 
+        let max_advance = if self.state.line_max_advance.is_finite() {
+            self.state.line_max_advance
+        } else {
+            line.metrics.advance
+        };
+
         line.metrics.inline_min_coord = self.state.line_x;
-        line.metrics.inline_max_coord = self.state.line_x + self.state.line_max_advance;
+        line.metrics.inline_max_coord = self.state.line_x + max_advance;
     }
 }
 
