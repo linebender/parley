@@ -547,7 +547,7 @@ impl Selection {
             if line_ix == line_start_ix || line_ix == line_end_ix {
                 // We only need to run the expensive logic on the first and
                 // last lines
-                let mut start_x = metrics.offset as f64;
+                let mut start_x = metrics.offset as f64 + metrics.inline_min_coord as f64;
                 let mut cur_x = start_x;
                 let mut cluster_count = 0;
                 let mut box_advance = 0.0;
@@ -598,7 +598,7 @@ impl Selection {
                     );
                 }
             } else {
-                let x = metrics.offset as f64;
+                let x = metrics.offset as f64 + metrics.inline_min_coord as f64;
                 let width = metrics.advance as f64;
                 f(
                     BoundingBox::new(x, line_min, x + width + newline_whitespace, line_max),
