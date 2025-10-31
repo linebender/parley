@@ -300,9 +300,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 // break_opportunity = true;
                             }
                         } else if is_newline {
-                            let line_height = cluster.height(&self.layout.data);
-                            self.state
-                                .append_cluster_to_line(self.state.line.x, line_height);
+                            self.state.append_cluster_to_line(
+                                self.state.line.x,
+                                run.metrics().line_height,
+                            );
                             if try_commit_line!(BreakReason::Explicit) {
                                 // TODO: can this be hoisted out of the conditional?
                                 self.state.cluster_idx += 1;
@@ -317,7 +318,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.state.mark_emergency_break_opportunity();
                         }
 
-                        let mut line_height = cluster.height(&self.layout.data);
+                        let line_height = run.metrics().line_height;
 
                         // If current cluster is the start of a ligature, then advance state to include
                         // the remaining clusters that make up the ligature
@@ -329,8 +330,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 } else {
                                     advance += cluster.advance();
                                     self.state.cluster_idx += 1;
-                                    line_height =
-                                        line_height.max(cluster.height(&self.layout.data));
                                 }
                             }
                         }
