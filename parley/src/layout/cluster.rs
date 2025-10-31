@@ -12,6 +12,8 @@ use crate::style::Brush;
 use core::ops::Range;
 use swash::text::cluster::Whitespace;
 
+use super::LayoutData;
+
 /// Atomic unit of text.
 #[derive(Copy, Clone)]
 pub struct Cluster<'a, B: Brush> {
@@ -436,6 +438,27 @@ impl<'a, B: Brush> Cluster<'a, B> {
     #[cfg(test)]
     pub(crate) fn text_len(&self) -> u8 {
         self.data.text_len
+    }
+
+    /// Compute the height of a cluster, taking into account divergent styles.
+    pub(crate) fn height(&self, layout: &LayoutData<B>) -> f32 {
+        if self.data.glyph_len != 0xFF && self.data.has_divergent_styles() {
+            let mut height: f32 = 0.;
+            let start = self.run.data.glyph_start + self.data.glyph_offset as usize;
+            let end = start + self.data.glyph_len as usize;
+            for glyph in &layout.glyphs[start..end] {
+                height = height.max(
+                    layout.styles[glyph.style_index()]
+                        .line_height
+                        .resolve(self.run.data),
+                );
+            }
+            height
+        } else {
+            layout.styles[self.data.style_index as usize]
+                .line_height
+                .resolve(self.run.data)
+        }
     }
 }
 

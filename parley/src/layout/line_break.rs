@@ -39,6 +39,9 @@ struct LineState {
     items: Range<usize>,
     clusters: Range<usize>,
     num_spaces: usize,
+    /// Of the line currently being built, the maximum line height seen so far.
+    /// This represents a lower-bound on the eventual line height of the line.
+    running_line_height: f32,
 }
 
 #[derive(Clone, Default)]
@@ -74,19 +77,21 @@ struct BreakerState {
 
 impl BreakerState {
     /// Add the cluster(s) currently being evaluated to the current line
-    fn append_cluster_to_line(&mut self, next_x: f32) {
+    fn append_cluster_to_line(&mut self, next_x: f32, clusters_height: f32) {
         self.line.items.end = self.item_idx + 1;
         self.line.clusters.end = self.cluster_idx + 1;
         self.line.x = next_x;
+        self.add_line_height(clusters_height);
         // Would like to add:
         // self.cluster_idx += 1;
     }
 
     /// Add inline box to line
-    fn append_inline_box_to_line(&mut self, next_x: f32) {
+    fn append_inline_box_to_line(&mut self, next_x: f32, box_height: f32) {
         // self.item_idx += 1;
         self.line.items.end += 1;
         self.line.x = next_x;
+        self.add_line_height(box_height);
         // Would like to add:
         // self.item_idx += 1;
     }
@@ -111,6 +116,11 @@ impl BreakerState {
             cluster_idx: self.cluster_idx,
             state: self.line.clone(),
         });
+    }
+
+    #[inline(always)]
+    fn add_line_height(&mut self, height: f32) {
+        self.line.running_line_height = self.line.running_line_height.max(height);
     }
 }
 
@@ -142,13 +152,16 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
     /// Reset state when a line has been committed
     fn start_new_line(&mut self) -> Option<(f32, f32)> {
+        let line_height = self.state.line.running_line_height;
+
         self.state.items = self.lines.line_items.len();
         self.state.lines = self.lines.lines.len();
         self.state.line.x = 0.;
+        self.state.line.running_line_height = 0.;
         self.state.prev_boundary = None; // Added by Nico
         self.state.emergency_boundary = None;
 
-        self.finish_line(self.lines.lines.len() - 1);
+        self.finish_line(self.lines.lines.len() - 1, line_height);
         self.last_line_data()
     }
 
@@ -231,7 +244,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // println!("BOX FITS");
 
                         self.state.item_idx += 1;
-                        self.state.append_inline_box_to_line(next_x);
+
+                        self.state
+                            .append_inline_box_to_line(next_x, inline_box.height);
 
                         // We can always line break after an inline box
                         self.state.mark_line_break_opportunity();
@@ -239,7 +254,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // If we're at the start of the line, this box will never fit, so consume it and accept the overflow.
                         if self.state.line.x == 0.0 {
                             // println!("BOX EMERGENCY BREAK");
-                            self.state.append_inline_box_to_line(next_x);
+                            self.state
+                                .append_inline_box_to_line(next_x, inline_box.height);
                             if try_commit_line!(BreakReason::Emergency) {
                                 self.state.item_idx += 1;
                                 return self.start_new_line();
@@ -284,7 +300,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 // break_opportunity = true;
                             }
                         } else if is_newline {
-                            self.state.append_cluster_to_line(self.state.line.x);
+                            let line_height = cluster.height(&self.layout.data);
+                            self.state
+                                .append_cluster_to_line(self.state.line.x, line_height);
                             if try_commit_line!(BreakReason::Explicit) {
                                 // TODO: can this be hoisted out of the conditional?
                                 self.state.cluster_idx += 1;
@@ -299,6 +317,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.state.mark_emergency_break_opportunity();
                         }
 
+                        let mut line_height = cluster.height(&self.layout.data);
+
                         // If current cluster is the start of a ligature, then advance state to include
                         // the remaining clusters that make up the ligature
                         let mut advance = cluster.advance();
@@ -309,6 +329,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 } else {
                                     advance += cluster.advance();
                                     self.state.cluster_idx += 1;
+                                    line_height =
+                                        line_height.max(cluster.height(&self.layout.data));
                                 }
                             }
                         }
@@ -324,7 +346,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         // If that x position does NOT exceed max_advance then we simply add the cluster(s) to the current line
                         if next_x <= max_advance {
-                            self.state.append_cluster_to_line(next_x);
+                            self.state.append_cluster_to_line(next_x, line_height);
                             self.state.cluster_idx += 1;
                             if is_space {
                                 self.state.line.num_spaces += 1;
@@ -334,7 +356,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         else {
                             // Handle case where cluster is space character. Hang overflowing whitespace.
                             if is_space {
-                                self.state.append_cluster_to_line(next_x);
+                                self.state.append_cluster_to_line(next_x, line_height);
                                 if try_commit_line!(BreakReason::Regular) {
                                     // TODO: can this be hoisted out of the conditional?
                                     self.state.cluster_idx += 1;
@@ -374,7 +396,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     return self.start_new_line();
                                 }
                             } else {
-                                self.state.append_cluster_to_line(next_x);
+                                self.state.append_cluster_to_line(next_x, line_height);
                                 self.state.cluster_idx += 1;
                             }
                         }
@@ -439,7 +461,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
     }
 
-    fn finish_line(&mut self, line_idx: usize) {
+    fn finish_line(&mut self, line_idx: usize, line_height: f32) {
         let prev_line_metrics = match line_idx {
             0 => None,
             idx => Some(self.lines.lines[idx - 1].metrics),
@@ -452,6 +474,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.leading = 0.;
         line.metrics.offset = 0.;
         line.text_range.start = usize::MAX;
+
+        line.metrics.line_height = line_height;
 
         if line.item_range.is_empty() {
             line.text_range = self.layout.data.text_len..self.layout.data.text_len;
@@ -472,7 +496,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // Default vertical alignment is to align the bottom of boxes with the text baseline.
                     // This is equivalent to the entire height of the box being "ascent"
                     line.metrics.ascent = line.metrics.ascent.max(item.height);
-                    line.metrics.line_height = line.metrics.line_height.max(item.height);
 
                     // Mark us as having seen non-whitespace content on this line
                     have_metrics = true;
@@ -491,10 +514,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         needs_reorder = true;
                     }
 
-                    let run = &self.layout.data.runs[line_item.index];
-                    let line_height = line_item.compute_line_height(&self.layout.data);
-                    line.metrics.line_height = line.metrics.line_height.max(line_height);
-
                     // Compute the run's advance by summing the advances of its constituent clusters
                     line_item.advance = self.layout.data.clusters[line_item.cluster_range.clone()]
                         .iter()
@@ -508,6 +527,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     }
 
                     // Compute the run's vertical metrics
+                    let run = &self.layout.data.runs[line_item.index];
                     line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent);
                     line.metrics.descent = line.metrics.descent.max(run.metrics.descent);
 
