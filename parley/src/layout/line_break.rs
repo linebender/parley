@@ -56,6 +56,8 @@ struct PrevBoundaryState {
 pub enum YieldData {
     /// Control flow was yielded because a line break was encountered
     LineBreak(LineBreakData),
+    /// Control flow was yielded because content on the line caused the line to exceed the max_height
+    MaxHeightExceeded(MaxHeightBreakData),
     /// Control flow was yielded because an inline box with `break_on_box` set
     /// to `true` was encountered
     InlineBoxBreak(BoxBreakData),
@@ -63,6 +65,11 @@ pub enum YieldData {
 
 pub struct LineBreakData {
     pub reason: BreakReason,
+    pub advance: f32,
+    pub line_height: f32,
+}
+
+pub struct MaxHeightBreakData {
     pub advance: f32,
     pub line_height: f32,
 }
@@ -75,7 +82,7 @@ pub struct BoxBreakData {
     pub advance: f32,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct BreakerState {
     /// The number of items that have been processed (used to revert state)
     items: usize,
@@ -99,10 +106,32 @@ pub struct BreakerState {
     layout_max_advance: f32,
     /// The max advance (max width) of the current line. This must be <= the `layout_max_advance`.
     line_max_advance: f32,
+    /// The max height available to the current line.
+    line_max_height: f32,
 
     line: LineState,
     prev_boundary: Option<PrevBoundaryState>,
     emergency_boundary: Option<PrevBoundaryState>,
+}
+
+impl Default for BreakerState {
+    fn default() -> Self {
+        Self {
+            items: 0,
+            lines: 0,
+            item_idx: 0,
+            run_idx: 0,
+            cluster_idx: 0,
+            line_x: 0.0,
+            line_y: 0.0,
+            layout_max_advance: 0.0,
+            line_max_advance: 0.0,
+            line_max_height: f32::MAX,
+            line: LineState::default(),
+            prev_boundary: None,
+            emergency_boundary: None,
+        }
+    }
 }
 
 impl BreakerState {
@@ -539,6 +568,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     self.state.line_y += line_break_data.line_height as f64;
                     continue;
                 }
+                YieldData::MaxHeightExceeded(_) => continue,
                 YieldData::InlineBoxBreak(_) => continue,
             }
         }
