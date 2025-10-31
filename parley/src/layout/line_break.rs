@@ -7,8 +7,8 @@ use alloc::vec::Vec;
 use swash::text::cluster::Whitespace;
 
 #[cfg(feature = "libm")]
-#[allow(unused_imports)]
-use core_maths::CoreFloat;
+#[cfg_attr(feature = "std", allow(unused_imports))]
+use core_maths::CoreFloat as _;
 
 use crate::OverflowWrap;
 use crate::layout::{

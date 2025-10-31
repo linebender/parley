@@ -12,10 +12,6 @@ use swash::text::cluster::{Boundary, Whitespace};
 
 use alloc::vec::Vec;
 
-#[cfg(feature = "libm")]
-#[allow(unused_imports)]
-use core_maths::CoreFloat;
-
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct ClusterData {
     pub(crate) info: ClusterInfo,
