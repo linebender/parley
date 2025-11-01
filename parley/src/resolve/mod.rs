@@ -476,7 +476,7 @@ impl<B: Brush> ResolvedStyle<B> {
             brush: self.brush.clone(),
             underline: self.underline.as_layout_decoration(&self.brush),
             strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
-            line_height: self.line_height.resolve(self.font_size),
+            line_height: self.line_height,
             overflow_wrap: self.overflow_wrap,
         }
     }

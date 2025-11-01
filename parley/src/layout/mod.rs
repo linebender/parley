@@ -32,7 +32,7 @@ pub use line::{GlyphRun, Line, LineMetrics, PositionedInlineBox, PositionedLayou
 pub use line_break::BreakLines;
 pub use run::{Run, RunMetrics};
 
-pub(crate) use data::{LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData, RunData};
+pub(crate) use data::{LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData};
 pub(crate) use line::LineItem;
 
 // TODO - Deprecation not yet active to ease internal code migration.
@@ -41,25 +41,8 @@ pub use crate::editing::{Cursor, Selection};
 
 // TODO - Move the following to `style` module and submodules.
 
-use crate::OverflowWrap;
 use crate::style::Brush;
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum LayoutLineHeight {
-    MetricsRelative(f32),
-    Absolute(f32),
-}
-
-impl LayoutLineHeight {
-    pub(crate) fn resolve(self, run: &RunData) -> f32 {
-        match self {
-            Self::MetricsRelative(value) => {
-                (run.metrics.ascent + run.metrics.descent + run.metrics.leading) * value
-            }
-            Self::Absolute(value) => value,
-        }
-    }
-}
+use crate::{LineHeight, OverflowWrap};
 
 #[allow(clippy::partial_pub_fields)]
 /// Style properties.
@@ -72,7 +55,7 @@ pub struct Style<B: Brush> {
     /// Strikethrough decoration.
     pub strikethrough: Option<Decoration<B>>,
     /// Partially resolved line height, either in in layout units or dependent on metrics
-    pub(crate) line_height: LayoutLineHeight,
+    pub(crate) line_height: LineHeight,
     /// Per-cluster overflow-wrap setting
     pub(crate) overflow_wrap: OverflowWrap,
 }

@@ -5,7 +5,7 @@ use crate::inline_box::InlineBox;
 use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::nearly_zero;
-use crate::{FontData, OverflowWrap};
+use crate::{FontData, LineHeight, OverflowWrap};
 use core::ops::Range;
 
 use swash::text::cluster::{Boundary, Whitespace};
@@ -40,7 +40,6 @@ pub(crate) struct ClusterData {
 impl ClusterData {
     pub(crate) const LIGATURE_START: u16 = 1;
     pub(crate) const LIGATURE_COMPONENT: u16 = 2;
-    pub(crate) const DIVERGENT_STYLES: u16 = 4;
 
     #[inline(always)]
     pub(crate) fn is_ligature_start(self) -> bool {
@@ -50,11 +49,6 @@ impl ClusterData {
     #[inline(always)]
     pub(crate) fn is_ligature_component(self) -> bool {
         self.flags & Self::LIGATURE_COMPONENT != 0
-    }
-
-    #[inline(always)]
-    pub(crate) fn has_divergent_styles(self) -> bool {
-        self.flags & Self::DIVERGENT_STYLES != 0
     }
 
     #[inline(always)]
@@ -369,6 +363,7 @@ impl<B: Brush> LayoutData<B> {
         synthesis: fontique::Synthesis,
         glyph_buffer: &harfrust::GlyphBuffer,
         bidi_level: u8,
+        style_index: u16,
         word_spacing: f32,
         letter_spacing: f32,
         source_text: &str,
@@ -413,6 +408,16 @@ impl<B: Brush> LayoutData<B> {
                     (metrics.ascent / 2.0, units_per_em / 18.0)
                 };
 
+            // Compute line height
+            let style = &self.styles[style_index as usize];
+            let line_height = match style.line_height {
+                LineHeight::Absolute(value) => value,
+                LineHeight::FontSizeRelative(value) => value * font_size,
+                LineHeight::MetricsRelative(value) => {
+                    (metrics.ascent - metrics.descent + metrics.leading) * value
+                }
+            };
+
             RunMetrics {
                 ascent: metrics.ascent,
                 descent: -metrics.descent,
@@ -421,6 +426,7 @@ impl<B: Brush> LayoutData<B> {
                 underline_size,
                 strikethrough_offset,
                 strikethrough_size,
+                line_height,
             }
         };
 

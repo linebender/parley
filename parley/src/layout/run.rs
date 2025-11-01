@@ -231,4 +231,6 @@ pub struct RunMetrics {
     pub strikethrough_offset: f32,
     /// Thickness of the strikethrough decoration.
     pub strikethrough_size: f32,
+    /// The line height
+    pub line_height: f32,
 }
