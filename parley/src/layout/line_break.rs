@@ -300,9 +300,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 // break_opportunity = true;
                             }
                         } else if is_newline {
-                            let line_height = cluster.height(&self.layout.data);
-                            self.state
-                                .append_cluster_to_line(self.state.line.x, line_height);
+                            self.state.append_cluster_to_line(
+                                self.state.line.x,
+                                run.metrics().line_height,
+                            );
                             if try_commit_line!(BreakReason::Explicit) {
                                 // TODO: can this be hoisted out of the conditional?
                                 self.state.cluster_idx += 1;
@@ -317,8 +318,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.state.mark_emergency_break_opportunity();
                         }
 
-                        let mut line_height = cluster.height(&self.layout.data);
-
                         // If current cluster is the start of a ligature, then advance state to include
                         // the remaining clusters that make up the ligature
                         let mut advance = cluster.advance();
@@ -329,8 +328,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 } else {
                                     advance += cluster.advance();
                                     self.state.cluster_idx += 1;
-                                    line_height =
-                                        line_height.max(cluster.height(&self.layout.data));
                                 }
                             }
                         }
@@ -346,6 +343,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         // If that x position does NOT exceed max_advance then we simply add the cluster(s) to the current line
                         if next_x <= max_advance {
+                            let line_height = run.metrics().line_height;
                             self.state.append_cluster_to_line(next_x, line_height);
                             self.state.cluster_idx += 1;
                             if is_space {
@@ -356,6 +354,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         else {
                             // Handle case where cluster is space character. Hang overflowing whitespace.
                             if is_space {
+                                let line_height = run.metrics().line_height;
                                 self.state.append_cluster_to_line(next_x, line_height);
                                 if try_commit_line!(BreakReason::Regular) {
                                     // TODO: can this be hoisted out of the conditional?
@@ -396,6 +395,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     return self.start_new_line();
                                 }
                             } else {
+                                let line_height = run.metrics().line_height;
                                 self.state.append_cluster_to_line(next_x, line_height);
                                 self.state.cluster_idx += 1;
                             }
