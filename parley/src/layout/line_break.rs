@@ -42,6 +42,10 @@ struct LineState {
     /// Of the line currently being built, the maximum line height seen so far.
     /// This represents a lower-bound on the eventual line height of the line.
     running_line_height: f32,
+
+    /// We lag the text-wrap-mode by one cluster due to line-breaking boundaries only
+    /// being triggered on the cluster after the linebreak.
+    text_wrap_mode: TextWrapMode,
 }
 
 #[derive(Clone, Default)]
@@ -240,7 +244,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                     // If the box fits on the current line (or we are at the start of the current line)
                     // then simply move on to the next item
-                    if next_x <= max_advance {
+                    if next_x <= max_advance || self.state.line.text_wrap_mode != TextWrapMode::Wrap
+                    {
                         // println!("BOX FITS");
 
                         self.state.item_idx += 1;
@@ -290,8 +295,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let boundary = cluster.info().boundary();
                         let style = &self.layout.data.styles[cluster.data.style_index as usize];
 
-                        if boundary == Boundary::Line && style.text_wrap_mode == TextWrapMode::Wrap
-                        {
+                        // Lag text_wrap_mode style by one cluster
+                        let text_wrap_mode = self.state.line.text_wrap_mode;
+                        self.state.line.text_wrap_mode = style.text_wrap_mode;
+
+                        if boundary == Boundary::Line && text_wrap_mode == TextWrapMode::Wrap {
                             // We do not currently handle breaking within a ligature, so we ignore boundaries in such a position.
                             //
                             // We also don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
@@ -313,6 +321,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         } else if
                         // This text can contribute "emergency" line breaks.
                         style.overflow_wrap != OverflowWrap::Normal && !is_ligature_continuation
+                        && text_wrap_mode == TextWrapMode::Wrap
                         // If we're at the start of the line, this particular cluster will never fit, so it's not a valid emergency break opportunity.
                         && self.state.line.x != 0.0
                         {
@@ -354,7 +363,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // Else we line break:
                         else {
                             // Handle case where cluster is space character. Hang overflowing whitespace.
-                            if is_space {
+                            if is_space && text_wrap_mode == TextWrapMode::Wrap {
                                 let line_height = run.metrics().line_height;
                                 self.state.append_cluster_to_line(next_x, line_height);
                                 if try_commit_line!(BreakReason::Regular) {

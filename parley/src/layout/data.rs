@@ -535,14 +535,15 @@ impl<B: Brush> LayoutData<B> {
         let mut min_width = 0.0_f32;
         let mut max_width = 0.0_f32;
 
+        let mut running_min_width = 0.0;
         let mut running_max_width = 0.0;
+        let mut text_wrap_mode = TextWrapMode::Wrap;
         let mut prev_cluster: Option<&ClusterData> = None;
         let is_rtl = self.base_level & 1 == 1;
         for item in &self.items {
             match item.kind {
                 LayoutItemKind::TextRun => {
                     let run = &self.runs[item.index];
-                    let mut running_min_width = 0.0;
                     let clusters = &self.clusters[run.cluster_range.clone()];
                     if is_rtl {
                         prev_cluster = clusters.first();
@@ -550,8 +551,10 @@ impl<B: Brush> LayoutData<B> {
                     for cluster in clusters {
                         let boundary = cluster.info.boundary();
                         let style = &self.styles[cluster.style_index as usize];
+                        let prev_text_wrap_mode = text_wrap_mode;
+                        text_wrap_mode = style.text_wrap_mode;
                         if boundary == Boundary::Mandatory
-                            || (style.text_wrap_mode == TextWrapMode::Wrap
+                            || (prev_text_wrap_mode == TextWrapMode::Wrap
                                 && (boundary == Boundary::Line
                                     || style.overflow_wrap == OverflowWrap::Anywhere))
                         {
@@ -573,8 +576,11 @@ impl<B: Brush> LayoutData<B> {
                 }
                 LayoutItemKind::InlineBox => {
                     let ibox = &self.inline_boxes[item.index];
-                    min_width = min_width.max(ibox.width);
                     running_max_width += ibox.width;
+                    if text_wrap_mode == TextWrapMode::Wrap {
+                        min_width = min_width.max(ibox.width);
+                        running_min_width = 0.0;
+                    }
                     prev_cluster = None;
                 }
             }
