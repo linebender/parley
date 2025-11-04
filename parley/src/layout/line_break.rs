@@ -10,12 +10,12 @@ use swash::text::cluster::Whitespace;
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 
-use crate::OverflowWrap;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
 };
 use crate::style::Brush;
+use crate::{OverflowWrap, TextWrapMode};
 use swash::text::cluster::Boundary;
 
 use core::ops::Range;
@@ -290,7 +290,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let boundary = cluster.info().boundary();
                         let style = &self.layout.data.styles[cluster.data.style_index as usize];
 
-                        if boundary == Boundary::Line {
+                        if boundary == Boundary::Line && style.text_wrap_mode == TextWrapMode::Wrap
+                        {
                             // We do not currently handle breaking within a ligature, so we ignore boundaries in such a position.
                             //
                             // We also don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive

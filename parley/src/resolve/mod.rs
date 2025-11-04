@@ -17,7 +17,7 @@ use super::style::{
 use crate::font::FontContext;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
-use crate::{LineHeight, OverflowWrap, WordBreakStrength, layout};
+use crate::{LineHeight, OverflowWrap, TextWrapMode, WordBreakStrength, layout};
 use core::borrow::Borrow;
 use core::ops::Range;
 use fontique::FamilyId;
@@ -157,6 +157,7 @@ impl ResolveContext {
             StyleProperty::LetterSpacing(value) => LetterSpacing(*value * scale),
             StyleProperty::WordBreak(value) => WordBreak(*value),
             StyleProperty::OverflowWrap(value) => OverflowWrap(*value),
+            StyleProperty::TextWrapMode(value) => TextWrapMode(*value),
         }
     }
 
@@ -193,6 +194,7 @@ impl ResolveContext {
             letter_spacing: raw_style.letter_spacing * scale,
             word_break: raw_style.word_break,
             overflow_wrap: raw_style.overflow_wrap,
+            text_wrap_mode: raw_style.text_wrap_mode,
         }
     }
 
@@ -374,6 +376,8 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     WordBreak(WordBreakStrength),
     /// Control over "emergency" line-breaking.
     OverflowWrap(OverflowWrap),
+    /// Control over non-"emergency" line-breaking.
+    TextWrapMode(TextWrapMode),
 }
 
 /// Flattened group of style properties.
@@ -411,6 +415,8 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     pub(crate) word_break: WordBreakStrength,
     /// Control over "emergency" line-breaking.
     pub(crate) overflow_wrap: OverflowWrap,
+    /// Control over non-"emergency" line-breaking.
+    pub(crate) text_wrap_mode: TextWrapMode,
 }
 
 impl<B: Brush> ResolvedStyle<B> {
@@ -440,6 +446,7 @@ impl<B: Brush> ResolvedStyle<B> {
             LetterSpacing(value) => self.letter_spacing = value,
             WordBreak(value) => self.word_break = value,
             OverflowWrap(value) => self.overflow_wrap = value,
+            TextWrapMode(value) => self.text_wrap_mode = value,
         }
     }
 
@@ -468,6 +475,7 @@ impl<B: Brush> ResolvedStyle<B> {
             LetterSpacing(value) => nearly_eq(self.letter_spacing, *value),
             WordBreak(value) => self.word_break == *value,
             OverflowWrap(value) => self.overflow_wrap == *value,
+            TextWrapMode(value) => self.text_wrap_mode == *value,
         }
     }
 
@@ -478,6 +486,7 @@ impl<B: Brush> ResolvedStyle<B> {
             strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
             line_height: self.line_height,
             overflow_wrap: self.overflow_wrap,
+            text_wrap_mode: self.text_wrap_mode,
         }
     }
 }

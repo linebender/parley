@@ -25,6 +25,19 @@ pub enum WhiteSpaceCollapse {
     Preserve,
 }
 
+/// Control over non-"emergency" line-breaking.
+///
+/// See <https://drafts.csswg.org/css-text-4/#text-wrap-mode> for more information.
+#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
+#[repr(u8)]
+pub enum TextWrapMode {
+    /// Wrap at non-emergency soft-wrap opportunities when necessary to prevent overflow.
+    #[default]
+    Wrap,
+    /// Do not wrap at non-emergency soft-wrap opportunities.
+    NoWrap,
+}
+
 /// Control over "emergency" line-breaking.
 ///
 /// See <https://drafts.csswg.org/css-text/#overflow-wrap-property> for more information.
@@ -132,6 +145,8 @@ pub enum StyleProperty<'a, B: Brush> {
     WordBreak(WordBreakStrength),
     /// Control over "emergency" line-breaking.
     OverflowWrap(OverflowWrap),
+    /// Control over non-"emergency" line-breaking.
+    TextWrapMode(TextWrapMode),
 }
 
 /// Unresolved styles.
@@ -181,6 +196,8 @@ pub struct TextStyle<'a, B: Brush> {
     pub word_break: WordBreakStrength,
     /// Control over "emergency" line-breaking.
     pub overflow_wrap: OverflowWrap,
+    /// Control over non-"emergency" line-breaking.
+    pub text_wrap_mode: TextWrapMode,
 }
 
 impl<B: Brush> Default for TextStyle<'_, B> {
@@ -208,6 +225,7 @@ impl<B: Brush> Default for TextStyle<'_, B> {
             letter_spacing: 0.0,
             word_break: WordBreakStrength::default(),
             overflow_wrap: OverflowWrap::default(),
+            text_wrap_mode: TextWrapMode::default(),
         }
     }
 }

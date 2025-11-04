@@ -5,7 +5,7 @@ use crate::inline_box::InlineBox;
 use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::nearly_zero;
-use crate::{FontData, LineHeight, OverflowWrap};
+use crate::{FontData, LineHeight, OverflowWrap, TextWrapMode};
 use core::ops::Range;
 
 use swash::text::cluster::{Boundary, Whitespace};
@@ -550,8 +550,10 @@ impl<B: Brush> LayoutData<B> {
                     for cluster in clusters {
                         let boundary = cluster.info.boundary();
                         let style = &self.styles[cluster.style_index as usize];
-                        if matches!(boundary, Boundary::Line | Boundary::Mandatory)
-                            || style.overflow_wrap == OverflowWrap::Anywhere
+                        if boundary == Boundary::Mandatory
+                            || (style.text_wrap_mode == TextWrapMode::Wrap
+                                && (boundary == Boundary::Line
+                                    || style.overflow_wrap == OverflowWrap::Anywhere))
                         {
                             let trailing_whitespace = whitespace_advance(prev_cluster);
                             min_width = min_width.max(running_min_width - trailing_whitespace);
