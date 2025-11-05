@@ -1,7 +1,6 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::InlineBox;
 use crate::layout::Style;
 use crate::layout::data::BreakReason;
 use crate::layout::data::{LayoutItemKind, LineData};
@@ -9,6 +8,7 @@ use crate::layout::glyph::Glyph;
 use crate::layout::layout::Layout;
 use crate::layout::run::Run;
 use crate::style::Brush;
+use crate::{InlineBox, InlineBoxKind};
 use core::ops::Range;
 
 /// Line in a text layout.
@@ -265,7 +265,9 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
 
                     self.item_index += 1;
                     self.glyph_start = 0;
-                    self.offset += inline_box.width;
+                    if inline_box.kind == InlineBoxKind::InFlow {
+                        self.offset += inline_box.width;
+                    }
                     return Some(PositionedLayoutItem::InlineBox(PositionedInlineBox {
                         x,
                         y: self.line.data.metrics.baseline - inline_box.height,

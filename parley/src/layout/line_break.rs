@@ -365,8 +365,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         }));
                     }
 
+                    let (width_contribution, height_contribution) = match inline_box.kind {
+                        InlineBoxKind::InFlow => (inline_box.width, inline_box.height),
+                        InlineBoxKind::OutOfFlow => (0.0, 0.0),
+                    };
+
                     // Compute the x position of the content being currently processed
-                    let next_x = self.state.line.x + inline_box.width;
+                    let next_x = self.state.line.x + width_contribution;
 
                     // println!("BOX next_x: {}", next_x);
 
@@ -379,7 +384,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         self.state.item_idx += 1;
 
                         self.state
-                            .append_inline_box_to_line(next_x, inline_box.height);
+                            .append_inline_box_to_line(next_x, height_contribution);
 
                         // We can always line break after an inline box
                         self.state.mark_line_break_opportunity();
@@ -388,7 +393,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         if self.state.line.x == 0.0 {
                             // println!("BOX EMERGENCY BREAK");
                             self.state
-                                .append_inline_box_to_line(next_x, inline_box.height);
+                                .append_inline_box_to_line(next_x, height_contribution);
                             if try_commit_line!(BreakReason::Emergency) {
                                 self.state.item_idx += 1;
                                 return self.start_new_line(BreakReason::Emergency);
