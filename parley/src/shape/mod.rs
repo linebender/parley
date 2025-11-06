@@ -278,7 +278,7 @@ fn shape_item<'a, B: Brush>(
     let item_text = &text[text_range.clone()];
     let item_infos = &infos[char_range.start..char_range.end]; // Only process current item
     let first_style_index = item_infos[0].1;
-    let fb_script = icu_convert::script_to_fontique(item.script);
+    let fb_script = icu_convert::script_to_fontique(item.script, analysis_data_sources);
     let mut font_selector = FontSelector::new(
         fq,
         rcx,

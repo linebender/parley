@@ -1,9 +1,12 @@
 pub(crate) mod cluster;
 mod provider;
 
+use std::marker::PhantomData;
+
 use crate::analysis::provider::{COMPOSITE_BLOB, PROVIDER};
 use crate::resolve::RangedStyle;
 use crate::{Brush, LayoutContext};
+
 use icu_normalizer::{
     ComposingNormalizer, ComposingNormalizerBorrowed, DecomposingNormalizer,
     DecomposingNormalizerBorrowed,
@@ -17,7 +20,7 @@ use icu_segmenter::{
     GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter,
     LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed,
 };
-use std::marker::PhantomData;
+use icu_properties::{PropertyNamesShort, PropertyNamesShortBorrowed};
 use unicode_bidi::TextSource;
 use unicode_data::{CompositePropsV1, CompositePropsV1Data};
 
@@ -27,6 +30,7 @@ pub(crate) struct AnalysisDataSources {
     line_segmenters: LineSegmenters,
     composing_normalizer: ComposingNormalizer,
     decomposing_normalizer: DecomposingNormalizer,
+    script_short_name: PropertyNamesShort<Script>,
 
     composite: DataResponse<CompositePropsV1>,
 }
@@ -62,7 +66,6 @@ impl AnalysisDataSources {
     pub(crate) fn new() -> Self {
         let blob =
             icu_provider_blob::BlobDataProvider::try_new_from_static_blob(COMPOSITE_BLOB).unwrap();
-        //let composite_props = blob.load_data(CompositePropsV1::INFO, DataRequest::default()).unwrap();
         // Convert blob (BufferProvider) to a typed DataProvider via deserialization:
         let dp = blob.as_deserializing();
 
@@ -81,6 +84,7 @@ impl AnalysisDataSources {
             line_segmenters: LineSegmenters::default(),
             composing_normalizer: ComposingNormalizer::try_new_nfc_unstable(&PROVIDER).unwrap(),
             decomposing_normalizer: DecomposingNormalizer::try_new_nfd_unstable(&PROVIDER).unwrap(),
+            script_short_name: PropertyNamesShort::<Script>::try_new_unstable(&PROVIDER).unwrap(),
             composite,
         }
     }
@@ -103,6 +107,10 @@ impl AnalysisDataSources {
 
     fn decomposing_normalizer(&self) -> DecomposingNormalizerBorrowed<'_> {
         self.decomposing_normalizer.as_borrowed()
+    }
+
+    pub(crate) fn script_short_name(&self) -> PropertyNamesShortBorrowed<'_, Script> {
+        self.script_short_name.as_borrowed()
     }
 }
 

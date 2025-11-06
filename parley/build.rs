@@ -2,6 +2,7 @@
 
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=../unicode_data");
 
     let out = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("baked_data");
 
