@@ -61,10 +61,10 @@ struct PrevBoundaryState {
 pub enum YieldData {
     /// Control flow was yielded because a line break was encountered
     LineBreak(LineBreakData),
-    /// Control flow was yielded because content on the line caused the line to exceed the max_height
+    /// Control flow was yielded because content on the line caused the line to exceed the max height
     MaxHeightExceeded(MaxHeightBreakData),
-    /// Control flow was yielded because an inline box with `break_on_box` set
-    /// to `true` was encountered
+    /// Control flow was yielded because an inline box with kind `InlineBoxKind::CustomOutOfFlow`
+    /// was encountered.
     InlineBoxBreak(BoxBreakData),
 }
 
@@ -355,19 +355,19 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 LayoutItemKind::InlineBox => {
                     let inline_box = &self.layout.data.inline_boxes[item.index];
 
-                    // If the box is marked as "break_on_box", then the assumption is that the caller will handle placement of the box.
-                    if inline_box.break_on_box {
-                        self.state.item_idx += 1;
-                        return Some(YieldData::InlineBoxBreak(BoxBreakData {
-                            inline_box_id: inline_box.id,
-                            inline_box_index: item.index,
-                            advance: self.state.line.x,
-                        }));
-                    }
-
                     let (width_contribution, height_contribution) = match inline_box.kind {
                         InlineBoxKind::InFlow => (inline_box.width, inline_box.height),
                         InlineBoxKind::OutOfFlow => (0.0, 0.0),
+                        // If the box is a `CustomOutOfFlow` box then we yield control flow back to the caller.
+                        // It is then the caller's responsibility to handle placement of the box.
+                        InlineBoxKind::CustomOutOfFlow => {
+                            self.state.item_idx += 1;
+                            return Some(YieldData::InlineBoxBreak(BoxBreakData {
+                                inline_box_id: inline_box.id,
+                                inline_box_index: item.index,
+                                advance: self.state.line.x,
+                            }));
+                        }
                     };
 
                     // Compute the x position of the content being currently processed

@@ -95,7 +95,6 @@ fn main() {
         builder.push_inline_box(InlineBox {
             id: 0,
             kind: InlineBoxKind::InFlow,
-            break_on_box: false,
             index: 0,
             width: 50.0,
             height: 50.0,
@@ -106,7 +105,6 @@ fn main() {
         builder.push_inline_box(InlineBox {
             id: 1,
             kind: InlineBoxKind::InFlow,
-            break_on_box: false,
             index: 50,
             width: 50.0,
             height: 30.0,
@@ -157,7 +155,6 @@ fn main() {
         builder.push_inline_box(InlineBox {
             id: 0,
             kind: InlineBoxKind::InFlow,
-            break_on_box: false,
             index: 40,
             width: 50.0,
             height: 50.0,
@@ -165,7 +162,6 @@ fn main() {
         builder.push_inline_box(InlineBox {
             id: 1,
             kind: InlineBoxKind::InFlow,
-            break_on_box: false,
             index: 50,
             width: 50.0,
             height: 30.0,
