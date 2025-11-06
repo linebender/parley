@@ -44,6 +44,7 @@ struct LineState {
     /// Of the line currently being built, the maximum line height seen so far.
     /// This represents a lower-bound on the eventual line height of the line.
     running_line_height: f32,
+    max_height_exceeded: bool,
 
     /// We lag the text-wrap-mode by one cluster due to line-breaking boundaries only
     /// being triggered on the cluster after the linebreak.
@@ -186,6 +187,7 @@ impl BreakerState {
     #[inline(always)]
     fn add_line_height(&mut self, height: f32) {
         self.line.running_line_height = self.line.running_line_height.max(height);
+        self.line.max_height_exceeded = self.line.running_line_height > self.line_max_height;
     }
 
     pub fn set_layout_max_advance(&mut self, advance: f32) {
@@ -259,6 +261,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             advance: line.metrics.advance,
             line_height: line.size(),
         }
+    }
+
+    fn max_height_break_data(&self, line_height: f32) -> Option<YieldData> {
+        Some(YieldData::MaxHeightExceeded(MaxHeightBreakData {
+            advance: self.state.line.x,
+            line_height,
+        }))
     }
 
     pub fn state(&self) -> &BreakerState {
@@ -376,6 +385,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                     // println!("BOX next_x: {}", next_x);
 
+                    let box_will_be_appended = next_x <= max_advance || self.state.line.x == 0.0;
+                    if height_contribution > self.state.line_max_height && box_will_be_appended {
+                        return self.max_height_break_data(height_contribution);
+                    }
+
                     // If the box fits on the current line (or we are at the start of the current line)
                     // then simply move on to the next item
                     if next_x <= max_advance || self.state.line.text_wrap_mode != TextWrapMode::Wrap
@@ -427,6 +441,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let is_newline = whitespace == Whitespace::Newline;
                         let is_space = whitespace.is_space_or_nbsp();
                         let boundary = cluster.info().boundary();
+                        let line_height = run.metrics().line_height;
+                        let max_height_exceeded = self.state.line.max_height_exceeded;
                         let style = &self.layout.data.styles[cluster.data.style_index as usize];
 
                         // Lag text_wrap_mode style by one cluster
@@ -443,10 +459,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 // break_opportunity = true;
                             }
                         } else if is_newline {
-                            self.state.append_cluster_to_line(
-                                self.state.line.x,
-                                run.metrics().line_height,
-                            );
+                            if max_height_exceeded {
+                                return self.max_height_break_data(line_height);
+                            }
+                            self.state
+                                .append_cluster_to_line(self.state.line.x, line_height);
                             if try_commit_line!(BreakReason::Explicit) {
                                 // TODO: can this be hoisted out of the conditional?
                                 self.state.cluster_idx += 1;
@@ -485,7 +502,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         //
                         // We simply append the cluster(s) to the current line
                         if next_x <= max_advance {
-                            let line_height = run.metrics().line_height;
+                            if max_height_exceeded {
+                                return self.max_height_break_data(line_height);
+                            }
                             self.state.append_cluster_to_line(next_x, line_height);
                             self.state.cluster_idx += 1;
                             if is_space {
@@ -502,7 +521,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             //
                             // We hang any overflowing whitespace and then line-break.
                             if is_space && text_wrap_mode == TextWrapMode::Wrap {
-                                let line_height = run.metrics().line_height;
+                                if max_height_exceeded {
+                                    return self.max_height_break_data(line_height);
+                                }
                                 self.state.append_cluster_to_line(next_x, line_height);
                                 if try_commit_line!(BreakReason::Regular) {
                                     // TODO: can this be hoisted out of the conditional?
@@ -553,7 +574,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             //
                             // We fall back to appending the content to the line.
                             else {
-                                let line_height = run.metrics().line_height;
+                                if max_height_exceeded {
+                                    return self.max_height_break_data(line_height);
+                                }
                                 self.state.append_cluster_to_line(next_x, line_height);
                                 self.state.cluster_idx += 1;
                             }
@@ -599,7 +622,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     self.state.line_y += line_break_data.line_height as f64;
                     continue;
                 }
-                YieldData::MaxHeightExceeded(_) => continue,
+                YieldData::MaxHeightExceeded(_) => continue, // unreachable because max_height is set to f32::MAX
                 YieldData::InlineBoxBreak(_) => continue,
             }
         }
