@@ -117,7 +117,7 @@ impl DataProvider<CompositePropsV1> for CompositePropsProvider {
 
         // Dense values table for 0..=0x10FFFF
         let mut values = Vec::<u32>::with_capacity(0x110000);
-        for cp in 0u32..=0x10FFFF {
+        for cp in 0_u32..=0x10FFFF {
             let v = pack(
                 script.get32(cp),
                 gc.get32(cp),
@@ -147,7 +147,7 @@ impl DataProvider<CompositePropsV1> for CompositePropsProvider {
         .build();
 
         Ok(DataResponse {
-            metadata: Default::default(),
+            metadata: DataResponseMetadata::default(),
             payload: DataPayload::from_owned(CompositePropsV1Data { trie }),
         })
     }

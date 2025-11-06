@@ -184,7 +184,7 @@ impl CharInfo {
         reason = "To be used in more complete emoji checking, in select_font"
     )]
     #[inline(always)]
-    pub(crate) fn is_variation_selector(&self) -> bool {
+    pub(crate) fn is_variation_selector(self) -> bool {
         self.flags & Self::VARIATION_SELECTOR_MASK != 0
     }
 
@@ -193,27 +193,27 @@ impl CharInfo {
         reason = "To be used in more complete emoji checking, in select_font"
     )]
     #[inline(always)]
-    pub(crate) fn is_region_indicator(&self) -> bool {
+    pub(crate) fn is_region_indicator(self) -> bool {
         self.flags & Self::REGION_INDICATOR_MASK != 0
     }
 
     #[inline(always)]
-    pub(crate) fn is_control(&self) -> bool {
+    pub(crate) fn is_control(self) -> bool {
         self.flags & Self::CONTROL_MASK != 0
     }
 
     #[inline(always)]
-    pub(crate) fn is_emoji_or_pictograph(&self) -> bool {
+    pub(crate) fn is_emoji_or_pictograph(self) -> bool {
         self.flags & Self::EMOJI_OR_PICTOGRAPH_MASK != 0
     }
 
     #[inline(always)]
-    pub(crate) fn contributes_to_shaping(&self) -> bool {
+    pub(crate) fn contributes_to_shaping(self) -> bool {
         self.flags & Self::CONTRIBUTES_TO_SHAPING_MASK != 0
     }
 
     #[inline(always)]
-    pub(crate) fn force_normalize(&self) -> bool {
+    pub(crate) fn force_normalize(self) -> bool {
         self.flags & Self::FORCE_NORMALIZE_MASK != 0
     }
 }
@@ -338,7 +338,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
     };
 
     let contiguous_word_break_substrings =
-        WordBreakSegmentIter::new(text, rest.iter(), &first_style);
+        WordBreakSegmentIter::new(text, rest.iter(), first_style);
     let mut global_offset = 0;
     let mut line_boundary_positions: Vec<usize> = Vec::new();
     for (substring_index, (substring, word_break_strength, last)) in
@@ -500,7 +500,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
 
             needs_bidi_resolution |= properties.needs_bidi_resolution();
 
-            return next_mandatory_linebreak;
+            next_mandatory_linebreak
         });
 
     if needs_bidi_resolution {

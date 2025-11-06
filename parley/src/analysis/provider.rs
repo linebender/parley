@@ -4,6 +4,7 @@
 )]
 #![allow(elided_lifetimes_in_paths)]
 #![allow(unreachable_pub)]
+#![allow(clippy::unseparated_literal_suffix)]
 
 include!(concat!(env!("OUT_DIR"), "/baked_data/mod.rs"));
 include!(concat!(env!("OUT_DIR"), "/baked_data/composite_blob.rs"));

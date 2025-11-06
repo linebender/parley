@@ -126,7 +126,7 @@ impl CharCluster {
                 // Normalize to NFD (decomposed) form
                 let nfd_str = analysis_data_sources
                     .decomposing_normalizer()
-                    .normalize(&scratch_string);
+                    .normalize(scratch_string);
 
                 // Copy the characters back to our form structure
                 let mut i = 0;
@@ -189,7 +189,7 @@ impl CharCluster {
                 // Normalize to NFC (composed) form
                 let nfc_str = analysis_data_sources
                     .composing_normalizer()
-                    .normalize(&scratch_string);
+                    .normalize(scratch_string);
 
                 // Copy the characters back to our form structure
                 let mut i = 0;
@@ -233,7 +233,7 @@ impl CharCluster {
         if len == 0 {
             return Status::Complete;
         }
-        let mut glyph_ids = [0u16; MAX_CLUSTER_SIZE];
+        let mut glyph_ids = [0_u16; MAX_CLUSTER_SIZE];
         let prev_ratio = self.best_ratio;
         let mut ratio;
         if self.force_normalize

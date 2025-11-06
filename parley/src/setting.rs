@@ -8,7 +8,7 @@ pub struct Setting<T> {
 }
 
 /// Creates a tag from four bytes.
-pub(crate) const fn tag_from_bytes(bytes: &[u8; 4]) -> Tag {
+pub(crate) const fn tag_from_bytes(bytes: [u8; 4]) -> Tag {
     (bytes[0] as u32) << 24 | (bytes[1] as u32) << 16 | (bytes[2] as u32) << 8 | bytes[3] as u32
 }
 
@@ -19,7 +19,7 @@ fn tag_from_str_lossy(s: &str) -> Tag {
     for (i, b) in s.as_bytes().iter().enumerate().take(4) {
         bytes[i] = *b;
     }
-    tag_from_bytes(&bytes)
+    tag_from_bytes(bytes)
 }
 
 impl Setting<u16> {

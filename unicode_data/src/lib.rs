@@ -74,26 +74,42 @@ impl Properties {
     /// Returns the script for the character.
     #[inline(always)]
     pub fn script(&self) -> Script {
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "script data only occupies SCRIPT_BITS bits; we cast to `u16` to fulfil the `from_icu4c_value` contract."
+        )]
         Script::from_icu4c_value(self.get(Self::SCRIPT_SHIFT, Self::SCRIPT_BITS) as u16)
     }
 
     /// Returns the general category for the character.
     #[inline(always)]
     pub fn general_category(&self) -> GeneralCategory {
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "general category data only occupies GC_BITS bits."
+        )]
         GeneralCategory::try_from(self.get(Self::GC_SHIFT, Self::GC_BITS) as u8).unwrap()
     }
 
     /// Returns the grapheme cluster break for the character.
     #[inline(always)]
     pub fn grapheme_cluster_break(&self) -> GraphemeClusterBreak {
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "cluster break data only occupies GCB_BITS bits"
+        )]
         GraphemeClusterBreak::from_icu4c_value(self.get(Self::GCB_SHIFT, Self::GCB_BITS) as u8)
     }
 
     /// Returns the bidirectional class for the character.
     #[inline(always)]
     pub fn bidi_class(&self) -> unicode_bidi::BidiClass {
-        #[allow(unsafe_code)]
+        #[allow(unsafe_code, reason = "transmute u8 to repr(u8) enum")]
         unsafe {
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "bidi class data only occupies BIDI_BITS bits"
+            )]
             std::mem::transmute(self.get(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8)
         }
     }
@@ -103,7 +119,7 @@ impl Properties {
     pub fn needs_bidi_resolution(&self) -> bool {
         use unicode_bidi::BidiClass::*;
         let bidi_class = self.bidi_class();
-        let bidi_mask = 1u32 << (bidi_class as u32);
+        let bidi_mask = 1_u32 << (bidi_class as u32);
 
         const OVERRIDE_MASK: u32 =
             (1 << RLE as u32) | (1 << LRE as u32) | (1 << RLO as u32) | (1 << LRO as u32);
