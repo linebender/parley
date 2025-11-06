@@ -63,6 +63,8 @@ pub(crate) struct TestEnv {
     // TODO: Add core::panic::Location for case.
     errors: Vec<(PathBuf, String)>,
     next_test_case_name: String,
+    /// Max size a screenshot can have, in bytes.
+    max_screenshot_size: Option<usize>,
 }
 
 fn is_accept_mode() -> bool {
@@ -158,11 +160,16 @@ impl TestEnv {
             cursor_size: 2.0,
             errors: Vec::new(),
             next_test_case_name: String::new(),
+            max_screenshot_size: Some(8 * 1024),
         }
     }
 
     pub(crate) fn rendering_config(&mut self) -> &mut RenderingConfig {
         &mut self.rendering_config
+    }
+
+    pub(crate) fn max_screenshot_size(&mut self) -> &mut Option<usize> {
+        &mut self.max_screenshot_size
     }
 
     fn default_style(&self) -> [StyleProperty<'static, ColorBrush>; 3] {
@@ -232,20 +239,7 @@ impl TestEnv {
         if !snapshot_path.is_file() {
             return Err(format!("Cannot find snapshot {}", snapshot_path.display()));
         }
-        let snapshot_img = match Pixmap::load_png(snapshot_path) {
-            Ok(snapshot_img) => snapshot_img,
-            Err(d) => {
-                if std::env::var("PARLEY_IGNORE_DECODING_ERRORS").is_ok() {
-                    return Ok(());
-                }
-                return Err(format!(
-                    "Loading snapshot {} failed due to decoding error {d}.\n\
-                    If this file is an LFS file, install git lfs (https://git-lfs.com/) and run `git lfs pull`.\n\
-                    If that fails (due to e.g. a lack of bandwidth), rerun tests with `PARLEY_IGNORE_DECODING_ERRORS=1` to skip this test.",
-                    snapshot_path.display()
-                ))?;
-            }
-        };
+        let snapshot_img = Pixmap::load_png(snapshot_path).unwrap();
         if snapshot_img.width() != current_img.width()
             || snapshot_img.height() != current_img.height()
         {
@@ -336,15 +330,56 @@ impl TestEnv {
         let snapshot_path = snapshot_dir().join(&image_name);
         let comparison_path = current_imgs_dir().join(&image_name);
 
+        #[cfg(not(target_os = "android"))]
+        #[track_caller]
+        fn save_image(image: &Pixmap, path: &PathBuf, max_size: Option<usize>) {
+            use oxipng::{Options, optimize_from_memory};
+
+            let image_data = image.encode_png().unwrap();
+
+            let data = optimize_from_memory(&image_data, &Options::from_preset(5)).unwrap();
+            let saved_len = data.len();
+
+            // Whenever we save a file, we optimise it just in case.
+            // In some cases this is redundant with what kompari already does,
+            // but it's simpler to cover all cases.
+            std::fs::write(path, data).unwrap();
+
+            if let Some(max_size) = max_size {
+                if saved_len > max_size {
+                    panic!(
+                        "New screenshot file size ({saved_len}b) was larger than the supported file size ({max_size}b). See TestEnv::max_screenshot_size to change the maximum.",
+                    );
+                }
+            }
+        }
+
+        // We special-case android targets because oxipng doesn't build in Android CI.
+        #[cfg(target_os = "android")]
+        fn save_image(_image: &Pixmap, _path: &PathBuf, _max_size: Option<usize>) {
+            panic!("Saving screenshots is not supported on Android targets");
+        }
+
+        // Max size a screenshot can have, in bytes.
+        let max_size = self.max_screenshot_size;
         if let Err(e) = self.check_images(img, &snapshot_path) {
             if is_accept_mode() {
-                img.save_png(&snapshot_path).unwrap();
+                save_image(img, &snapshot_path, max_size);
             } else {
-                img.save_png(&comparison_path).unwrap();
+                save_image(img, &comparison_path, max_size);
                 self.errors.push((comparison_path, e));
             }
         } else if is_generate_all_mode() {
-            img.save_png(&comparison_path).unwrap();
+            save_image(img, &comparison_path, max_size);
+        } else {
+            let reference_size = snapshot_path.metadata().unwrap().len() as usize;
+            if let Some(max_size) = max_size {
+                if reference_size > max_size {
+                    panic!(
+                        "Existing file size ({reference_size}b) was larger than the supported file size ({max_size}b). See TestEnv::max_screenshot_size to change the maximum."
+                    );
+                }
+            }
         }
     }
 }

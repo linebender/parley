@@ -467,6 +467,7 @@ fn shape_item<'a, B: Brush>(
             font.font.synthesis,
             &glyph_buffer,
             item.level,
+            item.style_index,
             item.word_spacing,
             item.letter_spacing,
             segment_text,

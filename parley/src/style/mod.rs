@@ -16,7 +16,7 @@ pub use font::{
 };
 pub use styleset::StyleSet;
 
-use crate::{LayoutLineHeight, util::nearly_eq};
+use crate::util::nearly_eq;
 
 #[derive(Debug, Clone, Copy)]
 pub enum WhiteSpaceCollapse {
@@ -80,14 +80,6 @@ impl LineHeight {
             Self::Absolute(value) => Self::Absolute(value * scale),
             // The other variants are relative to the font size, so scaling here needn't do anything
             value => value,
-        }
-    }
-
-    pub(crate) fn resolve(self, font_size: f32) -> LayoutLineHeight {
-        match self {
-            Self::MetricsRelative(value) => LayoutLineHeight::MetricsRelative(value),
-            Self::FontSizeRelative(value) => LayoutLineHeight::Absolute(value * font_size),
-            Self::Absolute(value) => LayoutLineHeight::Absolute(value),
         }
     }
 }

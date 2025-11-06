@@ -1,9 +1,23 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::{
-    Brush, Cluster, ClusterPath, FontData, Layout, LineItemData, Range, Run, RunData, Synthesis,
-};
+use crate::FontData;
+use crate::layout::cluster::{Cluster, ClusterPath};
+use crate::layout::data::{LineItemData, RunData};
+use crate::layout::layout::Layout;
+use crate::style::Brush;
+use core::ops::Range;
+use fontique::Synthesis;
+
+/// Sequence of clusters with a single font and style.
+#[derive(Copy, Clone)]
+pub struct Run<'a, B: Brush> {
+    pub(crate) layout: &'a Layout<B>,
+    pub(crate) line_index: u32,
+    pub(crate) index: u32,
+    pub(crate) data: &'a RunData,
+    pub(crate) line_data: Option<&'a LineItemData>,
+}
 
 impl<'a, B: Brush> Run<'a, B> {
     pub(crate) fn new(
@@ -217,4 +231,6 @@ pub struct RunMetrics {
     pub strikethrough_offset: f32,
     /// Thickness of the strikethrough decoration.
     pub strikethrough_size: f32,
+    /// The line height
+    pub line_height: f32,
 }

@@ -39,6 +39,9 @@ struct LineState {
     items: Range<usize>,
     clusters: Range<usize>,
     num_spaces: usize,
+    /// Of the line currently being built, the maximum line height seen so far.
+    /// This represents a lower-bound on the eventual line height of the line.
+    running_line_height: f32,
 }
 
 #[derive(Clone, Default)]
@@ -63,6 +66,10 @@ struct BreakerState {
     /// Iteration state: the current cluster (within the layout)
     cluster_idx: usize,
 
+    /// The y coordinate of the bottom of the last committed line (or else 0)
+    /// Use of f64 here is important. f32 causes test failures due to accumulated error
+    committed_y: f64,
+
     line: LineState,
     prev_boundary: Option<PrevBoundaryState>,
     emergency_boundary: Option<PrevBoundaryState>,
@@ -70,19 +77,21 @@ struct BreakerState {
 
 impl BreakerState {
     /// Add the cluster(s) currently being evaluated to the current line
-    fn append_cluster_to_line(&mut self, next_x: f32) {
+    fn append_cluster_to_line(&mut self, next_x: f32, clusters_height: f32) {
         self.line.items.end = self.item_idx + 1;
         self.line.clusters.end = self.cluster_idx + 1;
         self.line.x = next_x;
+        self.add_line_height(clusters_height);
         // Would like to add:
         // self.cluster_idx += 1;
     }
 
     /// Add inline box to line
-    fn append_inline_box_to_line(&mut self, next_x: f32) {
+    fn append_inline_box_to_line(&mut self, next_x: f32, box_height: f32) {
         // self.item_idx += 1;
         self.line.items.end += 1;
         self.line.x = next_x;
+        self.add_line_height(box_height);
         // Would like to add:
         // self.item_idx += 1;
     }
@@ -107,6 +116,11 @@ impl BreakerState {
             cluster_idx: self.cluster_idx,
             state: self.line.clone(),
         });
+    }
+
+    #[inline(always)]
+    fn add_line_height(&mut self, height: f32) {
+        self.line.running_line_height = self.line.running_line_height.max(height);
     }
 }
 
@@ -138,17 +152,27 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
     /// Reset state when a line has been committed
     fn start_new_line(&mut self) -> Option<(f32, f32)> {
+        let line_height = self.state.line.running_line_height;
+
         self.state.items = self.lines.line_items.len();
         self.state.lines = self.lines.lines.len();
         self.state.line.x = 0.;
+        self.state.line.running_line_height = 0.;
         self.state.prev_boundary = None; // Added by Nico
         self.state.emergency_boundary = None;
+
+        self.finish_line(self.lines.lines.len() - 1, line_height);
         self.last_line_data()
     }
 
     fn last_line_data(&self) -> Option<(f32, f32)> {
         let line = self.lines.lines.last().unwrap();
         Some((line.metrics.advance, line.size()))
+    }
+
+    /// Returns the y-coordinate of the top of the current line
+    pub fn committed_y(&self) -> f64 {
+        self.state.committed_y
     }
 
     /// Returns true if all the text has been placed into lines.
@@ -220,7 +244,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // println!("BOX FITS");
 
                         self.state.item_idx += 1;
-                        self.state.append_inline_box_to_line(next_x);
+
+                        self.state
+                            .append_inline_box_to_line(next_x, inline_box.height);
 
                         // We can always line break after an inline box
                         self.state.mark_line_break_opportunity();
@@ -228,7 +254,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // If we're at the start of the line, this box will never fit, so consume it and accept the overflow.
                         if self.state.line.x == 0.0 {
                             // println!("BOX EMERGENCY BREAK");
-                            self.state.append_inline_box_to_line(next_x);
+                            self.state
+                                .append_inline_box_to_line(next_x, inline_box.height);
                             if try_commit_line!(BreakReason::Emergency) {
                                 self.state.item_idx += 1;
                                 return self.start_new_line();
@@ -273,7 +300,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 // break_opportunity = true;
                             }
                         } else if is_newline {
-                            self.state.append_cluster_to_line(self.state.line.x);
+                            self.state.append_cluster_to_line(
+                                self.state.line.x,
+                                run.metrics().line_height,
+                            );
                             if try_commit_line!(BreakReason::Explicit) {
                                 // TODO: can this be hoisted out of the conditional?
                                 self.state.cluster_idx += 1;
@@ -313,7 +343,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         // If that x position does NOT exceed max_advance then we simply add the cluster(s) to the current line
                         if next_x <= max_advance {
-                            self.state.append_cluster_to_line(next_x);
+                            let line_height = run.metrics().line_height;
+                            self.state.append_cluster_to_line(next_x, line_height);
                             self.state.cluster_idx += 1;
                             if is_space {
                                 self.state.line.num_spaces += 1;
@@ -323,7 +354,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         else {
                             // Handle case where cluster is space character. Hang overflowing whitespace.
                             if is_space {
-                                self.state.append_cluster_to_line(next_x);
+                                let line_height = run.metrics().line_height;
+                                self.state.append_cluster_to_line(next_x, line_height);
                                 if try_commit_line!(BreakReason::Regular) {
                                     // TODO: can this be hoisted out of the conditional?
                                     self.state.cluster_idx += 1;
@@ -363,7 +395,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     return self.start_new_line();
                                 }
                             } else {
-                                self.state.append_cluster_to_line(next_x);
+                                let line_height = run.metrics().line_height;
+                                self.state.append_cluster_to_line(next_x, line_height);
                                 self.state.cluster_idx += 1;
                             }
                         }
@@ -420,235 +453,203 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
     /// Consumes the line breaker and finalizes all line computations.
     pub fn finish(mut self) {
-        // Whether metrics should be quantized to pixel boundaries
-        let quantize = self.layout.data.quantize;
-        // For each run (item which is a text run):
-        //   - Determine if it consists entirely of whitespace (is_whitespace property)
-        //   - Determine if it has trailing whitespace (has_trailing_whitespace property)
-        for item in &mut self.lines.line_items {
-            // Skip items which are not text runs
-            if item.kind != LayoutItemKind::TextRun {
-                continue;
-            }
-
-            let run = item;
-            run.is_whitespace = true;
-            if run.bidi_level & 1 != 0 {
-                // RTL runs check for "trailing" whitespace at the front.
-                for cluster in self.layout.data.clusters[run.cluster_range.clone()].iter() {
-                    if cluster.info.is_whitespace() {
-                        run.has_trailing_whitespace = true;
-                    } else {
-                        run.is_whitespace = false;
-                        break;
-                    }
-                }
-            } else {
-                for cluster in self.layout.data.clusters[run.cluster_range.clone()]
-                    .iter()
-                    .rev()
-                {
-                    if cluster.info.is_whitespace() {
-                        run.has_trailing_whitespace = true;
-                    } else {
-                        run.is_whitespace = false;
-                        break;
-                    }
-                }
-            }
-        }
-        let mut y: f64 = 0.; // f32 causes test failures due to accumulated error
-        let mut prev_line_metrics = None;
-        for line in &mut self.lines.lines {
-            // Reset metrics for line
-            line.metrics.ascent = 0.;
-            line.metrics.descent = 0.;
-            line.metrics.leading = 0.;
-            line.metrics.offset = 0.;
-            line.text_range.start = usize::MAX;
-
-            if line.item_range.is_empty() {
-                line.text_range = self.layout.data.text_len..self.layout.data.text_len;
-            }
-            // Compute metrics for the line, but ignore trailing whitespace.
-            let mut have_metrics = false;
-            let mut needs_reorder = false;
-            for line_item in self.lines.line_items[line.item_range.clone()]
-                .iter_mut()
-                .rev()
-            {
-                match line_item.kind {
-                    LayoutItemKind::InlineBox => {
-                        let item = &self.layout.data.inline_boxes[line_item.index];
-
-                        // Advance is already computed in "commit line" for items
-
-                        // Default vertical alignment is to align the bottom of boxes with the text baseline.
-                        // This is equivalent to the entire height of the box being "ascent"
-                        line.metrics.ascent = line.metrics.ascent.max(item.height);
-                        line.metrics.line_height = line.metrics.line_height.max(item.height);
-
-                        // Mark us as having seen non-whitespace content on this line
-                        have_metrics = true;
-                    }
-                    LayoutItemKind::TextRun => {
-                        // Compute the text range for the line
-                        // Q: Can we not simplify this computation by assuming that items are in order?
-                        line.text_range.end = line.text_range.end.max(line_item.text_range.end);
-                        line.text_range.start =
-                            line.text_range.start.min(line_item.text_range.start);
-
-                        // Mark line as needing bidi re-ordering if it contains any runs with non-zero bidi level
-                        // (zero is the default level, so this is equivalent to marking lines that have multiple levels)
-                        if line_item.bidi_level != 0 {
-                            needs_reorder = true;
-                        }
-
-                        let run = &self.layout.data.runs[line_item.index];
-                        let line_height = line_item.compute_line_height(&self.layout.data);
-                        line.metrics.line_height = line.metrics.line_height.max(line_height);
-
-                        // Compute the run's advance by summing the advances of its constituent clusters
-                        line_item.advance = self.layout.data.clusters
-                            [line_item.cluster_range.clone()]
-                        .iter()
-                        .map(|c| c.advance)
-                        .sum();
-
-                        // Ignore trailing whitespace for metrics computation
-                        // (we are iterating backwards so trailing whitespace comes first)
-                        if !have_metrics && line_item.is_whitespace {
-                            continue;
-                        }
-
-                        // Compute the run's vertical metrics
-                        line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent);
-                        line.metrics.descent = line.metrics.descent.max(run.metrics.descent);
-
-                        // Mark us as having seen non-whitespace content on this line
-                        have_metrics = true;
-                    }
-                }
-            }
-
-            // Reorder the items within the line (if required). Reordering is required if the line contains
-            // a mix of bidi levels (a mix of LTR and RTL text)
-            let item_count = line.item_range.end - line.item_range.start;
-            if needs_reorder && item_count > 1 {
-                reorder_line_items(&mut self.lines.line_items[line.item_range.clone()]);
-            }
-
-            // Compute size of line's trailing whitespace. "Trailing" is considered the right edge
-            // for LTR text and the left edge for RTL text.
-            let run = if self.layout.is_rtl() {
-                self.lines.line_items[line.item_range.clone()].first()
-            } else {
-                self.lines.line_items[line.item_range.clone()].last()
-            };
-            line.metrics.trailing_whitespace = run
-                .filter(|item| item.is_text_run())
-                .and_then(|run| {
-                    let cluster = if self.layout.is_rtl() {
-                        self.layout.data.clusters[run.cluster_range.clone()].first()
-                    } else {
-                        self.layout.data.clusters[run.cluster_range.clone()].last()
-                    };
-                    cluster
-                        .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
-                        .map(|cluster| cluster.advance)
-                })
-                .unwrap_or(0.0);
-
-            if !have_metrics {
-                // Line consisting entirely of whitespace?
-                if !line.item_range.is_empty() {
-                    let line_item = &self.lines.line_items[line.item_range.start];
-                    if line_item.is_text_run() {
-                        let run = &self.layout.data.runs[line_item.index];
-                        line.metrics.ascent = run.metrics.ascent;
-                        line.metrics.descent = run.metrics.descent;
-                    }
-                } else if let Some(metrics) = prev_line_metrics {
-                    // HACK: copy metrics from previous line if we don't have
-                    // any; this should only occur for an empty line following
-                    // a newline at the end of a layout
-                    line.metrics = metrics;
-                    // If we have no items on this line, it must be the last (empty)
-                    // line in a layout following a newline. Commit an empty run so
-                    // that AccessKit has a node with which to identify the visual
-                    // cursor position
-                    if let Some((index, run)) = self
-                        .layout
-                        .data
-                        .runs
-                        .iter()
-                        .enumerate()
-                        .rfind(|(_, run)| !run.text_range.is_empty())
-                    {
-                        let run_index = self.lines.line_items.len();
-                        let cluster = run.cluster_range.end;
-                        let text = run.text_range.end;
-                        self.lines.line_items.push(LineItemData {
-                            kind: LayoutItemKind::TextRun,
-                            index,
-                            bidi_level: 0,
-                            advance: 0.,
-                            is_whitespace: false,
-                            has_trailing_whitespace: false,
-                            cluster_range: cluster..cluster,
-                            text_range: text..text,
-                        });
-                        line.item_range = run_index..run_index + 1;
-                    }
-                }
-            }
-
-            line.metrics.leading =
-                line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
-
-            let (ascent, descent) = if quantize {
-                // We mimic Chrome in rounding ascent and descent separately,
-                // before calculating the rest.
-                // See lines_integral_line_height_ascent_descent_rounding() for more details.
-                (line.metrics.ascent.round(), line.metrics.descent.round())
-            } else {
-                (line.metrics.ascent, line.metrics.descent)
-            };
-
-            let (leading_above, leading_below) = if quantize {
-                // Calculate leading using the rounded ascent and descent.
-                let leading = line.metrics.line_height - (ascent + descent);
-                // We mimic Chrome in giving 'below' the larger leading half.
-                // Although the comment in Chromium's NGLineHeightMetrics::AddLeading function
-                // in ng_line_height_metrics.cc claims it's for legacy test compatibility.
-                // So we might want to think about giving 'above' the larger half instead.
-                let above = (leading * 0.5).floor();
-                let below = leading.round() - above;
-                (above, below)
-            } else {
-                (line.metrics.leading * 0.5, line.metrics.leading * 0.5)
-            };
-
-            line.metrics.baseline =
-                ascent + leading_above + if quantize { y.round() as f32 } else { y as f32 };
-
-            // Small line heights will cause leading to be negative.
-            // Negative leadings are correct for baseline calculation, but not for min/max coords.
-            // We clamp leading to zero for the purposes of min/max coords,
-            // which in turn clamps the selection box minimum height to ascent + descent.
-            line.metrics.min_coord = line.metrics.baseline - ascent - leading_above.max(0.);
-            line.metrics.max_coord = line.metrics.baseline + descent + leading_below.max(0.);
-
-            y += line.metrics.line_height as f64;
-
-            prev_line_metrics = Some(line.metrics);
-        }
         if self.layout.data.text_len == 0 {
             if let Some(line) = self.lines.line_items.first_mut() {
                 line.text_range = 0..0;
                 line.cluster_range = 0..0;
             }
         }
+    }
+
+    fn finish_line(&mut self, line_idx: usize, line_height: f32) {
+        let prev_line_metrics = match line_idx {
+            0 => None,
+            idx => Some(self.lines.lines[idx - 1].metrics),
+        };
+        let line = &mut self.lines.lines[line_idx];
+
+        // Reset metrics for line
+        line.metrics.ascent = 0.;
+        line.metrics.descent = 0.;
+        line.metrics.leading = 0.;
+        line.metrics.offset = 0.;
+        line.text_range.start = usize::MAX;
+
+        line.metrics.line_height = line_height;
+
+        if line.item_range.is_empty() {
+            line.text_range = self.layout.data.text_len..self.layout.data.text_len;
+        }
+        // Compute metrics for the line, but ignore trailing whitespace.
+        let mut have_metrics = false;
+        let mut needs_reorder = false;
+        for line_item in self.lines.line_items[line.item_range.clone()]
+            .iter_mut()
+            .rev()
+        {
+            match line_item.kind {
+                LayoutItemKind::InlineBox => {
+                    let item = &self.layout.data.inline_boxes[line_item.index];
+
+                    // Advance is already computed in "commit line" for items
+
+                    // Default vertical alignment is to align the bottom of boxes with the text baseline.
+                    // This is equivalent to the entire height of the box being "ascent"
+                    line.metrics.ascent = line.metrics.ascent.max(item.height);
+
+                    // Mark us as having seen non-whitespace content on this line
+                    have_metrics = true;
+                }
+                LayoutItemKind::TextRun => {
+                    line_item.compute_whitespace_properties(&self.layout.data);
+
+                    // Compute the text range for the line
+                    // Q: Can we not simplify this computation by assuming that items are in order?
+                    line.text_range.end = line.text_range.end.max(line_item.text_range.end);
+                    line.text_range.start = line.text_range.start.min(line_item.text_range.start);
+
+                    // Mark line as needing bidi re-ordering if it contains any runs with non-zero bidi level
+                    // (zero is the default level, so this is equivalent to marking lines that have multiple levels)
+                    if line_item.bidi_level != 0 {
+                        needs_reorder = true;
+                    }
+
+                    // Compute the run's advance by summing the advances of its constituent clusters
+                    line_item.advance = self.layout.data.clusters[line_item.cluster_range.clone()]
+                        .iter()
+                        .map(|c| c.advance)
+                        .sum();
+
+                    // Ignore trailing whitespace for metrics computation
+                    // (we are iterating backwards so trailing whitespace comes first)
+                    if !have_metrics && line_item.is_whitespace {
+                        continue;
+                    }
+
+                    // Compute the run's vertical metrics
+                    let run = &self.layout.data.runs[line_item.index];
+                    line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent);
+                    line.metrics.descent = line.metrics.descent.max(run.metrics.descent);
+
+                    // Mark us as having seen non-whitespace content on this line
+                    have_metrics = true;
+                }
+            }
+        }
+
+        // Reorder the items within the line (if required). Reordering is required if the line contains
+        // a mix of bidi levels (a mix of LTR and RTL text)
+        let item_count = line.item_range.end - line.item_range.start;
+        if needs_reorder && item_count > 1 {
+            reorder_line_items(&mut self.lines.line_items[line.item_range.clone()]);
+        }
+
+        // Compute size of line's trailing whitespace. "Trailing" is considered the right edge
+        // for LTR text and the left edge for RTL text.
+        let run = if self.layout.is_rtl() {
+            self.lines.line_items[line.item_range.clone()].first()
+        } else {
+            self.lines.line_items[line.item_range.clone()].last()
+        };
+        line.metrics.trailing_whitespace = run
+            .filter(|item| item.is_text_run())
+            .and_then(|run| {
+                let cluster = if self.layout.is_rtl() {
+                    self.layout.data.clusters[run.cluster_range.clone()].first()
+                } else {
+                    self.layout.data.clusters[run.cluster_range.clone()].last()
+                };
+                cluster
+                    .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
+                    .map(|cluster| cluster.advance)
+            })
+            .unwrap_or(0.0);
+
+        if !have_metrics {
+            // Line consisting entirely of whitespace?
+            if !line.item_range.is_empty() {
+                let line_item = &self.lines.line_items[line.item_range.start];
+                if line_item.is_text_run() {
+                    let run = &self.layout.data.runs[line_item.index];
+                    line.metrics.ascent = run.metrics.ascent;
+                    line.metrics.descent = run.metrics.descent;
+                }
+            } else if let Some(metrics) = prev_line_metrics {
+                // HACK: copy metrics from previous line if we don't have
+                // any; this should only occur for an empty line following
+                // a newline at the end of a layout
+                line.metrics = metrics;
+                // If we have no items on this line, it must be the last (empty)
+                // line in a layout following a newline. Commit an empty run so
+                // that AccessKit has a node with which to identify the visual
+                // cursor position
+                if let Some((index, run)) = self
+                    .layout
+                    .data
+                    .runs
+                    .iter()
+                    .enumerate()
+                    .rfind(|(_, run)| !run.text_range.is_empty())
+                {
+                    let run_index = self.lines.line_items.len();
+                    let cluster = run.cluster_range.end;
+                    let text = run.text_range.end;
+                    self.lines.line_items.push(LineItemData {
+                        kind: LayoutItemKind::TextRun,
+                        index,
+                        bidi_level: 0,
+                        advance: 0.,
+                        is_whitespace: false,
+                        has_trailing_whitespace: false,
+                        cluster_range: cluster..cluster,
+                        text_range: text..text,
+                    });
+                    line.item_range = run_index..run_index + 1;
+                }
+            }
+        }
+
+        line.metrics.leading =
+            line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
+
+        // Whether metrics should be quantized to pixel boundaries
+        let quantize = self.layout.data.quantize;
+
+        let (ascent, descent) = if quantize {
+            // We mimic Chrome in rounding ascent and descent separately,
+            // before calculating the rest.
+            // See lines_integral_line_height_ascent_descent_rounding() for more details.
+            (line.metrics.ascent.round(), line.metrics.descent.round())
+        } else {
+            (line.metrics.ascent, line.metrics.descent)
+        };
+
+        let (leading_above, leading_below) = if quantize {
+            // Calculate leading using the rounded ascent and descent.
+            let leading = line.metrics.line_height - (ascent + descent);
+            // We mimic Chrome in giving 'below' the larger leading half.
+            // Although the comment in Chromium's NGLineHeightMetrics::AddLeading function
+            // in ng_line_height_metrics.cc claims it's for legacy test compatibility.
+            // So we might want to think about giving 'above' the larger half instead.
+            let above = (leading * 0.5).floor();
+            let below = leading.round() - above;
+            (above, below)
+        } else {
+            (line.metrics.leading * 0.5, line.metrics.leading * 0.5)
+        };
+
+        let y = self.state.committed_y;
+        line.metrics.baseline =
+            ascent + leading_above + if quantize { y.round() as f32 } else { y as f32 };
+
+        // Small line heights will cause leading to be negative.
+        // Negative leadings are correct for baseline calculation, but not for min/max coords.
+        // We clamp leading to zero for the purposes of min/max coords,
+        // which in turn clamps the selection box minimum height to ascent + descent.
+        line.metrics.min_coord = line.metrics.baseline - ascent - leading_above.max(0.);
+        line.metrics.max_coord = line.metrics.baseline + descent + leading_below.max(0.);
+
+        self.state.committed_y += line.metrics.line_height as f64;
     }
 }
 

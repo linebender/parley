@@ -2,10 +2,36 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use super::{
-    Alignment, BreakReason, LayoutData,
+    BreakReason,
     data::{ClusterData, LineItemData},
 };
+use crate::data::LayoutData;
 use crate::style::Brush;
+
+/// Alignment of a layout.
+#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
+#[repr(u8)]
+pub enum Alignment {
+    /// This is [`Alignment::Left`] for LTR text and [`Alignment::Right`] for RTL text.
+    #[default]
+    Start,
+    /// This is [`Alignment::Right`] for LTR text and [`Alignment::Left`] for RTL text.
+    End,
+    /// Align content to the left edge.
+    ///
+    /// For alignment that should be aware of text direction, use [`Alignment::Start`] or
+    /// [`Alignment::End`] instead.
+    Left,
+    /// Align each line centered within the container.
+    Center,
+    /// Align content to the right edge.
+    ///
+    /// For alignment that should be aware of text direction, use [`Alignment::Start`] or
+    /// [`Alignment::End`] instead.
+    Right,
+    /// Justify each line by spacing out content, except for the last line.
+    Justify,
+}
 
 /// Additional options to fine tune alignment
 #[derive(Debug, Clone, Copy)]

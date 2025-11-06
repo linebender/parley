@@ -113,6 +113,7 @@ mod resolve;
 mod shape;
 mod util;
 
+pub mod editing;
 pub mod layout;
 pub mod setting;
 pub mod style;
@@ -130,8 +131,7 @@ pub use inline_box::InlineBox;
 #[doc(inline)]
 pub use layout::Layout;
 
-pub use layout::editor::{PlainEditor, PlainEditorDriver};
-
+pub use editing::*;
 pub use layout::*;
 pub use style::*;
 
