@@ -89,7 +89,6 @@ fn main() {
     builder.push_inline_box(InlineBox {
         id: 0,
         kind: InlineBoxKind::InFlow,
-        break_on_box: false,
         index: 40,
         width: 50.0,
         height: 50.0,

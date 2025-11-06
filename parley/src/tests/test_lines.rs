@@ -106,7 +106,6 @@ fn build_layout<A: Into<Option<f32>>>(
     builder.push_inline_box(InlineBox {
         id: 0,
         kind: InlineBoxKind::InFlow,
-        break_on_box: false,
         index: 40,
         width: 50.0,
         height: 5.0,
@@ -114,7 +113,6 @@ fn build_layout<A: Into<Option<f32>>>(
     builder.push_inline_box(InlineBox {
         id: 1,
         kind: InlineBoxKind::InFlow,
-        break_on_box: false,
         index: 51,
         width: 50.0,
         height: 3.0,

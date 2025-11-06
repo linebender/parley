@@ -9,8 +9,6 @@ pub struct InlineBox {
     pub id: u64,
     /// Whether the box is in-flow (takes up space in the layout) or out-of-flow (e.g. absolutely positioned or floated)
     pub kind: InlineBoxKind,
-    /// Whether layout should break on this box
-    pub break_on_box: bool,
     /// The byte offset into the underlying text string at which the box should be placed.
     /// This must not be within a Unicode code point.
     pub index: usize,
@@ -20,8 +18,23 @@ pub struct InlineBox {
     pub height: f32,
 }
 
+/// Whether a box is in-flow (takes up space in the layout) or out-of-flow (e.g. absolutely positioned)
+/// or custom-out-of-flow (line-breaking should yield control flow)
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub enum InlineBoxKind {
+    /// `InFlow` boxes take up space in the layout and flow in line with text
+    ///
+    /// They correspond to `display: inline-block` boxes in CSS.
     InFlow,
+    /// `OutOfFlow` boxes are assigned a position as if they were a zero-sized inline box, but
+    /// do not take up space in the layout.
+    ///
+    /// They correspond to `position: absolute` boxes in CSS.
     OutOfFlow,
+    /// `CustomOutOfFlow` boxes also do not take up space in the layout, but they are not assigned a position
+    /// by Parley. When they are encountered, control flow is yielded back to the caller who is then responsible
+    /// for laying out the box.
+    ///
+    /// They can be used to implement advanced layout modes such as CSS's `float`
+    CustomOutOfFlow,
 }
