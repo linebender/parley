@@ -276,7 +276,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
                 return None;
             }
 
-            while let Some(style) = self.styles.next() {
+            for style in self.styles.by_ref() {
                 // Empty style ranges are disallowed.
                 assert!(style.range.start < style.range.end);
 
