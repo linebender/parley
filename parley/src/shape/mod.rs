@@ -297,7 +297,7 @@ fn shape_item<'a, B: Brush>(
 
     // Build an iterator of boundaries and consume the first segment to seed the loop
     let mut boundaries_iter = grapheme_cluster_boundaries.skip(1);
-    let mut last_boundary = 0usize;
+    let mut last_boundary = 0_usize;
     let Some(mut current_boundary) = boundaries_iter.next() else {
         return; // No clusters
     };
