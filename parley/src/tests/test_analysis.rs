@@ -118,19 +118,19 @@ fn test_latin_mixed_keep_all_last() {
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..1);
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 1..2);
     })
-        .expect_boundary_list(vec![Boundary::Word, Boundary::None])
-        .expect_bidi_embed_level_list(vec![0, 0])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-        ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-        ])
-        .expect_is_control_list(vec![false, false])
-        .expect_contributes_to_shaping_list(vec![true, true])
-        .expect_force_normalize_list(vec![false, false]);
+    .expect_boundary_list(vec![Boundary::Word, Boundary::None])
+    .expect_bidi_embed_level_list(vec![0, 0])
+    .expect_script_list(vec![
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(25),
+    ])
+    .expect_grapheme_cluster_break_list(vec![
+        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::from_icu4c_value(0),
+    ])
+    .expect_is_control_list(vec![false, false])
+    .expect_contributes_to_shaping_list(vec![true, true])
+    .expect_force_normalize_list(vec![false, false]);
 }
 
 #[test]
@@ -199,7 +199,7 @@ fn test_latin_mixed_keep_all_first() {
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..1);
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..2);
     })
-        .expect_boundary_list(vec![Boundary::Word, Boundary::None]);
+    .expect_boundary_list(vec![Boundary::Word, Boundary::None]);
 }
 
 #[test]
@@ -213,16 +213,16 @@ fn test_mixed_break_four_segments() {
         );
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 4..8);
     })
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::None,
-            Boundary::Line,
-            Boundary::Line,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-        ]);
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::None,
+        Boundary::Line,
+        Boundary::Line,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+    ]);
 }
 
 #[test]
@@ -235,7 +235,7 @@ fn test_alternate_twice_within_word_normal_break_normal() {
         );
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 2..3);
     })
-        .expect_boundary_list(vec![Boundary::Word, Boundary::Line, Boundary::None]);
+    .expect_boundary_list(vec![Boundary::Word, Boundary::Line, Boundary::None]);
 }
 
 #[test]
@@ -251,7 +251,7 @@ fn test_alternate_twice_within_word_break_normal_break() {
             2..3,
         );
     })
-        .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::Line]);
+    .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::Line]);
 }
 
 #[test]
@@ -263,13 +263,13 @@ fn test_latin_trailing_space_mixed() {
         );
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..3);
     })
-        .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::Word])
-        .expect_bidi_embed_level_list(vec![0, 0, 0])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-        ]);
+    .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::Word])
+    .expect_bidi_embed_level_list(vec![0, 0, 0])
+    .expect_script_list(vec![
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(0),
+    ]);
 }
 
 #[test]
@@ -281,13 +281,13 @@ fn test_latin_leading_space_mixed() {
         );
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..3);
     })
-        .expect_boundary_list(vec![Boundary::Word, Boundary::Line, Boundary::None])
-        .expect_bidi_embed_level_list(vec![0, 0, 0])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-        ]);
+    .expect_boundary_list(vec![Boundary::Word, Boundary::Line, Boundary::None])
+    .expect_bidi_embed_level_list(vec![0, 0, 0])
+    .expect_script_list(vec![
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(25),
+    ]);
 }
 
 #[test]
@@ -299,7 +299,7 @@ fn test_latin_mixed_break_all_last() {
             1..2,
         );
     })
-        .expect_boundary_list(vec![Boundary::Word, Boundary::Line]);
+    .expect_boundary_list(vec![Boundary::Word, Boundary::Line]);
 }
 
 #[test]
@@ -311,7 +311,7 @@ fn test_latin_mixed_break_all_first() {
         );
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..2);
     })
-        .expect_boundary_list(vec![Boundary::Word, Boundary::None]);
+    .expect_boundary_list(vec![Boundary::Word, Boundary::None]);
 }
 
 #[test]
@@ -376,26 +376,26 @@ fn test_mixed_break_frequent_alternation() {
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 6..7);
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 7..8);
     })
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::None,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-        ])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-        ]);
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::None,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+    ])
+    .expect_script_list(vec![
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(0),
+    ]);
 }
 
 #[test]
@@ -404,28 +404,28 @@ fn test_mixed_style() {
         builder.push(StyleProperty::FontWeight(FontWeight::new(400.0)), 0..3);
         builder.push(StyleProperty::FontWeight(FontWeight::new(700.0)), 3..9);
     })
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::None,
-            Boundary::Line,
-            Boundary::Word,
-            Boundary::None,
-            Boundary::Line,
-            Boundary::Word,
-            Boundary::Line,
-        ])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-        ]);
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::None,
+        Boundary::Line,
+        Boundary::Word,
+        Boundary::None,
+        Boundary::Line,
+        Boundary::Word,
+        Boundary::Line,
+    ])
+    .expect_script_list(vec![
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(25),
+    ]);
 }
 
 #[test]
@@ -482,22 +482,22 @@ fn test_multi_byte_chars_alternating_break_all() {
             13..14,
         );
     })
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-        ])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(17),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(17),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-        ]);
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+    ])
+    .expect_script_list(vec![
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(17),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(17),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(25),
+    ]);
 }
 
 #[test]
@@ -521,28 +521,28 @@ fn test_multi_byte_chars_varying_utf8_lengths_whitespace_separated() {
             16..19,
         );
     })
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::Word,
-            Boundary::Line,
-        ])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(17),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-        ]);
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::Word,
+        Boundary::Line,
+    ])
+    .expect_script_list(vec![
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(17),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(25),
+    ]);
 }
 
 #[test]
@@ -563,20 +563,20 @@ fn test_multi_byte_chars_varying_utf8_lengths() {
             12..14,
         );
     })
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::Line,
-        ])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(17),
-            Script::from_icu4c_value(25),
-        ]);
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::Line,
+    ])
+    .expect_script_list(vec![
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(17),
+        Script::from_icu4c_value(25),
+    ]);
 }
 
 #[test]
@@ -649,26 +649,26 @@ fn test_mixed_break_simple() {
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..1);
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 1..8);
     })
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-        ])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-        ]);
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+    ])
+    .expect_script_list(vec![
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(0),
+    ]);
 }
 
 #[test]
@@ -689,34 +689,34 @@ fn test_multi_char_grapheme_mixed_break_all() {
             6..7,
         );
     })
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-        ])
-        .expect_bidi_embed_level_list(vec![0, 0, 0, 0, 0, 0])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(1),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-        ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(3),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-        ])
-        .expect_is_control_list(vec![false, false, false, false, false, false])
-        .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
-        .expect_force_normalize_list(vec![false, false, false, true, false, false]);
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+    ])
+    .expect_bidi_embed_level_list(vec![0, 0, 0, 0, 0, 0])
+    .expect_script_list(vec![
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(1),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(25),
+    ])
+    .expect_grapheme_cluster_break_list(vec![
+        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::from_icu4c_value(3),
+        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::from_icu4c_value(0),
+    ])
+    .expect_is_control_list(vec![false, false, false, false, false, false])
+    .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
+    .expect_force_normalize_list(vec![false, false, false, true, false, false]);
 }
 
 #[test]
@@ -735,22 +735,22 @@ fn test_multi_byte_chars_alternating_keep_all() {
             13..14,
         );
     })
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::None,
-        ])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(17),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(17),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-        ]);
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::None,
+    ])
+    .expect_script_list(vec![
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(17),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(17),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(25),
+    ]);
 }
 
 #[test]
@@ -793,8 +793,8 @@ fn test_mixed_ltr_rtl_multiple_segments() {
             Boundary::None,
         ])
         .expect_bidi_embed_level_list(vec![
-            0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0,
-            1, 1, 1, 1, 1, 1,
+            0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1,
+            1, 1, 1, 1, 1,
         ])
         .expect_script_list(vec![
             Script::from_icu4c_value(25),
@@ -885,34 +885,34 @@ fn test_multi_char_grapheme_mixed_break_and_keep_all() {
         );
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 6..7);
     })
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-        ])
-        .expect_bidi_embed_level_list(vec![0, 0, 0, 0, 0, 0])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(1),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-        ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(3),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-        ])
-        .expect_is_control_list(vec![false, false, false, false, false, false])
-        .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
-        .expect_force_normalize_list(vec![false, false, false, true, false, false]);
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+    ])
+    .expect_bidi_embed_level_list(vec![0, 0, 0, 0, 0, 0])
+    .expect_script_list(vec![
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(1),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(25),
+    ])
+    .expect_grapheme_cluster_break_list(vec![
+        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::from_icu4c_value(3),
+        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::from_icu4c_value(0),
+    ])
+    .expect_is_control_list(vec![false, false, false, false, false, false])
+    .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
+    .expect_force_normalize_list(vec![false, false, false, true, false, false]);
 }
 
 #[test]
@@ -924,34 +924,34 @@ fn test_multi_char_grapheme_mixed_keep_all() {
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 5..6);
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 6..7);
     })
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-        ])
-        .expect_bidi_embed_level_list(vec![0, 0, 0, 0, 0, 0])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(1),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-        ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(3),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-        ])
-        .expect_is_control_list(vec![false, false, false, false, false, false])
-        .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
-        .expect_force_normalize_list(vec![false, false, false, true, false, false]);
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+    ])
+    .expect_bidi_embed_level_list(vec![0, 0, 0, 0, 0, 0])
+    .expect_script_list(vec![
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(1),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(25),
+    ])
+    .expect_grapheme_cluster_break_list(vec![
+        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::from_icu4c_value(3),
+        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::from_icu4c_value(0),
+    ])
+    .expect_is_control_list(vec![false, false, false, false, false, false])
+    .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
+    .expect_force_normalize_list(vec![false, false, false, true, false, false]);
 }
 
 #[test]
@@ -1043,8 +1043,8 @@ fn test_multi_paragraph_bidi() {
             true, false, false, false, false, false, false, false, false, false, false, false,
         ])
         .expect_contributes_to_shaping_list(vec![
-            true, true, true, true, true, true, true, true, true, true, true, true, false,
-            true, true, true, true, true, true, true, true, true, true, true,
+            true, true, true, true, true, true, true, true, true, true, true, true, false, true,
+            true, true, true, true, true, true, true, true, true, true,
         ]);
 }
 
@@ -1112,7 +1112,7 @@ fn test_three_chars() {
     verify_analysis("ABC", |builder| {
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..3);
     })
-        .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::None]);
+    .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::None]);
 }
 
 #[test]
@@ -1120,10 +1120,10 @@ fn test_single_char_multi_byte() {
     verify_analysis("€", |builder| {
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..3);
     })
-        .expect_boundary_list(vec![Boundary::Word])
-        .expect_bidi_embed_level_list(vec![0])
-        .expect_script_list(vec![Script::from_icu4c_value(0)])
-        .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::from_icu4c_value(0)]);
+    .expect_boundary_list(vec![Boundary::Word])
+    .expect_bidi_embed_level_list(vec![0])
+    .expect_script_list(vec![Script::from_icu4c_value(0)])
+    .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::from_icu4c_value(0)]);
 }
 
 #[test]
@@ -1185,12 +1185,12 @@ fn test_two_chars_keep_all() {
     verify_analysis("AB", |builder| {
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..2);
     })
-        .expect_boundary_list(vec![Boundary::Word, Boundary::None])
-        .expect_bidi_embed_level_list(vec![0, 0])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-        ]);
+    .expect_boundary_list(vec![Boundary::Word, Boundary::None])
+    .expect_bidi_embed_level_list(vec![0, 0])
+    .expect_script_list(vec![
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(25),
+    ]);
 }
 
 #[test]
@@ -1226,26 +1226,26 @@ fn test_whitespace_contiguous_interspersed_in_latin_mixed() {
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..3);
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 3..9);
     })
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::None,
-            Boundary::Line,
-            Boundary::Word,
-            Boundary::None,
-            Boundary::Line,
-            Boundary::Word,
-            Boundary::Line,
-        ])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-        ]);
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::None,
+        Boundary::Line,
+        Boundary::Word,
+        Boundary::None,
+        Boundary::Line,
+        Boundary::Word,
+        Boundary::Line,
+    ])
+    .expect_script_list(vec![
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(25),
+        Script::from_icu4c_value(0),
+        Script::from_icu4c_value(25),
+    ]);
 }

@@ -8,12 +8,12 @@ use peniko::{
     kurbo::Size,
 };
 
+use super::utils::{ColorBrush, FONT_STACK, TestEnv, asserts::assert_eq_layout_data_alignments};
+use crate::setting::Setting;
 use crate::{
     Alignment, AlignmentOptions, ContentWidths, FontFamily, FontSettings, FontStack, InlineBox,
     Layout, LineHeight, StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
 };
-use crate::setting::Setting;
-use super::utils::{ColorBrush, FONT_STACK, TestEnv, asserts::assert_eq_layout_data_alignments};
 
 #[test]
 fn plain_multiline_text() {

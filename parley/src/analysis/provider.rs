@@ -1,4 +1,7 @@
-#![allow(unsafe_code, reason = "ICU4X uses fast bytearray loading in its baked data sources.")]
+#![allow(
+    unsafe_code,
+    reason = "ICU4X uses fast bytearray loading in its baked data sources."
+)]
 #![allow(elided_lifetimes_in_paths)]
 #![allow(unreachable_pub)]
 

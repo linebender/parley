@@ -8,7 +8,7 @@ use alloc::{vec, vec::Vec};
 use super::FontContext;
 use super::builder::RangedBuilder;
 use super::resolve::tree::TreeStyleBuilder;
-use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle };
+use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle};
 use super::style::{Brush, TextStyle};
 
 use crate::analysis::{AnalysisDataSources, CharInfo};

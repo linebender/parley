@@ -10,11 +10,11 @@ use core::ops::Range;
 
 use alloc::vec::Vec;
 
+use crate::analysis::cluster::Whitespace;
+use crate::analysis::{Boundary, CharInfo};
 #[cfg(feature = "libm")]
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
-use crate::analysis::{Boundary, CharInfo};
-use crate::analysis::cluster::Whitespace;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct ClusterData {
@@ -365,7 +365,7 @@ impl<B: Brush> LayoutData<B> {
         letter_spacing: f32,
         source_text: &str,
         char_infos: &[(CharInfo, u16)], // From text analysis
-        text_range: Range<usize>,                             // The text range this run covers
+        text_range: Range<usize>,       // The text range this run covers
         coords: &[harfrust::NormalizedCoord],
     ) {
         let coords_start = self.coords.len();

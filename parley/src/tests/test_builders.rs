@@ -3,10 +3,10 @@
 
 //! Test that the various builders produce the same results.
 
-use std::borrow::Cow;
-use icu_segmenter::options::LineBreakWordOption;
 use fontique::{FontStyle, FontWeight, FontWidth};
+use icu_segmenter::options::LineBreakWordOption;
 use peniko::color::palette;
+use std::borrow::Cow;
 
 use super::utils::{ColorBrush, FONT_STACK, asserts::assert_eq_layout_data, create_font_context};
 use crate::{

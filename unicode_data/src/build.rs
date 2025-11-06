@@ -10,8 +10,8 @@ use icu_properties::{
         RegionalIndicator, Script, VariationSelector,
     },
 };
-use icu_provider::prelude::*;
 use icu_provider::prelude::icu_locale_core::locale;
+use icu_provider::prelude::*;
 use icu_provider_adapters::fork::ForkByMarkerProvider;
 use icu_provider_export::{
     DataLocaleFamily, DeduplicationStrategy, ExportDriver, blob_exporter::BlobExporter,

@@ -12,6 +12,7 @@ use icu_normalizer::{
     DecomposingNormalizerBorrowed,
 };
 use icu_properties::props::{GeneralCategory, GraphemeClusterBreak, Script};
+use icu_properties::{PropertyNamesShort, PropertyNamesShortBorrowed};
 use icu_provider::DataMarker;
 use icu_provider::buf::AsDeserializingBufferProvider;
 use icu_provider::{DataRequest, DataResponse, DynamicDataProvider};
@@ -20,7 +21,6 @@ use icu_segmenter::{
     GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter,
     LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed,
 };
-use icu_properties::{PropertyNamesShort, PropertyNamesShortBorrowed};
 use unicode_bidi::TextSource;
 use unicode_data::{CompositePropsV1, CompositePropsV1Data};
 
@@ -138,9 +138,15 @@ impl CharInfo {
     const CONTRIBUTES_TO_SHAPING_SHIFT: u8 = 4;
     const FORCE_NORMALIZE_SHIFT: u8 = 5;
 
-    #[allow(dead_code, reason = "To be used in more complete emoji checking, in select_font")]
+    #[allow(
+        dead_code,
+        reason = "To be used in more complete emoji checking, in select_font"
+    )]
     const VARIATION_SELECTOR_MASK: u8 = 1 << Self::VARIATION_SELECTOR_SHIFT;
-    #[allow(dead_code, reason = "To be used in more complete emoji checking, in select_font")]
+    #[allow(
+        dead_code,
+        reason = "To be used in more complete emoji checking, in select_font"
+    )]
     const REGION_INDICATOR_MASK: u8 = 1 << Self::REGION_INDICATOR_SHIFT;
     const CONTROL_MASK: u8 = 1 << Self::CONTROL_SHIFT;
     const EMOJI_OR_PICTOGRAPH_MASK: u8 = 1 << Self::EMOJI_OR_PICTOGRAPH_SHIFT;
@@ -173,13 +179,19 @@ impl CharInfo {
         }
     }
 
-    #[allow(dead_code, reason = "To be used in more complete emoji checking, in select_font")]
+    #[allow(
+        dead_code,
+        reason = "To be used in more complete emoji checking, in select_font"
+    )]
     #[inline(always)]
     pub(crate) fn is_variation_selector(&self) -> bool {
         self.flags & Self::VARIATION_SELECTOR_MASK != 0
     }
 
-    #[allow(dead_code, reason = "To be used in more complete emoji checking, in select_font")]
+    #[allow(
+        dead_code,
+        reason = "To be used in more complete emoji checking, in select_font"
+    )]
     #[inline(always)]
     pub(crate) fn is_region_indicator(&self) -> bool {
         self.flags & Self::REGION_INDICATOR_MASK != 0

@@ -140,7 +140,9 @@ impl ResolveContext {
             StyleProperty::FontWeight(value) => FontWeight(*value),
             StyleProperty::FontVariations(value) => FontVariations(self.resolve_variations(value)),
             StyleProperty::FontFeatures(value) => FontFeatures(self.resolve_features(value)),
-            StyleProperty::Locale(value) => Locale(value.and_then(|v| LanguageIdentifier::try_from_str(v).ok())),
+            StyleProperty::Locale(value) => {
+                Locale(value.and_then(|v| LanguageIdentifier::try_from_str(v).ok()))
+            }
             StyleProperty::Brush(value) => Brush(value.clone()),
             StyleProperty::Underline(value) => Underline(*value),
             StyleProperty::UnderlineOffset(value) => UnderlineOffset(value.map(|x| x * scale)),
@@ -174,7 +176,9 @@ impl ResolveContext {
             font_weight: raw_style.font_weight,
             font_variations: self.resolve_variations(&raw_style.font_variations),
             font_features: self.resolve_features(&raw_style.font_features),
-            locale: raw_style.locale.and_then(|v| LanguageIdentifier::try_from_str(v).ok()),
+            locale: raw_style
+                .locale
+                .and_then(|v| LanguageIdentifier::try_from_str(v).ok()),
             brush: raw_style.brush.clone(),
             underline: ResolvedDecoration {
                 enabled: raw_style.has_underline,

@@ -8,9 +8,11 @@ use icu_properties::props::Script;
 
 pub(crate) fn script_to_fontique(
     script: Script,
-    analysis_data_sources: &AnalysisDataSources
+    analysis_data_sources: &AnalysisDataSources,
 ) -> fontique::Script {
-    let short_name: [u8; 4] = analysis_data_sources.script_short_name().get(script)
+    let short_name: [u8; 4] = analysis_data_sources
+        .script_short_name()
+        .get(script)
         .unwrap_or("Zzzz")
         .as_bytes()
         .try_into()
