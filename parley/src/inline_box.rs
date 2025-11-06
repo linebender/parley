@@ -20,7 +20,7 @@ pub struct InlineBox {
     pub height: f32,
 }
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Copy)]
 pub enum InlineBoxKind {
     InFlow,
     OutOfFlow,
