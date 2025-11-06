@@ -1,3 +1,6 @@
+// Copyright 2025 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use crate::analysis::{BidiLevel, Boundary};
 use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty};
 use fontique::FontWeight;

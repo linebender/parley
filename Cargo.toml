@@ -48,7 +48,7 @@ parley_dev = { default-features = false, path = "parley_dev" }
 peniko = { version = "0.4.1", default-features = false }
 skrifa = { version = "0.37.0", default-features = false }
 smallvec = "1.15.1"
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", default-features = false, features = ["derive"] }
 read-fonts = { version = "0.35.0", default-features = false }
 swash = { version = "0.2.6", default-features = false }
 unicode-bidi = "0.3.18"

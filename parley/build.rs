@@ -1,3 +1,6 @@
+// Copyright 2025 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Builds ICU4X data providers for Parley (via `unicode_data`).
 
 fn main() {

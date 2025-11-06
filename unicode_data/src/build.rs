@@ -1,3 +1,6 @@
+// Copyright 2025 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Exposes functionality that allows for building ICU4X data providers.
 
 use icu_codepointtrie_builder::{CodePointTrieBuilder, CodePointTrieBuilderData};

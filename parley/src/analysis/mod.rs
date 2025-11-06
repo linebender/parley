@@ -1,7 +1,10 @@
+// Copyright 2025 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 pub(crate) mod cluster;
 mod provider;
 
-use std::marker::PhantomData;
+use core::marker::PhantomData;
 
 use crate::analysis::provider::{COMPOSITE_BLOB, PROVIDER};
 use crate::resolve::RangedStyle;

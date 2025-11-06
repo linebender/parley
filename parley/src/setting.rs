@@ -1,3 +1,6 @@
+// Copyright 2025 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 type Tag = u32;
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
 pub struct Setting<T> {
