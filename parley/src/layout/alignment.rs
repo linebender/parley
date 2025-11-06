@@ -110,11 +110,6 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
         let line_width = line.metrics.inline_max_coord - line.metrics.inline_min_coord;
         let free_space = line_width - line.metrics.advance + line.metrics.trailing_whitespace;
 
-        // FIXME: width should never be infinite.
-        if !line_width.is_finite() {
-            continue;
-        }
-
         if !options.align_when_overflowing && free_space <= 0.0 {
             if is_rtl {
                 // In RTL text, right-align on overflow.
