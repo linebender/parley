@@ -24,6 +24,7 @@ impl FamilyId {
     pub fn new() -> Self {
         /// Make sure this is larger than the largest generic family id.
         static ID_COUNTER: AtomicCounter = AtomicCounter::new(64);
+        #[allow(clippy::useless_conversion, reason = "Not useless on 32-bit platforms")]
         Self(ID_COUNTER.fetch_add(1, Ordering::Relaxed).into())
     }
 

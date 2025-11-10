@@ -24,6 +24,7 @@ impl SourceId {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         static ID_COUNTER: AtomicCounter = AtomicCounter::new(1);
+        #[allow(clippy::useless_conversion, reason = "Not useless on 32-bit platforms")]
         Self(ID_COUNTER.fetch_add(1, Ordering::Relaxed).into())
     }
 
