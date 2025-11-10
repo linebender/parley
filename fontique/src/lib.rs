@@ -66,3 +66,8 @@ pub use source::{SourceId, SourceInfo, SourceKind};
 #[cfg(all(feature = "system", target_vendor = "apple"))]
 use objc2 as _;
 pub use source_cache::{SourceCache, SourceCacheOptions};
+
+#[cfg(not(target_has_atomic = "64"))]
+use core::sync::atomic::AtomicU32 as AtomicCounter;
+#[cfg(target_has_atomic = "64")]
+use core::sync::atomic::AtomicU64 as AtomicCounter;
