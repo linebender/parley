@@ -1,6 +1,10 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use alloc::string::String;
+use alloc::vec;
+use alloc::vec::Vec;
+
 use crate::analysis::AnalysisDataSources;
 
 /// The maximum number of characters in a single cluster.

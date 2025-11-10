@@ -7,6 +7,7 @@
 use core::mem;
 use core::ops::RangeInclusive;
 
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use super::layout::Layout;

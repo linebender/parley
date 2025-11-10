@@ -4,6 +4,7 @@
 pub(crate) mod cluster;
 mod provider;
 
+use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use crate::analysis::provider::{COMPOSITE_BLOB, PROVIDER};
@@ -239,7 +240,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
     struct WordBreakSegmentIter<'a, I: Iterator, B: Brush> {
         text: &'a str,
         styles: I,
-        char_indices: std::str::CharIndices<'a>,
+        char_indices: core::str::CharIndices<'a>,
         current_char: (usize, char),
         building_range_start: usize,
         previous_word_break_style: LineBreakWordOption,
