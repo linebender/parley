@@ -3,7 +3,8 @@
 
 //! Model for font data.
 
-use core::sync::atomic::{AtomicU64, Ordering};
+use crate::AtomicCounter;
+use core::sync::atomic::Ordering;
 use linebender_resource_handle::Blob;
 #[cfg(feature = "std")]
 use {
@@ -22,8 +23,8 @@ impl SourceId {
     /// Creates a new unique identifier.
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
-        static ID_COUNTER: AtomicU64 = AtomicU64::new(1);
-        Self(ID_COUNTER.fetch_add(1, Ordering::Relaxed))
+        static ID_COUNTER: AtomicCounter = AtomicCounter::new(1);
+        Self(ID_COUNTER.fetch_add(1, Ordering::Relaxed).into())
     }
 
     /// Returns the underlying integer value.
