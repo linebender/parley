@@ -45,17 +45,7 @@ unicode-bidi = { workspace = true, features = ["smallvec"] }
 zerovec = { workspace = true }
 
 [build-dependencies]
-icu_normalizer = { workspace = true }
-icu_properties = { workspace = true }
-icu_provider = { workspace = true }
-icu = { version = "2" }
-databake = { version = "0.1", features = ["derive"] }
-icu_provider_export = { version = "2", features = ["baked_exporter", "blob_exporter"] }
-icu_provider_source = { workspace = true }
-icu_segmenter = { workspace = true }
 unicode_data = { workspace = true, features = ["build"] }
-icu_codepointtrie_builder = { version = "0.5.0", features = ["wasm"] }
-icu_provider_adapters = { version = "2.0.0", features = ["export"] }
 
 [dev-dependencies]
 parley_dev = { workspace = true }

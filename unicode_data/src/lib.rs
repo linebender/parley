@@ -113,7 +113,7 @@ impl Properties {
                 clippy::cast_possible_truncation,
                 reason = "bidi class data only occupies BIDI_BITS bits"
             )]
-            std::mem::transmute(self.get(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8)
+            core::mem::transmute(self.get(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8)
         }
     }
 

@@ -3,6 +3,7 @@
 
 //! Exposes functionality that allows for building ICU4X data providers.
 
+use alloc::{boxed::Box, vec::Vec};
 use icu_codepointtrie_builder::{CodePointTrieBuilder, CodePointTrieBuilderData};
 use icu_collections::codepointtrie::TrieType;
 use icu_locale::LocaleFallbacker;
@@ -54,10 +55,10 @@ fn unicode_to_unicode_bidi(bidi: BidiClass) -> unicode_bidi::BidiClass {
     match bidi {
         BidiClass::LeftToRight => unicode_bidi::BidiClass::L,
         BidiClass::RightToLeft => unicode_bidi::BidiClass::R,
-        BidiClass::ArabicNumber => unicode_bidi::BidiClass::AL,
         BidiClass::EuropeanNumber => unicode_bidi::BidiClass::EN,
         BidiClass::EuropeanSeparator => unicode_bidi::BidiClass::ES,
         BidiClass::EuropeanTerminator => unicode_bidi::BidiClass::ET,
+        BidiClass::ArabicNumber => unicode_bidi::BidiClass::AN,
         BidiClass::CommonSeparator => unicode_bidi::BidiClass::CS,
         BidiClass::ParagraphSeparator => unicode_bidi::BidiClass::B,
         BidiClass::SegmentSeparator => unicode_bidi::BidiClass::S,
@@ -157,8 +158,8 @@ impl DataProvider<CompositePropsV1> for CompositePropsProvider {
 }
 
 impl IterableDataProvider<CompositePropsV1> for CompositePropsProvider {
-    fn iter_ids(&self) -> Result<std::collections::BTreeSet<DataIdentifierCow<'_>>, DataError> {
-        let mut set = std::collections::BTreeSet::new();
+    fn iter_ids(&self) -> Result<alloc::collections::BTreeSet<DataIdentifierCow<'_>>, DataError> {
+        let mut set = alloc::collections::BTreeSet::new();
         set.insert(DataIdentifierCow::from_locale(DataLocale::default()));
         Ok(set)
     }
@@ -205,6 +206,7 @@ pub fn bake(out: std::path::PathBuf) {
             let mut o = icu_provider_export::baked_exporter::Options::default();
             o.overwrite = true;
             o.use_separate_crates = true;
+            o.pretty = true;
             o
         })
         .unwrap(),
