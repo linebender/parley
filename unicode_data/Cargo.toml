@@ -1,0 +1,28 @@
+[package]
+name = "unicode_data"
+keywords = ["text", "layout"]
+categories = ["gui", "graphics"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[features]
+default = ["baked"]
+baked = []
+datagen = ["dep:databake", "icu_provider/export", "icu_collections/databake"]
+
+[dependencies]
+icu_locale = { workspace = true }
+icu_properties = { workspace = true }
+icu_collections = { workspace = true, features = ["serde"] }
+icu_provider = { workspace = true, features = ["alloc"] }
+yoke = { workspace = true, features = ["derive"] }
+zerofrom = { workspace = true }
+unicode-bidi = { workspace = true, features = ["smallvec"] }
+serde = { workspace = true }
+databake = { workspace = true, features = ["derive"], optional = true }
+
+[lints]
+workspace = true

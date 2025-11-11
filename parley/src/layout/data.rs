@@ -8,10 +8,10 @@ use crate::util::nearly_zero;
 use crate::{FontData, LineHeight, OverflowWrap};
 use core::ops::Range;
 
-use swash::text::cluster::{Boundary, Whitespace};
-
 use alloc::vec::Vec;
 
+use crate::analysis::cluster::Whitespace;
+use crate::analysis::{Boundary, CharInfo};
 #[cfg(feature = "libm")]
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
@@ -264,7 +264,6 @@ pub(crate) struct LayoutItem {
 pub(crate) struct LayoutData<B: Brush> {
     pub(crate) scale: f32,
     pub(crate) quantize: bool,
-    pub(crate) has_bidi: bool,
     pub(crate) base_level: u8,
     pub(crate) text_len: usize,
     pub(crate) width: f32,
@@ -299,7 +298,6 @@ impl<B: Brush> Default for LayoutData<B> {
         Self {
             scale: 1.,
             quantize: true,
-            has_bidi: false,
             base_level: 0,
             text_len: 0,
             width: 0.,
@@ -325,7 +323,6 @@ impl<B: Brush> LayoutData<B> {
     pub(crate) fn clear(&mut self) {
         self.scale = 1.;
         self.quantize = true;
-        self.has_bidi = false;
         self.base_level = 0;
         self.text_len = 0;
         self.width = 0.;
@@ -367,8 +364,8 @@ impl<B: Brush> LayoutData<B> {
         word_spacing: f32,
         letter_spacing: f32,
         source_text: &str,
-        char_infos: &[(swash::text::cluster::CharInfo, u16)], // From text analysis
-        text_range: Range<usize>,                             // The text range this run covers
+        char_infos: &[(CharInfo, u16)], // From text analysis
+        text_range: Range<usize>,       // The text range this run covers
         coords: &[harfrust::NormalizedCoord],
     ) {
         let coords_start = self.coords.len();
@@ -611,7 +608,7 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
     scale_factor: f32,
     glyph_infos: &[harfrust::GlyphInfo],
     glyph_positions: &[harfrust::GlyphPosition],
-    char_infos: &[(swash::text::cluster::CharInfo, u16)],
+    char_infos: &[(CharInfo, u16)],
     char_indices_iter: I,
 ) -> f32 {
     let mut char_indices_iter = char_indices_iter.peekable();
@@ -873,7 +870,7 @@ impl From<&ClusterType> for u16 {
 
 fn push_cluster(
     clusters: &mut Vec<ClusterData>,
-    char_info: (swash::text::cluster::CharInfo, u16),
+    char_info: (CharInfo, u16),
     cluster_start_char: (usize, char),
     glyph_offset: u32,
     advance: f32,
@@ -907,7 +904,7 @@ fn push_cluster(
     };
 
     clusters.push(ClusterData {
-        info: ClusterInfo::new(char_info.0.boundary(), cluster_start_char.1),
+        info: ClusterInfo::new(char_info.0.boundary, cluster_start_char.1),
         flags: (&cluster_type).into(),
         style_index: char_info.1,
         glyph_len: final_glyph_len,

@@ -8,12 +8,12 @@ use peniko::{
     kurbo::Size,
 };
 
+use super::utils::{ColorBrush, FONT_STACK, TestEnv, asserts::assert_eq_layout_data_alignments};
+use crate::setting::Setting;
 use crate::{
     Alignment, AlignmentOptions, ContentWidths, FontFamily, FontSettings, FontStack, InlineBox,
     Layout, LineHeight, StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
 };
-
-use super::utils::{ColorBrush, FONT_STACK, TestEnv, asserts::assert_eq_layout_data_alignments};
 
 #[test]
 fn plain_multiline_text() {
@@ -575,15 +575,15 @@ fn font_features() {
     let text = "fi ".repeat(4);
     let mut builder = env.ranged_builder(&text);
     builder.push(
-        StyleProperty::FontFeatures(FontSettings::List(Cow::Borrowed(&[swash::Setting {
-            tag: swash::tag_from_bytes(b"liga"),
+        StyleProperty::FontFeatures(FontSettings::List(Cow::Borrowed(&[Setting {
+            tag: crate::setting::tag_from_bytes(*b"liga"),
             value: 1,
         }]))),
         0..5,
     );
     builder.push(
-        StyleProperty::FontFeatures(FontSettings::List(Cow::Borrowed(&[swash::Setting {
-            tag: swash::tag_from_bytes(b"liga"),
+        StyleProperty::FontFeatures(FontSettings::List(Cow::Borrowed(&[Setting {
+            tag: crate::setting::tag_from_bytes(*b"liga"),
             value: 0,
         }]))),
         5..10,
@@ -606,8 +606,8 @@ fn variable_fonts() {
             FontFamily::Named(Cow::Borrowed("Arimo")),
         )));
         builder.push_default(StyleProperty::FontVariations(FontSettings::List(
-            Cow::Borrowed(&[swash::Setting {
-                tag: swash::tag_from_bytes(b"wght"),
+            Cow::Borrowed(&[Setting {
+                tag: crate::setting::tag_from_bytes(*b"wght"),
                 value: wght,
             }]),
         )));
@@ -692,7 +692,7 @@ fn realign_all() {
         }
     }
 
-    // Loop over all the base truths ..
+    // Loop over all the base truths ...
     let mut idx = 0;
     for (text_idx, (_, text_name)) in texts.iter().enumerate() {
         for (_, align_name) in alignments {
@@ -703,7 +703,7 @@ fn realign_all() {
                 let base_name = format!("{text_name}_{align_name}_{opts_name}_{ma_name}");
                 //env.with_name(&base_name).check_layout_snapshot(&layout);
 
-                // .. and make sure every combination can be applied on top without issues
+                // ... and make sure every combination can be applied on top without issues
                 let mut jdx = text_idx * (layouts.len() / texts.len());
                 for (top_alignment, align_name) in alignments {
                     for (top_max_advance, top_opts, ma_name, opts_name) in all_opts {
