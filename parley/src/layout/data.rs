@@ -578,8 +578,12 @@ impl<B: Brush> LayoutData<B> {
                     let ibox = &self.inline_boxes[item.index];
                     running_max_width += ibox.width;
                     if text_wrap_mode == TextWrapMode::Wrap {
+                        let trailing_whitespace = whitespace_advance(prev_cluster);
+                        min_width = min_width.max(running_min_width - trailing_whitespace);
                         min_width = min_width.max(ibox.width);
                         running_min_width = 0.0;
+                    } else {
+                        running_min_width += ibox.width;
                     }
                     prev_cluster = None;
                 }
@@ -587,6 +591,9 @@ impl<B: Brush> LayoutData<B> {
             let trailing_whitespace = whitespace_advance(prev_cluster);
             max_width = max_width.max(running_max_width - trailing_whitespace);
         }
+
+        let trailing_whitespace = whitespace_advance(prev_cluster);
+        min_width = min_width.max(running_min_width - trailing_whitespace);
 
         ContentWidths {
             min: min_width,
