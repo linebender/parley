@@ -367,6 +367,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_STABLE_VER }}
+          components: rustfmt
 
       - name: restore cache
         uses: Swatinem/rust-cache@v2
