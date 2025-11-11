@@ -96,14 +96,14 @@ pub fn generate(out: std::path::PathBuf) {
         // Generate a small Rust file to embed the blob bytes
         std::fs::write(
         custom_data_dir.clone().join("mod.rs"),
-        "/// Backing data for the `CompositePropsV1` data provider.\npub const COMPOSITE_BLOB: &[u8] = include_bytes!(\"./composite.postcard\");",
+        "/// Backing data for the `CompositePropsV1` data provider.\npub const COMPOSITE_BLOB: &[u8] = include_bytes!(\"./composite.postcard\");\n",
     )
     .unwrap();
 
         // Write a small mod.rs file in `out` that re-exports the ICU baked data and the composite data.
         std::fs::write(
             out.clone().join("mod.rs"),
-            "mod icu4x_data;\nmod composite;\npub use icu4x_data::*;\npub use composite::*;\n",
+            "mod composite;\nmod icu4x_data;\npub use composite::*;\npub use icu4x_data::*;\n",
         )
         .unwrap();
     }
