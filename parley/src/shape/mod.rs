@@ -320,11 +320,7 @@ fn shape_item<'a, B: Brush>(
         let segment_start_offset = cluster_range.start as usize - text_range.start;
         let mut segment_end_offset = cluster_range.end as usize - text_range.start;
 
-        loop {
-            let Some(next_boundary) = boundaries_iter.next() else {
-                break; // End of current item - process final segment
-            };
-
+        while let Some(next_boundary) = boundaries_iter.next() {
             // Build next cluster in-place
             last_boundary = current_boundary;
             current_boundary = next_boundary;
