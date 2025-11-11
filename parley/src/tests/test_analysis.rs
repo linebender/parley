@@ -109,7 +109,7 @@ fn verify_analysis(
         // Apply test-specific configuration
         configure_builder(&mut builder);
 
-        _ = builder.build(&text);
+        _ = builder.build(text);
     }
 
     test_context

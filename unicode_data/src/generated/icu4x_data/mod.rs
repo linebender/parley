@@ -1,3 +1,6 @@
+// Copyright 2025 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 #![allow(clippy::allow_attributes_without_reason)]
 // @generated
 include!("normalizer_nfd_tables_v1.rs.data");
