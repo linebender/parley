@@ -7,6 +7,8 @@ members = [
     "parley_bench",
     "parley_core",
     "parley_dev",
+    "unicode_data",
+    "unicode_data_gen",
     "examples/tiny_skia_render",
     "examples/swash_render",
     "examples/vello_editor",
@@ -17,23 +19,44 @@ members = [
 edition = "2021"
 # Keep in sync with RUST_MIN_VER in .github/workflows/ci.yml, with the relevant README.md files
 # and with the MSRV in the `Unreleased` section of CHANGELOG.md.
-rust-version = "1.82"
+rust-version = "1.83"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/linebender/parley"
 
 [workspace.dependencies]
 accesskit = "0.21.0"
 bytemuck = { version = "1.23.2", default-features = false }
+databake = { version = "0.2", default-features = false, features = ["derive"] }
 fontique = { version = "0.6.0", default-features = false, path = "fontique" }
 harfrust = { version = "0.3.1", default-features = false }
 hashbrown = "0.15.5"
+icu_codepointtrie_builder = { version = "0.5.0", default-features = false, features = ["wasm"] }
+icu_collections = { version = "2.1.1", default-features = false }
+icu_locale = { version = "2.1.1", default-features = false }
+icu_locale_core = { version = "2.1.1", default-features = false }
+icu_normalizer = { version = "2.1.1", default-features = false }
+icu_properties = { version = "2.1.1", default-features = false }
+icu_provider = { version = "2.1.1", default-features = false }
+icu_provider_adapters = { version = "2.1.1", default-features = false }
+icu_provider_blob = { version = "2.1.1", default-features = false }
+icu_provider_export = { version = "2.1.1", default-features = false }
+icu_provider_source = { version = "2.1.1", default-features = false }
+icu_segmenter = { version = "2.1.1", default-features = false }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
 parley = { version = "0.6.0", default-features = false, path = "parley" }
+unicode_data = { path = "unicode_data", default-features = false }
+unicode_data_gen = { path = "unicode_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
 peniko = { version = "0.4.1", default-features = false }
 skrifa = { version = "0.37.0", default-features = false }
+smallvec = "1.15.1"
+serde = { version = "1", default-features = false }
 read-fonts = { version = "0.35.0", default-features = false }
 swash = { version = "0.2.6", default-features = false }
+unicode-bidi = { version = "0.3.18", default-features = false }
+yoke = { version = "0.8", default-features = false }
+zerofrom = { version = "0.1", default-features = false }
+zerovec = { version = "0.11.5", default-features = false }
 
 [workspace.lints]
 rust.unsafe_code = "deny"
