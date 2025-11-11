@@ -1,7 +1,9 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Command-line interface for generating Parley Unicode data.
+//! A small CLI that refreshes the Unicode artefacts checked into the `unicode_data` crate.
+//! It pulls data from the canonical ICU4X upstream sources, recomputes Parley's composite property trie, and
+//! writes Rust modules that can be embedded directly into the repository.
 
 fn main() {
     use std::{env, ffi::OsString, path::PathBuf, process};

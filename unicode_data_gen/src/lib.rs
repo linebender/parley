@@ -1,7 +1,7 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Unicode data as required by the Parley crate for efficient text analysis.
+//! See `./main.rs`.
 
 use alloc::{boxed::Box, vec::Vec};
 use icu_codepointtrie_builder::{CodePointTrieBuilder, CodePointTrieBuilderData};
