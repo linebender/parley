@@ -9,35 +9,20 @@ repository.workspace = true
 publish = false
 
 [features]
-default = ["build"]
-build = [
-    "icu_provider_source",
-    "icu_codepointtrie_builder",
-    "icu_provider_export",
-    "icu_normalizer",
-    "icu_segmenter",
-    "icu_provider_adapters",
-]
+default = ["baked"]
+baked = []
+datagen = ["dep:databake", "icu_provider/export"]
 
 [dependencies]
 icu_locale = { workspace = true }
-icu_properties = { workspace = true, features = ["datagen"] }
-icu_collections = { workspace = true, features = ["databake", "serde"] }
-icu_provider = { workspace = true, features = ["baked"] }
-icu_provider_source = { workspace = true, optional = true, features = ["networking", "use_wasm"] }
-yoke = { workspace = true }
+icu_properties = { workspace = true }
+icu_collections = { workspace = true, features = ["serde"] }
+icu_provider = { workspace = true, features = ["alloc"] }
+yoke = { workspace = true, features = ["derive"] }
 zerofrom = { workspace = true }
 unicode-bidi = { workspace = true, features = ["smallvec"] }
-icu_normalizer = { workspace = true, optional = true }
-icu_segmenter = { workspace = true, optional = true }
-icu_provider_export = { workspace = true, features = [
-    "baked_exporter",
-    "blob_exporter",
-], optional = true  }
-serde = { workspace = true, features = ["derive"] }
-databake = { workspace = true, features = ["derive"] }
-icu_codepointtrie_builder = { workspace = true, features = ["wasm"], optional = true }
-icu_provider_adapters = { workspace = true, features = ["export"], optional = true }
+serde = { workspace = true }
+databake = { workspace = true, features = ["derive"], optional = true }
 
 [lints]
 workspace = true

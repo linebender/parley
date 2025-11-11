@@ -1,26 +1,54 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+#![no_std]
+
 //! Unicode data as required by the Parley crate for efficient text analysis.
 
-use databake::Bake;
 use icu_collections::codepointtrie::CodePointTrie;
 use icu_properties::props::{GeneralCategory, GraphemeClusterBreak, Script};
 use zerofrom::ZeroFrom;
 
-#[cfg(feature = "build")]
-pub mod build;
+/// Baked data for the `CompositePropsV1` data provider.
+#[cfg(feature = "baked")]
+pub mod generated;
 
 /// A data provider of `CompositePropsV1`.
-#[derive(Clone, Debug, Eq, PartialEq, yoke::Yokeable, ZeroFrom, serde::Serialize, Bake)]
-#[databake(path = composite_props_marker)]
-#[derive(serde::Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, yoke::Yokeable, ZeroFrom)]
+#[cfg_attr(feature = "datagen", derive(databake::Bake))]
+#[cfg_attr(feature = "datagen", databake(path = composite_props_marker))]
 pub struct CompositePropsV1Data<'data> {
-    #[serde(borrow)]
     trie: CodePointTrie<'data, u32>,
 }
 
+#[cfg(feature = "datagen")]
 icu_provider::data_struct!(CompositePropsV1Data<'_>);
+
+impl serde::Serialize for CompositePropsV1Data<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_newtype_struct("CompositePropsV1Data", &self.trie)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CompositePropsV1Data<'de> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let trie = CodePointTrie::deserialize(deserializer)?;
+        Ok(CompositePropsV1Data { trie })
+    }
+}
+
+impl<'data> CompositePropsV1Data<'data> {
+    /// Creates a new `CompositePropsV1Data` from a `CodePointTrie`.
+    pub fn new(trie: CodePointTrie<'data, u32>) -> Self {
+        Self { trie }
+    }
+}
 
 icu_provider::data_marker!(
     /// Marker for the composite multi-property trie (locale-invariant singleton)
@@ -68,6 +96,35 @@ impl Properties {
         Self::IS_VARIATION_SELECTOR_SHIFT + Self::IS_VARIATION_SELECTOR_BITS;
     const IS_MANDATORY_LINE_BREAK_SHIFT: u32 =
         Self::IS_REGION_INDICATOR_SHIFT + Self::IS_REGION_INDICATOR_BITS;
+
+    /// Packs the given arguments into a single u32.
+    #[cfg(feature = "datagen")]
+    pub fn new(
+        script: Script,
+        gc: GeneralCategory,
+        gcb: GraphemeClusterBreak,
+        bidi: icu_properties::props::BidiClass,
+        is_emoji_or_pictographic: bool,
+        is_variation_selector: bool,
+        is_region_indicator: bool,
+        is_mandatory_linebreak: bool,
+    ) -> Self {
+        let s = script.to_icu4c_value() as u32;
+        let gc = gc as u32;
+        let gcb = gcb.to_icu4c_value() as u32;
+        let bidi = unicode_to_unicode_bidi(bidi) as u32;
+
+        Self(
+            (s << Self::SCRIPT_SHIFT)
+                | (gc << Self::GC_SHIFT)
+                | (gcb << Self::GCB_SHIFT)
+                | (bidi << Self::BIDI_SHIFT)
+                | ((is_emoji_or_pictographic as u32) << Self::IS_EMOJI_OR_PICTOGRAPH_SHIFT)
+                | ((is_variation_selector as u32) << Self::IS_VARIATION_SELECTOR_SHIFT)
+                | ((is_region_indicator as u32) << Self::IS_REGION_INDICATOR_SHIFT)
+                | ((is_mandatory_linebreak as u32) << Self::IS_MANDATORY_LINE_BREAK_SHIFT),
+        )
+    }
 
     #[inline(always)]
     fn get(&self, shift: u32, bits: u32) -> u32 {
@@ -168,5 +225,42 @@ impl Properties {
             Self::IS_MANDATORY_LINE_BREAK_SHIFT,
             Self::IS_MANDATORY_LINE_BREAK_BITS,
         ) != 0
+    }
+}
+
+impl From<Properties> for u32 {
+    fn from(value: Properties) -> Self {
+        value.0
+    }
+}
+
+#[cfg(feature = "datagen")]
+fn unicode_to_unicode_bidi(bidi: icu_properties::props::BidiClass) -> unicode_bidi::BidiClass {
+    use icu_properties::props::BidiClass;
+    match bidi {
+        BidiClass::LeftToRight => unicode_bidi::BidiClass::L,
+        BidiClass::RightToLeft => unicode_bidi::BidiClass::R,
+        BidiClass::EuropeanNumber => unicode_bidi::BidiClass::EN,
+        BidiClass::EuropeanSeparator => unicode_bidi::BidiClass::ES,
+        BidiClass::EuropeanTerminator => unicode_bidi::BidiClass::ET,
+        BidiClass::ArabicNumber => unicode_bidi::BidiClass::AN,
+        BidiClass::CommonSeparator => unicode_bidi::BidiClass::CS,
+        BidiClass::ParagraphSeparator => unicode_bidi::BidiClass::B,
+        BidiClass::SegmentSeparator => unicode_bidi::BidiClass::S,
+        BidiClass::WhiteSpace => unicode_bidi::BidiClass::WS,
+        BidiClass::OtherNeutral => unicode_bidi::BidiClass::ON,
+        BidiClass::LeftToRightEmbedding => unicode_bidi::BidiClass::LRE,
+        BidiClass::LeftToRightOverride => unicode_bidi::BidiClass::LRO,
+        BidiClass::ArabicLetter => unicode_bidi::BidiClass::AL,
+        BidiClass::RightToLeftEmbedding => unicode_bidi::BidiClass::RLE,
+        BidiClass::RightToLeftOverride => unicode_bidi::BidiClass::RLO,
+        BidiClass::PopDirectionalFormat => unicode_bidi::BidiClass::PDF,
+        BidiClass::NonspacingMark => unicode_bidi::BidiClass::NSM,
+        BidiClass::BoundaryNeutral => unicode_bidi::BidiClass::BN,
+        BidiClass::FirstStrongIsolate => unicode_bidi::BidiClass::FSI,
+        BidiClass::LeftToRightIsolate => unicode_bidi::BidiClass::LRI,
+        BidiClass::RightToLeftIsolate => unicode_bidi::BidiClass::RLI,
+        BidiClass::PopDirectionalIsolate => unicode_bidi::BidiClass::PDI,
+        _ => unreachable!("Invalid BidiClass: {:?}", bidi),
     }
 }

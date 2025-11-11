@@ -29,7 +29,7 @@ skrifa = { workspace = true }
 linebender_resource_handle = { workspace = true }
 fontique = { workspace = true }
 core_maths = { version = "0.1.1", optional = true }
-unicode_data = { workspace = true }
+unicode_data = { workspace = true, features = ["baked"] }
 accesskit = { workspace = true, optional = true }
 hashbrown = { workspace = true }
 harfrust = { workspace = true }
@@ -43,9 +43,6 @@ icu_segmenter = { workspace = true, features = ["auto"] }
 unicode-bidi = { workspace = true, features = ["smallvec"] }
 # Used in ICU4X baked data sources
 zerovec = { workspace = true }
-
-[build-dependencies]
-unicode_data = { workspace = true, features = ["build"] }
 
 [dev-dependencies]
 parley_dev = { workspace = true }

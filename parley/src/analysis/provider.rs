@@ -9,8 +9,29 @@
 #![allow(unreachable_pub)]
 #![allow(clippy::unseparated_literal_suffix)]
 
-include!(concat!(env!("OUT_DIR"), "/baked_data/mod.rs"));
-include!(concat!(env!("OUT_DIR"), "/baked_data/composite_blob.rs"));
+pub use unicode_data::generated::*;
+
+/// This macro requires the following crates:
+/// * `icu_collections`
+/// * `icu_normalizer`
+/// * `icu_properties`
+/// * `icu_provider`
+/// * `icu_segmenter`
+/// * `zerovec`
+macro_rules! impl_data_provider {
+    ($ provider : ty) => {
+        make_provider!($provider);
+        impl_normalizer_nfd_tables_v1!($provider);
+        impl_segmenter_break_grapheme_cluster_v1!($provider);
+        impl_segmenter_break_line_v1!($provider);
+        impl_normalizer_nfc_v1!($provider);
+        impl_segmenter_lstm_auto_v1!($provider);
+        impl_property_name_short_script_v1!($provider);
+        impl_normalizer_nfd_data_v1!($provider);
+        impl_segmenter_break_word_v1!($provider);
+        impl_segmenter_break_word_override_v1!($provider);
+    };
+}
 
 pub struct BakedProvider;
 impl_data_provider!(BakedProvider);

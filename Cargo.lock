@@ -4742,6 +4742,21 @@ name = "unicode_data"
 version = "0.0.0"
 dependencies = [
  "databake",
+ "icu_collections",
+ "icu_locale",
+ "icu_properties",
+ "icu_provider",
+ "serde",
+ "unicode-bidi",
+ "yoke",
+ "zerofrom",
+]
+
+[[package]]
+name = "unicode_data_gen"
+version = "0.0.0"
+dependencies = [
+ "databake",
  "icu_codepointtrie_builder",
  "icu_collections",
  "icu_locale",
@@ -4754,6 +4769,7 @@ dependencies = [
  "icu_segmenter",
  "serde",
  "unicode-bidi",
+ "unicode_data",
  "yoke",
  "zerofrom",
 ]
