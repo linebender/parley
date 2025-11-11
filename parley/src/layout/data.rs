@@ -5,7 +5,7 @@ use crate::inline_box::InlineBox;
 use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::nearly_zero;
-use crate::{FontData, LineHeight, OverflowWrap};
+use crate::{FontData, LineHeight, OverflowWrap, TextWrapMode};
 use core::ops::Range;
 
 use swash::text::cluster::{Boundary, Whitespace};
@@ -535,14 +535,15 @@ impl<B: Brush> LayoutData<B> {
         let mut min_width = 0.0_f32;
         let mut max_width = 0.0_f32;
 
+        let mut running_min_width = 0.0;
         let mut running_max_width = 0.0;
+        let mut text_wrap_mode = TextWrapMode::Wrap;
         let mut prev_cluster: Option<&ClusterData> = None;
         let is_rtl = self.base_level & 1 == 1;
         for item in &self.items {
             match item.kind {
                 LayoutItemKind::TextRun => {
                     let run = &self.runs[item.index];
-                    let mut running_min_width = 0.0;
                     let clusters = &self.clusters[run.cluster_range.clone()];
                     if is_rtl {
                         prev_cluster = clusters.first();
@@ -550,8 +551,12 @@ impl<B: Brush> LayoutData<B> {
                     for cluster in clusters {
                         let boundary = cluster.info.boundary();
                         let style = &self.styles[cluster.style_index as usize];
-                        if matches!(boundary, Boundary::Line | Boundary::Mandatory)
-                            || style.overflow_wrap == OverflowWrap::Anywhere
+                        let prev_text_wrap_mode = text_wrap_mode;
+                        text_wrap_mode = style.text_wrap_mode;
+                        if boundary == Boundary::Mandatory
+                            || (prev_text_wrap_mode == TextWrapMode::Wrap
+                                && (boundary == Boundary::Line
+                                    || style.overflow_wrap == OverflowWrap::Anywhere))
                         {
                             let trailing_whitespace = whitespace_advance(prev_cluster);
                             min_width = min_width.max(running_min_width - trailing_whitespace);
@@ -571,14 +576,24 @@ impl<B: Brush> LayoutData<B> {
                 }
                 LayoutItemKind::InlineBox => {
                     let ibox = &self.inline_boxes[item.index];
-                    min_width = min_width.max(ibox.width);
                     running_max_width += ibox.width;
+                    if text_wrap_mode == TextWrapMode::Wrap {
+                        let trailing_whitespace = whitespace_advance(prev_cluster);
+                        min_width = min_width.max(running_min_width - trailing_whitespace);
+                        min_width = min_width.max(ibox.width);
+                        running_min_width = 0.0;
+                    } else {
+                        running_min_width += ibox.width;
+                    }
                     prev_cluster = None;
                 }
             }
             let trailing_whitespace = whitespace_advance(prev_cluster);
             max_width = max_width.max(running_max_width - trailing_whitespace);
         }
+
+        let trailing_whitespace = whitespace_advance(prev_cluster);
+        min_width = min_width.max(running_min_width - trailing_whitespace);
 
         ContentWidths {
             min: min_width,

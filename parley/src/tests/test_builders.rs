@@ -12,7 +12,7 @@ use swash::text::WordBreakStrength;
 use super::utils::{ColorBrush, FONT_STACK, asserts::assert_eq_layout_data, create_font_context};
 use crate::{
     FontContext, FontSettings, FontStack, Layout, LayoutContext, LineHeight, OverflowWrap,
-    RangedBuilder, StyleProperty, TextStyle, TreeBuilder,
+    RangedBuilder, StyleProperty, TextStyle, TextWrapMode, TreeBuilder,
 };
 
 /// Set of options for [`build_layout_with_ranged`].
@@ -184,6 +184,7 @@ fn create_root_style() -> TextStyle<'static, ColorBrush> {
         letter_spacing: 1.5,
         word_break: WordBreakStrength::BreakAll,
         overflow_wrap: OverflowWrap::Anywhere,
+        text_wrap_mode: TextWrapMode::Wrap,
     }
 }
 

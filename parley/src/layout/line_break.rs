@@ -10,12 +10,12 @@ use swash::text::cluster::Whitespace;
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 
-use crate::OverflowWrap;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
 };
 use crate::style::Brush;
+use crate::{OverflowWrap, TextWrapMode};
 use swash::text::cluster::Boundary;
 
 use core::ops::Range;
@@ -42,6 +42,10 @@ struct LineState {
     /// Of the line currently being built, the maximum line height seen so far.
     /// This represents a lower-bound on the eventual line height of the line.
     running_line_height: f32,
+
+    /// We lag the text-wrap-mode by one cluster due to line-breaking boundaries only
+    /// being triggered on the cluster after the linebreak.
+    text_wrap_mode: TextWrapMode,
 }
 
 #[derive(Clone, Default)]
@@ -240,7 +244,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                     // If the box fits on the current line (or we are at the start of the current line)
                     // then simply move on to the next item
-                    if next_x <= max_advance {
+                    if next_x <= max_advance || self.state.line.text_wrap_mode != TextWrapMode::Wrap
+                    {
                         // println!("BOX FITS");
 
                         self.state.item_idx += 1;
@@ -290,7 +295,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let boundary = cluster.info().boundary();
                         let style = &self.layout.data.styles[cluster.data.style_index as usize];
 
-                        if boundary == Boundary::Line {
+                        // Lag text_wrap_mode style by one cluster
+                        let text_wrap_mode = self.state.line.text_wrap_mode;
+                        self.state.line.text_wrap_mode = style.text_wrap_mode;
+
+                        if boundary == Boundary::Line && text_wrap_mode == TextWrapMode::Wrap {
                             // We do not currently handle breaking within a ligature, so we ignore boundaries in such a position.
                             //
                             // We also don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
@@ -312,6 +321,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         } else if
                         // This text can contribute "emergency" line breaks.
                         style.overflow_wrap != OverflowWrap::Normal && !is_ligature_continuation
+                        && text_wrap_mode == TextWrapMode::Wrap
                         // If we're at the start of the line, this particular cluster will never fit, so it's not a valid emergency break opportunity.
                         && self.state.line.x != 0.0
                         {
@@ -337,11 +347,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         // println!("Cluster {} next_x: {}", self.state.cluster_idx, next_x);
 
-                        // if break_opportunity {
-                        //     println!("===");
-                        // }
-
-                        // If that x position does NOT exceed max_advance then we simply add the cluster(s) to the current line
+                        // If the content fits (the x position does NOT exceed max_advance)
+                        //
+                        // We simply append the cluster(s) to the current line
                         if next_x <= max_advance {
                             let line_height = run.metrics().line_height;
                             self.state.append_cluster_to_line(next_x, line_height);
@@ -350,10 +358,16 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 self.state.line.num_spaces += 1;
                             }
                         }
-                        // Else we line break:
+                        // Else we attempt to line break:
+                        //
+                        // This will only succeed if there is an available line-break opportunity that has been marked earlier
+                        // in the line. If there is no such line-breaking opportunity (such as if wrapping is disabled), then
+                        // we fall back to appending the content to the line anyway.
                         else {
-                            // Handle case where cluster is space character. Hang overflowing whitespace.
-                            if is_space {
+                            // Case: cluster is a space character (and wrapping is enabled)
+                            //
+                            // We hang any overflowing whitespace and then line-break.
+                            if is_space && text_wrap_mode == TextWrapMode::Wrap {
                                 let line_height = run.metrics().line_height;
                                 self.state.append_cluster_to_line(next_x, line_height);
                                 if try_commit_line!(BreakReason::Regular) {
@@ -362,7 +376,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     return self.start_new_line();
                                 }
                             }
-                            // Handle the (common) case where we have previously encountered a line-breaking opportunity in the current line
+                            // Case: we have previously encountered a REGULAR line-breaking opportunity in the current line
                             //
                             // We "take" the line-breaking opportunity by starting a new line and resetting our
                             // item/run/cluster iteration state back to how it was when the line-breaking opportunity was encountered
@@ -381,7 +395,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     return self.start_new_line();
                                 }
                             }
-                            // Otherwise perform an emergency line break
+                            // Case: we have previously encountered an EMERGENCY line-breaking opportunity in the current line
+                            //
+                            // We "take" the line-breaking opportunity by starting a new line and resetting our
+                            // item/run/cluster iteration state back to how it was when the line-breaking opportunity was encountered
                             else if let Some(prev_emergency) =
                                 self.state.emergency_boundary.take()
                             {
@@ -394,7 +411,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                                     return self.start_new_line();
                                 }
-                            } else {
+                            }
+                            // Case: no line-breaking opportunities available
+                            //
+                            // This can happen when wrapping is disabled (TextWrapMode::NoWrap) or when no wrapping opportunities
+                            // (according to our `OverflowWrap` and `WordBreak` styles) have yet been encountered.
+                            //
+                            // We fall back to appending the content to the line.
+                            else {
                                 let line_height = run.metrics().line_height;
                                 self.state.append_cluster_to_line(next_x, line_height);
                                 self.state.cluster_idx += 1;
