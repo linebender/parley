@@ -20,10 +20,7 @@ unicode-bidi = { workspace = true, features = ["smallvec"] }
 unicode_data = { workspace = true, default-features = false, features = ["datagen"] }
 icu_normalizer = { workspace = true }
 icu_segmenter = { workspace = true }
-icu_provider_export = { workspace = true, features = [
-    "baked_exporter",
-    "blob_exporter",
-]}
+icu_provider_export = { workspace = true, features = ["baked_exporter", "blob_exporter"] }
 serde = { workspace = true, features = ["derive"] }
 databake = { workspace = true, features = ["derive"] }
 icu_codepointtrie_builder = { workspace = true, features = ["wasm"] }
