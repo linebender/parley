@@ -26,6 +26,9 @@ use unicode_data::*;
 
 extern crate alloc;
 
+const COPYRIGHT_HEADER: &str =
+    "// Copyright 2025 the Parley Authors\n// SPDX-License-Identifier: Apache-2.0 OR MIT\n";
+
 /// Exports ICU data provider as Rust code into the `out` directory.
 pub fn generate(out: std::path::PathBuf) {
     let icu4x_source_provider = SourceDataProvider::new();
@@ -66,7 +69,8 @@ pub fn generate(out: std::path::PathBuf) {
         .expect("Datagen should be successful");
         std::fs::write(
             icu4x_data_dir.clone().join("mod.rs"),
-            "#![allow(clippy::allow_attributes_without_reason)]\n".to_string()
+            COPYRIGHT_HEADER.to_string()
+                + "\n#![allow(clippy::allow_attributes_without_reason)]\n"
                 + &std::fs::read_to_string(icu4x_data_dir.clone().join("mod.rs")).unwrap(),
         )
         .unwrap();
@@ -96,14 +100,14 @@ pub fn generate(out: std::path::PathBuf) {
         // Generate a small Rust file to embed the blob bytes
         std::fs::write(
         custom_data_dir.clone().join("mod.rs"),
-        "/// Backing data for the `CompositePropsV1` data provider.\npub const COMPOSITE_BLOB: &[u8] = include_bytes!(\"./composite.postcard\");\n",
+        COPYRIGHT_HEADER.to_string() + "\n/// Backing data for the `CompositePropsV1` data provider.\npub const COMPOSITE_BLOB: &[u8] = include_bytes!(\"./composite.postcard\");\n",
     )
     .unwrap();
 
         // Write a small mod.rs file in `out` that re-exports the ICU baked data and the composite data.
         std::fs::write(
             out.clone().join("mod.rs"),
-            "mod composite;\nmod icu4x_data;\npub use composite::*;\npub use icu4x_data::*;\n",
+            COPYRIGHT_HEADER.to_string() + "\nmod composite;\nmod icu4x_data;\npub use composite::*;\npub use icu4x_data::*;\n",
         )
         .unwrap();
     }
