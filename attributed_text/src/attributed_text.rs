@@ -19,6 +19,8 @@ pub enum ApplyAttributeError {
     InvalidBounds,
     /// The range has `start > end`.
     InvalidRange,
+    /// Either `start` or `end` is not on a UTF-8 character boundary.
+    NotOnCharBoundary,
 }
 
 impl core::fmt::Display for ApplyAttributeError {
@@ -26,6 +28,9 @@ impl core::fmt::Display for ApplyAttributeError {
         match self {
             Self::InvalidBounds => f.write_str("attribute range is out of bounds"),
             Self::InvalidRange => f.write_str("attribute range start is greater than end"),
+            Self::NotOnCharBoundary => {
+                f.write_str("attribute range must align to UTF-8 char boundaries")
+            }
         }
     }
 }
@@ -68,6 +73,9 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
         }
         if range.start > text_len || range.end > text_len {
             return Err(ApplyAttributeError::InvalidBounds);
+        }
+        if !self.text.is_char_boundary(range.start) || !self.text.is_char_boundary(range.end) {
+            return Err(ApplyAttributeError::NotOnCharBoundary);
         }
         self.attributes.push((range, attribute));
         Ok(())
@@ -149,5 +157,18 @@ mod tests {
             at.apply_attribute(7..8, TestAttribute::Keep),
             Err(ApplyAttributeError::InvalidBounds)
         );
+    }
+
+    #[test]
+    fn not_on_char_boundary() {
+        // "é" is 2 bytes in UTF-8; index 1 is not a boundary
+        let t = "éclair";
+        let mut at = AttributedText::new(t);
+        assert_eq!(
+            at.apply_attribute(1..2, TestAttribute::Keep),
+            Err(ApplyAttributeError::NotOnCharBoundary)
+        );
+        // Using proper boundaries is OK
+        assert_eq!(at.apply_attribute(0..2, TestAttribute::Keep), Ok(()));
     }
 }
