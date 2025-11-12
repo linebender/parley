@@ -78,7 +78,7 @@ impl unicode_bidi::BidiDataSource for CompositePropsV1Data<'_> {
 
 /// Unicode character properties relevant for text analysis.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, yoke::Yokeable, ZeroFrom)]
-#[cfg_attr(feature = "datagen", derive(databake::Bake))]
+#[cfg_attr(feature = "datagen", derive(databake::Bake, Default))]
 #[cfg_attr(feature = "datagen", databake(path = properties_marker))]
 pub struct Properties(u32);
 
@@ -171,6 +171,10 @@ impl Properties {
     /// Returns the bidirectional class for the character.
     #[inline(always)]
     pub fn bidi_class(&self) -> unicode_bidi::BidiClass {
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "bidi class data only occupies BIDI_BITS bits."
+        )]
         match self.get(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8 {
             0 => unicode_bidi::BidiClass::AL,
             1 => unicode_bidi::BidiClass::AN,
@@ -256,13 +260,6 @@ impl Properties {
     }
 }
 
-#[cfg(feature = "datagen")]
-impl Default for Properties {
-    fn default() -> Self {
-        Self(0)
-    }
-}
-
 impl From<Properties> for u32 {
     fn from(value: Properties) -> Self {
         value.0
@@ -275,14 +272,14 @@ impl zerovec::ule::AsULE for Properties {
         self.0.into()
     }
     fn from_unaligned(unaligned: Self::ULE) -> Self {
-        Properties(u32::from_le_bytes(unaligned.0))
+        Self(u32::from_le_bytes(unaligned.0))
     }
 }
 
 impl TrieValue for Properties {
     type TryFromU32Error = TryFromIntError;
     fn try_from_u32(i: u32) -> Result<Self, Self::TryFromU32Error> {
-        Ok(Properties(i))
+        Ok(Self(i))
     }
     fn to_u32(self) -> u32 {
         self.0
@@ -295,7 +292,7 @@ impl<'de> serde::Deserialize<'de> for Properties {
         D: serde::Deserializer<'de>,
     {
         let value = u32::deserialize(deserializer)?;
-        Ok(Properties(value))
+        Ok(Self(value))
     }
 }
 
