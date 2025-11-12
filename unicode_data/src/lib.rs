@@ -167,13 +167,34 @@ impl Properties {
     /// Returns the bidirectional class for the character.
     #[inline(always)]
     pub fn bidi_class(&self) -> unicode_bidi::BidiClass {
-        #[allow(unsafe_code, reason = "transmute u8 to repr(u8) enum")]
-        unsafe {
-            #[allow(
-                clippy::cast_possible_truncation,
-                reason = "bidi class data only occupies BIDI_BITS bits"
-            )]
-            core::mem::transmute(self.get(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8)
+        match self.get(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8 {
+            0 => unicode_bidi::BidiClass::AL,
+            1 => unicode_bidi::BidiClass::AN,
+            2 => unicode_bidi::BidiClass::B,
+            3 => unicode_bidi::BidiClass::BN,
+            4 => unicode_bidi::BidiClass::CS,
+            5 => unicode_bidi::BidiClass::EN,
+            6 => unicode_bidi::BidiClass::ES,
+            7 => unicode_bidi::BidiClass::ET,
+            8 => unicode_bidi::BidiClass::FSI,
+            9 => unicode_bidi::BidiClass::L,
+            10 => unicode_bidi::BidiClass::LRE,
+            11 => unicode_bidi::BidiClass::LRI,
+            12 => unicode_bidi::BidiClass::LRO,
+            13 => unicode_bidi::BidiClass::NSM,
+            14 => unicode_bidi::BidiClass::ON,
+            15 => unicode_bidi::BidiClass::PDF,
+            16 => unicode_bidi::BidiClass::PDI,
+            17 => unicode_bidi::BidiClass::R,
+            18 => unicode_bidi::BidiClass::RLE,
+            19 => unicode_bidi::BidiClass::RLI,
+            20 => unicode_bidi::BidiClass::RLO,
+            21 => unicode_bidi::BidiClass::S,
+            22 => unicode_bidi::BidiClass::WS,
+            val => {
+                debug_assert!(false, "Invalid BidiClass: {val}");
+                unicode_bidi::BidiClass::ON // Other Neutral
+            }
         }
     }
 
