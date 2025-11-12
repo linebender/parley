@@ -8,7 +8,9 @@
 
 #![no_std]
 
-use icu_collections::codepointtrie::CodePointTrie;
+use core::num::TryFromIntError;
+
+use icu_collections::codepointtrie::{CodePointTrie, TrieValue};
 use icu_properties::props::{GeneralCategory, GraphemeClusterBreak, Script};
 use zerofrom::ZeroFrom;
 
@@ -21,7 +23,7 @@ pub mod generated;
 #[cfg_attr(feature = "datagen", derive(databake::Bake))]
 #[cfg_attr(feature = "datagen", databake(path = composite_props_marker))]
 pub struct CompositePropsV1Data<'data> {
-    trie: CodePointTrie<'data, u32>,
+    trie: CodePointTrie<'data, Properties>,
 }
 
 #[cfg(feature = "datagen")]
@@ -48,7 +50,7 @@ impl<'de> serde::Deserialize<'de> for CompositePropsV1Data<'de> {
 
 impl<'data> CompositePropsV1Data<'data> {
     /// Creates a new `CompositePropsV1Data` from a `CodePointTrie`.
-    pub fn new(trie: CodePointTrie<'data, u32>) -> Self {
+    pub fn new(trie: CodePointTrie<'data, Properties>) -> Self {
         Self { trie }
     }
 }
@@ -64,7 +66,7 @@ impl CompositePropsV1Data<'_> {
     /// Returns the properties for a given character.
     #[inline(always)]
     pub fn properties(&self, ch: u32) -> Properties {
-        Properties(self.trie.get32(ch))
+        self.trie.get32(ch)
     }
 }
 
@@ -75,7 +77,9 @@ impl unicode_bidi::BidiDataSource for CompositePropsV1Data<'_> {
 }
 
 /// Unicode character properties relevant for text analysis.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, yoke::Yokeable, ZeroFrom)]
+#[cfg_attr(feature = "datagen", derive(databake::Bake))]
+#[cfg_attr(feature = "datagen", databake(path = properties_marker))]
 pub struct Properties(u32);
 
 impl Properties {
@@ -252,9 +256,55 @@ impl Properties {
     }
 }
 
+#[cfg(feature = "datagen")]
+impl Default for Properties {
+    fn default() -> Self {
+        Self(0)
+    }
+}
+
 impl From<Properties> for u32 {
     fn from(value: Properties) -> Self {
         value.0
+    }
+}
+
+impl zerovec::ule::AsULE for Properties {
+    type ULE = zerovec::ule::RawBytesULE<4>;
+    fn to_unaligned(self) -> Self::ULE {
+        self.0.into()
+    }
+    fn from_unaligned(unaligned: Self::ULE) -> Self {
+        Properties(u32::from_le_bytes(unaligned.0))
+    }
+}
+
+impl TrieValue for Properties {
+    type TryFromU32Error = TryFromIntError;
+    fn try_from_u32(i: u32) -> Result<Self, Self::TryFromU32Error> {
+        Ok(Properties(i))
+    }
+    fn to_u32(self) -> u32 {
+        self.0
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Properties {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = u32::deserialize(deserializer)?;
+        Ok(Properties(value))
+    }
+}
+
+impl serde::Serialize for Properties {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_newtype_struct("Properties", &self.0)
     }
 }
 
