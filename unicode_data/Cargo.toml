@@ -23,6 +23,7 @@ zerofrom = { workspace = true }
 unicode-bidi = { workspace = true, features = ["smallvec"] }
 serde = { workspace = true }
 databake = { workspace = true, features = ["derive"], optional = true }
+zerovec = { workspace = true }
 
 [lints]
 workspace = true

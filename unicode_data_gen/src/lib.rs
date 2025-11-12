@@ -153,7 +153,7 @@ impl DataProvider<CompositePropsV1> for CompositePropsProvider {
         let linebreak = linebreak_source.as_borrowed();
 
         // Dense values table for 0..=0x10FFFF
-        let mut values = Vec::<u32>::with_capacity(0x110000);
+        let mut values = Vec::<Properties>::with_capacity(0x110000);
         for cp in 0_u32..=0x10FFFF {
             let v = Properties::new(
                 script.get32(cp),
@@ -172,13 +172,13 @@ impl DataProvider<CompositePropsV1> for CompositePropsProvider {
                         | LineBreak::NextLine
                 ),
             );
-            values.push(v.into());
+            values.push(v);
         }
 
         let trie = CodePointTrieBuilder {
             data: CodePointTrieBuilderData::ValuesByCodePoint(&values),
-            default_value: 0, // not observed; we filled all entries
-            error_value: 0,
+            default_value: Properties::default(), // not observed; we filled all entries
+            error_value: Properties::default(),
             trie_type: TrieType::Small,
         }
         .build();

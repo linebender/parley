@@ -4750,6 +4750,7 @@ dependencies = [
  "unicode-bidi",
  "yoke",
  "zerofrom",
+ "zerovec",
 ]
 
 [[package]]
