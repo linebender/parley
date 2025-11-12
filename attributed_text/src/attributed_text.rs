@@ -10,15 +10,24 @@ use crate::TextStorage;
 /// The errors that might happen as a result of [applying] an attribute.
 ///
 /// [applying]: AttributedText::apply_attribute
-///
-/// TODO: impl Error for this.
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum ApplyAttributeError {
     /// The bounds given were invalid.
     ///
     /// TODO: Store some data about this here.
     InvalidBounds,
 }
+
+impl core::fmt::Display for ApplyAttributeError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::InvalidBounds => f.write_str("attribute range is out of bounds"),
+        }
+    }
+}
+
+impl core::error::Error for ApplyAttributeError {}
 
 /// A block of text with attributes applied to ranges within the text.
 #[derive(Debug)]
