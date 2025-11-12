@@ -17,12 +17,15 @@ pub enum ApplyAttributeError {
     ///
     /// TODO: Store some data about this here.
     InvalidBounds,
+    /// The range has `start > end`.
+    InvalidRange,
 }
 
 impl core::fmt::Display for ApplyAttributeError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::InvalidBounds => f.write_str("attribute range is out of bounds"),
+            Self::InvalidRange => f.write_str("attribute range start is greater than end"),
         }
     }
 }
@@ -60,6 +63,9 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
         attribute: Attr,
     ) -> Result<(), ApplyAttributeError> {
         let text_len = self.text.len();
+        if range.start > range.end {
+            return Err(ApplyAttributeError::InvalidRange);
+        }
         if range.start > text_len || range.end > text_len {
             return Err(ApplyAttributeError::InvalidBounds);
         }
@@ -120,6 +126,10 @@ mod tests {
         assert!(at.attributes_at(0).collect::<Vec<_>>().is_empty());
     }
 
+    #[expect(
+        clippy::reversed_empty_ranges,
+        reason = "We want an invalid range for testing."
+    )]
     #[test]
     fn bad_range_for_apply_attribute() {
         let t = "Hello!";
@@ -127,6 +137,10 @@ mod tests {
 
         assert_eq!(at.apply_attribute(0..3, TestAttribute::Keep), Ok(()));
         assert_eq!(at.apply_attribute(0..6, TestAttribute::Keep), Ok(()));
+        assert_eq!(
+            at.apply_attribute(4..3, TestAttribute::Keep),
+            Err(ApplyAttributeError::InvalidRange)
+        );
         assert_eq!(
             at.apply_attribute(0..7, TestAttribute::Keep),
             Err(ApplyAttributeError::InvalidBounds)
