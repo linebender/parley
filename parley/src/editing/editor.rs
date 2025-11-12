@@ -453,113 +453,116 @@ where
     }
 
     /// Move the cursor to the start of the buffer.
-    pub fn move_to_text_start(&mut self) {
+    pub fn move_to_text_start(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(self.editor.selection.move_lines(
             &self.editor.layout,
             isize::MIN,
-            false,
+            extend,
         ));
     }
 
     /// Move the cursor to just after the previous hard line break (such as `\n`).
-    pub fn move_to_hard_line_start(&mut self) {
+    pub fn move_to_hard_line_start(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
-                .hard_line_start(&self.editor.layout, false),
+                .hard_line_start(&self.editor.layout, extend),
         );
     }
 
     /// Move the cursor to the start of the physical line.
-    pub fn move_to_line_start(&mut self) {
+    pub fn move_to_line_start(&mut self, extend: bool) {
         self.refresh_layout();
-        self.editor
-            .set_selection(self.editor.selection.line_start(&self.editor.layout, false));
+        self.editor.set_selection(
+            self.editor
+                .selection
+                .line_start(&self.editor.layout, extend),
+        );
     }
 
     /// Move the cursor to the end of the buffer.
-    pub fn move_to_text_end(&mut self) {
+    pub fn move_to_text_end(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(self.editor.selection.move_lines(
             &self.editor.layout,
             isize::MAX,
-            false,
+            extend,
         ));
     }
 
     /// Move the cursor to just before the next hard line break (such as `\n`).
-    pub fn move_to_hard_line_end(&mut self) {
+    pub fn move_to_hard_line_end(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
-                .hard_line_end(&self.editor.layout, false),
+                .hard_line_end(&self.editor.layout, extend),
         );
     }
 
     /// Move the cursor to the end of the physical line.
-    pub fn move_to_line_end(&mut self) {
+    pub fn move_to_line_end(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor
-            .set_selection(self.editor.selection.line_end(&self.editor.layout, false));
+            .set_selection(self.editor.selection.line_end(&self.editor.layout, extend));
     }
 
     /// Move up to the closest physical cluster boundary on the previous line, preserving the horizontal position for repeated movements.
-    pub fn move_up(&mut self) {
+    pub fn move_up(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
-                .previous_line(&self.editor.layout, false),
+                .previous_line(&self.editor.layout, extend),
         );
     }
 
     /// Move down to the closest physical cluster boundary on the next line, preserving the horizontal position for repeated movements.
-    pub fn move_down(&mut self) {
+    pub fn move_down(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor
-            .set_selection(self.editor.selection.next_line(&self.editor.layout, false));
+            .set_selection(self.editor.selection.next_line(&self.editor.layout, extend));
     }
 
     /// Move to the next cluster left in visual order.
-    pub fn move_left(&mut self) {
+    pub fn move_left(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
-                .previous_visual(&self.editor.layout, false),
+                .previous_visual(&self.editor.layout, extend),
         );
     }
 
     /// Move to the next cluster right in visual order.
-    pub fn move_right(&mut self) {
+    pub fn move_right(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
-                .next_visual(&self.editor.layout, false),
+                .next_visual(&self.editor.layout, extend),
         );
     }
 
     /// Move to the next word boundary left.
-    pub fn move_word_left(&mut self) {
+    pub fn move_word_left(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
-                .previous_visual_word(&self.editor.layout, false),
+                .previous_visual_word(&self.editor.layout, extend),
         );
     }
 
     /// Move to the next word boundary right.
-    pub fn move_word_right(&mut self) {
+    pub fn move_word_right(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(
             self.editor
                 .selection
-                .next_visual_word(&self.editor.layout, false),
+                .next_visual_word(&self.editor.layout, extend),
         );
     }
 
@@ -575,114 +578,6 @@ where
     /// Collapse selection into caret.
     pub fn collapse_selection(&mut self) {
         self.editor.set_selection(self.editor.selection.collapse());
-    }
-
-    /// Move the selection focus point to the start of the buffer.
-    pub fn select_to_text_start(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(self.editor.selection.move_lines(
-            &self.editor.layout,
-            isize::MIN,
-            true,
-        ));
-    }
-
-    /// Move the selection focus point to just after the previous hard line break (such as `\n`).
-    pub fn select_to_hard_line_start(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(
-            self.editor
-                .selection
-                .hard_line_start(&self.editor.layout, true),
-        );
-    }
-
-    /// Move the selection focus point to the start of the physical line.
-    pub fn select_to_line_start(&mut self) {
-        self.refresh_layout();
-        self.editor
-            .set_selection(self.editor.selection.line_start(&self.editor.layout, true));
-    }
-
-    /// Move the selection focus point to the end of the buffer.
-    pub fn select_to_text_end(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(self.editor.selection.move_lines(
-            &self.editor.layout,
-            isize::MAX,
-            true,
-        ));
-    }
-
-    /// Move the selection focus point to just before the next hard line break (such as `\n`).
-    pub fn select_to_hard_line_end(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(
-            self.editor
-                .selection
-                .hard_line_end(&self.editor.layout, true),
-        );
-    }
-
-    /// Move the selection focus point to the end of the physical line.
-    pub fn select_to_line_end(&mut self) {
-        self.refresh_layout();
-        self.editor
-            .set_selection(self.editor.selection.line_end(&self.editor.layout, true));
-    }
-
-    /// Move the selection focus point up to the nearest cluster boundary on the previous line, preserving the horizontal position for repeated movements.
-    pub fn select_up(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(
-            self.editor
-                .selection
-                .previous_line(&self.editor.layout, true),
-        );
-    }
-
-    /// Move the selection focus point down to the nearest cluster boundary on the next line, preserving the horizontal position for repeated movements.
-    pub fn select_down(&mut self) {
-        self.refresh_layout();
-        self.editor
-            .set_selection(self.editor.selection.next_line(&self.editor.layout, true));
-    }
-
-    /// Move the selection focus point to the next cluster left in visual order.
-    pub fn select_left(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(
-            self.editor
-                .selection
-                .previous_visual(&self.editor.layout, true),
-        );
-    }
-
-    /// Move the selection focus point to the next cluster right in visual order.
-    pub fn select_right(&mut self) {
-        self.refresh_layout();
-        self.editor
-            .set_selection(self.editor.selection.next_visual(&self.editor.layout, true));
-    }
-
-    /// Move the selection focus point to the next word boundary left.
-    pub fn select_word_left(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(
-            self.editor
-                .selection
-                .previous_visual_word(&self.editor.layout, true),
-        );
-    }
-
-    /// Move the selection focus point to the next word boundary right.
-    pub fn select_word_right(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(
-            self.editor
-                .selection
-                .next_visual_word(&self.editor.layout, true),
-        );
     }
 
     /// Select the word at the point.
