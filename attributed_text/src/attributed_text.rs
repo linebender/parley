@@ -36,6 +36,14 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
         }
     }
 
+    /// Borrow the underlying text as `&str` when the storage is contiguous.
+    pub fn as_str(&self) -> &str
+    where
+        T: AsRef<str>,
+    {
+        self.text.as_ref()
+    }
+
     /// Apply an `attribute` to a `range` within the text.
     pub fn apply_attribute(
         &mut self,
