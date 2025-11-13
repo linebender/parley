@@ -57,15 +57,10 @@ impl PartialEq<&'_ str> for SplitString<'_> {
     fn eq(&self, other: &&'_ str) -> bool {
         let [a, b] = self.0;
         let mid = a.len();
-        // When our MSRV is 1.80 or above, use split_at_checked instead.
-        // is_char_boundary checks bounds
-        let (a_1, b_1) = if other.is_char_boundary(mid) {
-            other.split_at(mid)
-        } else {
-            return false;
-        };
-
-        a_1 == a && b_1 == b
+        match other.split_at_checked(mid) {
+            Some((a_1, b_1)) => a_1 == a && b_1 == b,
+            None => false,
+        }
     }
 }
 // We intentionally choose not to:
