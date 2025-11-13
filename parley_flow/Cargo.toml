@@ -1,0 +1,25 @@
+[package]
+name = "parley_flow"
+description = "High-level text surfaces, multi-selection, and document aggregation on top of parley"
+keywords = ["text", "layout", "flow"]
+categories = ["gui", "graphics"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+exclude = ["/tests"]
+readme = "README.md"
+
+[package.metadata.docs.rs]
+all-features = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["std"]
+std = ["parley/std"]
+libm = ["parley/libm"]
+
+[dependencies]
+parley = { workspace = true }

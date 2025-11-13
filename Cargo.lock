@@ -2784,6 +2784,13 @@ name = "parley_dev"
 version = "0.0.0"
 
 [[package]]
+name = "parley_flow"
+version = "0.0.0"
+dependencies = [
+ "parley",
+]
+
+[[package]]
 name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
