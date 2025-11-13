@@ -245,7 +245,7 @@ impl Editor {
                         if state.modifiers.shift() {
                             drv.shift_click_extension(cursor_pos.0, cursor_pos.1);
                         } else {
-                            drv.move_to_point(cursor_pos.0, cursor_pos.1);
+                            drv.move_to_point(cursor_pos.0, cursor_pos.1, false);
                         }
                     }
                 }
@@ -259,7 +259,7 @@ impl Editor {
                 );
                 self.cursor_reset();
                 self.driver()
-                    .extend_selection_to_point(cursor_pos.0, cursor_pos.1);
+                    .move_to_point(cursor_pos.0, cursor_pos.1, true);
             }
             _ => {}
         }
