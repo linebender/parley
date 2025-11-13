@@ -29,7 +29,7 @@ The `move_*` methods on `PlainEditorDrv` now have a `bool` parameter, pass `fals
 
 #### Parley
 
-- The methods `select_to_text_start`, `select_to_hard_line_start`, `select_to_text_end`, `select_to_hard_line_end`, `select_to_line_end`, `select_up`, `select_down`, `select_left`, `select_right`, `select_word_left` and `select_word_right` have been removed from `PlainEditorDriver`. ([#459][] by [@ickshonpe][])
+- The methods `extend_selection_to_byte`, `select_to_text_start`, `select_to_hard_line_start`, `select_to_text_end`, `select_to_hard_line_end`, `select_to_line_end`, `select_up`, `select_down`, `select_left`, `select_right`, `select_word_left` and `select_word_right` have been removed from `PlainEditorDriver`. ([#459][] by [@ickshonpe][])
 
 
 ## [0.6.0] - 2025-10-06

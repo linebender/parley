@@ -444,15 +444,20 @@ where
     /// Move the cursor to a byte index.
     ///
     /// No-op if index is not a char boundary.
-    pub fn move_to_byte(&mut self, index: usize) {
+    /// If `extend` is true, the current selection will be extended.
+    pub fn move_to_byte(&mut self, index: usize, extend: bool) {
         if self.editor.buffer.is_char_boundary(index) {
             self.refresh_layout();
-            self.editor
-                .set_selection(self.editor.cursor_at(index).into());
+            self.editor.set_selection(if extend {
+                self.editor.selection.extend(self.editor.cursor_at(index))
+            } else {
+                self.editor.cursor_at(index).into()
+            });
         }
     }
 
     /// Move the cursor to the start of the buffer.
+    /// If `extend` is true, the current selection will be extended.
     pub fn move_to_text_start(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(self.editor.selection.move_lines(
@@ -463,6 +468,7 @@ where
     }
 
     /// Move the cursor to just after the previous hard line break (such as `\n`).
+    /// If `extend` is true, the current selection will be extended.
     pub fn move_to_hard_line_start(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(
@@ -473,6 +479,7 @@ where
     }
 
     /// Move the cursor to the start of the physical line.
+    /// If `extend` is true, the current selection will be extended.
     pub fn move_to_line_start(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(
@@ -483,6 +490,7 @@ where
     }
 
     /// Move the cursor to the end of the buffer.
+    /// If `extend` is true, the current selection will be extended.
     pub fn move_to_text_end(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(self.editor.selection.move_lines(
@@ -493,6 +501,7 @@ where
     }
 
     /// Move the cursor to just before the next hard line break (such as `\n`).
+    /// If `extend` is true, the current selection will be extended.
     pub fn move_to_hard_line_end(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(
@@ -503,6 +512,7 @@ where
     }
 
     /// Move the cursor to the end of the physical line.
+    /// If `extend` is true, the current selection will be extended.
     pub fn move_to_line_end(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor
@@ -510,6 +520,7 @@ where
     }
 
     /// Move up to the closest physical cluster boundary on the previous line, preserving the horizontal position for repeated movements.
+    /// If `extend` is true, the current selection will be extended.
     pub fn move_up(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(
@@ -520,6 +531,7 @@ where
     }
 
     /// Move down to the closest physical cluster boundary on the next line, preserving the horizontal position for repeated movements.
+    /// If `extend` is true, the current selection will be extended.
     pub fn move_down(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor
@@ -527,6 +539,7 @@ where
     }
 
     /// Move to the next cluster left in visual order.
+    /// If `extend` is true, the current selection will be extended.
     pub fn move_left(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(
@@ -537,6 +550,7 @@ where
     }
 
     /// Move to the next cluster right in visual order.
+    /// If `extend` is true, the current selection will be extended.
     pub fn move_right(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(
@@ -547,6 +561,7 @@ where
     }
 
     /// Move to the next word boundary left.
+    /// If `extend` is true, the current selection will be extended.
     pub fn move_word_left(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(
@@ -557,6 +572,7 @@ where
     }
 
     /// Move to the next word boundary right.
+    /// If `extend` is true, the current selection will be extended.
     pub fn move_word_right(&mut self, extend: bool) {
         self.refresh_layout();
         self.editor.set_selection(
@@ -630,17 +646,6 @@ where
                     .selection
                     .shift_click_extension(&self.editor.layout, x, y),
             );
-    }
-
-    /// Move the selection focus point to a byte index.
-    ///
-    /// No-op if index is not a char boundary.
-    pub fn extend_selection_to_byte(&mut self, index: usize) {
-        if self.editor.buffer.is_char_boundary(index) {
-            self.refresh_layout();
-            self.editor
-                .set_selection(self.editor.selection.extend(self.editor.cursor_at(index)));
-        }
     }
 
     /// Select a range of byte indices.
