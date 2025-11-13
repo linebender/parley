@@ -48,7 +48,7 @@ fn test_wrap_with_custom_text(
 
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(wrap_width));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -142,7 +142,7 @@ fn overflow_wrap_anywhere_min_content_width() {
     let mut layout = builder.build(text);
 
     layout.break_all_lines(Some(layout.calculate_content_widths().min));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -157,7 +157,7 @@ fn overflow_wrap_break_word_min_content_width() {
     let mut layout = builder.build(text);
 
     layout.break_all_lines(Some(layout.calculate_content_widths().min));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -224,7 +224,7 @@ fn word_break_break_all_min_content_width() {
     let mut layout = builder.build(text);
 
     layout.break_all_lines(Some(layout.calculate_content_widths().min));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
     // This snapshot will have slightly different line wrapping than the corresponding overflow-wrap test. This is to be
     // expected and matches browser/CSS behavior.
     env.check_layout_snapshot(&layout);
@@ -259,7 +259,7 @@ fn word_break_keep_all() {
         let mut layout = builder.build(text);
 
         layout.break_all_lines(Some(wrap_width));
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
         env.with_name(name).check_layout_snapshot(&layout);
     };
 
