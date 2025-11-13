@@ -13,16 +13,16 @@ fn editor_simple_move() {
     let mut editor = env.editor("Hi, all!\nNext");
     env.check_editor_snapshot(&mut editor);
     let mut drv = env.driver(&mut editor);
-    drv.move_right();
-    drv.move_right();
-    drv.move_right();
+    drv.move_right(false);
+    drv.move_right(false);
+    drv.move_right(false);
 
     env.check_editor_snapshot(&mut editor);
-    env.driver(&mut editor).move_down();
+    env.driver(&mut editor).move_down(false);
     env.check_editor_snapshot(&mut editor);
-    env.driver(&mut editor).move_left();
+    env.driver(&mut editor).move_left(false);
     env.check_editor_snapshot(&mut editor);
-    env.driver(&mut editor).move_up();
+    env.driver(&mut editor).move_up(false);
     env.check_editor_snapshot(&mut editor);
 }
 
@@ -39,28 +39,28 @@ fn editor_select_hard_line() {
     let mut env = TestEnv::new(test_name!(), None);
     let mut editor = env.editor("First\nNew Hard Line with soft break!\nLast");
     editor.set_width(Some(40.));
-    env.driver(&mut editor).move_right();
+    env.driver(&mut editor).move_right(false);
     // We can select the first line.
-    env.driver(&mut editor).select_to_hard_line_end();
+    env.driver(&mut editor).move_to_hard_line_end(true);
     env.check_editor_snapshot(&mut editor);
-    env.driver(&mut editor).move_to_hard_line_start();
+    env.driver(&mut editor).move_to_hard_line_start(false);
     env.check_editor_snapshot(&mut editor);
-    env.driver(&mut editor).move_down();
-    env.driver(&mut editor).move_to_hard_line_end();
+    env.driver(&mut editor).move_down(false);
+    env.driver(&mut editor).move_to_hard_line_end(false);
     env.check_editor_snapshot(&mut editor);
-    env.driver(&mut editor).select_to_hard_line_start();
+    env.driver(&mut editor).move_to_hard_line_start(true);
     env.check_editor_snapshot(&mut editor);
-    env.driver(&mut editor).move_right();
+    env.driver(&mut editor).move_right(false);
     // Cursor is logically after the newline; there's not really any great answer here.
-    env.driver(&mut editor).select_to_hard_line_start();
+    env.driver(&mut editor).move_to_hard_line_start(true);
     env.check_editor_snapshot(&mut editor);
 
     // We can select the last line.
-    env.driver(&mut editor).move_right();
-    env.driver(&mut editor).move_right();
-    env.driver(&mut editor).move_to_hard_line_end();
+    env.driver(&mut editor).move_right(false);
+    env.driver(&mut editor).move_right(false);
+    env.driver(&mut editor).move_to_hard_line_end(false);
     env.check_editor_snapshot(&mut editor);
-    env.driver(&mut editor).select_to_hard_line_start();
+    env.driver(&mut editor).move_to_hard_line_start(true);
     env.check_editor_snapshot(&mut editor);
 }
 
