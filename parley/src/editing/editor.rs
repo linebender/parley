@@ -435,10 +435,20 @@ where
 
     // --- MARK: Cursor Movement ---
     /// Move the cursor to the cluster boundary nearest this point in the layout.
-    pub fn move_to_point(&mut self, x: f32, y: f32) {
+    /// If `extend` is true, the current selection will be extended.
+    ///
+    /// If the initial selection was created from a word or line, then the new
+    /// selection will be extended at the same granularity.
+    pub fn move_to_point(&mut self, x: f32, y: f32, extend: bool) {
         self.refresh_layout();
-        self.editor
-            .set_selection(Selection::from_point(&self.editor.layout, x, y));
+        self.editor.set_selection(if extend {
+            // FIXME: This is usually the wrong way to handle selection extension for mouse moves, but not a regression.
+            self.editor
+                .selection
+                .extend_to_point(&self.editor.layout, x, y)
+        } else {
+            Selection::from_point(&self.editor.layout, x, y)
+        });
     }
 
     /// Move the cursor to a byte index.
@@ -621,20 +631,6 @@ where
         self.refresh_layout();
         let hard_line = Selection::hard_line_from_point(&self.editor.layout, x, y);
         self.editor.set_selection(hard_line);
-    }
-
-    /// Move the selection focus point to the cluster boundary closest to point.
-    ///
-    /// If the initial selection was created from a word or line, then the new
-    /// selection will be extended at the same granularity.
-    pub fn extend_selection_to_point(&mut self, x: f32, y: f32) {
-        self.refresh_layout();
-        // FIXME: This is usually the wrong way to handle selection extension for mouse moves, but not a regression.
-        self.editor.set_selection(
-            self.editor
-                .selection
-                .extend_to_point(&self.editor.layout, x, y),
-        );
     }
 
     /// Move the selection focus point to the cluster boundary closest to point.
