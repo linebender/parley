@@ -15,6 +15,23 @@ You can find its changes [documented below](#060---2025-10-06).
 
 This release has an [MSRV] of 1.82.
 
+### Migration 
+
+The `move_*` methods on `PlainEditorDrv` now have a `bool` parameter, pass `false` for their previous behavior. The `select_*` selection extending methods on `PlainEditorDrv` have been removed, instead use the corresponding `move_*` methods passing `true`.
+
+### Changed
+
+#### Parley
+
+-- Breaking change: The `move_*` methods on `PlainEditorDrv` now take an `extend: bool` parameter. For their previous behavior use `false`. When `extend` is `true` they extend the selection range, following the behaviour of the removed `select_*` methods. ([#459][] by [@ickshonpe][])
+
+### Removed
+
+#### Parley
+
+- The methods `select_to_text_start`, `select_to_hard_line_start`, `select_to_text_end`, `select_to_hard_line_end`, `select_to_line_end`, `select_up`, `select_down`, `select_left`, `select_right`, `select_word_left` and `select_word_right` have been removed from `PlainEditorDriver`. ([#459][] by [@ickshonpe][])
+
+
 ## [0.6.0] - 2025-10-06
 
 This release has an [MSRV] of 1.82.
@@ -283,6 +300,7 @@ This release has an [MSRV][] of 1.70.
 [@wfdewith]: https://github.com/wfdewith
 [@xorgy]: https://github.com/xorgy
 [@xStrom]: https://github.com/xStrom
+[@ickshonpe]: https:://github.com/ickshonpe
 
 [#54]: https://github.com/linebender/parley/pull/54
 [#55]: https://github.com/linebender/parley/pull/55
@@ -368,6 +386,7 @@ This release has an [MSRV][] of 1.70.
 [#413]: https://github.com/linebender/parley/pull/413
 [#414]: https://github.com/linebender/parley/pull/414
 [#418]: https://github.com/linebender/parley/pull/418
+[#459]: https://github.com/linebender/parley/pull/459
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.5.0...HEAD
 [0.5.0]: https://github.com/linebender/parley/compare/v0.4.0...v0.5.0
