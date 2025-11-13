@@ -7,6 +7,7 @@ members = [
     "parley_bench",
     "parley_core",
     "parley_dev",
+    "parley_flow",
     "examples/tiny_skia_render",
     "examples/swash_render",
     "examples/vello_editor",
