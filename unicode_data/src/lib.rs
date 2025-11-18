@@ -167,6 +167,10 @@ impl Properties {
     /// Returns the bidirectional class for the character.
     #[inline(always)]
     pub fn bidi_class(&self) -> unicode_bidi::BidiClass {
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "bidi class data only occupies BIDI_BITS bits"
+        )]
         match self.get(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8 {
             0 => unicode_bidi::BidiClass::AL,
             1 => unicode_bidi::BidiClass::AN,
