@@ -32,6 +32,10 @@ wdth = "wdth"
 [files]
 # Include .github, .cargo, etc.
 ignore-hidden = false
-# /.git isn't in .gitignore, because git never tracks it.
-# Typos doesn't know that, though.
-extend-exclude = ["/.git"]
+extend-exclude = [
+    # /.git isn't in .gitignore, because git never tracks it.
+    # Typos doesn't know that, though.
+    "/.git",
+    # Generated code doesn't need typo checking.
+    "/unicode_data/src/generated/**",
+]
