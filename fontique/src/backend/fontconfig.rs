@@ -14,13 +14,25 @@ use std::{
     sync::Arc,
 };
 
+#[cfg(feature = "dlopen")]
+use fontconfig_sys::statics::{LIB, LIB_RESULT};
 use fontconfig_sys::{
     FcChar8, FcCharSet, FcConfig, FcFontSet, FcLangSet, FcMatchKind, FcMatchPattern, FcPattern,
     FcResult, FcResultMatch, FcResultNoId, FcResultNoMatch, FcResultOutOfMemory,
     FcResultTypeMismatch, FcSetSystem,
     constants::{FC_CHARSET, FC_FAMILY, FC_FILE, FC_INDEX, FC_LANG, FC_SLANT, FC_WEIGHT, FC_WIDTH},
-    statics::{LIB, LIB_RESULT},
+    ffi_dispatch,
 };
+#[cfg(not(feature = "dlopen"))]
+use fontconfig_sys::{
+    FcCharSetAddChar, FcCharSetCopy, FcCharSetCreate, FcCharSetDestroy, FcConfigBuildFonts,
+    FcConfigDestroy, FcConfigGetFonts, FcConfigReference, FcConfigSubstitute, FcFontMatch,
+    FcFontRenderPrepare, FcFontSetDestroy, FcFontSort, FcInitLoadConfig, FcLangSetAdd,
+    FcLangSetCopy, FcLangSetCreate, FcLangSetDestroy, FcNameUnparse, FcPatternAddCharSet,
+    FcPatternAddLangSet, FcPatternAddString, FcPatternCreate, FcPatternDestroy,
+    FcPatternGetInteger, FcPatternGetString, FcPatternReference, FcStrFree,
+};
+
 use hashbrown::{HashMap, HashSet, hash_map::Entry};
 use smallvec::SmallVec;
 
@@ -74,7 +86,9 @@ struct Pattern {
 
 impl Pattern {
     fn new() -> Option<Self> {
-        Some(unsafe { Self::from_raw((LIB.FcPatternCreate)(), Ownership::Application)? })
+        Some(unsafe {
+            Self::from_raw(ffi_dispatch!(LIB, FcPatternCreate,), Ownership::Application)?
+        })
     }
 
     unsafe fn from_raw(raw: *mut FcPattern, ownership: Ownership) -> Option<Self> {
@@ -82,7 +96,7 @@ impl Pattern {
         // Don't free this object when we are dropped.
         if ownership == Ownership::Fontconfig {
             unsafe {
-                (LIB.FcPatternReference)(inner.as_ptr());
+                ffi_dispatch!(LIB, FcPatternReference, inner.as_ptr());
             }
         }
         Some(Self { inner })
@@ -91,20 +105,37 @@ impl Pattern {
     fn add_string(&mut self, object: &CStr, s: &CStr) -> bool {
         // All objects passed to FcPatternAddWhatever are cloned.
         unsafe {
-            (LIB.FcPatternAddString)(self.inner.as_ptr(), object.as_ptr(), s.as_ptr() as *const _)
-                != 0
+            ffi_dispatch!(
+                LIB,
+                FcPatternAddString,
+                self.inner.as_ptr(),
+                object.as_ptr(),
+                s.as_ptr() as *const _
+            ) != 0
         }
     }
 
     fn add_charset(&mut self, object: &CStr, s: &CharSet) -> bool {
         unsafe {
-            (LIB.FcPatternAddCharSet)(self.inner.as_ptr(), object.as_ptr(), s.inner.as_ptr()) != 0
+            ffi_dispatch!(
+                LIB,
+                FcPatternAddCharSet,
+                self.inner.as_ptr(),
+                object.as_ptr(),
+                s.inner.as_ptr()
+            ) != 0
         }
     }
 
     fn add_langset(&mut self, object: &CStr, s: &LangSet) -> bool {
         unsafe {
-            (LIB.FcPatternAddLangSet)(self.inner.as_ptr(), object.as_ptr(), s.inner.as_ptr()) != 0
+            ffi_dispatch!(
+                LIB,
+                FcPatternAddLangSet,
+                self.inner.as_ptr(),
+                object.as_ptr(),
+                s.inner.as_ptr()
+            ) != 0
         }
     }
 
@@ -115,11 +146,13 @@ impl Pattern {
     fn get_c_string<'a>(&'a self, object: &CStr, n: u32) -> MatchResult<&'a CStr> {
         let mut dest: *mut FcChar8 = std::ptr::null_mut();
         let result = unsafe {
-            (LIB.FcPatternGetString)(
+            ffi_dispatch!(
+                LIB,
+                FcPatternGetString,
                 self.inner.as_ptr(),
                 object.as_ptr(),
                 n.try_into().map_err(|_| MatchErr::Other)?,
-                &raw mut dest,
+                &raw mut dest
             )
         };
         if result != FcResultMatch {
@@ -132,11 +165,13 @@ impl Pattern {
     fn get_int(&self, object: &CStr, n: u32) -> MatchResult<i32> {
         let mut dest = 0;
         let result = unsafe {
-            (LIB.FcPatternGetInteger)(
+            ffi_dispatch!(
+                LIB,
+                FcPatternGetInteger,
                 self.inner.as_ptr(),
                 object.as_ptr(),
                 n.try_into().map_err(|_| MatchErr::Other)?,
-                &raw mut dest,
+                &raw mut dest
             )
         };
         if result != FcResultMatch {
@@ -148,25 +183,25 @@ impl Pattern {
 
 impl Clone for Pattern {
     fn clone(&self) -> Self {
-        unsafe { (LIB.FcPatternReference)(self.inner.as_ptr()) };
+        unsafe { ffi_dispatch!(LIB, FcPatternReference, self.inner.as_ptr()) };
         Self { inner: self.inner }
     }
 }
 
 impl Drop for Pattern {
     fn drop(&mut self) {
-        unsafe { (LIB.FcPatternDestroy)(self.inner.as_ptr()) };
+        unsafe { ffi_dispatch!(LIB, FcPatternDestroy, self.inner.as_ptr()) };
     }
 }
 
 impl std::fmt::Debug for Pattern {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match NonNull::new(unsafe { (LIB.FcNameUnparse)(self.inner.as_ptr()) }) {
+        match NonNull::new(unsafe { ffi_dispatch!(LIB, FcNameUnparse, self.inner.as_ptr()) }) {
             Some(unparsed) => {
                 let res = f.write_str(unsafe {
                     &CStr::from_ptr(unparsed.as_ptr() as *const c_char).to_string_lossy()
                 });
-                unsafe { (LIB.FcStrFree)(unparsed.as_ptr()) };
+                unsafe { ffi_dispatch!(LIB, FcStrFree, unparsed.as_ptr()) };
                 res
             }
             None => f.debug_struct("Pattern").finish(),
@@ -208,7 +243,7 @@ impl FontSet<'_> {
 impl Drop for FontSet<'_> {
     fn drop(&mut self) {
         if self.ownership == Ownership::Application {
-            unsafe { (LIB.FcFontSetDestroy)(self.inner.as_ptr()) };
+            unsafe { ffi_dispatch!(LIB, FcFontSetDestroy, self.inner.as_ptr()) };
         }
     }
 }
@@ -247,25 +282,34 @@ struct LangSet {
 
 impl LangSet {
     fn new() -> Option<Self> {
-        let inner = NonNull::new(unsafe { (LIB.FcLangSetCreate)() })?;
+        let inner = NonNull::new(unsafe { ffi_dispatch!(LIB, FcLangSetCreate,) })?;
         Some(Self { inner })
     }
 
     fn add(&mut self, lang: &CStr) -> bool {
-        unsafe { (LIB.FcLangSetAdd)(self.inner.as_ptr(), lang.as_ptr() as *const _) != 0 }
+        unsafe {
+            ffi_dispatch!(
+                LIB,
+                FcLangSetAdd,
+                self.inner.as_ptr(),
+                lang.as_ptr() as *const _
+            ) != 0
+        }
     }
 }
 
 impl Drop for LangSet {
     fn drop(&mut self) {
-        unsafe { (LIB.FcLangSetDestroy)(self.inner.as_ptr()) };
+        unsafe { ffi_dispatch!(LIB, FcLangSetDestroy, self.inner.as_ptr()) };
     }
 }
 
 impl Clone for LangSet {
     fn clone(&self) -> Self {
         Self {
-            inner: unsafe { NonNull::new((LIB.FcLangSetCopy)(self.inner.as_ptr())).unwrap() },
+            inner: unsafe {
+                NonNull::new(ffi_dispatch!(LIB, FcLangSetCopy, self.inner.as_ptr())).unwrap()
+            },
         }
     }
 }
@@ -276,25 +320,27 @@ struct CharSet {
 
 impl CharSet {
     fn new() -> Option<Self> {
-        let inner = NonNull::new(unsafe { (LIB.FcCharSetCreate)() })?;
+        let inner = NonNull::new(unsafe { ffi_dispatch!(LIB, FcCharSetCreate,) })?;
         Some(Self { inner })
     }
 
     fn add(&mut self, c: char) -> bool {
-        unsafe { (LIB.FcCharSetAddChar)(self.inner.as_ptr(), c as u32) != 0 }
+        unsafe { ffi_dispatch!(LIB, FcCharSetAddChar, self.inner.as_ptr(), c as u32) != 0 }
     }
 }
 
 impl Drop for CharSet {
     fn drop(&mut self) {
-        unsafe { (LIB.FcCharSetDestroy)(self.inner.as_ptr()) };
+        unsafe { ffi_dispatch!(LIB, FcCharSetDestroy, self.inner.as_ptr()) };
     }
 }
 
 impl Clone for CharSet {
     fn clone(&self) -> Self {
         Self {
-            inner: unsafe { NonNull::new((LIB.FcCharSetCopy)(self.inner.as_ptr())).unwrap() },
+            inner: unsafe {
+                NonNull::new(ffi_dispatch!(LIB, FcCharSetCopy, self.inner.as_ptr())).unwrap()
+            },
         }
     }
 }
@@ -309,14 +355,22 @@ impl Config {
         // Don't free this object when we are dropped.
         if ownership == Ownership::Fontconfig {
             unsafe {
-                (LIB.FcConfigReference)(inner.as_ptr());
+                ffi_dispatch!(LIB, FcConfigReference, inner.as_ptr());
             }
         }
         Some(Self { inner })
     }
 
     fn substitute(&self, pattern: &mut Pattern, kind: FcMatchKind) {
-        unsafe { (LIB.FcConfigSubstitute)(self.inner.as_ptr(), pattern.inner.as_ptr(), kind) };
+        unsafe {
+            ffi_dispatch!(
+                LIB,
+                FcConfigSubstitute,
+                self.inner.as_ptr(),
+                pattern.inner.as_ptr(),
+                kind
+            )
+        };
     }
 
     fn font_sort<'me, 'ret, 'pat: 'ret>(
@@ -328,12 +382,14 @@ impl Config {
         // The returned FcFontSet is for us to free.
         let font_set = unsafe {
             FontSet::from_raw(
-                (LIB.FcFontSort)(
+                ffi_dispatch!(
+                    LIB,
+                    FcFontSort,
                     self.inner.as_ptr(),
                     pattern.inner.as_ptr(),
                     trim as i32,
                     std::ptr::null_mut(),
-                    &raw mut result,
+                    &raw mut result
                 ),
                 Ownership::Application,
             )
@@ -350,7 +406,13 @@ impl Config {
         let mut result = 0;
         let pattern = unsafe {
             Pattern::from_raw(
-                (LIB.FcFontMatch)(self.inner.as_ptr(), pattern.inner.as_ptr(), &raw mut result),
+                ffi_dispatch!(
+                    LIB,
+                    FcFontMatch,
+                    self.inner.as_ptr(),
+                    pattern.inner.as_ptr(),
+                    &raw mut result
+                ),
                 Ownership::Application,
             )
         }
@@ -365,10 +427,12 @@ impl Config {
     fn font_render_prepare(&self, pat: &Pattern, font: &Pattern) -> Option<Pattern> {
         unsafe {
             Pattern::from_raw(
-                (LIB.FcFontRenderPrepare)(
+                ffi_dispatch!(
+                    LIB,
+                    FcFontRenderPrepare,
                     self.inner.as_ptr(),
                     pat.inner.as_ptr(),
-                    font.inner.as_ptr(),
+                    font.inner.as_ptr()
                 ),
                 Ownership::Application,
             )
@@ -378,14 +442,14 @@ impl Config {
 
 impl Clone for Config {
     fn clone(&self) -> Self {
-        unsafe { (LIB.FcConfigReference)(self.inner.as_ptr()) };
+        unsafe { ffi_dispatch!(LIB, FcConfigReference, self.inner.as_ptr()) };
         Self { inner: self.inner }
     }
 }
 
 impl Drop for Config {
     fn drop(&mut self) {
-        unsafe { (LIB.FcConfigDestroy)(self.inner.as_ptr()) };
+        unsafe { ffi_dispatch!(LIB, FcConfigDestroy, self.inner.as_ptr()) };
     }
 }
 
@@ -427,23 +491,23 @@ unsafe impl Send for SystemFonts {}
 
 impl SystemFonts {
     pub(crate) fn new() -> Self {
-        let library_exists = LIB_RESULT.as_ref().ok().is_some();
         // We couldn't find the fontconfig library; maybe it doesn't exist. Just
         // return a `SystemFonts` with no `config`. All our methods will return
         // `None` and shouldn't attempt any FFI calls because the first thing we
         // do is check for `config`.
-        if !library_exists {
+        #[cfg(feature = "dlopen")]
+        if LIB_RESULT.is_err() {
             return Self::default();
         }
 
         // Initialize the config
-        let config = unsafe { (LIB.FcInitLoadConfig)() };
+        let config = unsafe { ffi_dispatch!(LIB, FcInitLoadConfig,) };
         // fontconfig returns a new config object each time we call FcInitLoadConfig
         let Some(config) = (unsafe { Config::from_raw(config, Ownership::Application) }) else {
             return Self::default();
         };
         unsafe {
-            (LIB.FcConfigBuildFonts)(config.inner.as_ptr());
+            ffi_dispatch!(LIB, FcConfigBuildFonts, config.inner.as_ptr());
         }
 
         // Get all the fonts.
@@ -459,7 +523,7 @@ impl SystemFonts {
         // But we're not doing that.
         let Some(font_set) = (unsafe {
             FontSet::from_raw(
-                (LIB.FcConfigGetFonts)(config.inner.as_ptr(), FcSetSystem),
+                ffi_dispatch!(LIB, FcConfigGetFonts, config.inner.as_ptr(), FcSetSystem),
                 Ownership::Fontconfig,
             )
         }) else {
