@@ -174,6 +174,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
             item.locale = style.locale;
             item.variations = style.font_variations;
             item.features = style.font_features;
+            item.word_spacing = style.word_spacing;
+            item.letter_spacing = style.letter_spacing;
             text_range.start = text_range.end;
             char_range.start = char_range.end;
         }
