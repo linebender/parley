@@ -119,6 +119,10 @@ jobs:
           targets: x86_64-unknown-none,thumbv8m.main-none-eabihf
           components: clippy
 
+      - name: Install fontconfig-dev
+        if: runner.os == 'Linux'
+        run: sudo apt-get install libfontconfig-dev
+
       - name: install cargo-hack
         uses: taiki-e/install-action@v2
         with:
@@ -267,6 +271,10 @@ jobs:
         with:
           toolchain: ${{ env.RUST_MIN_VER }}
           targets: x86_64-unknown-none,thumbv8m.main-none-eabihf
+
+      - name: Install fontconfig-dev
+        if: runner.os == 'Linux'
+        run: sudo apt-get install libfontconfig-dev
 
       - name: install cargo-hack
         uses: taiki-e/install-action@v2
