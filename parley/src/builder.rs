@@ -155,13 +155,12 @@ fn build_into_layout<B: Brush>(
     lcx: &mut LayoutContext<B>,
     fcx: &mut FontContext,
 ) {
-    lcx.analyze_text(text);
+    crate::analysis::analyze_text(lcx, text);
 
     layout.data.clear();
     layout.data.scale = scale;
     layout.data.quantize = quantize;
-    layout.data.has_bidi = !lcx.bidi.levels().is_empty();
-    layout.data.base_level = lcx.bidi.base_level();
+    layout.data.base_level = lcx.info.first().map(|i| i.0.bidi_embed_level).unwrap_or(0);
     layout.data.text_len = text.len();
 
     let mut char_index = 0;
@@ -190,10 +189,10 @@ fn build_into_layout<B: Brush>(
             &lcx.styles,
             &lcx.inline_boxes,
             &lcx.info,
-            lcx.bidi.levels(),
             &mut lcx.scx,
             text,
             layout,
+            &lcx.analysis_data_sources,
         );
     }
 

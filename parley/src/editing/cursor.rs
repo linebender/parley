@@ -3,13 +3,13 @@
 
 use crate::BoundingBox;
 #[cfg(feature = "accesskit")]
+use crate::analysis::cluster::Whitespace;
+#[cfg(feature = "accesskit")]
 use crate::layout::LayoutAccessibility;
 use crate::layout::{Affinity, BreakReason, Cluster, ClusterSide, Layout, Line};
 use crate::style::Brush;
 #[cfg(feature = "accesskit")]
 use accesskit::TextPosition;
-#[cfg(feature = "accesskit")]
-use swash::text::cluster::Whitespace;
 
 /// Defines a position with a text layout.
 #[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]

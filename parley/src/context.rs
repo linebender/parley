@@ -4,18 +4,14 @@
 //! Context for layout.
 
 use alloc::{vec, vec::Vec};
-use swash::text::WordBreakStrength;
-
-use self::tree::TreeStyleBuilder;
 
 use super::FontContext;
-use super::bidi;
 use super::builder::RangedBuilder;
-use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle, tree};
+use super::resolve::tree::TreeStyleBuilder;
+use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle};
 use super::style::{Brush, TextStyle};
 
-use swash::text::cluster::CharInfo;
-
+use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
 use crate::shape::ShapeContext;
@@ -24,7 +20,6 @@ use crate::shape::ShapeContext;
 ///
 /// This type is designed to be a global resource with only one per-application (or per-thread).
 pub struct LayoutContext<B: Brush = [u8; 4]> {
-    pub(crate) bidi: bidi::BidiResolver,
     pub(crate) rcx: ResolveContext,
     pub(crate) styles: Vec<RangedStyle<B>>,
     pub(crate) inline_boxes: Vec<InlineBox>,
@@ -33,20 +28,24 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) ranged_style_builder: RangedStyleBuilder<B>,
     pub(crate) tree_style_builder: TreeStyleBuilder<B>,
 
+    // u16: style index for character
     pub(crate) info: Vec<(CharInfo, u16)>,
     pub(crate) scx: ShapeContext,
+
+    // Unicode analysis data sources (provided by icu)
+    pub(crate) analysis_data_sources: AnalysisDataSources,
 }
 
 impl<B: Brush> LayoutContext<B> {
     pub fn new() -> Self {
         Self {
-            bidi: bidi::BidiResolver::new(),
             rcx: ResolveContext::default(),
             styles: vec![],
             inline_boxes: vec![],
             ranged_style_builder: RangedStyleBuilder::default(),
             tree_style_builder: TreeStyleBuilder::default(),
             info: vec![],
+            analysis_data_sources: AnalysisDataSources::new(),
             scx: ShapeContext::default(),
         }
     }
@@ -144,51 +143,11 @@ impl<B: Brush> LayoutContext<B> {
         }
     }
 
-    pub(crate) fn analyze_text(&mut self, text: &str) {
-        let text = if text.is_empty() { " " } else { text };
-        let mut a = swash::text::analyze(text.chars());
-
-        let mut word_break = WordBreakStrength::default();
-        let mut style_idx = 0;
-
-        let mut char_indices = text.char_indices();
-        loop {
-            let Some((char_idx, _)) = char_indices.next() else {
-                break;
-            };
-
-            // Find the style for this character. If the text is empty, we may not have any styles. Otherwise,
-            // self.styles should span the entire range of the text.
-            while let Some(style) = self.styles.get(style_idx) {
-                if style.range.end > char_idx {
-                    word_break = style.style.word_break;
-                    break;
-                }
-                style_idx += 1;
-            }
-            a.set_break_strength(word_break);
-
-            let Some((properties, boundary)) = a.next() else {
-                break;
-            };
-
-            self.info.push((CharInfo::new(properties, boundary), 0));
-        }
-        if a.needs_bidi_resolution() {
-            self.bidi.resolve(
-                text.chars()
-                    .zip(self.info.iter().map(|info| info.0.bidi_class())),
-                None,
-            );
-        }
-    }
-
     fn begin(&mut self) {
         self.rcx.clear();
         self.styles.clear();
         self.inline_boxes.clear();
         self.info.clear();
-        self.bidi.clear();
     }
 }
 
