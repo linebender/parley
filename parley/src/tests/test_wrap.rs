@@ -1,10 +1,12 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use icu_segmenter::options::LineBreakWordOption;
 use peniko::color::palette::css;
 
 use crate::{
-    Alignment, AlignmentOptions, LineBreakWordOption, OverflowWrap, StyleProperty, test_name,
+    Alignment, AlignmentOptions, OverflowWrap, StyleProperty, TextWrapMode,
+    test_name,
 };
 
 use super::utils::{ColorBrush, TestEnv};
@@ -276,4 +278,131 @@ fn word_break_keep_all() {
     test_text("フォ フォ", "ID_and_CJ", 30.0);
     // Jamo decomposed on purpose
     test_text("애기판다 애기판다", "korean_hangul_jamos", 90.0);
+}
+
+#[test]
+fn text_wrap_mode_nowrap_disables_soft_wraps() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "Most words are short. But Antidisestablishmentarianism is long and needs to wrap.";
+    let wrap_width = 120.0;
+
+    let mut baseline_layout = env.ranged_builder(text).build(text);
+    baseline_layout.break_all_lines(Some(wrap_width));
+    assert!(
+        baseline_layout.len() > 1,
+        "Expected baseline layout to wrap with width {wrap_width}"
+    );
+
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::TextWrapMode(TextWrapMode::NoWrap));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(wrap_width));
+
+    assert_eq!(
+        layout.len(),
+        1,
+        "Applying TextWrapMode::NoWrap should prevent soft wrapping"
+    );
+
+    let line_advance = layout
+        .lines()
+        .next()
+        .expect("layout should have one line")
+        .metrics()
+        .advance;
+    assert!(
+        line_advance > wrap_width,
+        "Line advance {line_advance} should overflow the requested width {wrap_width}"
+    );
+}
+
+#[test]
+fn text_wrap_mode_allows_break_before_nowrap_span() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "Hello world!";
+    let prefix = "Hello ";
+
+    let prefix_width = {
+        let mut layout = env.ranged_builder(prefix).build(prefix);
+        layout.break_all_lines(None);
+        layout.width()
+    };
+
+    let wrap_width = prefix_width + 1.0;
+
+    let start = text.find("world!").unwrap();
+    let mut builder = env.ranged_builder(text);
+    builder.push(
+        StyleProperty::TextWrapMode(TextWrapMode::NoWrap),
+        // `start..text.len()` === "world!"
+        start..text.len(),
+    );
+
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(wrap_width));
+
+    assert_eq!(
+        layout.len(),
+        2,
+        "Layout should still wrap before the NoWrap span boundary"
+    );
+
+    let first_line = layout.get(0).unwrap();
+    let second_line = layout.get(1).unwrap();
+    assert_eq!(
+        &text[first_line.text_range()],
+        "Hello ",
+        "First line should end before the NoWrap span"
+    );
+    assert_eq!(
+        &text[second_line.text_range()],
+        "world!",
+        "Second line should contain the NoWrap span"
+    );
+}
+
+#[test]
+fn text_wrap_mode_updates_min_content_width() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "Tags: London UK Paris FR";
+    let span_text = "London UK";
+    let span_start = text.find(span_text).unwrap();
+    let span_range = span_start..span_start + span_text.len();
+
+    let widths_wrap = {
+        let layout = env.ranged_builder(text).build(text);
+        layout.calculate_content_widths()
+    };
+
+    let widths_nowrap = {
+        let mut builder = env.ranged_builder(text);
+        builder.push(
+            StyleProperty::TextWrapMode(TextWrapMode::NoWrap),
+            span_range.clone(),
+        );
+        let layout = builder.build(text);
+        layout.calculate_content_widths()
+    };
+
+    let span_width = {
+        let mut layout = env.ranged_builder(span_text).build(span_text);
+        layout.break_all_lines(None);
+        layout.width()
+    };
+
+    assert!(
+        widths_wrap.min < span_width,
+        "Without NoWrap, min content width {} should be smaller than the span width {}",
+        widths_wrap.min,
+        span_width
+    );
+    assert!(
+        widths_nowrap.min >= span_width - 0.5,
+        "With NoWrap, min content width {} should be at least the span width {}",
+        widths_nowrap.min,
+        span_width
+    );
 }

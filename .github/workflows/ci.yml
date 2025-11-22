@@ -116,7 +116,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_STABLE_VER }}
-          targets: x86_64-unknown-none
+          targets: x86_64-unknown-none,thumbv8m.main-none-eabihf
           components: clippy
 
       - name: install cargo-hack
@@ -131,6 +131,9 @@ jobs:
 
       - name: cargo clippy (no_std)
         run: cargo hack clippy ${{ env.RUST_MIN_VER_PKGS }} --locked --optional-deps --each-feature --ignore-unknown-features --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }} --target x86_64-unknown-none -- -D warnings
+
+      - name: cargo clippy (no_std 32-bit)
+        run: cargo hack clippy ${{ env.RUST_MIN_VER_PKGS }} --locked --optional-deps --each-feature --ignore-unknown-features --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }} --target thumbv8m.main-none-eabihf -- -D warnings
 
       - name: cargo clippy
         run: cargo hack clippy --workspace --locked --optional-deps --each-feature --ignore-unknown-features --features std -- -D warnings
@@ -263,7 +266,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_MIN_VER }}
-          targets: x86_64-unknown-none
+          targets: x86_64-unknown-none,thumbv8m.main-none-eabihf
 
       - name: install cargo-hack
         uses: taiki-e/install-action@v2
@@ -277,6 +280,9 @@ jobs:
 
       - name: cargo check (no_std)
         run: cargo hack check ${{ env.RUST_MIN_VER_PKGS }} --locked --optional-deps --each-feature --ignore-unknown-features --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }} --target x86_64-unknown-none
+
+      - name: cargo check (no_std 32-bit)
+        run: cargo hack check ${{ env.RUST_MIN_VER_PKGS }} --locked --optional-deps --each-feature --ignore-unknown-features --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }} --target thumbv8m.main-none-eabihf
 
       - name: cargo check
         run: cargo hack check ${{ env.RUST_MIN_VER_PKGS }} --locked --optional-deps --each-feature --ignore-unknown-features --features std

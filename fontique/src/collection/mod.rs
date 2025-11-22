@@ -22,8 +22,8 @@ use super::{
     generic::GenericFamilyMap,
     source::{SourceId, SourceInfo, SourceKind},
 };
+use crate::AtomicCounter;
 use alloc::{string::String, sync::Arc, vec::Vec};
-use core::sync::atomic::AtomicU64;
 use hashbrown::HashMap;
 use read_fonts::types::NameId;
 #[cfg(feature = "std")]
@@ -721,7 +721,7 @@ impl CommonData {
 #[derive(Default)]
 struct Shared {
     #[allow(unused)]
-    version: AtomicU64,
+    version: AtomicCounter,
     #[cfg(feature = "std")]
     #[allow(unused)]
     data: Mutex<CommonData>,
