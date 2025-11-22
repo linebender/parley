@@ -735,6 +735,34 @@ fn realign_all() {
 }
 
 #[test]
+fn spacing_changes_per_style_run() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "foo bar";
+    let mut builder = env.ranged_builder(text);
+    builder.push(StyleProperty::WordSpacing(2.0), 3..text.len());
+    builder.push(StyleProperty::LetterSpacing(1.5), 3..text.len());
+
+    let layout = builder.build(text);
+    assert_eq!(
+        layout.data.runs.len(),
+        2,
+        "expected two runs after style break"
+    );
+
+    let first_run = &layout.data.runs[0];
+    let second_run = &layout.data.runs[1];
+
+    assert_eq!(&text[first_run.text_range.clone()], "foo");
+    assert_eq!(first_run.word_spacing, 0.0);
+    assert_eq!(first_run.letter_spacing, 0.0);
+
+    assert_eq!(&text[second_run.text_range.clone()], " bar");
+    assert_eq!(second_run.word_spacing, 2.0);
+    assert_eq!(second_run.letter_spacing, 1.5);
+}
+
+#[test]
 fn layout_impl_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<Layout<()>>();
