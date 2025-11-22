@@ -33,6 +33,8 @@ system = [
     "dep:yeslogic-fontconfig-sys",
     "dep:roxmltree",
 ]
+# Use dlopen to load the fontconfig library.
+dlopen = ["yeslogic-fontconfig-sys?/dlopen"]
 
 [dependencies]
 bytemuck = { workspace = true }
@@ -74,7 +76,7 @@ objc2-core-text = { version = "0.3.2", optional = true, default-features = false
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-yeslogic-fontconfig-sys = { version = "6.0.0", optional = true, features = ["dlopen"] }
+yeslogic-fontconfig-sys = { version = "6.0.0", optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
 roxmltree = { version = "0.20.0", optional = true }
