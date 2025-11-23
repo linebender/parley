@@ -145,21 +145,86 @@ fn inbox_separated_by_whitespace() {
 }
 
 #[test]
-fn trailing_whitespace() {
+fn trailing_whitespace_ltr() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    let text = "AAA BBB";
-    let builder = env.ranged_builder(text);
-    let mut layout = builder.build(text);
-    layout.break_all_lines(Some(45.));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    {
+        let text = "AAA BBB";
+        let builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(45.));
+        layout.align(None, Alignment::Start, AlignmentOptions::default());
 
-    assert!(
-        layout.width() < layout.full_width(),
-        "Trailing whitespace should cause a difference between width and full_width"
-    );
+        env.with_name("soft_wrap").check_layout_snapshot(&layout);
+    }
 
-    env.check_layout_snapshot(&layout);
+    {
+        let text = "AAA \nBBB";
+        let builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(None, Alignment::Start, AlignmentOptions::default());
+
+        env.with_name("hard_wrap").check_layout_snapshot(&layout);
+    }
+}
+
+#[test]
+fn trailing_whitespace_rtl() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    {
+        let text = "بببب ااااا";
+        let builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(45.));
+        layout.align(None, Alignment::Start, AlignmentOptions::default());
+
+        env.with_name("soft_wrap").check_layout_snapshot(&layout);
+    }
+
+    {
+        let text = "بببب \nااااا";
+        let builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(None, Alignment::Start, AlignmentOptions::default());
+
+        env.with_name("hard_wrap").check_layout_snapshot(&layout);
+    }
+}
+
+#[test]
+fn trailing_whitespace_bidi() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    {
+        for (text, test_case_name) in [
+            ("AAA ااااا", "soft_wrap_ltr_rtl"),
+            ("بببب BBB", "soft_wrap_rtl_ltr"),
+        ] {
+            let builder = env.ranged_builder(text);
+            let mut layout = builder.build(text);
+            layout.break_all_lines(Some(45.));
+            layout.align(None, Alignment::Start, AlignmentOptions::default());
+
+            env.with_name(test_case_name).check_layout_snapshot(&layout);
+        }
+    }
+
+    {
+        for (text, test_case_name) in [
+            ("AAA \nااااا", "hard_wrap_ltr_rtl"),
+            ("بببب \nBBB", "hard_wrap_rtl_ltr"),
+        ] {
+            let builder = env.ranged_builder(text);
+            let mut layout = builder.build(text);
+            layout.break_all_lines(None);
+            layout.align(None, Alignment::Start, AlignmentOptions::default());
+
+            env.with_name(test_case_name).check_layout_snapshot(&layout);
+        }
+    }
 }
 
 #[test]
