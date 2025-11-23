@@ -36,6 +36,9 @@ Some modules have been moved:
 - `parley::editor` and `parley::layout::editor` are now `parley::editing`
 - `parley::layout::cursor` is now `parley::cursor`
 
+Fontique no longer sets the `dlopen` feature of `yeslogic-fontconfig-sys` by default. If you wish to run Fontique on a Linux system without fontconfig
+installed then you will need to enable the new `dlopen` feature of the `fontique` crate.
+
 ### Added
 
 #### Parley
@@ -48,6 +51,10 @@ Some modules have been moved:
 #### Parley
 - Split off various modules into "editing" folder. ([#440][] by [@PoignardAzur][])
 - Split contents of layout/mod.rs file. ([#444][] by [@PoignardAzur][])
+
+#### Fontique
+
+- Make the yeslogic-fontconfig-sys/dlopen feature optional [#467][] by [@ogoffart][])
 
 ### Fixed
 
@@ -425,6 +432,7 @@ This release has an [MSRV][] of 1.70.
 [#448]: https://github.com/linebender/parley/pull/448
 [#449]: https://github.com/linebender/parley/pull/449
 [#451]: https://github.com/linebender/parley/pull/451
+[#467]: https://github.com/linebender/parley/pull/467
 [#468]: https://github.com/linebender/parley/pull/468
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.7.0...HEAD
