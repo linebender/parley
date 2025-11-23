@@ -79,4 +79,4 @@ objc2-core-text = { version = "0.3.2", optional = true, default-features = false
 yeslogic-fontconfig-sys = { version = "6.0.0", optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
-roxmltree = { version = "0.20.0", optional = true }
+roxmltree = { version = "0.21.1", optional = true }
