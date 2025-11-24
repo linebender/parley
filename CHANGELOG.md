@@ -37,7 +37,8 @@ Some modules have been moved:
 - `parley::layout::cursor` is now `parley::cursor`
 
 Fontique no longer sets the `dlopen` feature of `yeslogic-fontconfig-sys` by default. If you wish to run Fontique on a Linux system without fontconfig
-installed then you will need to enable the new `dlopen` feature of the `fontique` crate.
+installed then you will need to enable the new `fontconfig-dlopen` feature of the `fontique` crate. If you wish to compile Fontique on a Linux system
+without the `fontconfig-dlopen` enabled then you will need the fontconfig dev package (e.g. `libfontconfig1-dev` on Ubuntu) installed.
 
 ### Added
 
