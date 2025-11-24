@@ -14,7 +14,7 @@ use std::{
     sync::Arc,
 };
 
-#[cfg(feature = "dlopen")]
+#[cfg(feature = "fontconfig-dlopen")]
 use fontconfig_sys::statics::{LIB, LIB_RESULT};
 use fontconfig_sys::{
     FcChar8, FcCharSet, FcConfig, FcFontSet, FcLangSet, FcMatchKind, FcMatchPattern, FcPattern,
@@ -23,7 +23,7 @@ use fontconfig_sys::{
     constants::{FC_CHARSET, FC_FAMILY, FC_FILE, FC_INDEX, FC_LANG, FC_SLANT, FC_WEIGHT, FC_WIDTH},
     ffi_dispatch,
 };
-#[cfg(not(feature = "dlopen"))]
+#[cfg(not(feature = "fontconfig-dlopen"))]
 use fontconfig_sys::{
     FcCharSetAddChar, FcCharSetCopy, FcCharSetCreate, FcCharSetDestroy, FcConfigBuildFonts,
     FcConfigDestroy, FcConfigGetFonts, FcConfigReference, FcConfigSubstitute, FcFontMatch,
@@ -87,7 +87,10 @@ struct Pattern {
 impl Pattern {
     fn new() -> Option<Self> {
         Some(unsafe {
-            Self::from_raw(ffi_dispatch!(LIB, FcPatternCreate,), Ownership::Application)?
+            Self::from_raw(
+                ffi_dispatch!(feature = "fontconfig-dlopen", LIB, FcPatternCreate,),
+                Ownership::Application,
+            )?
         })
     }
 
@@ -96,7 +99,12 @@ impl Pattern {
         // Don't free this object when we are dropped.
         if ownership == Ownership::Fontconfig {
             unsafe {
-                ffi_dispatch!(LIB, FcPatternReference, inner.as_ptr());
+                ffi_dispatch!(
+                    feature = "fontconfig-dlopen",
+                    LIB,
+                    FcPatternReference,
+                    inner.as_ptr()
+                );
             }
         }
         Some(Self { inner })
@@ -106,6 +114,7 @@ impl Pattern {
         // All objects passed to FcPatternAddWhatever are cloned.
         unsafe {
             ffi_dispatch!(
+                feature = "fontconfig-dlopen",
                 LIB,
                 FcPatternAddString,
                 self.inner.as_ptr(),
@@ -118,6 +127,7 @@ impl Pattern {
     fn add_charset(&mut self, object: &CStr, s: &CharSet) -> bool {
         unsafe {
             ffi_dispatch!(
+                feature = "fontconfig-dlopen",
                 LIB,
                 FcPatternAddCharSet,
                 self.inner.as_ptr(),
@@ -130,6 +140,7 @@ impl Pattern {
     fn add_langset(&mut self, object: &CStr, s: &LangSet) -> bool {
         unsafe {
             ffi_dispatch!(
+                feature = "fontconfig-dlopen",
                 LIB,
                 FcPatternAddLangSet,
                 self.inner.as_ptr(),
@@ -147,6 +158,7 @@ impl Pattern {
         let mut dest: *mut FcChar8 = std::ptr::null_mut();
         let result = unsafe {
             ffi_dispatch!(
+                feature = "fontconfig-dlopen",
                 LIB,
                 FcPatternGetString,
                 self.inner.as_ptr(),
@@ -166,6 +178,7 @@ impl Pattern {
         let mut dest = 0;
         let result = unsafe {
             ffi_dispatch!(
+                feature = "fontconfig-dlopen",
                 LIB,
                 FcPatternGetInteger,
                 self.inner.as_ptr(),
@@ -183,25 +196,53 @@ impl Pattern {
 
 impl Clone for Pattern {
     fn clone(&self) -> Self {
-        unsafe { ffi_dispatch!(LIB, FcPatternReference, self.inner.as_ptr()) };
+        unsafe {
+            ffi_dispatch!(
+                feature = "fontconfig-dlopen",
+                LIB,
+                FcPatternReference,
+                self.inner.as_ptr()
+            )
+        };
         Self { inner: self.inner }
     }
 }
 
 impl Drop for Pattern {
     fn drop(&mut self) {
-        unsafe { ffi_dispatch!(LIB, FcPatternDestroy, self.inner.as_ptr()) };
+        unsafe {
+            ffi_dispatch!(
+                feature = "fontconfig-dlopen",
+                LIB,
+                FcPatternDestroy,
+                self.inner.as_ptr()
+            )
+        };
     }
 }
 
 impl std::fmt::Debug for Pattern {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match NonNull::new(unsafe { ffi_dispatch!(LIB, FcNameUnparse, self.inner.as_ptr()) }) {
+        match NonNull::new(unsafe {
+            ffi_dispatch!(
+                feature = "fontconfig-dlopen",
+                LIB,
+                FcNameUnparse,
+                self.inner.as_ptr()
+            )
+        }) {
             Some(unparsed) => {
                 let res = f.write_str(unsafe {
                     &CStr::from_ptr(unparsed.as_ptr() as *const c_char).to_string_lossy()
                 });
-                unsafe { ffi_dispatch!(LIB, FcStrFree, unparsed.as_ptr()) };
+                unsafe {
+                    ffi_dispatch!(
+                        feature = "fontconfig-dlopen",
+                        LIB,
+                        FcStrFree,
+                        unparsed.as_ptr()
+                    )
+                };
                 res
             }
             None => f.debug_struct("Pattern").finish(),
@@ -243,7 +284,14 @@ impl FontSet<'_> {
 impl Drop for FontSet<'_> {
     fn drop(&mut self) {
         if self.ownership == Ownership::Application {
-            unsafe { ffi_dispatch!(LIB, FcFontSetDestroy, self.inner.as_ptr()) };
+            unsafe {
+                ffi_dispatch!(
+                    feature = "fontconfig-dlopen",
+                    LIB,
+                    FcFontSetDestroy,
+                    self.inner.as_ptr()
+                )
+            };
         }
     }
 }
@@ -282,13 +330,16 @@ struct LangSet {
 
 impl LangSet {
     fn new() -> Option<Self> {
-        let inner = NonNull::new(unsafe { ffi_dispatch!(LIB, FcLangSetCreate,) })?;
+        let inner = NonNull::new(unsafe {
+            ffi_dispatch!(feature = "fontconfig-dlopen", LIB, FcLangSetCreate,)
+        })?;
         Some(Self { inner })
     }
 
     fn add(&mut self, lang: &CStr) -> bool {
         unsafe {
             ffi_dispatch!(
+                feature = "fontconfig-dlopen",
                 LIB,
                 FcLangSetAdd,
                 self.inner.as_ptr(),
@@ -300,7 +351,14 @@ impl LangSet {
 
 impl Drop for LangSet {
     fn drop(&mut self) {
-        unsafe { ffi_dispatch!(LIB, FcLangSetDestroy, self.inner.as_ptr()) };
+        unsafe {
+            ffi_dispatch!(
+                feature = "fontconfig-dlopen",
+                LIB,
+                FcLangSetDestroy,
+                self.inner.as_ptr()
+            )
+        };
     }
 }
 
@@ -308,7 +366,13 @@ impl Clone for LangSet {
     fn clone(&self) -> Self {
         Self {
             inner: unsafe {
-                NonNull::new(ffi_dispatch!(LIB, FcLangSetCopy, self.inner.as_ptr())).unwrap()
+                NonNull::new(ffi_dispatch!(
+                    feature = "fontconfig-dlopen",
+                    LIB,
+                    FcLangSetCopy,
+                    self.inner.as_ptr()
+                ))
+                .unwrap()
             },
         }
     }
@@ -320,18 +384,35 @@ struct CharSet {
 
 impl CharSet {
     fn new() -> Option<Self> {
-        let inner = NonNull::new(unsafe { ffi_dispatch!(LIB, FcCharSetCreate,) })?;
+        let inner = NonNull::new(unsafe {
+            ffi_dispatch!(feature = "fontconfig-dlopen", LIB, FcCharSetCreate,)
+        })?;
         Some(Self { inner })
     }
 
     fn add(&mut self, c: char) -> bool {
-        unsafe { ffi_dispatch!(LIB, FcCharSetAddChar, self.inner.as_ptr(), c as u32) != 0 }
+        unsafe {
+            ffi_dispatch!(
+                feature = "fontconfig-dlopen",
+                LIB,
+                FcCharSetAddChar,
+                self.inner.as_ptr(),
+                c as u32
+            ) != 0
+        }
     }
 }
 
 impl Drop for CharSet {
     fn drop(&mut self) {
-        unsafe { ffi_dispatch!(LIB, FcCharSetDestroy, self.inner.as_ptr()) };
+        unsafe {
+            ffi_dispatch!(
+                feature = "fontconfig-dlopen",
+                LIB,
+                FcCharSetDestroy,
+                self.inner.as_ptr()
+            )
+        };
     }
 }
 
@@ -339,7 +420,13 @@ impl Clone for CharSet {
     fn clone(&self) -> Self {
         Self {
             inner: unsafe {
-                NonNull::new(ffi_dispatch!(LIB, FcCharSetCopy, self.inner.as_ptr())).unwrap()
+                NonNull::new(ffi_dispatch!(
+                    feature = "fontconfig-dlopen",
+                    LIB,
+                    FcCharSetCopy,
+                    self.inner.as_ptr()
+                ))
+                .unwrap()
             },
         }
     }
@@ -355,7 +442,12 @@ impl Config {
         // Don't free this object when we are dropped.
         if ownership == Ownership::Fontconfig {
             unsafe {
-                ffi_dispatch!(LIB, FcConfigReference, inner.as_ptr());
+                ffi_dispatch!(
+                    feature = "fontconfig-dlopen",
+                    LIB,
+                    FcConfigReference,
+                    inner.as_ptr()
+                );
             }
         }
         Some(Self { inner })
@@ -364,6 +456,7 @@ impl Config {
     fn substitute(&self, pattern: &mut Pattern, kind: FcMatchKind) {
         unsafe {
             ffi_dispatch!(
+                feature = "fontconfig-dlopen",
                 LIB,
                 FcConfigSubstitute,
                 self.inner.as_ptr(),
@@ -383,6 +476,7 @@ impl Config {
         let font_set = unsafe {
             FontSet::from_raw(
                 ffi_dispatch!(
+                    feature = "fontconfig-dlopen",
                     LIB,
                     FcFontSort,
                     self.inner.as_ptr(),
@@ -407,6 +501,7 @@ impl Config {
         let pattern = unsafe {
             Pattern::from_raw(
                 ffi_dispatch!(
+                    feature = "fontconfig-dlopen",
                     LIB,
                     FcFontMatch,
                     self.inner.as_ptr(),
@@ -428,6 +523,7 @@ impl Config {
         unsafe {
             Pattern::from_raw(
                 ffi_dispatch!(
+                    feature = "fontconfig-dlopen",
                     LIB,
                     FcFontRenderPrepare,
                     self.inner.as_ptr(),
@@ -442,14 +538,28 @@ impl Config {
 
 impl Clone for Config {
     fn clone(&self) -> Self {
-        unsafe { ffi_dispatch!(LIB, FcConfigReference, self.inner.as_ptr()) };
+        unsafe {
+            ffi_dispatch!(
+                feature = "fontconfig-dlopen",
+                LIB,
+                FcConfigReference,
+                self.inner.as_ptr()
+            )
+        };
         Self { inner: self.inner }
     }
 }
 
 impl Drop for Config {
     fn drop(&mut self) {
-        unsafe { ffi_dispatch!(LIB, FcConfigDestroy, self.inner.as_ptr()) };
+        unsafe {
+            ffi_dispatch!(
+                feature = "fontconfig-dlopen",
+                LIB,
+                FcConfigDestroy,
+                self.inner.as_ptr()
+            )
+        };
     }
 }
 
@@ -495,19 +605,25 @@ impl SystemFonts {
         // return a `SystemFonts` with no `config`. All our methods will return
         // `None` and shouldn't attempt any FFI calls because the first thing we
         // do is check for `config`.
-        #[cfg(feature = "dlopen")]
+        #[cfg(feature = "fontconfig-dlopen")]
         if LIB_RESULT.is_err() {
             return Self::default();
         }
 
         // Initialize the config
-        let config = unsafe { ffi_dispatch!(LIB, FcInitLoadConfig,) };
+        let config =
+            unsafe { ffi_dispatch!(feature = "fontconfig-dlopen", LIB, FcInitLoadConfig,) };
         // fontconfig returns a new config object each time we call FcInitLoadConfig
         let Some(config) = (unsafe { Config::from_raw(config, Ownership::Application) }) else {
             return Self::default();
         };
         unsafe {
-            ffi_dispatch!(LIB, FcConfigBuildFonts, config.inner.as_ptr());
+            ffi_dispatch!(
+                feature = "fontconfig-dlopen",
+                LIB,
+                FcConfigBuildFonts,
+                config.inner.as_ptr()
+            );
         }
 
         // Get all the fonts.
@@ -523,7 +639,13 @@ impl SystemFonts {
         // But we're not doing that.
         let Some(font_set) = (unsafe {
             FontSet::from_raw(
-                ffi_dispatch!(LIB, FcConfigGetFonts, config.inner.as_ptr(), FcSetSystem),
+                ffi_dispatch!(
+                    feature = "fontconfig-dlopen",
+                    LIB,
+                    FcConfigGetFonts,
+                    config.inner.as_ptr(),
+                    FcSetSystem
+                ),
                 Ownership::Fontconfig,
             )
         }) else {

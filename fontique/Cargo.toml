@@ -33,8 +33,11 @@ system = [
     "dep:yeslogic-fontconfig-sys",
     "dep:roxmltree",
 ]
-# Use dlopen to load the fontconfig library.
-dlopen = ["yeslogic-fontconfig-sys?/dlopen"]
+
+# Use dlopen to load the fontconfig library. This allows Fontique to compile even if the
+# system does not have fontconfig installed, although the font fallback to system fonts
+# will not work properly in this case (no such fallback will occur)
+fontconfig-dlopen = ["yeslogic-fontconfig-sys?/dlopen"]
 
 [dependencies]
 bytemuck = { workspace = true }
