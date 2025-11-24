@@ -202,7 +202,7 @@ impl Clone for Pattern {
                 LIB,
                 FcPatternReference,
                 self.inner.as_ptr()
-            )
+            );
         };
         Self { inner: self.inner }
     }
@@ -216,7 +216,7 @@ impl Drop for Pattern {
                 LIB,
                 FcPatternDestroy,
                 self.inner.as_ptr()
-            )
+            );
         };
     }
 }
@@ -241,7 +241,7 @@ impl std::fmt::Debug for Pattern {
                         LIB,
                         FcStrFree,
                         unparsed.as_ptr()
-                    )
+                    );
                 };
                 res
             }
@@ -290,7 +290,7 @@ impl Drop for FontSet<'_> {
                     LIB,
                     FcFontSetDestroy,
                     self.inner.as_ptr()
-                )
+                );
             };
         }
     }
@@ -357,7 +357,7 @@ impl Drop for LangSet {
                 LIB,
                 FcLangSetDestroy,
                 self.inner.as_ptr()
-            )
+            );
         };
     }
 }
@@ -411,7 +411,7 @@ impl Drop for CharSet {
                 LIB,
                 FcCharSetDestroy,
                 self.inner.as_ptr()
-            )
+            );
         };
     }
 }
@@ -558,7 +558,7 @@ impl Drop for Config {
                 LIB,
                 FcConfigDestroy,
                 self.inner.as_ptr()
-            )
+            );
         };
     }
 }
