@@ -8,14 +8,14 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 # Changelog
 
-The latest published Parley release is [0.7.0](#060---2025-10-24) which was released on 2025-10-24.
-You can find its changes [documented below](#060---2025-10-24).
+The latest published Parley release is [0.7.0](#060---2025-11-24) which was released on 2025-11-24.
+You can find its changes [documented below](#060---2025-11-24).
 
 ## [Unreleased]
 
 This release has an [MSRV] of 1.83.
 
-## [0.7.0] - 2025-10-24
+## [0.7.0] - 2025-11-24
 
 This release has an [MSRV] of 1.83.
 
@@ -25,7 +25,7 @@ This release has an [MSRV] of 1.83.
 out large paragraphs of text. Previously the time to perform layout was non-linear with respect to the input size and laying out
 paragraphs of text with more than ~1k characters was very slow.
 
-The new `TextWrapMode` style implements the semantics of the[`text-wrap-mode`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/text-wrap-mode)
+The new `TextWrapMode` style implements the semantics of the [`text-wrap-mode`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/text-wrap-mode)
 CSS property and allows text-wrapping to be disabled completely for a span of text.
 
 
@@ -44,7 +44,7 @@ installed then you will need to enable the new `dlopen` feature of the `fontique
 #### Parley
 
 - Add `TextWrapMode` style. This allow line wrapping to be disabled completely for a span of text (excluding explicit line breaks) ([#367][] by [@nicoburns][])
-- Add `Cluster::from_point_exact` method for hit-testing spans of text. This is useful for implemented "hover" or "click" functionality. ([#447][] by [@nicoburns][])
+- Add `Cluster::from_point_exact` method for hit-testing spans of text. This is useful for implementing "hover" or "click" functionality. ([#447][] by [@nicoburns][])
 
 ### Changed
 
