@@ -1298,7 +1298,7 @@ dependencies = [
 
 [[package]]
 name = "fontique"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "bytemuck",
  "core_maths",
@@ -3322,7 +3322,7 @@ dependencies = [
 
 [[package]]
 name = "parley"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "accesskit",
  "core_maths",
