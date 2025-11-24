@@ -4,8 +4,8 @@
 //! Properties for specifying font weight, width and style.
 
 #[cfg(feature = "libm")]
-#[allow(unused_imports)]
-use core_maths::CoreFloat;
+#[cfg_attr(feature = "std", allow(unused_imports))]
+use core_maths::CoreFloat as _;
 
 use core::fmt;
 

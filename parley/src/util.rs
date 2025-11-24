@@ -3,10 +3,6 @@
 
 //! Misc helpers.
 
-#[cfg(feature = "libm")]
-#[allow(unused_imports)]
-use core_maths::CoreFloat;
-
 pub(crate) fn nearly_eq(x: f32, y: f32) -> bool {
     (x - y).abs() < f32::EPSILON
 }
