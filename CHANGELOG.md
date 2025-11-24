@@ -21,54 +21,56 @@ This release has an [MSRV] of 1.83.
 
 ### Highlights
 
-([#448][] by [@taj-p][]) and ([#449][] by [@nicoburns][]) collectively fix a significant performance bug that occurred when laying
-out large paragraphs of text. Previously the time to perform layout was non-linear with respect to the input size and laying out
+[#448][] by [@taj-p][]) and ([#449][] by [@nicoburns][] collectively fix a significant performance bug that occurred when laying
+out large paragraphs of text.
+Previously the time to perform layout was non-linear with respect to the input size and laying out
 paragraphs of text with more than ~1k characters was very slow.
 
 The new `TextWrapMode` style implements the semantics of the [`text-wrap-mode`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/text-wrap-mode)
 CSS property and allows text-wrapping to be disabled completely for a span of text.
 
-
 ### Migration
 
 Some modules have been moved:
 
-- `parley::editor` and `parley::layout::editor` are now `parley::editing`
-- `parley::layout::cursor` is now `parley::cursor`
+- `parley::editor` and `parley::layout::editor` are now `parley::editing`.
+- `parley::layout::cursor` is now `parley::cursor`.
 
-Fontique no longer sets the `dlopen` feature of `yeslogic-fontconfig-sys` by default. If you wish to run Fontique on a Linux system without fontconfig
-installed then you will need to enable the new `fontconfig-dlopen` feature of the `fontique` crate. If you wish to compile Fontique on a Linux system
-without the `fontconfig-dlopen` enabled then you will need the fontconfig dev package (e.g. `libfontconfig1-dev` on Ubuntu) installed.
+Fontique no longer sets the `dlopen` feature of `yeslogic-fontconfig-sys` by default. If you wish to run Fontique on a Linux system
+without fontconfig installed then you will need to enable the new `fontconfig-dlopen` feature of the `fontique` crate.
+If you wish to compile Fontique on a Linux system without the `fontconfig-dlopen` enabled then you will need the fontconfig dev
+package (e.g. `libfontconfig1-dev` on Ubuntu) installed.
 
 ### Added
 
 #### Parley
 
-- Add `TextWrapMode` style. This allow line wrapping to be disabled completely for a span of text (excluding explicit line breaks) ([#367][] by [@nicoburns][])
+- Add `TextWrapMode` style. This allow line wrapping to be disabled completely for a span of text (excluding explicit line breaks). ([#367][] by [@nicoburns][])
 - Add `Cluster::from_point_exact` method for hit-testing spans of text. This is useful for implementing "hover" or "click" functionality. ([#447][] by [@nicoburns][])
 
 ### Changed
 
 #### Parley
+
 - Split off various modules into "editing" folder. ([#440][] by [@PoignardAzur][])
 - Split contents of layout/mod.rs file. ([#444][] by [@PoignardAzur][])
 
 #### Fontique
 
-- Make the yeslogic-fontconfig-sys/dlopen feature optional [#467][] by [@ogoffart][])
+- Make the yeslogic-fontconfig-sys/dlopen feature optional. [#467][] by [@ogoffart][])
 
 ### Fixed
 
 #### Parley
 
-- Running line height calculation  ([#448][] by [@taj-p][])
-- Optimise line height computation ([#449][] by [@nicoburns][])
-- Add word and letter spacing to text layout based on style properties ([#468][] by [@dolsup][])
-- Hang trailing whitespace preceding explicit newline ([#276][] by [@wfdewith][])
+- Running line height calculation. ([#448][] by [@taj-p][])
+- Optimise line height computation. ([#449][] by [@nicoburns][])
+- Add word and letter spacing to text layout based on style properties. ([#468][] by [@dolsup][])
+- Hang trailing whitespace preceding explicit newline. ([#276][] by [@wfdewith][])
 
 #### Fontique
 
-- Fix build on platforms without 64bit atomics ([#451][] by [@nicoburns][])
+- Fix build on platforms without 64bit atomics. ([#451][] by [@nicoburns][])
 
 ## [0.6.0] - 2025-10-06
 
@@ -331,6 +333,7 @@ This release has an [MSRV][] of 1.70.
 [@nicoburns]: https://github.com/nicoburns
 [@NoahR02]: https://github.com/NoahR02
 [@ogoffart]: https://github.com/ogoffart
+[@PoignardAzur]: https://github.com/@PoignardAzur
 [@richardhozak]: https://github.com/richardhozak
 [@spirali]: https://github.com/spirali
 [@taj-p]: https://github.com/taj-p
