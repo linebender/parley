@@ -159,55 +159,29 @@ impl Editor {
                     }
                     Key::Named(NamedKey::ArrowLeft) => {
                         if action_mod {
-                            if shift {
-                                drv.select_word_left();
-                            } else {
-                                drv.move_word_left();
-                            }
-                        } else if shift {
-                            drv.select_left();
+                            drv.move_word_left(shift);
                         } else {
-                            drv.move_left();
+                            drv.move_left(shift);
                         }
                     }
                     Key::Named(NamedKey::ArrowRight) => {
                         if action_mod {
-                            if shift {
-                                drv.select_word_right();
-                            } else {
-                                drv.move_word_right();
-                            }
-                        } else if shift {
-                            drv.select_right();
+                            drv.move_word_right(shift);
                         } else {
-                            drv.move_right();
+                            drv.move_right(shift);
                         }
                     }
                     Key::Named(NamedKey::ArrowUp) => {
-                        if shift {
-                            drv.select_up();
-                        } else {
-                            drv.move_up();
-                        }
+                        drv.move_up(shift);
                     }
                     Key::Named(NamedKey::ArrowDown) => {
-                        if shift {
-                            drv.select_down();
-                        } else {
-                            drv.move_down();
-                        }
+                        drv.move_down(shift);
                     }
                     Key::Named(NamedKey::Home) => {
                         if action_mod {
-                            if shift {
-                                drv.select_to_text_start();
-                            } else {
-                                drv.move_to_text_start();
-                            }
-                        } else if shift {
-                            drv.select_to_line_start();
+                            drv.move_to_text_start(shift);
                         } else {
-                            drv.move_to_line_start();
+                            drv.move_to_line_start(shift);
                         }
                     }
                     Key::Named(NamedKey::End) => {
@@ -215,15 +189,9 @@ impl Editor {
                         let mut drv = this.driver();
 
                         if action_mod {
-                            if shift {
-                                drv.select_to_text_end();
-                            } else {
-                                drv.move_to_text_end();
-                            }
-                        } else if shift {
-                            drv.select_to_line_end();
+                            drv.move_to_text_end(shift);
                         } else {
-                            drv.move_to_line_end();
+                            drv.move_to_line_end(shift);
                         }
                     }
                     Key::Named(NamedKey::Delete) => {
@@ -277,7 +245,7 @@ impl Editor {
                         if state.modifiers.shift() {
                             drv.shift_click_extension(cursor_pos.0, cursor_pos.1);
                         } else {
-                            drv.move_to_point(cursor_pos.0, cursor_pos.1);
+                            drv.move_to_point(cursor_pos.0, cursor_pos.1, false);
                         }
                     }
                 }
@@ -291,7 +259,7 @@ impl Editor {
                 );
                 self.cursor_reset();
                 self.driver()
-                    .extend_selection_to_point(cursor_pos.0, cursor_pos.1);
+                    .move_to_point(cursor_pos.0, cursor_pos.1, true);
             }
             _ => {}
         }
