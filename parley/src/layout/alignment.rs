@@ -177,6 +177,7 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
                             }
                             if cluster.info.whitespace().is_space_or_nbsp() {
                                 cluster.advance += adjustment;
+                                line.metrics.advance += adjustment;
                                 applied += 1;
                             }
                         });
