@@ -128,7 +128,7 @@ fn bounding_box_to_rect(bb: parley::BoundingBox) -> kurbo::Rect {
 
 #### Parley
 
-- Adjust the advance of the whole line when justifying text.  ([#397][] by [@kekelp][])
+- Adjust the advance of the whole line when justifying text. ([#397][] by [@kekelp][])
 - Selection extension moves the focus to the side being extended. ([#385][] by [@kekelp][])
 - Ranged builder default style not respecting `scale`. ([#368][] by [@xStrom][])
 - Cluster source character not correct. ([#402][] by [@taj-p][])

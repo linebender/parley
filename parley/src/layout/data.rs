@@ -167,7 +167,7 @@ pub(crate) struct LineData {
     pub(crate) max_advance: f32,
     /// Number of justified clusters on the line.
     pub(crate) num_spaces: usize,
-    /// Max advance for the line before justification
+    /// Max advance for the line before justification.
     pub(crate) unjustified_advance: f32,
 }
 
