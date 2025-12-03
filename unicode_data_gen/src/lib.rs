@@ -3,8 +3,6 @@
 
 //! See `./main.rs`.
 
-use std::io::BufWriter;
-
 use icu_codepointtrie_builder::{CodePointTrieBuilder, CodePointTrieBuilderData};
 use icu_collections::codepointtrie::TrieType;
 use icu_locale::LocaleFallbacker;
@@ -15,13 +13,10 @@ use icu_properties::{
         BidiClass, Emoji, ExtendedPictographic, LineBreak, RegionalIndicator, VariationSelector,
     },
 };
-use icu_provider::prelude::icu_locale_core::locale;
-use icu_provider::prelude::*;
-use icu_provider_export::{DataLocaleFamily, DeduplicationStrategy, ExportDriver};
+use icu_provider_export::prelude::*;
 use icu_provider_source::SourceDataProvider;
-
-use std::io::Write;
-use unicode_data::*;
+use std::io::{BufWriter, Write};
+use unicode_data::Properties;
 
 const COPYRIGHT_HEADER: &str =
     "// Copyright 2025 the Parley Authors\n// SPDX-License-Identifier: Apache-2.0 OR MIT\n";

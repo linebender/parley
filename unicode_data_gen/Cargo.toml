@@ -11,16 +11,12 @@ publish = false
 [dependencies]
 icu_locale = { workspace = true }
 icu_properties = { workspace = true, features = ["compiled_data"] }
-icu_collections = { workspace = true, features = ["databake", "serde"] }
-icu_provider = { workspace = true, features = ["baked"] }
+icu_collections = { workspace = true, features = ["databake"] }
 icu_provider_source = { workspace = true, features = ["networking", "use_wasm"] }
-yoke = { workspace = true, features = ["derive"] }
-zerofrom = { workspace = true }
 unicode_data = { workspace = true, default-features = false, features = ["datagen"] }
 icu_normalizer = { workspace = true, features = ["compiled_data"] }
 icu_segmenter = { workspace = true }
 icu_provider_export = { workspace = true, features = ["baked_exporter"] }
-serde = { workspace = true, features = ["derive"] }
 databake = { workspace = true, features = ["derive"] }
 icu_codepointtrie_builder = { workspace = true, features = ["wasm"] }
 
