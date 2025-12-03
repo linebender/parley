@@ -3,7 +3,6 @@
 
 use crate::analysis::AnalysisDataSources;
 
-use icu_locale_core::LanguageIdentifier;
 use icu_properties::props::Script;
 
 pub(crate) fn script_to_fontique(
@@ -12,16 +11,10 @@ pub(crate) fn script_to_fontique(
 ) -> fontique::Script {
     let short_name: [u8; 4] = analysis_data_sources
         .script_short_name()
-        .get(script)
-        .unwrap_or("Zzzz")
-        .as_bytes()
-        .try_into()
-        .expect("exactly 4 bytes");
+        .get_locale_script(script)
+        .unwrap_or(icu_locale_core::subtags::script!("Zzzz"))
+        .into_raw();
     fontique::Script(short_name)
-}
-
-pub(crate) fn locale_to_fontique(locale: LanguageIdentifier) -> Option<fontique::Language> {
-    fontique::Language::try_from_utf8(locale.to_string().as_bytes()).ok()
 }
 
 pub(crate) fn script_to_harfrust(script: fontique::Script) -> harfrust::Script {

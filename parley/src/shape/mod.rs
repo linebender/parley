@@ -537,8 +537,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         let features = rcx.features(style.font_features).unwrap_or(&[]);
         query.set_families(fonts.iter().copied());
 
-        let fb_language = locale.and_then(icu_convert::locale_to_fontique);
-        query.set_fallbacks(fontique::FallbackKey::new(fb_script, fb_language.as_ref()));
+        query.set_fallbacks(fontique::FallbackKey::new(fb_script, locale.as_ref()));
         query.set_attributes(attrs);
 
         Self {
