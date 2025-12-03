@@ -115,7 +115,33 @@ impl Properties {
         let s = script.to_icu4c_value() as u32;
         let gc = gc as u32;
         let gcb = gcb.to_icu4c_value() as u32;
-        let bidi = unicode_to_unicode_bidi(bidi) as u32;
+        use icu_properties::props::BidiClass;
+        let bidi = match bidi {
+            BidiClass::LeftToRight => 9,
+            BidiClass::RightToLeft => 17,
+            BidiClass::EuropeanNumber => 5,
+            BidiClass::EuropeanSeparator => 6,
+            BidiClass::EuropeanTerminator => 7,
+            BidiClass::ArabicNumber => 1,
+            BidiClass::CommonSeparator => 4,
+            BidiClass::ParagraphSeparator => 2,
+            BidiClass::SegmentSeparator => 21,
+            BidiClass::WhiteSpace => 22,
+            BidiClass::OtherNeutral => 14,
+            BidiClass::LeftToRightEmbedding => 10,
+            BidiClass::LeftToRightOverride => 12,
+            BidiClass::ArabicLetter => 0,
+            BidiClass::RightToLeftEmbedding => 18,
+            BidiClass::RightToLeftOverride => 20,
+            BidiClass::PopDirectionalFormat => 15,
+            BidiClass::NonspacingMark => 13,
+            BidiClass::BoundaryNeutral => 3,
+            BidiClass::FirstStrongIsolate => 8,
+            BidiClass::LeftToRightIsolate => 11,
+            BidiClass::RightToLeftIsolate => 19,
+            BidiClass::PopDirectionalIsolate => 16,
+            _ => unreachable!("Invalid BidiClass: {:?}", bidi),
+        };
 
         Self(
             (s << Self::SCRIPT_SHIFT)
@@ -171,6 +197,8 @@ impl Properties {
             clippy::cast_possible_truncation,
             reason = "bidi class data only occupies BIDI_BITS bits"
         )]
+        // Note: the values match the discriminants as of unicode_bidi 0.3.18,
+        // so this is not a runtime match.
         match self.get(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8 {
             0 => unicode_bidi::BidiClass::AL,
             1 => unicode_bidi::BidiClass::AN,
@@ -205,16 +233,16 @@ impl Properties {
     /// Returns whether the character needs bidirectional resolution.
     #[inline(always)]
     pub fn needs_bidi_resolution(&self) -> bool {
-        use unicode_bidi::BidiClass::*;
-        let bidi_class = self.bidi_class();
-        let bidi_mask = 1_u32 << (bidi_class as u32);
+        const _: () = assert!(
+            Properties::BIDI_BITS < 32,
+            "too many bidi classes for bit shift hack"
+        );
+        let bidi_mask = 1 << self.get(Self::BIDI_SHIFT, Self::BIDI_BITS);
 
-        const OVERRIDE_MASK: u32 =
-            (1 << RLE as u32) | (1 << LRE as u32) | (1 << RLO as u32) | (1 << LRO as u32);
-        const ISOLATE_MASK: u32 = (1 << RLI as u32) | (1 << LRI as u32) | (1 << FSI as u32);
+        const OVERRIDE_MASK: u32 = (1 << 18) | (1 << 10) | (1 << 20) | (1 << 12);
+        const ISOLATE_MASK: u32 = (1 << 19) | (1 << 11) | (1 << 8);
         const EXPLICIT_MASK: u32 = OVERRIDE_MASK | ISOLATE_MASK;
-        const BIDI_MASK: u32 =
-            EXPLICIT_MASK | (1 << R as u32) | (1 << AL as u32) | (1 << AN as u32);
+        const BIDI_MASK: u32 = EXPLICIT_MASK | (1 << 17) | (1 << 0) | (1 << 1);
 
         (bidi_mask & BIDI_MASK) != 0
     }
@@ -259,36 +287,5 @@ impl Properties {
 impl From<Properties> for u32 {
     fn from(value: Properties) -> Self {
         value.0
-    }
-}
-
-#[cfg(feature = "datagen")]
-fn unicode_to_unicode_bidi(bidi: icu_properties::props::BidiClass) -> unicode_bidi::BidiClass {
-    use icu_properties::props::BidiClass;
-    match bidi {
-        BidiClass::LeftToRight => unicode_bidi::BidiClass::L,
-        BidiClass::RightToLeft => unicode_bidi::BidiClass::R,
-        BidiClass::EuropeanNumber => unicode_bidi::BidiClass::EN,
-        BidiClass::EuropeanSeparator => unicode_bidi::BidiClass::ES,
-        BidiClass::EuropeanTerminator => unicode_bidi::BidiClass::ET,
-        BidiClass::ArabicNumber => unicode_bidi::BidiClass::AN,
-        BidiClass::CommonSeparator => unicode_bidi::BidiClass::CS,
-        BidiClass::ParagraphSeparator => unicode_bidi::BidiClass::B,
-        BidiClass::SegmentSeparator => unicode_bidi::BidiClass::S,
-        BidiClass::WhiteSpace => unicode_bidi::BidiClass::WS,
-        BidiClass::OtherNeutral => unicode_bidi::BidiClass::ON,
-        BidiClass::LeftToRightEmbedding => unicode_bidi::BidiClass::LRE,
-        BidiClass::LeftToRightOverride => unicode_bidi::BidiClass::LRO,
-        BidiClass::ArabicLetter => unicode_bidi::BidiClass::AL,
-        BidiClass::RightToLeftEmbedding => unicode_bidi::BidiClass::RLE,
-        BidiClass::RightToLeftOverride => unicode_bidi::BidiClass::RLO,
-        BidiClass::PopDirectionalFormat => unicode_bidi::BidiClass::PDF,
-        BidiClass::NonspacingMark => unicode_bidi::BidiClass::NSM,
-        BidiClass::BoundaryNeutral => unicode_bidi::BidiClass::BN,
-        BidiClass::FirstStrongIsolate => unicode_bidi::BidiClass::FSI,
-        BidiClass::LeftToRightIsolate => unicode_bidi::BidiClass::LRI,
-        BidiClass::RightToLeftIsolate => unicode_bidi::BidiClass::RLI,
-        BidiClass::PopDirectionalIsolate => unicode_bidi::BidiClass::PDI,
-        _ => unreachable!("Invalid BidiClass: {:?}", bidi),
     }
 }
