@@ -2,12 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 pub(crate) mod cluster;
-mod provider;
 
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use crate::analysis::provider::PROVIDER;
 use crate::resolve::{RangedStyle, ResolvedStyle};
 use crate::{Brush, LayoutContext, WordBreak};
 
@@ -19,107 +17,80 @@ use icu_properties::props::{BidiMirroringGlyph, GeneralCategory, GraphemeCluster
 use icu_properties::{
     CodePointMapData, CodePointMapDataBorrowed, PropertyNamesShort, PropertyNamesShortBorrowed,
 };
-use icu_segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakOptions};
+use icu_segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakInvariantOptions};
 use icu_segmenter::{
     GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter,
     LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed,
 };
 use parley_data::CompositeProps;
 
-pub(crate) struct AnalysisDataSources {
-    grapheme_segmenter: GraphemeClusterSegmenter,
-    word_segmenter: WordSegmenter,
-    line_segmenters: LineSegmenters,
-    composing_normalizer: CanonicalComposition,
-    decomposing_normalizer: CanonicalDecomposition,
-    script_short_name: PropertyNamesShort<Script>,
-    brackets: CodePointMapData<BidiMirroringGlyph>,
-
-    composite: CompositeProps,
-}
-
-#[derive(Default)]
-struct LineSegmenters {
-    normal: Option<LineSegmenter>,
-    keep_all: Option<LineSegmenter>,
-    break_all: Option<LineSegmenter>,
-}
-
-impl LineSegmenters {
-    fn get(&mut self, word_break_strength: WordBreak) -> LineSegmenterBorrowed<'_> {
-        let segmenter = match word_break_strength {
-            WordBreak::Normal => &mut self.normal,
-            WordBreak::KeepAll => &mut self.keep_all,
-            WordBreak::BreakAll => &mut self.break_all,
-        };
-
-        segmenter
-            .get_or_insert_with(|| {
-                let mut line_break_opts = LineBreakOptions::default();
-                let word_break_strength_icu = match word_break_strength {
-                    WordBreak::Normal => LineBreakWordOption::Normal,
-                    WordBreak::BreakAll => LineBreakWordOption::BreakAll,
-                    WordBreak::KeepAll => LineBreakWordOption::KeepAll,
-                };
-                line_break_opts.word_option = Some(word_break_strength_icu);
-                LineSegmenter::try_new_auto_unstable(&PROVIDER, line_break_opts)
-                    .expect("Failed to create LineSegmenter")
-            })
-            .as_borrowed()
-    }
-}
+pub(crate) struct AnalysisDataSources;
 
 impl AnalysisDataSources {
     pub(crate) fn new() -> Self {
-        Self {
-            grapheme_segmenter: GraphemeClusterSegmenter::try_new_unstable(&PROVIDER).unwrap(),
-            word_segmenter: WordSegmenter::try_new_lstm_unstable(
-                &PROVIDER,
-                WordBreakOptions::default(),
-            )
-            .unwrap(),
-            line_segmenters: LineSegmenters::default(),
-            composing_normalizer: CanonicalComposition::try_new_unstable(&PROVIDER).unwrap(),
-            decomposing_normalizer: CanonicalDecomposition::try_new_unstable(&PROVIDER).unwrap(),
-            script_short_name: PropertyNamesShort::<Script>::try_new_unstable(&PROVIDER).unwrap(),
-            brackets: CodePointMapData::<BidiMirroringGlyph>::try_new_unstable(&PROVIDER).unwrap(),
-            composite: CompositeProps,
-        }
+        Self
     }
 
     #[inline(always)]
-    pub(crate) fn composite(&self) -> &CompositeProps {
-        &self.composite
+    pub(crate) fn composite(&self) -> CompositeProps {
+        const { CompositeProps }
     }
 
     #[inline(always)]
     pub(crate) fn grapheme_segmenter(&self) -> GraphemeClusterSegmenterBorrowed<'_> {
-        self.grapheme_segmenter.as_borrowed()
+        const { GraphemeClusterSegmenter::new() }
     }
 
     #[inline(always)]
-    fn word_segmenter(&self) -> WordSegmenterBorrowed<'_> {
-        self.word_segmenter.as_borrowed()
+    fn word_segmenter(&self) -> WordSegmenterBorrowed<'static> {
+        const { WordSegmenter::new_for_non_complex_scripts(WordBreakInvariantOptions::default()) }
+    }
+
+    #[inline(always)]
+    fn line_segmenter(&self, word_break_strength: WordBreak) -> LineSegmenterBorrowed<'static> {
+        match word_break_strength {
+            WordBreak::Normal => {
+                const {
+                    let mut opt = LineBreakOptions::default();
+                    opt.word_option = Some(LineBreakWordOption::Normal);
+                    LineSegmenter::new_for_non_complex_scripts(opt)
+                }
+            }
+            WordBreak::BreakAll => {
+                const {
+                    let mut opt = LineBreakOptions::default();
+                    opt.word_option = Some(LineBreakWordOption::BreakAll);
+                    LineSegmenter::new_for_non_complex_scripts(opt)
+                }
+            }
+            WordBreak::KeepAll => {
+                const {
+                    let mut opt = LineBreakOptions::default();
+                    opt.word_option = Some(LineBreakWordOption::KeepAll);
+                    LineSegmenter::new_for_non_complex_scripts(opt)
+                }
+            }
+        }
     }
 
     #[inline(always)]
     fn composing_normalizer(&self) -> CanonicalCompositionBorrowed<'_> {
-        self.composing_normalizer.as_borrowed()
+        const { CanonicalComposition::new() }
     }
 
     #[inline(always)]
     fn decomposing_normalizer(&self) -> CanonicalDecompositionBorrowed<'_> {
-        self.decomposing_normalizer.as_borrowed()
+        const { CanonicalDecomposition::new() }
     }
 
     #[inline(always)]
-    pub(crate) fn script_short_name(&self) -> PropertyNamesShortBorrowed<'_, Script> {
-        self.script_short_name.as_borrowed()
+    pub(crate) fn script_short_name(&self) -> PropertyNamesShortBorrowed<'static, Script> {
+        PropertyNamesShort::new()
     }
 
     #[inline(always)]
-    pub(crate) fn brackets(&self) -> CodePointMapDataBorrowed<'_, BidiMirroringGlyph> {
-        self.brackets.as_borrowed()
+    fn brackets(&self) -> CodePointMapDataBorrowed<'_, BidiMirroringGlyph> {
+        const { CodePointMapData::new() }
     }
 }
 
@@ -335,8 +306,6 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
         }
     }
 
-    let mut line_segmenters = core::mem::take(&mut lcx.analysis_data_sources.line_segmenters);
-
     // Collect boundary byte positions compactly
     let mut wb_iter = lcx
         .analysis_data_sources
@@ -361,8 +330,9 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
     {
         // Fast path for text with a single word-break option.
         if substring_index == 0 && last {
-            let mut lb_iter = line_segmenters
-                .get(word_break_strength)
+            let mut lb_iter = lcx
+                .analysis_data_sources
+                .line_segmenter(word_break_strength)
                 .segment_str(substring);
 
             let _first = lb_iter.next();
@@ -383,8 +353,9 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
             break;
         }
 
-        let line_boundaries_iter = line_segmenters
-            .get(word_break_strength)
+        let line_boundaries_iter = lcx
+            .analysis_data_sources
+            .line_segmenter(word_break_strength)
             .segment_str(substring);
 
         let mut substring_chars = substring.chars();
@@ -527,9 +498,6 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
             None,
         );
     }
-
-    // Restore line segmenters
-    lcx.analysis_data_sources.line_segmenters = line_segmenters;
 }
 
 /// All characters contribute to shaping except:

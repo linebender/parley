@@ -1,10 +1,8 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Unicode data that Parley's text analysis and shaping pipeline needs at runtime by exposing:
-//!
-//! - Re-exported ICU4X data providers for grapheme, word, and line breaking, plus Unicode normalization tables used by Parley.
-//! - A locale-invariant `CompositeProps` provider backed by a compact `CodePointTrie`, allowing the engine to obtain all required character properties with a single lookup.
+//! `parley_data` packages the Unicode data that Parley's text analysis and shaping pipeline needs at runtime.
+//! It exposes a locale-invariant `CompositeProps` data backed by a compact `CodePointTrie`, allowing the engine to obtain all required character properties with a single lookup.
 
 #![no_std]
 
