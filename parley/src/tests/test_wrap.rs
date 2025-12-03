@@ -4,10 +4,7 @@
 use icu_segmenter::options::LineBreakWordOption;
 use peniko::color::palette::css;
 
-use crate::{
-    Alignment, AlignmentOptions, OverflowWrap, StyleProperty, TextWrapMode,
-    test_name,
-};
+use crate::{Alignment, AlignmentOptions, OverflowWrap, StyleProperty, TextWrapMode, test_name};
 
 use super::utils::{ColorBrush, TestEnv};
 

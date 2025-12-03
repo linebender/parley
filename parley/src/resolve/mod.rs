@@ -14,11 +14,11 @@ use super::style::{
     Brush, FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontVariation, FontWeight,
     FontWidth, StyleProperty,
 };
+use crate::TextWrapMode;
 use crate::font::FontContext;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
 use crate::{LineBreakWordOption, LineHeight, OverflowWrap, layout};
-use crate::TextWrapMode;
 use core::borrow::Borrow;
 use core::ops::Range;
 use fontique::FamilyId;

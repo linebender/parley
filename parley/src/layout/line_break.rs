@@ -9,15 +9,15 @@ use alloc::vec::Vec;
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 
-use crate::analysis::cluster::Whitespace;
 use crate::analysis::Boundary;
+use crate::analysis::cluster::Whitespace;
 use crate::data::ClusterData;
-use crate::{OverflowWrap, TextWrapMode};
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
 };
 use crate::style::Brush;
+use crate::{OverflowWrap, TextWrapMode};
 
 use core::ops::Range;
 
