@@ -8,12 +8,69 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 # Changelog
 
-The latest published Parley release is [0.6.0](#060---2025-10-06) which was released on 2025-10-06.
-You can find its changes [documented below](#060---2025-10-06).
+The latest published Parley release is [0.7.0](#060---2025-11-24) which was released on 2025-11-24.
+You can find its changes [documented below](#060---2025-11-24).
 
 ## [Unreleased]
 
-This release has an [MSRV] of 1.82.
+This release has an [MSRV] of 1.83.
+
+## [0.7.0] - 2025-11-24
+
+This release has an [MSRV] of 1.83.
+
+### Highlights
+
+[#448][] by [@taj-p][]) and ([#449][] by [@nicoburns][] collectively fix a significant performance bug that occurred when laying
+out large paragraphs of text.
+Previously the time to perform layout was non-linear with respect to the input size and laying out
+paragraphs of text with more than ~1k characters was very slow.
+
+The new `TextWrapMode` style implements the semantics of the [`text-wrap-mode`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/text-wrap-mode)
+CSS property and allows text-wrapping to be disabled completely for a span of text.
+
+### Migration
+
+Some modules have been moved:
+
+- `parley::editor` and `parley::layout::editor` are now `parley::editing`.
+- `parley::layout::cursor` is now `parley::cursor`.
+
+Fontique no longer sets the `dlopen` feature of `yeslogic-fontconfig-sys` by default. If you wish to run Fontique on a Linux system
+without fontconfig installed then you will need to enable the new `fontconfig-dlopen` feature of the `fontique` crate.
+If you wish to compile Fontique on a Linux system without the `fontconfig-dlopen` enabled then you will need the fontconfig dev
+package (e.g. `libfontconfig1-dev` on Ubuntu) installed.
+
+### Added
+
+#### Parley
+
+- Add `TextWrapMode` style. This allow line wrapping to be disabled completely for a span of text (excluding explicit line breaks). ([#367][] by [@nicoburns][])
+- Add `Cluster::from_point_exact` method for hit-testing spans of text. This is useful for implementing "hover" or "click" functionality. ([#447][] by [@nicoburns][])
+
+### Changed
+
+#### Parley
+
+- Split off various modules into "editing" folder. ([#440][] by [@PoignardAzur][])
+- Split contents of layout/mod.rs file. ([#444][] by [@PoignardAzur][])
+
+#### Fontique
+
+- Make the yeslogic-fontconfig-sys/dlopen feature optional. [#467][] by [@ogoffart][])
+
+### Fixed
+
+#### Parley
+
+- Running line height calculation. ([#448][] by [@taj-p][])
+- Optimise line height computation. ([#449][] by [@nicoburns][])
+- Add word and letter spacing to text layout based on style properties. ([#468][] by [@dolsup][])
+- Hang trailing whitespace preceding explicit newline. ([#276][] by [@wfdewith][])
+
+#### Fontique
+
+- Fix build on platforms without 64bit atomics. ([#451][] by [@nicoburns][])
 
 ## [0.6.0] - 2025-10-06
 
@@ -270,10 +327,13 @@ This release has an [MSRV][] of 1.70.
 [@dfrg]: https://github.com/dfrg
 [@dhardy]: https://github.com/dhardy
 [@DJMcNab]: https://github.com/DJMcNab
+[@dolsup]: https://github.com/dolsup
 [@kekelp]: https://github.com/kekelp
 [@mwcampbell]: https://github.com/mwcampbell
 [@nicoburns]: https://github.com/nicoburns
 [@NoahR02]: https://github.com/NoahR02
+[@ogoffart]: https://github.com/ogoffart
+[@PoignardAzur]: https://github.com/@PoignardAzur
 [@richardhozak]: https://github.com/richardhozak
 [@spirali]: https://github.com/spirali
 [@taj-p]: https://github.com/taj-p
@@ -331,6 +391,7 @@ This release has an [MSRV][] of 1.70.
 [#264]: https://github.com/linebender/parley/pull/264
 [#268]: https://github.com/linebender/parley/pull/268
 [#271]: https://github.com/linebender/parley/pull/271
+[#276]: https://github.com/linebender/parley/pull/276
 [#280]: https://github.com/linebender/parley/pull/280
 [#294]: https://github.com/linebender/parley/pull/294
 [#296]: https://github.com/linebender/parley/pull/296
@@ -352,6 +413,7 @@ This release has an [MSRV][] of 1.70.
 [#348]: https://github.com/linebender/parley/pull/348
 [#353]: https://github.com/linebender/parley/pull/353
 [#362]: https://github.com/linebender/parley/pull/362
+[#367]: https://github.com/linebender/parley/pull/367
 [#368]: https://github.com/linebender/parley/pull/368
 [#369]: https://github.com/linebender/parley/pull/369
 [#378]: https://github.com/linebender/parley/pull/378
@@ -368,8 +430,18 @@ This release has an [MSRV][] of 1.70.
 [#413]: https://github.com/linebender/parley/pull/413
 [#414]: https://github.com/linebender/parley/pull/414
 [#418]: https://github.com/linebender/parley/pull/418
+[#440]: https://github.com/linebender/parley/pull/440
+[#444]: https://github.com/linebender/parley/pull/444
+[#447]: https://github.com/linebender/parley/pull/447
+[#448]: https://github.com/linebender/parley/pull/448
+[#449]: https://github.com/linebender/parley/pull/449
+[#451]: https://github.com/linebender/parley/pull/451
+[#467]: https://github.com/linebender/parley/pull/467
+[#468]: https://github.com/linebender/parley/pull/468
 
-[Unreleased]: https://github.com/linebender/parley/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/linebender/parley/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/linebender/parley/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/linebender/parley/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/linebender/parley/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/linebender/parley/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/linebender/parley/compare/v0.2.0...v0.3.0
