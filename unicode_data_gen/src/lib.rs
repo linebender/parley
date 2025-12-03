@@ -107,6 +107,12 @@ pub fn generate(out: std::path::PathBuf) {
 
         writeln!(&mut file, "{COPYRIGHT_HEADER}").unwrap();
         writeln!(&mut file, "/// Backing data for the `CompositeProps`").unwrap();
+        writeln!(
+            &mut file,
+            "/// Expected size: {}B",
+            size_of_val(&trie) + databake::BakeSize::borrows_size(&trie)
+        )
+        .unwrap();
         writeln!(&mut file, "#[rustfmt::skip]").unwrap();
         writeln!(&mut file, "#[allow(unsafe_code, unused_unsafe, clippy::unseparated_literal_suffix, reason = \"databake behaviour\")]").unwrap();
         writeln!(
