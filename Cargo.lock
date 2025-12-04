@@ -1079,18 +1079,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "embedded-io"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef1a6892d9eef45c8fa6b9e0086428a2cca8491aca8f787c534a3d6d0bcb3ced"
-
-[[package]]
-name = "embedded-io"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
-
-[[package]]
 name = "encode_unicode"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2000,6 +1988,7 @@ checksum = "5f6c8828b67bf8908d82127b2054ea1b4427ff0230ee9141c54251934ab1b599"
 dependencies = [
  "databake",
  "icu_collections",
+ "icu_normalizer_data",
  "icu_properties",
  "icu_provider",
  "serde",
@@ -2009,6 +1998,12 @@ dependencies = [
  "write16",
  "zerovec",
 ]
+
+[[package]]
+name = "icu_normalizer_data"
+version = "2.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7aedcccd01fc5fe81e6b489c15b247b8b0690feb23304303a9e560f37efc560a"
 
 [[package]]
 name = "icu_pattern"
@@ -2083,16 +2078,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "icu_provider_adapters"
-version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37dafa75fcb2ca73939cf7e7f4967d30be122b5e1d10f2b344e0addca8fa9446"
-dependencies = [
- "icu_locale",
- "icu_provider",
-]
-
-[[package]]
 name = "icu_provider_baked"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2108,21 +2093,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "icu_provider_blob"
-version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcd377d80121ab5d320c90f914cf7145a6881556d886c2aa2c6f89cdae5f7a30"
-dependencies = [
- "icu_provider",
- "log",
- "postcard",
- "serde",
- "writeable",
- "zerotrie",
- "zerovec",
-]
-
-[[package]]
 name = "icu_provider_export"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2132,7 +2102,6 @@ dependencies = [
  "icu_locale",
  "icu_provider",
  "icu_provider_baked",
- "icu_provider_blob",
  "log",
  "writeable",
 ]
@@ -3509,8 +3478,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6764c3b5dd454e283a30e6dfe78e9b31096d9e32036b5d1eaac7a6119ccb9a24"
 dependencies = [
  "cobs",
- "embedded-io 0.4.0",
- "embedded-io 0.6.1",
  "serde",
 ]
 
@@ -4659,9 +4626,6 @@ name = "unicode-bidi"
 version = "0.3.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c1cb5db39152898a79168971543b1cb5020dff7fe43c8dc468b0885f5e29df5"
-dependencies = [
- "smallvec",
-]
 
 [[package]]
 name = "unicode-ident"
@@ -4703,15 +4667,10 @@ checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 name = "unicode_data"
 version = "0.0.0"
 dependencies = [
- "databake",
  "icu_collections",
- "icu_locale",
  "icu_properties",
- "icu_provider",
- "serde",
  "unicode-bidi",
- "yoke",
- "zerofrom",
+ "zerovec",
 ]
 
 [[package]]
@@ -4724,16 +4683,10 @@ dependencies = [
  "icu_locale",
  "icu_normalizer",
  "icu_properties",
- "icu_provider",
- "icu_provider_adapters",
  "icu_provider_export",
  "icu_provider_source",
  "icu_segmenter",
- "serde",
- "unicode-bidi",
  "unicode_data",
- "yoke",
- "zerofrom",
 ]
 
 [[package]]
