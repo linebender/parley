@@ -116,8 +116,7 @@ impl Properties {
         let gc = gc as u32;
         let gcb = gcb.to_icu4c_value() as u32;
         use icu_properties::props::BidiClass;
-        // Translate `icu_properties::props::BidiClass` values to the `unicode_bidi::BidiClass` discriminants
-        // as of unicode_bidi 0.3.18.
+        // Translate `icu_properties::props::BidiClass` values to the `unicode_bidi::BidiClass`
         let bidi = match bidi {
             BidiClass::ArabicLetter => 0,
             BidiClass::ArabicNumber => 1,
@@ -199,8 +198,7 @@ impl Properties {
             clippy::cast_possible_truncation,
             reason = "bidi class data only occupies BIDI_BITS bits"
         )]
-        // Note: the values match the discriminants as of unicode_bidi 0.3.18,
-        // so this is not a runtime match.
+        // Note: this match compiles out, see `bidi_class_discriminant_test`
         match self.get(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8 {
             0 => unicode_bidi::BidiClass::AL,
             1 => unicode_bidi::BidiClass::AN,
@@ -290,4 +288,33 @@ impl From<Properties> for u32 {
     fn from(value: Properties) -> Self {
         value.0
     }
+}
+
+#[test]
+fn bidi_class_discriminant_test() {
+    // unicode_bidi::BidiClass's discriminants are not stable, but
+    // our code optimises better if they are these values.
+    assert_eq!(unicode_bidi::BidiClass::AL as u8, 0);
+    assert_eq!(unicode_bidi::BidiClass::AN as u8, 1);
+    assert_eq!(unicode_bidi::BidiClass::B as u8, 2);
+    assert_eq!(unicode_bidi::BidiClass::BN as u8, 3);
+    assert_eq!(unicode_bidi::BidiClass::CS as u8, 4);
+    assert_eq!(unicode_bidi::BidiClass::EN as u8, 5);
+    assert_eq!(unicode_bidi::BidiClass::ES as u8, 6);
+    assert_eq!(unicode_bidi::BidiClass::ET as u8, 7);
+    assert_eq!(unicode_bidi::BidiClass::FSI as u8, 8);
+    assert_eq!(unicode_bidi::BidiClass::L as u8, 9);
+    assert_eq!(unicode_bidi::BidiClass::LRE as u8, 10);
+    assert_eq!(unicode_bidi::BidiClass::LRI as u8, 11);
+    assert_eq!(unicode_bidi::BidiClass::LRO as u8, 12);
+    assert_eq!(unicode_bidi::BidiClass::NSM as u8, 13);
+    assert_eq!(unicode_bidi::BidiClass::ON as u8, 14);
+    assert_eq!(unicode_bidi::BidiClass::PDF as u8, 15);
+    assert_eq!(unicode_bidi::BidiClass::PDI as u8, 16);
+    assert_eq!(unicode_bidi::BidiClass::R as u8, 17);
+    assert_eq!(unicode_bidi::BidiClass::RLE as u8, 18);
+    assert_eq!(unicode_bidi::BidiClass::RLI as u8, 19);
+    assert_eq!(unicode_bidi::BidiClass::RLO as u8, 20);
+    assert_eq!(unicode_bidi::BidiClass::S as u8, 21);
+    assert_eq!(unicode_bidi::BidiClass::WS as u8, 22);
 }
