@@ -8,7 +8,7 @@
 
 #![no_std]
 
-use icu_collections::codepointtrie::{CodePointTrie, TrieValue};
+use icu_collections::codepointtrie::CodePointTrie;
 use icu_properties::props::{BidiClass, GeneralCategory, GraphemeClusterBreak, Script};
 use zerofrom::ZeroFrom;
 
