@@ -12,6 +12,7 @@ use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedSt
 use super::style::{Brush, TextStyle};
 
 use crate::analysis::{AnalysisDataSources, CharInfo};
+use crate::bidi::BidiResolver;
 use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
 use crate::shape::ShapeContext;
@@ -23,6 +24,7 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) rcx: ResolveContext,
     pub(crate) styles: Vec<RangedStyle<B>>,
     pub(crate) inline_boxes: Vec<InlineBox>,
+    pub(crate) bidi: BidiResolver,
 
     // Reusable style builders (to amortise allocations)
     pub(crate) ranged_style_builder: RangedStyleBuilder<B>,
@@ -42,6 +44,7 @@ impl<B: Brush> LayoutContext<B> {
             rcx: ResolveContext::default(),
             styles: vec![],
             inline_boxes: vec![],
+            bidi: BidiResolver::new(),
             ranged_style_builder: RangedStyleBuilder::default(),
             tree_style_builder: TreeStyleBuilder::default(),
             info: vec![],

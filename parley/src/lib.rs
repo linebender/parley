@@ -103,6 +103,7 @@ extern crate alloc;
 pub use fontique;
 
 mod analysis;
+mod bidi;
 mod builder;
 mod context;
 mod font;

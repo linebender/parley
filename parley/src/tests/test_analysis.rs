@@ -1,9 +1,10 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::analysis::{BidiLevel, Boundary};
+use crate::analysis::Boundary;
 use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty};
 use fontique::FontWeight;
+use icu_collections::codepointtrie::TrieValue;
 use icu_properties::props::{GraphemeClusterBreak, Script};
 use icu_segmenter::options::LineBreakWordOption;
 
@@ -25,12 +26,13 @@ impl TestContext {
         self
     }
 
-    fn expect_bidi_embed_level_list(self, expected: Vec<BidiLevel>) -> Self {
+    fn expect_bidi_embed_level_list(self, expected: Vec<u8>) -> Self {
         let actual: Vec<_> = self
             .layout_context
-            .info
+            .bidi
+            .levels()
             .iter()
-            .map(|(info, _)| info.bidi_embed_level)
+            .map(|l| l.to_u32() as u8)
             .collect();
         assert_eq!(actual, expected, "Bidi embed level list mismatch");
         self
@@ -122,7 +124,7 @@ fn test_latin_mixed_keep_all_last() {
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 1..2);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None])
-    .expect_bidi_embed_level_list(vec![0, 0])
+    .expect_bidi_embed_level_list(vec![])
     .expect_script_list(vec![
         Script::from_icu4c_value(25),
         Script::from_icu4c_value(25),
@@ -150,7 +152,7 @@ fn test_mandatory_break_in_text() {
             Boundary::Word,
             Boundary::Mandatory,
         ])
-        .expect_bidi_embed_level_list(vec![0, 0, 0, 0, 0, 0, 0, 0, 0])
+        .expect_bidi_embed_level_list(vec![])
         .expect_script_list(vec![
             Script::from_icu4c_value(25),
             Script::from_icu4c_value(25),
@@ -188,7 +190,7 @@ fn test_mandatory_break_in_text() {
 fn test_blank() {
     verify_analysis("", |_| {})
         .expect_boundary_list(vec![Boundary::Word])
-        .expect_bidi_embed_level_list(vec![0])
+        .expect_bidi_embed_level_list(vec![])
         .expect_script_list(vec![Script::from_icu4c_value(0)])
         .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::from_icu4c_value(0)])
         .expect_is_control_list(vec![false])
@@ -267,7 +269,7 @@ fn test_latin_trailing_space_mixed() {
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..3);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::Word])
-    .expect_bidi_embed_level_list(vec![0, 0, 0])
+    .expect_bidi_embed_level_list(vec![])
     .expect_script_list(vec![
         Script::from_icu4c_value(25),
         Script::from_icu4c_value(25),
@@ -285,7 +287,7 @@ fn test_latin_leading_space_mixed() {
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..3);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::Line, Boundary::None])
-    .expect_bidi_embed_level_list(vec![0, 0, 0])
+    .expect_bidi_embed_level_list(vec![])
     .expect_script_list(vec![
         Script::from_icu4c_value(0),
         Script::from_icu4c_value(25),
@@ -321,7 +323,7 @@ fn test_latin_mixed_break_all_first() {
 fn test_all_whitespace() {
     verify_analysis("   ", |_| {})
         .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::None])
-        .expect_bidi_embed_level_list(vec![0, 0, 0])
+        .expect_bidi_embed_level_list(vec![])
         .expect_script_list(vec![
             Script::from_icu4c_value(0),
             Script::from_icu4c_value(0),
@@ -700,7 +702,7 @@ fn test_multi_char_grapheme_mixed_break_all() {
         Boundary::Word,
         Boundary::Line,
     ])
-    .expect_bidi_embed_level_list(vec![0, 0, 0, 0, 0, 0])
+    .expect_bidi_embed_level_list(vec![])
     .expect_script_list(vec![
         Script::from_icu4c_value(25),
         Script::from_icu4c_value(0),
@@ -896,7 +898,7 @@ fn test_multi_char_grapheme_mixed_break_and_keep_all() {
         Boundary::Word,
         Boundary::Line,
     ])
-    .expect_bidi_embed_level_list(vec![0, 0, 0, 0, 0, 0])
+    .expect_bidi_embed_level_list(vec![])
     .expect_script_list(vec![
         Script::from_icu4c_value(25),
         Script::from_icu4c_value(0),
@@ -935,7 +937,7 @@ fn test_multi_char_grapheme_mixed_keep_all() {
         Boundary::Word,
         Boundary::Line,
     ])
-    .expect_bidi_embed_level_list(vec![0, 0, 0, 0, 0, 0])
+    .expect_bidi_embed_level_list(vec![])
     .expect_script_list(vec![
         Script::from_icu4c_value(25),
         Script::from_icu4c_value(0),
@@ -1124,7 +1126,7 @@ fn test_single_char_multi_byte() {
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..3);
     })
     .expect_boundary_list(vec![Boundary::Word])
-    .expect_bidi_embed_level_list(vec![0])
+    .expect_bidi_embed_level_list(vec![])
     .expect_script_list(vec![Script::from_icu4c_value(0)])
     .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::from_icu4c_value(0)]);
 }
@@ -1163,7 +1165,7 @@ fn test_rtl_paragraph_with_non_authoritative_logical_first_character() {
 fn test_two_newlines() {
     verify_analysis("\n\n", |_| {})
         .expect_boundary_list(vec![Boundary::Word, Boundary::Mandatory])
-        .expect_bidi_embed_level_list(vec![0, 0])
+        .expect_bidi_embed_level_list(vec![])
         .expect_script_list(vec![
             Script::from_icu4c_value(0),
             Script::from_icu4c_value(0),
@@ -1178,7 +1180,7 @@ fn test_two_newlines() {
 fn test_newline() {
     verify_analysis("\n", |_| {})
         .expect_boundary_list(vec![Boundary::Word])
-        .expect_bidi_embed_level_list(vec![0])
+        .expect_bidi_embed_level_list(vec![])
         .expect_script_list(vec![Script::from_icu4c_value(0)])
         .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::from_icu4c_value(5)]);
 }
@@ -1189,7 +1191,7 @@ fn test_two_chars_keep_all() {
         builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..2);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None])
-    .expect_bidi_embed_level_list(vec![0, 0])
+    .expect_bidi_embed_level_list(vec![])
     .expect_script_list(vec![
         Script::from_icu4c_value(25),
         Script::from_icu4c_value(25),

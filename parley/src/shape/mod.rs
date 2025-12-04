@@ -71,6 +71,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     styles: &'a [RangedStyle<B>],
     inline_boxes: &[InlineBox],
     infos: &[(CharInfo, u16)],
+    levels: &[u8],
     scx: &mut ShapeContext,
     mut text: &str,
     layout: &mut Layout<B>,
@@ -96,7 +97,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     let mut item = Item {
         style_index: 0,
         size: style.font_size,
-        level: infos[0].0.bidi_embed_level,
+        level: levels.first().copied().unwrap_or(0),
         script: infos
             .iter()
             .map(|x| x.0.script)
@@ -116,13 +117,15 @@ pub(crate) fn shape_text<'a, B: Brush>(
     let mut current_box = inline_box_iter.next();
 
     // Iterate over characters in the text
-    for ((_, (byte_index, ch)), (info, style_index)) in text.char_indices().enumerate().zip(infos) {
+    for ((char_index, (byte_index, ch)), (info, style_index)) in
+        text.char_indices().enumerate().zip(infos)
+    {
         let mut break_run = false;
         let mut script = info.script;
         if !real_script(script) {
             script = item.script;
         }
-        let level = info.bidi_embed_level;
+        let level = levels.get(char_index).copied().unwrap_or(0);
         if item.style_index != *style_index {
             item.style_index = *style_index;
             style = &styles[*style_index as usize].style;

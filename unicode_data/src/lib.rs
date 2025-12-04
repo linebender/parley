@@ -8,8 +8,8 @@
 
 #![no_std]
 
-use icu_collections::codepointtrie::CodePointTrie;
-use icu_properties::props::{GeneralCategory, GraphemeClusterBreak, Script};
+use icu_collections::codepointtrie::{CodePointTrie, TrieValue};
+use icu_properties::props::{BidiClass, GeneralCategory, GraphemeClusterBreak, Script};
 use zerofrom::ZeroFrom;
 
 /// Baked data for the `CompositePropsV1` data provider.
@@ -68,12 +68,6 @@ impl CompositePropsV1Data<'_> {
     }
 }
 
-impl unicode_bidi::BidiDataSource for CompositePropsV1Data<'_> {
-    fn bidi_class(&self, cp: char) -> unicode_bidi::BidiClass {
-        self.properties(cp as u32).bidi_class()
-    }
-}
-
 /// Unicode character properties relevant for text analysis.
 #[derive(Copy, Clone, Debug)]
 pub struct Properties(u32);
@@ -106,7 +100,7 @@ impl Properties {
         script: Script,
         gc: GeneralCategory,
         gcb: GraphemeClusterBreak,
-        bidi: icu_properties::props::BidiClass,
+        bidi: BidiClass,
         is_emoji_or_pictographic: bool,
         is_variation_selector: bool,
         is_region_indicator: bool,
@@ -115,7 +109,7 @@ impl Properties {
         let s = script.to_icu4c_value() as u32;
         let gc = gc as u32;
         let gcb = gcb.to_icu4c_value() as u32;
-        let bidi = unicode_to_unicode_bidi(bidi) as u32;
+        let bidi = bidi.to_icu4c_value() as u32;
 
         Self(
             (s << Self::SCRIPT_SHIFT)
@@ -166,38 +160,38 @@ impl Properties {
 
     /// Returns the bidirectional class for the character.
     #[inline(always)]
-    pub fn bidi_class(&self) -> unicode_bidi::BidiClass {
+    pub fn bidi_class(&self) -> BidiClass {
         #[allow(
             clippy::cast_possible_truncation,
             reason = "bidi class data only occupies BIDI_BITS bits"
         )]
         match self.get(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8 {
-            0 => unicode_bidi::BidiClass::AL,
-            1 => unicode_bidi::BidiClass::AN,
-            2 => unicode_bidi::BidiClass::B,
-            3 => unicode_bidi::BidiClass::BN,
-            4 => unicode_bidi::BidiClass::CS,
-            5 => unicode_bidi::BidiClass::EN,
-            6 => unicode_bidi::BidiClass::ES,
-            7 => unicode_bidi::BidiClass::ET,
-            8 => unicode_bidi::BidiClass::FSI,
-            9 => unicode_bidi::BidiClass::L,
-            10 => unicode_bidi::BidiClass::LRE,
-            11 => unicode_bidi::BidiClass::LRI,
-            12 => unicode_bidi::BidiClass::LRO,
-            13 => unicode_bidi::BidiClass::NSM,
-            14 => unicode_bidi::BidiClass::ON,
-            15 => unicode_bidi::BidiClass::PDF,
-            16 => unicode_bidi::BidiClass::PDI,
-            17 => unicode_bidi::BidiClass::R,
-            18 => unicode_bidi::BidiClass::RLE,
-            19 => unicode_bidi::BidiClass::RLI,
-            20 => unicode_bidi::BidiClass::RLO,
-            21 => unicode_bidi::BidiClass::S,
-            22 => unicode_bidi::BidiClass::WS,
+            13 => BidiClass::ArabicLetter,
+            5 => BidiClass::ArabicNumber,
+            7 => BidiClass::ParagraphSeparator,
+            18 => BidiClass::BoundaryNeutral,
+            6 => BidiClass::CommonSeparator,
+            2 => BidiClass::EuropeanNumber,
+            3 => BidiClass::EuropeanSeparator,
+            4 => BidiClass::EuropeanTerminator,
+            19 => BidiClass::FirstStrongIsolate,
+            0 => BidiClass::LeftToRight,
+            11 => BidiClass::LeftToRightEmbedding,
+            20 => BidiClass::LeftToRightIsolate,
+            12 => BidiClass::LeftToRightOverride,
+            17 => BidiClass::NonspacingMark,
+            10 => BidiClass::OtherNeutral,
+            16 => BidiClass::PopDirectionalFormat,
+            22 => BidiClass::PopDirectionalIsolate,
+            1 => BidiClass::RightToLeft,
+            14 => BidiClass::RightToLeftEmbedding,
+            21 => BidiClass::RightToLeftIsolate,
+            15 => BidiClass::RightToLeftOverride,
+            8 => BidiClass::SegmentSeparator,
+            9 => BidiClass::WhiteSpace,
             val => {
                 debug_assert!(false, "Invalid BidiClass: {val}");
-                unicode_bidi::BidiClass::ON // Other Neutral
+                BidiClass::OtherNeutral
             }
         }
     }
@@ -205,16 +199,25 @@ impl Properties {
     /// Returns whether the character needs bidirectional resolution.
     #[inline(always)]
     pub fn needs_bidi_resolution(&self) -> bool {
-        use unicode_bidi::BidiClass::*;
         let bidi_class = self.bidi_class();
-        let bidi_mask = 1_u32 << (bidi_class as u32);
+        let bidi_mask = 1_u32 << (bidi_class.to_u32());
 
-        const OVERRIDE_MASK: u32 =
-            (1 << RLE as u32) | (1 << LRE as u32) | (1 << RLO as u32) | (1 << LRO as u32);
-        const ISOLATE_MASK: u32 = (1 << RLI as u32) | (1 << LRI as u32) | (1 << FSI as u32);
+        const fn mask(class: BidiClass) -> u32 {
+            1 << class.to_icu4c_value()
+        }
+
+        const OVERRIDE_MASK: u32 = mask(BidiClass::RightToLeftEmbedding)
+            | mask(BidiClass::LeftToRightEmbedding)
+            | mask(BidiClass::RightToLeftOverride)
+            | mask(BidiClass::LeftToRightOverride);
+        const ISOLATE_MASK: u32 = mask(BidiClass::RightToLeftIsolate)
+            | mask(BidiClass::LeftToRightIsolate)
+            | mask(BidiClass::FirstStrongIsolate);
         const EXPLICIT_MASK: u32 = OVERRIDE_MASK | ISOLATE_MASK;
-        const BIDI_MASK: u32 =
-            EXPLICIT_MASK | (1 << R as u32) | (1 << AL as u32) | (1 << AN as u32);
+        const BIDI_MASK: u32 = EXPLICIT_MASK
+            | mask(BidiClass::RightToLeft)
+            | mask(BidiClass::ArabicLetter)
+            | mask(BidiClass::ArabicNumber);
 
         (bidi_mask & BIDI_MASK) != 0
     }
@@ -259,36 +262,5 @@ impl Properties {
 impl From<Properties> for u32 {
     fn from(value: Properties) -> Self {
         value.0
-    }
-}
-
-#[cfg(feature = "datagen")]
-fn unicode_to_unicode_bidi(bidi: icu_properties::props::BidiClass) -> unicode_bidi::BidiClass {
-    use icu_properties::props::BidiClass;
-    match bidi {
-        BidiClass::LeftToRight => unicode_bidi::BidiClass::L,
-        BidiClass::RightToLeft => unicode_bidi::BidiClass::R,
-        BidiClass::EuropeanNumber => unicode_bidi::BidiClass::EN,
-        BidiClass::EuropeanSeparator => unicode_bidi::BidiClass::ES,
-        BidiClass::EuropeanTerminator => unicode_bidi::BidiClass::ET,
-        BidiClass::ArabicNumber => unicode_bidi::BidiClass::AN,
-        BidiClass::CommonSeparator => unicode_bidi::BidiClass::CS,
-        BidiClass::ParagraphSeparator => unicode_bidi::BidiClass::B,
-        BidiClass::SegmentSeparator => unicode_bidi::BidiClass::S,
-        BidiClass::WhiteSpace => unicode_bidi::BidiClass::WS,
-        BidiClass::OtherNeutral => unicode_bidi::BidiClass::ON,
-        BidiClass::LeftToRightEmbedding => unicode_bidi::BidiClass::LRE,
-        BidiClass::LeftToRightOverride => unicode_bidi::BidiClass::LRO,
-        BidiClass::ArabicLetter => unicode_bidi::BidiClass::AL,
-        BidiClass::RightToLeftEmbedding => unicode_bidi::BidiClass::RLE,
-        BidiClass::RightToLeftOverride => unicode_bidi::BidiClass::RLO,
-        BidiClass::PopDirectionalFormat => unicode_bidi::BidiClass::PDF,
-        BidiClass::NonspacingMark => unicode_bidi::BidiClass::NSM,
-        BidiClass::BoundaryNeutral => unicode_bidi::BidiClass::BN,
-        BidiClass::FirstStrongIsolate => unicode_bidi::BidiClass::FSI,
-        BidiClass::LeftToRightIsolate => unicode_bidi::BidiClass::LRI,
-        BidiClass::RightToLeftIsolate => unicode_bidi::BidiClass::RLI,
-        BidiClass::PopDirectionalIsolate => unicode_bidi::BidiClass::PDI,
-        _ => unreachable!("Invalid BidiClass: {:?}", bidi),
     }
 }

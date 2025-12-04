@@ -160,7 +160,7 @@ fn build_into_layout<B: Brush>(
     layout.data.clear();
     layout.data.scale = scale;
     layout.data.quantize = quantize;
-    layout.data.base_level = lcx.info.first().map(|i| i.0.bidi_embed_level).unwrap_or(0);
+    layout.data.base_level = lcx.bidi.base_level();
     layout.data.text_len = text.len();
 
     let mut char_index = 0;
@@ -189,6 +189,7 @@ fn build_into_layout<B: Brush>(
             &lcx.styles,
             &lcx.inline_boxes,
             &lcx.info,
+            &lcx.bidi.levels(),
             &mut lcx.scx,
             text,
             layout,

@@ -29,6 +29,7 @@ macro_rules! impl_data_provider {
         impl_property_name_short_script_v1!($provider);
         impl_normalizer_nfd_data_v1!($provider);
         impl_segmenter_break_word_v1!($provider);
+        impl_property_enum_bidi_mirroring_glyph_v1!($provider);
         impl_segmenter_break_word_override_v1!($provider);
     };
 }

@@ -15,8 +15,10 @@ use icu_normalizer::{
     ComposingNormalizer, ComposingNormalizerBorrowed, DecomposingNormalizer,
     DecomposingNormalizerBorrowed,
 };
-use icu_properties::props::{GeneralCategory, GraphemeClusterBreak, Script};
-use icu_properties::{PropertyNamesShort, PropertyNamesShortBorrowed};
+use icu_properties::props::{BidiMirroringGlyph, GeneralCategory, GraphemeClusterBreak, Script};
+use icu_properties::{
+    CodePointMapData, CodePointMapDataBorrowed, PropertyNamesShort, PropertyNamesShortBorrowed,
+};
 use icu_provider::DataMarker;
 use icu_provider::buf::AsDeserializingBufferProvider;
 use icu_provider::{DataRequest, DataResponse, DynamicDataProvider};
@@ -35,6 +37,7 @@ pub(crate) struct AnalysisDataSources {
     composing_normalizer: ComposingNormalizer,
     decomposing_normalizer: DecomposingNormalizer,
     script_short_name: PropertyNamesShort<Script>,
+    brackets: CodePointMapData<BidiMirroringGlyph>,
 
     composite: DataResponse<CompositePropsV1>,
 }
@@ -89,6 +92,7 @@ impl AnalysisDataSources {
             composing_normalizer: ComposingNormalizer::try_new_nfc_unstable(&PROVIDER).unwrap(),
             decomposing_normalizer: DecomposingNormalizer::try_new_nfd_unstable(&PROVIDER).unwrap(),
             script_short_name: PropertyNamesShort::<Script>::try_new_unstable(&PROVIDER).unwrap(),
+            brackets: CodePointMapData::<BidiMirroringGlyph>::try_new_unstable(&PROVIDER).unwrap(),
             composite,
         }
     }
@@ -116,20 +120,24 @@ impl AnalysisDataSources {
     pub(crate) fn script_short_name(&self) -> PropertyNamesShortBorrowed<'_, Script> {
         self.script_short_name.as_borrowed()
     }
-}
 
-pub(crate) type BidiLevel = u8;
+    pub(crate) fn brackets(&self) -> CodePointMapDataBorrowed<'_, BidiMirroringGlyph> {
+        self.brackets.as_borrowed()
+    }
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CharInfo {
     /// The line/word breaking boundary classification of this character.
     pub boundary: Boundary,
-    /// The bidirectional embedding level of the character (even = LTR, odd = RTL).
-    pub bidi_embed_level: BidiLevel,
     /// The Unicode script this character belongs to.
     pub script: Script,
     /// The grapheme cluster boundary property of this character.
     pub grapheme_cluster_break: GraphemeClusterBreak,
+    /// The impact this character has on directionality.
+    pub bidi_class: icu_properties::props::BidiClass,
+    /// Whether or not the character is a bracket, plus mirror data if so.
+    pub bracket: BidiMirroringGlyph,
 
     flags: u8,
 }
@@ -159,9 +167,10 @@ impl CharInfo {
 
     fn new(
         boundary: Boundary,
-        bidi_embed_level: BidiLevel,
         script: Script,
         grapheme_cluster_break: GraphemeClusterBreak,
+        bidi_class: icu_properties::props::BidiClass,
+        bracket: BidiMirroringGlyph,
         is_variation_selector: bool,
         is_region_indicator: bool,
         is_control: bool,
@@ -171,9 +180,10 @@ impl CharInfo {
     ) -> Self {
         Self {
             boundary,
-            bidi_embed_level,
             script,
             grapheme_cluster_break,
+            bidi_class,
+            bracket,
             flags: (is_variation_selector as u8) << Self::VARIATION_SELECTOR_SHIFT
                 | (is_region_indicator as u8) << Self::REGION_INDICATOR_SHIFT
                 | (is_control as u8) << Self::CONTROL_SHIFT
@@ -454,13 +464,13 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
         // character-indexed.
         .fold(false, |is_mandatory_linebreak, (boundary, ch)| {
             let properties = composite.properties(ch as u32);
-            let grapheme_cluster_break = properties.grapheme_cluster_break();
-            let general_category = properties.general_category();
             let script = properties.script();
+            let grapheme_cluster_break = properties.grapheme_cluster_break();
+            let bidi_class = properties.bidi_class();
+            let general_category = properties.general_category();
             let is_emoji_or_pictograph = properties.is_emoji_or_pictograph();
             let is_variation_selector = properties.is_variation_selector();
             let is_region_indicator = properties.is_region_indicator();
-            let bidi_embed_level: BidiLevel = 0;
             let next_mandatory_linebreak = properties.is_mandatory_linebreak();
 
             let boundary = if is_mandatory_linebreak {
@@ -486,12 +496,16 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
                 }
             };
 
+            needs_bidi_resolution |= properties.needs_bidi_resolution();
+            let bracket = lcx.analysis_data_sources.brackets().get(ch);
+
             lcx.info.push((
                 CharInfo::new(
                     boundary,
-                    bidi_embed_level,
                     script,
                     grapheme_cluster_break,
+                    bidi_class,
+                    bracket,
                     is_variation_selector,
                     is_region_indicator,
                     is_control,
@@ -502,22 +516,18 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
                 0, // Style index is populated later
             ));
 
-            needs_bidi_resolution |= properties.needs_bidi_resolution();
-
             next_mandatory_linebreak
         });
 
     if needs_bidi_resolution {
-        let bidi_embedding_levels = unicode_bidi::BidiInfo::new_with_data_source(
-            lcx.analysis_data_sources.composite(),
-            text,
+        lcx.bidi.resolve(
+            text.chars().zip(
+                lcx.info
+                    .iter()
+                    .map(|info| (info.0.bidi_class, info.0.bracket)),
+            ),
             None,
-        )
-        .levels;
-
-        for ((byte_pos, _), (info, _)) in text.char_indices().zip(lcx.info.iter_mut()) {
-            info.bidi_embed_level = bidi_embedding_levels[byte_pos].into();
-        }
+        );
     }
 
     // Restore line segmenters
