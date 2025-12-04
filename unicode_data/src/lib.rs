@@ -165,42 +165,14 @@ impl Properties {
             clippy::cast_possible_truncation,
             reason = "bidi class data only occupies BIDI_BITS bits"
         )]
-        match self.get(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8 {
-            13 => BidiClass::ArabicLetter,
-            5 => BidiClass::ArabicNumber,
-            7 => BidiClass::ParagraphSeparator,
-            18 => BidiClass::BoundaryNeutral,
-            6 => BidiClass::CommonSeparator,
-            2 => BidiClass::EuropeanNumber,
-            3 => BidiClass::EuropeanSeparator,
-            4 => BidiClass::EuropeanTerminator,
-            19 => BidiClass::FirstStrongIsolate,
-            0 => BidiClass::LeftToRight,
-            11 => BidiClass::LeftToRightEmbedding,
-            20 => BidiClass::LeftToRightIsolate,
-            12 => BidiClass::LeftToRightOverride,
-            17 => BidiClass::NonspacingMark,
-            10 => BidiClass::OtherNeutral,
-            16 => BidiClass::PopDirectionalFormat,
-            22 => BidiClass::PopDirectionalIsolate,
-            1 => BidiClass::RightToLeft,
-            14 => BidiClass::RightToLeftEmbedding,
-            21 => BidiClass::RightToLeftIsolate,
-            15 => BidiClass::RightToLeftOverride,
-            8 => BidiClass::SegmentSeparator,
-            9 => BidiClass::WhiteSpace,
-            val => {
-                debug_assert!(false, "Invalid BidiClass: {val}");
-                BidiClass::OtherNeutral
-            }
-        }
+        BidiClass::from_icu4c_value(self.get(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8)
     }
 
     /// Returns whether the character needs bidirectional resolution.
     #[inline(always)]
     pub fn needs_bidi_resolution(&self) -> bool {
         let bidi_class = self.bidi_class();
-        let bidi_mask = 1_u32 << (bidi_class.to_u32());
+        let bidi_mask = 1_u32 << (bidi_class.to_icu4c_value());
 
         const fn mask(class: BidiClass) -> u32 {
             1 << class.to_icu4c_value()
