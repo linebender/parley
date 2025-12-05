@@ -7,8 +7,9 @@
 
 use std::{
     borrow::Cow,
+    cell::RefCell,
     path::PathBuf,
-    sync::{Arc, Mutex, MutexGuard, OnceLock},
+    sync::{Arc, OnceLock},
 };
 
 use parley::{
@@ -22,20 +23,22 @@ pub mod benches;
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ColorBrush {}
 
-/// Returns a tuple of font and layout contexts.
-pub fn get_contexts() -> (
-    MutexGuard<'static, FontContext>,
-    MutexGuard<'static, LayoutContext<ColorBrush>>,
-) {
-    // Since Tango runs benchmarks sequentially, no two benchmarks running from the same revision
-    // will have to wait for the mutex to be available.
-    static FONT_CX: OnceLock<Mutex<FontContext>> = OnceLock::new();
-    static LAYOUT_CX: OnceLock<Mutex<LayoutContext<ColorBrush>>> = OnceLock::new();
+std::thread_local! {
+    static FONT_CX_TL: RefCell<FontContext> = RefCell::new(create_font_context());
+    static LAYOUT_CX_TL: RefCell<LayoutContext<ColorBrush>> = RefCell::new(LayoutContext::new());
+}
 
-    let font_cx = FONT_CX.get_or_init(|| Mutex::new(create_font_context()));
-    let layout_cx = LAYOUT_CX.get_or_init(|| Mutex::new(LayoutContext::new()));
-
-    (font_cx.lock().unwrap(), layout_cx.lock().unwrap())
+/// Runs the provided closure with mutable access to the thread-local font and layout contexts.
+pub fn with_contexts<R>(
+    f: impl FnOnce(&mut FontContext, &mut LayoutContext<ColorBrush>) -> R,
+) -> R {
+    FONT_CX_TL.with(|font_cell| {
+        LAYOUT_CX_TL.with(|layout_cell| {
+            let mut font_cx = font_cell.borrow_mut();
+            let mut layout_cx = layout_cell.borrow_mut();
+            f(&mut font_cx, &mut layout_cx)
+        })
+    })
 }
 
 pub(crate) fn create_font_context() -> FontContext {
