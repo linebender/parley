@@ -7,7 +7,7 @@ mod provider;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use crate::analysis::provider::{COMPOSITE_BLOB, PROVIDER};
+use crate::analysis::provider::PROVIDER;
 use crate::resolve::RangedStyle;
 use crate::{Brush, LayoutContext};
 
@@ -19,16 +19,13 @@ use icu_properties::props::{BidiMirroringGlyph, GeneralCategory, GraphemeCluster
 use icu_properties::{
     CodePointMapData, CodePointMapDataBorrowed, PropertyNamesShort, PropertyNamesShortBorrowed,
 };
-use icu_provider::DataMarker;
-use icu_provider::buf::AsDeserializingBufferProvider;
-use icu_provider::{DataRequest, DataResponse, DynamicDataProvider};
 use icu_segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakOptions};
 use icu_segmenter::{
     GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter,
     LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed,
 };
 use unicode_bidi::TextSource;
-use unicode_data::{CompositePropsV1, CompositePropsV1Data};
+use unicode_data::CompositeProps;
 
 pub(crate) struct AnalysisDataSources {
     grapheme_segmenter: GraphemeClusterSegmenter,
@@ -39,7 +36,7 @@ pub(crate) struct AnalysisDataSources {
     script_short_name: PropertyNamesShort<Script>,
     brackets: CodePointMapData<BidiMirroringGlyph>,
 
-    composite: DataResponse<CompositePropsV1>,
+    composite: CompositeProps,
 }
 
 #[derive(Default)]
@@ -71,16 +68,6 @@ impl LineSegmenters {
 
 impl AnalysisDataSources {
     pub(crate) fn new() -> Self {
-        let blob =
-            icu_provider_blob::BlobDataProvider::try_new_from_static_blob(COMPOSITE_BLOB).unwrap();
-        // Convert blob (BufferProvider) to a typed DataProvider via deserialization:
-        let dp = blob.as_deserializing();
-
-        // Load typed data:
-        let composite: DataResponse<CompositePropsV1> = dp
-            .load_data(CompositePropsV1::INFO, DataRequest::default())
-            .unwrap();
-
         Self {
             grapheme_segmenter: GraphemeClusterSegmenter::try_new_unstable(&PROVIDER).unwrap(),
             word_segmenter: WordSegmenter::try_new_lstm_unstable(
@@ -93,12 +80,12 @@ impl AnalysisDataSources {
             decomposing_normalizer: DecomposingNormalizer::try_new_nfd_unstable(&PROVIDER).unwrap(),
             script_short_name: PropertyNamesShort::<Script>::try_new_unstable(&PROVIDER).unwrap(),
             brackets: CodePointMapData::<BidiMirroringGlyph>::try_new_unstable(&PROVIDER).unwrap(),
-            composite,
+            composite: CompositeProps,
         }
     }
 
-    pub(crate) fn composite(&self) -> &CompositePropsV1Data<'_> {
-        self.composite.payload.get()
+    pub(crate) fn composite(&self) -> &CompositeProps {
+        &self.composite
     }
 
     pub(crate) fn grapheme_segmenter(&self) -> GraphemeClusterSegmenterBorrowed<'_> {

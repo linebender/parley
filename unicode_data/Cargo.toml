@@ -10,19 +10,13 @@ publish = false
 
 [features]
 default = ["baked"]
-baked = []
-datagen = ["dep:databake", "icu_provider/export", "icu_collections/databake"]
+baked = ["dep:zerovec"]
+datagen = []
 
 [dependencies]
-icu_locale = { workspace = true }
 icu_properties = { workspace = true }
-icu_collections = { workspace = true, features = ["serde"] }
-icu_provider = { workspace = true, features = ["alloc"] }
-yoke = { workspace = true, features = ["derive"] }
-zerofrom = { workspace = true }
-unicode-bidi = { workspace = true, features = ["smallvec"] }
-serde = { workspace = true }
-databake = { workspace = true, features = ["derive"], optional = true }
+icu_collections = { workspace = true }
+zerovec = { workspace = true, optional = true }
 
 [lints]
 workspace = true

@@ -4,67 +4,26 @@
 //! Unicode data that Parley's text analysis and shaping pipeline needs at runtime by exposing:
 //!
 //! - Re-exported ICU4X data providers for grapheme, word, and line breaking, plus Unicode normalization tables used by Parley.
-//! - A locale-invariant `CompositePropsV1` provider backed by a compact `CodePointTrie`, allowing the engine to obtain all required character properties with a single lookup.
+//! - A locale-invariant `CompositeProps` provider backed by a compact `CodePointTrie`, allowing the engine to obtain all required character properties with a single lookup.
 
 #![no_std]
 
-use icu_collections::codepointtrie::CodePointTrie;
 use icu_properties::props::{BidiClass, GeneralCategory, GraphemeClusterBreak, Script};
-use zerofrom::ZeroFrom;
 
-/// Baked data for the `CompositePropsV1` data provider.
+/// Baked data.
 #[cfg(feature = "baked")]
 pub mod generated;
 
-/// A data provider of `CompositePropsV1`.
-#[derive(Clone, Debug, Eq, PartialEq, yoke::Yokeable, ZeroFrom)]
-#[cfg_attr(feature = "datagen", derive(databake::Bake))]
-#[cfg_attr(feature = "datagen", databake(path = composite_props_marker))]
-pub struct CompositePropsV1Data<'data> {
-    trie: CodePointTrie<'data, u32>,
-}
+/// Lookup for [`Properties`]
+#[derive(Clone, Debug, Copy)]
+pub struct CompositeProps;
 
-#[cfg(feature = "datagen")]
-icu_provider::data_struct!(CompositePropsV1Data<'_>);
-
-impl serde::Serialize for CompositePropsV1Data<'_> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_newtype_struct("CompositePropsV1Data", &self.trie)
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CompositePropsV1Data<'de> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let trie = CodePointTrie::deserialize(deserializer)?;
-        Ok(CompositePropsV1Data { trie })
-    }
-}
-
-impl<'data> CompositePropsV1Data<'data> {
-    /// Creates a new `CompositePropsV1Data` from a `CodePointTrie`.
-    pub fn new(trie: CodePointTrie<'data, u32>) -> Self {
-        Self { trie }
-    }
-}
-
-icu_provider::data_marker!(
-    /// Marker for the composite multi-property trie (locale-invariant singleton)
-    CompositePropsV1,
-    CompositePropsV1Data<'static>,
-    is_singleton = true,
-);
-
-impl CompositePropsV1Data<'_> {
+#[cfg(feature = "baked")]
+impl CompositeProps {
     /// Returns the properties for a given character.
     #[inline(always)]
     pub fn properties(&self, ch: u32) -> Properties {
-        Properties(self.trie.get32(ch))
+        Properties(generated::COMPOSITE.get32(ch))
     }
 }
 
