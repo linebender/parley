@@ -102,8 +102,9 @@ pub fn generate(out: std::path::PathBuf) {
         }
         .build();
 
-        let mut file =
-            BufWriter::new(std::fs::File::create(out.join("composite").join("mod.rs")).unwrap());
+        let composite_dir = out.join("composite");
+        std::fs::create_dir(&composite_dir).unwrap();
+        let mut file = BufWriter::new(std::fs::File::create(composite_dir.join("mod.rs")).unwrap());
 
         writeln!(&mut file, "{COPYRIGHT_HEADER}").unwrap();
         writeln!(&mut file, "/// Backing data for the `CompositeProps`").unwrap();
