@@ -73,14 +73,16 @@ pub(crate) fn render_layout(
     let width = config
         .size
         .map(|size| size.width as f32)
-        .unwrap_or(layout.width())
+        .unwrap_or(layout.available_width())
         .ceil() as u32;
     let height = config
         .size
         .map(|size| size.height as f32)
         .unwrap_or(layout.height())
         .ceil() as u32;
-    let padded_width = width + padding * 2;
+
+    let img_width = width.max(layout.width().ceil() as u32);
+    let padded_width = img_width + padding * 2;
     let padded_height = height + padding * 2;
     let fpadding = padding as f32;
 
@@ -160,12 +162,14 @@ pub(crate) fn render_layout_with_clusters(
     let width = config
         .size
         .map(|size| size.width as f32)
-        .unwrap_or(layout.width())
+        .unwrap_or(layout.available_width())
         .ceil() as u32;
     let base_height = layout.height();
     let num_lines = layout.len();
     let height = (base_height + (line_extra_spacing * num_lines as f32)).ceil() as u32;
-    let padded_width = width + padding * 2;
+
+    let img_width = width.max(layout.width().ceil() as u32);
+    let padded_width = img_width + padding * 2;
     let padded_height = height + padding * 2;
     let fpadding = padding as f32;
 
