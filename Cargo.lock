@@ -1292,6 +1292,7 @@ dependencies = [
  "core_maths",
  "hashbrown 0.16.1",
  "icu_locale_core",
+ "icu_properties",
  "linebender_resource_handle",
  "memmap2",
  "objc2 0.6.3",

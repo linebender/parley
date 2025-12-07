@@ -176,8 +176,8 @@ fn canonical_locale(script: Script, locale: Option<&Language>) -> Option<(bool, 
         .as_ref()
         .map(|s| s.as_str())
         .unwrap_or_default();
-    let (is_default, token) = match &script.into_raw() {
-        b"Arab" => match (lang, region) {
+    let (is_default, token) = match script {
+        Script::Arabic => match (lang, region) {
             ("ar", "") => (true, "ar"),
             ("ar", "IR") => (false, "ar-IR"),
             ("fa", "") => (false, "fa"),
@@ -194,13 +194,13 @@ fn canonical_locale(script: Script, locale: Option<&Language>) -> Option<(bool, 
             ("ur", "") => (false, "ur"),
             _ => return None,
         },
-        b"Beng" => match (lang, region) {
+        Script::Bengali => match (lang, region) {
             ("bn", "") => (true, "bn"),
             ("as", "") => (false, "as"),
             ("mni", "") => (false, "mni"),
             _ => return None,
         },
-        b"Deva" => match (lang, region) {
+        Script::Devanagari => match (lang, region) {
             ("hi", "") => (true, "hi"),
             ("bh", "") => (false, "bh"),
             ("bho", "") => (false, "bho"),
@@ -215,7 +215,7 @@ fn canonical_locale(script: Script, locale: Option<&Language>) -> Option<(bool, 
             ("sat", "") => (false, "sat"),
             _ => return None,
         },
-        b"Ethi" => match (lang, region) {
+        Script::Ethiopian => match (lang, region) {
             ("gez", "") => (true, "gez"),
             ("am", "") => (false, "am"),
             ("byn", "") => (false, "byn"),
@@ -226,7 +226,7 @@ fn canonical_locale(script: Script, locale: Option<&Language>) -> Option<(bool, 
             ("wal", "") => (false, "wal"),
             _ => return None,
         },
-        b"Hani" => match lang {
+        Script::Han => match lang {
             "ja" => (false, "ja"),
             "ko" => (false, "ko"),
             "zh" => {
@@ -247,12 +247,12 @@ fn canonical_locale(script: Script, locale: Option<&Language>) -> Option<(bool, 
             }
             _ => return None,
         },
-        b"Hebr" => match (lang, region) {
+        Script::Hebrew => match (lang, region) {
             ("he", "") => (true, "he"),
             ("yi", "") => (false, "yi"),
             _ => return None,
         },
-        b"Tibt" => match (lang, region) {
+        Script::Tibetan => match (lang, region) {
             ("bo", "") => (true, "bo"),
             ("dz", "") => (false, "dz"),
             _ => return None,

@@ -46,6 +46,7 @@ zerovec = { workspace = true }
 parley_dev = { workspace = true }
 peniko = { workspace = true }
 tiny-skia = "0.11.4"
+icu_properties = { workspace = true, features = ["compiled_data"] }
 
 # We special-case android targets because oxipng doesn't build in Android CI.
 [target.'cfg(not(target_os = "android"))'.dev-dependencies]

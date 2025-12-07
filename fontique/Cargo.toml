@@ -44,6 +44,7 @@ linebender_resource_handle = { workspace = true }
 smallvec = "1.15.1"
 memmap2 = { version = "0.9.9", optional = true }
 core_maths = { version = "0.1.1", optional = true }
+icu_properties = { workspace = true }
 icu_locale_core = { workspace = true, features = ["alloc"] }
 hashbrown = { workspace = true }
 

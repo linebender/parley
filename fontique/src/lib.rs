@@ -50,7 +50,7 @@ mod source;
 mod source_cache;
 
 pub use icu_locale_core::LanguageIdentifier as Language;
-pub use icu_locale_core::subtags::Script;
+pub use icu_properties::props::Script;
 pub use linebender_resource_handle::Blob;
 
 pub use attributes::{Attributes, FontStyle, FontWeight, FontWidth};
