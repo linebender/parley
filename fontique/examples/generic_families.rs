@@ -3,10 +3,10 @@
 
 //! Print an enumeration of discovered fonts for each `GenericFamily`.
 
-use fontique::{Collection, GenericFamily::*};
+use fontique::{Collection, CollectionOptions, GenericFamily::*};
 
 fn main() {
-    let mut collection = Collection::new(Default::default());
+    let mut collection = Collection::new(CollectionOptions::default());
 
     for gf in [
         Serif,

@@ -17,6 +17,6 @@ pub struct FontContext {
 impl FontContext {
     /// Create a new `FontContext`, discovering system fonts if available.
     pub fn new() -> Self {
-        Default::default()
+        Self::default()
     }
 }

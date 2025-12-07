@@ -7,11 +7,7 @@
 //! Note: Emoji rendering is not currently implemented in this example. See the swash example
 //! if you need emoji rendering.
 
-#![expect(
-    clippy::cast_possible_truncation,
-    clippy::shadow_unrelated,
-    reason = "Deferred"
-)]
+#![expect(clippy::cast_possible_truncation, reason = "Deferred")]
 
 use parley::{
     Alignment, AlignmentOptions, FontContext, FontWeight, GenericFamily, GlyphRun, InlineBox,

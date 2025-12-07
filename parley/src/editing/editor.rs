@@ -3,14 +3,6 @@
 
 //! A simple plain text editor and related types.
 
-use crate::{
-    FontContext, LayoutContext, Rect, StyleProperty, StyleSet,
-    layout::{
-        Affinity, Alignment, AlignmentOptions, Layout,
-        cursor::{Cursor, Selection},
-    },
-    style::Brush,
-};
 use alloc::{borrow::ToOwned, string::String, vec::Vec};
 use core::{
     cmp::PartialEq,
@@ -19,6 +11,11 @@ use core::{
     num::NonZeroUsize,
     ops::Range,
 };
+
+use crate::editing::{Cursor, Selection};
+use crate::layout::{Affinity, Alignment, AlignmentOptions, Layout};
+use crate::style::Brush;
+use crate::{BoundingBox, FontContext, LayoutContext, StyleProperty, StyleSet};
 
 #[cfg(feature = "accesskit")]
 use crate::layout::LayoutAccessibility;
@@ -60,15 +57,10 @@ impl PartialEq<&'_ str> for SplitString<'_> {
     fn eq(&self, other: &&'_ str) -> bool {
         let [a, b] = self.0;
         let mid = a.len();
-        // When our MSRV is 1.80 or above, use split_at_checked instead.
-        // is_char_boundary checks bounds
-        let (a_1, b_1) = if other.is_char_boundary(mid) {
-            other.split_at(mid)
-        } else {
-            return false;
-        };
-
-        a_1 == a && b_1 == b
+        match other.split_at_checked(mid) {
+            Some((a_1, b_1)) => a_1 == a && b_1 == b,
+            None => false,
+        }
     }
 }
 // We intentionally choose not to:
@@ -138,11 +130,11 @@ where
     pub fn new(font_size: f32) -> Self {
         Self {
             default_style: StyleSet::new(font_size),
-            buffer: Default::default(),
-            layout: Default::default(),
+            buffer: String::default(),
+            layout: Layout::default(),
             #[cfg(feature = "accesskit")]
-            layout_access: Default::default(),
-            selection: Default::default(),
+            layout_access: LayoutAccessibility::default(),
+            selection: Selection::default(),
             compose: None,
             show_cursor: true,
             width: None,
@@ -860,7 +852,7 @@ where
 
     /// Get rectangles, and their corresponding line indices, representing the selected portions of
     /// text.
-    pub fn selection_geometry(&self) -> Vec<(Rect, usize)> {
+    pub fn selection_geometry(&self) -> Vec<(BoundingBox, usize)> {
         // We do not check `self.show_cursor` here, as the IME handling code collapses the
         // selection to a caret in that case.
         self.selection.geometry(&self.layout)
@@ -868,7 +860,7 @@ where
 
     /// Invoke a callback with each rectangle representing the selected portions of text, and the
     /// indices of the lines to which they belong.
-    pub fn selection_geometry_with(&self, f: impl FnMut(Rect, usize)) {
+    pub fn selection_geometry_with(&self, f: impl FnMut(BoundingBox, usize)) {
         // We do not check `self.show_cursor` here, as the IME handling code collapses the
         // selection to a caret in that case.
         self.selection.geometry_with(&self.layout, f);
@@ -878,7 +870,7 @@ where
     ///
     /// There is not always a caret. For example, the IME may have indicated the caret should be
     /// hidden.
-    pub fn cursor_geometry(&self, size: f32) -> Option<Rect> {
+    pub fn cursor_geometry(&self, size: f32) -> Option<BoundingBox> {
         self.show_cursor
             .then(|| self.selection.focus().geometry(&self.layout, size))
     }
@@ -888,7 +880,7 @@ where
     /// This is useful for suggesting an exclusion area to the platform for, e.g., IME candidate
     /// box placement. This bounds the area of the preedit text if present, otherwise it bounds the
     /// selection on the focused line.
-    pub fn ime_cursor_area(&self) -> Rect {
+    pub fn ime_cursor_area(&self) -> BoundingBox {
         let (area, focus) = if let Some(preedit_range) = &self.compose {
             let selection = Selection::new(
                 self.cursor_at(preedit_range.start),
@@ -930,7 +922,7 @@ where
         // Using 0.6 as an estimate of the average advance
         let inflate = 3. * 0.6 * font_size as f64;
         let editor_width = self.width.map(f64::from).unwrap_or(f64::INFINITY);
-        Rect {
+        BoundingBox {
             x0: (area.x0 - inflate).max(0.),
             x1: (area.x1 + inflate).min(editor_width),
             y0: area.y0,

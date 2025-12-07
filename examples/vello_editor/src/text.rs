@@ -8,7 +8,9 @@ use web_time::Instant;
 
 use accesskit::{Node, TreeUpdate};
 use core::default::Default;
-use parley::{GenericFamily, StyleProperty, editor::SplitString, layout::PositionedLayoutItem};
+use parley::editing::SplitString;
+use parley::layout::PositionedLayoutItem;
+use parley::{GenericFamily, StyleProperty};
 use std::time::Duration;
 use ui_events::pointer::PointerButton;
 use ui_events::{
@@ -23,7 +25,7 @@ use vello::{
 };
 use winit::event::{Ime, WindowEvent};
 
-pub use parley::layout::editor::Generation;
+pub use parley::editing::Generation;
 use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorDriver};
 
 use crate::access_ids::next_node_id;
@@ -39,6 +41,10 @@ pub struct Editor {
     blink_period: Duration,
 }
 
+fn convert_rect(rect: &parley::BoundingBox) -> peniko::kurbo::Rect {
+    peniko::kurbo::Rect::new(rect.x0, rect.y0, rect.x1, rect.y1)
+}
+
 impl Editor {
     pub fn new(text: &str) -> Self {
         let mut editor = PlainEditor::new(32.0);
@@ -48,12 +54,13 @@ impl Editor {
         styles.insert(GenericFamily::SystemUi.into());
         styles.insert(StyleProperty::Brush(palette::css::WHITE.into()));
         Self {
-            font_cx: Default::default(),
-            layout_cx: Default::default(),
+            font_cx: FontContext::default(),
+            layout_cx: LayoutContext::default(),
             editor,
-            cursor_visible: Default::default(),
-            start_time: Default::default(),
-            blink_period: Default::default(),
+            cursor_visible: false,
+            start_time: None,
+            // TODO: Why initialize to zero?
+            blink_period: Duration::ZERO,
         }
     }
 
@@ -337,7 +344,7 @@ impl Editor {
                 transform,
                 palette::css::STEEL_BLUE,
                 None,
-                &vello::kurbo::Rect::new(rect.x0, rect.y0, rect.x1, rect.y1),
+                &convert_rect(&rect),
             );
         });
         if self.cursor_visible {
@@ -347,7 +354,7 @@ impl Editor {
                     transform,
                     palette::css::WHITE,
                     None,
-                    &vello::kurbo::Rect::new(cursor.x0, cursor.y0, cursor.x1, cursor.y1),
+                    &convert_rect(&cursor),
                 );
             }
         }

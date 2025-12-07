@@ -4,6 +4,7 @@
 //! Context for layout.
 
 use alloc::{vec, vec::Vec};
+use swash::text::WordBreakStrength;
 
 use self::tree::TreeStyleBuilder;
 
@@ -147,7 +148,7 @@ impl<B: Brush> LayoutContext<B> {
         let text = if text.is_empty() { " " } else { text };
         let mut a = swash::text::analyze(text.chars());
 
-        let mut word_break = Default::default();
+        let mut word_break = WordBreakStrength::default();
         let mut style_idx = 0;
 
         let mut char_indices = text.char_indices();

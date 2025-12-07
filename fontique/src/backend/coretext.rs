@@ -32,15 +32,13 @@ pub(crate) struct SystemFonts {
 
 impl SystemFonts {
     pub(crate) fn new() -> Self {
-        let paths = unsafe {
-            NSSearchPathForDirectoriesInDomains(
-                NSSearchPathDirectory::LibraryDirectory,
-                NSSearchPathDomainMask::AllDomainsMask,
-                true,
-            )
-            .into_iter()
-            .map(|p| format!("{p}/Fonts/"))
-        };
+        let paths = NSSearchPathForDirectoriesInDomains(
+            NSSearchPathDirectory::LibraryDirectory,
+            NSSearchPathDomainMask::AllDomainsMask,
+            true,
+        )
+        .into_iter()
+        .map(|p| format!("{p}/Fonts/"));
         let scanned = scan::ScannedCollection::from_paths(paths, 8);
         let name_map = scanned.family_names;
         let mut generic_families = GenericFamilyMap::default();

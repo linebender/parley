@@ -8,35 +8,121 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 # Changelog
 
-The latest published Parley release is [0.5.0](#050---2025-06-01) which was released on 2025-06-01.
-You can find its changes [documented below](#050---2025-06-01).
+The latest published Parley release is [0.7.0](#060---2025-11-24) which was released on 2025-11-24.
+You can find its changes [documented below](#060---2025-11-24).
 
 ## [Unreleased]
 
+This release has an [MSRV] of 1.83.
+
+## [0.7.0] - 2025-11-24
+
+This release has an [MSRV] of 1.83.
+
+### Highlights
+
+[#448][] by [@taj-p][]) and ([#449][] by [@nicoburns][] collectively fix a significant performance bug that occurred when laying
+out large paragraphs of text.
+Previously the time to perform layout was non-linear with respect to the input size and laying out
+paragraphs of text with more than ~1k characters was very slow.
+
+The new `TextWrapMode` style implements the semantics of the [`text-wrap-mode`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/text-wrap-mode)
+CSS property and allows text-wrapping to be disabled completely for a span of text.
+
+### Migration
+
+Some modules have been moved:
+
+- `parley::editor` and `parley::layout::editor` are now `parley::editing`.
+- `parley::layout::cursor` is now `parley::cursor`.
+
+Fontique no longer sets the `dlopen` feature of `yeslogic-fontconfig-sys` by default. If you wish to run Fontique on a Linux system
+without fontconfig installed then you will need to enable the new `fontconfig-dlopen` feature of the `fontique` crate.
+If you wish to compile Fontique on a Linux system without the `fontconfig-dlopen` enabled then you will need the fontconfig dev
+package (e.g. `libfontconfig1-dev` on Ubuntu) installed.
+
+### Added
+
+#### Parley
+
+- Add `TextWrapMode` style. This allow line wrapping to be disabled completely for a span of text (excluding explicit line breaks). ([#367][] by [@nicoburns][])
+- Add `Cluster::from_point_exact` method for hit-testing spans of text. This is useful for implementing "hover" or "click" functionality. ([#447][] by [@nicoburns][])
+
+### Changed
+
+#### Parley
+
+- Split off various modules into "editing" folder. ([#440][] by [@PoignardAzur][])
+- Split contents of layout/mod.rs file. ([#444][] by [@PoignardAzur][])
+
+#### Fontique
+
+- Make the yeslogic-fontconfig-sys/dlopen feature optional. [#467][] by [@ogoffart][])
+
+### Fixed
+
+#### Parley
+
+- Running line height calculation. ([#448][] by [@taj-p][])
+- Optimise line height computation. ([#449][] by [@nicoburns][])
+- Add word and letter spacing to text layout based on style properties. ([#468][] by [@dolsup][])
+- Hang trailing whitespace preceding explicit newline. ([#276][] by [@wfdewith][])
+
+#### Fontique
+
+- Fix build on platforms without 64bit atomics. ([#451][] by [@nicoburns][])
+
+## [0.6.0] - 2025-10-06
+
 This release has an [MSRV] of 1.82.
+
+### Highlights
+
+Parley now uses [HarfRust](https://github.com/harfbuzz/harfrust) rather than [Swash](https://github.com/dfrg/swash). This means that
+Parley now has production-quality shaping for all scripts and can be recommended for general usage.
+
+### Migration
+
+As Parley now uses it's own `parley::BoundingBox` in place of `kurbo::Rect`, you may need to convert the type if you were
+previously passing one of these values into a function that expects `kurbo::Rect`.
+The following function may be used to perform this conversion:
+
+```rust
+fn bounding_box_to_rect(bb: parley::BoundingBox) -> kurbo::Rect {
+    kurbo::Rect::new(bb.x0, bb.y0, bb.x1, bb.y1)
+}
+```
 
 ### Added
 
 #### Parley
 
 - Shift-click support through `Selection::shift_click_extension` and `PlainEditorDriver::shift_click_extension`. ([#385][] by [@kekelp][])
-- Benchmarks. ([#405]() by [@taj-p][])
+- Add some benchmarks using [Tango](https://github.com/bazhenov/tango). ([#405][] by [@taj-p][])
 
 #### Fontique
 
 - Cache character mapping metadata for each font to improve performance of font selection. ([#413][] by [@dfrg][])
+- Upgrade `icu4x` dependencies to v2.x. ([#418][] by [@nicoburns][])
+- Added an `unregister_font` method to remove a font from a collection. ([#395][] by [@taj-p][])
 
 ### Changed
 
 #### Parley
 
-- `Alignment`` variants have been renamed to better match CSS. `Alignment::Justified` is now `Alignment::Justify` and `Alignment::Middle` is now `Alignment::Center`. ([#389][] by [@waywardmonkeys][])
+- Breaking change: `Alignment` variants have been renamed to better match CSS. `Alignment::Justified` is now `Alignment::Justify` and `Alignment::Middle` is now `Alignment::Center`. ([#389][] by [@waywardmonkeys][])
+- In the `PlainEditor`, triple-click now selects paragraphs rather than words ([#381][] by [@DJMcNab][])
 - Updated to `accesskit` 0.21. ([#390][] by [@mwcampbell][])
-- Uses `HarfRust` for text shaping ([[#400][] by [@taj-p][]).
+- Uses `HarfRust` for text shaping. ([#400][] by [@taj-p][])
+- Parley no longer depends on `peniko` or `kurbo`. ([#414][] by [@nicoburns][]):
+  - Breaking change: The use of `peniko::Font` has been replaced with `linebender_resource_handle::FontData`, as such `parley::Font` is now called `Parley::FontData`.
+    Note that this is the same type as in previous releases, and so is fully backwards-compatible, just with a different name.
+  - Breaking change: The use of `kurbo::Rect` has been replaced with a new `parley::BoundingBox` type.
 
 #### Fontique
 
 - The fontconfig backend, used to enumerate system fonts on Linux, has been rewritten to call into the system's fontconfig library instead of parsing fontconfig's configuration files itself. This should significantly improve the behavior of system fonts and generic families on Linux. ([#378][] by [@valadaptive][])
+- Fontique no longer depends on `peniko`. The use of `peniko::Blob` has been replaced with `linebender_resource_handle::Blob`. This is unlikely to affect users of the crate. ([#414][] by [@nicoburns][])
 
 ### Fixed
 
@@ -44,7 +130,8 @@ This release has an [MSRV] of 1.82.
 
 - Selection extension moves the focus to the side being extended. ([#385][] by [@kekelp][])
 - Ranged builder default style not respecting `scale`. ([#368][] by [@xStrom][])
-- Cluster source character not correct ([[#402][] by [@taj-p][]).
+- Cluster source character not correct. ([#402][] by [@taj-p][])
+- Don't justify the last line of a paragraph. ([#410][] by [@taj-p][])
 
 #### Fontique
 
@@ -238,20 +325,24 @@ This release has an [MSRV][] of 1.70.
 [MSRV]: README.md#minimum-supported-rust-version-msrv
 
 [@dfrg]: https://github.com/dfrg
+[@dhardy]: https://github.com/dhardy
 [@DJMcNab]: https://github.com/DJMcNab
+[@dolsup]: https://github.com/dolsup
+[@kekelp]: https://github.com/kekelp
 [@mwcampbell]: https://github.com/mwcampbell
 [@nicoburns]: https://github.com/nicoburns
 [@NoahR02]: https://github.com/NoahR02
+[@ogoffart]: https://github.com/ogoffart
+[@PoignardAzur]: https://github.com/@PoignardAzur
+[@richardhozak]: https://github.com/richardhozak
 [@spirali]: https://github.com/spirali
+[@taj-p]: https://github.com/taj-p
 [@tomcur]: https://github.com/tomcur
 [@valadaptive]: https://github.com/valadaptive
 [@waywardmonkeys]: https://github.com/waywardmonkeys
 [@wfdewith]: https://github.com/wfdewith
 [@xorgy]: https://github.com/xorgy
 [@xStrom]: https://github.com/xStrom
-[@dhardy]: https://github.com/dhardy
-[@kekelp]: https://github.com/kekelp
-[@taj-p]: https://github.com/taj-p
 
 [#54]: https://github.com/linebender/parley/pull/54
 [#55]: https://github.com/linebender/parley/pull/55
@@ -281,7 +372,6 @@ This release has an [MSRV][] of 1.70.
 [#188]: https://github.com/linebender/parley/pull/188
 [#191]: https://github.com/linebender/parley/pull/191
 [#192]: https://github.com/linebender/parley/pull/192
-[#194]: https://github.com/linebender/parley/pull/194
 [#198]: https://github.com/linebender/parley/pull/198
 [#201]: https://github.com/linebender/parley/pull/201
 [#202]: https://github.com/linebender/parley/pull/202
@@ -301,6 +391,7 @@ This release has an [MSRV][] of 1.70.
 [#264]: https://github.com/linebender/parley/pull/264
 [#268]: https://github.com/linebender/parley/pull/268
 [#271]: https://github.com/linebender/parley/pull/271
+[#276]: https://github.com/linebender/parley/pull/276
 [#280]: https://github.com/linebender/parley/pull/280
 [#294]: https://github.com/linebender/parley/pull/294
 [#296]: https://github.com/linebender/parley/pull/296
@@ -322,19 +413,35 @@ This release has an [MSRV][] of 1.70.
 [#348]: https://github.com/linebender/parley/pull/348
 [#353]: https://github.com/linebender/parley/pull/353
 [#362]: https://github.com/linebender/parley/pull/362
+[#367]: https://github.com/linebender/parley/pull/367
 [#368]: https://github.com/linebender/parley/pull/368
 [#369]: https://github.com/linebender/parley/pull/369
 [#378]: https://github.com/linebender/parley/pull/378
 [#380]: https://github.com/linebender/parley/pull/380
+[#381]: https://github.com/linebender/parley/pull/381
 [#385]: https://github.com/linebender/parley/pull/385
 [#389]: https://github.com/linebender/parley/pull/389
 [#390]: https://github.com/linebender/parley/pull/390
+[#395]: https://github.com/linebender/parley/pull/395
 [#400]: https://github.com/linebender/parley/pull/400
 [#402]: https://github.com/linebender/parley/pull/402
 [#405]: https://github.com/linebender/parley/pull/405
+[#410]: https://github.com/linebender/parley/pull/410
 [#413]: https://github.com/linebender/parley/pull/413
+[#414]: https://github.com/linebender/parley/pull/414
+[#418]: https://github.com/linebender/parley/pull/418
+[#440]: https://github.com/linebender/parley/pull/440
+[#444]: https://github.com/linebender/parley/pull/444
+[#447]: https://github.com/linebender/parley/pull/447
+[#448]: https://github.com/linebender/parley/pull/448
+[#449]: https://github.com/linebender/parley/pull/449
+[#451]: https://github.com/linebender/parley/pull/451
+[#467]: https://github.com/linebender/parley/pull/467
+[#468]: https://github.com/linebender/parley/pull/468
 
-[Unreleased]: https://github.com/linebender/parley/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/linebender/parley/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/linebender/parley/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/linebender/parley/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/linebender/parley/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/linebender/parley/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/linebender/parley/compare/v0.2.0...v0.3.0

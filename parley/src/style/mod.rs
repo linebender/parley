@@ -17,12 +17,25 @@ pub use font::{
 pub use styleset::StyleSet;
 pub use swash::text::WordBreakStrength;
 
-use crate::{LayoutLineHeight, util::nearly_eq};
+use crate::util::nearly_eq;
 
 #[derive(Debug, Clone, Copy)]
 pub enum WhiteSpaceCollapse {
     Collapse,
     Preserve,
+}
+
+/// Control over non-"emergency" line-breaking.
+///
+/// See <https://drafts.csswg.org/css-text-4/#text-wrap-mode> for more information.
+#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
+#[repr(u8)]
+pub enum TextWrapMode {
+    /// Wrap at non-emergency soft-wrap opportunities when necessary to prevent overflow.
+    #[default]
+    Wrap,
+    /// Do not wrap at non-emergency soft-wrap opportunities.
+    NoWrap,
 }
 
 /// Control over "emergency" line-breaking.
@@ -67,28 +80,20 @@ impl Default for LineHeight {
 }
 
 impl LineHeight {
-    pub(crate) fn nearly_eq(&self, other: &Self) -> bool {
+    pub(crate) fn nearly_eq(self, other: Self) -> bool {
         match (self, other) {
             (Self::MetricsRelative(a), Self::MetricsRelative(b))
             | (Self::FontSizeRelative(a), Self::FontSizeRelative(b))
-            | (Self::Absolute(a), Self::Absolute(b)) => nearly_eq(*a, *b),
+            | (Self::Absolute(a), Self::Absolute(b)) => nearly_eq(a, b),
             _ => false,
         }
     }
 
-    pub(crate) fn scale(&self, scale: f32) -> Self {
+    pub(crate) fn scale(self, scale: f32) -> Self {
         match self {
-            Self::Absolute(value) => Self::Absolute(*value * scale),
+            Self::Absolute(value) => Self::Absolute(value * scale),
             // The other variants are relative to the font size, so scaling here needn't do anything
-            value => *value,
-        }
-    }
-
-    pub(crate) fn resolve(&self, font_size: f32) -> LayoutLineHeight {
-        match self {
-            Self::MetricsRelative(value) => LayoutLineHeight::MetricsRelative(*value),
-            Self::FontSizeRelative(value) => LayoutLineHeight::Absolute(*value * font_size),
-            Self::Absolute(value) => LayoutLineHeight::Absolute(*value),
+            value => value,
         }
     }
 }
@@ -140,6 +145,8 @@ pub enum StyleProperty<'a, B: Brush> {
     WordBreak(WordBreakStrength),
     /// Control over "emergency" line-breaking.
     OverflowWrap(OverflowWrap),
+    /// Control over non-"emergency" line-breaking.
+    TextWrapMode(TextWrapMode),
 }
 
 /// Unresolved styles.
@@ -189,6 +196,8 @@ pub struct TextStyle<'a, B: Brush> {
     pub word_break: WordBreakStrength,
     /// Control over "emergency" line-breaking.
     pub overflow_wrap: OverflowWrap,
+    /// Control over non-"emergency" line-breaking.
+    pub text_wrap_mode: TextWrapMode,
 }
 
 impl<B: Brush> Default for TextStyle<'_, B> {
@@ -196,26 +205,27 @@ impl<B: Brush> Default for TextStyle<'_, B> {
         TextStyle {
             font_stack: FontStack::Source(Cow::Borrowed("sans-serif")),
             font_size: 16.0,
-            font_width: Default::default(),
-            font_style: Default::default(),
-            font_weight: Default::default(),
+            font_width: FontWidth::default(),
+            font_style: FontStyle::default(),
+            font_weight: FontWeight::default(),
             font_variations: FontSettings::List(Cow::Borrowed(&[])),
             font_features: FontSettings::List(Cow::Borrowed(&[])),
-            locale: Default::default(),
-            brush: Default::default(),
-            has_underline: Default::default(),
-            underline_offset: Default::default(),
-            underline_size: Default::default(),
-            underline_brush: Default::default(),
-            has_strikethrough: Default::default(),
-            strikethrough_offset: Default::default(),
-            strikethrough_size: Default::default(),
-            strikethrough_brush: Default::default(),
-            line_height: Default::default(),
-            word_spacing: Default::default(),
-            letter_spacing: Default::default(),
-            word_break: Default::default(),
-            overflow_wrap: Default::default(),
+            locale: None,
+            brush: B::default(),
+            has_underline: false,
+            underline_offset: None,
+            underline_size: None,
+            underline_brush: None,
+            has_strikethrough: false,
+            strikethrough_offset: None,
+            strikethrough_size: None,
+            strikethrough_brush: None,
+            line_height: LineHeight::default(),
+            word_spacing: 0.0,
+            letter_spacing: 0.0,
+            word_break: WordBreakStrength::default(),
+            overflow_wrap: OverflowWrap::default(),
+            text_wrap_mode: TextWrapMode::default(),
         }
     }
 }

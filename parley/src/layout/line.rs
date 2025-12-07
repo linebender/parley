@@ -2,10 +2,22 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::InlineBox;
+use crate::layout::Style;
+use crate::layout::data::BreakReason;
+use crate::layout::data::{LayoutItemKind, LineData};
+use crate::layout::glyph::Glyph;
+use crate::layout::layout::Layout;
+use crate::layout::run::Run;
+use crate::style::Brush;
+use core::ops::Range;
 
-use super::{BreakReason, Brush, Glyph, LayoutItemKind, Line, Range, Run, Style};
-
-pub(crate) mod greedy;
+/// Line in a text layout.
+#[derive(Copy, Clone)]
+pub struct Line<'a, B: Brush> {
+    pub(crate) layout: &'a Layout<B>,
+    pub(crate) index: u32,
+    pub(crate) data: &'a LineData,
+}
 
 impl<'a, B: Brush> Line<'a, B> {
     /// Returns the metrics for the line.

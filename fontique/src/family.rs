@@ -8,8 +8,9 @@ use super::{
     family_name::FamilyName,
     font::FontInfo,
 };
+use crate::AtomicCounter;
 use alloc::sync::Arc;
-use core::sync::atomic::{AtomicU64, Ordering};
+use core::sync::atomic::Ordering;
 use smallvec::SmallVec;
 
 /// Unique identifier for a font family.
@@ -22,8 +23,9 @@ impl FamilyId {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         /// Make sure this is larger than the largest generic family id.
-        static ID_COUNTER: AtomicU64 = AtomicU64::new(64);
-        Self(ID_COUNTER.fetch_add(1, Ordering::Relaxed))
+        static ID_COUNTER: AtomicCounter = AtomicCounter::new(64);
+        #[allow(clippy::useless_conversion, reason = "Not useless on 32-bit platforms")]
+        Self(ID_COUNTER.fetch_add(1, Ordering::Relaxed).into())
     }
 
     /// Returns the underlying integer value.
@@ -43,9 +45,9 @@ impl FamilyInfo {
         let fonts: SmallVec<[FontInfo; 4]> = fonts.into_iter().collect();
         let default_font = super::matching::match_font(
             &fonts[..],
-            Default::default(),
-            Default::default(),
-            Default::default(),
+            FontWidth::default(),
+            FontStyle::default(),
+            FontWeight::default(),
             false,
         )
         .unwrap_or(0);

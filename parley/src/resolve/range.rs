@@ -22,7 +22,10 @@ impl<B: Brush> Default for RangedStyleBuilder<B> {
         Self {
             properties: vec![],
             root_style: ResolvedStyle::default(),
-            len: !0,
+            // We use `usize::MAX` as a sentinel that `begin` hasn't been called.
+            // This is required (rather than requiring the root style in the constructor)
+            // as we want to support re-using this value.
+            len: usize::MAX,
         }
     }
 }
@@ -38,21 +41,35 @@ impl<B: Brush> RangedStyleBuilder<B> {
     }
 
     /// Change a property of the root style, which covers the full range of text.
+    ///
+    /// # Panics
+    ///
+    /// If [`begin`](Self::begin) has not been called before using this method.
     pub(crate) fn push_default(&mut self, property: ResolvedProperty<B>) {
-        assert!(self.len != !0);
+        assert!(
+            self.len != usize::MAX,
+            "Internal error: Must call `begin` before setting properties on a `RangedStyleBuilder`."
+        );
         self.root_style.apply(property);
     }
 
     /// Override a property for the specified range of text.
+    ///
+    /// # Panics
+    ///
+    /// If [`begin`](Self::begin) has not been called before using this method.
     pub(crate) fn push(&mut self, property: ResolvedProperty<B>, range: impl RangeBounds<usize>) {
-        assert!(self.len != !0);
+        assert!(
+            self.len != usize::MAX,
+            "Internal error: Must call `begin` before setting properties on a `RangedStyleBuilder`."
+        );
         let range = resolve_range(range, self.len);
         self.properties.push(RangedProperty { property, range });
     }
 
     /// Computes the sequence of ranged styles.
     pub(crate) fn finish(&mut self, styles: &mut Vec<RangedStyle<B>>) {
-        if self.len == !0 {
+        if self.len == usize::MAX {
             self.properties.clear();
             self.root_style = ResolvedStyle::default();
             return;
@@ -127,7 +144,7 @@ impl<B: Brush> RangedStyleBuilder<B> {
 
         self.properties.clear();
         self.root_style = ResolvedStyle::default();
-        self.len = !0;
+        self.len = usize::MAX;
     }
 }
 

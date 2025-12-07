@@ -235,7 +235,7 @@ impl FontInfo {
             }
             (axes, attrs_axes)
         } else {
-            (Default::default(), Default::default())
+            (SmallVec::default(), 0)
         };
         Some(Self {
             source,

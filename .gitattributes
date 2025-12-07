@@ -1,3 +1,1 @@
-# LFS settings
-# If changing, also change in .github/workflows/ci.yml
-parley/tests/snapshots/*.png filter=lfs diff=lfs merge=lfs -text
+unicode_data/src/generated/** linguist-generated

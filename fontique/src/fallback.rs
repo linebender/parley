@@ -6,9 +6,10 @@
 use super::{family::FamilyId, script::Script};
 use alloc::vec::Vec;
 use hashbrown::HashMap;
-use icu_locid::LanguageIdentifier;
+use icu_locale_core::LanguageIdentifier;
+use smallvec::SmallVec;
 
-type FamilyList = smallvec::SmallVec<[FamilyId; 1]>;
+type FamilyList = SmallVec<[FamilyId; 1]>;
 
 /// Maps script and language pairs to font families.
 #[derive(Clone, Default, Debug)]
@@ -74,7 +75,7 @@ impl FallbackMap {
                     .entry(script)
                     .or_default()
                     .default
-                    .get_or_insert(Default::default());
+                    .get_or_insert(SmallVec::default());
                 if do_set {
                     existing_families.clear();
                 }
@@ -165,7 +166,7 @@ where
     S: Into<Script>,
 {
     fn from(value: (S, &str)) -> Self {
-        let locale = LanguageIdentifier::try_from_bytes(value.1.as_bytes()).ok();
+        let locale = LanguageIdentifier::try_from_str(value.1).ok();
         Self::new(value.0, locale.as_ref())
     }
 }

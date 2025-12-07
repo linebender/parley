@@ -174,6 +174,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
             item.locale = style.locale;
             item.variations = style.font_variations;
             item.features = style.font_features;
+            item.word_spacing = style.word_spacing;
+            item.letter_spacing = style.letter_spacing;
             text_range.start = text_range.end;
             char_range.start = char_range.end;
         }
@@ -395,6 +397,7 @@ fn shape_item<'a, B: Brush>(
             font.font.synthesis,
             &glyph_buffer,
             item.level,
+            item.style_index,
             item.word_spacing,
             item.letter_spacing,
             segment_text,
@@ -465,8 +468,8 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         let features = rcx.features(style.font_features).unwrap_or(&[]);
         query.set_families(fonts.iter().copied());
 
-        let fb_script = crate::swash_convert::script_to_fontique(script);
-        let fb_language = locale.and_then(crate::swash_convert::locale_to_fontique);
+        let fb_script = swash_convert::script_to_fontique(script);
+        let fb_language = locale.and_then(swash_convert::locale_to_fontique);
         query.set_fallbacks(fontique::FallbackKey::new(fb_script, fb_language.as_ref()));
         query.set_attributes(attrs);
 

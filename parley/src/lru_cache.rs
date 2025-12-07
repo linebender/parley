@@ -23,7 +23,7 @@ pub(crate) struct LruCache<ID, T> {
 impl<ID, T> LruCache<ID, T> {
     pub(crate) fn new(max_entries: usize) -> Self {
         Self {
-            entries: Default::default(),
+            entries: Vec::default(),
             epoch: 0,
             max_entries,
         }
