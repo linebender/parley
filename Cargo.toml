@@ -28,7 +28,7 @@ accesskit = "0.21.1"
 bytemuck = { version = "1.24.0", default-features = false }
 databake = { version = "0.2", default-features = false, features = ["derive"] }
 fontique = { version = "0.7.0", default-features = false, path = "fontique" }
-harfrust = { version = "0.3.2", default-features = false }
+harfrust = { git = "https://github.com/harfbuzz/harfrust.git", rev = "904ed514cd50f2d345745bc9f6346c54630171ce", default-features = false }
 hashbrown = "0.16.1"
 icu_codepointtrie_builder = { version = "0.5.1", default-features = false, features = ["wasm"] }
 icu_collections = { version = "2.1.1", default-features = false }

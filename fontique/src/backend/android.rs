@@ -4,7 +4,6 @@
 use std::{path::Path, str::FromStr, sync::Arc};
 
 use hashbrown::HashMap;
-use icu_locale_core::subtags::script;
 use roxmltree::{Document, Node};
 
 use super::{
@@ -123,18 +122,24 @@ impl SystemFonts {
                                         }) {
                                             for lang in langs {
                                                 if let Ok(locale) = Language::try_from_str(lang) {
-                                                    let scr =
-                                                        locale.script.unwrap_or(script!("Zzzz"));
+                                                    let scr = locale
+                                                        .script
+                                                        .and_then(|s| {
+                                                            icu_properties::PropertyParser::new()
+                                                                .get_strict(s.as_str())
+                                                        })
+                                                        .unwrap_or(Script::Unknown);
                                                     // Also fallback for the script on its own
                                                     script_fallback.push((scr, *family));
-                                                    if scr == script!("Hant") {
+                                                    // 74 == Hant
+                                                    if scr.to_icu4c_value() == 74 {
                                                         // This works around ambiguous han char­
                                                         // acters going unmapped with current
                                                         // fallback code. This should be done in
                                                         // a locale-dependent manner, since that
                                                         // is the norm.
                                                         script_fallback
-                                                            .push((script!("Hani"), *family));
+                                                            .push((Script::Han, *family));
                                                     }
                                                     if !locale.language.is_unknown() {
                                                         locale_fallback.push((

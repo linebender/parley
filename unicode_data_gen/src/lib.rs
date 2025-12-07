@@ -38,7 +38,6 @@ pub fn generate(out: std::path::PathBuf) {
         )
         .with_markers([
             icu_properties::provider::PropertyEnumBidiMirroringGlyphV1::INFO,
-            icu_properties::provider::PropertyNameShortScriptV1::INFO,
             icu_segmenter::provider::SegmenterBreakGraphemeClusterV1::INFO,
             icu_segmenter::provider::SegmenterBreakWordOverrideV1::INFO,
             icu_segmenter::provider::SegmenterLstmAutoV1::INFO,

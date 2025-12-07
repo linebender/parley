@@ -380,7 +380,7 @@ fn shape_item<'a, B: Brush>(
         } else {
             harfrust::Direction::LeftToRight
         };
-        let hb_script = script_to_harfrust(fb_script, analysis_data_sources);
+        let hb_script = script_to_harfrust(fb_script);
         let language = item
             .locale
             .as_ref()

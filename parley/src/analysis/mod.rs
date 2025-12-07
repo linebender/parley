@@ -16,9 +16,7 @@ use icu_normalizer::properties::{
     CanonicalDecompositionBorrowed,
 };
 use icu_properties::props::{BidiMirroringGlyph, GeneralCategory, GraphemeClusterBreak, Script};
-use icu_properties::{
-    CodePointMapData, CodePointMapDataBorrowed, PropertyNamesShort, PropertyNamesShortBorrowed,
-};
+use icu_properties::{CodePointMapData, CodePointMapDataBorrowed};
 use icu_segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakOptions};
 use icu_segmenter::{
     GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter,
@@ -32,7 +30,6 @@ pub(crate) struct AnalysisDataSources {
     line_segmenters: LineSegmenters,
     composing_normalizer: CanonicalComposition,
     decomposing_normalizer: CanonicalDecomposition,
-    script_short_name: PropertyNamesShort<Script>,
     brackets: CodePointMapData<BidiMirroringGlyph>,
 
     composite: CompositeProps,
@@ -81,7 +78,6 @@ impl AnalysisDataSources {
             line_segmenters: LineSegmenters::default(),
             composing_normalizer: CanonicalComposition::try_new_unstable(&PROVIDER).unwrap(),
             decomposing_normalizer: CanonicalDecomposition::try_new_unstable(&PROVIDER).unwrap(),
-            script_short_name: PropertyNamesShort::<Script>::try_new_unstable(&PROVIDER).unwrap(),
             brackets: CodePointMapData::<BidiMirroringGlyph>::try_new_unstable(&PROVIDER).unwrap(),
             composite: CompositeProps,
         }
@@ -110,11 +106,6 @@ impl AnalysisDataSources {
     #[inline(always)]
     fn decomposing_normalizer(&self) -> CanonicalDecompositionBorrowed<'_> {
         self.decomposing_normalizer.as_borrowed()
-    }
-
-    #[inline(always)]
-    pub(crate) fn script_short_name(&self) -> PropertyNamesShortBorrowed<'_, Script> {
-        self.script_short_name.as_borrowed()
     }
 
     #[inline(always)]
