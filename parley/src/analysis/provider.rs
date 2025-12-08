@@ -14,7 +14,7 @@ pub use unicode_data::generated::*;
 /// This macro requires the following crates:
 /// * `icu_collections`
 /// * `icu_normalizer`
-/// * `icu_properties`fm
+/// * `icu_properties`
 /// * `icu_provider`
 /// * `icu_segmenter`
 /// * `zerovec`
