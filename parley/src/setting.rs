@@ -1,7 +1,7 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-pub(crate) use harfrust::Tag as Tag;
+pub(crate) use harfrust::Tag;
 
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
 pub struct Setting<T> {

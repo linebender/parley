@@ -22,7 +22,7 @@ use crate::{TextWrapMode, WordBreak};
 use core::borrow::Borrow;
 use core::ops::Range;
 use fontique::FamilyId;
-use icu_locale_core::LanguageIdentifier;
+use fontique::Language;
 
 /// Style with an associated range.
 #[derive(Debug, Clone)]
@@ -180,7 +180,7 @@ impl ResolveContext {
             font_features: self.resolve_features(&raw_style.font_features),
             locale: raw_style
                 .locale
-                .and_then(|v| LanguageIdentifier::try_from_str(v).ok()),
+                .and_then(|v| Language::try_from_str(v).ok()),
             brush: raw_style.brush.clone(),
             underline: ResolvedDecoration {
                 enabled: raw_style.has_underline,
@@ -352,7 +352,7 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     /// Font feature settings.
     FontFeatures(Resolved<FontFeature>),
     /// Locale.
-    Locale(Option<LanguageIdentifier>),
+    Locale(Option<Language>),
     /// Brush for rendering text.
     Brush(B),
     /// Underline decoration.
@@ -403,7 +403,7 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     /// Font feature settings.
     pub(crate) font_features: Resolved<FontFeature>,
     /// Locale.
-    pub(crate) locale: Option<LanguageIdentifier>,
+    pub(crate) locale: Option<Language>,
     /// Brush for rendering text.
     pub(crate) brush: B,
     /// Underline decoration.

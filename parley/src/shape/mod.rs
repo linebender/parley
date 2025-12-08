@@ -18,7 +18,7 @@ use crate::inline_box::InlineBox;
 use crate::lru_cache::LruCache;
 use crate::util::nearly_eq;
 use crate::{FontData, convert};
-use icu_locale_core::LanguageIdentifier;
+use fontique::Language;
 use icu_properties::props::Script;
 
 use fontique::{self, Query, QueryFamily, QueryFont};
@@ -53,7 +53,7 @@ struct Item {
     size: f32,
     script: Script,
     level: u8,
-    locale: Option<LanguageIdentifier>,
+    locale: Option<Language>,
     variations: Resolved<FontVariation>,
     features: Resolved<FontFeature>,
     word_spacing: f32,
@@ -518,7 +518,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         styles: &'a [RangedStyle<B>],
         style_index: u16,
         fb_script: fontique::Script,
-        locale: Option<LanguageIdentifier>,
+        locale: Option<Language>,
     ) -> Self {
         let style = &styles[style_index as usize].style;
         let fonts_id = style.font_stack.id();
