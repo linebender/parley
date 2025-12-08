@@ -24,7 +24,6 @@ use icu_segmenter::{
     GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter,
     LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed,
 };
-use unicode_bidi::TextSource;
 use unicode_data::CompositeProps;
 
 pub(crate) struct AnalysisDataSources {
@@ -303,9 +302,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
                 let prev_size = prev_char_index.1.len_utf8();
                 let size = self.current_char.1.len_utf8();
 
-                let substring = self
-                    .text
-                    .subrange(self.building_range_start..style_start_index + size);
+                let substring = &self.text[self.building_range_start..style_start_index + size];
                 let result_style = self.previous_word_break_style;
 
                 self.building_range_start = style_start_index - prev_size;
@@ -316,9 +313,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
 
             // Final segment
             self.done = true;
-            let last_substring = self
-                .text
-                .subrange(self.building_range_start..self.text.len());
+            let last_substring = &self.text[self.building_range_start..self.text.len()];
             Some((last_substring, self.previous_word_break_style, true))
         }
     }
