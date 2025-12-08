@@ -9,7 +9,7 @@ use core::marker::PhantomData;
 
 use crate::analysis::provider::PROVIDER;
 use crate::resolve::RangedStyle;
-use crate::{Brush, LayoutContext};
+use crate::{Brush, LayoutContext, WordBreak};
 
 use icu_normalizer::properties::{
     CanonicalComposition, CanonicalCompositionBorrowed, CanonicalDecomposition,
@@ -47,18 +47,22 @@ struct LineSegmenters {
 }
 
 impl LineSegmenters {
-    fn get(&mut self, word_break_strength: LineBreakWordOption) -> LineSegmenterBorrowed<'_> {
+    fn get(&mut self, word_break_strength: WordBreak) -> LineSegmenterBorrowed<'_> {
         let segmenter = match word_break_strength {
-            LineBreakWordOption::Normal => &mut self.normal,
-            LineBreakWordOption::KeepAll => &mut self.keep_all,
-            LineBreakWordOption::BreakAll => &mut self.break_all,
-            _ => unreachable!(),
+            WordBreak::Normal => &mut self.normal,
+            WordBreak::KeepAll => &mut self.keep_all,
+            WordBreak::BreakAll => &mut self.break_all,
         };
 
         segmenter
             .get_or_insert_with(|| {
                 let mut line_break_opts = LineBreakOptions::default();
-                line_break_opts.word_option = Some(word_break_strength);
+                let word_break_strength_icu = match word_break_strength {
+                    WordBreak::Normal => LineBreakWordOption::Normal,
+                    WordBreak::BreakAll => LineBreakWordOption::BreakAll,
+                    WordBreak::KeepAll => LineBreakWordOption::KeepAll,
+                };
+                line_break_opts.word_option = Some(word_break_strength_icu);
                 LineSegmenter::try_new_auto_unstable(&PROVIDER, line_break_opts)
                     .expect("Failed to create LineSegmenter")
             })
@@ -240,7 +244,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
         char_indices: core::str::CharIndices<'a>,
         current_char: (usize, char),
         building_range_start: usize,
-        previous_word_break_style: LineBreakWordOption,
+        previous_word_break_style: WordBreak,
         done: bool,
         _phantom: PhantomData<B>,
     }
@@ -270,7 +274,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
     where
         I: Iterator<Item = &'a RangedStyle<B>>,
     {
-        type Item = (&'a str, LineBreakWordOption, bool);
+        type Item = (&'a str, WordBreak, bool);
 
         fn next(&mut self) -> Option<Self::Item> {
             if self.done {

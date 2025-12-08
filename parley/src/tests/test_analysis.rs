@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::analysis::Boundary;
-use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty};
+use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty, WordBreak};
 use fontique::FontWeight;
 use icu_collections::codepointtrie::TrieValue;
 use icu_properties::props::{GraphemeClusterBreak, Script};
-use icu_segmenter::options::LineBreakWordOption;
 
 #[derive(Default)]
 struct TestContext {
@@ -120,8 +119,8 @@ fn verify_analysis(
 #[test]
 fn test_latin_mixed_keep_all_last() {
     verify_analysis("AB", |builder| {
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..1);
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 1..2);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 0..1);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 1..2);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None])
     .expect_bidi_embed_level_list(vec![])
@@ -201,8 +200,8 @@ fn test_blank() {
 #[test]
 fn test_latin_mixed_keep_all_first() {
     verify_analysis("AB", |builder| {
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..1);
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..2);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..1);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..2);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None]);
 }
@@ -210,13 +209,10 @@ fn test_latin_mixed_keep_all_first() {
 #[test]
 fn test_mixed_break_four_segments() {
     verify_analysis("ABCD 123", |builder| {
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..1);
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 1..2);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            2..4,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 4..8);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 0..1);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 1..2);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 2..4);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 4..8);
     })
     .expect_boundary_list(vec![
         Boundary::Word,
@@ -233,12 +229,9 @@ fn test_mixed_break_four_segments() {
 #[test]
 fn test_alternate_twice_within_word_normal_break_normal() {
     verify_analysis("ABC", |builder| {
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..1);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            1..2,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 2..3);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 0..1);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 1..2);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 2..3);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::Line, Boundary::None]);
 }
@@ -246,15 +239,9 @@ fn test_alternate_twice_within_word_normal_break_normal() {
 #[test]
 fn test_alternate_twice_within_word_break_normal_break() {
     verify_analysis("ABC", |builder| {
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            0..1,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..2);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            2..3,
-        );
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..1);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..2);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 2..3);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::Line]);
 }
@@ -262,11 +249,8 @@ fn test_alternate_twice_within_word_break_normal_break() {
 #[test]
 fn test_latin_trailing_space_mixed() {
     verify_analysis("AB ", |builder| {
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            0..1,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..3);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..1);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..3);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::Word])
     .expect_bidi_embed_level_list(vec![])
@@ -280,11 +264,8 @@ fn test_latin_trailing_space_mixed() {
 #[test]
 fn test_latin_leading_space_mixed() {
     verify_analysis(" AB", |builder| {
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            0..1,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..3);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..1);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..3);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::Line, Boundary::None])
     .expect_bidi_embed_level_list(vec![])
@@ -298,11 +279,8 @@ fn test_latin_leading_space_mixed() {
 #[test]
 fn test_latin_mixed_break_all_last() {
     verify_analysis("AB", |builder| {
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..1);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            1..2,
-        );
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 0..1);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 1..2);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::Line]);
 }
@@ -310,11 +288,8 @@ fn test_latin_mixed_break_all_last() {
 #[test]
 fn test_latin_mixed_break_all_first() {
     verify_analysis("AB", |builder| {
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            0..1,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..2);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..1);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..2);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None]);
 }
@@ -366,20 +341,14 @@ fn test_multi_char_grapheme() {
 #[test]
 fn test_mixed_break_frequent_alternation() {
     verify_analysis("ABCD 123", |builder| {
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..1);
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 1..2);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            2..3,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 3..4);
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 4..5);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            5..6,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 6..7);
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 7..8);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 0..1);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 1..2);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 2..3);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 3..4);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 4..5);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 5..6);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 6..7);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 7..8);
     })
     .expect_boundary_list(vec![
         Boundary::Word,
@@ -468,24 +437,12 @@ fn test_mixed_ltr_rtl() {
 #[test]
 fn test_multi_byte_chars_alternating_break_all() {
     verify_analysis("€你€你AA", |builder| {
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            0..3,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 3..6);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            6..9,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 9..12);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            12..13,
-        );
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::Normal),
-            13..14,
-        );
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..3);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 3..6);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 6..9);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 9..12);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 12..13);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 13..14);
     })
     .expect_boundary_list(vec![
         Boundary::Word,
@@ -508,23 +465,11 @@ fn test_multi_byte_chars_alternating_break_all() {
 #[test]
 fn test_multi_byte_chars_varying_utf8_lengths_whitespace_separated() {
     verify_analysis("ß € 𝓗 你 ą", |builder| {
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            0..3,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 3..7);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            7..12,
-        );
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::Normal),
-            12..16,
-        );
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            16..19,
-        );
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..3);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 3..7);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 7..12);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 12..16);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 16..19);
     })
     .expect_boundary_list(vec![
         Boundary::Word,
@@ -553,20 +498,11 @@ fn test_multi_byte_chars_varying_utf8_lengths_whitespace_separated() {
 #[test]
 fn test_multi_byte_chars_varying_utf8_lengths() {
     verify_analysis("ß€𝓗你ą", |builder| {
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            0..2,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 2..5);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            5..9,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 9..12);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            12..14,
-        );
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..2);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 2..5);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 5..9);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 9..12);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 12..14);
     })
     .expect_boundary_list(vec![
         Boundary::Word,
@@ -651,8 +587,8 @@ fn test_mixed_ltr_rtl_nested_embedding() {
 #[test]
 fn test_mixed_break_simple() {
     verify_analysis("ABCD 123", |builder| {
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..1);
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 1..8);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 0..1);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 1..8);
     })
     .expect_boundary_list(vec![
         Boundary::Word,
@@ -679,20 +615,11 @@ fn test_mixed_break_simple() {
 #[test]
 fn test_multi_char_grapheme_mixed_break_all() {
     verify_analysis("A e\u{301} B", |builder| {
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            0..1,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..2);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            2..5,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 5..6);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            6..7,
-        );
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..1);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..2);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 2..5);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 5..6);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 6..7);
     })
     .expect_boundary_list(vec![
         Boundary::Word,
@@ -727,18 +654,12 @@ fn test_multi_char_grapheme_mixed_break_all() {
 #[test]
 fn test_multi_byte_chars_alternating_keep_all() {
     verify_analysis("€你€你AA", |builder| {
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..3);
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 3..6);
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 6..9);
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 9..12);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::KeepAll),
-            12..13,
-        );
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::Normal),
-            13..14,
-        );
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..3);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 3..6);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 6..9);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 9..12);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 12..13);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 13..14);
     })
     .expect_boundary_list(vec![
         Boundary::Word,
@@ -878,17 +799,11 @@ fn test_mixed_ltr_rtl_multiple_segments() {
 #[test]
 fn test_multi_char_grapheme_mixed_break_and_keep_all() {
     verify_analysis("A e\u{301} B", |builder| {
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..1);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            1..2,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 2..5);
-        builder.push(
-            StyleProperty::WordBreak(LineBreakWordOption::BreakAll),
-            5..6,
-        );
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 6..7);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..1);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 1..2);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 2..5);
+        builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 5..6);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 6..7);
     })
     .expect_boundary_list(vec![
         Boundary::Word,
@@ -923,11 +838,11 @@ fn test_multi_char_grapheme_mixed_break_and_keep_all() {
 #[test]
 fn test_multi_char_grapheme_mixed_keep_all() {
     verify_analysis("A e\u{301} B", |builder| {
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..1);
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 1..2);
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 2..5);
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 5..6);
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 6..7);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..1);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..2);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 2..5);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 5..6);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 6..7);
     })
     .expect_boundary_list(vec![
         Boundary::Word,
@@ -1115,7 +1030,7 @@ fn test_rtl_paragraph_with_non_authoritative_logical_first_char_two_paragraphs()
 #[test]
 fn test_three_chars() {
     verify_analysis("ABC", |builder| {
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 0..3);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 0..3);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::None]);
 }
@@ -1123,7 +1038,7 @@ fn test_three_chars() {
 #[test]
 fn test_single_char_multi_byte() {
     verify_analysis("€", |builder| {
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..3);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..3);
     })
     .expect_boundary_list(vec![Boundary::Word])
     .expect_bidi_embed_level_list(vec![])
@@ -1188,7 +1103,7 @@ fn test_newline() {
 #[test]
 fn test_two_chars_keep_all() {
     verify_analysis("AB", |builder| {
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..2);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..2);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None])
     .expect_bidi_embed_level_list(vec![])
@@ -1228,8 +1143,8 @@ fn test_whitespace_contiguous_interspersed_in_latin() {
 #[test]
 fn test_whitespace_contiguous_interspersed_in_latin_mixed() {
     verify_analysis("A  B  C D", |builder| {
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::KeepAll), 0..3);
-        builder.push(StyleProperty::WordBreak(LineBreakWordOption::Normal), 3..9);
+        builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..3);
+        builder.push(StyleProperty::WordBreak(WordBreak::Normal), 3..9);
     })
     .expect_boundary_list(vec![
         Boundary::Word,
