@@ -1614,12 +1614,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hashbrown"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
-
-[[package]]
 name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2231,17 +2225,6 @@ dependencies = [
  "portable-atomic",
  "unicode-width 0.2.2",
  "web-time",
-]
-
-[[package]]
-name = "io-uring"
-version = "0.7.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "046fa2d4d00aea763528b4950358d0ead425372445dc8ff86312b3c69ff7727b"
-dependencies = [
- "bitflags 2.9.4",
- "cfg-if",
- "libc",
 ]
 
 [[package]]
@@ -4449,7 +4432,6 @@ dependencies = [
  "libc",
  "mio",
  "pin-project-lite",
- "slab",
  "socket2",
  "tokio-macros",
  "windows-sys 0.61.2",
@@ -4805,7 +4787,7 @@ dependencies = [
  "anyhow",
  "clipboard-rs",
  "parley",
- "peniko 0.4.0",
+ "peniko",
  "pollster",
  "ui-events",
  "ui-events-winit",
