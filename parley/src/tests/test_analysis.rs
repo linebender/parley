@@ -4,7 +4,6 @@
 use crate::analysis::Boundary;
 use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty, WordBreak};
 use fontique::FontWeight;
-use icu_collections::codepointtrie::TrieValue;
 use icu_properties::props::{GraphemeClusterBreak, Script};
 
 #[derive(Default)]
@@ -26,13 +25,7 @@ impl TestContext {
     }
 
     fn expect_bidi_embed_level_list(self, expected: Vec<u8>) -> Self {
-        let actual: Vec<_> = self
-            .layout_context
-            .bidi
-            .levels()
-            .iter()
-            .map(|l| l.to_u32() as u8)
-            .collect();
+        let actual: Vec<_> = self.layout_context.bidi.levels().iter().copied().collect();
         assert_eq!(actual, expected, "Bidi embed level list mismatch");
         self
     }
