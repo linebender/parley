@@ -127,32 +127,6 @@ impl Properties {
         BidiClass::from_icu4c_value(self.get(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8)
     }
 
-    /// Returns whether the character needs bidirectional resolution.
-    #[inline(always)]
-    pub fn needs_bidi_resolution(&self) -> bool {
-        let bidi_class = self.bidi_class();
-        let bidi_mask = 1_u32 << (bidi_class.to_icu4c_value());
-
-        const fn mask(class: BidiClass) -> u32 {
-            1 << class.to_icu4c_value()
-        }
-
-        const OVERRIDE_MASK: u32 = mask(BidiClass::RightToLeftEmbedding)
-            | mask(BidiClass::LeftToRightEmbedding)
-            | mask(BidiClass::RightToLeftOverride)
-            | mask(BidiClass::LeftToRightOverride);
-        const ISOLATE_MASK: u32 = mask(BidiClass::RightToLeftIsolate)
-            | mask(BidiClass::LeftToRightIsolate)
-            | mask(BidiClass::FirstStrongIsolate);
-        const EXPLICIT_MASK: u32 = OVERRIDE_MASK | ISOLATE_MASK;
-        const BIDI_MASK: u32 = EXPLICIT_MASK
-            | mask(BidiClass::RightToLeft)
-            | mask(BidiClass::ArabicLetter)
-            | mask(BidiClass::ArabicNumber);
-
-        (bidi_mask & BIDI_MASK) != 0
-    }
-
     /// Returns whether the character is an emoji or pictograph.
     #[inline(always)]
     pub fn is_emoji_or_pictograph(&self) -> bool {

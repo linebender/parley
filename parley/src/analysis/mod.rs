@@ -8,6 +8,7 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use crate::analysis::provider::PROVIDER;
+use crate::bidi::BidiResolver;
 use crate::resolve::RangedStyle;
 use crate::{Brush, LayoutContext, WordBreak};
 
@@ -478,7 +479,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
                 }
             };
 
-            needs_bidi_resolution |= properties.needs_bidi_resolution();
+            needs_bidi_resolution |= BidiResolver::needs_bidi_resolution(bidi_class);
             let bracket = lcx.analysis_data_sources.brackets().get(ch);
 
             lcx.info.push((
