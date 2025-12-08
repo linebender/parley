@@ -11,9 +11,9 @@ use crate::analysis::provider::PROVIDER;
 use crate::resolve::RangedStyle;
 use crate::{Brush, LayoutContext};
 
-use icu_normalizer::{
-    ComposingNormalizer, ComposingNormalizerBorrowed, DecomposingNormalizer,
-    DecomposingNormalizerBorrowed,
+use icu_normalizer::properties::{
+    CanonicalComposition, CanonicalCompositionBorrowed, CanonicalDecomposition,
+    CanonicalDecompositionBorrowed,
 };
 use icu_properties::props::{BidiMirroringGlyph, GeneralCategory, GraphemeClusterBreak, Script};
 use icu_properties::{
@@ -31,8 +31,8 @@ pub(crate) struct AnalysisDataSources {
     grapheme_segmenter: GraphemeClusterSegmenter,
     word_segmenter: WordSegmenter,
     line_segmenters: LineSegmenters,
-    composing_normalizer: ComposingNormalizer,
-    decomposing_normalizer: DecomposingNormalizer,
+    composing_normalizer: CanonicalComposition,
+    decomposing_normalizer: CanonicalDecomposition,
     script_short_name: PropertyNamesShort<Script>,
     brackets: CodePointMapData<BidiMirroringGlyph>,
 
@@ -76,8 +76,8 @@ impl AnalysisDataSources {
             )
             .unwrap(),
             line_segmenters: LineSegmenters::default(),
-            composing_normalizer: ComposingNormalizer::try_new_nfc_unstable(&PROVIDER).unwrap(),
-            decomposing_normalizer: DecomposingNormalizer::try_new_nfd_unstable(&PROVIDER).unwrap(),
+            composing_normalizer: CanonicalComposition::try_new_unstable(&PROVIDER).unwrap(),
+            decomposing_normalizer: CanonicalDecomposition::try_new_unstable(&PROVIDER).unwrap(),
             script_short_name: PropertyNamesShort::<Script>::try_new_unstable(&PROVIDER).unwrap(),
             brackets: CodePointMapData::<BidiMirroringGlyph>::try_new_unstable(&PROVIDER).unwrap(),
             composite: CompositeProps,
@@ -96,11 +96,11 @@ impl AnalysisDataSources {
         self.word_segmenter.as_borrowed()
     }
 
-    fn composing_normalizer(&self) -> ComposingNormalizerBorrowed<'_> {
+    fn composing_normalizer(&self) -> CanonicalCompositionBorrowed<'_> {
         self.composing_normalizer.as_borrowed()
     }
 
-    fn decomposing_normalizer(&self) -> DecomposingNormalizerBorrowed<'_> {
+    fn decomposing_normalizer(&self) -> CanonicalDecompositionBorrowed<'_> {
         self.decomposing_normalizer.as_borrowed()
     }
 
@@ -466,10 +466,6 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
                 boundary
             };
 
-            let is_control = matches!(general_category, GeneralCategory::Control);
-            let contributes_to_shaping = !is_control
-                || (matches!(general_category, GeneralCategory::Format)
-                    && !matches!(script, Script::Inherited));
             let force_normalize = {
                 // "Extend" break chars should be normalized first, with two exceptions
                 if matches!(grapheme_cluster_break, GraphemeClusterBreak::Extend) &&
@@ -495,9 +491,9 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
                     bracket,
                     is_variation_selector,
                     is_region_indicator,
-                    is_control,
+                    is_control(general_category),
                     is_emoji_or_pictograph,
-                    contributes_to_shaping,
+                    contributes_to_shaping(general_category, script),
                     force_normalize,
                 ),
                 0, // Style index is populated later
@@ -519,4 +515,19 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
 
     // Restore line segmenters
     lcx.analysis_data_sources.line_segmenters = line_segmenters;
+}
+
+/// All characters contribute to shaping except:
+/// - Control characters
+/// - Format characters, unless they use the "Inherited" script
+pub(crate) fn contributes_to_shaping(general_category: GeneralCategory, script: Script) -> bool {
+    if is_control(general_category) {
+        return false;
+    }
+
+    !(general_category == GeneralCategory::Format && script != Script::Inherited)
+}
+
+fn is_control(general_category: GeneralCategory) -> bool {
+    general_category == GeneralCategory::Control
 }

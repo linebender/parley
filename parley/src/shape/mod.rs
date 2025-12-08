@@ -4,11 +4,9 @@
 //! Text shaping implementation using `harfrust`for shaping
 //! and `icu` for text analysis.
 
+use alloc::vec::Vec;
 use core::mem;
 use core::ops::RangeInclusive;
-
-use alloc::string::String;
-use alloc::vec::Vec;
 
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
@@ -33,7 +31,6 @@ pub(crate) struct ShapeContext {
     shape_plan_cache: LruCache<cache::ShapePlanId, harfrust::ShapePlan>,
     unicode_buffer: Option<harfrust::UnicodeBuffer>,
     features: Vec<harfrust::Feature>,
-    scratch_string: String,
     char_cluster: CharCluster,
 }
 
@@ -46,7 +43,6 @@ impl Default for ShapeContext {
             shape_plan_cache: LruCache::new(MAX_ENTRIES),
             unicode_buffer: Some(harfrust::UnicodeBuffer::new()),
             features: Vec::new(),
-            scratch_string: String::new(),
             char_cluster: CharCluster::default(),
         }
     }
@@ -315,8 +311,7 @@ fn shape_item<'a, B: Brush>(
         char_cluster,
     );
 
-    let mut current_font =
-        font_selector.select_font(char_cluster, analysis_data_sources, &mut scx.scratch_string);
+    let mut current_font = font_selector.select_font(char_cluster, analysis_data_sources);
 
     // Main segmentation loop (based on swash shape_clusters) - only within current item
     while let Some(font) = current_font.take() {
@@ -336,11 +331,8 @@ fn shape_item<'a, B: Brush>(
                 char_cluster,
             );
 
-            if let Some(next_font) = font_selector.select_font(
-                char_cluster,
-                analysis_data_sources,
-                &mut scx.scratch_string,
-            ) {
+            if let Some(next_font) = font_selector.select_font(char_cluster, analysis_data_sources)
+            {
                 if next_font != font {
                     current_font = Some(next_font);
                     break;
@@ -559,7 +551,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         &mut self,
         cluster: &mut CharCluster,
         analysis_data_sources: &AnalysisDataSources,
-        scratch_string: &mut String,
     ) -> Option<SelectedFont> {
         let style_index = cluster.style_index();
         let is_emoji = cluster.is_emoji;
@@ -613,7 +604,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
                         .unwrap_or_default()
                 },
                 analysis_data_sources,
-                scratch_string,
             );
 
             match map_status {

@@ -46,6 +46,7 @@ pub fn generate(out: std::path::PathBuf) {
             icu_segmenter::provider::SegmenterBreakLineV1::INFO,
             icu_normalizer::provider::NormalizerNfcV1::INFO,
             icu_normalizer::provider::NormalizerNfdDataV1::INFO,
+            icu_normalizer::provider::NormalizerNfdSupplementV1::INFO,
             icu_normalizer::provider::NormalizerNfdTablesV1::INFO,
         ])
         .export(

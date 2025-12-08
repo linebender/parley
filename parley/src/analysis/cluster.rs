@@ -1,9 +1,9 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
+use icu_normalizer::properties::Decomposed;
 
 use crate::analysis::AnalysisDataSources;
 
@@ -114,50 +114,52 @@ impl CharCluster {
         self.chars[0].style_index
     }
 
-    fn decomposed(
-        &mut self,
-        analysis_data_sources: &AnalysisDataSources,
-        scratch_string: &mut String,
-    ) -> Option<&[Char]> {
+    fn push_or_replace_at(chars: &mut Vec<Char>, char: Char, index: usize) {
+        if index >= chars.len() {
+            chars.push(char);
+        } else {
+            chars[index] = char;
+        }
+    }
+
+    fn contributes_to_shaping(ch: char, analysis_data_sources: &AnalysisDataSources) -> bool {
+        let props = analysis_data_sources.composite.properties(ch as u32);
+        crate::analysis::contributes_to_shaping(props.general_category(), props.script())
+    }
+
+    fn decomposed(&mut self, analysis_data_sources: &AnalysisDataSources) -> Option<&[Char]> {
         match self.decomp.state {
             FormState::Invalid => None,
             FormState::None => {
                 self.decomp.state = FormState::Invalid;
 
-                // Create a string from the original characters to normalize
-                scratch_string.clear();
-                for ch in &self.chars[..self.len()] {
-                    scratch_string.push(ch.ch);
-                }
-
-                // Normalize to NFD (decomposed) form
-                let nfd_str = analysis_data_sources
-                    .decomposing_normalizer()
-                    .normalize(scratch_string);
-
-                // Copy the characters back to our form structure
-                let mut i = 0;
-                for c in nfd_str.chars() {
-                    if i == MAX_CLUSTER_SIZE {
-                        return None;
-                    }
-
-                    // Use the first character as a template for other properties
-                    let mut copy = self.chars[0];
-                    copy.ch = c;
-                    if i >= self.decomp.chars.len() {
-                        self.decomp.chars.push(copy);
-                    } else {
-                        self.decomp.chars[i] = copy;
-                    }
-                    i += 1;
-                }
-
-                if i == 0 {
+                // Only attempt pairwise normalization (1 <-> 2 characters)
+                if self.chars.len() != 1 {
                     return None;
                 }
 
-                self.decomp.len = i as u8;
+                let decomposer = analysis_data_sources.decomposing_normalizer();
+                let decomp = decomposer.decompose(self.chars[0].ch);
+                match decomp {
+                    Decomposed::Default | Decomposed::Singleton(_) => {
+                        return None;
+                    }
+                    Decomposed::Expansion(a, b) => {
+                        let mut copy = self.chars[0];
+                        copy.ch = a;
+                        copy.contributes_to_shaping =
+                            Self::contributes_to_shaping(a, analysis_data_sources);
+                        Self::push_or_replace_at(&mut self.decomp.chars, copy, 0);
+
+                        copy.ch = b;
+                        copy.contributes_to_shaping =
+                            Self::contributes_to_shaping(b, analysis_data_sources);
+                        Self::push_or_replace_at(&mut self.decomp.chars, copy, 1);
+
+                        self.decomp.len = 2;
+                    }
+                }
+
                 self.decomp.state = FormState::Valid;
                 self.decomp.setup();
                 Some(self.decomp.chars())
@@ -166,62 +168,31 @@ impl CharCluster {
         }
     }
 
-    fn composed(
-        &mut self,
-        analysis_data_sources: &AnalysisDataSources,
-        scratch_string: &mut String,
-    ) -> Option<&[Char]> {
+    fn composed(&mut self, analysis_data_sources: &AnalysisDataSources) -> Option<&[Char]> {
         match self.comp.state {
             FormState::Invalid => None,
             FormState::None => {
-                // First, we need decomposed characters
-                if self
-                    .decomposed(analysis_data_sources, scratch_string)
-                    .map(|chars| chars.len())
-                    .unwrap_or(0)
-                    == 0
-                {
-                    self.comp.state = FormState::Invalid;
-                    return None;
-                }
-
                 self.comp.state = FormState::Invalid;
 
-                // Create a string from the decomposed characters to normalize
-                scratch_string.clear();
-                for ch in &self.decomp.chars()[..self.decomp.len as usize] {
-                    scratch_string.push(ch.ch);
-                }
-
-                // Normalize to NFC (composed) form
-                let nfc_str = analysis_data_sources
-                    .composing_normalizer()
-                    .normalize(scratch_string);
-
-                // Copy the characters back to our form structure
-                let mut i = 0;
-                for c in nfc_str.chars() {
-                    if i >= MAX_CLUSTER_SIZE {
-                        self.comp.state = FormState::Invalid;
-                        return None;
-                    }
-
-                    // Use the first decomposed character as a template for other properties
-                    let mut ch_copy = self.decomp.chars[0];
-                    ch_copy.ch = c;
-                    if i >= self.comp.chars.len() {
-                        self.comp.chars.push(ch_copy);
-                    } else {
-                        self.comp.chars[i] = ch_copy;
-                    }
-                    i += 1;
-                }
-
-                if i == 0 {
+                // Only attempt pairwise normalization (1 <-> 2 characters)
+                if self.chars.len() != 2 {
                     return None;
                 }
 
-                self.comp.len = i as u8;
+                let composer = analysis_data_sources.composing_normalizer();
+                let comp = composer.compose(self.chars[0].ch, self.chars[1].ch);
+                match comp {
+                    None => {}
+                    Some(ch) => {
+                        let mut copy = self.chars[0];
+                        copy.ch = ch;
+                        copy.contributes_to_shaping =
+                            Self::contributes_to_shaping(ch, analysis_data_sources);
+                        Self::push_or_replace_at(&mut self.comp.chars, copy, 0);
+                        self.comp.len = 1;
+                    }
+                }
+
                 self.comp.state = FormState::Valid;
                 self.comp.setup();
                 Some(self.comp.chars())
@@ -234,7 +205,6 @@ impl CharCluster {
         &mut self,
         f: impl Fn(char) -> GlyphId,
         analysis_data_sources: &AnalysisDataSources,
-        scratch_string: &mut String,
     ) -> Status {
         let len = self.len();
         if len == 0 {
@@ -243,11 +213,7 @@ impl CharCluster {
         let mut glyph_ids = [0_u16; MAX_CLUSTER_SIZE];
         let prev_ratio = self.best_ratio;
         let mut ratio;
-        if self.force_normalize
-            && self
-                .composed(analysis_data_sources, scratch_string)
-                .is_some()
-        {
+        if self.force_normalize && self.composed(analysis_data_sources).is_some() {
             ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
@@ -269,11 +235,7 @@ impl CharCluster {
                 return Status::Complete;
             }
         }
-        if len > 1
-            && self
-                .decomposed(analysis_data_sources, scratch_string)
-                .is_some()
-        {
+        if self.decomposed(analysis_data_sources).is_some() {
             ratio = self.decomp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
@@ -282,11 +244,7 @@ impl CharCluster {
                     return Status::Complete;
                 }
             }
-            if !self.force_normalize
-                && self
-                    .composed(analysis_data_sources, scratch_string)
-                    .is_some()
-            {
+            if !self.force_normalize && self.composed(analysis_data_sources).is_some() {
                 ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
                 if ratio > self.best_ratio {
                     self.best_ratio = ratio;
