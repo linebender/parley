@@ -141,9 +141,9 @@ impl ResolveContext {
             StyleProperty::FontWeight(value) => FontWeight(*value),
             StyleProperty::FontVariations(value) => FontVariations(self.resolve_variations(value)),
             StyleProperty::FontFeatures(value) => FontFeatures(self.resolve_features(value)),
-            StyleProperty::Locale(value) => {
-                Locale(value.and_then(|v| LanguageIdentifier::try_from_str(v).ok()))
-            }
+            StyleProperty::Locale(value) => Locale(
+                value.and_then(|v| icu_locale_core::Locale::try_from_str(v).map(|v| v.id).ok()),
+            ),
             StyleProperty::Brush(value) => Brush(value.clone()),
             StyleProperty::Underline(value) => Underline(*value),
             StyleProperty::UnderlineOffset(value) => UnderlineOffset(value.map(|x| x * scale)),
