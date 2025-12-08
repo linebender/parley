@@ -124,13 +124,10 @@ fn test_latin_mixed_keep_all_last() {
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None])
     .expect_bidi_embed_level_list(vec![])
-    .expect_script_list(vec![
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(25),
-    ])
+    .expect_script_list(vec![Script::Latin, Script::Latin])
     .expect_grapheme_cluster_break_list(vec![
-        GraphemeClusterBreak::from_icu4c_value(0),
-        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
     ])
     .expect_is_control_list(vec![false, false])
     .expect_contributes_to_shaping_list(vec![true, true])
@@ -153,26 +150,26 @@ fn test_mandatory_break_in_text() {
         ])
         .expect_bidi_embed_level_list(vec![])
         .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Common,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Common,
+            Script::Latin,
         ])
         .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(5),
-            GraphemeClusterBreak::from_icu4c_value(0),
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::LF,
+            GraphemeClusterBreak::Other,
         ])
         .expect_is_control_list(vec![
             false, false, false, false, false, false, false, true, false,
@@ -190,8 +187,8 @@ fn test_blank() {
     verify_analysis("", |_| {})
         .expect_boundary_list(vec![Boundary::Word])
         .expect_bidi_embed_level_list(vec![])
-        .expect_script_list(vec![Script::from_icu4c_value(0)])
-        .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::from_icu4c_value(0)])
+        .expect_script_list(vec![Script::Common])
+        .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::Other])
         .expect_is_control_list(vec![false])
         .expect_contributes_to_shaping_list(vec![true])
         .expect_force_normalize_list(vec![false]);
@@ -254,11 +251,7 @@ fn test_latin_trailing_space_mixed() {
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::Word])
     .expect_bidi_embed_level_list(vec![])
-    .expect_script_list(vec![
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(0),
-    ]);
+    .expect_script_list(vec![Script::Latin, Script::Latin, Script::Common]);
 }
 
 #[test]
@@ -269,11 +262,7 @@ fn test_latin_leading_space_mixed() {
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::Line, Boundary::None])
     .expect_bidi_embed_level_list(vec![])
-    .expect_script_list(vec![
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(25),
-    ]);
+    .expect_script_list(vec![Script::Common, Script::Latin, Script::Latin]);
 }
 
 #[test]
@@ -299,11 +288,7 @@ fn test_all_whitespace() {
     verify_analysis("   ", |_| {})
         .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::None])
         .expect_bidi_embed_level_list(vec![])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-        ]);
+        .expect_script_list(vec![Script::Common, Script::Common, Script::Common]);
 }
 
 #[test]
@@ -318,20 +303,20 @@ fn test_multi_char_grapheme() {
             Boundary::Line,
         ])
         .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(1),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
+            Script::Latin,
+            Script::Common,
+            Script::Latin,
+            Script::Inherited,
+            Script::Common,
+            Script::Latin,
         ])
         .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(3),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Extend,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
         ])
         .expect_is_control_list(vec![false, false, false, false, false, false])
         .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
@@ -361,14 +346,14 @@ fn test_mixed_break_frequent_alternation() {
         Boundary::None,
     ])
     .expect_script_list(vec![
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(0),
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Common,
+        Script::Common,
+        Script::Common,
+        Script::Common,
     ]);
 }
 
@@ -390,15 +375,15 @@ fn test_mixed_style() {
         Boundary::Line,
     ])
     .expect_script_list(vec![
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(25),
+        Script::Latin,
+        Script::Common,
+        Script::Common,
+        Script::Latin,
+        Script::Common,
+        Script::Common,
+        Script::Latin,
+        Script::Common,
+        Script::Latin,
     ]);
 }
 
@@ -420,17 +405,17 @@ fn test_mixed_ltr_rtl() {
         ])
         .expect_bidi_embed_level_list(vec![0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
         .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Common,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
         ]);
 }
 
@@ -453,12 +438,12 @@ fn test_multi_byte_chars_alternating_break_all() {
         Boundary::None,
     ])
     .expect_script_list(vec![
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(17),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(17),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(25),
+        Script::Common,
+        Script::Han,
+        Script::Common,
+        Script::Han,
+        Script::Latin,
+        Script::Latin,
     ]);
 }
 
@@ -483,15 +468,15 @@ fn test_multi_byte_chars_varying_utf8_lengths_whitespace_separated() {
         Boundary::Line,
     ])
     .expect_script_list(vec![
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(17),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(25),
+        Script::Latin,
+        Script::Common,
+        Script::Common,
+        Script::Common,
+        Script::Common,
+        Script::Common,
+        Script::Han,
+        Script::Common,
+        Script::Latin,
     ]);
 }
 
@@ -512,11 +497,11 @@ fn test_multi_byte_chars_varying_utf8_lengths() {
         Boundary::Line,
     ])
     .expect_script_list(vec![
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(17),
-        Script::from_icu4c_value(25),
+        Script::Latin,
+        Script::Common,
+        Script::Common,
+        Script::Han,
+        Script::Latin,
     ]);
 }
 
@@ -555,32 +540,32 @@ fn test_mixed_ltr_rtl_nested_embedding() {
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0,
         ])
         .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(19),
-            Script::from_icu4c_value(19),
-            Script::from_icu4c_value(19),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(19),
-            Script::from_icu4c_value(19),
-            Script::from_icu4c_value(19),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
+            Script::Latin,
+            Script::Latin,
+            Script::Common,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Common,
+            Script::Common,
+            Script::Hebrew,
+            Script::Hebrew,
+            Script::Hebrew,
+            Script::Common,
+            Script::Common,
+            Script::Common,
+            Script::Common,
+            Script::Common,
+            Script::Common,
+            Script::Hebrew,
+            Script::Hebrew,
+            Script::Hebrew,
+            Script::Common,
+            Script::Common,
+            Script::Common,
         ]);
 }
 
@@ -601,14 +586,14 @@ fn test_mixed_break_simple() {
         Boundary::None,
     ])
     .expect_script_list(vec![
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(0),
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Common,
+        Script::Common,
+        Script::Common,
+        Script::Common,
     ]);
 }
 
@@ -631,20 +616,20 @@ fn test_multi_char_grapheme_mixed_break_all() {
     ])
     .expect_bidi_embed_level_list(vec![])
     .expect_script_list(vec![
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(1),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(25),
+        Script::Latin,
+        Script::Common,
+        Script::Latin,
+        Script::Inherited,
+        Script::Common,
+        Script::Latin,
     ])
     .expect_grapheme_cluster_break_list(vec![
-        GraphemeClusterBreak::from_icu4c_value(0),
-        GraphemeClusterBreak::from_icu4c_value(0),
-        GraphemeClusterBreak::from_icu4c_value(0),
-        GraphemeClusterBreak::from_icu4c_value(3),
-        GraphemeClusterBreak::from_icu4c_value(0),
-        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Extend,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
     ])
     .expect_is_control_list(vec![false, false, false, false, false, false])
     .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
@@ -670,12 +655,12 @@ fn test_multi_byte_chars_alternating_keep_all() {
         Boundary::None,
     ])
     .expect_script_list(vec![
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(17),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(17),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(25),
+        Script::Common,
+        Script::Han,
+        Script::Common,
+        Script::Han,
+        Script::Latin,
+        Script::Latin,
     ]);
 }
 
@@ -723,76 +708,76 @@ fn test_mixed_ltr_rtl_multiple_segments() {
             1, 1, 1, 1, 1,
         ])
         .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Common,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Common,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Common,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Common,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Common,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
         ])
         .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
         ]);
 }
 
@@ -815,20 +800,20 @@ fn test_multi_char_grapheme_mixed_break_and_keep_all() {
     ])
     .expect_bidi_embed_level_list(vec![])
     .expect_script_list(vec![
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(1),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(25),
+        Script::Latin,
+        Script::Common,
+        Script::Latin,
+        Script::Inherited,
+        Script::Common,
+        Script::Latin,
     ])
     .expect_grapheme_cluster_break_list(vec![
-        GraphemeClusterBreak::from_icu4c_value(0),
-        GraphemeClusterBreak::from_icu4c_value(0),
-        GraphemeClusterBreak::from_icu4c_value(0),
-        GraphemeClusterBreak::from_icu4c_value(3),
-        GraphemeClusterBreak::from_icu4c_value(0),
-        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Extend,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
     ])
     .expect_is_control_list(vec![false, false, false, false, false, false])
     .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
@@ -854,20 +839,20 @@ fn test_multi_char_grapheme_mixed_keep_all() {
     ])
     .expect_bidi_embed_level_list(vec![])
     .expect_script_list(vec![
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(1),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(25),
+        Script::Latin,
+        Script::Common,
+        Script::Latin,
+        Script::Inherited,
+        Script::Common,
+        Script::Latin,
     ])
     .expect_grapheme_cluster_break_list(vec![
-        GraphemeClusterBreak::from_icu4c_value(0),
-        GraphemeClusterBreak::from_icu4c_value(0),
-        GraphemeClusterBreak::from_icu4c_value(0),
-        GraphemeClusterBreak::from_icu4c_value(3),
-        GraphemeClusterBreak::from_icu4c_value(0),
-        GraphemeClusterBreak::from_icu4c_value(0),
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Extend,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
     ])
     .expect_is_control_list(vec![false, false, false, false, false, false])
     .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
@@ -907,56 +892,56 @@ fn test_multi_paragraph_bidi() {
             0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
         ])
         .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Common,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Common,
+            Script::Common,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Latin,
+            Script::Common,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
         ])
         .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(5),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::LF,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
         ])
         .expect_is_control_list(vec![
             false, false, false, false, false, false, false, false, false, false, false, false,
@@ -991,30 +976,30 @@ fn test_rtl_paragraph_with_non_authoritative_logical_first_char_two_paragraphs()
         ])
         .expect_bidi_embed_level_list(vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
         .expect_script_list(vec![
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(1),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(1),
-            Script::from_icu4c_value(0),
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Inherited,
+            Script::Common,
+            Script::Common,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Inherited,
+            Script::Common,
         ])
         .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(3),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(5),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(3),
-            GraphemeClusterBreak::from_icu4c_value(0),
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Extend,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::LF,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Extend,
+            GraphemeClusterBreak::Other,
         ])
         .expect_is_control_list(vec![
             false, false, false, false, false, true, false, false, false, false, false,
@@ -1042,8 +1027,8 @@ fn test_single_char_multi_byte() {
     })
     .expect_boundary_list(vec![Boundary::Word])
     .expect_bidi_embed_level_list(vec![])
-    .expect_script_list(vec![Script::from_icu4c_value(0)])
-    .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::from_icu4c_value(0)]);
+    .expect_script_list(vec![Script::Common])
+    .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::Other]);
 }
 
 #[test]
@@ -1058,18 +1043,18 @@ fn test_rtl_paragraph_with_non_authoritative_logical_first_character() {
         ])
         .expect_bidi_embed_level_list(vec![1, 1, 1, 1, 1])
         .expect_script_list(vec![
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(2),
-            Script::from_icu4c_value(1),
-            Script::from_icu4c_value(0),
+            Script::Arabic,
+            Script::Arabic,
+            Script::Arabic,
+            Script::Inherited,
+            Script::Common,
         ])
         .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(0),
-            GraphemeClusterBreak::from_icu4c_value(3),
-            GraphemeClusterBreak::from_icu4c_value(0),
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Other,
+            GraphemeClusterBreak::Extend,
+            GraphemeClusterBreak::Other,
         ])
         .expect_is_control_list(vec![false, false, false, false, false])
         .expect_contributes_to_shaping_list(vec![true, true, true, true, true])
@@ -1081,13 +1066,10 @@ fn test_two_newlines() {
     verify_analysis("\n\n", |_| {})
         .expect_boundary_list(vec![Boundary::Word, Boundary::Mandatory])
         .expect_bidi_embed_level_list(vec![])
-        .expect_script_list(vec![
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-        ])
+        .expect_script_list(vec![Script::Common, Script::Common])
         .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::from_icu4c_value(5),
-            GraphemeClusterBreak::from_icu4c_value(5),
+            GraphemeClusterBreak::LF,
+            GraphemeClusterBreak::LF,
         ]);
 }
 
@@ -1096,8 +1078,8 @@ fn test_newline() {
     verify_analysis("\n", |_| {})
         .expect_boundary_list(vec![Boundary::Word])
         .expect_bidi_embed_level_list(vec![])
-        .expect_script_list(vec![Script::from_icu4c_value(0)])
-        .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::from_icu4c_value(5)]);
+        .expect_script_list(vec![Script::Common])
+        .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::LF]);
 }
 
 #[test]
@@ -1107,10 +1089,7 @@ fn test_two_chars_keep_all() {
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None])
     .expect_bidi_embed_level_list(vec![])
-    .expect_script_list(vec![
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(25),
-    ]);
+    .expect_script_list(vec![Script::Latin, Script::Latin]);
 }
 
 #[test]
@@ -1128,15 +1107,15 @@ fn test_whitespace_contiguous_interspersed_in_latin() {
             Boundary::Line,
         ])
         .expect_script_list(vec![
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
-            Script::from_icu4c_value(0),
-            Script::from_icu4c_value(25),
+            Script::Latin,
+            Script::Common,
+            Script::Common,
+            Script::Latin,
+            Script::Common,
+            Script::Common,
+            Script::Latin,
+            Script::Common,
+            Script::Latin,
         ]);
 }
 
@@ -1158,14 +1137,14 @@ fn test_whitespace_contiguous_interspersed_in_latin_mixed() {
         Boundary::Line,
     ])
     .expect_script_list(vec![
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(25),
-        Script::from_icu4c_value(0),
-        Script::from_icu4c_value(25),
+        Script::Latin,
+        Script::Common,
+        Script::Common,
+        Script::Latin,
+        Script::Common,
+        Script::Common,
+        Script::Latin,
+        Script::Common,
+        Script::Latin,
     ]);
 }
