@@ -1,18 +1,14 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-type Tag = u32;
+pub(crate) use harfrust::Tag as Tag;
+
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq)]
 pub struct Setting<T> {
     /// The tag that identifies the setting.
     pub tag: Tag,
     /// The value for the setting.
     pub value: T,
-}
-
-/// Creates a tag from four bytes.
-pub(crate) const fn tag_from_bytes(bytes: [u8; 4]) -> Tag {
-    u32::from_be_bytes(bytes)
 }
 
 /// Creates a tag from the first four bytes of a string, inserting
@@ -22,7 +18,7 @@ fn tag_from_str_lossy(s: &str) -> Tag {
     for (i, b) in s.as_bytes().iter().enumerate().take(4) {
         bytes[i] = *b;
     }
-    tag_from_bytes(bytes)
+    Tag::new(&bytes)
 }
 
 impl Setting<u16> {

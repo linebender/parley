@@ -641,14 +641,14 @@ fn font_features() {
     let mut builder = env.ranged_builder(&text);
     builder.push(
         StyleProperty::FontFeatures(FontSettings::List(Cow::Borrowed(&[Setting {
-            tag: crate::setting::tag_from_bytes(*b"liga"),
+            tag: crate::setting::Tag::new(b"liga"),
             value: 1,
         }]))),
         0..5,
     );
     builder.push(
         StyleProperty::FontFeatures(FontSettings::List(Cow::Borrowed(&[Setting {
-            tag: crate::setting::tag_from_bytes(*b"liga"),
+            tag: crate::setting::Tag::new(b"liga"),
             value: 0,
         }]))),
         5..10,
@@ -672,7 +672,7 @@ fn variable_fonts() {
         )));
         builder.push_default(StyleProperty::FontVariations(FontSettings::List(
             Cow::Borrowed(&[Setting {
-                tag: crate::setting::tag_from_bytes(*b"wght"),
+                tag: crate::setting::Tag::new(b"wght"),
                 value: wght,
             }]),
         )));
