@@ -12,7 +12,7 @@ pub struct Setting<T> {
 
 /// Creates a tag from four bytes.
 pub(crate) const fn tag_from_bytes(bytes: [u8; 4]) -> Tag {
-    (bytes[0] as u32) << 24 | (bytes[1] as u32) << 16 | (bytes[2] as u32) << 8 | bytes[3] as u32
+    u32::from_be_bytes(bytes)
 }
 
 /// Creates a tag from the first four bytes of a string, inserting
