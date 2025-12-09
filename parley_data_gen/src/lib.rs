@@ -15,8 +15,8 @@ use icu_properties::{
 };
 use icu_provider_export::prelude::*;
 use icu_provider_source::SourceDataProvider;
-use std::io::{BufWriter, Write};
 use parley_data::Properties;
+use std::io::{BufWriter, Write};
 
 const COPYRIGHT_HEADER: &str =
     "// Copyright 2025 the Parley Authors\n// SPDX-License-Identifier: Apache-2.0 OR MIT\n";
