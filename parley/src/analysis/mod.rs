@@ -87,30 +87,37 @@ impl AnalysisDataSources {
         }
     }
 
+    #[inline(always)]
     pub(crate) fn composite(&self) -> &CompositeProps {
         &self.composite
     }
 
+    #[inline(always)]
     pub(crate) fn grapheme_segmenter(&self) -> GraphemeClusterSegmenterBorrowed<'_> {
         self.grapheme_segmenter.as_borrowed()
     }
 
+    #[inline(always)]
     fn word_segmenter(&self) -> WordSegmenterBorrowed<'_> {
         self.word_segmenter.as_borrowed()
     }
 
+    #[inline(always)]
     fn composing_normalizer(&self) -> CanonicalCompositionBorrowed<'_> {
         self.composing_normalizer.as_borrowed()
     }
 
+    #[inline(always)]
     fn decomposing_normalizer(&self) -> CanonicalDecompositionBorrowed<'_> {
         self.decomposing_normalizer.as_borrowed()
     }
 
+    #[inline(always)]
     pub(crate) fn script_short_name(&self) -> PropertyNamesShortBorrowed<'_, Script> {
         self.script_short_name.as_borrowed()
     }
 
+    #[inline(always)]
     pub(crate) fn brackets(&self) -> CodePointMapDataBorrowed<'_, BidiMirroringGlyph> {
         self.brackets.as_borrowed()
     }
