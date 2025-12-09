@@ -14,11 +14,11 @@ pub trait ScriptExt {
 
     /// Returns the associated [`icu_properties::props::Script`] value.
     #[cfg(feature = "icu_properties")]
-    fn properties_script(self) -> Option<icu_properties::props::Script>;
+    fn properties_script(self) -> icu_properties::props::Script;
 
     /// Returns the associated [`unicode_script::Script`] value.
     #[cfg(feature = "unicode_script")]
-    fn unicode_script(self) -> Option<unicode_script::Script>;
+    fn unicode_script(self) -> unicode_script::Script;
 
     #[cfg(feature = "icu_properties")]
     fn from_properties_script(value: icu_properties::props::Script) -> Script;
@@ -41,22 +41,20 @@ impl ScriptExt for Script {
 
     /// Returns the associated [`icu_properties::props::Script`] value.
     #[cfg(feature = "icu_properties")]
-    fn properties_script(self) -> Option<icu_properties::props::Script> {
-        icu_properties::PropertyParser::<icu_properties::props::Script>::new()
-            .get_strict(self.as_str())
+    fn properties_script(self) -> icu_properties::props::Script {
+        self.into()
     }
 
     /// Returns the associated [`unicode_script::Script`] value.
     #[cfg(feature = "unicode_script")]
-    fn unicode_script(self) -> Option<unicode_script::Script> {
+    fn unicode_script(self) -> unicode_script::Script {
         unicode_script::Script::from_short_name(self.as_str())
+            .unwrap_or(unicode_script::Script::Unknown)
     }
 
     #[cfg(feature = "icu_properties")]
     fn from_properties_script(value: icu_properties::props::Script) -> Self {
-        icu_properties::PropertyNamesShort::new()
-            .get_locale_script(value)
-            .unwrap_or(script!("Zzzz"))
+        value.into()
     }
 
     #[cfg(feature = "unicode_script")]
