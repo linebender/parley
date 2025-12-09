@@ -102,7 +102,7 @@ impl Editor {
     pub fn cursor_blink(&mut self) {
         self.cursor_visible = self.start_time.is_some_and(|start_time| {
             let elapsed = Instant::now().duration_since(start_time);
-            (elapsed.as_millis() / self.blink_period.as_millis()) % 2 == 0
+            (elapsed.as_millis() / self.blink_period.as_millis()).is_multiple_of(2)
         });
     }
 
