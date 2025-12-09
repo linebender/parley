@@ -61,27 +61,6 @@ impl BidiResolver {
         self.base_level = 0;
     }
 
-    /// Returns whether the character needs bidirectional resolution.
-    #[inline(always)]
-    pub(crate) fn needs_bidi_resolution(bidi_class: BidiClass) -> bool {
-        let bidi_mask = 1_u32 << (bidi_class.to_icu4c_value());
-
-        const OVERRIDE_MASK: u32 = mask(BidiClass::RightToLeftEmbedding)
-            | mask(BidiClass::LeftToRightEmbedding)
-            | mask(BidiClass::RightToLeftOverride)
-            | mask(BidiClass::LeftToRightOverride);
-        const ISOLATE_MASK: u32 = mask(BidiClass::RightToLeftIsolate)
-            | mask(BidiClass::LeftToRightIsolate)
-            | mask(BidiClass::FirstStrongIsolate);
-        const EXPLICIT_MASK: u32 = OVERRIDE_MASK | ISOLATE_MASK;
-        const BIDI_MASK: u32 = EXPLICIT_MASK
-            | mask(BidiClass::RightToLeft)
-            | mask(BidiClass::ArabicLetter)
-            | mask(BidiClass::ArabicNumber);
-
-        (bidi_mask & BIDI_MASK) != 0
-    }
-
     /// Resolves a paragraph with the specified base direction and
     /// precomputed types.
     pub(crate) fn resolve(
@@ -739,6 +718,12 @@ where
             i += 1;
         }
     }
+}
+
+/// Returns whether the character needs bidirectional resolution.
+#[inline(always)]
+pub(crate) fn needs_bidi_resolution(bidi_class: BidiClass) -> bool {
+    mask(bidi_class) & BIDI_MASK != 0
 }
 
 const OVERRIDE_MASK: u32 = mask(BidiClass::RightToLeftEmbedding)

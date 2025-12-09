@@ -8,7 +8,6 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use crate::analysis::provider::PROVIDER;
-use crate::bidi::BidiResolver;
 use crate::resolve::RangedStyle;
 use crate::{Brush, LayoutContext, WordBreak};
 
@@ -479,7 +478,8 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
                 }
             };
 
-            needs_bidi_resolution |= BidiResolver::needs_bidi_resolution(bidi_class);
+            needs_bidi_resolution |= crate::bidi::needs_bidi_resolution(bidi_class);
+            // TODO: maybe extend CompositeProps to u64 to fit BidiMirroringGlyph
             let bracket = lcx.analysis_data_sources.brackets().get(ch);
 
             lcx.info.push((
@@ -520,6 +520,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
 /// All characters contribute to shaping except:
 /// - Control characters
 /// - Format characters, unless they use the "Inherited" script
+#[inline(always)]
 pub(crate) fn contributes_to_shaping(general_category: GeneralCategory, script: Script) -> bool {
     if is_control(general_category) {
         return false;
@@ -528,6 +529,7 @@ pub(crate) fn contributes_to_shaping(general_category: GeneralCategory, script: 
     !(general_category == GeneralCategory::Format && script != Script::Inherited)
 }
 
+#[inline(always)]
 fn is_control(general_category: GeneralCategory) -> bool {
     general_category == GeneralCategory::Control
 }

@@ -180,7 +180,7 @@ impl ResolveContext {
             font_features: self.resolve_features(&raw_style.font_features),
             locale: raw_style
                 .locale
-                .and_then(|v| Language::try_from_str(v).ok()),
+                .and_then(|v| icu_locale_core::Locale::try_from_str(v).map(|v| v.id).ok()),
             brush: raw_style.brush.clone(),
             underline: ResolvedDecoration {
                 enabled: raw_style.has_underline,

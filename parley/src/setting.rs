@@ -11,16 +11,6 @@ pub struct Setting<T> {
     pub value: T,
 }
 
-/// Creates a tag from the first four bytes of a string, inserting
-/// spaces for any missing bytes.
-fn tag_from_str_lossy(s: &str) -> Tag {
-    let mut bytes = [b' '; 4];
-    for (i, b) in s.as_bytes().iter().enumerate().take(4) {
-        bytes[i] = *b;
-    }
-    Tag::new(&bytes)
-}
-
 impl Setting<u16> {
     /// Parses a comma separated list of feature settings according to the CSS
     /// grammar.
@@ -112,10 +102,10 @@ impl<'a> Iterator for ParseList<'a> {
         }
         self.pos = pos;
         let tag_str = tag_str?;
-        if tag_str.len() != 4 || !tag_str.is_ascii() {
+        if !tag_str.is_ascii() {
             return None;
         }
-        let tag = tag_from_str_lossy(tag_str);
+        let tag = Tag::new(&tag_str.as_bytes().try_into().ok()?);
         while pos < self.len {
             if !self.source[pos].is_ascii_whitespace() {
                 break;

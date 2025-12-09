@@ -1,7 +1,6 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use alloc::vec;
 use alloc::vec::Vec;
 use icu_normalizer::properties::Decomposed;
 
@@ -40,7 +39,7 @@ pub(crate) struct SourceRange {
     pub end: u32,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub(crate) struct Char {
     /// The character.
     pub ch: char,
@@ -114,14 +113,6 @@ impl CharCluster {
         self.chars[0].style_index
     }
 
-    fn push_or_replace_at(chars: &mut Vec<Char>, char: Char, index: usize) {
-        if index >= chars.len() {
-            chars.push(char);
-        } else {
-            chars[index] = char;
-        }
-    }
-
     fn contributes_to_shaping(ch: char, analysis_data_sources: &AnalysisDataSources) -> bool {
         let props = analysis_data_sources.composite.properties(ch as u32);
         crate::analysis::contributes_to_shaping(props.general_category(), props.script())
@@ -149,12 +140,12 @@ impl CharCluster {
                         copy.ch = a;
                         copy.contributes_to_shaping =
                             Self::contributes_to_shaping(a, analysis_data_sources);
-                        Self::push_or_replace_at(&mut self.decomp.chars, copy, 0);
+                        self.decomp.chars[0] = copy;
 
                         copy.ch = b;
                         copy.contributes_to_shaping =
                             Self::contributes_to_shaping(b, analysis_data_sources);
-                        Self::push_or_replace_at(&mut self.decomp.chars, copy, 1);
+                        self.decomp.chars[1] = copy;
 
                         self.decomp.len = 2;
                     }
@@ -188,7 +179,7 @@ impl CharCluster {
                         copy.ch = ch;
                         copy.contributes_to_shaping =
                             Self::contributes_to_shaping(ch, analysis_data_sources);
-                        Self::push_or_replace_at(&mut self.comp.chars, copy, 0);
+                        self.comp.chars[0] = copy;
                         self.comp.len = 1;
                     }
                 }
@@ -286,7 +277,7 @@ enum FormState {
 
 #[derive(Clone, Debug)]
 pub(crate) struct Form {
-    chars: Vec<Char>,
+    chars: [Char; 2],
     len: u8,
     map_len: u8,
     state: FormState,
@@ -301,7 +292,7 @@ impl Default for Form {
 impl Form {
     fn new() -> Self {
         Self {
-            chars: vec![],
+            chars: [Char::default(), Char::default()],
             len: 0,
             map_len: 0,
             state: FormState::None,
@@ -309,7 +300,7 @@ impl Form {
     }
 
     fn clear(&mut self) {
-        self.chars.clear();
+        self.chars = [Char::default(), Char::default()];
         self.len = 0;
         self.map_len = 0;
         self.state = FormState::None;

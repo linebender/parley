@@ -25,7 +25,7 @@ impl TestContext {
     }
 
     fn expect_bidi_embed_level_list(self, expected: Vec<u8>) -> Self {
-        let actual: Vec<_> = self.layout_context.bidi.levels().to_vec();
+        let actual = self.layout_context.bidi.levels();
         assert_eq!(actual, expected, "Bidi embed level list mismatch");
         self
     }
