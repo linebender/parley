@@ -3,6 +3,7 @@
 
 use super::{
     FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily, GenericFamilyMap, scan,
+    script_samples,
 };
 use alloc::sync::Arc;
 use core::ptr::{null, null_mut};
@@ -64,7 +65,7 @@ impl SystemFonts {
 
     pub(crate) fn fallback(&mut self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
         let key = key.into();
-        let sample = key.script().sample()?;
+        let sample = script_samples::sample(key.script())?;
         let font = create_fallback_font_for_text(sample, key.locale(), false)?;
         let family_name = unsafe { font.family_name() };
         self.name_map.get(&family_name.to_string()).map(|n| n.id())

@@ -36,12 +36,9 @@ use fontconfig_sys::{
 use hashbrown::{HashMap, HashSet, hash_map::Entry};
 use smallvec::SmallVec;
 
-use crate::{
-    FallbackKey, FamilyId, FamilyInfo, FontInfo, FontStyle, FontWeight, FontWidth, GenericFamily,
-    Script,
-    family_name::{FamilyName, FamilyNameMap},
-    generic::GenericFamilyMap,
-    source::SourcePathMap,
+use super::{
+    FallbackKey, FamilyId, FamilyInfo, FamilyName, FamilyNameMap, FontInfo, FontStyle, FontWeight,
+    FontWidth, GenericFamily, GenericFamilyMap, Script, SourcePathMap, script_samples,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -572,7 +569,7 @@ impl ScriptCharSetMap {
         match self.0.entry(script) {
             Entry::Occupied(e) => e.into_mut().as_ref(),
             Entry::Vacant(e) => {
-                let Some(sample) = script.sample() else {
+                let Some(sample) = script_samples::sample(script) else {
                     return e.insert(None).as_ref();
                 };
 

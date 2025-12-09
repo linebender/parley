@@ -19,8 +19,6 @@ workspace = true
 default = ["system"]
 std = ["read-fonts/std", "dep:memmap2"]
 libm = ["read-fonts/libm", "dep:core_maths"]
-icu_properties = ["dep:icu_properties"]
-unicode_script = ["dep:unicode-script"]
 # Enables support for system font backends
 system = [
     "std",
@@ -45,9 +43,7 @@ read-fonts = { workspace = true }
 linebender_resource_handle = { workspace = true }
 smallvec = "1.15.1"
 memmap2 = { version = "0.9.9", optional = true }
-unicode-script = { version = "0.5.7", optional = true }
 core_maths = { version = "0.1.1", optional = true }
-icu_properties = { workspace = true, features = ["compiled_data"], optional = true }
 icu_locale_core = { workspace = true, features = ["alloc"] }
 hashbrown = { workspace = true }
 

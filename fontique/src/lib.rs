@@ -45,12 +45,12 @@ mod font;
 mod generic;
 mod matching;
 mod scan;
-mod script;
 mod source;
 
 mod source_cache;
 
 pub use icu_locale_core::LanguageIdentifier as Language;
+pub use icu_locale_core::subtags::Script;
 pub use linebender_resource_handle::Blob;
 
 pub use attributes::{Attributes, FontStyle, FontWeight, FontWidth};
@@ -60,7 +60,6 @@ pub use fallback::FallbackKey;
 pub use family::{FamilyId, FamilyInfo};
 pub use font::{AxisInfo, FontInfo, FontInfoOverride, Synthesis};
 pub use generic::GenericFamily;
-pub use script::Script;
 pub use source::{SourceId, SourceInfo, SourceKind};
 
 #[cfg(all(feature = "system", target_vendor = "apple"))]

@@ -22,7 +22,7 @@ use windows::{
 
 use super::{
     FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, FontInfo, GenericFamily, GenericFamilyMap,
-    SourcePathMap,
+    SourcePathMap, script_samples,
 };
 
 const DEFAULT_GENERIC_FAMILIES: &[(GenericFamily, &[&str])] = &[
@@ -113,7 +113,7 @@ impl SystemFonts {
         // DirectWrite does not have a function to get the default font for a script and locale pair
         // so here we provide a sample of the intended script instead.
         let key = key.into();
-        let text = key.script().sample()?;
+        let text = script_samples::sample(key.script())?;
         let locale = key.locale();
         let family_name = self.dwrite_fonts.family_name_for_text(text, locale)?;
         self.name_map.get(&family_name).map(|name| name.id())
