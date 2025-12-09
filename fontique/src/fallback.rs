@@ -3,10 +3,9 @@
 
 //! Support for script/language based font fallback.
 
-use super::{family::FamilyId, script::Script};
+use super::{Language, Script, family::FamilyId};
 use alloc::vec::Vec;
 use hashbrown::HashMap;
-use icu_locale_core::LanguageIdentifier;
 use smallvec::SmallVec;
 
 type FamilyList = SmallVec<[FamilyId; 1]>;
@@ -122,7 +121,7 @@ pub struct FallbackKey {
 
 impl FallbackKey {
     /// Creates a new fallback key from the given script and locale.
-    pub fn new(script: impl Into<Script>, locale: Option<&LanguageIdentifier>) -> Self {
+    pub fn new(script: impl Into<Script>, locale: Option<&Language>) -> Self {
         let script = script.into();
         let (locale, is_default, is_tracked) = match canonical_locale(script, locale) {
             Some((is_default, locale)) => (Some(locale), is_default, true),
@@ -161,44 +160,13 @@ impl FallbackKey {
     }
 }
 
-impl<S> From<(S, &str)> for FallbackKey
-where
-    S: Into<Script>,
-{
-    fn from(value: (S, &str)) -> Self {
-        let locale = LanguageIdentifier::try_from_str(value.1).ok();
-        Self::new(value.0, locale.as_ref())
-    }
-}
-
-impl<S> From<(S, &LanguageIdentifier)> for FallbackKey
-where
-    S: Into<Script>,
-{
-    fn from(value: (S, &LanguageIdentifier)) -> Self {
-        Self::new(value.0, Some(value.1))
-    }
-}
-
-impl<S> From<S> for FallbackKey
-where
-    S: Into<Script>,
-{
-    fn from(value: S) -> Self {
-        Self::new(value, None)
-    }
-}
-
 #[derive(Clone, Default, Debug)]
 struct PerScript {
     default: Option<FamilyList>,
     others: Vec<(&'static str, FamilyList)>,
 }
 
-fn canonical_locale(
-    script: Script,
-    locale: Option<&LanguageIdentifier>,
-) -> Option<(bool, &'static str)> {
+fn canonical_locale(script: Script, locale: Option<&Language>) -> Option<(bool, &'static str)> {
     let Some(locale) = locale else {
         return Some((true, ""));
     };
@@ -208,7 +176,7 @@ fn canonical_locale(
         .as_ref()
         .map(|s| s.as_str())
         .unwrap_or_default();
-    let (is_default, token) = match &script.0 {
+    let (is_default, token) = match &script.into_raw() {
         b"Arab" => match (lang, region) {
             ("ar", "") => (true, "ar"),
             ("ar", "IR") => (false, "ar-IR"),
