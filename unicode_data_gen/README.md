@@ -16,7 +16,7 @@ The `output-dir` is created if it does not exist. After the command completes, t
 - `composite/`: a postcard blob and Rust module for Parley's `CompositePropsV1` trie.
 - `mod.rs`: a convenience module that re-exports the generated content.
 
-To update `unicode_data`, copy the generated files into `unicode_data/src/generated` (or simply set `<output-dir>` to `./unicode_data_src/generated`).
+To update `unicode_data`, copy the generated files into `parley/data` (or simply set `<output-dir>` to `./parley/data`).
 
 ## License
 

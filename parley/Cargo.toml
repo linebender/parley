@@ -23,13 +23,13 @@ libm = ["fontique/libm", "peniko/libm", "skrifa/libm", "dep:core_maths"]
 # Enables support for system font backends
 system = ["std", "fontique/system"]
 accesskit = ["dep:accesskit"]
+datagen = []
 
 [dependencies]
 skrifa = { workspace = true }
 linebender_resource_handle = { workspace = true }
 fontique = { workspace = true }
 core_maths = { version = "0.1.1", optional = true }
-unicode_data = { workspace = true, features = ["baked"] }
 accesskit = { workspace = true, optional = true }
 hashbrown = { workspace = true }
 harfrust = { workspace = true }

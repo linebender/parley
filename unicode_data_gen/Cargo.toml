@@ -13,7 +13,7 @@ icu_locale = { workspace = true }
 icu_properties = { workspace = true, features = ["compiled_data"] }
 icu_collections = { workspace = true, features = ["databake"] }
 icu_provider_source = { workspace = true, features = ["networking", "use_wasm"] }
-unicode_data = { workspace = true, default-features = false, features = ["datagen"] }
+parley = { workspace = true, default-features = false, features = ["datagen", "std"] }
 icu_normalizer = { workspace = true, features = ["compiled_data"] }
 icu_segmenter = { workspace = true }
 icu_provider_export = { workspace = true, features = ["baked_exporter"] }

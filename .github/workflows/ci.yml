@@ -389,7 +389,7 @@ jobs:
           save-if: ${{ github.event_name != 'merge_group' }}
 
       - name: regenerate unicode data
-        run: cargo run --locked -p unicode_data_gen -- ./unicode_data/src/generated
+        run: cargo run --locked -p unicode_data_gen -- ./parley/data
 
       - name: check for differences
         run: git diff --exit-code

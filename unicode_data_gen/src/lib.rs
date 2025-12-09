@@ -15,8 +15,8 @@ use icu_properties::{
 };
 use icu_provider_export::prelude::*;
 use icu_provider_source::SourceDataProvider;
+use parley::Properties;
 use std::io::{BufWriter, Write};
-use unicode_data::Properties;
 
 const COPYRIGHT_HEADER: &str =
     "// Copyright 2025 the Parley Authors\n// SPDX-License-Identifier: Apache-2.0 OR MIT\n";
@@ -63,10 +63,10 @@ pub fn generate(out: std::path::PathBuf) {
         )
         .expect("Datagen should be successful");
         std::fs::write(
-            icu4x_data_dir.clone().join("mod.rs"),
+            icu4x_data_dir.join("mod.rs"),
             COPYRIGHT_HEADER.to_string()
-                + "\n#![allow(clippy::allow_attributes_without_reason)]\n"
-                + &std::fs::read_to_string(icu4x_data_dir.clone().join("mod.rs")).unwrap(),
+                + "\n"
+                + &std::fs::read_to_string(icu4x_data_dir.join("mod.rs")).unwrap(),
         )
         .unwrap();
     }
@@ -120,7 +120,6 @@ pub fn generate(out: std::path::PathBuf) {
         )
         .unwrap();
         writeln!(&mut file, "#[rustfmt::skip]").unwrap();
-        writeln!(&mut file, "#[allow(unsafe_code, unused_unsafe, clippy::unseparated_literal_suffix, reason = \"databake behaviour\")]").unwrap();
         writeln!(
             &mut file,
             "pub const COMPOSITE: icu_collections::codepointtrie::CodePointTrie<'static, u32> = {};",
@@ -128,12 +127,4 @@ pub fn generate(out: std::path::PathBuf) {
         )
         .unwrap();
     }
-
-    let mut file = BufWriter::new(std::fs::File::create(out.join("mod.rs")).unwrap());
-
-    writeln!(&mut file, "{COPYRIGHT_HEADER}").unwrap();
-    writeln!(&mut file, "mod composite;").unwrap();
-    writeln!(&mut file, "mod icu4x_data;").unwrap();
-    writeln!(&mut file, "pub use composite::*;").unwrap();
-    writeln!(&mut file, "pub use icu4x_data::*;").unwrap();
 }

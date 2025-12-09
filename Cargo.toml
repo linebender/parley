@@ -7,7 +7,6 @@ members = [
     "parley_bench",
     "parley_core",
     "parley_dev",
-    "unicode_data",
     "unicode_data_gen",
     "examples/tiny_skia_render",
     "examples/swash_render",
@@ -43,7 +42,6 @@ icu_provider_source = { version = "2.1.1", default-features = false }
 icu_segmenter = { version = "~2.1.1", default-features = false }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
 parley = { version = "0.7.0", default-features = false, path = "parley" }
-unicode_data = { path = "unicode_data", default-features = false }
 unicode_data_gen = { path = "unicode_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
 peniko = { version = "0.4.1", default-features = false }

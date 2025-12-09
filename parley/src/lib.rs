@@ -141,3 +141,7 @@ pub use style::*;
     since = "0.6.0"
 )]
 pub type Font = FontData;
+
+#[cfg(feature = "datagen")]
+#[doc(hidden)]
+pub use analysis::Properties;
