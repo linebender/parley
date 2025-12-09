@@ -37,5 +37,5 @@ extend-exclude = [
     # Typos doesn't know that, though.
     "/.git",
     # Generated code doesn't need typo checking.
-    "/unicode_data/src/generated/**",
+    "/parley_data/src/generated/**",
 ]

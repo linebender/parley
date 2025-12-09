@@ -6,12 +6,12 @@ members = [
     "parley",
     "parley_bench",
     "parley_core",
+    "parley_data",
+    "parley_data_gen",
     "parley_dev",
     "parley_draw",
-    "unicode_data",
-    "unicode_data_gen",
-    "examples/tiny_skia_render",
     "examples/swash_render",
+    "examples/tiny_skia_render",
     "examples/vello_editor",
     "xtask",
 ]
@@ -44,13 +44,13 @@ icu_provider_source = { version = "2.1.1", default-features = false }
 icu_segmenter = { version = "~2.1.1", default-features = false }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
 parley = { version = "0.7.0", default-features = false, path = "parley" }
-unicode_data = { path = "unicode_data", default-features = false }
-unicode_data_gen = { path = "unicode_data_gen" }
+parley_data = { path = "parley_data", default-features = false }
+parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
 peniko = { version = "0.4.1", default-features = false }
+read-fonts = { version = "0.35.0", default-features = false }
 skrifa = { version = "0.37.0", default-features = false }
 smallvec = "1.15.1"
-read-fonts = { version = "0.35.0", default-features = false }
 swash = { version = "0.2.6", default-features = false }
 zerovec = { version = "0.11.5", default-features = false }
 

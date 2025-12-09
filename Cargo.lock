@@ -3307,11 +3307,11 @@ dependencies = [
  "icu_segmenter",
  "linebender_resource_handle",
  "oxipng",
+ "parley_data",
  "parley_dev",
  "peniko",
  "skrifa 0.37.0",
  "tiny-skia",
- "unicode_data",
  "zerovec",
 ]
 
@@ -3328,6 +3328,31 @@ dependencies = [
 [[package]]
 name = "parley_core"
 version = "0.0.0"
+
+[[package]]
+name = "parley_data"
+version = "0.0.0"
+dependencies = [
+ "icu_collections",
+ "icu_properties",
+ "zerovec",
+]
+
+[[package]]
+name = "parley_data_gen"
+version = "0.0.0"
+dependencies = [
+ "databake",
+ "icu_codepointtrie_builder",
+ "icu_collections",
+ "icu_locale",
+ "icu_normalizer",
+ "icu_properties",
+ "icu_provider_export",
+ "icu_provider_source",
+ "icu_segmenter",
+ "parley_data",
+]
 
 [[package]]
 name = "parley_dev"
@@ -4667,31 +4692,6 @@ name = "unicode-xid"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
-
-[[package]]
-name = "unicode_data"
-version = "0.0.0"
-dependencies = [
- "icu_collections",
- "icu_properties",
- "zerovec",
-]
-
-[[package]]
-name = "unicode_data_gen"
-version = "0.0.0"
-dependencies = [
- "databake",
- "icu_codepointtrie_builder",
- "icu_collections",
- "icu_locale",
- "icu_normalizer",
- "icu_properties",
- "icu_provider_export",
- "icu_provider_source",
- "icu_segmenter",
- "unicode_data",
-]
 
 [[package]]
 name = "untrusted"
