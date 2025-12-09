@@ -5,6 +5,7 @@ pub(crate) mod cluster;
 
 use alloc::vec::Vec;
 use core::marker::PhantomData;
+use parley_data::Properties;
 
 use crate::resolve::{RangedStyle, ResolvedStyle};
 use crate::{Brush, LayoutContext, WordBreak};
@@ -13,7 +14,6 @@ use icu_properties::CodePointMapData;
 use icu_properties::props::{BidiMirroringGlyph, GeneralCategory, GraphemeClusterBreak, Script};
 use icu_segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakInvariantOptions};
 use icu_segmenter::{LineSegmenter, WordSegmenter};
-use parley_data::CompositeProps;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CharInfo {
@@ -369,7 +369,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
         // character's index, but we need our iterators to align, and the rest are simply
         // character-indexed.
         .fold(false, |is_mandatory_linebreak, (boundary, ch)| {
-            let properties = CompositeProps.properties(ch as u32);
+            let properties = Properties::get(ch);
             let script = properties.script();
             let grapheme_cluster_break = properties.grapheme_cluster_break();
             let bidi_class = properties.bidi_class();
