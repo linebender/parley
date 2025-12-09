@@ -32,8 +32,8 @@ pub fn generate(out: std::path::PathBuf) {
         std::fs::create_dir_all(&icu4x_data_dir).unwrap();
 
         ExportDriver::new(
-            [DataLocaleFamily::single(locale!("en").into())],
-            DeduplicationStrategy::Maximal.into(),
+            [DataLocaleFamily::single(DataLocale::default())],
+            DeduplicationStrategy::None.into(),
             LocaleFallbacker::new_without_data(),
         )
         .with_markers([
@@ -49,8 +49,9 @@ pub fn generate(out: std::path::PathBuf) {
             icu_normalizer::provider::NormalizerNfdSupplementV1::INFO,
             icu_normalizer::provider::NormalizerNfdTablesV1::INFO,
         ])
+        .with_segmenter_models([])
         .export(
-            &icu4x_source_provider.clone(),
+            &icu4x_source_provider,
             icu_provider_export::baked_exporter::BakedExporter::new(icu4x_data_dir.clone(), {
                 let mut o = icu_provider_export::baked_exporter::Options::default();
                 o.overwrite = true;
