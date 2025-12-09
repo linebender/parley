@@ -43,7 +43,6 @@ icu_provider_adapters = { version = "2.1.1", default-features = false }
 icu_provider_export = { version = "2.1.1", default-features = false }
 icu_provider_source = { version = "2.1.1", default-features = false }
 icu_segmenter = { version = "~2.1.1", default-features = false }
-libm = { version = "0.2.15" }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
 parley = { version = "0.7.0", default-features = false, path = "parley" }
 parley_data = { path = "parley_data", default-features = false }

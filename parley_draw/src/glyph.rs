@@ -31,7 +31,7 @@ use crate::kurbo::{Point, Rect};
 use skrifa::bitmap::{BitmapData, BitmapFormat, BitmapStrikes, Origin};
 
 #[cfg(not(feature = "std"))]
-use peniko::kurbo::common::FloatFuncs as _;
+use crate::peniko::kurbo::common::FloatFuncs as _;
 
 /// Positioned glyph.
 #[derive(Copy, Clone, Default, Debug)]

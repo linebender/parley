@@ -69,7 +69,7 @@ impl<'a> ColrPainter<'a> {
     }
 
     /// Paint the underlying glyph.
-    pub(crate) fn paint(&mut self) {
+    pub fn paint(&mut self) {
         let color_glyph = self.color_glyph.skrifa_glyph.clone();
         let location_ref = self.color_glyph.location;
         // Ignore errors for now.

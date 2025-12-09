@@ -4,8 +4,6 @@
 //! Mathematical helper functions.
 
 use core::ops::Sub;
-#[cfg(not(feature = "std"))]
-use peniko::kurbo::common::FloatFuncs as _;
 
 // From <https://github.com/linebender/tiny-skia/blob/68b198a7210a6bbf752b43d6bc4db62445730313/path/src/scalar.rs#L12>
 const SCALAR_NEARLY_ZERO: f32 = 1.0 / (1 << 12) as f32;

@@ -3389,7 +3389,6 @@ version = "0.0.0"
 dependencies = [
  "bytemuck",
  "hashbrown 0.16.1",
- "libm",
  "skrifa 0.37.0",
  "smallvec",
  "vello_common",
