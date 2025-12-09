@@ -22,7 +22,7 @@ use windows::{
 
 use super::{
     FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, FontInfo, GenericFamily, GenericFamilyMap,
-    SourcePathMap,
+    ScriptExt, SourcePathMap,
 };
 
 const DEFAULT_GENERIC_FAMILIES: &[(GenericFamily, &[&str])] = &[
