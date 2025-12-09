@@ -1,3 +1,6 @@
+// Copyright 2025 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Glyph renderer implementation using Vello CPU.
 
 use alloc::sync::Arc;
