@@ -3,6 +3,12 @@
 
 //! Processing and drawing glyphs.
 
+#![allow(
+    clippy::cast_possible_truncation,
+    reason = "We temporarily ignore these because the casts\
+only break in edge cases, and some of them are also only related to conversions from f64 to f32."
+)]
+
 use crate::kurbo::{Affine, BezPath, Vec2};
 use crate::peniko::FontData;
 use alloc::boxed::Box;
@@ -662,14 +668,16 @@ mod tests {
 // TODO: Consider capturing cache performance metrics like hit rate, etc.
 #[derive(Debug, Default)]
 pub struct GlyphCaches {
+    /// Caches glyph outlines for reuse.
     pub outline_cache: OutlineCache,
+    /// Caches hinting instances for reuse.
     pub hinting_cache: HintCache,
 }
 
 impl GlyphCaches {
     /// Creates a new `GlyphCaches` instance.
     pub fn new() -> Self {
-        Default::default()
+        Self::default()
     }
 
     /// Clears the glyph caches.
@@ -732,6 +740,9 @@ impl Debug for OutlineCache {
 }
 
 impl OutlineCache {
+    /// Maintains the outline cache by evicting unused cache entries.
+    ///
+    /// Should be called once per scene rendering.
     pub fn maintain(&mut self) {
         // Maximum number of full renders where we'll retain an unused glyph
         const MAX_ENTRY_AGE: u32 = 64;
@@ -779,6 +790,7 @@ impl OutlineCache {
         });
     }
 
+    /// Clears the outline cache.
     pub fn clear(&mut self) {
         self.free_list.clear();
         self.static_map.clear();
@@ -885,6 +897,7 @@ impl From<VarLookupKey<'_>> for VarKey {
 /// to redo it occasionally.
 const MAX_CACHED_HINT_INSTANCES: usize = 16;
 
+/// Hint key for hinting instances.
 #[derive(Debug)]
 pub struct HintKey<'a> {
     font_id: u64,
@@ -923,6 +936,7 @@ impl Debug for HintCache {
 }
 
 impl HintCache {
+    /// Gets a hinting instance for the given key.
     pub fn get(&mut self, key: &HintKey<'_>) -> Option<&HintingInstance> {
         let entries = match key.outlines.format()? {
             OutlineGlyphFormat::Glyf => &mut self.glyf_entries,
@@ -943,6 +957,7 @@ impl HintCache {
         Some(&entry.instance)
     }
 
+    /// Clears the hint cache.
     pub fn clear(&mut self) {
         self.glyf_entries.clear();
         self.cff_entries.clear();

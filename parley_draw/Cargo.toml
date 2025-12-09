@@ -16,7 +16,8 @@ all-features = true
 
 [features]
 default = ["std", "vello_cpu"]
-std = ["vello_common/std", "vello_cpu/std"]
+std = ["vello_common/std", "skrifa/std", "vello_cpu?/std"]
+libm = ["dep:libm", "skrifa/libm", "vello_common/libm", "vello_cpu?/libm"]
 png = ["vello_common/png", "vello_cpu/png"]
 vello_cpu = ["dep:vello_cpu"]
 
@@ -26,6 +27,7 @@ workspace = true
 [dependencies]
 bytemuck = { workspace = true }
 hashbrown = { workspace = true }
+libm = { workspace = true, optional = true }
 skrifa = { workspace = true }
 smallvec = { workspace = true }
 vello_common = { workspace = true }

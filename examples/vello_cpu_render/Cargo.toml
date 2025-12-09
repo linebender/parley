@@ -15,4 +15,3 @@ skrifa = { workspace = true }
 
 [lints]
 workspace = true
-
