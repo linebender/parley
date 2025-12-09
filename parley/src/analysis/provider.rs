@@ -9,7 +9,7 @@
 #![allow(unreachable_pub)]
 #![allow(clippy::unseparated_literal_suffix)]
 
-pub use unicode_data::generated::*;
+pub use parley_data::generated::*;
 
 /// This macro requires the following crates:
 /// * `icu_collections`

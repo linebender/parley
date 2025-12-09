@@ -29,7 +29,7 @@ skrifa = { workspace = true }
 linebender_resource_handle = { workspace = true }
 fontique = { workspace = true }
 core_maths = { version = "0.1.1", optional = true }
-unicode_data = { workspace = true, features = ["baked"] }
+parley_data = { workspace = true, features = ["baked"] }
 accesskit = { workspace = true, optional = true }
 hashbrown = { workspace = true }
 harfrust = { workspace = true }
