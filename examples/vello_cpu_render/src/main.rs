@@ -96,7 +96,9 @@ fn main() {
     let padded_width = width + padding * 2;
     let padded_height = height + padding * 2;
 
+    // The renderer and glyph caches should be created once per app (or per thread).
     let mut renderer = RenderContext::new(padded_width, padded_height);
+    let mut glyph_caches = GlyphCaches::new();
 
     renderer.set_paint(background_color);
     renderer.fill_rect(&kurbo::Rect::new(
@@ -109,8 +111,6 @@ fn main() {
         padding as f64,
         padding as f64,
     )));
-
-    let mut caches = GlyphCaches::new();
 
     // Render each glyph run
     for line in layout.lines() {
@@ -131,7 +131,7 @@ fn main() {
                                     x: glyph.x,
                                     y: glyph.y,
                                 }),
-                            &mut caches,
+                            &mut glyph_caches,
                         );
 
                     let style = glyph_run.style();
@@ -174,6 +174,8 @@ fn main() {
 
     let mut pixmap = Pixmap::new(padded_width, padded_height);
     renderer.render_to_pixmap(&mut pixmap);
+    // After rendering, we must `maintain` the glyph caches to evict unused cache entries.
+    glyph_caches.maintain();
 
     // Write image to PNG file in examples/_output dir
     let output_path = {
