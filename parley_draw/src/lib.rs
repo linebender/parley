@@ -6,6 +6,8 @@
 //! ## Features
 //!
 //! - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
+//! - `vello_cpu` (enabled by default): This feature implements `GlyphRenderer` for Vello CPU's `RenderContext`.
+//! - `png`: This feature enables PNG support for drawing bitmap glyphs.
 
 // LINEBENDER LINT SET - lib.rs - v3
 // See https://linebender.org/wiki/canonical-lints/
@@ -18,5 +20,21 @@
 // END LINEBENDER LINT SET
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![no_std]
+
+extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
+
+use vello_common::{color, kurbo, peniko, pixmap::Pixmap};
+
+mod colr;
+mod glyph;
+mod math;
+
+pub mod renderers;
+
+pub use colr::ColrRenderer;
+pub use glyph::{
+    BitmapGlyph, ColorGlyph, Glyph, GlyphCaches, GlyphRenderer, GlyphRunBuilder, GlyphType,
+    HintCache, HintKey, OutlineCache, OutlineGlyph, PreparedGlyph,
+};

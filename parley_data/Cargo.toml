@@ -1,5 +1,5 @@
 [package]
-name = "unicode_data"
+name = "parley_data"
 keywords = ["text", "layout"]
 categories = ["gui", "graphics"]
 edition.workspace = true
