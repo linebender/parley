@@ -3,16 +3,14 @@
 
 //! Test that the various builders produce the same results.
 
-use std::borrow::Cow;
-
 use fontique::{FontStyle, FontWeight, FontWidth};
 use peniko::color::palette;
-use swash::text::WordBreakStrength;
+use std::borrow::Cow;
 
 use super::utils::{ColorBrush, FONT_STACK, asserts::assert_eq_layout_data, create_font_context};
 use crate::{
     FontContext, FontSettings, FontStack, Layout, LayoutContext, LineHeight, OverflowWrap,
-    RangedBuilder, StyleProperty, TextStyle, TextWrapMode, TreeBuilder,
+    RangedBuilder, StyleProperty, TextStyle, TextWrapMode, TreeBuilder, WordBreak,
 };
 
 /// Set of options for [`build_layout_with_ranged`].
@@ -182,7 +180,7 @@ fn create_root_style() -> TextStyle<'static, ColorBrush> {
         line_height: LineHeight::Absolute(30.),
         word_spacing: 2.,
         letter_spacing: 1.5,
-        word_break: WordBreakStrength::BreakAll,
+        word_break: WordBreak::BreakAll,
         overflow_wrap: OverflowWrap::Anywhere,
         text_wrap_mode: TextWrapMode::Wrap,
     }
@@ -220,7 +218,7 @@ fn set_root_style(rb: &mut RangedBuilder<'_, ColorBrush>) {
     rb.push_default(LineHeight::Absolute(30.));
     rb.push_default(StyleProperty::WordSpacing(2.));
     rb.push_default(StyleProperty::LetterSpacing(1.5));
-    rb.push_default(StyleProperty::WordBreak(WordBreakStrength::BreakAll));
+    rb.push_default(StyleProperty::WordBreak(WordBreak::BreakAll));
     rb.push_default(StyleProperty::OverflowWrap(OverflowWrap::Anywhere));
 }
 

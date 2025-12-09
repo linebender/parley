@@ -101,21 +101,22 @@ compile_error!("parley requires either the `std` or `libm` feature to be enabled
 extern crate alloc;
 
 pub use fontique;
-pub use swash;
 
+mod analysis;
 mod bidi;
 mod builder;
 mod context;
+mod convert;
 mod font;
 mod inline_box;
 mod lru_cache;
 mod resolve;
 mod shape;
-mod swash_convert;
 mod util;
 
 pub mod editing;
 pub mod layout;
+pub mod setting;
 pub mod style;
 
 #[cfg(test)]

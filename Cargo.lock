@@ -2046,6 +2046,7 @@ dependencies = [
  "icu_properties_data",
  "icu_provider",
  "serde",
+ "unicode-bidi",
  "zerotrie",
  "zerovec",
 ]
@@ -2154,6 +2155,7 @@ version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43da5e7e9b540df15e53ca27f69b50e36e01b652584b40b3335ed65d18303834"
 dependencies = [
+ "core_maths",
  "databake",
  "icu_collections",
  "icu_provider",
@@ -3298,13 +3300,20 @@ dependencies = [
  "fontique",
  "harfrust",
  "hashbrown 0.16.1",
+ "icu_collections",
+ "icu_locale_core",
+ "icu_normalizer",
+ "icu_properties",
+ "icu_provider",
+ "icu_segmenter",
  "linebender_resource_handle",
  "oxipng",
  "parley_dev",
  "peniko",
  "skrifa 0.37.0",
- "swash",
  "tiny-skia",
+ "unicode_data",
+ "zerovec",
 ]
 
 [[package]]
@@ -4219,7 +4228,6 @@ version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47846491253e976bdd07d0f9cc24b7daf24720d11309302ccbbc6e6b6e53550a"
 dependencies = [
- "core_maths",
  "skrifa 0.37.0",
  "yazi",
  "zeno",
@@ -4669,7 +4677,6 @@ version = "0.0.0"
 dependencies = [
  "icu_collections",
  "icu_properties",
- "unicode-bidi",
  "zerovec",
 ]
 
@@ -6092,9 +6099,6 @@ name = "zeno"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6df3dc4292935e51816d896edcd52aa30bc297907c26167fec31e2b0c6a32524"
-dependencies = [
- "libm",
-]
 
 [[package]]
 name = "zerocopy"

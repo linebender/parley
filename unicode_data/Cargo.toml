@@ -16,7 +16,6 @@ datagen = []
 [dependencies]
 icu_properties = { workspace = true }
 icu_collections = { workspace = true }
-unicode-bidi = { workspace = true }
 zerovec = { workspace = true, optional = true }
 
 [lints]

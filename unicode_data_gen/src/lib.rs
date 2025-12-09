@@ -37,6 +37,7 @@ pub fn generate(out: std::path::PathBuf) {
             LocaleFallbacker::new_without_data(),
         )
         .with_markers([
+            icu_properties::provider::PropertyEnumBidiMirroringGlyphV1::INFO,
             icu_properties::provider::PropertyNameShortScriptV1::INFO,
             icu_segmenter::provider::SegmenterBreakGraphemeClusterV1::INFO,
             icu_segmenter::provider::SegmenterBreakWordOverrideV1::INFO,
@@ -45,6 +46,7 @@ pub fn generate(out: std::path::PathBuf) {
             icu_segmenter::provider::SegmenterBreakLineV1::INFO,
             icu_normalizer::provider::NormalizerNfcV1::INFO,
             icu_normalizer::provider::NormalizerNfdDataV1::INFO,
+            icu_normalizer::provider::NormalizerNfdSupplementV1::INFO,
             icu_normalizer::provider::NormalizerNfdTablesV1::INFO,
         ])
         .export(

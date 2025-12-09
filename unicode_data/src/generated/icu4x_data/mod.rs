@@ -4,6 +4,7 @@
 #![allow(clippy::allow_attributes_without_reason)]
 // @generated
 include!("normalizer_nfd_tables_v1.rs.data");
+include!("normalizer_nfd_supplement_v1.rs.data");
 include!("segmenter_break_grapheme_cluster_v1.rs.data");
 include!("segmenter_break_line_v1.rs.data");
 include!("normalizer_nfc_v1.rs.data");
@@ -11,6 +12,7 @@ include!("segmenter_lstm_auto_v1.rs.data");
 include!("property_name_short_script_v1.rs.data");
 include!("normalizer_nfd_data_v1.rs.data");
 include!("segmenter_break_word_v1.rs.data");
+include!("property_enum_bidi_mirroring_glyph_v1.rs.data");
 include!("segmenter_break_word_override_v1.rs.data");
 /// Marks a type as a data provider. You can then use macros like
 /// `impl_core_helloworld_v1` to add implementations.
@@ -49,6 +51,7 @@ macro_rules! impl_data_provider {
     ($ provider : ty) => {
         make_provider!($provider);
         impl_normalizer_nfd_tables_v1!($provider);
+        impl_normalizer_nfd_supplement_v1!($provider);
         impl_segmenter_break_grapheme_cluster_v1!($provider);
         impl_segmenter_break_line_v1!($provider);
         impl_normalizer_nfc_v1!($provider);
@@ -56,6 +59,7 @@ macro_rules! impl_data_provider {
         impl_property_name_short_script_v1!($provider);
         impl_normalizer_nfd_data_v1!($provider);
         impl_segmenter_break_word_v1!($provider);
+        impl_property_enum_bidi_mirroring_glyph_v1!($provider);
         impl_segmenter_break_word_override_v1!($provider);
     };
 }

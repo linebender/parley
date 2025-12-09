@@ -5,7 +5,7 @@
 //!
 //! This module provides a benchmark for the default style.
 
-use crate::{ColorBrush, FONT_STACK, get_contexts, get_samples};
+use crate::{ColorBrush, FONT_STACK, get_samples, with_contexts};
 use parley::{
     Alignment, AlignmentOptions, FontStack, FontStyle, FontWeight, Layout, RangedBuilder,
     StyleProperty,
@@ -29,23 +29,23 @@ pub fn defaults() -> Vec<Benchmark> {
                 |b| {
                     b.iter(|| {
                         let text = &sample.text;
-                        let (mut font_cx, mut layout_cx) = get_contexts();
+                        with_contexts(|font_cx, layout_cx| {
+                            let mut builder =
+                                layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
+                            builder.push_default(StyleProperty::FontStack(FontStack::List(
+                                FONT_STACK.into(),
+                            )));
 
-                        let mut builder =
-                            layout_cx.ranged_builder(&mut font_cx, text, DISPLAY_SCALE, QUANTIZE);
-                        builder.push_default(StyleProperty::FontStack(FontStack::List(
-                            FONT_STACK.into(),
-                        )));
+                            let mut layout: Layout<ColorBrush> = builder.build(text);
+                            layout.break_all_lines(Some(MAX_ADVANCE));
+                            layout.align(
+                                Some(MAX_ADVANCE),
+                                Alignment::Start,
+                                AlignmentOptions::default(),
+                            );
 
-                        let mut layout: Layout<ColorBrush> = builder.build(text);
-                        layout.break_all_lines(Some(MAX_ADVANCE));
-                        layout.align(
-                            Some(MAX_ADVANCE),
-                            Alignment::Start,
-                            AlignmentOptions::default(),
-                        );
-
-                        black_box(layout);
+                            black_box(layout);
+                        });
                     })
                 },
             )
@@ -86,43 +86,43 @@ pub fn styled() -> Vec<Benchmark> {
                     b.iter(|| {
                         let text = &sample.text;
 
-                        let (mut font_cx, mut layout_cx) = get_contexts();
+                        with_contexts(|font_cx, layout_cx| {
+                            let mut builder =
+                                layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
+                            builder.push_default(StyleProperty::FontStack(FontStack::List(
+                                FONT_STACK.into(),
+                            )));
 
-                        let mut builder =
-                            layout_cx.ranged_builder(&mut font_cx, text, DISPLAY_SCALE, QUANTIZE);
-                        builder.push_default(StyleProperty::FontStack(FontStack::List(
-                            FONT_STACK.into(),
-                        )));
+                            // Apply different styles every `style_interval` characters
+                            let style_interval = (text.len() / 5).min(10);
+                            {
+                                let mut chunk_start = 0;
+                                let mut style_idx = 0;
 
-                        // Apply different styles every `style_interval` characters
-                        let style_interval = (text.len() / 5).min(10);
-                        {
-                            let mut chunk_start = 0;
-                            let mut style_idx = 0;
+                                for (char_count, (byte_idx, _)) in text.char_indices().enumerate() {
+                                    if char_count != 0 && char_count % style_interval == 0 {
+                                        apply_style(&mut builder, style_idx, chunk_start..byte_idx);
+                                        chunk_start = byte_idx;
+                                        style_idx += 1;
+                                    }
+                                }
 
-                            for (char_count, (byte_idx, _)) in text.char_indices().enumerate() {
-                                if char_count != 0 && char_count % style_interval == 0 {
-                                    apply_style(&mut builder, style_idx, chunk_start..byte_idx);
-                                    chunk_start = byte_idx;
-                                    style_idx += 1;
+                                // Apply style to the last chunk if there's remaining text
+                                if chunk_start < text.len() {
+                                    apply_style(&mut builder, style_idx, chunk_start..text.len());
                                 }
                             }
 
-                            // Apply style to the last chunk if there's remaining text
-                            if chunk_start < text.len() {
-                                apply_style(&mut builder, style_idx, chunk_start..text.len());
-                            }
-                        }
+                            let mut layout: Layout<ColorBrush> = builder.build(text);
+                            layout.break_all_lines(Some(MAX_ADVANCE));
+                            layout.align(
+                                Some(MAX_ADVANCE),
+                                Alignment::Start,
+                                AlignmentOptions::default(),
+                            );
 
-                        let mut layout: Layout<ColorBrush> = builder.build(text);
-                        layout.break_all_lines(Some(MAX_ADVANCE));
-                        layout.align(
-                            Some(MAX_ADVANCE),
-                            Alignment::Start,
-                            AlignmentOptions::default(),
-                        );
-
-                        black_box(layout);
+                            black_box(layout);
+                        });
                     })
                 },
             )

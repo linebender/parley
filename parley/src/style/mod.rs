@@ -15,7 +15,6 @@ pub use font::{
     FontWidth, GenericFamily,
 };
 pub use styleset::StyleSet;
-pub use swash::text::WordBreakStrength;
 
 use crate::util::nearly_eq;
 
@@ -23,6 +22,27 @@ use crate::util::nearly_eq;
 pub enum WhiteSpaceCollapse {
     Collapse,
     Preserve,
+}
+
+/// Control over word breaking, named for the CSS property.
+///
+/// See <https://drafts.csswg.org/css-text-3/#word-break-property> for more information.
+/// Adapted from [`icu_segmenter::options::LineBreakWordOption`].
+#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
+#[repr(u8)]
+pub enum WordBreak {
+    /// Words break according to their customary rules. See the details in
+    /// <https://drafts.csswg.org/css-text-3/#valdef-word-break-normal>.
+    #[default]
+    Normal,
+
+    /// Breaking is allowed within "words".
+    /// <https://drafts.csswg.org/css-text-3/#valdef-word-break-break-all>
+    BreakAll,
+
+    /// Breaking is forbidden within "word".
+    /// <https://drafts.csswg.org/css-text-3/#valdef-word-break-keep-all>
+    KeepAll,
 }
 
 /// Control over non-"emergency" line-breaking.
@@ -44,8 +64,7 @@ pub enum TextWrapMode {
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum OverflowWrap {
-    /// Even with extremely long words, lines can only break at places specified in
-    /// [`WordBreakStrength`].
+    /// Even with extremely long words, lines can only break at places specified in [`WordBreak`].
     #[default]
     Normal,
     /// Words may be broken at an arbitrary point if there are no other places in the line to break
@@ -142,7 +161,7 @@ pub enum StyleProperty<'a, B: Brush> {
     /// Extra spacing between letters.
     LetterSpacing(f32),
     /// Control over where words can wrap.
-    WordBreak(WordBreakStrength),
+    WordBreak(WordBreak),
     /// Control over "emergency" line-breaking.
     OverflowWrap(OverflowWrap),
     /// Control over non-"emergency" line-breaking.
@@ -193,7 +212,7 @@ pub struct TextStyle<'a, B: Brush> {
     /// Extra spacing between letters.
     pub letter_spacing: f32,
     /// Control over where words can wrap.
-    pub word_break: WordBreakStrength,
+    pub word_break: WordBreak,
     /// Control over "emergency" line-breaking.
     pub overflow_wrap: OverflowWrap,
     /// Control over non-"emergency" line-breaking.
@@ -223,7 +242,7 @@ impl<B: Brush> Default for TextStyle<'_, B> {
             line_height: LineHeight::default(),
             word_spacing: 0.0,
             letter_spacing: 0.0,
-            word_break: WordBreakStrength::default(),
+            word_break: WordBreak::default(),
             overflow_wrap: OverflowWrap::default(),
             text_wrap_mode: TextWrapMode::default(),
         }
