@@ -18,7 +18,7 @@ all-features = true
 default = ["std", "vello_cpu"]
 std = ["vello_common/std", "skrifa/std", "vello_cpu?/std"]
 libm = ["skrifa/libm", "vello_common/libm", "vello_cpu?/libm"]
-png = ["vello_common/png", "vello_cpu/png"]
+png = ["std", "vello_common/png", "vello_cpu/png"]
 vello_cpu = ["dep:vello_cpu"]
 
 [lints]
