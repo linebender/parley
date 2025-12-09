@@ -1,0 +1,24 @@
+[package]
+name = "parley_draw"
+version = "0.0.0"
+description = "Parley Draw provides APIs for efficiently rendering text."
+keywords = ["text", "layout"]
+categories = ["gui", "graphics"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+publish = false
+
+[package.metadata.docs.rs]
+all-features = true
+
+[features]
+default = ["std"]
+std = []
+
+[lints]
+workspace = true
+
+[dependencies]
