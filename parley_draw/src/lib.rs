@@ -5,9 +5,13 @@
 //!
 //! ## Features
 //!
-//! - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
-//! - `vello_cpu` (enabled by default): This feature implements `GlyphRenderer` for Vello CPU's `RenderContext`.
-//! - `png`: This feature enables PNG support for drawing bitmap glyphs.
+//! - `std` (enabled by default): Get floating point functions from the standard library
+//!   (likely using your target's libc).
+//! - `libm`: Use floating point implementations from [libm].
+//! - `vello_cpu` (enabled by default): Implements `GlyphRenderer` for Vello CPU's `RenderContext`.
+//! - `png`: Enables PNG support for drawing bitmap glyphs.
+//!
+//! At least one of `std` and `libm` is required; `std` overrides `libm`.
 
 // LINEBENDER LINT SET - lib.rs - v3
 // See https://linebender.org/wiki/canonical-lints/
@@ -20,6 +24,10 @@
 // END LINEBENDER LINT SET
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![no_std]
+
+// Suppress the unused_crate_dependencies lint when both std and libm are specified.
+#[cfg(all(feature = "std", feature = "libm"))]
+use libm as _;
 
 extern crate alloc;
 #[cfg(feature = "std")]
