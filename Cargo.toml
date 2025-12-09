@@ -21,7 +21,7 @@ members = [
 edition = "2021"
 # Keep in sync with RUST_MIN_VER in .github/workflows/ci.yml, with the relevant README.md files
 # and with the MSRV in the `Unreleased` section of CHANGELOG.md.
-rust-version = "1.85"
+rust-version = "1.88"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/linebender/parley"
 
