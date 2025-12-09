@@ -7,6 +7,7 @@ members = [
     "parley_bench",
     "parley_core",
     "parley_dev",
+    "parley_draw",
     "unicode_data",
     "unicode_data_gen",
     "examples/tiny_skia_render",
