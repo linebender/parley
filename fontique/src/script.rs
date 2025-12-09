@@ -5,12 +5,65 @@
 
 use icu_locale_core::subtags::{Script, script};
 
-/// Returns a string containing sample characters for this script.
-pub(crate) fn sample(script: Script) -> Option<&'static str> {
-    let ix = SCRIPT_SAMPLES
-        .binary_search_by(|entry| entry.0.cmp(&script))
-        .ok()?;
-    SCRIPT_SAMPLES.get(ix).map(|entry| entry.1)
+pub trait ScriptExt {
+    /// Returns a mapping of scripts to sample text.
+    fn all_samples() -> &'static [(Script, &'static str)];
+
+    /// Returns a string containing sample characters for this script.
+    fn sample(&self) -> Option<&'static str>;
+
+    /// Returns the associated [`icu_properties::props::Script`] value.
+    #[cfg(feature = "icu_properties")]
+    fn properties_script(self) -> Option<icu_properties::props::Script>;
+
+    /// Returns the associated [`unicode_script::Script`] value.
+    #[cfg(feature = "unicode_script")]
+    fn unicode_script(self) -> Option<unicode_script::Script>;
+
+    #[cfg(feature = "icu_properties")]
+    fn from_properties_script(value: icu_properties::props::Script) -> Script;
+
+    #[cfg(feature = "unicode_script")]
+    fn from_unicode_script(value: unicode_script::Script) -> Script;
+}
+
+impl ScriptExt for Script {
+    fn all_samples() -> &'static [(Self, &'static str)] {
+        SCRIPT_SAMPLES
+    }
+
+    fn sample(&self) -> Option<&'static str> {
+        let ix = SCRIPT_SAMPLES
+            .binary_search_by(|entry| entry.0.cmp(self))
+            .ok()?;
+        SCRIPT_SAMPLES.get(ix).map(|entry| entry.1)
+    }
+
+    /// Returns the associated [`icu_properties::props::Script`] value.
+    #[cfg(feature = "icu_properties")]
+    fn properties_script(self) -> Option<icu_properties::props::Script> {
+        icu_properties::PropertyParser::<icu_properties::props::Script>::new()
+            .get_strict(self.as_str())
+    }
+
+    /// Returns the associated [`unicode_script::Script`] value.
+    #[cfg(feature = "unicode_script")]
+    fn unicode_script(self) -> Option<unicode_script::Script> {
+        unicode_script::Script::from_short_name(self.as_str())
+    }
+
+    #[cfg(feature = "icu_properties")]
+    fn from_properties_script(value: icu_properties::props::Script) -> Self {
+        icu_properties::PropertyNamesShort::new()
+            .get_locale_script(value)
+            .unwrap_or(script!("Zzzz"))
+    }
+
+    #[cfg(feature = "unicode_script")]
+    fn from_unicode_script(value: unicode_script::Script) -> Self {
+        Self::try_from_raw(value.short_name().as_bytes().try_into().unwrap_or_default())
+            .unwrap_or(script!("Zzzz"))
+    }
 }
 
 #[test]
@@ -21,7 +74,7 @@ fn assert_sorted() {
     }
 }
 
-pub(crate) const SCRIPT_SAMPLES: &[(Script, &str)] = &[
+pub const SCRIPT_SAMPLES: &[(Script, &str)] = &[
     (script!("Adlm"), "𞤀𞤁𞤂𞤃𞤄𞤅𞤆𞤇𞤈𞤉𞤊𞤋𞤌𞤍𞤎𞤏"),
     (script!("Aghb"), "𐔰𐔱𐔲𐔳𐔴𐔵𐔶𐔷𐔸𐔹𐔺𐔻𐔼𐔽𐔾𐔿"),
     (script!("Ahom"), "𑜀𑜁𑜂𑜃𑜄𑜅𑜆𑜇𑜈𑜉𑜊𑜋𑜌𑜍𑜎𑜏"),

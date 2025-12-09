@@ -21,8 +21,8 @@ mod system;
 
 #[allow(unused_imports)]
 use super::{
-    FallbackKey, FamilyId, FamilyInfo, FontInfo, FontStyle, FontWeight, FontWidth, GenericFamily,
-    Language, Script, SourceInfo,
+    FallbackKey, FamilyId, FamilyInfo, FontInfo, GenericFamily, Language, Script, ScriptExt,
+    SourceInfo,
     family_name::{FamilyName, FamilyNameMap},
     generic::GenericFamilyMap,
     scan,
@@ -33,9 +33,6 @@ use super::{
 use super::source::SourcePathMap;
 
 pub(crate) use system::SystemFonts;
-
-#[allow(dead_code)]
-mod script_samples;
 
 // Dummy system font backend for targets like wasm32-unknown-unknown
 #[cfg(any(

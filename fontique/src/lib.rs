@@ -45,6 +45,7 @@ mod font;
 mod generic;
 mod matching;
 mod scan;
+mod script;
 mod source;
 
 mod source_cache;
@@ -52,6 +53,7 @@ mod source_cache;
 pub use icu_locale_core::LanguageIdentifier as Language;
 pub use icu_locale_core::subtags::Script;
 pub use linebender_resource_handle::Blob;
+pub use script::ScriptExt;
 
 pub use attributes::{Attributes, FontStyle, FontWeight, FontWidth};
 pub use charmap::{Charmap, CharmapIndex};
