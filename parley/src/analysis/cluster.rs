@@ -104,15 +104,18 @@ impl CharCluster {
         self.best_ratio = 0.;
     }
 
+    #[inline(always)]
     fn len(&self) -> usize {
         self.chars.len()
     }
 
     /// Returns the primary style index for the cluster.
+    #[inline(always)]
     pub(crate) fn style_index(&self) -> u16 {
         self.chars[0].style_index
     }
 
+    #[inline(always)]
     fn contributes_to_shaping(ch: char, analysis_data_sources: &AnalysisDataSources) -> bool {
         let props = analysis_data_sources.composite.properties(ch as u32);
         crate::analysis::contributes_to_shaping(props.general_category(), props.script())
@@ -306,10 +309,12 @@ impl Form {
         self.state = FormState::None;
     }
 
+    #[inline(always)]
     fn chars(&self) -> &[Char] {
         &self.chars[..self.len as usize]
     }
 
+    #[inline(always)]
     fn setup(&mut self) {
         self.map_len = (self
             .chars()
@@ -319,6 +324,7 @@ impl Form {
             .max(1);
     }
 
+    #[inline(always)]
     fn map(
         &mut self,
         f: &impl Fn(char) -> u16,
