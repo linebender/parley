@@ -9,90 +9,11 @@ use core::marker::PhantomData;
 use crate::resolve::{RangedStyle, ResolvedStyle};
 use crate::{Brush, LayoutContext, WordBreak};
 
-use icu_normalizer::properties::{
-    CanonicalComposition, CanonicalCompositionBorrowed, CanonicalDecomposition,
-    CanonicalDecompositionBorrowed,
-};
+use icu_properties::CodePointMapData;
 use icu_properties::props::{BidiMirroringGlyph, GeneralCategory, GraphemeClusterBreak, Script};
-use icu_properties::{
-    CodePointMapData, CodePointMapDataBorrowed, PropertyNamesShort, PropertyNamesShortBorrowed,
-};
 use icu_segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakInvariantOptions};
-use icu_segmenter::{
-    GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter,
-    LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed,
-};
+use icu_segmenter::{LineSegmenter, WordSegmenter};
 use parley_data::CompositeProps;
-
-pub(crate) struct AnalysisDataSources;
-
-impl AnalysisDataSources {
-    pub(crate) fn new() -> Self {
-        Self
-    }
-
-    #[inline(always)]
-    pub(crate) fn composite(&self) -> CompositeProps {
-        const { CompositeProps }
-    }
-
-    #[inline(always)]
-    pub(crate) fn grapheme_segmenter(&self) -> GraphemeClusterSegmenterBorrowed<'_> {
-        const { GraphemeClusterSegmenter::new() }
-    }
-
-    #[inline(always)]
-    fn word_segmenter(&self) -> WordSegmenterBorrowed<'static> {
-        const { WordSegmenter::new_for_non_complex_scripts(WordBreakInvariantOptions::default()) }
-    }
-
-    #[inline(always)]
-    fn line_segmenter(&self, word_break_strength: WordBreak) -> LineSegmenterBorrowed<'static> {
-        match word_break_strength {
-            WordBreak::Normal => {
-                const {
-                    let mut opt = LineBreakOptions::default();
-                    opt.word_option = Some(LineBreakWordOption::Normal);
-                    LineSegmenter::new_for_non_complex_scripts(opt)
-                }
-            }
-            WordBreak::BreakAll => {
-                const {
-                    let mut opt = LineBreakOptions::default();
-                    opt.word_option = Some(LineBreakWordOption::BreakAll);
-                    LineSegmenter::new_for_non_complex_scripts(opt)
-                }
-            }
-            WordBreak::KeepAll => {
-                const {
-                    let mut opt = LineBreakOptions::default();
-                    opt.word_option = Some(LineBreakWordOption::KeepAll);
-                    LineSegmenter::new_for_non_complex_scripts(opt)
-                }
-            }
-        }
-    }
-
-    #[inline(always)]
-    fn composing_normalizer(&self) -> CanonicalCompositionBorrowed<'_> {
-        const { CanonicalComposition::new() }
-    }
-
-    #[inline(always)]
-    fn decomposing_normalizer(&self) -> CanonicalDecompositionBorrowed<'_> {
-        const { CanonicalDecomposition::new() }
-    }
-
-    #[inline(always)]
-    pub(crate) fn script_short_name(&self) -> PropertyNamesShortBorrowed<'static, Script> {
-        PropertyNamesShort::new()
-    }
-
-    #[inline(always)]
-    fn brackets(&self) -> CodePointMapDataBorrowed<'_, BidiMirroringGlyph> {
-        const { CodePointMapData::new() }
-    }
-}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CharInfo {
@@ -307,11 +228,10 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
     }
 
     // Collect boundary byte positions compactly
-    let mut wb_iter = lcx
-        .analysis_data_sources
-        .word_segmenter()
-        .segment_str(text)
-        .peekable();
+    let mut wb_iter =
+        WordSegmenter::new_for_non_complex_scripts(WordBreakInvariantOptions::default())
+            .segment_str(text)
+            .peekable();
 
     // Line boundaries (word break naming refers to the line boundary determination config).
     //
@@ -328,12 +248,33 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
     for (substring_index, (substring, word_break_strength, last)) in
         contiguous_word_break_substrings.enumerate()
     {
+        let line_segmenter = match word_break_strength {
+            WordBreak::Normal => {
+                const {
+                    let mut opt = LineBreakOptions::default();
+                    opt.word_option = Some(LineBreakWordOption::Normal);
+                    LineSegmenter::new_for_non_complex_scripts(opt)
+                }
+            }
+            WordBreak::BreakAll => {
+                const {
+                    let mut opt = LineBreakOptions::default();
+                    opt.word_option = Some(LineBreakWordOption::BreakAll);
+                    LineSegmenter::new_for_non_complex_scripts(opt)
+                }
+            }
+            WordBreak::KeepAll => {
+                const {
+                    let mut opt = LineBreakOptions::default();
+                    opt.word_option = Some(LineBreakWordOption::KeepAll);
+                    LineSegmenter::new_for_non_complex_scripts(opt)
+                }
+            }
+        };
+
         // Fast path for text with a single word-break option.
         if substring_index == 0 && last {
-            let mut lb_iter = lcx
-                .analysis_data_sources
-                .line_segmenter(word_break_strength)
-                .segment_str(substring);
+            let mut lb_iter = line_segmenter.segment_str(substring);
 
             let _first = lb_iter.next();
             let second = lb_iter.next();
@@ -353,11 +294,6 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
             break;
         }
 
-        let line_boundaries_iter = lcx
-            .analysis_data_sources
-            .line_segmenter(word_break_strength)
-            .segment_str(substring);
-
         let mut substring_chars = substring.chars();
         if substring_index != 0 {
             global_offset -= substring_chars.next().unwrap().len_utf8();
@@ -367,9 +303,9 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
         let last_len = substring_chars.next_back().unwrap().len_utf8();
 
         // Mark line boundaries (overriding word boundaries where present).
-        for (index, pos) in line_boundaries_iter.enumerate() {
+        for pos in line_segmenter.segment_str(substring).skip(1) {
             // icu adds leading and trailing line boundaries, which we don't use.
-            if index == 0 || pos == substring.len() {
+            if pos == substring.len() {
                 continue;
             }
 
@@ -424,8 +360,6 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
         (boundary, ch)
     });
 
-    let composite = lcx.analysis_data_sources.composite();
-
     let mut needs_bidi_resolution = false;
 
     lcx.info.reserve(text.len());
@@ -435,7 +369,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
         // character's index, but we need our iterators to align, and the rest are simply
         // character-indexed.
         .fold(false, |is_mandatory_linebreak, (boundary, ch)| {
-            let properties = composite.properties(ch as u32);
+            let properties = CompositeProps.properties(ch as u32);
             let script = properties.script();
             let grapheme_cluster_break = properties.grapheme_cluster_break();
             let bidi_class = properties.bidi_class();
@@ -466,7 +400,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
 
             needs_bidi_resolution |= crate::bidi::needs_bidi_resolution(bidi_class);
             // TODO: maybe extend CompositeProps to u64 to fit BidiMirroringGlyph
-            let bracket = lcx.analysis_data_sources.brackets().get(ch);
+            let bracket = CodePointMapData::new().get(ch);
 
             lcx.info.push((
                 CharInfo::new(
