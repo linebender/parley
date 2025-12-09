@@ -892,6 +892,7 @@ fn try_commit_line<B: Brush>(
             advance: state.x,
             ..Default::default()
         },
+        unjustified_advance: state.x,
         ..Default::default()
     });
 
