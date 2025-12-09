@@ -9,7 +9,6 @@
 ## Cargo features
 
 - `baked` *(default)* embeds pre-generated ICU4X and composite data from `src/generated`, enabling use in `no_std` targets without a filesystem.
-- `datagen` enables code so the crate can participate in regeneration workflows. This feature is intended for developer use when refreshing the baked data and principally used by `../parley_data_gen`.
 
 ## Regenerating the baked data
 
