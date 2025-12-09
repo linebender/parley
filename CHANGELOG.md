@@ -13,7 +13,7 @@ You can find its changes [documented below](#060---2025-11-24).
 
 ## [Unreleased]
 
-This release has an [MSRV] of 1.83.
+This release has an [MSRV] of 1.85.
 
 ## [0.7.0] - 2025-11-24
 
