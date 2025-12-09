@@ -41,7 +41,7 @@ mod math;
 
 pub mod renderers;
 
-pub use colr::ColrRenderer;
+pub use colr::{ColrPainter, ColrRenderer};
 pub use glyph::{
     BitmapGlyph, ColorGlyph, Glyph, GlyphCaches, GlyphRenderer, GlyphRunBuilder, GlyphType,
     HintCache, HintKey, OutlineCache, OutlineGlyph, PreparedGlyph,

@@ -38,7 +38,7 @@ pub trait ColrRenderer {
 }
 
 /// An abstraction for painting COLR glyphs.
-pub(crate) struct ColrPainter<'a> {
+pub struct ColrPainter<'a> {
     transforms: Vec<Affine>,
     color_glyph: Box<ColorGlyph<'a>>,
     context_color: AlphaColor<Srgb>,
@@ -54,7 +54,7 @@ impl Debug for ColrPainter<'_> {
 
 impl<'a> ColrPainter<'a> {
     /// Create a new COLR painter.
-    pub(crate) fn new(
+    pub fn new(
         color_glyph: Box<ColorGlyph<'a>>,
         context_color: AlphaColor<Srgb>,
         painter: &'a mut impl ColrRenderer,
