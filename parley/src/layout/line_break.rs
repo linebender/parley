@@ -39,7 +39,7 @@ struct LineState {
     x: f32,
     items: Range<usize>,
     clusters: Range<usize>,
-    num_spaces: usize,
+    num_non_trailing_spaces: usize,
     /// Of the line currently being built, the maximum line height seen so far.
     /// This represents a lower-bound on the eventual line height of the line.
     running_line_height: f32,
@@ -356,7 +356,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.state.append_cluster_to_line(next_x, line_height);
                             self.state.cluster_idx += 1;
                             if is_space {
-                                self.state.line.num_spaces += 1;
+                                self.state.line.num_non_trailing_spaces += 1;
                             }
                         }
                         // Else we attempt to line break:
@@ -368,14 +368,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             // Case: cluster is a space character (and wrapping is enabled)
                             //
                             // We hang any overflowing whitespace and then line-break.
+                            // "Hanging" means we add the space to the line but continue processing
+                            // rather than committing the line. The trailing whitespace is allowed
+                            // to overflow and will be accounted for when we hit a non-space that
+                            // requires a break.
                             if is_space && text_wrap_mode == TextWrapMode::Wrap {
                                 let line_height = run.metrics().line_height;
                                 self.state.append_cluster_to_line(next_x, line_height);
-                                if try_commit_line!(BreakReason::Regular) {
-                                    // TODO: can this be hoisted out of the conditional?
-                                    self.state.cluster_idx += 1;
-                                    return self.start_new_line();
-                                }
+                                self.state.cluster_idx += 1;
                             }
                             // Case: we have previously encountered a REGULAR line-breaking opportunity in the current line
                             //
@@ -571,29 +571,45 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         // Compute size of line's trailing whitespace. "Trailing" is considered the right edge
         // for LTR text and the left edge for RTL text.
-        let run = if self.layout.is_rtl() {
+        let trailing_run = if self.layout.is_rtl() {
             self.lines.line_items[line.item_range.clone()].first()
         } else {
             self.lines.line_items[line.item_range.clone()].last()
         };
-        line.metrics.trailing_whitespace = run
+        let (trailing_whitespace_advance, trailing_whitespace_count) = trailing_run
             .filter(|item| item.is_text_run() && item.has_trailing_whitespace)
             .map(|run| {
-                fn whitespace_advance<'c, I: Iterator<Item = &'c ClusterData>>(clusters: I) -> f32 {
-                    clusters
-                        .take_while(|cluster| cluster.info.whitespace() != Whitespace::None)
-                        .map(|cluster| cluster.advance)
-                        .sum()
+                fn whitespace_stats<'c, I: Iterator<Item = &'c ClusterData>>(
+                    clusters: I,
+                ) -> (f32, usize) {
+                    let mut advance = 0.0;
+                    let mut count = 0;
+                    for cluster in clusters {
+                        if cluster.info.whitespace() == Whitespace::None {
+                            break;
+                        }
+                        advance += cluster.advance;
+                        if cluster.info.whitespace().is_space_or_nbsp() {
+                            count += 1;
+                        }
+                    }
+                    (advance, count)
                 }
 
                 let clusters = &self.layout.data.clusters[run.cluster_range.clone()];
                 if run.is_rtl() {
-                    whitespace_advance(clusters.iter())
+                    whitespace_stats(clusters.iter())
                 } else {
-                    whitespace_advance(clusters.iter().rev())
+                    whitespace_stats(clusters.iter().rev())
                 }
             })
-            .unwrap_or(0.0);
+            .unwrap_or((0.0, 0));
+        line.metrics.trailing_whitespace = trailing_whitespace_advance;
+        // Line computation has ended, but we haven't yet removed trailing whitespace from the line,
+        // so mutate `num_non_trailing_spaces` to reflect the actual number of trailing whitespace spaces.
+        line.num_non_trailing_spaces = line
+            .num_non_trailing_spaces
+            .saturating_sub(trailing_whitespace_count);
 
         if !have_metrics {
             // Line consisting entirely of whitespace?
@@ -877,17 +893,11 @@ fn try_commit_line<B: Brush>(
     //     return false;
     // }
 
-    // Q: why this special case?
-    let mut num_spaces = state.num_spaces;
-    if break_reason == BreakReason::Regular {
-        num_spaces = num_spaces.saturating_sub(1);
-    }
-
     lines.lines.push(LineData {
         item_range: start_item_idx..end_item_idx,
         max_advance,
         break_reason,
-        num_spaces,
+        num_non_trailing_spaces: state.num_non_trailing_spaces,
         metrics: LineMetrics {
             advance: state.x,
             ..Default::default()
@@ -896,7 +906,7 @@ fn try_commit_line<B: Brush>(
     });
 
     // Reset state for the new line
-    state.num_spaces = 0;
+    state.num_non_trailing_spaces = 0;
     if committed_text_run {
         state.clusters.start = state.clusters.end;
     }
