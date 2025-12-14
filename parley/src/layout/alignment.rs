@@ -149,8 +149,8 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
                     continue;
                 }
 
-                let adjustment =
-                    free_space / line.num_non_trailing_spaces as f32 * if UNDO_JUSTIFICATION { -1. } else { 1. };
+                let adjustment = free_space / line.num_non_trailing_spaces as f32
+                    * if UNDO_JUSTIFICATION { -1. } else { 1. };
                 let mut applied = 0;
                 // Iterate over text runs in the line and clusters in the text run
                 //   - Iterate forwards for even bidi levels (which represent LTR runs)
