@@ -252,20 +252,6 @@ fn leading_whitespace() {
 }
 
 #[test]
-fn breaking_whitespace_does_not_wrap() {
-    let mut env = TestEnv::new(test_name!(), None);
-
-    let text = "First                                                 Second";
-    let builder = env.ranged_builder(text);
-    let mut layout = builder.build(text);
-    layout.break_all_lines(Some(50.0));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
-
-    //assert_eq!(layout.lines().count(), 2);
-    env.check_layout_snapshot(&layout);
-}
-
-#[test]
 fn hanging_whitespace_does_not_contribute_to_align() {
     let mut env = TestEnv::new(test_name!(), None);
 
@@ -281,7 +267,7 @@ fn hanging_whitespace_does_not_contribute_to_align() {
         layout.break_all_lines(Some(50.0));
         layout.align(None, alignment, AlignmentOptions::default());
 
-        //assert_eq!(layout.lines().count(), 2);
+        assert_eq!(layout.lines().count(), 2);
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
