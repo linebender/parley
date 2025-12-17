@@ -3,10 +3,9 @@
 
 //! Support for script/language based font fallback.
 
-use super::{family::FamilyId, script::Script};
+use super::{Language, family::FamilyId, script::Script};
 use alloc::vec::Vec;
 use hashbrown::HashMap;
-use icu_locale_core::LanguageIdentifier;
 use smallvec::SmallVec;
 
 type FamilyList = SmallVec<[FamilyId; 1]>;
@@ -122,7 +121,7 @@ pub struct FallbackKey {
 
 impl FallbackKey {
     /// Creates a new fallback key from the given script and locale.
-    pub fn new(script: impl Into<Script>, locale: Option<&LanguageIdentifier>) -> Self {
+    pub fn new(script: impl Into<Script>, locale: Option<&Language>) -> Self {
         let script = script.into();
         let (locale, is_default, is_tracked) = match canonical_locale(script, locale) {
             Some((is_default, locale)) => (Some(locale), is_default, true),
@@ -166,16 +165,16 @@ where
     S: Into<Script>,
 {
     fn from(value: (S, &str)) -> Self {
-        let locale = LanguageIdentifier::try_from_str(value.1).ok();
+        let locale = Language::try_from_str(value.1).ok();
         Self::new(value.0, locale.as_ref())
     }
 }
 
-impl<S> From<(S, &LanguageIdentifier)> for FallbackKey
+impl<S> From<(S, &Language)> for FallbackKey
 where
     S: Into<Script>,
 {
-    fn from(value: (S, &LanguageIdentifier)) -> Self {
+    fn from(value: (S, &Language)) -> Self {
         Self::new(value.0, Some(value.1))
     }
 }
@@ -195,10 +194,7 @@ struct PerScript {
     others: Vec<(&'static str, FamilyList)>,
 }
 
-fn canonical_locale(
-    script: Script,
-    locale: Option<&LanguageIdentifier>,
-) -> Option<(bool, &'static str)> {
+fn canonical_locale(script: Script, locale: Option<&Language>) -> Option<(bool, &'static str)> {
     let Some(locale) = locale else {
         return Some((true, ""));
     };

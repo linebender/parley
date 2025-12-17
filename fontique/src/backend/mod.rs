@@ -21,7 +21,7 @@ mod system;
 
 #[allow(unused_imports)]
 use super::{
-    FallbackKey, FamilyId, FamilyInfo, FontInfo, GenericFamily, Script, SourceInfo,
+    FallbackKey, FamilyId, FamilyInfo, FontInfo, GenericFamily, Language, Script, SourceInfo,
     family_name::{FamilyName, FamilyNameMap},
     generic::GenericFamilyMap,
     scan,

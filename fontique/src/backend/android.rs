@@ -4,11 +4,11 @@
 use std::{path::Path, str::FromStr, sync::Arc};
 
 use hashbrown::HashMap;
-use icu_locale_core::LanguageIdentifier;
 use roxmltree::{Document, Node};
 
 use super::{
-    FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily, GenericFamilyMap, Script, scan,
+    FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily, GenericFamilyMap, Language,
+    Script, scan,
 };
 
 // TODO: Use actual generic families here, where available, when fonts.xml is properly parsed.
@@ -125,7 +125,7 @@ impl SystemFonts {
                                                     // Undefined lang for script-only fallbacks
                                                     script_fallback.push((scr.into(), *family));
                                                 } else if let Ok(locale) =
-                                                    LanguageIdentifier::try_from_str(lang)
+                                                    Language::try_from_str(lang)
                                                 {
                                                     if let Some(scr) = locale.script {
                                                         // Also fallback for the script on its own
