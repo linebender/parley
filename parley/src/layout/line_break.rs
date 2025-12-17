@@ -11,7 +11,6 @@ use core_maths::CoreFloat;
 
 use crate::analysis::Boundary;
 use crate::analysis::cluster::Whitespace;
-use crate::data::ClusterData;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -241,11 +240,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     char_count += 1;
 
                     // Check if we've reached the limit after adding this box
-                    if char_count >= max_chars {
-                        if try_commit_line!(BreakReason::Regular) {
-                            self.start_new_line();
-                            return Some(());
-                        }
+                    if char_count >= max_chars && try_commit_line!(BreakReason::Regular) {
+                        self.start_new_line();
+                        return Some(());
                     }
                 }
                 LayoutItemKind::TextRun => {
@@ -259,11 +256,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let cluster = run.get(self.state.cluster_idx - cluster_start).unwrap();
 
                         // Check if we should break before this cluster
-                        if char_count >= max_chars && max_chars != 0 {
-                            if try_commit_line!(BreakReason::Regular) {
-                                self.start_new_line();
-                                return Some(());
-                            }
+                        if char_count >= max_chars
+                            && max_chars != 0
+                            && try_commit_line!(BreakReason::Regular)
+                        {
+                            self.start_new_line();
+                            return Some(());
                         }
 
                         let whitespace = cluster.info().whitespace();
@@ -282,11 +280,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         }
 
                         // Check if we've reached the limit after adding this cluster
-                        if char_count >= max_chars {
-                            if try_commit_line!(BreakReason::Regular) {
-                                self.start_new_line();
-                                return Some(());
-                            }
+                        if char_count >= max_chars && try_commit_line!(BreakReason::Regular) {
+                            self.start_new_line();
+                            return Some(());
                         }
                     }
                     self.state.run_idx += 1;
