@@ -151,6 +151,7 @@ impl<B: Brush> LayoutContext<B> {
         self.styles.clear();
         self.inline_boxes.clear();
         self.info.clear();
+        self.bidi.clear();
     }
 }
 

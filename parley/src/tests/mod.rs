@@ -6,6 +6,7 @@ mod test_basic;
 mod test_builders;
 mod test_cursor;
 mod test_editor;
+mod test_issues;
 mod test_lines;
 mod test_wrap;
 mod utils;
