@@ -2381,6 +2381,17 @@ checksum = "c62026ae44756f8a599ba21140f350303d4f08dcdcc71b5ad9c9bb8128c13c62"
 dependencies = [
  "arrayvec",
  "euclid",
+ "smallvec",
+]
+
+[[package]]
+name = "kurbo"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce9729cc38c18d86123ab736fd2e7151763ba226ac2490ec092d1dd148825e32"
+dependencies = [
+ "arrayvec",
+ "euclid",
  "libm",
  "smallvec",
 ]
@@ -3309,7 +3320,7 @@ dependencies = [
  "oxipng",
  "parley_data",
  "parley_dev",
- "peniko",
+ "peniko 0.4.0",
  "skrifa 0.37.0",
  "tiny-skia",
  "zerovec",
@@ -3376,12 +3387,23 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "peniko"
+version = "0.4.0"
+source = "git+https://github.com/linebender/peniko?rev=dde968cf406be54d3211fe422bdd066f891ab632#dde968cf406be54d3211fe422bdd066f891ab632"
+dependencies = [
+ "color",
+ "kurbo 0.12.0",
+ "linebender_resource_handle",
+ "smallvec",
+]
+
+[[package]]
+name = "peniko"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b44f9ddd2f480176b34278eb653ec1c8062f3b143a4e16eeff5ffac3334e288"
 dependencies = [
  "color",
- "kurbo",
+ "kurbo 0.11.3",
  "linebender_resource_handle",
  "smallvec",
 ]
@@ -4772,7 +4794,7 @@ dependencies = [
  "bytemuck",
  "futures-intrusive",
  "log",
- "peniko",
+ "peniko 0.4.1",
  "png 0.17.16",
  "skrifa 0.35.0",
  "static_assertions",
@@ -4791,7 +4813,7 @@ dependencies = [
  "anyhow",
  "clipboard-rs",
  "parley",
- "peniko",
+ "peniko 0.4.0",
  "pollster",
  "ui-events",
  "ui-events-winit",
@@ -4808,7 +4830,7 @@ checksum = "c69b0fe94b0ac7e47619c504ee2c377355174f5c46353c46d03fa5f7e435922b"
 dependencies = [
  "bytemuck",
  "guillotiere",
- "peniko",
+ "peniko 0.4.1",
  "skrifa 0.35.0",
  "smallvec",
 ]

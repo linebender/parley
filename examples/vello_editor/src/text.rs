@@ -338,26 +338,26 @@ impl Editor {
     /// Returns drawn `Generation`.
     pub fn draw(&mut self, scene: &mut Scene) -> Generation {
         let transform = Affine::translate((INSET as f64, INSET as f64));
-        self.editor.selection_geometry_with(|rect, _| {
-            scene.fill(
-                Fill::NonZero,
-                transform,
-                palette::css::STEEL_BLUE,
-                None,
-                &convert_rect(&rect),
-            );
-        });
-        if self.cursor_visible {
-            if let Some(cursor) = self.editor.cursor_geometry(1.5) {
-                scene.fill(
-                    Fill::NonZero,
-                    transform,
-                    palette::css::WHITE,
-                    None,
-                    &convert_rect(&cursor),
-                );
-            }
-        }
+        // self.editor.selection_geometry_with(|rect, _| {
+        //     scene.fill(
+        //         Fill::NonZero,
+        //         transform,
+        //         palette::css::STEEL_BLUE,
+        //         None,
+        //         &convert_rect(&rect),
+        //     );
+        // });
+        // if self.cursor_visible {
+        //     if let Some(cursor) = self.editor.cursor_geometry(1.5) {
+        //         scene.fill(
+        //             Fill::NonZero,
+        //             transform,
+        //             palette::css::WHITE,
+        //             None,
+        //             &convert_rect(&cursor),
+        //         );
+        //     }
+        // }
         let layout = self.editor.layout(&mut self.font_cx, &mut self.layout_cx);
         for line in layout.lines() {
             for item in line.items() {
