@@ -576,24 +576,41 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         } else {
             self.lines.line_items[line.item_range.clone()].last()
         };
+        // TODO(LSR-545):
+        // https://github.com/linebender/parley/pull/276 saw our snapshot tests regress text that ends in trailing whitespace.
+        //
+        // We should be using the commented out code to calculate trailing whitespace.
         line.metrics.trailing_whitespace = run
-            .filter(|item| item.is_text_run() && item.has_trailing_whitespace)
-            .map(|run| {
-                fn whitespace_advance<'c, I: Iterator<Item = &'c ClusterData>>(clusters: I) -> f32 {
-                    clusters
-                        .take_while(|cluster| cluster.info.whitespace() != Whitespace::None)
-                        .map(|cluster| cluster.advance)
-                        .sum()
-                }
-
-                let clusters = &self.layout.data.clusters[run.cluster_range.clone()];
-                if run.is_rtl() {
-                    whitespace_advance(clusters.iter())
+            .filter(|item| item.is_text_run())
+            .and_then(|run| {
+                let cluster = if self.layout.is_rtl() {
+                    self.layout.data.clusters[run.cluster_range.clone()].first()
                 } else {
-                    whitespace_advance(clusters.iter().rev())
-                }
+                    self.layout.data.clusters[run.cluster_range.clone()].last()
+                };
+                cluster
+                    .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
+                    .map(|cluster| cluster.advance)
             })
             .unwrap_or(0.0);
+        // line.metrics.trailing_whitespace = run
+        //     .filter(|item| item.is_text_run() && item.has_trailing_whitespace)
+        //     .map(|run| {
+        //         fn whitespace_advance<'c, I: Iterator<Item = &'c ClusterData>>(clusters: I) -> f32 {
+        //             clusters
+        //                 .take_while(|cluster| cluster.info.whitespace() != Whitespace::None)
+        //                 .map(|cluster| cluster.advance)
+        //                 .sum()
+        //         }
+
+        //         let clusters = &self.layout.data.clusters[run.cluster_range.clone()];
+        //         if run.is_rtl() {
+        //             whitespace_advance(clusters.iter())
+        //         } else {
+        //             whitespace_advance(clusters.iter().rev())
+        //         }
+        //     })
+        //     .unwrap_or(0.0);
 
         if !have_metrics {
             // Line consisting entirely of whitespace?
