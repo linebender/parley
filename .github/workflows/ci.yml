@@ -121,7 +121,9 @@ jobs:
 
       - name: Install fontconfig-dev
         if: runner.os == 'Linux'
-        run: sudo apt-get install libfontconfig-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install libfontconfig-dev
 
       - name: install cargo-hack
         uses: taiki-e/install-action@v2
@@ -274,7 +276,9 @@ jobs:
 
       - name: Install fontconfig-dev
         if: runner.os == 'Linux'
-        run: sudo apt-get install libfontconfig-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install libfontconfig-dev
 
       - name: install cargo-hack
         uses: taiki-e/install-action@v2
