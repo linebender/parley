@@ -17,11 +17,12 @@ use super::style::{
 use crate::font::FontContext;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
-use crate::{LineHeight, OverflowWrap, TextWrapMode, WordBreakStrength, layout};
+use crate::{LineHeight, OverflowWrap, layout};
+use crate::{TextWrapMode, WordBreak};
 use core::borrow::Borrow;
 use core::ops::Range;
 use fontique::FamilyId;
-use swash::text::Language;
+use fontique::Language;
 
 /// Style with an associated range.
 #[derive(Debug, Clone)]
@@ -140,7 +141,9 @@ impl ResolveContext {
             StyleProperty::FontWeight(value) => FontWeight(*value),
             StyleProperty::FontVariations(value) => FontVariations(self.resolve_variations(value)),
             StyleProperty::FontFeatures(value) => FontFeatures(self.resolve_features(value)),
-            StyleProperty::Locale(value) => Locale(value.map(Language::parse).flatten()),
+            StyleProperty::Locale(value) => Locale(
+                value.and_then(|v| icu_locale_core::Locale::try_from_str(v).map(|v| v.id).ok()),
+            ),
             StyleProperty::Brush(value) => Brush(value.clone()),
             StyleProperty::Underline(value) => Underline(*value),
             StyleProperty::UnderlineOffset(value) => UnderlineOffset(value.map(|x| x * scale)),
@@ -175,7 +178,9 @@ impl ResolveContext {
             font_weight: raw_style.font_weight,
             font_variations: self.resolve_variations(&raw_style.font_variations),
             font_features: self.resolve_features(&raw_style.font_features),
-            locale: raw_style.locale.and_then(Language::parse),
+            locale: raw_style
+                .locale
+                .and_then(|v| icu_locale_core::Locale::try_from_str(v).map(|v| v.id).ok()),
             brush: raw_style.brush.clone(),
             underline: ResolvedDecoration {
                 enabled: raw_style.has_underline,
@@ -373,7 +378,7 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     /// Extra spacing between letters.
     LetterSpacing(f32),
     /// Control over where words can wrap.
-    WordBreak(WordBreakStrength),
+    WordBreak(WordBreak),
     /// Control over "emergency" line-breaking.
     OverflowWrap(OverflowWrap),
     /// Control over non-"emergency" line-breaking.
@@ -412,7 +417,7 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     /// Extra spacing between letters.
     pub(crate) letter_spacing: f32,
     /// Control over where words can wrap.
-    pub(crate) word_break: WordBreakStrength,
+    pub(crate) word_break: WordBreak,
     /// Control over "emergency" line-breaking.
     pub(crate) overflow_wrap: OverflowWrap,
     /// Control over non-"emergency" line-breaking.

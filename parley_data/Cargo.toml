@@ -1,5 +1,5 @@
 [package]
-name = "unicode_data"
+name = "parley_data"
 keywords = ["text", "layout"]
 categories = ["gui", "graphics"]
 edition.workspace = true
@@ -16,7 +16,6 @@ datagen = []
 [dependencies]
 icu_properties = { workspace = true }
 icu_collections = { workspace = true }
-unicode-bidi = { workspace = true }
 zerovec = { workspace = true, optional = true }
 
 [lints]

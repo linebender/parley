@@ -4,12 +4,13 @@
 //! Greedy line breaking.
 
 use alloc::vec::Vec;
-use swash::text::cluster::Whitespace;
 
 #[cfg(feature = "libm")]
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 
+use crate::analysis::Boundary;
+use crate::analysis::cluster::Whitespace;
 use crate::data::ClusterData;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
@@ -17,7 +18,6 @@ use crate::layout::{
 };
 use crate::style::Brush;
 use crate::{OverflowWrap, TextWrapMode};
-use swash::text::cluster::Boundary;
 
 use core::ops::Range;
 

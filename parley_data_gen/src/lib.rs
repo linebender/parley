@@ -15,8 +15,8 @@ use icu_properties::{
 };
 use icu_provider_export::prelude::*;
 use icu_provider_source::SourceDataProvider;
+use parley_data::Properties;
 use std::io::{BufWriter, Write};
-use unicode_data::Properties;
 
 const COPYRIGHT_HEADER: &str =
     "// Copyright 2025 the Parley Authors\n// SPDX-License-Identifier: Apache-2.0 OR MIT\n";
@@ -32,11 +32,12 @@ pub fn generate(out: std::path::PathBuf) {
         std::fs::create_dir_all(&icu4x_data_dir).unwrap();
 
         ExportDriver::new(
-            [DataLocaleFamily::single(locale!("en").into())],
-            DeduplicationStrategy::Maximal.into(),
+            [DataLocaleFamily::single(DataLocale::default())],
+            DeduplicationStrategy::None.into(),
             LocaleFallbacker::new_without_data(),
         )
         .with_markers([
+            icu_properties::provider::PropertyEnumBidiMirroringGlyphV1::INFO,
             icu_properties::provider::PropertyNameShortScriptV1::INFO,
             icu_segmenter::provider::SegmenterBreakGraphemeClusterV1::INFO,
             icu_segmenter::provider::SegmenterBreakWordOverrideV1::INFO,
@@ -45,10 +46,12 @@ pub fn generate(out: std::path::PathBuf) {
             icu_segmenter::provider::SegmenterBreakLineV1::INFO,
             icu_normalizer::provider::NormalizerNfcV1::INFO,
             icu_normalizer::provider::NormalizerNfdDataV1::INFO,
+            icu_normalizer::provider::NormalizerNfdSupplementV1::INFO,
             icu_normalizer::provider::NormalizerNfdTablesV1::INFO,
         ])
+        .with_segmenter_models([])
         .export(
-            &icu4x_source_provider.clone(),
+            &icu4x_source_provider,
             icu_provider_export::baked_exporter::BakedExporter::new(icu4x_data_dir.clone(), {
                 let mut o = icu_provider_export::baked_exporter::Options::default();
                 o.overwrite = true;
