@@ -1,3 +1,6 @@
+// Copyright 2025 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use super::utils::TestEnv;
 use crate::{Alignment, AlignmentOptions, test_name};
 
