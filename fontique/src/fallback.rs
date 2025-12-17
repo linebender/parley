@@ -3,7 +3,7 @@
 
 //! Support for script/language based font fallback.
 
-use super::{Language, family::FamilyId, script::Script};
+use super::{Language, Script, family::FamilyId};
 use alloc::vec::Vec;
 use hashbrown::HashMap;
 use smallvec::SmallVec;
@@ -179,15 +179,6 @@ where
     }
 }
 
-impl<S> From<S> for FallbackKey
-where
-    S: Into<Script>,
-{
-    fn from(value: S) -> Self {
-        Self::new(value, None)
-    }
-}
-
 #[derive(Clone, Default, Debug)]
 struct PerScript {
     default: Option<FamilyList>,
@@ -204,7 +195,7 @@ fn canonical_locale(script: Script, locale: Option<&Language>) -> Option<(bool, 
         .as_ref()
         .map(|s| s.as_str())
         .unwrap_or_default();
-    let (is_default, token) = match &script.0 {
+    let (is_default, token) = match &script.into_raw() {
         b"Arab" => match (lang, region) {
             ("ar", "") => (true, "ar"),
             ("ar", "IR") => (false, "ar-IR"),
