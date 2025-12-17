@@ -185,6 +185,129 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         self.done
     }
 
+    /// Computes the next line in the paragraph by character count.
+    ///
+    /// This method breaks lines based on the number of characters rather than advance width.
+    /// Each text cluster (including whitespace and newlines) counts as 1 character.
+    /// Each inline box also counts as 1 character.
+    /// Ligature components each count separately (matching character count).
+    ///
+    /// Unlike `break_next`, this method does not respect normal line break opportunities and
+    /// will break exactly when the character limit is reached.
+    pub fn break_next_with_length(&mut self, max_chars: u32) -> Option<()> {
+        if self.done {
+            return None;
+        }
+        self.prev_state = Some(self.state.clone());
+
+        // Track cluster count for this line
+        let mut char_count: u32 = 0;
+
+        // This macro simply calls the `commit_line` with the provided arguments and some parts of self.
+        macro_rules! try_commit_line {
+            ($break_reason:expr) => {
+                try_commit_line(
+                    self.layout,
+                    &mut self.lines,
+                    &mut self.state.line,
+                    f32::MAX, // No advance limit
+                    $break_reason,
+                )
+            };
+        }
+
+        let item_count = self.layout.data.items.len();
+        while self.state.item_idx < item_count {
+            let item = &self.layout.data.items[self.state.item_idx];
+
+            match item.kind {
+                LayoutItemKind::InlineBox => {
+                    let inline_box = &self.layout.data.inline_boxes[item.index];
+
+                    // Check if adding this box would exceed the limit
+                    if char_count >= max_chars && max_chars != 0 {
+                        // Break before this box
+                        if try_commit_line!(BreakReason::Regular) {
+                            self.start_new_line();
+                            return Some(());
+                        }
+                    }
+
+                    // Compute the x position for the line width tracking
+                    let next_x = self.state.line.x + inline_box.width;
+                    self.state.item_idx += 1;
+                    self.state
+                        .append_inline_box_to_line(next_x, inline_box.height);
+                    char_count += 1;
+
+                    // Check if we've reached the limit after adding this box
+                    if char_count >= max_chars {
+                        if try_commit_line!(BreakReason::Regular) {
+                            self.start_new_line();
+                            return Some(());
+                        }
+                    }
+                }
+                LayoutItemKind::TextRun => {
+                    let run_idx = item.index;
+                    let run_data = &self.layout.data.runs[run_idx];
+                    let run = Run::new(self.layout, 0, 0, run_data, None);
+                    let cluster_start = run_data.cluster_range.start;
+                    let cluster_end = run_data.cluster_range.end;
+
+                    while self.state.cluster_idx < cluster_end {
+                        let cluster = run.get(self.state.cluster_idx - cluster_start).unwrap();
+
+                        // Check if we should break before this cluster
+                        if char_count >= max_chars && max_chars != 0 {
+                            if try_commit_line!(BreakReason::Regular) {
+                                self.start_new_line();
+                                return Some(());
+                            }
+                        }
+
+                        let whitespace = cluster.info().whitespace();
+                        let is_space = whitespace.is_space_or_nbsp();
+                        let advance = cluster.advance();
+
+                        // Compute the x position
+                        let next_x = self.state.line.x + advance;
+                        let line_height = run.metrics().line_height;
+                        self.state.append_cluster_to_line(next_x, line_height);
+                        self.state.cluster_idx += 1;
+                        char_count += 1;
+
+                        if is_space {
+                            self.state.line.num_spaces += 1;
+                        }
+
+                        // Check if we've reached the limit after adding this cluster
+                        if char_count >= max_chars {
+                            if try_commit_line!(BreakReason::Regular) {
+                                self.start_new_line();
+                                return Some(());
+                            }
+                        }
+                    }
+                    self.state.run_idx += 1;
+                    self.state.item_idx += 1;
+                }
+            }
+        }
+
+        // Commit the final line
+        if self.state.line.items.end == 0 {
+            self.state.line.items.end = 1;
+        }
+        if try_commit_line!(BreakReason::None) {
+            self.done = true;
+            self.start_new_line();
+            return Some(());
+        }
+
+        None
+    }
+
     /// Computes the next line in the paragraph. Returns the advance and size
     /// (width and height for horizontal layouts) of the line.
     pub fn break_next(&mut self, max_advance: f32) -> Option<(f32, f32)> {
