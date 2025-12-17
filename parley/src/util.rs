@@ -16,7 +16,7 @@ pub(crate) fn nearly_zero(x: f32) -> bool {
 }
 
 /// A bounding box.
-#[derive(Clone, Copy, Default, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub struct BoundingBox {
     /// The left edge.
     pub x0: f64,
