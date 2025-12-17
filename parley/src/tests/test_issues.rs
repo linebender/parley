@@ -5,7 +5,7 @@ use super::utils::TestEnv;
 use crate::{Alignment, AlignmentOptions, test_name};
 
 /// Test that rendering RTL text doesn't affect subsequent LTR layouts.
-/// See https://github.com/linebender/parley/issues/489.
+/// See <https://github.com/linebender/parley/issues/489>.
 #[test]
 fn issue_489() {
     let mut env = TestEnv::new(test_name!(), None);
@@ -53,7 +53,7 @@ fn issue_489() {
 }
 
 /// Test that justified text is correctly aligned.
-/// See https://github.com/linebender/parley/issues/409.
+/// See <https://github.com/linebender/parley/issues/409>.
 #[test]
 fn issue_409() {
     let mut env = TestEnv::new(test_name!(), None);
