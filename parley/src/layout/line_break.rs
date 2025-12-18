@@ -562,7 +562,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         None
     }
 
-
     /// Reverts the last computed line, returning to the previous state.
     pub fn revert(&mut self) -> bool {
         if let Some(state) = self.prev_state.take() {
