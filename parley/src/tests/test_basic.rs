@@ -805,3 +805,216 @@ fn layout_impl_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<Layout<()>>();
 }
+
+#[test]
+fn break_by_length_basic() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // 6 characters "ABCDEF", break every 2 clusters -> 3 lines
+    let text = "ABCDEF";
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
+
+    let mut breaker = layout.break_lines();
+    breaker.break_next_with_length(2);
+    breaker.break_next_with_length(2);
+    breaker.break_next_with_length(2);
+    breaker.finish();
+
+    assert_eq!(layout.len(), 3, "Expected 3 lines");
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn break_by_length_varying_lengths() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // 10 characters "ABCDEFGHIJ", break at 3, 4, 3 clusters
+    let text = "ABCDEFGHIJ";
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
+
+    let mut breaker = layout.break_lines();
+    breaker.break_next_with_length(3); // ABC
+    breaker.break_next_with_length(4); // DEFG
+    breaker.break_next_with_length(3); // HIJ
+    breaker.finish();
+
+    assert_eq!(layout.len(), 3, "Expected 3 lines");
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn break_by_length_with_spaces() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // "AB CD" = 5 clusters (space counts)
+    let text = "AB CD";
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
+
+    let mut breaker = layout.break_lines();
+    breaker.break_next_with_length(3); // "AB " (including space)
+    breaker.break_next_with_length(2); // "CD"
+    breaker.finish();
+
+    assert_eq!(layout.len(), 2, "Expected 2 lines");
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn break_by_length_with_newline() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // "AB\nCD" = 5 clusters, newline counts as 1 and does NOT cause automatic break
+    let text = "AB\nCD";
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
+
+    // Break at 4 clusters: should get "AB\nC" on first line, "D" on second
+    let mut breaker = layout.break_lines();
+    breaker.break_next_with_length(4);
+    breaker.break_next_with_length(10); // remaining
+    breaker.finish();
+
+    assert_eq!(layout.len(), 2, "Expected 2 lines");
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn break_by_length_with_inline_box() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // "A[box]BC" where box counts as 1 cluster
+    let text = "ABC";
+    let mut builder = env.ranged_builder(text);
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        index: 1, // After 'A'
+        width: 10.0,
+        height: 10.0,
+    });
+    let mut layout = builder.build(text);
+
+    // Break at 2 clusters: "A[box]" on first line, "BC" on second
+    let mut breaker = layout.break_lines();
+    breaker.break_next_with_length(2);
+    breaker.break_next_with_length(10);
+    breaker.finish();
+
+    assert_eq!(layout.len(), 2, "Expected 2 lines");
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn break_by_length_multiple_inline_boxes() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // "[box][box][box]ABC" - 3 boxes + 3 chars = 6 clusters
+    let text = "ABC";
+    let mut builder = env.ranged_builder(text);
+    for id in 0..3 {
+        builder.push_inline_box(InlineBox {
+            id,
+            index: 0, // All at the start
+            width: 10.0,
+            height: 10.0,
+        });
+    }
+    let mut layout = builder.build(text);
+
+    // Break at 2 clusters each -> 3 lines
+    let mut breaker = layout.break_lines();
+    breaker.break_next_with_length(2);
+    breaker.break_next_with_length(2);
+    breaker.break_next_with_length(2);
+    breaker.finish();
+
+    assert_eq!(layout.len(), 3, "Expected 3 lines");
+    env.check_layout_snapshot(&layout);
+}
+
+/// This test verifies that breaking in the middle of a ligature produces valid glyphs.
+///
+/// When "abfi" is broken after 3 characters, the "fi" ligature is split with "f" on line 1
+/// and "i" on line 2. For proper rendering, the "i" cluster on line 2 should contain a
+/// valid glyph. However, parley does not currently support re-shaping after layout, so
+/// the ligature continuation cluster ("i") has no glyphs - they all belong to the ligature
+/// start cluster ("f") which is on the previous line.
+#[test]
+#[should_panic(expected = "no item on line 2")]
+fn break_by_length_with_ligature() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // "abfi" has ligature "fi" which should count as 2 clusters (matching character count)
+    let text = "abfi";
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
+
+    // Break at 3 clusters: "abf" on first line, "i" on second
+    let mut breaker = layout.break_lines();
+    breaker.break_next_with_length(3);
+    breaker.break_next_with_length(10);
+    breaker.finish();
+
+    assert_eq!(layout.len(), 2, "Expected 2 lines");
+
+    // Get the second line and verify the "i" cluster has a valid glyph
+    let line2 = layout.get(1).expect("Expected line 2 to exist");
+
+    // Line 2 should have an item containing the "i" cluster
+    let item = line2.items().next();
+    let glyph_run = match item {
+        Some(crate::PositionedLayoutItem::GlyphRun(glyph_run)) => glyph_run,
+        Some(crate::PositionedLayoutItem::InlineBox(_)) => panic!("unexpected inline box"),
+        None => panic!("no item on line 2"),
+    };
+
+    // The "i" cluster should have at least one glyph for proper rendering.
+    // This assertion will fail because parley doesn't re-shape after breaking a ligature.
+    let cluster = glyph_run.run().clusters().next();
+    match cluster {
+        Some(c) if c.glyphs().count() > 0 => {
+            // Success - the ligature was properly broken and reshaped
+        }
+        _ => panic!("ligature was not properly broken"),
+    }
+
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn break_by_length_exact_fit() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // "ABCD" = 4 clusters, break at exactly 4
+    let text = "ABCD";
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
+
+    let mut breaker = layout.break_lines();
+    breaker.break_next_with_length(4);
+    breaker.finish();
+
+    assert_eq!(layout.len(), 1, "Expected 1 line");
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn break_by_length_single_cluster_lines() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // "ABC" = 3 clusters, break every 1 cluster -> 3 lines
+    let text = "ABC";
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
+
+    let mut breaker = layout.break_lines();
+    breaker.break_next_with_length(1);
+    breaker.break_next_with_length(1);
+    breaker.break_next_with_length(1);
+    breaker.finish();
+
+    assert_eq!(layout.len(), 3, "Expected 3 lines");
+    env.check_layout_snapshot(&layout);
+}
