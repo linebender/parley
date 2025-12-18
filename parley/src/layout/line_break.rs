@@ -192,7 +192,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     /// Ligature components each count separately (matching character count).
     ///
     /// Unlike `break_next`, this method does not respect normal line break opportunities and
-    /// will break exactly when the character limit is reached.
+    /// will break exactly when the character limit is reached. It does not break on newlines, for example.
     pub fn break_next_with_length(&mut self, max_chars: u32) -> Option<()> {
         if self.done {
             return None;
