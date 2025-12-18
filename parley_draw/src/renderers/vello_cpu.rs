@@ -1,4 +1,4 @@
-// Copyright 2025 the Parley Authors
+// Copyright 2025 the Vello Authors and the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Glyph renderer implementation using Vello CPU.
