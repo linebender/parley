@@ -498,9 +498,22 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     char_count += 1;
 
                     // Check if we've reached the limit after adding this box
-                    if char_count >= max_chars && try_commit_line!(BreakReason::Regular) {
-                        self.start_new_line();
-                        return Some(());
+                    if char_count >= max_chars {
+                        // Check if we've consumed all content (this is the last line).
+                        let is_last_item = self.state.item_idx >= self.layout.data.items.len();
+                        let break_reason = if is_last_item {
+                            BreakReason::None
+                        } else {
+                            BreakReason::Regular
+                        };
+
+                        if try_commit_line!(break_reason) {
+                            if break_reason == BreakReason::None {
+                                self.done = true;
+                            }
+                            self.start_new_line();
+                            return Some(());
+                        }
                     }
                 }
                 LayoutItemKind::TextRun => {
@@ -523,11 +536,17 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         }
 
                         let whitespace = cluster.info().whitespace();
+                        let is_newline = whitespace == Whitespace::Newline;
                         let is_space = whitespace.is_space_or_nbsp();
                         let advance = cluster.advance();
 
-                        // Compute the x position
-                        let next_x = self.state.line.x + advance;
+                        // Compute the x position.
+                        // Newlines don't contribute to line width (matching break_next behavior).
+                        let next_x = if is_newline {
+                            self.state.line.x
+                        } else {
+                            self.state.line.x + advance
+                        };
                         let line_height = run.metrics().line_height;
                         self.state.append_cluster_to_line(next_x, line_height);
                         self.state.cluster_idx += 1;
@@ -538,9 +557,29 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         }
 
                         // Check if we've reached the limit after adding this cluster
-                        if char_count >= max_chars && try_commit_line!(BreakReason::Regular) {
-                            self.start_new_line();
-                            return Some(());
+                        if char_count >= max_chars {
+                            // Determine the break reason to match break_next behavior:
+                            // - BreakReason::None for the last line (end of content)
+                            // - BreakReason::Explicit if this line ends with a newline
+                            // - BreakReason::Regular for soft wraps
+                            let is_last_cluster_of_run = self.state.cluster_idx >= cluster_end;
+                            let is_last_item =
+                                self.state.item_idx + 1 >= self.layout.data.items.len();
+                            let break_reason = if is_last_cluster_of_run && is_last_item {
+                                BreakReason::None
+                            } else if is_newline {
+                                BreakReason::Explicit
+                            } else {
+                                BreakReason::Regular
+                            };
+
+                            if try_commit_line!(break_reason) {
+                                if break_reason == BreakReason::None {
+                                    self.done = true;
+                                }
+                                self.start_new_line();
+                                return Some(());
+                            }
                         }
                     }
                     self.state.run_idx += 1;
@@ -549,7 +588,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
         }
 
-        // Commit the final line
+        // Commit the final line (only reached if content remains after all break_next_with_length calls)
         if self.state.line.items.end == 0 {
             self.state.line.items.end = 1;
         }

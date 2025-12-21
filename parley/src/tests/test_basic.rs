@@ -1018,3 +1018,178 @@ fn break_by_length_single_cluster_lines() {
     assert_eq!(layout.len(), 3, "Expected 3 lines");
     env.check_layout_snapshot(&layout);
 }
+
+/// This test verifies that `break_next_with_length` produces the same layout metrics as
+/// `break_all_lines` when breaking at the same cluster positions.
+///
+/// The test applies letter spacing to text with newlines and compares:
+/// 1. A layout broken with `break_all_lines(None)` (breaks on newlines only)
+/// 2. A layout broken with `break_next_with_length` using cluster counts from (1)
+#[test]
+fn break_by_length_matches_max_advance_with_letter_spacing() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Text with newlines and multiple spaces as the user specified
+    let text = "01 2  \n\n  34\n 5";
+
+    // Create first layout with letter spacing, broken by max_advance (respects newlines)
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::LetterSpacing(2.0));
+    let mut layout_max_advance = builder.build(text);
+    layout_max_advance.break_all_lines(None);
+    layout_max_advance.align(None, Alignment::Start, AlignmentOptions::default());
+
+    // Count clusters per line from the max_advance layout by summing cluster ranges of line items
+    let cluster_counts: Vec<u32> = layout_max_advance
+        .data
+        .lines
+        .iter()
+        .map(|line| {
+            let mut count = 0u32;
+            for line_item in &layout_max_advance.data.line_items[line.item_range.clone()] {
+                count += (line_item.cluster_range.end - line_item.cluster_range.start) as u32;
+            }
+            count
+        })
+        .collect();
+
+    // Create second layout with the same letter spacing, broken by length
+    let mut builder2 = env.ranged_builder(text);
+    builder2.push_default(StyleProperty::LetterSpacing(2.0));
+    let mut layout_by_length = builder2.build(text);
+
+    let mut breaker = layout_by_length.break_lines();
+    for count in &cluster_counts {
+        breaker.break_next_with_length(*count);
+    }
+    breaker.finish();
+    layout_by_length.align(None, Alignment::Start, AlignmentOptions::default());
+
+    // Compare the layouts - they should have the same line count
+    assert_eq!(
+        layout_max_advance.len(),
+        layout_by_length.len(),
+        "Line count mismatch: max_advance={}, by_length={}",
+        layout_max_advance.len(),
+        layout_by_length.len()
+    );
+
+    // Compare line-by-line metrics
+    for (i, (line_a, line_b)) in layout_max_advance
+        .data
+        .lines
+        .iter()
+        .zip(layout_by_length.data.lines.iter())
+        .enumerate()
+    {
+        assert_eq!(
+            line_a.metrics.offset, line_b.metrics.offset,
+            "Line {i} offset mismatch: max_advance={}, by_length={}",
+            line_a.metrics.offset, line_b.metrics.offset
+        );
+        assert_eq!(
+            line_a.metrics.advance, line_b.metrics.advance,
+            "Line {i} advance mismatch: max_advance={}, by_length={}",
+            line_a.metrics.advance, line_b.metrics.advance
+        );
+        assert_eq!(
+            line_a.text_range, line_b.text_range,
+            "Line {i} text_range mismatch"
+        );
+    }
+
+    // Compare line item cluster ranges
+    for (i, (item_a, item_b)) in layout_max_advance
+        .data
+        .line_items
+        .iter()
+        .zip(layout_by_length.data.line_items.iter())
+        .enumerate()
+    {
+        assert_eq!(
+            item_a.cluster_range, item_b.cluster_range,
+            "Line item {i} cluster_range mismatch"
+        );
+    }
+
+    // Compare overall layout dimensions
+    assert_eq!(
+        layout_max_advance.width(),
+        layout_by_length.width(),
+        "Layout width mismatch"
+    );
+    assert_eq!(
+        layout_max_advance.height(),
+        layout_by_length.height(),
+        "Layout height mismatch"
+    );
+
+    // Check both snapshots
+    env.with_name("max_advance")
+        .check_layout_snapshot(&layout_max_advance);
+    env.with_name("by_length")
+        .check_layout_snapshot(&layout_by_length);
+}
+
+/// This test verifies that the last line of justified text is start-aligned when using
+/// `break_next_with_length`, matching the behavior of `break_all_lines`.
+#[test]
+fn break_by_length_justified_last_line_start_aligned() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "AAA BBB CCC";
+
+    // Create layout with break_all_lines and justify
+    let builder = env.ranged_builder(text);
+    let mut layout_max_advance = builder.build(text);
+    layout_max_advance.break_all_lines(Some(60.0)); // Force wrapping
+    layout_max_advance.align(Some(100.0), Alignment::Justify, AlignmentOptions::default());
+
+    // Get cluster counts per line
+    let cluster_counts: Vec<u32> = layout_max_advance
+        .data
+        .lines
+        .iter()
+        .map(|line| {
+            let mut count = 0u32;
+            for line_item in &layout_max_advance.data.line_items[line.item_range.clone()] {
+                count += (line_item.cluster_range.end - line_item.cluster_range.start) as u32;
+            }
+            count
+        })
+        .collect();
+
+    // Create layout with break_next_with_length and justify
+    let builder2 = env.ranged_builder(text);
+    let mut layout_by_length = builder2.build(text);
+    let mut breaker = layout_by_length.break_lines();
+    for count in &cluster_counts {
+        breaker.break_next_with_length(*count);
+    }
+    breaker.finish();
+    layout_by_length.align(Some(100.0), Alignment::Justify, AlignmentOptions::default());
+
+    // Verify both layouts have the same number of lines
+    assert_eq!(layout_max_advance.len(), layout_by_length.len());
+
+    // Verify the break reasons match (important for justification behavior)
+    for (i, (line_a, line_b)) in layout_max_advance
+        .data
+        .lines
+        .iter()
+        .zip(layout_by_length.data.lines.iter())
+        .enumerate()
+    {
+        assert_eq!(
+            line_a.break_reason, line_b.break_reason,
+            "Line {i} break_reason mismatch: max_advance={:?}, by_length={:?}",
+            line_a.break_reason, line_b.break_reason
+        );
+    }
+
+    // Check both snapshots
+    env.with_name("max_advance")
+        .check_layout_snapshot(&layout_max_advance);
+    env.with_name("by_length")
+        .check_layout_snapshot(&layout_by_length);
+}
