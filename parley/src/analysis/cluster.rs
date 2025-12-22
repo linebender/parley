@@ -257,18 +257,13 @@ impl CharCluster {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 #[allow(clippy::upper_case_acronyms)]
 enum FormKind {
+    #[default]
     Original,
     NFD,
     NFC,
-}
-
-impl Default for FormKind {
-    fn default() -> Self {
-        Self::Original
-    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
