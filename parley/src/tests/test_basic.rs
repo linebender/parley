@@ -172,7 +172,7 @@ fn trailing_whitespace_ltr() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name("hard_wrap").check_layout_snapshot(&layout);
     }
@@ -187,7 +187,7 @@ fn trailing_whitespace_rtl() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(45.));
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name("soft_wrap").check_layout_snapshot(&layout);
     }
@@ -197,7 +197,7 @@ fn trailing_whitespace_rtl() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name("hard_wrap").check_layout_snapshot(&layout);
     }
@@ -215,7 +215,7 @@ fn trailing_whitespace_bidi() {
             let builder = env.ranged_builder(text);
             let mut layout = builder.build(text);
             layout.break_all_lines(Some(45.));
-            layout.align(None, Alignment::Start, AlignmentOptions::default());
+            layout.align(Alignment::Start, AlignmentOptions::default());
 
             env.with_name(test_case_name).check_layout_snapshot(&layout);
         }
@@ -229,7 +229,7 @@ fn trailing_whitespace_bidi() {
             let builder = env.ranged_builder(text);
             let mut layout = builder.build(text);
             layout.break_all_lines(None);
-            layout.align(None, Alignment::Start, AlignmentOptions::default());
+            layout.align(Alignment::Start, AlignmentOptions::default());
 
             env.with_name(test_case_name).check_layout_snapshot(&layout);
         }
