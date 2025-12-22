@@ -143,11 +143,9 @@ impl SystemFonts {
                                                             script_fallback
                                                                 .push((script!("Hani"), *family));
                                                         }
-                                                        locale_fallback.push((
-                                                            locale.to_string().into(),
-                                                            *family,
-                                                        ));
                                                     }
+                                                    locale_fallback
+                                                        .push((locale.to_string().into(), *family));
                                                 }
                                             }
                                         }
