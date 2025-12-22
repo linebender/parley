@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use crate::analysis::provider::PROVIDER;
-use crate::resolve::RangedStyle;
+use crate::resolve::{RangedStyle, ResolvedStyle};
 use crate::{Brush, LayoutContext, WordBreak};
 
 use icu_normalizer::properties::{
@@ -243,7 +243,7 @@ pub(crate) enum Boundary {
     Mandatory = 3,
 }
 
-pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
+pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str) {
     struct WordBreakSegmentIter<'a, I: Iterator, B: Brush> {
         text: &'a str,
         styles: I,
@@ -325,7 +325,15 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, text: &str) {
         }
     }
 
-    let text = if text.is_empty() { " " } else { text };
+    if text.is_empty() {
+        text = " ";
+        if lcx.styles.is_empty() {
+            lcx.styles.push(RangedStyle {
+                style: ResolvedStyle::default(),
+                range: 0..0,
+            });
+        }
+    }
 
     let mut line_segmenters = core::mem::take(&mut lcx.analysis_data_sources.line_segmenters);
 
