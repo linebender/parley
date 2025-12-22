@@ -165,8 +165,9 @@ pub(crate) struct LineData {
     pub(crate) break_reason: BreakReason,
     /// Maximum advance for the line.
     pub(crate) max_advance: f32,
-    /// Number of justified clusters on the line.
-    pub(crate) num_spaces: usize,
+    /// The number of non-trailing spaces on the line.
+    /// Used for justification.
+    pub(crate) num_non_trailing_spaces: usize,
 }
 
 impl LineData {
