@@ -18,7 +18,6 @@ use crate::layout::{
 };
 use crate::style::Brush;
 use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
-use swash::text::cluster::Boundary;
 
 use core::ops::Range;
 
