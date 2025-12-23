@@ -4,11 +4,12 @@
 use std::{path::Path, str::FromStr, sync::Arc};
 
 use hashbrown::HashMap;
-use icu_locale_core::LanguageIdentifier;
+use icu_locale_core::subtags::script;
 use roxmltree::{Document, Node};
 
 use super::{
-    FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily, GenericFamilyMap, Script, scan,
+    FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily, GenericFamilyMap, Language,
+    Script, scan,
 };
 
 // TODO: Use actual generic families here, where available, when fonts.xml is properly parsed.
@@ -123,22 +124,24 @@ impl SystemFonts {
                                             for lang in langs {
                                                 if let Some(scr) = lang.strip_prefix("und-") {
                                                     // Undefined lang for script-only fallbacks
-                                                    script_fallback.push((scr.into(), *family));
+                                                    script_fallback.push((
+                                                        scr.parse().unwrap_or(script!("Zzzz")),
+                                                        *family,
+                                                    ));
                                                 } else if let Ok(locale) =
-                                                    LanguageIdentifier::try_from_str(lang)
+                                                    Language::try_from_str(lang)
                                                 {
                                                     if let Some(scr) = locale.script {
                                                         // Also fallback for the script on its own
-                                                        script_fallback
-                                                            .push((scr.as_str().into(), *family));
-                                                        if "Hant" == scr.as_str() {
+                                                        script_fallback.push((scr, *family));
+                                                        if script!("Hant") == scr {
                                                             // This works around ambiguous han char­
                                                             // acters going unmapped with current
                                                             // fallback code. This should be done in
                                                             // a locale-dependent manner, since that
                                                             // is the norm.
                                                             script_fallback
-                                                                .push(("Hani".into(), *family));
+                                                                .push((script!("Hani"), *family));
                                                         }
                                                     }
                                                     locale_fallback

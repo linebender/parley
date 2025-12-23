@@ -38,7 +38,7 @@ use smallvec::SmallVec;
 
 use crate::{
     FallbackKey, FamilyId, FamilyInfo, FontInfo, FontStyle, FontWeight, FontWidth, GenericFamily,
-    Script,
+    Script, ScriptExt,
     family_name::{FamilyName, FamilyNameMap},
     generic::GenericFamilyMap,
     source::SourcePathMap,
