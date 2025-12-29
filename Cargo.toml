@@ -10,6 +10,8 @@ members = [
     "parley_data_gen",
     "parley_dev",
     "parley_draw",
+    "styled_text",
+    "text_style",
     "examples/swash_render",
     "examples/tiny_skia_render",
     "examples/vello_cpu_render",
