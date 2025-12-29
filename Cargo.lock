@@ -4287,6 +4287,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "styled_text"
+version = "0.1.0"
+dependencies = [
+ "attributed_text",
+ "text_primitives",
+]
+
+[[package]]
+name = "styled_text_parley"
+version = "0.1.0"
+dependencies = [
+ "attributed_text",
+ "parley",
+ "styled_text",
+]
+
+[[package]]
 name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4875,6 +4892,17 @@ dependencies = [
  "parley",
  "parley_draw",
  "skrifa 0.40.0",
+ "vello_cpu",
+]
+
+[[package]]
+name = "vello_cpu_render_styled_text"
+version = "0.1.0"
+dependencies = [
+ "parley",
+ "parley_draw",
+ "styled_text",
+ "styled_text_parley",
  "vello_cpu",
 ]
 
