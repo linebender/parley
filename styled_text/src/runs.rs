@@ -1,16 +1,48 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use alloc::collections::BTreeSet;
+use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt::Debug;
 use core::ops::Range;
 
 use attributed_text::TextStorage;
 use text_style::InlineResolveContext;
-use text_style::{ComputedInlineStyle, InlineStyle, ResolveStyleError};
+use text_style::{ComputedInlineStyle, InlineDeclaration, InlineStyle, ResolveStyleError};
 
 use crate::text::StyledText;
 use crate::traits::HasInlineStyle;
+
+#[derive(Clone, Debug)]
+struct Span<'a> {
+    declarations: &'a [InlineDeclaration],
+}
+
+const INLINE_DECL_KEY_COUNT: usize = 14;
+
+fn inline_decl_key_index(decl: &InlineDeclaration) -> Option<usize> {
+    match decl {
+        InlineDeclaration::FontStack(_) => Some(0),
+        InlineDeclaration::FontSize(_) => Some(1),
+        InlineDeclaration::FontStyle(_) => Some(2),
+        InlineDeclaration::FontWeight(_) => Some(3),
+        InlineDeclaration::FontWidth(_) => Some(4),
+        InlineDeclaration::FontVariations(_) => Some(5),
+        InlineDeclaration::FontFeatures(_) => Some(6),
+        InlineDeclaration::Locale(_) => Some(7),
+        InlineDeclaration::Underline(_) => Some(8),
+        InlineDeclaration::Strikethrough(_) => Some(9),
+        InlineDeclaration::LineHeight(_) => Some(10),
+        InlineDeclaration::WordSpacing(_) => Some(11),
+        InlineDeclaration::LetterSpacing(_) => Some(12),
+        InlineDeclaration::BidiControl(_) => Some(13),
+        // `InlineDeclaration` is `#[non_exhaustive]`, so new variants can be added in `text_style`
+        // without breaking `styled_text`. Returning `None` triggers a slower fallback path that
+        // preserves correct "last writer wins" semantics for unknown properties.
+        _ => None,
+    }
+}
 
 /// A resolved inline style run for a contiguous text range.
 #[derive(Clone, Debug, PartialEq)]
@@ -29,6 +61,11 @@ pub struct InlineStyleRun {
 pub struct ResolvedInlineRuns<'a, T: Debug + TextStorage, A: Debug + HasInlineStyle> {
     pub(crate) styled: &'a StyledText<T, A>,
     pub(crate) boundaries: Vec<usize>,
+    start_events: Vec<Vec<usize>>,
+    end_events: Vec<Vec<usize>>,
+    spans: Vec<Span<'a>>,
+    active: BTreeSet<usize>,
+    scratch: InlineStyle,
     pub(crate) index: usize,
 }
 
@@ -44,27 +81,109 @@ impl<'a, T: Debug + TextStorage, A: Debug + HasInlineStyle> ResolvedInlineRuns<'
         }
         boundaries.sort_unstable();
         boundaries.dedup();
+
+        let mut start_events = vec![Vec::new(); boundaries.len()];
+        let mut end_events = vec![Vec::new(); boundaries.len()];
+        let mut spans = Vec::new();
+
+        for (range, attr) in styled.attributed.attributes_iter() {
+            if range.start == range.end {
+                continue;
+            }
+            let start_boundary = boundaries
+                .binary_search(&range.start)
+                .expect("attribute boundary start should be in boundary list");
+            let end_boundary = boundaries
+                .binary_search(&range.end)
+                .expect("attribute boundary end should be in boundary list");
+            if start_boundary == end_boundary {
+                continue;
+            }
+
+            let id = spans.len();
+            spans.push(Span {
+                declarations: attr.inline_style().declarations(),
+            });
+            start_events[start_boundary].push(id);
+            end_events[end_boundary].push(id);
+        }
+
         Self {
             styled,
             boundaries,
+            start_events,
+            end_events,
+            spans,
+            active: BTreeSet::new(),
+            scratch: InlineStyle::new(),
             index: 0,
         }
     }
 
-    pub(crate) fn compute_style(
-        &self,
-        start: usize,
-        end: usize,
+    fn update_active_for_boundary(&mut self, boundary_index: usize) {
+        for &id in &self.end_events[boundary_index] {
+            self.active.remove(&id);
+        }
+        for &id in &self.start_events[boundary_index] {
+            self.active.insert(id);
+        }
+    }
+
+    fn compute_style_for_current_segment(
+        &mut self,
     ) -> Result<ComputedInlineStyle, ResolveStyleError> {
-        let mut merged = InlineStyle::new();
-        for (range, attr) in self.styled.attributed.attributes_iter() {
-            if range.start < end && range.end > start {
-                for declaration in attr.inline_style().declarations() {
-                    merged.push_declaration(declaration.clone());
+        self.scratch.clear();
+
+        let mut has_unknown = false;
+        'outer: for &span_id in self.active.iter().rev() {
+            let span = &self.spans[span_id];
+            for decl in span.declarations.iter() {
+                if inline_decl_key_index(decl).is_none() {
+                    has_unknown = true;
+                    break 'outer;
                 }
             }
         }
-        merged.resolve(InlineResolveContext::new(
+
+        if has_unknown {
+            // Preserve semantics for forward-compatible `InlineDeclaration` variants: merge all
+            // active declarations in authoring order.
+            for &span_id in &self.active {
+                for decl in self.spans[span_id].declarations {
+                    self.scratch.push_declaration(decl.clone());
+                }
+            }
+        } else {
+            let mut picked: [Option<InlineDeclaration>; INLINE_DECL_KEY_COUNT] =
+                core::array::from_fn(|_| None);
+            let mut remaining = INLINE_DECL_KEY_COUNT;
+
+            for &span_id in self.active.iter().rev() {
+                let span = &self.spans[span_id];
+                for decl in span.declarations.iter().rev() {
+                    let Some(idx) = inline_decl_key_index(decl) else {
+                        continue;
+                    };
+                    if picked[idx].is_some() {
+                        continue;
+                    }
+                    picked[idx] = Some(decl.clone());
+                    remaining -= 1;
+                    if remaining == 0 {
+                        break;
+                    }
+                }
+                if remaining == 0 {
+                    break;
+                }
+            }
+
+            for decl in picked.into_iter().flatten() {
+                self.scratch.push_declaration(decl);
+            }
+        }
+
+        self.scratch.resolve(InlineResolveContext::new(
             &self.styled.base_inline,
             &self.styled.initial_inline,
             &self.styled.root_inline,
@@ -77,6 +196,7 @@ impl<T: Debug + TextStorage, A: Debug + HasInlineStyle> Iterator for ResolvedInl
 
     fn next(&mut self) -> Option<Self::Item> {
         while self.index + 1 < self.boundaries.len() {
+            self.update_active_for_boundary(self.index);
             let start = self.boundaries[self.index];
             let end = self.boundaries[self.index + 1];
             self.index += 1;
@@ -84,10 +204,13 @@ impl<T: Debug + TextStorage, A: Debug + HasInlineStyle> Iterator for ResolvedInl
                 continue;
             }
 
-            return Some(self.compute_style(start, end).map(|style| InlineStyleRun {
-                range: start..end,
-                style,
-            }));
+            return Some(
+                self.compute_style_for_current_segment()
+                    .map(|style| InlineStyleRun {
+                        range: start..end,
+                        style,
+                    }),
+            );
         }
         None
     }
@@ -99,12 +222,16 @@ impl<T: Debug + TextStorage, A: Debug + HasInlineStyle> Iterator for ResolvedInl
 #[derive(Clone, Debug)]
 pub struct CoalescedInlineRuns<'a, T: Debug + TextStorage, A: Debug + HasInlineStyle> {
     pub(crate) inner: ResolvedInlineRuns<'a, T, A>,
+    pending: Option<InlineStyleRun>,
+    terminated: bool,
 }
 
 impl<'a, T: Debug + TextStorage, A: Debug + HasInlineStyle> CoalescedInlineRuns<'a, T, A> {
     pub(crate) fn new(styled: &'a StyledText<T, A>) -> Self {
         Self {
             inner: ResolvedInlineRuns::new(styled),
+            pending: None,
+            terminated: false,
         }
     }
 }
@@ -113,54 +240,36 @@ impl<T: Debug + TextStorage, A: Debug + HasInlineStyle> Iterator for CoalescedIn
     type Item = Result<InlineStyleRun, ResolveStyleError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while self.inner.index + 1 < self.inner.boundaries.len() {
-            let start = self.inner.boundaries[self.inner.index];
-            let mut end = self.inner.boundaries[self.inner.index + 1];
-            self.inner.index += 1;
-            if start == end {
-                continue;
-            }
+        if self.terminated {
+            return None;
+        }
 
-            let mut style = match self.inner.compute_style(start, end) {
-                Ok(style) => style,
-                Err(err) => {
-                    // Propagate the error and terminate the iterator.
-                    self.inner.index = self.inner.boundaries.len();
+        let mut run = match self.pending.take().map(Ok).or_else(|| self.inner.next())? {
+            Ok(run) => run,
+            Err(err) => {
+                self.terminated = true;
+                return Some(Err(err));
+            }
+        };
+
+        loop {
+            match self.inner.next() {
+                None => break,
+                Some(Err(err)) => {
+                    self.terminated = true;
                     return Some(Err(err));
                 }
-            };
-
-            while self.inner.index + 1 < self.inner.boundaries.len() {
-                let next_start = self.inner.boundaries[self.inner.index];
-                let next_end = self.inner.boundaries[self.inner.index + 1];
-                if next_start == next_end {
-                    self.inner.index += 1;
-                    continue;
-                }
-                debug_assert_eq!(
-                    next_start, end,
-                    "run boundaries should be contiguous after dedup/sort"
-                );
-                let next_style = match self.inner.compute_style(next_start, next_end) {
-                    Ok(s) => s,
-                    Err(err) => {
-                        self.inner.index = self.inner.boundaries.len();
-                        return Some(Err(err));
+                Some(Ok(next_run)) => {
+                    if next_run.range.start == run.range.end && next_run.style == run.style {
+                        run.range.end = next_run.range.end;
+                        continue;
                     }
-                };
-                if next_style != style {
+                    self.pending = Some(next_run);
                     break;
                 }
-                style = next_style;
-                end = next_end;
-                self.inner.index += 1;
             }
-
-            return Some(Ok(InlineStyleRun {
-                range: start..end,
-                style,
-            }));
         }
-        None
+
+        Some(Ok(run))
     }
 }

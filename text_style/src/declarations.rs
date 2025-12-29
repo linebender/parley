@@ -96,6 +96,29 @@ impl InlineStyle {
         &self.declarations
     }
 
+    /// Removes all declarations from this style, retaining the allocated storage.
+    ///
+    /// This is useful for reusing an `InlineStyle` as scratch storage when generating many
+    /// computed runs.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    /// use text_style::{InlineDeclaration, InlineStyle, Specified};
+    ///
+    /// let mut style = InlineStyle::new().underline(Specified::Value(true));
+    /// assert_eq!(style.declarations().len(), 1);
+    ///
+    /// style.clear();
+    /// assert!(style.declarations().is_empty());
+    ///
+    /// style.push_declaration(InlineDeclaration::Underline(Specified::Value(false)));
+    /// assert_eq!(style.declarations().len(), 1);
+    /// ```
+    pub fn clear(&mut self) {
+        self.declarations.clear();
+    }
+
     /// Appends a declaration to this style.
     pub fn push_declaration(&mut self, declaration: InlineDeclaration) {
         self.declarations.push(declaration);
