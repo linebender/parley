@@ -4274,6 +4274,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "styled_text"
+version = "0.1.0"
+dependencies = [
+ "attributed_text",
+ "text_style",
+]
+
+[[package]]
 name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4407,6 +4415,13 @@ name = "text_primitives"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
+]
+
+[[package]]
+name = "text_style"
+version = "0.1.0"
+dependencies = [
+ "text_primitives",
 ]
 
 [[package]]
