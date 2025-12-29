@@ -4279,6 +4279,7 @@ version = "0.1.0"
 dependencies = [
  "attributed_text",
  "text_style",
+ "text_style_resolve",
 ]
 
 [[package]]
@@ -4413,6 +4414,13 @@ dependencies = [
 [[package]]
 name = "text_style"
 version = "0.1.0"
+
+[[package]]
+name = "text_style_resolve"
+version = "0.1.0"
+dependencies = [
+ "text_style",
+]
 
 [[package]]
 name = "thiserror"

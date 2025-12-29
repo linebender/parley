@@ -1,22 +1,24 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use alloc::vec::Vec;
+
 use crate::ParseSettingsError;
 use crate::computed::{ComputedInlineStyle, ComputedLineHeight, ComputedParagraphStyle};
 use crate::context::{InlineResolveContext, ParagraphResolveContext};
-use crate::declarations::{InlineDeclaration, ParagraphDeclaration};
 use crate::error::ResolveStyleError;
 use crate::parse::{parse_feature_settings, parse_variation_settings};
-use crate::settings::{Setting, Settings};
-use crate::specified::Specified;
-use crate::values::{FontSize, LineHeight, Spacing};
-use crate::{
-    BaseDirection, BidiControl, FontStack, FontStyle, FontWeight, FontWidth, OverflowWrap,
-    TextWrapMode, WordBreak,
+use text_style::{
+    BaseDirection, BidiControl, FontSize, FontStack, FontStyle, FontWeight, FontWidth,
+    InlineDeclaration, LineHeight, OverflowWrap, ParagraphDeclaration, Setting, Settings, Spacing,
+    Specified, TextWrapMode, WordBreak,
 };
-use alloc::vec::Vec;
 
-pub(crate) fn resolve_inline_declarations(
+/// Resolves a list of inline declarations into a computed inline style.
+///
+/// The input is treated as a declaration list: if multiple declarations of the same property are
+/// present, the last declaration wins.
+pub fn resolve_inline_declarations(
     declarations: &[InlineDeclaration],
     ctx: InlineResolveContext<'_>,
 ) -> Result<ComputedInlineStyle, ResolveStyleError> {
@@ -51,6 +53,7 @@ pub(crate) fn resolve_inline_declarations(
             InlineDeclaration::WordSpacing(v) => word_spacing = Some(v),
             InlineDeclaration::LetterSpacing(v) => letter_spacing = Some(v),
             InlineDeclaration::BidiControl(v) => bidi_control = Some(v),
+            _ => {}
         }
     }
 
@@ -141,7 +144,11 @@ pub(crate) fn resolve_inline_declarations(
     Ok(out)
 }
 
-pub(crate) fn resolve_paragraph_declarations(
+/// Resolves a list of paragraph declarations into a computed paragraph style.
+///
+/// The input is treated as a declaration list: if multiple declarations of the same property are
+/// present, the last declaration wins.
+pub fn resolve_paragraph_declarations(
     declarations: &[ParagraphDeclaration],
     ctx: ParagraphResolveContext<'_>,
 ) -> ComputedParagraphStyle {
@@ -156,6 +163,7 @@ pub(crate) fn resolve_paragraph_declarations(
             ParagraphDeclaration::WordBreak(v) => word_break = Some(v),
             ParagraphDeclaration::OverflowWrap(v) => overflow_wrap = Some(v),
             ParagraphDeclaration::TextWrapMode(v) => text_wrap_mode = Some(v),
+            _ => {}
         }
     }
 
@@ -196,6 +204,13 @@ fn resolve_font_size(specified: FontSize, parent_font_size_px: f32, root_font_si
         FontSize::Px(px) => px,
         FontSize::Em(em) => parent_font_size_px * em,
         FontSize::Rem(rem) => root_font_size_px * rem,
+        _ => {
+            debug_assert!(
+                false,
+                "unhandled FontSize variant; update text_style_resolve for the new unit"
+            );
+            parent_font_size_px
+        }
     }
 }
 
@@ -204,6 +219,13 @@ fn resolve_spacing(specified: Spacing, font_size_px: f32, root_font_size_px: f32
         Spacing::Px(px) => px,
         Spacing::Em(em) => font_size_px * em,
         Spacing::Rem(rem) => root_font_size_px * rem,
+        _ => {
+            debug_assert!(
+                false,
+                "unhandled Spacing variant; update text_style_resolve for the new unit"
+            );
+            0.0
+        }
     }
 }
 
@@ -218,6 +240,13 @@ fn resolve_line_height(
         LineHeight::Px(px) => ComputedLineHeight::Px(px),
         LineHeight::Em(em) => ComputedLineHeight::Px(font_size_px * em),
         LineHeight::Rem(rem) => ComputedLineHeight::Px(root_font_size_px * rem),
+        _ => {
+            debug_assert!(
+                false,
+                "unhandled LineHeight variant; update text_style_resolve for the new unit"
+            );
+            ComputedLineHeight::default()
+        }
     }
 }
 

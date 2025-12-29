@@ -52,7 +52,8 @@ impl<T> Setting<T> {
 /// Settings that can be supplied as raw CSS-like source or a parsed list.
 ///
 /// This enables accepting CSS-like input without making strings the primary representation. When
-/// resolution occurs, `Source` values are parsed into `List` values.
+/// resolution occurs (for example via the `text_style_resolve` crate), `Source` values are parsed
+/// into `List` values.
 #[derive(Clone, PartialEq, Debug)]
 pub enum Settings<T> {
     /// A raw source string (CSS-like syntax).

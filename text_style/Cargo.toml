@@ -1,7 +1,7 @@
 [package]
 name = "text_style"
 version = "0.1.0"
-description = "CSS-inspired text style types and resolution"
+description = "CSS-inspired text style vocabulary"
 keywords = ["text", "style", "css"]
 categories = ["graphics", "text"]
 edition.workspace = true

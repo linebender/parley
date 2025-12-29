@@ -1,10 +1,7 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::ComputedParagraphStyle;
 use crate::ParagraphDeclaration;
-use crate::ParagraphResolveContext;
-use crate::resolve::resolve_paragraph_declarations;
 use crate::specified::Specified;
 use alloc::vec::Vec;
 
@@ -105,10 +102,5 @@ impl ParagraphStyle {
     /// Sets `text-wrap-mode`.
     pub fn text_wrap_mode(self, value: Specified<TextWrapMode>) -> Self {
         self.push(ParagraphDeclaration::TextWrapMode(value))
-    }
-
-    /// Resolves this style relative to the provided context.
-    pub fn resolve(&self, ctx: ParagraphResolveContext<'_>) -> ComputedParagraphStyle {
-        resolve_paragraph_declarations(&self.declarations, ctx)
     }
 }

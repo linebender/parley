@@ -2,7 +2,7 @@
 
 # Text Style
 
-CSS-inspired text style vocabulary and resolution.
+CSS-inspired text style vocabulary.
 
 [![Linebender Zulip, #parley channel](https://img.shields.io/badge/Linebender-%23parley-blue?logo=Zulip)](https://xi.zulipchat.com/#narrow/channel/205635-parley)
 [![dependency status](https://deps.rs/repo/github/linebender/parley/status.svg)](https://deps.rs/repo/github/linebender/parley)
@@ -22,14 +22,16 @@ Full documentation at https://github.com/orium/cargo-rdme -->
 See https://linebender.org/blog/doc-include/ for related discussion. -->
 <!-- cargo-rdme start -->
 
-CSS-inspired text style vocabulary and resolution.
+CSS-inspired text style vocabulary.
 
 This crate defines:
 - A closed set of inline and paragraph style properties (the vocabulary)
 - CSS-like reset semantics via [`Specified`]
-- Resolution of specified styles into *computed* (absolute) styles
 
 It is `no_std` + `alloc` friendly and is intentionally independent of any shaping/layout engine.
+
+Specified→computed resolution (including parsing of raw OpenType settings sources) lives in the
+companion crate `text_style_resolve`.
 
 ## Scope
 
@@ -41,7 +43,7 @@ an engine-lowering layer.
 
 The primary integration pattern is:
 - Author spans using [`InlineStyle`] declarations
-- Resolve to [`ComputedInlineStyle`] runs (e.g. via a higher-level crate)
+- Resolve specified styles to computed runs (via `text_style_resolve` or a higher-level crate)
 - Lower computed runs to a layout engine such as Parley
 
 ## Model
@@ -50,27 +52,18 @@ This crate is structured similarly to CSS:
 
 - **Specified values** are expressed as declaration lists ([`InlineStyle`], [`ParagraphStyle`]).
 - Declarations store values wrapped in [`Specified`], enabling `inherit`/`initial` behavior.
-- **Computed values** are absolute and engine-ready ([`ComputedInlineStyle`],
-  [`ComputedParagraphStyle`]).
-
-Some inline declarations (such as OpenType feature/variation settings) can fail to parse when
-provided as raw CSS-like source strings. In those cases, inline resolution returns an error.
+- **Computed values** are absolute and engine-ready, produced by an engine layer such as
+  `text_style_resolve`.
 
 ## OpenType Settings
 
 OpenType feature and variation settings are represented as [`Settings`]. For convenience, they
 can be authored either as a parsed list ([`Settings::List`]) or as a CSS-like source string
-([`Settings::Source`]). When using `Source`, parsing happens during inline style resolution and
-invalid input will return a [`ResolveStyleError`].
+([`Settings::Source`]). When using `Source`, parsing is performed by an engine layer (for
+example `text_style_resolve`).
 
-Resolution is performed relative to three computed styles:
-
-- `parent`: the inherited style context
-- `initial`: the style used for [`Specified::Initial`]
-- `root`: the style used for root-relative units such as `rem`
-
-The crate does not define how you obtain `parent`/`initial`; that is typically provided by a
-higher-level layer (e.g. a styled text model, a document model, or a UI toolkit).
+Resolution is performed relative to three computed styles (`parent`, `initial`, and `root`) by
+an engine layer (for example `text_style_resolve`).
 
 ## Conflict Handling
 
@@ -104,27 +97,17 @@ This crate is inspired by (but not identical to) these specifications:
 ## Example
 
 ```rust
-use text_style::{
-    BaseDirection, ComputedInlineStyle, ComputedParagraphStyle, FontSize, InlineResolveContext,
-    InlineStyle, ParagraphResolveContext, ParagraphStyle, Specified,
-};
-
-let base_inline = ComputedInlineStyle::default();
-let base_paragraph = ComputedParagraphStyle::default();
+use text_style::{BaseDirection, FontSize, InlineStyle, ParagraphStyle, Specified};
 
 // "font-size: 1.25em; text-decoration-line: underline"
 let inline = InlineStyle::new()
     .font_size(Specified::Value(FontSize::Em(1.25)))
     .underline(Specified::Value(true));
-let inline_ctx = InlineResolveContext::new(&base_inline, &base_inline, &base_inline);
-let computed_inline = inline.resolve(inline_ctx).unwrap();
-assert_eq!(computed_inline.font_size_px(), base_inline.font_size_px() * 1.25);
+assert_eq!(inline.declarations().len(), 2);
 
 // "direction: rtl"
 let paragraph = ParagraphStyle::new().base_direction(Specified::Value(BaseDirection::Rtl));
-let paragraph_ctx = ParagraphResolveContext::new(&base_paragraph, &base_paragraph, &base_paragraph);
-let computed_paragraph = paragraph.resolve(paragraph_ctx);
-assert_eq!(computed_paragraph.base_direction(), BaseDirection::Rtl);
+assert_eq!(paragraph.declarations().len(), 1);
 ```
 
 <!-- cargo-rdme end -->
@@ -174,4 +157,3 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 
 [Rust Code of Conduct]: https://www.rust-lang.org/policies/code-of-conduct
 [AUTHORS]: ./AUTHORS
-

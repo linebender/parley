@@ -5,8 +5,9 @@ use core::fmt::Debug;
 use core::ops::Range;
 
 use attributed_text::{AttributedText, Error, TextStorage};
-use text_style::{
-    ComputedInlineStyle, ComputedParagraphStyle, ParagraphResolveContext, ParagraphStyle,
+use text_style::ParagraphStyle;
+use text_style_resolve::{
+    ComputedInlineStyle, ComputedParagraphStyle, ParagraphResolveContext, ResolveStyleExt,
 };
 
 use crate::runs::{CoalescedInlineRuns, ResolvedInlineRuns};

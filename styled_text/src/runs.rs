@@ -8,8 +8,10 @@ use core::fmt::Debug;
 use core::ops::Range;
 
 use attributed_text::TextStorage;
-use text_style::InlineResolveContext;
-use text_style::{ComputedInlineStyle, InlineDeclaration, InlineStyle, ResolveStyleError};
+use text_style::{InlineDeclaration, InlineStyle};
+use text_style_resolve::{
+    ComputedInlineStyle, InlineResolveContext, ResolveStyleError, ResolveStyleExt,
+};
 
 use crate::text::StyledText;
 use crate::traits::HasInlineStyle;
