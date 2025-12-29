@@ -10,8 +10,8 @@ use crate::error::ResolveStyleError;
 use crate::parse::{parse_feature_settings, parse_variation_settings};
 use text_style::{
     BaseDirection, BidiControl, FontSize, FontStack, FontStyle, FontWeight, FontWidth,
-    InlineDeclaration, LineHeight, OverflowWrap, ParagraphDeclaration, Setting, Settings, Spacing,
-    Specified, TextWrapMode, WordBreak,
+    InlineDeclaration, Language, LineHeight, OverflowWrap, ParagraphDeclaration, Setting, Settings,
+    Spacing, Specified, TextWrapMode, WordBreak,
 };
 
 /// Resolves a list of inline declarations into a computed inline style.
@@ -29,7 +29,7 @@ pub fn resolve_inline_declarations(
     let mut font_width: Option<&Specified<FontWidth>> = None;
     let mut font_variations: Option<&Specified<Settings<f32>>> = None;
     let mut font_features: Option<&Specified<Settings<u16>>> = None;
-    let mut locale: Option<&Specified<Option<Arc<str>>>> = None;
+    let mut locale: Option<&Specified<Option<Language>>> = None;
     let mut underline: Option<&Specified<bool>> = None;
     let mut strikethrough: Option<&Specified<bool>> = None;
     let mut line_height: Option<&Specified<LineHeight>> = None;
@@ -100,7 +100,7 @@ pub fn resolve_inline_declarations(
     }
 
     if let Some(value) = locale {
-        out.locale = resolve_specified(value, &parent.locale, &initial.locale).clone();
+        out.locale = *resolve_specified(value, &parent.locale, &initial.locale);
     }
 
     if let Some(value) = underline {

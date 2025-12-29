@@ -4,8 +4,8 @@
 use alloc::sync::Arc;
 
 use text_style::{
-    BaseDirection, BidiControl, FontStack, FontStyle, FontWeight, FontWidth, OverflowWrap, Setting,
-    TextWrapMode, WordBreak,
+    BaseDirection, BidiControl, FontStack, FontStyle, FontWeight, FontWidth, Language,
+    OverflowWrap, Setting, TextWrapMode, WordBreak,
 };
 
 /// A computed (resolved) line height.
@@ -39,7 +39,7 @@ pub struct ComputedInlineStyle {
     pub(crate) font_weight: FontWeight,
     pub(crate) font_variations: Arc<[Setting<f32>]>,
     pub(crate) font_features: Arc<[Setting<u16>]>,
-    pub(crate) locale: Option<Arc<str>>,
+    pub(crate) locale: Option<Language>,
     pub(crate) underline: bool,
     pub(crate) strikethrough: bool,
     pub(crate) line_height: ComputedLineHeight,
@@ -113,7 +113,7 @@ impl ComputedInlineStyle {
 
     /// Returns the locale/language tag, if any.
     pub fn locale(&self) -> Option<&str> {
-        self.locale.as_deref()
+        self.locale.as_ref().map(Language::as_str)
     }
 
     /// Returns whether underline is enabled.

@@ -1,7 +1,7 @@
 [package]
-name = "text_style"
+name = "text_primitives"
 version = "0.1.0"
-description = "CSS-inspired text style vocabulary"
+description = "Fundamental text property types"
 keywords = ["text", "style", "css"]
 categories = ["graphics", "text"]
 edition.workspace = true
@@ -22,7 +22,6 @@ default = ["std"]
 std = []
 
 [dependencies]
-text_primitives = { path = "../text_primitives", default-features = false }
 
 [lints]
 workspace = true

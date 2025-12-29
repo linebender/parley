@@ -5,6 +5,8 @@ use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
 
+use text_primitives::GenericFamily;
+
 /// A font family name or generic family.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum FontFamily {
@@ -19,30 +21,6 @@ impl FontFamily {
     pub fn named(name: impl Into<Arc<str>>) -> Self {
         Self::Named(name.into())
     }
-}
-
-/// Generic font families, named after CSS.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum GenericFamily {
-    /// The `serif` generic family.
-    Serif,
-    /// The `sans-serif` generic family.
-    SansSerif,
-    /// The `monospace` generic family.
-    Monospace,
-    /// The `cursive` generic family.
-    Cursive,
-    /// The `fantasy` generic family.
-    Fantasy,
-    /// The `system-ui` generic family.
-    SystemUi,
-    /// The `emoji` generic family.
-    Emoji,
-    /// The `math` generic family.
-    Math,
-    /// The `fangsong` generic family.
-    Fangsong,
 }
 
 /// A prioritized list of font families.

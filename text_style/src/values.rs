@@ -34,21 +34,6 @@ pub enum Spacing {
     Rem(f32),
 }
 
-/// A specified font style.
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
-#[non_exhaustive]
-pub enum FontStyle {
-    /// `normal`.
-    #[default]
-    Normal,
-    /// `italic`.
-    Italic,
-    /// `oblique` with an optional angle in degrees.
-    ///
-    /// If `None`, the engine-specific default oblique angle is used.
-    Oblique(Option<f32>),
-}
-
 /// A specified line height.
 ///
 /// The relationship between line-height, font size, and font metrics is engine-dependent; this

@@ -1,15 +1,15 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use crate::FontWeight as FontWeightValue;
-use crate::bidi::BidiControl;
 use crate::font::FontStack;
 use crate::specified::Specified;
-use crate::values::{FontSize, FontStyle, LineHeight, Spacing};
-use crate::{BaseDirection, OverflowWrap, TextWrapMode, WordBreak};
+use crate::values::{FontSize, LineHeight, Spacing};
+use crate::{
+    BaseDirection, BidiControl, FontStyle, Language, OverflowWrap, TextWrapMode, WordBreak,
+};
 use crate::{FontWidth, Settings};
 
 /// A single inline style declaration.
@@ -31,7 +31,7 @@ pub enum InlineDeclaration {
     /// Font feature settings (OpenType feature values).
     FontFeatures(Specified<Settings<u16>>),
     /// Locale/language tag, if any.
-    Locale(Specified<Option<Arc<str>>>),
+    Locale(Specified<Option<Language>>),
     /// Underline decoration.
     Underline(Specified<bool>),
     /// Strikethrough decoration.
@@ -160,7 +160,7 @@ impl InlineStyle {
     }
 
     /// Sets `locale` (language tag), if any.
-    pub fn locale(self, value: Specified<Option<Arc<str>>>) -> Self {
+    pub fn locale(self, value: Specified<Option<Language>>) -> Self {
         self.push(InlineDeclaration::Locale(value))
     }
 

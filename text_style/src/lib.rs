@@ -102,8 +102,6 @@
 
 extern crate alloc;
 
-mod bidi;
-mod computed;
 mod declarations;
 mod font;
 mod paragraph;
@@ -111,13 +109,16 @@ mod settings;
 mod specified;
 mod values;
 
-pub use bidi::{BidiControl, BidiDirection, BidiOverride};
-pub use computed::{FontWeight, FontWidth};
 pub use declarations::{InlineDeclaration, ParagraphDeclaration};
-pub use font::{FontFamily, FontStack, GenericFamily};
-pub use paragraph::{BaseDirection, OverflowWrap, ParagraphStyle, TextWrapMode, WordBreak};
-pub use settings::{Setting, Settings, Tag};
+pub use font::{FontFamily, FontStack};
+pub use paragraph::ParagraphStyle;
+pub use settings::Settings;
 pub use specified::Specified;
-pub use values::{FontSize, FontStyle, LineHeight, Spacing};
+pub use text_primitives::{
+    BaseDirection, BidiControl, BidiDirection, BidiOverride, FontStyle, FontWeight, FontWidth,
+    GenericFamily, Language, OverflowWrap, ParseLanguageError, Setting, Tag, TextWrapMode,
+    WordBreak,
+};
+pub use values::{FontSize, LineHeight, Spacing};
 
 pub use declarations::InlineStyle;

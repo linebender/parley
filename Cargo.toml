@@ -12,6 +12,7 @@ members = [
     "parley_draw",
     "styled_text",
     "styled_text_parley",
+    "text_primitives",
     "text_style",
     "text_style_resolve",
     "examples/swash_render",
