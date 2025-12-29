@@ -1,0 +1,33 @@
+[package]
+name = "styled_text_parley"
+version = "0.1.0"
+description = "Parley backend for styled_text"
+keywords = ["text", "style", "parley"]
+categories = ["graphics", "text"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+publish = false
+
+[package.metadata.docs.rs]
+all-features = true
+# There are no platform specific docs.
+default-target = "x86_64-unknown-linux-gnu"
+targets = []
+
+[features]
+default = ["std"]
+std = ["parley/std"]
+libm = ["parley/libm"]
+
+[dependencies]
+attributed_text = { path = "../attributed_text", default-features = false }
+parley = { path = "../parley", default-features = false }
+styled_text = { path = "../styled_text", default-features = false }
+text_style = { path = "../text_style", default-features = false }
+text_style_resolve = { path = "../text_style_resolve", default-features = false }
+
+[lints]
+workspace = true
