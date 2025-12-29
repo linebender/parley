@@ -62,8 +62,10 @@ pub struct InlineStyleRun {
 pub struct ResolvedInlineRuns<'a, T: Debug + TextStorage, A: Debug + HasInlineStyle> {
     pub(crate) styled: &'a StyledText<T, A>,
     pub(crate) boundaries: Vec<usize>,
-    start_events: Vec<Vec<usize>>,
-    end_events: Vec<Vec<usize>>,
+    start_offsets: Vec<usize>,
+    start_events: Vec<usize>,
+    end_offsets: Vec<usize>,
+    end_events: Vec<usize>,
     spans: Vec<Span<'a>>,
     active: Vec<usize>,
     scratch: InlineStyle,
@@ -83,10 +85,18 @@ impl<'a, T: Debug + TextStorage, A: Debug + HasInlineStyle> ResolvedInlineRuns<'
         boundaries.sort_unstable();
         boundaries.dedup();
 
-        let mut start_events = vec![Vec::new(); boundaries.len()];
-        let mut end_events = vec![Vec::new(); boundaries.len()];
-        let mut spans = Vec::new();
+        let boundary_count = boundaries.len();
 
+        let mut spans = Vec::new();
+        let mut span_starts = Vec::new();
+        let mut span_ends = Vec::new();
+
+        // We build start/end event lists keyed by boundary index. Instead of a `Vec<Vec<usize>>`
+        // (which would allocate an inner `Vec` for each boundary), we use a
+        // CSR (Compressed Sparse Row)-style layout:
+        // a single flat event buffer plus an offsets array giving the slice for each boundary.
+        //
+        // This represents "many small lists" without lots of tiny heap allocations.
         for (range, attr) in styled.attributed.attributes_iter() {
             if range.start == range.end {
                 continue;
@@ -101,18 +111,52 @@ impl<'a, T: Debug + TextStorage, A: Debug + HasInlineStyle> ResolvedInlineRuns<'
                 continue;
             }
 
-            let id = spans.len();
             spans.push(Span {
                 declarations: attr.inline_style().declarations(),
             });
-            start_events[start_boundary].push(id);
-            end_events[end_boundary].push(id);
+            span_starts.push(start_boundary);
+            span_ends.push(end_boundary);
+        }
+
+        let mut start_counts = vec![0_usize; boundary_count];
+        let mut end_counts = vec![0_usize; boundary_count];
+        for &b in &span_starts {
+            start_counts[b] += 1;
+        }
+        for &b in &span_ends {
+            end_counts[b] += 1;
+        }
+
+        let mut start_offsets = vec![0_usize; boundary_count + 1];
+        let mut end_offsets = vec![0_usize; boundary_count + 1];
+        for i in 0..boundary_count {
+            start_offsets[i + 1] = start_offsets[i] + start_counts[i];
+            end_offsets[i + 1] = end_offsets[i] + end_counts[i];
+        }
+
+        let mut start_events = vec![0_usize; start_offsets[boundary_count]];
+        let mut end_events = vec![0_usize; end_offsets[boundary_count]];
+
+        let mut start_next = start_offsets.clone();
+        let mut end_next = end_offsets.clone();
+        for (id, (&start_boundary, &end_boundary)) in
+            span_starts.iter().zip(span_ends.iter()).enumerate()
+        {
+            let start_ix = start_next[start_boundary];
+            start_events[start_ix] = id;
+            start_next[start_boundary] += 1;
+
+            let end_ix = end_next[end_boundary];
+            end_events[end_ix] = id;
+            end_next[end_boundary] += 1;
         }
 
         Self {
             styled,
             boundaries,
+            start_offsets,
             start_events,
+            end_offsets,
             end_events,
             spans,
             active: Vec::new(),
@@ -122,12 +166,15 @@ impl<'a, T: Debug + TextStorage, A: Debug + HasInlineStyle> ResolvedInlineRuns<'
     }
 
     fn update_active_for_boundary(&mut self, boundary_index: usize) {
-        for &id in &self.end_events[boundary_index] {
+        let end_range = self.end_offsets[boundary_index]..self.end_offsets[boundary_index + 1];
+        for &id in &self.end_events[end_range] {
             if let Ok(ix) = self.active.binary_search(&id) {
                 self.active.remove(ix);
             }
         }
-        for &id in &self.start_events[boundary_index] {
+        let start_range =
+            self.start_offsets[boundary_index]..self.start_offsets[boundary_index + 1];
+        for &id in &self.start_events[start_range] {
             match self.active.binary_search(&id) {
                 Ok(_) => {}
                 Err(ix) => self.active.insert(ix, id),
