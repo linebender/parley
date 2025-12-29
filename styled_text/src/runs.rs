@@ -1,7 +1,6 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use alloc::collections::BTreeSet;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt::Debug;
@@ -66,7 +65,7 @@ pub struct ResolvedInlineRuns<'a, T: Debug + TextStorage, A: Debug + HasInlineSt
     start_events: Vec<Vec<usize>>,
     end_events: Vec<Vec<usize>>,
     spans: Vec<Span<'a>>,
-    active: BTreeSet<usize>,
+    active: Vec<usize>,
     scratch: InlineStyle,
     pub(crate) index: usize,
 }
@@ -116,7 +115,7 @@ impl<'a, T: Debug + TextStorage, A: Debug + HasInlineStyle> ResolvedInlineRuns<'
             start_events,
             end_events,
             spans,
-            active: BTreeSet::new(),
+            active: Vec::new(),
             scratch: InlineStyle::new(),
             index: 0,
         }
@@ -124,10 +123,15 @@ impl<'a, T: Debug + TextStorage, A: Debug + HasInlineStyle> ResolvedInlineRuns<'
 
     fn update_active_for_boundary(&mut self, boundary_index: usize) {
         for &id in &self.end_events[boundary_index] {
-            self.active.remove(&id);
+            if let Ok(ix) = self.active.binary_search(&id) {
+                self.active.remove(ix);
+            }
         }
         for &id in &self.start_events[boundary_index] {
-            self.active.insert(id);
+            match self.active.binary_search(&id) {
+                Ok(_) => {}
+                Err(ix) => self.active.insert(ix, id),
+            }
         }
     }
 
