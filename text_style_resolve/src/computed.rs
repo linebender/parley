@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use alloc::sync::Arc;
-use alloc::vec::Vec;
 
 use text_style::{
     BaseDirection, BidiControl, FontStack, FontStyle, FontWeight, FontWidth, OverflowWrap, Setting,
@@ -38,8 +37,8 @@ pub struct ComputedInlineStyle {
     pub(crate) font_width: FontWidth,
     pub(crate) font_style: FontStyle,
     pub(crate) font_weight: FontWeight,
-    pub(crate) font_variations: Vec<Setting<f32>>,
-    pub(crate) font_features: Vec<Setting<u16>>,
+    pub(crate) font_variations: Arc<[Setting<f32>]>,
+    pub(crate) font_features: Arc<[Setting<u16>]>,
     pub(crate) locale: Option<Arc<str>>,
     pub(crate) underline: bool,
     pub(crate) strikethrough: bool,
@@ -57,8 +56,8 @@ impl Default for ComputedInlineStyle {
             font_width: FontWidth::NORMAL,
             font_style: FontStyle::default(),
             font_weight: FontWeight::NORMAL,
-            font_variations: Vec::new(),
-            font_features: Vec::new(),
+            font_variations: Arc::from([]),
+            font_features: Arc::from([]),
             locale: None,
             underline: false,
             strikethrough: false,

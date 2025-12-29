@@ -1,7 +1,7 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use alloc::vec::Vec;
+use alloc::sync::Arc;
 
 use crate::ParseSettingsError;
 use crate::computed::{ComputedInlineStyle, ComputedLineHeight, ComputedParagraphStyle};
@@ -29,7 +29,7 @@ pub fn resolve_inline_declarations(
     let mut font_width: Option<&Specified<FontWidth>> = None;
     let mut font_variations: Option<&Specified<Settings<f32>>> = None;
     let mut font_features: Option<&Specified<Settings<u16>>> = None;
-    let mut locale: Option<&Specified<Option<alloc::sync::Arc<str>>>> = None;
+    let mut locale: Option<&Specified<Option<Arc<str>>>> = None;
     let mut underline: Option<&Specified<bool>> = None;
     let mut strikethrough: Option<&Specified<bool>> = None;
     let mut line_height: Option<&Specified<LineHeight>> = None;
@@ -252,26 +252,30 @@ fn resolve_line_height(
 
 fn resolve_settings_f32(
     specified: &Specified<Settings<f32>>,
-    parent: &[Setting<f32>],
-    initial: &[Setting<f32>],
-) -> Result<Vec<Setting<f32>>, ParseSettingsError> {
+    parent: &Arc<[Setting<f32>]>,
+    initial: &Arc<[Setting<f32>]>,
+) -> Result<Arc<[Setting<f32>]>, ParseSettingsError> {
     match specified {
-        Specified::Inherit => Ok(parent.to_vec()),
-        Specified::Initial => Ok(initial.to_vec()),
-        Specified::Value(Settings::List(list)) => Ok(list.clone()),
-        Specified::Value(Settings::Source(source)) => parse_variation_settings(source),
+        Specified::Inherit => Ok(Arc::clone(parent)),
+        Specified::Initial => Ok(Arc::clone(initial)),
+        Specified::Value(Settings::List(list)) => Ok(Arc::from(list.clone().into_boxed_slice())),
+        Specified::Value(Settings::Source(source)) => Ok(Arc::from(
+            parse_variation_settings(source)?.into_boxed_slice(),
+        )),
     }
 }
 
 fn resolve_settings_u16(
     specified: &Specified<Settings<u16>>,
-    parent: &[Setting<u16>],
-    initial: &[Setting<u16>],
-) -> Result<Vec<Setting<u16>>, ParseSettingsError> {
+    parent: &Arc<[Setting<u16>]>,
+    initial: &Arc<[Setting<u16>]>,
+) -> Result<Arc<[Setting<u16>]>, ParseSettingsError> {
     match specified {
-        Specified::Inherit => Ok(parent.to_vec()),
-        Specified::Initial => Ok(initial.to_vec()),
-        Specified::Value(Settings::List(list)) => Ok(list.clone()),
-        Specified::Value(Settings::Source(source)) => parse_feature_settings(source),
+        Specified::Inherit => Ok(Arc::clone(parent)),
+        Specified::Initial => Ok(Arc::clone(initial)),
+        Specified::Value(Settings::List(list)) => Ok(Arc::from(list.clone().into_boxed_slice())),
+        Specified::Value(Settings::Source(source)) => Ok(Arc::from(
+            parse_feature_settings(source)?.into_boxed_slice(),
+        )),
     }
 }
