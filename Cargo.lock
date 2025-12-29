@@ -4283,6 +4283,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "styled_text_parley"
+version = "0.1.0"
+dependencies = [
+ "attributed_text",
+ "parley",
+ "styled_text",
+ "text_style",
+ "text_style_resolve",
+]
+
+[[package]]
 name = "subtle"
 version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4518,6 +4529,19 @@ version = "0.1.0"
 dependencies = [
  "parley",
  "skrifa 0.37.0",
+ "tiny-skia",
+]
+
+[[package]]
+name = "tiny_skia_render_styled_text"
+version = "0.1.0"
+dependencies = [
+ "parley",
+ "skrifa 0.37.0",
+ "styled_text",
+ "styled_text_parley",
+ "text_style",
+ "text_style_resolve",
  "tiny-skia",
 ]
 
