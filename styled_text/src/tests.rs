@@ -6,7 +6,10 @@ use crate::document::StyledDocument;
 use crate::text::StyledText;
 use alloc::vec::Vec;
 use core::ops::Range;
-use text_style::{ComputedInlineStyle, ComputedParagraphStyle, FontSize, InlineStyle, Specified};
+use text_style::{FontSize, InlineStyle, Specified};
+use text_style_resolve::{
+    ComputedInlineStyle, ComputedParagraphStyle, InlineResolveContext, ResolveStyleExt,
+};
 
 /// Reference implementation of inline run resolution.
 ///
@@ -30,11 +33,7 @@ fn reference_resolved_inline_runs(
     boundaries.sort_unstable();
     boundaries.dedup();
 
-    let ctx = text_style::InlineResolveContext::new(
-        &text.base_inline,
-        &text.initial_inline,
-        &text.root_inline,
-    );
+    let ctx = InlineResolveContext::new(&text.base_inline, &text.initial_inline, &text.root_inline);
 
     let mut out = Vec::new();
     for pair in boundaries.windows(2) {

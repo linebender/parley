@@ -13,6 +13,7 @@ members = [
     "styled_text",
     "text_primitives",
     "text_style",
+    "text_style_resolve",
     "examples/swash_render",
     "examples/tiny_skia_render",
     "examples/vello_cpu_render",

@@ -24,6 +24,7 @@ std = []
 [dependencies]
 attributed_text = { path = "../attributed_text", default-features = false }
 text_style = { path = "../text_style", default-features = false }
+text_style_resolve = { path = "../text_style_resolve", default-features = false }
 
 [lints]
 workspace = true

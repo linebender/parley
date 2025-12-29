@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 
 use attributed_text::TextStorage;
-use text_style::{ComputedInlineStyle, ComputedParagraphStyle};
+use text_style_resolve::{ComputedInlineStyle, ComputedParagraphStyle};
 
 use crate::block::Block;
 

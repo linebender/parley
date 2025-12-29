@@ -40,8 +40,9 @@ pub use text_primitives::FontStyle;
 /// A specified line height.
 ///
 /// The relationship between line-height, font size, and font metrics is engine-dependent; this
-/// crate resolves relative values into a [`ComputedLineHeight`](crate::ComputedLineHeight) that can be lowered to
-/// engine-specific representations. See the crate-level docs for details: [`crate`].
+/// is typically resolved by an engine layer (for example `text_style_resolve`) into a computed line
+/// height that can be lowered to engine-specific representations. See the crate-level docs for
+/// details: [`crate`].
 ///
 /// See: <https://www.w3.org/TR/css-inline-3/#propdef-line-height>
 #[derive(Clone, Copy, Debug, PartialEq, Default)]

@@ -24,7 +24,8 @@ See https://linebender.org/blog/doc-include/ for related discussion. -->
 
 Span styling and document structure built on [`attributed_text`] and [`text_style`].
 
-- [`text_style`] defines a closed style vocabulary and specified→computed resolution.
+- [`text_style`] defines a closed style vocabulary.
+- [`text_style_resolve`] resolves specified styles to computed styles.
 - [`attributed_text`] stores generic attributes on byte ranges.
 - `styled_text` combines them:
   - [`StyledText`]: a single layout block (maps cleanly to one Parley `Layout`)
@@ -57,7 +58,8 @@ an error item.
 
 ```rust
 use styled_text::StyledText;
-use text_style::{ComputedInlineStyle, ComputedParagraphStyle, FontSize, InlineStyle, Specified};
+use text_style::{FontSize, InlineStyle, Specified};
+use text_style_resolve::{ComputedInlineStyle, ComputedParagraphStyle};
 
 let base_inline = ComputedInlineStyle::default();
 let base_paragraph = ComputedParagraphStyle::default();
@@ -81,7 +83,8 @@ assert_eq!(runs[1].range, 6..12);
 ```rust
 use alloc::sync::Arc;
 use styled_text::{HasInlineStyle, StyledText};
-use text_style::{ComputedInlineStyle, ComputedParagraphStyle, InlineStyle};
+use text_style::InlineStyle;
+use text_style_resolve::{ComputedInlineStyle, ComputedParagraphStyle};
 
 #[derive(Debug, Clone)]
 struct Attr {
@@ -155,4 +158,3 @@ Unless you explicitly state otherwise, any contribution intentionally submitted 
 
 [Rust Code of Conduct]: https://www.rust-lang.org/policies/code-of-conduct
 [AUTHORS]: ./AUTHORS
-

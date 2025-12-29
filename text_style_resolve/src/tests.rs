@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::{
-    BaseDirection, ComputedInlineStyle, ComputedLineHeight, ComputedParagraphStyle, FontSize,
-    InlineDeclaration, InlineResolveContext, InlineStyle, LineHeight, ParagraphResolveContext,
-    ParagraphStyle, Spacing, Specified, WordBreak,
+    ComputedInlineStyle, ComputedLineHeight, ComputedParagraphStyle, InlineResolveContext,
+    ParagraphResolveContext, ParseSettingsError, ResolveStyleError, ResolveStyleExt,
 };
-use crate::{ParseSettingsError, ResolveStyleError, Setting, Settings, Tag};
+use text_style::{
+    BaseDirection, FontSize, InlineDeclaration, InlineStyle, LineHeight, ParagraphStyle, Setting,
+    Settings, Spacing, Specified, Tag, WordBreak,
+};
 
 #[test]
 fn specified_inherit_initial_and_value() {

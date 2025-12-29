@@ -5,17 +5,11 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use crate::FontWeight as FontWeightValue;
-use crate::InlineResolveContext;
-use crate::ResolveStyleError;
 use crate::bidi::BidiControl;
 use crate::font::FontStack;
-use crate::resolve::resolve_inline_declarations;
 use crate::specified::Specified;
 use crate::values::{FontSize, FontStyle, LineHeight, Spacing};
-use crate::{
-    BaseDirection, ComputedInlineStyle, ComputedParagraphStyle, OverflowWrap, TextWrapMode,
-    WordBreak,
-};
+use crate::{BaseDirection, OverflowWrap, TextWrapMode, WordBreak};
 use crate::{FontWidth, Settings};
 
 /// A single inline style declaration.
@@ -199,17 +193,6 @@ impl InlineStyle {
     pub fn bidi_control(self, value: Specified<BidiControl>) -> Self {
         self.push(InlineDeclaration::BidiControl(value))
     }
-
-    /// Resolves this style relative to the provided context.
-    ///
-    /// This can fail if any declarations require parsing and the provided values are invalid (for
-    /// example OpenType settings supplied as [`Settings::Source`]).
-    pub fn resolve(
-        &self,
-        ctx: InlineResolveContext<'_>,
-    ) -> Result<ComputedInlineStyle, ResolveStyleError> {
-        resolve_inline_declarations(&self.declarations, ctx)
-    }
 }
 
 /// A single paragraph style declaration.
@@ -225,7 +208,3 @@ pub enum ParagraphDeclaration {
     /// Control over non-"emergency" line-breaking.
     TextWrapMode(Specified<TextWrapMode>),
 }
-
-// Keep these `use`s alive until the corresponding resolve code is factored into their own modules.
-#[expect(unused_imports, reason = "Used by public types in this module.")]
-use ComputedParagraphStyle as _;
