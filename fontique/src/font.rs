@@ -5,9 +5,9 @@
 
 use crate::CharmapIndex;
 
-use super::attributes::{FontStyle, FontWeight, FontWidth};
 use super::source::{SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
+use crate::{FontStyle, FontWeight, FontWidth};
 use core::fmt;
 use read_fonts::{FontRef, TableProvider as _, types::Tag};
 use smallvec::SmallVec;
@@ -132,6 +132,7 @@ impl FontInfo {
                         }
                     }
                 }
+                _ => {}
             }
         }
         synth.len = len as u8;

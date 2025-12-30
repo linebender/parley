@@ -1300,7 +1300,6 @@ name = "fontique"
 version = "0.7.0"
 dependencies = [
  "bytemuck",
- "core_maths",
  "hashbrown 0.16.1",
  "icu_locale_core",
  "icu_properties",
@@ -1313,6 +1312,7 @@ dependencies = [
  "read-fonts 0.35.0",
  "roxmltree",
  "smallvec",
+ "text_primitives",
  "unicode-script",
  "windows 0.58.0",
  "windows-core 0.58.0",
