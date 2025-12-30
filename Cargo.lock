@@ -4403,6 +4403,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "text_primitives"
+version = "0.1.0"
+
+[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
