@@ -123,29 +123,25 @@ impl Default for FontWeight {
 
 impl fmt::Display for FontWeight {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let keyword = if self.0 == 100.0 {
-            Some("thin")
-        } else if self.0 == 200.0 {
-            Some("extra-light")
-        } else if self.0 == 300.0 {
-            Some("light")
-        } else if self.0 == 400.0 {
-            Some("normal")
-        } else if self.0 == 500.0 {
-            Some("medium")
-        } else if self.0 == 600.0 {
-            Some("semi-bold")
-        } else if self.0 == 700.0 {
-            Some("bold")
-        } else if self.0 == 800.0 {
-            Some("extra-bold")
-        } else if self.0 == 900.0 {
-            Some("black")
-        } else {
-            None
-        };
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "The integer keyword mapping is only used when the cast is lossless (checked)."
+        )]
+        let int_value = self.0 as i32;
 
-        if let Some(keyword) = keyword {
+        if self.0 == int_value as f32 {
+            let keyword = match int_value {
+                100 => "thin",
+                200 => "extra-light",
+                300 => "light",
+                400 => "normal",
+                500 => "medium",
+                600 => "semi-bold",
+                700 => "bold",
+                800 => "extra-bold",
+                900 => "black",
+                _ => return write!(f, "{}", self.0),
+            };
             f.write_str(keyword)
         } else {
             write!(f, "{}", self.0)
@@ -276,29 +272,26 @@ impl Default for FontWidth {
 impl fmt::Display for FontWidth {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let value = self.0 * 1000.0;
-        let keyword = if value == 500.0 {
-            Some("ultra-condensed")
-        } else if value == 625.0 {
-            Some("extra-condensed")
-        } else if value == 750.0 {
-            Some("condensed")
-        } else if value == 875.0 {
-            Some("semi-condensed")
-        } else if value == 1000.0 {
-            Some("normal")
-        } else if value == 1125.0 {
-            Some("semi-expanded")
-        } else if value == 1250.0 {
-            Some("expanded")
-        } else if value == 1500.0 {
-            Some("extra-expanded")
-        } else if value == 2000.0 {
-            Some("ultra-expanded")
-        } else {
-            None
-        };
 
-        if let Some(keyword) = keyword {
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "The integer keyword mapping is only used when the cast is lossless (checked)."
+        )]
+        let int_value = value as i32;
+
+        if value == int_value as f32 {
+            let keyword = match int_value {
+                500 => "ultra-condensed",
+                625 => "extra-condensed",
+                750 => "condensed",
+                875 => "semi-condensed",
+                1000 => "normal",
+                1125 => "semi-expanded",
+                1250 => "expanded",
+                1500 => "extra-expanded",
+                2000 => "ultra-expanded",
+                _ => return write!(f, "{}%", self.percentage()),
+            };
             f.write_str(keyword)
         } else {
             write!(f, "{}%", self.percentage())
