@@ -53,6 +53,21 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
         }
     }
 
+    /// Borrow the underlying text storage.
+    pub fn text(&self) -> &T {
+        &self.text
+    }
+
+    /// Returns the length of the underlying text, in bytes.
+    pub fn len(&self) -> usize {
+        self.text.len()
+    }
+
+    /// Returns `true` if the underlying text is empty.
+    pub fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+
     /// Borrow the underlying text as `&str` when the storage is contiguous.
     pub fn as_str(&self) -> &str
     where
@@ -79,6 +94,13 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
         }
         self.attributes.push((range, attribute));
         Ok(())
+    }
+
+    /// Iterate over all attributes and the ranges they apply to.
+    ///
+    /// Attributes are yielded in the order they were applied.
+    pub fn attributes_iter(&self) -> impl ExactSizeIterator<Item = (&Range<usize>, &Attr)> {
+        self.attributes.iter().map(|(range, attr)| (range, attr))
     }
 
     /// Get an iterator over the attributes that apply at the given `index`.
@@ -109,6 +131,16 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
                 None
             }
         })
+    }
+
+    /// Returns the number of attribute spans applied to the text.
+    pub fn attributes_len(&self) -> usize {
+        self.attributes.len()
+    }
+
+    /// Remove all applied attribute spans.
+    pub fn clear_attributes(&mut self) {
+        self.attributes.clear();
     }
 }
 
