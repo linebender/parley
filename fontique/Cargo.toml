@@ -19,6 +19,7 @@ workspace = true
 default = ["system"]
 std = ["read-fonts/std", "dep:memmap2", "text_primitives/std"]
 libm = ["read-fonts/libm"]
+bytemuck = ["text_primitives/bytemuck"]
 icu_properties = ["dep:icu_properties"]
 unicode_script = ["dep:unicode-script"]
 # Enables support for system font backends
