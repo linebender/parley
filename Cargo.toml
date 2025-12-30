@@ -31,7 +31,10 @@ bytemuck = { version = "1.24.0", default-features = false }
 databake = { version = "0.2", default-features = false }
 fontique = { version = "0.7.0", default-features = false, path = "fontique" }
 harfrust = { version = "0.3.2", default-features = false }
-hashbrown = { version = "0.16.1", default-features = false, features = ["default-hasher", "raw-entry"] }
+hashbrown = { version = "0.16.1", default-features = false, features = [
+    "default-hasher",
+    "raw-entry",
+] }
 icu_codepointtrie_builder = { version = "0.5.1", default-features = false, features = ["wasm"] }
 icu_collections = { version = "2.1.1", default-features = false }
 icu_locale = { version = "2.1.1", default-features = false }
