@@ -11,15 +11,16 @@ use core::ops::RangeInclusive;
 use super::layout::Layout;
 use super::resolve::{RangedStyle, ResolveContext, Resolved};
 use super::style::{Brush, FontFeature, FontVariation};
+use crate::FontData;
+use crate::analysis::CharInfo;
 use crate::analysis::cluster::{Char, CharCluster, Status};
-use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::convert::script_to_harfrust;
 use crate::inline_box::InlineBox;
 use crate::lru_cache::LruCache;
 use crate::util::nearly_eq;
-use crate::{FontData, convert};
 use fontique::Language;
 use icu_properties::props::Script;
+use icu_segmenter::GraphemeClusterSegmenter;
 
 use fontique::{self, Query, QueryFamily, QueryFont};
 
@@ -71,7 +72,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
     scx: &mut ShapeContext,
     mut text: &str,
     layout: &mut Layout<B>,
-    analysis_data_sources: &AnalysisDataSources,
 ) {
     // If we have both empty text and no inline boxes, shape with a fake space
     // to generate metrics that can be used to size a cursor.
@@ -173,7 +173,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 &char_range,
                 infos,
                 layout,
-                analysis_data_sources,
             );
             item.size = style.font_size;
             item.level = level;
@@ -209,7 +208,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
             &char_range,
             infos,
             layout,
-            analysis_data_sources,
         );
     }
 
@@ -275,12 +273,11 @@ fn shape_item<'a, B: Brush>(
     char_range: &core::ops::Range<usize>,
     infos: &[(CharInfo, u16)],
     layout: &mut Layout<B>,
-    analysis_data_sources: &AnalysisDataSources,
 ) {
     let item_text = &text[text_range.clone()];
     let item_infos = &infos[char_range.start..char_range.end]; // Only process current item
     let first_style_index = item_infos[0].1;
-    let fb_script = convert::script_to_fontique(item.script, analysis_data_sources);
+    let fb_script = item.script.into();
     let mut font_selector = FontSelector::new(
         fq,
         rcx,
@@ -290,9 +287,7 @@ fn shape_item<'a, B: Brush>(
         item.locale.clone(),
     );
 
-    let grapheme_cluster_boundaries = analysis_data_sources
-        .grapheme_segmenter()
-        .segment_str(item_text);
+    let grapheme_cluster_boundaries = GraphemeClusterSegmenter::new().segment_str(item_text);
     let mut item_infos_iter = item_infos.iter();
     let mut code_unit_offset_in_string = text_range.start;
     let char_cluster = &mut scx.char_cluster;
@@ -311,7 +306,7 @@ fn shape_item<'a, B: Brush>(
         char_cluster,
     );
 
-    let mut current_font = font_selector.select_font(char_cluster, analysis_data_sources);
+    let mut current_font = font_selector.select_font(char_cluster);
 
     // Main segmentation loop (based on swash shape_clusters) - only within current item
     while let Some(font) = current_font.take() {
@@ -331,8 +326,7 @@ fn shape_item<'a, B: Brush>(
                 char_cluster,
             );
 
-            if let Some(next_font) = font_selector.select_font(char_cluster, analysis_data_sources)
-            {
+            if let Some(next_font) = font_selector.select_font(char_cluster) {
                 if next_font != font {
                     current_font = Some(next_font);
                     break;
@@ -547,11 +541,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         }
     }
 
-    fn select_font(
-        &mut self,
-        cluster: &mut CharCluster,
-        analysis_data_sources: &AnalysisDataSources,
-    ) -> Option<SelectedFont> {
+    fn select_font(&mut self, cluster: &mut CharCluster) -> Option<SelectedFont> {
         let style_index = cluster.style_index();
         let is_emoji = cluster.is_emoji;
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
@@ -589,22 +579,19 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
                 return fontique::QueryStatus::Continue;
             };
 
-            let map_status = cluster.map(
-                |ch| {
-                    charmap
-                        .map(ch)
-                        .map(|g| {
-                            // HACK: in reality, we're only computing coverage, so
-                            // we only care about whether the font  has a mapping
-                            // for a particular glyph. Any non-zero value indicates
-                            // the existence of a glyph so we can simplify this
-                            // without a fallible conversion from u32 to u16.
-                            (g != 0) as u16
-                        })
-                        .unwrap_or_default()
-                },
-                analysis_data_sources,
-            );
+            let map_status = cluster.map(|ch| {
+                charmap
+                    .map(ch)
+                    .map(|g| {
+                        // HACK: in reality, we're only computing coverage, so
+                        // we only care about whether the font  has a mapping
+                        // for a particular glyph. Any non-zero value indicates
+                        // the existence of a glyph so we can simplify this
+                        // without a fallible conversion from u32 to u16.
+                        (g != 0) as u16
+                    })
+                    .unwrap_or_default()
+            });
 
             match map_status {
                 Status::Complete => {
