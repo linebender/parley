@@ -12,9 +12,6 @@ use alloc::vec::Vec;
 
 use crate::analysis::cluster::Whitespace;
 use crate::analysis::{Boundary, CharInfo};
-#[cfg(feature = "libm")]
-#[allow(unused_imports)]
-use core_maths::CoreFloat;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct ClusterData {
