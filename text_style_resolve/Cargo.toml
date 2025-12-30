@@ -1,0 +1,28 @@
+[package]
+name = "text_style_resolve"
+version = "0.1.0"
+description = "Specified→computed resolution for text_style"
+keywords = ["text", "style", "css"]
+categories = ["graphics", "text"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+publish = false
+
+[package.metadata.docs.rs]
+all-features = true
+# There are no platform specific docs.
+default-target = "x86_64-unknown-linux-gnu"
+targets = []
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+text_style = { path = "../text_style", default-features = false }
+
+[lints]
+workspace = true

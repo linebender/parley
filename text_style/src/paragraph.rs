@@ -1,0 +1,51 @@
+// Copyright 2025 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
+use crate::ParagraphDeclaration;
+use crate::specified::Specified;
+use alloc::vec::Vec;
+use text_primitives::{BaseDirection, OverflowWrap, TextWrapMode, WordBreak};
+
+/// A set of specified paragraph declarations for a block of text.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ParagraphStyle {
+    declarations: Vec<ParagraphDeclaration>,
+}
+
+impl ParagraphStyle {
+    /// Creates an empty paragraph style (no declarations).
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Returns the declarations in this style, in authoring order.
+    pub fn declarations(&self) -> &[ParagraphDeclaration] {
+        &self.declarations
+    }
+
+    /// Appends an arbitrary declaration.
+    pub fn push(mut self, declaration: ParagraphDeclaration) -> Self {
+        self.declarations.push(declaration);
+        self
+    }
+
+    /// Sets the base direction.
+    pub fn base_direction(self, value: Specified<BaseDirection>) -> Self {
+        self.push(ParagraphDeclaration::BaseDirection(value))
+    }
+
+    /// Sets `word-break`.
+    pub fn word_break(self, value: Specified<WordBreak>) -> Self {
+        self.push(ParagraphDeclaration::WordBreak(value))
+    }
+
+    /// Sets `overflow-wrap`.
+    pub fn overflow_wrap(self, value: Specified<OverflowWrap>) -> Self {
+        self.push(ParagraphDeclaration::OverflowWrap(value))
+    }
+
+    /// Sets `text-wrap-mode`.
+    pub fn text_wrap_mode(self, value: Specified<TextWrapMode>) -> Self {
+        self.push(ParagraphDeclaration::TextWrapMode(value))
+    }
+}
