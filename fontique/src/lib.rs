@@ -61,9 +61,8 @@ pub use collection::{Collection, CollectionOptions, Query, QueryFamily, QueryFon
 pub use fallback::FallbackKey;
 pub use family::{FamilyId, FamilyInfo};
 pub use font::{AxisInfo, FontInfo, FontInfoOverride, Synthesis};
-pub use generic::GenericFamily;
 pub use source::{SourceId, SourceInfo, SourceKind};
-pub use text_primitives::{FontStyle, FontWeight, FontWidth};
+pub use text_primitives::{FontStyle, FontWeight, FontWidth, GenericFamily};
 
 #[cfg(all(feature = "system", target_vendor = "apple"))]
 use objc2 as _;

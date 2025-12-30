@@ -1299,7 +1299,6 @@ dependencies = [
 name = "fontique"
 version = "0.7.0"
 dependencies = [
- "bytemuck",
  "hashbrown 0.16.1",
  "icu_locale_core",
  "icu_properties",
