@@ -97,12 +97,13 @@ impl FontWeight {
             }
 
             if weight < fc_b {
-                let (ot_a, fc_a) = MAP[i - 1];
                 let weight = weight as f32;
-                let fc_a = fc_a as f32;
                 let fc_b = fc_b as f32;
-                let ot_a = ot_a as f32;
                 let ot_b = ot_b as f32;
+
+                let (ot_a, fc_a) = MAP[i - 1];
+                let fc_a = fc_a as f32;
+                let ot_a = ot_a as f32;
 
                 // Linear interpolation between (fc_a → ot_a) and (fc_b → ot_b).
                 let t = (weight - fc_a) / (fc_b - fc_a);
