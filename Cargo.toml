@@ -12,6 +12,7 @@ members = [
     "parley_draw",
     "examples/swash_render",
     "examples/tiny_skia_render",
+    "examples/vello_cpu_render",
     "examples/vello_editor",
     "xtask",
 ]
@@ -20,7 +21,7 @@ members = [
 edition = "2021"
 # Keep in sync with RUST_MIN_VER in .github/workflows/ci.yml, with the relevant README.md files
 # and with the MSRV in the `Unreleased` section of CHANGELOG.md.
-rust-version = "1.83"
+rust-version = "1.88"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/linebender/parley"
 
@@ -30,7 +31,10 @@ bytemuck = { version = "1.24.0", default-features = false }
 databake = { version = "0.2", default-features = false }
 fontique = { version = "0.7.0", default-features = false, path = "fontique" }
 harfrust = { version = "0.3.2", default-features = false }
-hashbrown = { version = "0.16.1", default-features = false, features = ["default-hasher"] }
+hashbrown = { version = "0.16.1", default-features = false, features = [
+    "default-hasher",
+    "raw-entry",
+] }
 icu_codepointtrie_builder = { version = "0.5.1", default-features = false, features = ["wasm"] }
 icu_collections = { version = "2.1.1", default-features = false }
 icu_locale = { version = "2.1.1", default-features = false }
@@ -47,11 +51,14 @@ parley = { version = "0.7.0", default-features = false, path = "parley" }
 parley_data = { path = "parley_data", default-features = false }
 parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
+parley_draw = { default-features = false, path = "parley_draw" }
 peniko = { version = "0.4.1", default-features = false }
 read-fonts = { version = "0.35.0", default-features = false }
 skrifa = { version = "0.37.0", default-features = false }
 smallvec = "1.15.1"
 swash = { version = "0.2.6", default-features = false }
+vello_common = { git = "https://github.com/linebender/vello.git", rev = "ab948fed9d6a0a79bb0eb7c72043a65b7b7a391f", default-features = false }
+vello_cpu = { git = "https://github.com/linebender/vello.git", rev = "ab948fed9d6a0a79bb0eb7c72043a65b7b7a391f", default-features = false }
 zerovec = { version = "0.11.5", default-features = false }
 
 [workspace.lints]

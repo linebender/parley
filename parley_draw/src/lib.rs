@@ -5,7 +5,13 @@
 //!
 //! ## Features
 //!
-//! - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
+//! - `std` (enabled by default): Get floating point functions from the standard library
+//!   (likely using your target's libc).
+//! - `libm`: Use floating point implementations from `libm`.
+//! - `vello_cpu` (enabled by default): Implements `GlyphRenderer` for Vello CPU's `RenderContext`.
+//! - `png`: Enables PNG support for drawing bitmap glyphs.
+//!
+//! At least one of `std` and `libm` is required.
 
 // LINEBENDER LINT SET - lib.rs - v3
 // See https://linebender.org/wiki/canonical-lints/
@@ -18,5 +24,21 @@
 // END LINEBENDER LINT SET
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![no_std]
+
+extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
+
+use vello_common::{color, kurbo, peniko, pixmap::Pixmap};
+
+mod colr;
+mod glyph;
+mod math;
+
+pub mod renderers;
+
+pub use colr::{ColrPainter, ColrRenderer};
+pub use glyph::{
+    BitmapGlyph, ColorGlyph, Glyph, GlyphCaches, GlyphRenderer, GlyphRunBuilder, GlyphType,
+    HintCache, HintKey, OutlineCache, OutlineGlyph, PreparedGlyph,
+};

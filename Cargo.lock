@@ -137,6 +137,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "allocator-api2"
+version = "0.2.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
+
+[[package]]
 name = "android-activity"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -806,6 +812,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a18ef4657441fb193b65f34dc39b3781f0dfec23d3bd94d0eeb4e88cde421edb"
 dependencies = [
+ "bytemuck",
  "libm",
 ]
 
@@ -1204,6 +1211,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fearless_simd"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8fb2907d1f08b2b316b9223ced5b0e89d87028ba8deae9764741dba8ff7f3903"
+dependencies = [
+ "bytemuck",
+ "libm",
+]
+
+[[package]]
 name = "filetime"
 version = "0.2.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1593,6 +1610,8 @@ version = "0.15.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
 dependencies = [
+ "allocator-api2",
+ "equivalent",
  "foldhash 0.1.5",
 ]
 
@@ -2370,6 +2389,18 @@ name = "kurbo"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c62026ae44756f8a599ba21140f350303d4f08dcdcc71b5ad9c9bb8128c13c62"
+dependencies = [
+ "arrayvec",
+ "euclid",
+ "libm",
+ "smallvec",
+]
+
+[[package]]
+name = "kurbo"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce9729cc38c18d86123ab736fd2e7151763ba226ac2490ec092d1dd148825e32"
 dependencies = [
  "arrayvec",
  "euclid",
@@ -3301,7 +3332,7 @@ dependencies = [
  "oxipng",
  "parley_data",
  "parley_dev",
- "peniko",
+ "peniko 0.4.1",
  "skrifa 0.37.0",
  "tiny-skia",
  "zerovec",
@@ -3353,6 +3384,14 @@ version = "0.0.0"
 [[package]]
 name = "parley_draw"
 version = "0.0.0"
+dependencies = [
+ "bytemuck",
+ "hashbrown 0.16.1",
+ "skrifa 0.37.0",
+ "smallvec",
+ "vello_common",
+ "vello_cpu",
+]
 
 [[package]]
 name = "parse-zoneinfo"
@@ -3373,7 +3412,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b44f9ddd2f480176b34278eb653ec1c8062f3b143a4e16eeff5ffac3334e288"
 dependencies = [
  "color",
- "kurbo",
+ "kurbo 0.11.3",
+ "linebender_resource_handle",
+ "smallvec",
+]
+
+[[package]]
+name = "peniko"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3c76095c9a636173600478e0373218c7b955335048c2bcd12dc6a79657649d8"
+dependencies = [
+ "bytemuck",
+ "color",
+ "kurbo 0.12.0",
  "linebender_resource_handle",
  "smallvec",
 ]
@@ -4764,7 +4816,7 @@ dependencies = [
  "bytemuck",
  "futures-intrusive",
  "log",
- "peniko",
+ "peniko 0.4.1",
  "png 0.17.16",
  "skrifa 0.35.0",
  "static_assertions",
@@ -4772,6 +4824,42 @@ dependencies = [
  "vello_encoding",
  "vello_shaders",
  "wgpu",
+]
+
+[[package]]
+name = "vello_common"
+version = "0.0.4"
+source = "git+https://github.com/linebender/vello.git?rev=ab948fed9d6a0a79bb0eb7c72043a65b7b7a391f#ab948fed9d6a0a79bb0eb7c72043a65b7b7a391f"
+dependencies = [
+ "bytemuck",
+ "fearless_simd",
+ "hashbrown 0.15.5",
+ "libm",
+ "log",
+ "peniko 0.5.0",
+ "png 0.17.16",
+ "skrifa 0.37.0",
+ "smallvec",
+]
+
+[[package]]
+name = "vello_cpu"
+version = "0.0.4"
+source = "git+https://github.com/linebender/vello.git?rev=ab948fed9d6a0a79bb0eb7c72043a65b7b7a391f#ab948fed9d6a0a79bb0eb7c72043a65b7b7a391f"
+dependencies = [
+ "bytemuck",
+ "hashbrown 0.15.5",
+ "vello_common",
+]
+
+[[package]]
+name = "vello_cpu_render"
+version = "0.1.0"
+dependencies = [
+ "parley",
+ "parley_draw",
+ "skrifa 0.37.0",
+ "vello_cpu",
 ]
 
 [[package]]
@@ -4783,7 +4871,7 @@ dependencies = [
  "anyhow",
  "clipboard-rs",
  "parley",
- "peniko",
+ "peniko 0.4.1",
  "pollster",
  "ui-events",
  "ui-events-winit",
@@ -4800,7 +4888,7 @@ checksum = "c69b0fe94b0ac7e47619c504ee2c377355174f5c46353c46d03fa5f7e435922b"
 dependencies = [
  "bytemuck",
  "guillotiere",
- "peniko",
+ "peniko 0.4.1",
  "skrifa 0.35.0",
  "smallvec",
 ]

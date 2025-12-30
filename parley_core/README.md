@@ -34,7 +34,7 @@ Parley Core provides low level APIs for implementing text layout.
 
 ## Minimum supported Rust Version (MSRV)
 
-This version of Parley Core has been verified to compile with **Rust 1.83** and later.
+This version of Parley Core has been verified to compile with **Rust 1.88** and later.
 
 Future versions of Parley Core might increase the Rust version requirement.
 It will not be treated as a breaking change and as such can even happen with small patch releases.
