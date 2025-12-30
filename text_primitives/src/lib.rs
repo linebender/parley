@@ -40,6 +40,8 @@
 
 mod bidi;
 mod font;
+#[cfg(feature = "bytemuck")]
+mod impl_bytemuck;
 mod language;
 mod tag;
 mod text;
