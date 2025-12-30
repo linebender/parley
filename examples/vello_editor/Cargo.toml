@@ -11,8 +11,8 @@ publish = false
 vello = "0.5.1"
 anyhow = "1.0.100"
 pollster = "0.4.0"
-ui-events = "0.1"
-ui-events-winit = "0.1"
+ui-events-winit = "0.2"
+ui-events = "0.2"
 winit = "0.30.12"
 parley = { workspace = true, default-features = true, features = ["accesskit"] }
 peniko = { workspace = true }
