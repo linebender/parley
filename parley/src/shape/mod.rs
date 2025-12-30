@@ -388,7 +388,7 @@ fn shape_item<'a, B: Brush>(
         scx.features.clear();
         for feature in rcx.features(item.features).unwrap_or(&[]) {
             scx.features.push(harfrust::Feature::new(
-                feature.tag,
+                harfrust::Tag::new(&feature.tag.to_bytes()),
                 feature.value as u32,
                 ..,
             ));
@@ -483,6 +483,10 @@ fn variations_iter<'a>(
     synthesis: &'a fontique::Synthesis,
     item: Option<&'a [FontVariation]>,
 ) -> impl Iterator<Item = harfrust::Variation> + 'a {
+    fn tag_to_harfrust(tag: crate::setting::Tag) -> harfrust::Tag {
+        harfrust::Tag::new(&tag.to_bytes())
+    }
+
     synthesis
         .variation_settings()
         .iter()
@@ -494,7 +498,7 @@ fn variations_iter<'a>(
             item.unwrap_or(&[])
                 .iter()
                 .map(|variation| harfrust::Variation {
-                    tag: variation.tag,
+                    tag: tag_to_harfrust(variation.tag),
                     value: variation.value,
                 }),
         )

@@ -3333,6 +3333,7 @@ dependencies = [
  "parley_dev",
  "peniko 0.4.1",
  "skrifa 0.37.0",
+ "text_primitives",
  "tiny-skia",
  "zerovec",
 ]
