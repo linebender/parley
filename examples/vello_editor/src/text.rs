@@ -15,7 +15,7 @@ use std::time::Duration;
 use ui_events::pointer::PointerButton;
 use ui_events::{
     keyboard::{Key, KeyboardEvent, NamedKey},
-    pointer::{PointerEvent, PointerInfo, PointerState, PointerType},
+    pointer::{PointerButtonEvent, PointerEvent, PointerInfo, PointerState, PointerType},
 };
 use vello::{
     Scene,
@@ -261,7 +261,7 @@ impl Editor {
         };
         match event {
             // TODO: Handle touch long press specially, for SelectWordAtPoint.
-            PointerEvent::Down { pointer, state, .. }
+            PointerEvent::Down(PointerButtonEvent { pointer, state, .. })
                 if pressed(pointer, state) && !self.editor.is_composing() =>
             {
                 self.cursor_reset();
