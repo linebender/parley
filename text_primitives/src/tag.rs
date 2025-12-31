@@ -6,7 +6,7 @@ use core::fmt;
 /// A 4-byte OpenType tag (for example `wght`, `liga`).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
-pub struct Tag(u32);
+pub struct Tag([u8; 4]);
 
 impl Tag {
     /// Creates a tag from a 4-byte array reference.
@@ -16,12 +16,12 @@ impl Tag {
 
     /// Creates a tag from 4 bytes.
     pub const fn from_bytes(bytes: [u8; 4]) -> Self {
-        Self(u32::from_be_bytes(bytes))
+        Self(bytes)
     }
 
     /// Returns this tag as 4 bytes.
     pub const fn to_bytes(self) -> [u8; 4] {
-        self.0.to_be_bytes()
+        self.0
     }
 
     /// Parses a tag from a 4-character ASCII string.
