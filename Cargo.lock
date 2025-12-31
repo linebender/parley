@@ -4440,6 +4440,7 @@ dependencies = [
 name = "text_style_resolve"
 version = "0.1.0"
 dependencies = [
+ "text_primitives",
  "text_style",
 ]
 

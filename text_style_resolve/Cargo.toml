@@ -23,6 +23,7 @@ std = []
 
 [dependencies]
 text_style = { path = "../text_style", default-features = false }
+text_primitives = { path = "../text_primitives", default-features = false }
 
 [lints]
 workspace = true

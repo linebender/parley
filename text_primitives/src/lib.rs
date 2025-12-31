@@ -51,5 +51,5 @@ pub use bidi::{BidiControl, BidiDirection, BidiOverride};
 pub use font::{FontStyle, FontWeight, FontWidth};
 pub use generic_family::GenericFamily;
 pub use language::{Language, ParseLanguageError};
-pub use tag::{Setting, Tag};
+pub use tag::{ParseSettingsError, ParseSettingsErrorKind, Setting, Tag};
 pub use text::{BaseDirection, OverflowWrap, TextWrapMode, WordBreak};

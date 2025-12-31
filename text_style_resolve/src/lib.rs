@@ -67,6 +67,7 @@ pub use computed::{ComputedInlineStyle, ComputedLineHeight, ComputedParagraphSty
 pub use context::{InlineResolveContext, ParagraphResolveContext};
 pub use error::ResolveStyleError;
 pub use parse::ParseSettingsError;
+pub use text_primitives::ParseSettingsErrorKind;
 
 pub use resolve::{resolve_inline_declarations, resolve_paragraph_declarations};
 

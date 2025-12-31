@@ -3,7 +3,7 @@
 
 use crate::{
     ComputedInlineStyle, ComputedLineHeight, ComputedParagraphStyle, InlineResolveContext,
-    ParagraphResolveContext, ParseSettingsError, ResolveStyleError, ResolveStyleExt,
+    ParagraphResolveContext, ParseSettingsErrorKind, ResolveStyleError, ResolveStyleExt,
 };
 use text_style::{
     BaseDirection, FontSize, InlineDeclaration, InlineStyle, LineHeight, ParagraphStyle, Setting,
@@ -214,12 +214,11 @@ fn invalid_settings_source_returns_error() {
     let ctx = InlineResolveContext::new(&base, &base, &base);
     let style = InlineStyle::new().font_variations(Specified::Value(Settings::source("wght 1")));
 
-    assert_eq!(
+    assert!(matches!(
         style.resolve(ctx),
-        Err(ResolveStyleError::FontVariations(
-            ParseSettingsError::InvalidSyntax
-        ))
-    );
+        Err(ResolveStyleError::FontVariations(err))
+            if err.kind() == ParseSettingsErrorKind::InvalidSyntax
+    ));
 }
 
 #[test]
@@ -240,12 +239,11 @@ fn feature_out_of_range_returns_error() {
 
     let style =
         InlineStyle::new().font_features(Specified::Value(Settings::source("\"liga\" 70000")));
-    assert_eq!(
+    assert!(matches!(
         style.resolve(ctx),
-        Err(ResolveStyleError::FontFeatures(
-            ParseSettingsError::OutOfRange
-        ))
-    );
+        Err(ResolveStyleError::FontFeatures(err))
+            if err.kind() == ParseSettingsErrorKind::OutOfRange
+    ));
 }
 
 #[test]
@@ -254,10 +252,9 @@ fn invalid_tag_length_returns_error() {
     let ctx = InlineResolveContext::new(&base, &base, &base);
 
     let style = InlineStyle::new().font_variations(Specified::Value(Settings::source("\"wg\" 1")));
-    assert_eq!(
+    assert!(matches!(
         style.resolve(ctx),
-        Err(ResolveStyleError::FontVariations(
-            ParseSettingsError::InvalidTag
-        ))
-    );
+        Err(ResolveStyleError::FontVariations(err))
+            if err.kind() == ParseSettingsErrorKind::InvalidTag
+    ));
 }
