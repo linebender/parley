@@ -43,6 +43,7 @@ mod family;
 mod family_name;
 mod font;
 mod generic;
+mod impl_fontconfig;
 mod matching;
 mod scan;
 mod script;
@@ -61,6 +62,7 @@ pub use collection::{Collection, CollectionOptions, Query, QueryFamily, QueryFon
 pub use fallback::FallbackKey;
 pub use family::{FamilyId, FamilyInfo};
 pub use font::{AxisInfo, FontInfo, FontInfoOverride, Synthesis};
+pub use impl_fontconfig::FromFontconfig;
 pub use source::{SourceId, SourceInfo, SourceKind};
 pub use text_primitives::{FontStyle, FontWeight, FontWidth, GenericFamily};
 

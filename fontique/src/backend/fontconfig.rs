@@ -37,8 +37,8 @@ use hashbrown::{HashMap, HashSet, hash_map::Entry};
 use smallvec::SmallVec;
 
 use crate::{
-    FallbackKey, FamilyId, FamilyInfo, FontInfo, FontStyle, FontWeight, FontWidth, GenericFamily,
-    Script, ScriptExt,
+    FallbackKey, FamilyId, FamilyInfo, FontInfo, FontStyle, FontWeight, FontWidth,
+    FromFontconfig as _, GenericFamily, Script, ScriptExt,
     family_name::{FamilyName, FamilyNameMap},
     generic::GenericFamilyMap,
     source::SourcePathMap,
