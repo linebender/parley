@@ -32,7 +32,7 @@ pub enum WordBreak {
 /// See: <https://www.w3.org/TR/css-text-3/#overflow-wrap-property>
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum OverflowWrap {
-    /// Only break at opportunities specified by word-breaking rules.
+    /// Even with extremely long words, lines can only break at places specified in [`WordBreak`].
     #[default]
     Normal,
     /// Words may be broken at an arbitrary point if needed.
