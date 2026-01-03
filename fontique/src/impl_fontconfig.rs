@@ -12,6 +12,9 @@ use crate::{FontStyle, FontWeight, FontWidth};
 ///
 /// This is intentionally kept in `fontique` (rather than `text_primitives`) because it is a
 /// Fontconfig-specific mapping.
+///
+/// The numeric values used by these conversions are based on the `fonts.conf` documentation:
+/// <https://www.freedesktop.org/software/fontconfig/fontconfig-user.html>.
 pub trait FromFontconfig: Sized {
     /// Creates a value from the corresponding Fontconfig numeric representation.
     ///
