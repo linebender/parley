@@ -31,6 +31,7 @@ representations of common “leaf” concepts (weights, widths, OpenType tags, l
 ## Features
 
 - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
+- `bytemuck`: Implement traits from `bytemuck` on [`GenericFamily`].
 
 ## Example
 
