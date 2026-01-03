@@ -43,6 +43,7 @@ mod family;
 mod family_name;
 mod font;
 mod generic;
+mod impl_fontconfig;
 mod matching;
 mod scan;
 mod script;
@@ -55,14 +56,15 @@ pub use icu_locale_core::subtags::Script;
 pub use linebender_resource_handle::Blob;
 pub use script::ScriptExt;
 
-pub use attributes::{Attributes, FontStyle, FontWeight, FontWidth};
+pub use attributes::Attributes;
 pub use charmap::{Charmap, CharmapIndex};
 pub use collection::{Collection, CollectionOptions, Query, QueryFamily, QueryFont, QueryStatus};
 pub use fallback::FallbackKey;
 pub use family::{FamilyId, FamilyInfo};
 pub use font::{AxisInfo, FontInfo, FontInfoOverride, Synthesis};
-pub use generic::GenericFamily;
+pub use impl_fontconfig::FromFontconfig;
 pub use source::{SourceId, SourceInfo, SourceKind};
+pub use text_primitives::{FontStyle, FontWeight, FontWidth, GenericFamily};
 
 #[cfg(all(feature = "system", target_vendor = "apple"))]
 use objc2 as _;

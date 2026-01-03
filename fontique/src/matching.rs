@@ -3,8 +3,8 @@
 
 //! Implementation of the CSS font matching algorithm.
 
-use super::attributes::{FontStyle, FontWeight, FontWidth};
 use super::font::FontInfo;
+use crate::{FontStyle, FontWeight, FontWidth};
 use smallvec::SmallVec;
 
 const DEFAULT_OBLIQUE_ANGLE: f32 = 14.0;
