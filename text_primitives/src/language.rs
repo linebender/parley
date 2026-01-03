@@ -38,33 +38,32 @@ impl Language {
     }
 
     /// Returns the canonical string form (`language[-Script][-REGION]`).
+    #[must_use]
     #[inline(always)]
     pub fn as_str(&self) -> &str {
-        core::str::from_utf8(&self.bytes[..self.len as usize])
-            .expect("only ASCII")
+        core::str::from_utf8(&self.bytes[..self.len as usize]).expect("only ASCII")
     }
 
     /// Returns the primary language subtag (lowercase).
+    #[must_use]
     #[inline(always)]
     pub fn language(&self) -> &str {
-        core::str::from_utf8(&self.bytes[..self.language_len as usize])
-            .expect("only ASCII")
+        core::str::from_utf8(&self.bytes[..self.language_len as usize]).expect("only ASCII")
     }
 
     /// Returns the script subtag (titlecase), if present.
+    #[must_use]
     pub fn script(&self) -> Option<&str> {
         if self.script_len == 0 {
             return None;
         }
         let start = self.language_len as usize + 1;
         let end = start + self.script_len as usize;
-        Some(
-            core::str::from_utf8(&self.bytes[start..end])
-                .expect("only ASCII"),
-        )
+        Some(core::str::from_utf8(&self.bytes[start..end]).expect("only ASCII"))
     }
 
     /// Returns the region subtag (uppercase or digits), if present.
+    #[must_use]
     pub fn region(&self) -> Option<&str> {
         if self.region_len == 0 {
             return None;
@@ -75,10 +74,7 @@ impl Language {
         }
         start += 1;
         let end = start + self.region_len as usize;
-        Some(
-            core::str::from_utf8(&self.bytes[start..end])
-                .expect("only ASCII"),
-        )
+        Some(core::str::from_utf8(&self.bytes[start..end]).expect("only ASCII"))
     }
 
     const fn from_language_bytes(bytes: [u8; 3], len: u8) -> Self {
