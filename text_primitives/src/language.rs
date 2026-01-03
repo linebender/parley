@@ -37,15 +37,17 @@ impl Language {
     }
 
     /// Returns the canonical string form (`language[-Script][-REGION]`).
+    #[inline(always)]
     pub fn as_str(&self) -> &str {
         core::str::from_utf8(&self.bytes[..self.len as usize])
-            .expect("Language stores only ASCII bytes")
+            .expect("only ASCII")
     }
 
     /// Returns the primary language subtag (lowercase).
+    #[inline(always)]
     pub fn language(&self) -> &str {
         core::str::from_utf8(&self.bytes[..self.language_len as usize])
-            .expect("Language stores only ASCII bytes")
+            .expect("only ASCII")
     }
 
     /// Returns the script subtag (titlecase), if present.
@@ -57,7 +59,7 @@ impl Language {
         let end = start + self.script_len as usize;
         Some(
             core::str::from_utf8(&self.bytes[start..end])
-                .expect("Language stores only ASCII bytes"),
+                .expect("only ASCII"),
         )
     }
 
@@ -74,7 +76,7 @@ impl Language {
         let end = start + self.region_len as usize;
         Some(
             core::str::from_utf8(&self.bytes[start..end])
-                .expect("Language stores only ASCII bytes"),
+                .expect("only ASCII"),
         )
     }
 
