@@ -37,6 +37,26 @@ impl Language {
         s.parse()
     }
 
+    /// Parses the `language[-Script][-REGION]` prefix of a tag, returning the remainder.
+    ///
+    /// The remainder starts at the first unconsumed subtag (without a leading `-`/`_`). This can
+    /// be used to inspect or process variants, extensions, or private-use subtags without forcing
+    /// this type to model them.
+    ///
+    /// ```
+    /// use text_primitives::Language;
+    ///
+    /// let (lang, rest) = Language::parse_prefix("tr-Latin-TR").unwrap();
+    /// assert_eq!(lang.as_str(), "tr");
+    /// assert_eq!(rest, "Latin-TR");
+    /// ```
+    pub fn parse_prefix(s: &str) -> Result<(Self, &str), ParseLanguageError> {
+        let (lang, rest) = parse_language_prefix(s)?;
+        // Normalize the remainder by dropping any leading separators.
+        let rest = rest.trim_start_matches(['-', '_']);
+        Ok((lang, rest))
+    }
+
     /// Returns the canonical string form (`language[-Script][-REGION]`).
     #[must_use]
     #[inline(always)]
@@ -93,6 +113,139 @@ impl Language {
     }
 }
 
+fn parse_language_prefix(s: &str) -> Result<(Language, &str), ParseLanguageError> {
+    let bytes = s.as_bytes();
+    let mut pos = 0_usize;
+
+    let (language_start, language_end) =
+        next_part_bounds(s, &mut pos).ok_or(ParseLanguageError::InvalidLanguage)?;
+    let language = &s[language_start..language_end];
+    let language_bytes = language.as_bytes();
+    if !(2..=3).contains(&language_bytes.len())
+        || !language_bytes.iter().all(|b| b.is_ascii_alphabetic())
+    {
+        return Err(ParseLanguageError::InvalidLanguage);
+    }
+
+    let mut out = Language {
+        bytes: [0; 12],
+        len: 0,
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "language subtag length is 2 or 3"
+        )]
+        language_len: language_bytes.len() as u8,
+        script_len: 0,
+        region_len: 0,
+    };
+
+    // language: lower
+    for (i, b) in language_bytes.iter().enumerate() {
+        out.bytes[i] = b.to_ascii_lowercase();
+    }
+    out.len = out.language_len;
+
+    // optional script or region
+    let Some((start, end)) = next_part_bounds(s, &mut pos) else {
+        return Ok((out, ""));
+    };
+
+    let b = &bytes[start..end];
+    if b.len() == 4 {
+        if !b.iter().all(|c| c.is_ascii_alphabetic()) {
+            return Err(ParseLanguageError::InvalidScript);
+        }
+        out.bytes[out.len as usize] = b'-';
+        out.len += 1;
+        out.script_len = 4;
+        // titlecase script
+        out.bytes[out.len as usize] = b[0].to_ascii_uppercase();
+        out.bytes[out.len as usize + 1] = b[1].to_ascii_lowercase();
+        out.bytes[out.len as usize + 2] = b[2].to_ascii_lowercase();
+        out.bytes[out.len as usize + 3] = b[3].to_ascii_lowercase();
+        out.len += 4;
+    } else if b.len() == 2 || b.len() == 3 {
+        let is_alpha2 = b.len() == 2 && b.iter().all(|c| c.is_ascii_alphabetic());
+        let is_digit3 = b.len() == 3 && b.iter().all(|c| c.is_ascii_digit());
+        if !(is_alpha2 || is_digit3) {
+            return Err(ParseLanguageError::InvalidRegion);
+        }
+        out.bytes[out.len as usize] = b'-';
+        out.len += 1;
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "region subtag length is 2 or 3"
+        )]
+        {
+            out.region_len = b.len() as u8;
+        }
+        if is_alpha2 {
+            out.bytes[out.len as usize] = b[0].to_ascii_uppercase();
+            out.bytes[out.len as usize + 1] = b[1].to_ascii_uppercase();
+        } else {
+            out.bytes[out.len as usize] = b[0];
+            out.bytes[out.len as usize + 1] = b[1];
+            out.bytes[out.len as usize + 2] = b[2];
+        }
+        out.len += out.region_len;
+    } else {
+        return Ok((out, &s[start..]));
+    }
+
+    // optional region (if not already set)
+    if out.region_len != 0 {
+        return Ok((out, &s[pos..]));
+    }
+    let Some((start, end)) = next_part_bounds(s, &mut pos) else {
+        return Ok((out, ""));
+    };
+    let b = &bytes[start..end];
+    if b.len() == 2 || b.len() == 3 {
+        let is_alpha2 = b.len() == 2 && b.iter().all(|c| c.is_ascii_alphabetic());
+        let is_digit3 = b.len() == 3 && b.iter().all(|c| c.is_ascii_digit());
+        if !(is_alpha2 || is_digit3) {
+            return Err(ParseLanguageError::InvalidRegion);
+        }
+        out.bytes[out.len as usize] = b'-';
+        out.len += 1;
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "region subtag length is 2 or 3"
+        )]
+        {
+            out.region_len = b.len() as u8;
+        }
+        if is_alpha2 {
+            out.bytes[out.len as usize] = b[0].to_ascii_uppercase();
+            out.bytes[out.len as usize + 1] = b[1].to_ascii_uppercase();
+        } else {
+            out.bytes[out.len as usize] = b[0];
+            out.bytes[out.len as usize + 1] = b[1];
+            out.bytes[out.len as usize + 2] = b[2];
+        }
+        out.len += out.region_len;
+        Ok((out, &s[pos..]))
+    } else {
+        Ok((out, &s[start..]))
+    }
+}
+
+fn next_part_bounds(s: &str, pos: &mut usize) -> Option<(usize, usize)> {
+    let bytes = s.as_bytes();
+    while *pos < bytes.len() && matches!(bytes[*pos], b'-' | b'_') {
+        *pos += 1;
+    }
+    if *pos >= bytes.len() {
+        return None;
+    }
+    let start = *pos;
+    while *pos < bytes.len() && !matches!(bytes[*pos], b'-' | b'_') {
+        *pos += 1;
+    }
+    let end = *pos;
+    Some((start, end))
+}
+
 impl fmt::Debug for Language {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Language").field(&self.as_str()).finish()
@@ -135,110 +288,94 @@ impl FromStr for Language {
     type Err = ParseLanguageError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parts = s.split(['-', '_']).filter(|p| !p.is_empty());
-
-        let language = parts.next().ok_or(ParseLanguageError::InvalidLanguage)?;
-        let language_bytes = language.as_bytes();
-        if !(2..=3).contains(&language_bytes.len())
-            || !language_bytes.iter().all(|b| b.is_ascii_alphabetic())
-        {
-            return Err(ParseLanguageError::InvalidLanguage);
-        }
-
-        let mut out = Self {
-            bytes: [0; 12],
-            len: 0,
-            #[allow(
-                clippy::cast_possible_truncation,
-                reason = "language subtag length is 2 or 3"
-            )]
-            language_len: language_bytes.len() as u8,
-            script_len: 0,
-            region_len: 0,
-        };
-
-        // language: lower
-        for (i, b) in language_bytes.iter().enumerate() {
-            out.bytes[i] = b.to_ascii_lowercase();
-        }
-        out.len = out.language_len;
-
-        let mut seen_variant = false;
-        let mut seen_extension_or_private = false;
-
-        for part in parts {
-            if seen_extension_or_private {
-                break;
-            }
-            let b = part.as_bytes();
-
-            // Extension or private use: we stop validating at this point.
-            if b.len() == 1 && b[0].is_ascii_alphanumeric() {
-                seen_extension_or_private = true;
-                continue;
-            }
-
-            if is_variant(b) {
-                seen_variant = true;
-                continue;
-            }
-
-            // Script (BCP 47): 4 alpha.
-            if b.len() == 4 {
-                if !b.iter().all(|c| c.is_ascii_alphabetic()) {
-                    return Err(ParseLanguageError::InvalidScript);
-                }
-                if out.script_len != 0 || out.region_len != 0 || seen_variant {
-                    return Err(ParseLanguageError::InvalidScript);
-                }
-                out.bytes[out.len as usize] = b'-';
-                out.len += 1;
-                out.script_len = 4;
-                // titlecase script
-                out.bytes[out.len as usize] = b[0].to_ascii_uppercase();
-                out.bytes[out.len as usize + 1] = b[1].to_ascii_lowercase();
-                out.bytes[out.len as usize + 2] = b[2].to_ascii_lowercase();
-                out.bytes[out.len as usize + 3] = b[3].to_ascii_lowercase();
-                out.len += 4;
-                continue;
-            }
-
-            // Region (BCP 47): 2 alpha or 3 digit.
-            if b.len() == 2 || b.len() == 3 {
-                let is_alpha2 = b.len() == 2 && b.iter().all(|c| c.is_ascii_alphabetic());
-                let is_digit3 = b.len() == 3 && b.iter().all(|c| c.is_ascii_digit());
-                if !(is_alpha2 || is_digit3) {
-                    return Err(ParseLanguageError::InvalidRegion);
-                }
-                if out.region_len != 0 || seen_variant {
-                    return Err(ParseLanguageError::InvalidRegion);
-                }
-                out.bytes[out.len as usize] = b'-';
-                out.len += 1;
-                #[allow(
-                    clippy::cast_possible_truncation,
-                    reason = "region subtag length is 2 or 3"
-                )]
-                {
-                    out.region_len = b.len() as u8;
-                }
-                if is_alpha2 {
-                    out.bytes[out.len as usize] = b[0].to_ascii_uppercase();
-                    out.bytes[out.len as usize + 1] = b[1].to_ascii_uppercase();
-                } else {
-                    out.bytes[out.len as usize] = b[0];
-                    out.bytes[out.len as usize + 1] = b[1];
-                    out.bytes[out.len as usize + 2] = b[2];
-                }
-                out.len += out.region_len;
-                continue;
-            }
-
-            return Err(ParseLanguageError::InvalidSubtag);
-        }
-
-        Ok(out)
+        let (lang, rest) = parse_language_prefix(s)?;
+        validate_remainder(rest)?;
+        Ok(lang)
     }
+}
+
+fn validate_remainder(rest: &str) -> Result<(), ParseLanguageError> {
+    #[derive(Clone, Copy)]
+    enum State {
+        Base,
+        Extension,
+        Private,
+    }
+
+    let mut state = State::Base;
+    let mut needs_payload = false;
+
+    for part in rest.split(['-', '_']).filter(|p| !p.is_empty()) {
+        let bytes = part.as_bytes();
+
+        match state {
+            State::Base => {
+                if is_variant(bytes) {
+                    continue;
+                }
+
+                if bytes.len() == 1 && bytes[0].is_ascii_alphanumeric() {
+                    state = if bytes[0].eq_ignore_ascii_case(&b'x') {
+                        State::Private
+                    } else {
+                        State::Extension
+                    };
+                    needs_payload = true;
+                    continue;
+                }
+
+                if bytes.len() == 4 && bytes.iter().all(|c| c.is_ascii_alphabetic()) {
+                    return Err(ParseLanguageError::InvalidScript);
+                }
+
+                if bytes.len() == 2 && bytes.iter().all(|c| c.is_ascii_alphabetic()) {
+                    return Err(ParseLanguageError::InvalidRegion);
+                }
+
+                if bytes.len() == 3 && bytes.iter().all(|c| c.is_ascii_digit()) {
+                    return Err(ParseLanguageError::InvalidRegion);
+                }
+
+                return Err(ParseLanguageError::InvalidSubtag);
+            }
+            State::Extension => {
+                if bytes.len() == 1 && bytes[0].is_ascii_alphanumeric() {
+                    if needs_payload {
+                        return Err(ParseLanguageError::InvalidSubtag);
+                    }
+                    state = if bytes[0].eq_ignore_ascii_case(&b'x') {
+                        State::Private
+                    } else {
+                        State::Extension
+                    };
+                    needs_payload = true;
+                    continue;
+                }
+
+                if (2..=8).contains(&bytes.len()) && bytes.iter().all(|b| b.is_ascii_alphanumeric())
+                {
+                    needs_payload = false;
+                    continue;
+                }
+
+                return Err(ParseLanguageError::InvalidSubtag);
+            }
+            State::Private => {
+                if (1..=8).contains(&bytes.len()) && bytes.iter().all(|b| b.is_ascii_alphanumeric())
+                {
+                    needs_payload = false;
+                    continue;
+                }
+                return Err(ParseLanguageError::InvalidSubtag);
+            }
+        }
+    }
+
+    if needs_payload {
+        return Err(ParseLanguageError::InvalidSubtag);
+    }
+
+    Ok(())
 }
 
 fn is_variant(bytes: &[u8]) -> bool {
@@ -337,5 +474,19 @@ mod tests {
             Language::parse("en-abc$e").unwrap_err(),
             ParseLanguageError::InvalidSubtag
         );
+    }
+
+    #[test]
+    fn parse_prefix_stops_at_unrecognized_subtag() {
+        let (lang, rest) = Language::parse_prefix("tr-Latin-TR").unwrap();
+        assert_eq!(lang.as_str(), "tr");
+        assert_eq!(rest, "Latin-TR");
+    }
+
+    #[test]
+    fn parse_prefix_returns_variants_and_extensions() {
+        let (lang, rest) = Language::parse_prefix("en-Latn-US-posix-u-ca-gregory").unwrap();
+        assert_eq!(lang.as_str(), "en-Latn-US");
+        assert_eq!(rest, "posix-u-ca-gregory");
     }
 }
