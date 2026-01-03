@@ -119,6 +119,8 @@ impl fmt::Display for ParseLanguageError {
     }
 }
 
+impl core::error::Error for ParseLanguageError {}
+
 impl FromStr for Language {
     type Err = ParseLanguageError;
 
