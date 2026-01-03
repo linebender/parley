@@ -5,10 +5,15 @@ use core::fmt;
 
 /// Visual weight class of a font, typically on a scale from 1.0 to 1000.0.
 ///
+/// The default value is [`FontWeight::NORMAL`] or `400.0`.
+///
 /// In variable fonts, this can be controlled with the `wght` axis. This uses an `f32` so that it
 /// can represent the full range of values possible with variable fonts.
 ///
-/// In CSS, this corresponds to the `font-weight` property.
+/// See <https://fonts.google.com/knowledge/glossary/weight>.
+///
+/// In CSS, this corresponds to the `font-weight` property:
+/// <https://www.w3.org/TR/css-fonts-4/#font-weight-prop>.
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct FontWeight(f32);
 
@@ -114,12 +119,22 @@ impl fmt::Display for FontWeight {
     }
 }
 
-/// Visual width of a font — a relative change from the normal aspect ratio.
+/// Visual width of a font — a relative change from the normal aspect ratio, typically in the
+/// range `0.5` to `2.0`.
+///
+/// The default value is [`FontWidth::NORMAL`] or `1.0`.
 ///
 /// In variable fonts, this can be controlled with the `wdth` axis. This uses an `f32` so that it
-/// can represent the full range of values possible with variable fonts.
+/// can represent the same range of values as the `wdth` axis.
 ///
-/// In CSS, this corresponds to the `font-width` (`font-stretch`) property.
+/// In Open Type, the `u16` `usWidthClass` field has 9 values, from 1-9, which doesn't allow for
+/// the wide range of values possible with variable fonts.
+/// See <https://learn.microsoft.com/en-us/typography/opentype/spec/os2#uswidthclass>.
+///
+/// See <https://fonts.google.com/knowledge/glossary/width>.
+///
+/// In CSS, this corresponds to the `font-width` property:
+/// <https://www.w3.org/TR/css-fonts-4/#font-width-prop>.
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub struct FontWidth(f32);
 
@@ -278,6 +293,9 @@ impl fmt::Display for FontWidth {
 ///
 /// In variable fonts, this can be controlled with the `ital` and `slnt` axes for italic and
 /// oblique styles, respectively.
+///
+/// In CSS, this corresponds to the `font-style` property:
+/// <https://www.w3.org/TR/css-fonts-4/#font-style-prop>.
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub enum FontStyle {
     /// `normal`.
