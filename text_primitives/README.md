@@ -28,10 +28,9 @@ This crate is intended as a lightweight, `no_std`-friendly vocabulary layer that
 across style systems, text layout engines, and font tooling. It focuses on small, typed
 representations of common “leaf” concepts (weights, widths, OpenType tags, language tags, etc).
 
-Higher-level crates can build on this:
-- `text_style`: declaration-based authoring of text styles (CSS-inspired)
-- `text_style_resolve`: specified→computed resolution
-- `styled_text`: rich text spanning + resolved runs
+## Features
+
+- `std` (enabled by default): This is currently unused and is provided for forward compatibility.
 
 ## Example
 
