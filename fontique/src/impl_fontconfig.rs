@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Fontconfig numeric value conversions.
+//!
+//! The numeric values used here are based on the `fonts.conf` documentation:
+//! <https://www.freedesktop.org/software/fontconfig/fontconfig-user.html>.
 
 use crate::{FontStyle, FontWeight, FontWidth};
 
@@ -11,27 +14,17 @@ use crate::{FontStyle, FontWeight, FontWidth};
 /// Fontconfig-specific mapping.
 pub trait FromFontconfig: Sized {
     /// Creates a value from the corresponding Fontconfig numeric representation.
+    ///
+    /// The numeric values are determined based on the `fonts.conf` documentation:
+    /// <https://www.freedesktop.org/software/fontconfig/fontconfig-user.html>.
     fn from_fontconfig(value: i32) -> Self;
 }
 
-impl FromFontconfig for FontWidth {
-    fn from_fontconfig(width: i32) -> Self {
-        match width {
-            50 => Self::ULTRA_CONDENSED,
-            63 => Self::EXTRA_CONDENSED,
-            75 => Self::CONDENSED,
-            87 => Self::SEMI_CONDENSED,
-            100 => Self::NORMAL,
-            113 => Self::SEMI_EXPANDED,
-            125 => Self::EXPANDED,
-            150 => Self::EXTRA_EXPANDED,
-            200 => Self::ULTRA_EXPANDED,
-            _ => Self::from_ratio(width as f32 / 100.0),
-        }
-    }
-}
-
 impl FromFontconfig for FontWeight {
+    /// Creates a new weight attribute with the given value from Fontconfig.
+    ///
+    /// The values are determined based on the `fonts.conf` documentation:
+    /// <https://www.freedesktop.org/software/fontconfig/fontconfig-user.html>.
     fn from_fontconfig(weight: i32) -> Self {
         // A selection of OpenType weights (first) and their corresponding fontconfig value (second)
         // Invariant: The fontconfig values are sorted.
@@ -76,7 +69,32 @@ impl FromFontconfig for FontWeight {
     }
 }
 
+impl FromFontconfig for FontWidth {
+    /// Creates a new width attribute with the given value from Fontconfig.
+    ///
+    /// The values are determined based on the `fonts.conf` documentation:
+    /// <https://www.freedesktop.org/software/fontconfig/fontconfig-user.html>.
+    fn from_fontconfig(width: i32) -> Self {
+        match width {
+            50 => Self::ULTRA_CONDENSED,
+            63 => Self::EXTRA_CONDENSED,
+            75 => Self::CONDENSED,
+            87 => Self::SEMI_CONDENSED,
+            100 => Self::NORMAL,
+            113 => Self::SEMI_EXPANDED,
+            125 => Self::EXPANDED,
+            150 => Self::EXTRA_EXPANDED,
+            200 => Self::ULTRA_EXPANDED,
+            _ => Self::from_ratio(width as f32 / 100.0),
+        }
+    }
+}
+
 impl FromFontconfig for FontStyle {
+    /// Creates a new style attribute with the given value from Fontconfig.
+    ///
+    /// The values are determined based on the `fonts.conf` documentation:
+    /// <https://www.freedesktop.org/software/fontconfig/fontconfig-user.html>.
     fn from_fontconfig(slant: i32) -> Self {
         match slant {
             100 => Self::Italic,
