@@ -47,12 +47,14 @@ impl FontWeight {
     pub const EXTRA_BLACK: Self = Self(950.0);
 
     /// Creates a new weight value.
-    pub fn new(weight: f32) -> Self {
+    #[inline(always)]
+    pub const fn new(weight: f32) -> Self {
         Self(weight)
     }
 
     /// Returns the underlying weight value.
-    pub fn value(self) -> f32 {
+    #[inline(always)]
+    pub const fn value(self) -> f32 {
         self.0
     }
 
@@ -150,38 +152,45 @@ impl FontWidth {
     pub const ULTRA_EXPANDED: Self = Self(2.0);
 
     /// Creates a new width value with the given ratio.
-    pub fn from_ratio(ratio: f32) -> Self {
+    #[inline(always)]
+    pub const fn from_ratio(ratio: f32) -> Self {
         Self(ratio)
     }
 
     /// Creates a width value from a percentage.
-    pub fn from_percentage(percentage: f32) -> Self {
+    #[inline(always)]
+    pub const fn from_percentage(percentage: f32) -> Self {
         Self(percentage / 100.0)
     }
 
     /// Returns the width value as a ratio, with `1.0` being normal width.
-    pub fn ratio(self) -> f32 {
+    #[inline(always)]
+    pub const fn ratio(self) -> f32 {
         self.0
     }
 
     /// Returns the width value as a percentage.
-    pub fn percentage(self) -> f32 {
+    #[inline(always)]
+    pub const fn percentage(self) -> f32 {
         self.0 * 100.0
     }
 
     /// Returns `true` if the width is normal.
-    pub fn is_normal(self) -> bool {
-        self == Self::NORMAL
+    #[inline(always)]
+    pub const fn is_normal(self) -> bool {
+        self.0 == Self::NORMAL.0
     }
 
     /// Returns `true` if the width is condensed (less than normal).
-    pub fn is_condensed(self) -> bool {
-        self < Self::NORMAL
+    #[inline(always)]
+    pub const fn is_condensed(self) -> bool {
+        self.0 < Self::NORMAL.0
     }
 
     /// Returns `true` if the width is expanded (greater than normal).
-    pub fn is_expanded(self) -> bool {
-        self > Self::NORMAL
+    #[inline(always)]
+    pub const fn is_expanded(self) -> bool {
+        self.0 > Self::NORMAL.0
     }
 
     /// Parses a CSS `font-width` / `font-stretch` value.
