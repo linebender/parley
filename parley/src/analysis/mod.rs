@@ -51,7 +51,6 @@ impl LineSegmenters {
             WordBreak::Normal => &mut self.normal,
             WordBreak::KeepAll => &mut self.keep_all,
             WordBreak::BreakAll => &mut self.break_all,
-            _ => &mut self.normal,
         };
 
         segmenter
@@ -61,7 +60,6 @@ impl LineSegmenters {
                     WordBreak::Normal => LineBreakWordOption::Normal,
                     WordBreak::BreakAll => LineBreakWordOption::BreakAll,
                     WordBreak::KeepAll => LineBreakWordOption::KeepAll,
-                    _ => LineBreakWordOption::Normal,
                 };
                 line_break_opts.word_option = Some(word_break_strength_icu);
                 LineSegmenter::try_new_auto_unstable(&PROVIDER, line_break_opts)

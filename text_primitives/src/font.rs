@@ -272,7 +272,6 @@ impl fmt::Display for FontWidth {
 /// In variable fonts, this can be controlled with the `ital` and `slnt` axes for italic and
 /// oblique styles, respectively.
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
-#[non_exhaustive]
 pub enum FontStyle {
     /// `normal`.
     #[default]

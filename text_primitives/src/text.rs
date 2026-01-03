@@ -3,7 +3,6 @@
 
 /// The paragraph's base direction.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-#[non_exhaustive]
 pub enum BaseDirection {
     /// Choose direction automatically (commonly "first-strong").
     #[default]
@@ -18,7 +17,6 @@ pub enum BaseDirection {
 ///
 /// See: <https://www.w3.org/TR/css-text-3/#word-break-property>
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-#[non_exhaustive]
 pub enum WordBreak {
     /// Customary rules.
     #[default]
@@ -33,7 +31,6 @@ pub enum WordBreak {
 ///
 /// See: <https://www.w3.org/TR/css-text-3/#overflow-wrap-property>
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-#[non_exhaustive]
 pub enum OverflowWrap {
     /// Only break at opportunities specified by word-breaking rules.
     #[default]
@@ -48,7 +45,6 @@ pub enum OverflowWrap {
 ///
 /// See: <https://www.w3.org/TR/css-text-4/#text-wrap-mode>
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-#[non_exhaustive]
 pub enum TextWrapMode {
     /// Wrap as needed to prevent overflow.
     #[default]

@@ -132,7 +132,6 @@ impl FontInfo {
                         }
                     }
                 }
-                _ => {}
             }
         }
         synth.len = len as u8;
