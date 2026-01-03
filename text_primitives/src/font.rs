@@ -298,10 +298,12 @@ impl fmt::Display for FontWidth {
 /// <https://www.w3.org/TR/css-fonts-4/#font-style-prop>.
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
 pub enum FontStyle {
-    /// `normal`.
+    /// An upright or "roman" style.
     #[default]
     Normal,
-    /// `italic`.
+    /// Generally a slanted style, originally based on semi-cursive forms.
+    ///
+    /// This often has a different structure from the normal style.
     Italic,
     /// `oblique` with an optional angle in degrees.
     ///

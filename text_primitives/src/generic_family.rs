@@ -14,7 +14,10 @@ pub enum GenericFamily {
     SansSerif = 1,
     /// All glyphs have the same fixed width.
     Monospace = 2,
-    /// Glyphs are partially or completely connected, resembling handwriting.
+    /// Glyphs in cursive fonts generally have either joining strokes or other
+    /// cursive characteristics beyond those of italic typefaces. The glyphs
+    /// are partially or completely connected, and the result looks more like
+    /// handwritten pen or brush writing than printed letter work.
     Cursive = 3,
     /// Decorative fonts with playful representations of characters.
     Fantasy = 4,
@@ -30,10 +33,16 @@ pub enum GenericFamily {
     UiRounded = 9,
     /// Fonts that are specifically designed to render emoji.
     Emoji = 10,
-    /// Fonts designed to represent mathematics.
+    /// This is for the particular stylistic concerns of representing
+    /// mathematics: superscript and subscript, brackets that cross several
+    /// lines, nesting expressions, and double struck glyphs with distinct
+    /// meanings.
     Math = 11,
-    /// A Chinese character style between Song and Kai forms.
+    /// A particular style of Chinese characters that are between serif-style
+    /// Song and cursive-style Kai forms. This style is often used for
+    /// government documents.
     FangSong = 12,
+    // NOTICE: If a new value is added, be sure to modify `MAX_VALUE`.
 }
 
 impl GenericFamily {
