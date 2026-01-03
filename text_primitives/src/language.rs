@@ -32,6 +32,7 @@ impl Language {
     pub const UND: Self = Self::from_language_bytes(*b"und", 3);
 
     /// Parses a language tag, keeping only language/script/region.
+    #[inline(always)]
     pub fn parse(s: &str) -> Result<Self, ParseLanguageError> {
         s.parse()
     }
