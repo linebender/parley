@@ -68,12 +68,12 @@ impl FontWeight {
     /// ```
     /// use text_primitives::FontWeight;
     ///
-    /// assert_eq!(FontWeight::parse("normal"), Some(FontWeight::NORMAL));
-    /// assert_eq!(FontWeight::parse("bold"), Some(FontWeight::BOLD));
-    /// assert_eq!(FontWeight::parse("850"), Some(FontWeight::new(850.0)));
-    /// assert_eq!(FontWeight::parse("invalid"), None);
+    /// assert_eq!(FontWeight::parse_css("normal"), Some(FontWeight::NORMAL));
+    /// assert_eq!(FontWeight::parse_css("bold"), Some(FontWeight::BOLD));
+    /// assert_eq!(FontWeight::parse_css("850"), Some(FontWeight::new(850.0)));
+    /// assert_eq!(FontWeight::parse_css("invalid"), None);
     /// ```
-    pub fn parse(s: &str) -> Option<Self> {
+    pub fn parse_css(s: &str) -> Option<Self> {
         let s = s.trim();
         Some(match s {
             "normal" => Self::NORMAL,
@@ -91,26 +91,21 @@ impl Default for FontWeight {
 
 impl fmt::Display for FontWeight {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Display only valid CSS values.
+        if *self == Self::NORMAL {
+            return f.write_str("normal");
+        }
+        if *self == Self::BOLD {
+            return f.write_str("bold");
+        }
+
         #[allow(
             clippy::cast_possible_truncation,
-            reason = "The integer keyword mapping is only used when the cast is lossless (checked)."
+            reason = "Truncation is only used when the cast is lossless (checked)."
         )]
         let int_value = self.0 as i32;
-
         if self.0 == int_value as f32 {
-            let keyword = match int_value {
-                100 => "thin",
-                200 => "extra-light",
-                300 => "light",
-                400 => "normal",
-                500 => "medium",
-                600 => "semi-bold",
-                700 => "bold",
-                800 => "extra-bold",
-                900 => "black",
-                _ => return write!(f, "{}", self.0),
-            };
-            f.write_str(keyword)
+            write!(f, "{int_value}")
         } else {
             write!(f, "{}", self.0)
         }
@@ -201,14 +196,17 @@ impl FontWidth {
     /// ```
     /// use text_primitives::FontWidth;
     ///
-    /// assert_eq!(FontWidth::parse("semi-condensed"), Some(FontWidth::SEMI_CONDENSED));
     /// assert_eq!(
-    ///     FontWidth::parse("80%"),
+    ///     FontWidth::parse_css("semi-condensed"),
+    ///     Some(FontWidth::SEMI_CONDENSED)
+    /// );
+    /// assert_eq!(
+    ///     FontWidth::parse_css("80%"),
     ///     Some(FontWidth::from_percentage(80.0))
     /// );
-    /// assert_eq!(FontWidth::parse("wideload"), None);
+    /// assert_eq!(FontWidth::parse_css("wideload"), None);
     /// ```
-    pub fn parse(s: &str) -> Option<Self> {
+    pub fn parse_css(s: &str) -> Option<Self> {
         let s = s.trim();
         Some(match s {
             "ultra-condensed" => Self::ULTRA_CONDENSED,
@@ -305,14 +303,23 @@ impl FontStyle {
     /// ```
     /// use text_primitives::FontStyle;
     ///
-    /// assert_eq!(FontStyle::parse("normal"), Some(FontStyle::Normal));
-    /// assert_eq!(FontStyle::parse("italic"), Some(FontStyle::Italic));
-    /// assert_eq!(FontStyle::parse("oblique"), Some(FontStyle::Oblique(Some(14.0))));
-    /// assert_eq!(FontStyle::parse("oblique 30deg"), Some(FontStyle::Oblique(Some(30.0))));
-    /// assert_eq!(FontStyle::parse("oblique banana"), Some(FontStyle::Oblique(None)));
-    /// assert_eq!(FontStyle::parse("banana"), None);
+    /// assert_eq!(FontStyle::parse_css("normal"), Some(FontStyle::Normal));
+    /// assert_eq!(FontStyle::parse_css("italic"), Some(FontStyle::Italic));
+    /// assert_eq!(
+    ///     FontStyle::parse_css("oblique"),
+    ///     Some(FontStyle::Oblique(Some(14.0)))
+    /// );
+    /// assert_eq!(
+    ///     FontStyle::parse_css("oblique 30deg"),
+    ///     Some(FontStyle::Oblique(Some(30.0)))
+    /// );
+    /// assert_eq!(
+    ///     FontStyle::parse_css("oblique banana"),
+    ///     Some(FontStyle::Oblique(None))
+    /// );
+    /// assert_eq!(FontStyle::parse_css("banana"), None);
     /// ```
-    pub fn parse(mut s: &str) -> Option<Self> {
+    pub fn parse_css(mut s: &str) -> Option<Self> {
         s = s.trim();
         Some(match s {
             "normal" => Self::Normal,
@@ -352,16 +359,13 @@ impl FontStyle {
 
 impl fmt::Display for FontStyle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let value = match self {
-            Self::Normal => "normal",
-            Self::Italic => "italic",
-            Self::Oblique(None) => "oblique",
-            Self::Oblique(Some(degrees)) if *degrees == 14.0 => "oblique",
-            Self::Oblique(Some(degrees)) => {
-                return write!(f, "oblique({degrees}deg)");
-            }
-        };
-        write!(f, "{value}")
+        match self {
+            Self::Normal => f.write_str("normal"),
+            Self::Italic => f.write_str("italic"),
+            Self::Oblique(None) => f.write_str("oblique"),
+            Self::Oblique(Some(degrees)) if *degrees == 14.0 => f.write_str("oblique"),
+            Self::Oblique(Some(degrees)) => write!(f, "oblique {degrees}deg"),
+        }
     }
 }
 
@@ -374,56 +378,59 @@ mod tests {
 
     #[test]
     fn fontwidth_parse_includes_expanded() {
-        assert_eq!(FontWidth::parse("expanded"), Some(FontWidth::EXPANDED));
+        assert_eq!(FontWidth::parse_css("expanded"), Some(FontWidth::EXPANDED));
     }
 
     #[test]
     fn fontwidth_parse_keywords() {
-        assert_eq!(FontWidth::parse("normal"), Some(FontWidth::NORMAL));
+        assert_eq!(FontWidth::parse_css("normal"), Some(FontWidth::NORMAL));
         assert_eq!(
-            FontWidth::parse("ultra-condensed"),
+            FontWidth::parse_css("ultra-condensed"),
             Some(FontWidth::ULTRA_CONDENSED)
         );
         assert_eq!(
-            FontWidth::parse("extra-expanded"),
+            FontWidth::parse_css("extra-expanded"),
             Some(FontWidth::EXTRA_EXPANDED)
         );
-        assert_eq!(FontWidth::parse("  condensed "), Some(FontWidth::CONDENSED));
+        assert_eq!(
+            FontWidth::parse_css("  condensed "),
+            Some(FontWidth::CONDENSED)
+        );
     }
 
     #[test]
     fn fontwidth_parse_percentage() {
         assert_eq!(
-            FontWidth::parse("87.5%"),
+            FontWidth::parse_css("87.5%"),
             Some(FontWidth::from_percentage(87.5))
         );
         assert_eq!(
-            FontWidth::parse(" 80% "),
+            FontWidth::parse_css(" 80% "),
             Some(FontWidth::from_percentage(80.0))
         );
-        assert_eq!(FontWidth::parse("80"), None);
-        assert_eq!(FontWidth::parse("%"), None);
-        assert_eq!(FontWidth::parse("80%%"), None);
+        assert_eq!(FontWidth::parse_css("80"), None);
+        assert_eq!(FontWidth::parse_css("%"), None);
+        assert_eq!(FontWidth::parse_css("80%%"), None);
     }
 
     #[test]
     fn fontweight_parse_keywords_and_numbers() {
-        assert_eq!(FontWeight::parse("normal"), Some(FontWeight::NORMAL));
-        assert_eq!(FontWeight::parse("bold"), Some(FontWeight::BOLD));
-        assert_eq!(FontWeight::parse(" 850 "), Some(FontWeight::new(850.0)));
-        assert_eq!(FontWeight::parse("invalid"), None);
+        assert_eq!(FontWeight::parse_css("normal"), Some(FontWeight::NORMAL));
+        assert_eq!(FontWeight::parse_css("bold"), Some(FontWeight::BOLD));
+        assert_eq!(FontWeight::parse_css(" 850 "), Some(FontWeight::new(850.0)));
+        assert_eq!(FontWeight::parse_css("invalid"), None);
     }
 
     #[test]
     fn fontstyle_parse_keywords() {
-        assert_eq!(FontStyle::parse("normal"), Some(FontStyle::Normal));
-        assert_eq!(FontStyle::parse("italic"), Some(FontStyle::Italic));
+        assert_eq!(FontStyle::parse_css("normal"), Some(FontStyle::Normal));
+        assert_eq!(FontStyle::parse_css("italic"), Some(FontStyle::Italic));
         assert_eq!(
-            FontStyle::parse("oblique"),
+            FontStyle::parse_css("oblique"),
             Some(FontStyle::Oblique(Some(14.0)))
         );
         assert_eq!(
-            FontStyle::parse(" oblique "),
+            FontStyle::parse_css(" oblique "),
             Some(FontStyle::Oblique(Some(14.0)))
         );
     }
@@ -431,41 +438,41 @@ mod tests {
     #[test]
     fn fontstyle_parse_oblique_angles() {
         assert_eq!(
-            FontStyle::parse("oblique 30deg"),
+            FontStyle::parse_css("oblique 30deg"),
             Some(FontStyle::Oblique(Some(30.0)))
         );
         assert_eq!(
-            FontStyle::parse("oblique 0.5turn"),
+            FontStyle::parse_css("oblique 0.5turn"),
             Some(FontStyle::Oblique(Some(180.0)))
         );
         assert_eq!(
-            FontStyle::parse("oblique 200grad"),
+            FontStyle::parse_css("oblique 200grad"),
             Some(FontStyle::Oblique(Some(180.0)))
         );
         assert_eq!(
-            FontStyle::parse("oblique 3.1415927rad"),
+            FontStyle::parse_css("oblique 3.1415927rad"),
             Some(FontStyle::Oblique(Some(180.0)))
         );
 
         // Present but unparsable angle yields `Oblique(None)`.
         assert_eq!(
-            FontStyle::parse("oblique banana"),
+            FontStyle::parse_css("oblique banana"),
             Some(FontStyle::Oblique(None))
         );
         assert_eq!(
-            FontStyle::parse("oblique 12"),
+            FontStyle::parse_css("oblique 12"),
             Some(FontStyle::Oblique(None))
         );
         assert_eq!(
-            FontStyle::parse("oblique 12foo"),
+            FontStyle::parse_css("oblique 12foo"),
             Some(FontStyle::Oblique(None))
         );
     }
 
     #[test]
     fn fontstyle_parse_invalid() {
-        assert_eq!(FontStyle::parse("banana"), None);
-        assert_eq!(FontStyle::parse("oblique12deg"), None);
-        assert_eq!(FontStyle::parse("Oblique"), None);
+        assert_eq!(FontStyle::parse_css("banana"), None);
+        assert_eq!(FontStyle::parse_css("oblique12deg"), None);
+        assert_eq!(FontStyle::parse_css("Oblique"), None);
     }
 }
