@@ -483,10 +483,6 @@ fn variations_iter<'a>(
     synthesis: &'a fontique::Synthesis,
     item: Option<&'a [FontVariation]>,
 ) -> impl Iterator<Item = harfrust::Variation> + 'a {
-    fn tag_to_harfrust(tag: crate::setting::Tag) -> harfrust::Tag {
-        harfrust::Tag::new(&tag.to_bytes())
-    }
-
     synthesis
         .variation_settings()
         .iter()
@@ -498,7 +494,7 @@ fn variations_iter<'a>(
             item.unwrap_or(&[])
                 .iter()
                 .map(|variation| harfrust::Variation {
-                    tag: tag_to_harfrust(variation.tag),
+                    tag: harfrust::Tag::new(&variation.tag.to_bytes()),
                     value: variation.value,
                 }),
         )
