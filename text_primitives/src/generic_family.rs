@@ -6,7 +6,6 @@ use core::fmt;
 /// Generic font families, named after CSS.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u8)]
-#[non_exhaustive]
 pub enum GenericFamily {
     /// Glyphs have finishing strokes, flared or tapering ends, or have actual serifed endings.
     Serif = 0,
