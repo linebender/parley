@@ -155,6 +155,10 @@ fn parse_language_prefix(s: &str) -> Result<(Language, &str), ParseLanguageError
     let b = &bytes[start..end];
     if b.len() == 4 {
         if !b.iter().all(|c| c.is_ascii_alphabetic()) {
+            // BCP 47 variant: 4 alphanum starting with a digit.
+            if is_variant(b) {
+                return Ok((out, &s[start..]));
+            }
             return Err(ParseLanguageError::InvalidScript);
         }
         out.bytes[out.len as usize] = b'-';
@@ -490,5 +494,30 @@ mod tests {
         let (lang, rest) = Language::parse_prefix("en-Latn-US-posix-u-ca-gregory").unwrap();
         assert_eq!(lang.as_str(), "en-Latn-US");
         assert_eq!(rest, "posix-u-ca-gregory");
+    }
+
+    #[test]
+    fn parse_4_char_digit_variant() {
+        // BCP 47 variants can be 4 alphanumeric chars if they start with a digit.
+        // These should be treated as variants (in remainder), not rejected as invalid scripts.
+        let lang = Language::parse("de-1996").unwrap();
+        assert_eq!(lang.as_str(), "de");
+        assert_eq!(lang.script(), None);
+        assert_eq!(lang.region(), None);
+
+        // With script before the variant
+        let lang = Language::parse("de-Latn-1996").unwrap();
+        assert_eq!(lang.as_str(), "de-Latn");
+        assert_eq!(lang.script(), Some("Latn"));
+
+        // With region before the variant
+        let lang = Language::parse("de-DE-1996").unwrap();
+        assert_eq!(lang.as_str(), "de-DE");
+        assert_eq!(lang.region(), Some("DE"));
+
+        // parse_prefix should return the variant in the remainder
+        let (lang, rest) = Language::parse_prefix("de-1996").unwrap();
+        assert_eq!(lang.as_str(), "de");
+        assert_eq!(rest, "1996");
     }
 }
