@@ -15,6 +15,7 @@ pub use font::{
     FontWidth, GenericFamily,
 };
 pub use styleset::StyleSet;
+pub use text_primitives::{OverflowWrap, TextWrapMode, WordBreak};
 
 use crate::util::nearly_eq;
 
@@ -22,57 +23,6 @@ use crate::util::nearly_eq;
 pub enum WhiteSpaceCollapse {
     Collapse,
     Preserve,
-}
-
-/// Control over word breaking, named for the CSS property.
-///
-/// See <https://drafts.csswg.org/css-text-3/#word-break-property> for more information.
-/// Adapted from [`icu_segmenter::options::LineBreakWordOption`].
-#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-#[repr(u8)]
-pub enum WordBreak {
-    /// Words break according to their customary rules. See the details in
-    /// <https://drafts.csswg.org/css-text-3/#valdef-word-break-normal>.
-    #[default]
-    Normal,
-
-    /// Breaking is allowed within "words".
-    /// <https://drafts.csswg.org/css-text-3/#valdef-word-break-break-all>
-    BreakAll,
-
-    /// Breaking is forbidden within "word".
-    /// <https://drafts.csswg.org/css-text-3/#valdef-word-break-keep-all>
-    KeepAll,
-}
-
-/// Control over non-"emergency" line-breaking.
-///
-/// See <https://drafts.csswg.org/css-text-4/#text-wrap-mode> for more information.
-#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-#[repr(u8)]
-pub enum TextWrapMode {
-    /// Wrap at non-emergency soft-wrap opportunities when necessary to prevent overflow.
-    #[default]
-    Wrap,
-    /// Do not wrap at non-emergency soft-wrap opportunities.
-    NoWrap,
-}
-
-/// Control over "emergency" line-breaking.
-///
-/// See <https://drafts.csswg.org/css-text/#overflow-wrap-property> for more information.
-#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-#[repr(u8)]
-pub enum OverflowWrap {
-    /// Even with extremely long words, lines can only break at places specified in [`WordBreak`].
-    #[default]
-    Normal,
-    /// Words may be broken at an arbitrary point if there are no other places in the line to break
-    /// them.
-    Anywhere,
-    /// Like [`OverflowWrap::Anywhere`], except arbitrary wrapping opportunities are not considered
-    /// when calculating the minimum content width (see [`crate::Layout::calculate_content_widths`]).
-    BreakWord,
 }
 
 /// The height that this text takes up. The default is `MetricsRelative(1.0)`, which is the given

@@ -1299,8 +1299,6 @@ dependencies = [
 name = "fontique"
 version = "0.7.0"
 dependencies = [
- "bytemuck",
- "core_maths",
  "hashbrown 0.16.1",
  "icu_locale_core",
  "icu_properties",
@@ -1313,6 +1311,7 @@ dependencies = [
  "read-fonts 0.35.0",
  "roxmltree",
  "smallvec",
+ "text_primitives",
  "unicode-script",
  "windows 0.58.0",
  "windows-core 0.58.0",
@@ -3334,6 +3333,7 @@ dependencies = [
  "parley_dev",
  "peniko 0.4.1",
  "skrifa 0.37.0",
+ "text_primitives",
  "tiny-skia",
  "zerovec",
 ]
@@ -4400,6 +4400,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "text_primitives"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
 ]
 
 [[package]]

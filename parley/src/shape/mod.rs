@@ -388,7 +388,7 @@ fn shape_item<'a, B: Brush>(
         scx.features.clear();
         for feature in rcx.features(item.features).unwrap_or(&[]) {
             scx.features.push(harfrust::Feature::new(
-                feature.tag,
+                harfrust::Tag::new(&feature.tag.to_bytes()),
                 feature.value as u32,
                 ..,
             ));
@@ -494,7 +494,7 @@ fn variations_iter<'a>(
             item.unwrap_or(&[])
                 .iter()
                 .map(|variation| harfrust::Variation {
-                    tag: variation.tag,
+                    tag: harfrust::Tag::new(&variation.tag.to_bytes()),
                     value: variation.value,
                 }),
         )

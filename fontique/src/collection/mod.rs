@@ -12,8 +12,7 @@ use crate::font::FontInfoOverride;
 use super::SourceCache;
 
 use super::{
-    Blob, GenericFamily, Script,
-    attributes::{FontStyle, FontWeight, FontWidth},
+    Blob, FontStyle, FontWeight, FontWidth, GenericFamily, Script,
     backend::SystemFonts,
     fallback::{FallbackKey, FallbackMap},
     family::{FamilyId, FamilyInfo},
