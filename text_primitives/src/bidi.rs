@@ -9,7 +9,6 @@
 /// For background on bidi behavior see UAX #9:
 /// <https://www.unicode.org/reports/tr9/>
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
-#[non_exhaustive]
 pub enum BidiControl {
     /// No explicit control.
     #[default]
@@ -22,7 +21,6 @@ pub enum BidiControl {
 
 /// Direction choice used by bidi controls.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[non_exhaustive]
 pub enum BidiDirection {
     /// Choose direction automatically.
     Auto,
@@ -34,7 +32,6 @@ pub enum BidiDirection {
 
 /// Direction choice used by bidi overrides.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[non_exhaustive]
 pub enum BidiOverride {
     /// Force left-to-right.
     Ltr,
