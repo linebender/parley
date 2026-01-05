@@ -268,7 +268,7 @@ impl ResolveContext {
             FontSettings::Source(source) => {
                 self.tmp_variations.clear();
                 self.tmp_variations
-                    .extend(FontVariation::parse_list(source));
+                    .extend(FontVariation::parse_css_list(source).map_while(Result::ok));
             }
             FontSettings::List(settings) => {
                 self.tmp_variations.clear();
@@ -292,7 +292,8 @@ impl ResolveContext {
         match features {
             FontSettings::Source(source) => {
                 self.tmp_features.clear();
-                self.tmp_features.extend(FontFeature::parse_list(source));
+                self.tmp_features
+                    .extend(FontFeature::parse_css_list(source).map_while(Result::ok));
             }
             FontSettings::List(settings) => {
                 self.tmp_features.clear();
