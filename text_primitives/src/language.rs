@@ -6,15 +6,17 @@ use core::str::FromStr;
 
 /// A compact, zero-allocation language tag.
 ///
-/// This type captures only the `language` + optional `script` + optional `region` subtags from a
-/// BCP 47 language tag, normalized to common casing conventions:
-/// - language: lowercase (2–3 letters)
-/// - script: titlecase (4 letters)
-/// - region: uppercase (2 letters) or digits (3 digits)
+/// Parses the `language [-script] [-region]` prefix of a BCP 47 language tag.
 ///
-/// Any additional subtags (variants, extensions, private use) are ignored, but the input must
-/// still be well-formed enough that `script`/`region` aren't silently dropped (for example, a
-/// region subtag after a variant is treated as an error).
+/// This type captures only the `language` + optional `script` + optional `region` subtags from a
+/// BCP 47 language tag. Parsing is case-insensitive; output is normalized to:
+/// - language: 2–3 lowercase letters (e.g. `EN` → `en`)
+/// - script: 4 titlecase letters (e.g. `LATN` → `Latn`)
+/// - region: 2 uppercase letters or 3 digits (e.g. `us` → `US`, `419` → `419`)
+///
+/// Trailing subtags (variants, extensions, private use) are validated for basic structural
+/// conformance but discarded. Extended language subtags (`extlang`) are not supported and will
+/// error.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Language {
     bytes: [u8; 12],
