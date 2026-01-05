@@ -13,7 +13,7 @@ use std::{
 };
 
 use parley::{
-    FontContext, FontFamily, LayoutContext,
+    FontContext, FontFamilyName, LayoutContext,
     fontique::{Blob, Collection, CollectionOptions, SourceCache},
 };
 
@@ -47,8 +47,8 @@ pub(crate) fn create_font_context() -> FontContext {
         system_fonts: false,
     });
     load_fonts(&mut collection, parley_dev::font_dirs()).unwrap();
-    for font in FONT_STACK {
-        if let FontFamily::Named(font_name) = font {
+    for font in FONT_FAMILY_LIST {
+        if let FontFamilyName::Named(font_name) = font {
             collection
                 .family_id(font_name)
                 .unwrap_or_else(|| panic!("{font_name} font not found"));
@@ -60,9 +60,9 @@ pub(crate) fn create_font_context() -> FontContext {
     }
 }
 
-pub(crate) const FONT_STACK: &[FontFamily<'_>] = &[
-    FontFamily::Named(Cow::Borrowed("Roboto")),
-    FontFamily::Named(Cow::Borrowed("Noto Kufi Arabic")),
+pub(crate) const FONT_FAMILY_LIST: &[FontFamilyName<'_>] = &[
+    FontFamilyName::Named(Cow::Borrowed("Roboto")),
+    FontFamilyName::Named(Cow::Borrowed("Noto Kufi Arabic")),
 ];
 
 pub(crate) fn load_fonts(

@@ -9,7 +9,7 @@
 use image::codecs::png::PngEncoder;
 use image::{self, Pixel, Rgba, RgbaImage};
 use parley::layout::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
-use parley::style::{FontStack, FontWeight, StyleProperty, TextStyle};
+use parley::style::{FontFamily, FontWeight, StyleProperty, TextStyle};
 use parley::{AlignmentOptions, FontContext, InlineBox, LayoutContext, LineHeight};
 use std::fs::File;
 use swash::FontRef;
@@ -64,7 +64,7 @@ fn main() {
     // Setup some Parley text styles
     let text_brush = ColorBrush { color: text_color };
     let brush_style = StyleProperty::Brush(text_brush);
-    let font_stack = FontStack::from("system-ui");
+    let font_family = FontFamily::from("system-ui");
     let bold_style = StyleProperty::FontWeight(FontWeight::new(600.0));
     let underline_style = StyleProperty::Underline(true);
     let strikethrough_style = StyleProperty::Strikethrough(true);
@@ -77,7 +77,7 @@ fn main() {
 
         let root_style = TextStyle {
             brush: text_brush,
-            font_stack,
+            font_family,
             line_height: LineHeight::FontSizeRelative(1.3),
             font_size: 16.0,
             ..TextStyle::default()
@@ -139,7 +139,7 @@ fn main() {
         builder.push_default(brush_style);
 
         // Set default font family
-        builder.push_default(font_stack);
+        builder.push_default(font_family);
         builder.push_default(LineHeight::FontSizeRelative(1.3));
         builder.push_default(StyleProperty::FontSize(16.0));
 

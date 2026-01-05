@@ -32,7 +32,7 @@ impl<Brush: crate::Brush> StyleSet<Brush> {
 
     /// Add `style` to this collection, returning any overwritten value.
     ///
-    /// Note: Adding a [font stack](crate::StyleProperty::FontStack) to this collection is not
+    /// Note: Adding a [`font-family`](crate::StyleProperty::FontFamily) to this collection is not
     /// additive, and instead overwrites any previously added font stack.
     pub fn insert(&mut self, style: StyleProperty<Brush>) -> Option<StyleProperty<Brush>> {
         let discriminant = core::mem::discriminant(&style);

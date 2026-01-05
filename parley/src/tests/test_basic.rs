@@ -8,11 +8,13 @@ use peniko::{
     kurbo::Size,
 };
 
-use super::utils::{ColorBrush, FONT_STACK, TestEnv, asserts::assert_eq_layout_data_alignments};
+use super::utils::{
+    ColorBrush, FONT_FAMILY_LIST, TestEnv, asserts::assert_eq_layout_data_alignments,
+};
 use crate::setting::Setting;
 use crate::{
-    Alignment, AlignmentOptions, ContentWidths, FontFamily, FontSettings, FontStack, InlineBox,
-    Layout, LineHeight, StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
+    Alignment, AlignmentOptions, ContentWidths, FontFamily, FontSettings, InlineBox, Layout,
+    LineHeight, StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
 };
 
 #[test]
@@ -254,7 +256,7 @@ fn leading_whitespace() {
 #[test]
 fn nested_span_inheritance() {
     let ts = |c: AlphaColor<Srgb>| TextStyle {
-        font_stack: FontStack::from(FONT_STACK),
+        font_family: FontFamily::from(FONT_FAMILY_LIST),
         font_size: 24.,
         line_height: LineHeight::Absolute(30.),
         brush: ColorBrush::new(c),
@@ -640,9 +642,7 @@ fn variable_fonts() {
 
     for wght in [100., 500., 1000.] {
         let mut builder = env.ranged_builder(text);
-        builder.push_default(StyleProperty::FontStack(FontStack::Single(
-            FontFamily::Named(Cow::Borrowed("Arimo")),
-        )));
+        builder.push_default(FontFamily::named("Arimo"));
         builder.push_default(StyleProperty::FontVariations(FontSettings::List(
             Cow::Borrowed(&[Setting {
                 tag: crate::setting::Tag::new(b"wght"),

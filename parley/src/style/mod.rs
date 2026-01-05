@@ -11,7 +11,7 @@ use alloc::borrow::Cow;
 
 pub use brush::*;
 pub use font::{
-    FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontVariation, FontWeight,
+    FontFamily, FontFamilyName, FontFeature, FontSettings, FontStyle, FontVariation, FontWeight,
     FontWidth, GenericFamily,
 };
 pub use styleset::StyleSet;
@@ -70,8 +70,8 @@ impl LineHeight {
 /// Properties that define a style.
 #[derive(Clone, PartialEq, Debug)]
 pub enum StyleProperty<'a, B: Brush> {
-    /// Font family stack.
-    FontStack(FontStack<'a>),
+    /// CSS `font-family` property value.
+    FontFamily(FontFamily<'a>),
     /// Font size.
     FontSize(f32),
     /// Font width.
@@ -121,8 +121,8 @@ pub enum StyleProperty<'a, B: Brush> {
 /// Unresolved styles.
 #[derive(Clone, PartialEq, Debug)]
 pub struct TextStyle<'a, B: Brush> {
-    /// Font family stack.
-    pub font_stack: FontStack<'a>,
+    /// CSS `font-family` property value.
+    pub font_family: FontFamily<'a>,
     /// Font size.
     pub font_size: f32,
     /// Font width.
@@ -172,7 +172,7 @@ pub struct TextStyle<'a, B: Brush> {
 impl<B: Brush> Default for TextStyle<'_, B> {
     fn default() -> Self {
         TextStyle {
-            font_stack: FontStack::Source(Cow::Borrowed("sans-serif")),
+            font_family: FontFamily::Source(Cow::Borrowed("sans-serif")),
             font_size: 16.0,
             font_width: FontWidth::default(),
             font_style: FontStyle::default(),
@@ -199,27 +199,27 @@ impl<B: Brush> Default for TextStyle<'_, B> {
     }
 }
 
-impl<'a, B: Brush> From<FontStack<'a>> for StyleProperty<'a, B> {
-    fn from(fs: FontStack<'a>) -> Self {
-        StyleProperty::FontStack(fs)
-    }
-}
-
-impl<'a, B: Brush> From<&'a [FontFamily<'a>]> for StyleProperty<'a, B> {
-    fn from(fs: &'a [FontFamily<'a>]) -> Self {
-        StyleProperty::FontStack(fs.into())
-    }
-}
-
 impl<'a, B: Brush> From<FontFamily<'a>> for StyleProperty<'a, B> {
-    fn from(f: FontFamily<'a>) -> Self {
-        StyleProperty::FontStack(FontStack::from(f))
+    fn from(value: FontFamily<'a>) -> Self {
+        StyleProperty::FontFamily(value)
+    }
+}
+
+impl<'a, B: Brush> From<&'a [FontFamilyName<'a>]> for StyleProperty<'a, B> {
+    fn from(value: &'a [FontFamilyName<'a>]) -> Self {
+        StyleProperty::FontFamily(value.into())
+    }
+}
+
+impl<'a, B: Brush> From<FontFamilyName<'a>> for StyleProperty<'a, B> {
+    fn from(value: FontFamilyName<'a>) -> Self {
+        StyleProperty::FontFamily(value.into())
     }
 }
 
 impl<B: Brush> From<GenericFamily> for StyleProperty<'_, B> {
     fn from(f: GenericFamily) -> Self {
-        StyleProperty::FontStack(f.into())
+        StyleProperty::FontFamily(f.into())
     }
 }
 
