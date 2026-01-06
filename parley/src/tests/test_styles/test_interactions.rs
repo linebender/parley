@@ -66,6 +66,7 @@ fn interaction_font_size_line_height_absolute() {
 // ============================================================================
 
 #[test]
+// TODO: Ligatures should break with letter spacing. They currently do not.
 fn interaction_letter_spacing_ligatures() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LIGATURES;
@@ -86,7 +87,7 @@ fn interaction_letter_spacing_ligatures() {
     env.with_name("no_spacing")
         .check_layout_snapshot(&layout_no_spacing);
 
-    // With letter spacing - ligatures may break
+    // With letter spacing - ligatures SHOULD break
     let mut builder_with_spacing = env.ranged_builder(text);
     builder_with_spacing.push_default(StyleProperty::FontFeatures(features_on));
     builder_with_spacing.push_default(StyleProperty::LetterSpacing(2.0));
@@ -159,6 +160,7 @@ fn interaction_font_weight_vs_variations() {
 // WordSpacing × Alignment::Justify Interactions
 // ============================================================================
 
+// TODO: Word spacing does not expand content box for justified text.
 #[test]
 fn interaction_word_spacing_justify() {
     let mut env = TestEnv::new(test_name!(), None);
