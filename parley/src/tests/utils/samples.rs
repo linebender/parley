@@ -1,11 +1,6 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Canonical text samples for style property testing.
-//!
-//! Each sample is designed to exercise specific text layout behaviors.
-//! Tests should use these samples selectively based on what the property affects.
-
 /// Simple Latin text - baseline for most tests
 pub(crate) const LATIN: &str = "The quick brown fox jumps.";
 
