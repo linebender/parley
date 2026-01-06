@@ -226,16 +226,22 @@ fn interaction_weight_style_width() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::style::{FontFamily, FontStack};
-    use crate::{FontStyle, FontWeight, FontWidth};
+    use crate::setting::Tag;
+    use crate::style::{FontFamily, FontSettings, FontStack, FontVariation};
+    use crate::{FontWeight, FontWidth};
 
-    // Bold + Italic
+    // Bold + Italic (using slnt axis)
+    let italic_variation = FontSettings::List(Cow::Borrowed(&[FontVariation {
+        tag: Tag::new(b"slnt"),
+        value: -10.0,
+    }]));
+
     let mut builder_bold_italic = env.ranged_builder(text);
     builder_bold_italic.push_default(StyleProperty::FontStack(FontStack::Single(
         FontFamily::Named(Cow::Borrowed("Roboto Flex")),
     )));
     builder_bold_italic.push_default(StyleProperty::FontWeight(FontWeight::BOLD));
-    builder_bold_italic.push_default(StyleProperty::FontStyle(FontStyle::Italic));
+    builder_bold_italic.push_default(StyleProperty::FontVariations(italic_variation.clone()));
     let mut layout_bold_italic = builder_bold_italic.build(text);
     layout_bold_italic.break_all_lines(None);
     layout_bold_italic.align(None, Alignment::Start, AlignmentOptions::default());
@@ -257,14 +263,14 @@ fn interaction_weight_style_width() {
     env.with_name("light_condensed")
         .check_layout_snapshot(&layout_light_condensed);
 
-    // Black + Expanded + Italic
+    // Black + Expanded + Italic (using slnt axis)
     let mut builder_complex = env.ranged_builder(text);
     builder_complex.push_default(StyleProperty::FontStack(FontStack::Single(
         FontFamily::Named(Cow::Borrowed("Roboto Flex")),
     )));
     builder_complex.push_default(StyleProperty::FontWeight(FontWeight::BLACK));
     builder_complex.push_default(StyleProperty::FontWidth(FontWidth::EXPANDED));
-    builder_complex.push_default(StyleProperty::FontStyle(FontStyle::Italic));
+    builder_complex.push_default(StyleProperty::FontVariations(italic_variation));
     let mut layout_complex = builder_complex.build(text);
     layout_complex.break_all_lines(None);
     layout_complex.align(None, Alignment::Start, AlignmentOptions::default());

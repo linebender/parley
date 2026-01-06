@@ -8,7 +8,7 @@ use alloc::borrow::Cow;
 use crate::layout::Alignment;
 use crate::style::StyleProperty;
 use crate::test_name;
-use crate::tests::utils::{samples, ColorBrush, TestEnv};
+use crate::tests::utils::{ColorBrush, TestEnv, samples};
 use crate::{AlignmentOptions, Layout};
 
 /// Helper to build a layout with a single font size applied
@@ -49,8 +49,8 @@ fn style_font_weight_values() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::style::{FontFamily, FontStack};
     use crate::FontWeight;
+    use crate::style::{FontFamily, FontStack};
 
     for (weight, name) in [
         (FontWeight::THIN, "thin"),
@@ -115,19 +115,23 @@ fn style_font_style_values() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::FontStyle;
-    use crate::style::{FontFamily, FontStack};
+    use crate::setting::Tag;
+    use crate::style::{FontFamily, FontSettings, FontStack, FontVariation};
 
-    for (style, name) in [
-        (FontStyle::Normal, "normal"),
-        (FontStyle::Italic, "italic"),
-        (FontStyle::Oblique(None), "oblique"),
-    ] {
+    // Using Roboto Flex with slnt axis for italic/oblique effects
+    // TODO: FontStyle property doesn't automatically map to slnt axis for variable fonts,
+    // so, for this test, we use FontVariations directly
+    for (slnt_value, name) in [(0.0, "normal"), (-10.0, "italic"), (-10.0, "oblique")] {
+        let variations = FontSettings::List(Cow::Borrowed(&[FontVariation {
+            tag: Tag::new(b"slnt"),
+            value: slnt_value,
+        }]));
+
         let mut builder = env.ranged_builder(text);
         builder.push_default(StyleProperty::FontStack(FontStack::Single(
             FontFamily::Named(Cow::Borrowed("Roboto Flex")),
         )));
-        builder.push_default(StyleProperty::FontStyle(style));
+        builder.push_default(StyleProperty::FontVariations(variations));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
         layout.align(None, Alignment::Start, AlignmentOptions::default());
@@ -150,9 +154,9 @@ fn style_font_stack_named() {
 
     // Test with Roboto (should be available in test fonts)
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::FontStack(FontStack::Single(FontFamily::Named(
-        Cow::Borrowed("Roboto"),
-    ))));
+    builder.push_default(StyleProperty::FontStack(FontStack::Single(
+        FontFamily::Named(Cow::Borrowed("Roboto")),
+    )));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
     layout.align(None, Alignment::Start, AlignmentOptions::default());
