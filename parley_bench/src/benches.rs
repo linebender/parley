@@ -38,11 +38,7 @@ pub fn defaults() -> Vec<Benchmark> {
 
                             let mut layout: Layout<ColorBrush> = builder.build(text);
                             layout.break_all_lines(Some(MAX_ADVANCE));
-                            layout.align(
-                                Some(MAX_ADVANCE),
-                                Alignment::Start,
-                                AlignmentOptions::default(),
-                            );
+                            layout.align(Alignment::Start, AlignmentOptions::default());
 
                             black_box(layout);
                         });
@@ -115,11 +111,7 @@ pub fn styled() -> Vec<Benchmark> {
 
                             let mut layout: Layout<ColorBrush> = builder.build(text);
                             layout.break_all_lines(Some(MAX_ADVANCE));
-                            layout.align(
-                                Some(MAX_ADVANCE),
-                                Alignment::Start,
-                                AlignmentOptions::default(),
-                            );
+                            layout.align(Alignment::Start, AlignmentOptions::default());
 
                             black_box(layout);
                         });

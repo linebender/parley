@@ -16,7 +16,7 @@ fn issue_489() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(200.0));
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         assert!(layout.is_rtl());
     }
@@ -27,7 +27,7 @@ fn issue_489() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(200.0));
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         assert!(!layout.is_rtl());
 
@@ -76,7 +76,7 @@ And, finally, yet another sentence."#;
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(150.0));
-        layout.align(None, Alignment::Justify, AlignmentOptions::default());
+        layout.align(Alignment::Justify, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
