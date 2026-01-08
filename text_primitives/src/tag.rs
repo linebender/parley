@@ -66,7 +66,7 @@ pub struct ParseSettingsError {
 }
 
 impl ParseSettingsError {
-    fn new(kind: ParseSettingsErrorKind, at: usize) -> Self {
+    const fn new(kind: ParseSettingsErrorKind, at: usize) -> Self {
         Self {
             kind,
             at,
@@ -74,7 +74,7 @@ impl ParseSettingsError {
         }
     }
 
-    fn with_span(mut self, span: (usize, usize)) -> Self {
+    const fn with_span(mut self, span: (usize, usize)) -> Self {
         self.span = Some(span);
         self
     }
