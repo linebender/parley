@@ -136,23 +136,45 @@ impl Setting<u16> {
     ///   - `off` => `0`
     ///   - a numeric value is parsed as `u16`
     ///
-    /// Whitespace is ignored and a trailing comma is permitted.
+    /// Grammar (simplified):
+    /// `list := ws? entry (ws? ',' ws? entry)* (ws? ',')?`
+    ///
+    /// Whitespace is ignored and a trailing comma is permitted, but empty entries (such as `,,`)
+    /// are rejected.
     pub fn parse_css_list(
         s: &str,
     ) -> impl Iterator<Item = Result<Self, ParseSettingsError>> + '_ + Clone {
         ParseCssList::new(s).map(|parsed| {
             let (tag, value_str, value_at) = parsed?;
             let span = (value_at, value_at + value_str.len());
-            let value = match value_str {
-                "" | "on" => 1,
-                "off" => 0,
-                _ => value_str.parse::<u16>().map_err(|_| {
-                    ParseSettingsError::new(ParseSettingsErrorKind::OutOfRange, value_at)
-                        .with_span(span)
-                })?,
-            };
+            let value = parse_u16_feature_value(value_str)
+                .map_err(|kind| ParseSettingsError::new(kind, value_at).with_span(span))?;
             Ok(Self { tag, value })
         })
+    }
+}
+
+fn parse_u16_feature_value(value_str: &str) -> Result<u16, ParseSettingsErrorKind> {
+    match value_str {
+        "" | "on" => Ok(1),
+        "off" => Ok(0),
+        _ => {
+            if !value_str.as_bytes().iter().all(|b| b.is_ascii_digit()) {
+                return Err(ParseSettingsErrorKind::InvalidSyntax);
+            }
+            let mut value: u32 = 0;
+            for &b in value_str.as_bytes() {
+                let digit = (b - b'0') as u32;
+                value = value
+                    .checked_mul(10)
+                    .and_then(|v| v.checked_add(digit))
+                    .ok_or(ParseSettingsErrorKind::OutOfRange)?;
+                if value > u16::MAX as u32 {
+                    return Err(ParseSettingsErrorKind::OutOfRange);
+                }
+            }
+            u16::try_from(value).map_err(|_| ParseSettingsErrorKind::OutOfRange)
+        }
     }
 }
 
@@ -165,7 +187,11 @@ impl Setting<f32> {
     /// - tags are required and must be quoted: `"wght" 700` or `'wght' 700`
     /// - values are required and are parsed as `f32`
     ///
-    /// Whitespace is ignored and a trailing comma is permitted.
+    /// Grammar (simplified):
+    /// `list := ws? entry (ws? ',' ws? entry)* (ws? ',')?`
+    ///
+    /// Whitespace is ignored and a trailing comma is permitted, but empty entries (such as `,,`)
+    /// are rejected.
     pub fn parse_css_list(
         s: &str,
     ) -> impl Iterator<Item = Result<Self, ParseSettingsError>> + '_ + Clone {
@@ -225,20 +251,21 @@ impl<'a> Iterator for ParseCssList<'a> {
         }
 
         let mut pos = self.pos;
-        while pos < self.len {
-            let ch = self.source[pos];
-            if ch.is_ascii_whitespace() || ch == b',' {
-                pos += 1;
-            } else {
-                break;
-            }
+        while pos < self.len && self.source[pos].is_ascii_whitespace() {
+            pos += 1;
+        }
+        if pos < self.len && self.source[pos] == b',' {
+            self.done = true;
+            return Some(Err(ParseSettingsError::new(
+                ParseSettingsErrorKind::InvalidSyntax,
+                pos,
+            )));
         }
         self.pos = pos;
         if pos >= self.len {
             self.done = true;
             return None;
         }
-
         let first = self.source[pos];
         let mut start = pos;
         let quote = match first {
@@ -372,7 +399,16 @@ mod tests {
     }
 
     #[test]
-    fn parse_feature_settings_css_list_errors_include_offset_and_span() {
+    fn parse_feature_settings_css_list_rejects_empty_entries() {
+        let err = Setting::<u16>::parse_css_list(r#""liga" on,, "kern""#)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap_err();
+        assert_eq!(err.kind(), ParseSettingsErrorKind::InvalidSyntax);
+        assert_eq!(err.byte_offset(), 10);
+    }
+
+    #[test]
+    fn parse_feature_settings_css_list_out_of_range_reports_span() {
         let err = Setting::<u16>::parse_css_list(r#""liga" 70000"#)
             .next()
             .unwrap()
@@ -380,6 +416,51 @@ mod tests {
         assert_eq!(err.kind(), ParseSettingsErrorKind::OutOfRange);
         assert_eq!(err.byte_offset(), 7);
         assert_eq!(err.byte_span(), Some((7, 12)));
+    }
+
+    #[test]
+    fn parse_feature_settings_css_list_invalid_value_reports_span() {
+        let err = Setting::<u16>::parse_css_list(r#""liga" nope"#)
+            .next()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(err.kind(), ParseSettingsErrorKind::InvalidSyntax);
+        assert_eq!(err.byte_offset(), 7);
+        assert_eq!(err.byte_span(), Some((7, 11)));
+    }
+
+    #[test]
+    fn parse_feature_settings_css_list_very_large_number_is_out_of_range() {
+        let s = r#""liga" 999999999999999999999"#;
+        let err = Setting::<u16>::parse_css_list(s)
+            .next()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(err.kind(), ParseSettingsErrorKind::OutOfRange);
+        assert_eq!(err.byte_offset(), 7);
+        assert_eq!(err.byte_span(), Some((7, s.len())));
+    }
+
+    #[test]
+    fn parse_feature_settings_css_list_rejects_leading_comma() {
+        let err = Setting::<u16>::parse_css_list(r#", "liga" on"#)
+            .next()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(err.kind(), ParseSettingsErrorKind::InvalidSyntax);
+        assert_eq!(err.byte_offset(), 0);
+    }
+
+    #[test]
+    fn parse_feature_settings_css_list_rejects_separator_soup() {
+        let s = r#""liga" on,,, ,   ,,,    'kern', "dlig" off, "salt" 3,"#;
+        let err = Setting::<u16>::parse_css_list(s)
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap_err();
+        assert_eq!(err.kind(), ParseSettingsErrorKind::InvalidSyntax);
+        let second_comma = s.find(",,").unwrap() + 1;
+        assert_eq!(err.byte_offset(), second_comma);
+        assert_eq!(err.byte_span(), None);
     }
 
     #[test]
