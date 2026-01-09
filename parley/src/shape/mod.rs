@@ -521,8 +521,8 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         locale: Option<Language>,
     ) -> Self {
         let style = &styles[style_index as usize].style;
-        let fonts_id = style.font_stack.id();
-        let fonts = rcx.stack(style.font_stack).unwrap_or(&[]);
+        let fonts_id = style.font_family.id();
+        let fonts = rcx.stack(style.font_family).unwrap_or(&[]);
         let attrs = fontique::Attributes {
             width: style.font_width,
             weight: style.font_weight,
@@ -558,8 +558,8 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize].style;
 
-            let fonts_id = style.font_stack.id();
-            let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
+            let fonts_id = style.font_family.id();
+            let fonts = self.rcx.stack(style.font_family).unwrap_or(&[]);
             let fonts = fonts.iter().copied().map(QueryFamily::Id);
             if is_emoji {
                 use core::iter::once;

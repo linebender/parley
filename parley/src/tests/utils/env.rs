@@ -5,7 +5,7 @@ use crate::tests::utils::renderer::{
     ColorBrush, RenderingConfig, render_layout, render_layout_with_clusters,
 };
 use crate::{
-    BoundingBox, FontContext, FontFamily, FontStack, Layout, LayoutContext, LineHeight,
+    BoundingBox, FontContext, FontFamily, FontFamilyName, Layout, LayoutContext, LineHeight,
     PlainEditor, PlainEditorDriver, RangedBuilder, StyleProperty, TextStyle, TreeBuilder,
 };
 use fontique::{Blob, Collection, CollectionOptions, SourceCache};
@@ -46,9 +46,9 @@ fn snapshot_dir() -> PathBuf {
         .join("snapshots")
 }
 
-pub(crate) const FONT_STACK: &[FontFamily<'_>] = &[
-    FontFamily::Named(Cow::Borrowed("Roboto")),
-    FontFamily::Named(Cow::Borrowed("Noto Kufi Arabic")),
+pub(crate) const FONT_FAMILY_LIST: &[FontFamilyName<'_>] = &[
+    FontFamilyName::Named(Cow::Borrowed("Roboto")),
+    FontFamilyName::Named(Cow::Borrowed("Noto Kufi Arabic")),
 ];
 
 pub(crate) struct TestEnv {
@@ -111,8 +111,8 @@ pub(crate) fn create_font_context() -> FontContext {
         system_fonts: false,
     });
     load_fonts(&mut collection, parley_dev::font_dirs()).unwrap();
-    for font in FONT_STACK {
-        if let FontFamily::Named(font_name) = font {
+    for font in FONT_FAMILY_LIST {
+        if let FontFamilyName::Named(font_name) = font {
             collection
                 .family_id(font_name)
                 .unwrap_or_else(|| panic!("{font_name} font not found"));
@@ -177,7 +177,7 @@ impl TestEnv {
             StyleProperty::Brush(ColorBrush {
                 color: self.text_color,
             }),
-            StyleProperty::FontStack(FontStack::List(FONT_STACK.into())),
+            StyleProperty::FontFamily(FontFamily::List(FONT_FAMILY_LIST.into())),
             // When our tests were originally generated, they used this style value, as it was the default.
             // To avoid regenerating all tests, as the default has now changed, set this explicitly.
             StyleProperty::LineHeight(LineHeight::FontSizeRelative(1.0)),

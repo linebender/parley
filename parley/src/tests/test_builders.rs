@@ -7,9 +7,11 @@ use fontique::{FontStyle, FontWeight, FontWidth};
 use peniko::color::palette;
 use std::borrow::Cow;
 
-use super::utils::{ColorBrush, FONT_STACK, asserts::assert_eq_layout_data, create_font_context};
+use super::utils::{
+    ColorBrush, FONT_FAMILY_LIST, asserts::assert_eq_layout_data, create_font_context,
+};
 use crate::{
-    FontContext, FontSettings, FontStack, Layout, LayoutContext, LineHeight, OverflowWrap,
+    FontContext, FontFamily, FontSettings, Layout, LayoutContext, LineHeight, OverflowWrap,
     RangedBuilder, StyleProperty, TextStyle, TextWrapMode, TreeBuilder, WordBreak,
 };
 
@@ -161,7 +163,7 @@ fn assert_builders_produce_same_result<'a, 'b>(
 /// The [`TreeBuilder`] version of [`set_root_style`].
 fn create_root_style() -> TextStyle<'static, ColorBrush> {
     TextStyle {
-        font_stack: FontStack::from(FONT_STACK),
+        font_family: FontFamily::from(FONT_FAMILY_LIST),
         font_size: 20.,
         font_width: FontWidth::CONDENSED,
         font_style: FontStyle::Italic,
@@ -191,7 +193,7 @@ fn create_root_style() -> TextStyle<'static, ColorBrush> {
 ///
 /// The [`RangedBuilder`] version of [`create_root_style`].
 fn set_root_style(rb: &mut RangedBuilder<'_, ColorBrush>) {
-    rb.push_default(FontStack::from(FONT_STACK));
+    rb.push_default(FontFamily::from(FONT_FAMILY_LIST));
     rb.push_default(StyleProperty::FontSize(20.));
     rb.push_default(StyleProperty::FontWidth(FontWidth::CONDENSED));
     rb.push_default(StyleProperty::FontStyle(FontStyle::Italic));
@@ -231,12 +233,12 @@ fn builders_default() {
     let quantize = false;
     let max_advance = Some(50.);
     let root_style = TextStyle {
-        font_stack: FontStack::from(FONT_STACK),
+        font_family: FontFamily::from(FONT_FAMILY_LIST),
         ..TextStyle::default()
     };
 
     let with_ranged_builder = |rb: &mut RangedBuilder<'_, ColorBrush>| {
-        rb.push_default(FontStack::from(FONT_STACK));
+        rb.push_default(FontFamily::from(FONT_FAMILY_LIST));
     };
     let with_tree_builder = |tb: &mut TreeBuilder<'_, ColorBrush>| {
         tb.push_text(text);

@@ -40,6 +40,7 @@
 
 mod bidi;
 mod font;
+mod font_family;
 mod generic_family;
 #[cfg(feature = "bytemuck")]
 mod impl_bytemuck;
@@ -49,6 +50,7 @@ mod text;
 
 pub use bidi::{BidiControl, BidiDirection, BidiOverride};
 pub use font::{FontStyle, FontWeight, FontWidth};
+pub use font_family::{FontFamily, FontFamilyName, ParseFontFamilyError, ParseFontFamilyErrorKind};
 pub use generic_family::GenericFamily;
 pub use language::{Language, ParseLanguageError};
 pub use tag::{Setting, Tag};

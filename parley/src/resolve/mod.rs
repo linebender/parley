@@ -11,8 +11,8 @@ pub(crate) use range::RangedStyleBuilder;
 use alloc::{vec, vec::Vec};
 
 use super::style::{
-    Brush, FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontVariation, FontWeight,
-    FontWidth, StyleProperty,
+    Brush, FontFamily, FontFamilyName, FontFeature, FontSettings, FontStyle, FontVariation,
+    FontWeight, FontWidth, StyleProperty,
 };
 use crate::font::FontContext;
 use crate::style::TextStyle;
@@ -134,7 +134,7 @@ impl ResolveContext {
     ) -> ResolvedProperty<B> {
         use ResolvedProperty::*;
         match property {
-            StyleProperty::FontStack(value) => FontStack(self.resolve_stack(fcx, value)),
+            StyleProperty::FontFamily(value) => FontFamily(self.resolve_font_family(fcx, value)),
             StyleProperty::FontSize(value) => FontSize(*value * scale),
             StyleProperty::FontWidth(value) => FontWidth(*value),
             StyleProperty::FontStyle(value) => FontStyle(*value),
@@ -171,7 +171,7 @@ impl ResolveContext {
         scale: f32,
     ) -> ResolvedStyle<B> {
         ResolvedStyle {
-            font_stack: self.resolve_stack(fcx, &raw_style.font_stack),
+            font_family: self.resolve_font_family(fcx, &raw_style.font_family),
             font_size: raw_style.font_size * scale,
             font_width: raw_style.font_width,
             font_style: raw_style.font_style,
@@ -203,50 +203,50 @@ impl ResolveContext {
         }
     }
 
-    /// Resolves a font stack.
-    pub(crate) fn resolve_stack(
+    /// Resolves a `font-family` value.
+    pub(crate) fn resolve_font_family(
         &mut self,
         fcx: &mut FontContext,
-        stack: &FontStack<'_>,
+        value: &FontFamily<'_>,
     ) -> Resolved<FamilyId> {
         self.tmp_families.clear();
-        match stack {
-            FontStack::Source(source) => {
-                for family in FontFamily::parse_list(source) {
+        match value {
+            FontFamily::Source(source) => {
+                for family in FontFamilyName::parse_css_list(source).map_while(Result::ok) {
                     match family {
-                        FontFamily::Named(name) => {
+                        FontFamilyName::Named(name) => {
                             if let Some(family) = fcx.collection.family_by_name(&name) {
                                 self.tmp_families.push(family.id());
                             }
                         }
-                        FontFamily::Generic(family) => {
+                        FontFamilyName::Generic(family) => {
                             self.tmp_families
                                 .extend(fcx.collection.generic_families(family));
                         }
                     }
                 }
             }
-            FontStack::Single(family) => match family {
-                FontFamily::Named(name) => {
+            FontFamily::Single(family) => match family {
+                FontFamilyName::Named(name) => {
                     if let Some(family) = fcx.collection.family_by_name(name) {
                         self.tmp_families.push(family.id());
                     }
                 }
-                FontFamily::Generic(family) => {
+                FontFamilyName::Generic(family) => {
                     self.tmp_families
                         .extend(fcx.collection.generic_families(*family));
                 }
             },
-            FontStack::List(families) => {
-                let families: &[FontFamily<'_>] = families.borrow();
+            FontFamily::List(families) => {
+                let families: &[FontFamilyName<'_>] = families.borrow();
                 for family in families {
                     match family {
-                        FontFamily::Named(name) => {
+                        FontFamilyName::Named(name) => {
                             if let Some(family) = fcx.collection.family_by_name(name) {
                                 self.tmp_families.push(family.id());
                             }
                         }
-                        FontFamily::Generic(family) => {
+                        FontFamilyName::Generic(family) => {
                             self.tmp_families
                                 .extend(fcx.collection.generic_families(*family));
                         }
@@ -337,8 +337,8 @@ impl ResolveContext {
 /// Style property with resolved resources.
 #[derive(Clone, PartialEq)]
 pub(crate) enum ResolvedProperty<B: Brush> {
-    /// Font stack.
-    FontStack(Resolved<FamilyId>),
+    /// `font-family`.
+    FontFamily(Resolved<FamilyId>),
     /// Font size.
     FontSize(f32),
     /// Font width.
@@ -388,8 +388,8 @@ pub(crate) enum ResolvedProperty<B: Brush> {
 /// Flattened group of style properties.
 #[derive(Clone, PartialEq, Debug, Default)]
 pub(crate) struct ResolvedStyle<B: Brush> {
-    /// Font stack.
-    pub(crate) font_stack: Resolved<FamilyId>,
+    /// `font-family`.
+    pub(crate) font_family: Resolved<FamilyId>,
     /// Font size.
     pub(crate) font_size: f32,
     /// Font width.
@@ -429,7 +429,7 @@ impl<B: Brush> ResolvedStyle<B> {
     pub(crate) fn apply(&mut self, property: ResolvedProperty<B>) {
         use ResolvedProperty::*;
         match property {
-            FontStack(value) => self.font_stack = value,
+            FontFamily(value) => self.font_family = value,
             FontSize(value) => self.font_size = value,
             FontWidth(value) => self.font_width = value,
             FontStyle(value) => self.font_style = value,
@@ -458,7 +458,7 @@ impl<B: Brush> ResolvedStyle<B> {
     pub(crate) fn check(&self, property: &ResolvedProperty<B>) -> bool {
         use ResolvedProperty::*;
         match property {
-            FontStack(value) => self.font_stack == *value,
+            FontFamily(value) => self.font_family == *value,
             FontSize(value) => nearly_eq(self.font_size, *value),
             FontWidth(value) => self.font_width == *value,
             FontStyle(value) => self.font_style == *value,
