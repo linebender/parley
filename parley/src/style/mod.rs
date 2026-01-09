@@ -11,8 +11,8 @@ use alloc::borrow::Cow;
 
 pub use brush::*;
 pub use font::{
-    FontFamily, FontFamilyName, FontFeature, FontSettings, FontStyle, FontVariation, FontWeight,
-    FontWidth, GenericFamily,
+    FontFamily, FontFamilyName, FontFeature, FontFeatures, FontStyle, FontVariation,
+    FontVariations, FontWeight, FontWidth, GenericFamily,
 };
 pub use styleset::StyleSet;
 pub use text_primitives::{OverflowWrap, TextWrapMode, WordBreak};
@@ -81,9 +81,9 @@ pub enum StyleProperty<'a, B: Brush> {
     /// Font weight.
     FontWeight(FontWeight),
     /// Font variation settings.
-    FontVariations(FontSettings<'a, FontVariation>),
+    FontVariations(FontVariations<'a>),
     /// Font feature settings.
-    FontFeatures(FontSettings<'a, FontFeature>),
+    FontFeatures(FontFeatures<'a>),
     /// Locale.
     Locale(Option<&'a str>),
     /// Brush for rendering text.
@@ -132,9 +132,9 @@ pub struct TextStyle<'a, B: Brush> {
     /// Font weight.
     pub font_weight: FontWeight,
     /// Font variation settings.
-    pub font_variations: FontSettings<'a, FontVariation>,
+    pub font_variations: FontVariations<'a>,
     /// Font feature settings.
-    pub font_features: FontSettings<'a, FontFeature>,
+    pub font_features: FontFeatures<'a>,
     /// Locale.
     pub locale: Option<&'a str>,
     /// Brush for rendering text.
@@ -177,8 +177,8 @@ impl<B: Brush> Default for TextStyle<'_, B> {
             font_width: FontWidth::default(),
             font_style: FontStyle::default(),
             font_weight: FontWeight::default(),
-            font_variations: FontSettings::List(Cow::Borrowed(&[])),
-            font_features: FontSettings::List(Cow::Borrowed(&[])),
+            font_variations: FontVariations::empty(),
+            font_features: FontFeatures::empty(),
             locale: None,
             brush: B::default(),
             has_underline: false,
@@ -214,6 +214,18 @@ impl<'a, B: Brush> From<&'a [FontFamilyName<'a>]> for StyleProperty<'a, B> {
 impl<'a, B: Brush> From<FontFamilyName<'a>> for StyleProperty<'a, B> {
     fn from(value: FontFamilyName<'a>) -> Self {
         StyleProperty::FontFamily(value.into())
+    }
+}
+
+impl<'a, B: Brush> From<FontVariations<'a>> for StyleProperty<'a, B> {
+    fn from(value: FontVariations<'a>) -> Self {
+        StyleProperty::FontVariations(value)
+    }
+}
+
+impl<'a, B: Brush> From<FontFeatures<'a>> for StyleProperty<'a, B> {
+    fn from(value: FontFeatures<'a>) -> Self {
+        StyleProperty::FontFeatures(value)
     }
 }
 

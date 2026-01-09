@@ -1,8 +1,6 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use std::borrow::Cow;
-
 use peniko::{
     color::{AlphaColor, Srgb, palette},
     kurbo::Size,
@@ -11,10 +9,10 @@ use peniko::{
 use super::utils::{
     ColorBrush, FONT_FAMILY_LIST, TestEnv, asserts::assert_eq_layout_data_alignments,
 };
-use crate::setting::Setting;
+use crate::setting::{FontFeature, FontVariation};
 use crate::{
-    Alignment, AlignmentOptions, ContentWidths, FontFamily, FontSettings, InlineBox, Layout,
-    LineHeight, StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
+    Alignment, AlignmentOptions, ContentWidths, FontFamily, FontFeatures, FontVariations,
+    InlineBox, Layout, LineHeight, StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
 };
 
 #[test]
@@ -615,17 +613,17 @@ fn font_features() {
     let text = "fi ".repeat(4);
     let mut builder = env.ranged_builder(&text);
     builder.push(
-        StyleProperty::FontFeatures(FontSettings::List(Cow::Borrowed(&[Setting {
+        FontFeatures::from(&[FontFeature {
             tag: crate::setting::Tag::new(b"liga"),
             value: 1,
-        }]))),
+        }]),
         0..5,
     );
     builder.push(
-        StyleProperty::FontFeatures(FontSettings::List(Cow::Borrowed(&[Setting {
+        FontFeatures::from(&[FontFeature {
             tag: crate::setting::Tag::new(b"liga"),
             value: 0,
-        }]))),
+        }]),
         5..10,
     );
     let mut layout = builder.build(&text);
@@ -643,12 +641,10 @@ fn variable_fonts() {
     for wght in [100., 500., 1000.] {
         let mut builder = env.ranged_builder(text);
         builder.push_default(FontFamily::named("Arimo"));
-        builder.push_default(StyleProperty::FontVariations(FontSettings::List(
-            Cow::Borrowed(&[Setting {
-                tag: crate::setting::Tag::new(b"wght"),
-                value: wght,
-            }]),
-        )));
+        builder.push_default(FontVariations::from(&[FontVariation::new(
+            crate::setting::Tag::new(b"wght"),
+            wght,
+        )]));
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(100.0));
         layout.align(None, Alignment::Start, AlignmentOptions::default());

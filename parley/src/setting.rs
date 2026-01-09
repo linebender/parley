@@ -3,4 +3,4 @@
 
 //! OpenType settings (features and variations).
 
-pub use text_primitives::{Setting, Tag};
+pub use text_primitives::{FontFeature, FontVariation, Tag};

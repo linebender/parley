@@ -53,5 +53,5 @@ pub use font::{FontStyle, FontWeight, FontWidth};
 pub use font_family::{FontFamily, FontFamilyName, ParseFontFamilyError, ParseFontFamilyErrorKind};
 pub use generic_family::GenericFamily;
 pub use language::{Language, ParseLanguageError};
-pub use tag::{ParseSettingsError, ParseSettingsErrorKind, Setting, Tag};
+pub use tag::{FontFeature, FontVariation, ParseSettingsError, ParseSettingsErrorKind, Tag};
 pub use text::{BaseDirection, OverflowWrap, TextWrapMode, WordBreak};

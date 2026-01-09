@@ -5,14 +5,13 @@
 
 use fontique::{FontStyle, FontWeight, FontWidth};
 use peniko::color::palette;
-use std::borrow::Cow;
 
 use super::utils::{
     ColorBrush, FONT_FAMILY_LIST, asserts::assert_eq_layout_data, create_font_context,
 };
 use crate::{
-    FontContext, FontFamily, FontSettings, Layout, LayoutContext, LineHeight, OverflowWrap,
-    RangedBuilder, StyleProperty, TextStyle, TextWrapMode, TreeBuilder, WordBreak,
+    FontContext, FontFamily, FontFeatures, FontVariations, Layout, LayoutContext, LineHeight,
+    OverflowWrap, RangedBuilder, StyleProperty, TextStyle, TextWrapMode, TreeBuilder, WordBreak,
 };
 
 /// Set of options for [`build_layout_with_ranged`].
@@ -168,8 +167,8 @@ fn create_root_style() -> TextStyle<'static, ColorBrush> {
         font_width: FontWidth::CONDENSED,
         font_style: FontStyle::Italic,
         font_weight: FontWeight::BOLD,
-        font_variations: FontSettings::List(Cow::Borrowed(&[])), // TODO: Set a non-default value
-        font_features: FontSettings::List(Cow::Borrowed(&[])),   // TODO: Set a non-default value
+        font_variations: FontVariations::empty(), // TODO: Set a non-default value
+        font_features: FontFeatures::empty(),     // TODO: Set a non-default value
         locale: Some("en-US"),
         brush: ColorBrush::new(palette::css::GREEN),
         has_underline: true,
@@ -198,12 +197,8 @@ fn set_root_style(rb: &mut RangedBuilder<'_, ColorBrush>) {
     rb.push_default(StyleProperty::FontWidth(FontWidth::CONDENSED));
     rb.push_default(StyleProperty::FontStyle(FontStyle::Italic));
     rb.push_default(StyleProperty::FontWeight(FontWeight::BOLD));
-    rb.push_default(StyleProperty::FontVariations(FontSettings::List(
-        Cow::Borrowed(&[]),
-    )));
-    rb.push_default(StyleProperty::FontFeatures(FontSettings::List(
-        Cow::Borrowed(&[]),
-    )));
+    rb.push_default(FontVariations::empty());
+    rb.push_default(FontFeatures::empty());
     rb.push_default(StyleProperty::Locale(Some("en-US")));
     rb.push_default(StyleProperty::Brush(ColorBrush::new(palette::css::GREEN)));
     rb.push_default(StyleProperty::Underline(true));

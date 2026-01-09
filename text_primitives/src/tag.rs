@@ -108,23 +108,21 @@ impl fmt::Display for ParseSettingsError {
 
 impl core::error::Error for ParseSettingsError {}
 
-/// A single OpenType setting (tag + value).
+/// OpenType font feature setting (tag + `u16` value).
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub struct Setting<T> {
+pub struct FontFeature {
     /// The OpenType tag for this setting.
     pub tag: Tag,
-    /// The setting value.
-    pub value: T,
+    /// The feature value.
+    pub value: u16,
 }
 
-impl<T> Setting<T> {
-    /// Creates a new setting.
-    pub const fn new(tag: Tag, value: T) -> Self {
+impl FontFeature {
+    /// Creates a new feature setting.
+    pub const fn new(tag: Tag, value: u16) -> Self {
         Self { tag, value }
     }
-}
 
-impl Setting<u16> {
     /// Parses a comma-separated list of feature settings according to the CSS grammar.
     ///
     /// On success, yields a sequence of settings. On failure, yields a [`ParseSettingsError`].
@@ -178,7 +176,21 @@ fn parse_u16_feature_value(value_str: &str) -> Result<u16, ParseSettingsErrorKin
     }
 }
 
-impl Setting<f32> {
+/// OpenType font variation setting (tag + `f32` value).
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub struct FontVariation {
+    /// The OpenType tag for this setting.
+    pub tag: Tag,
+    /// The variation value.
+    pub value: f32,
+}
+
+impl FontVariation {
+    /// Creates a new variation setting.
+    pub const fn new(tag: Tag, value: f32) -> Self {
+        Self { tag, value }
+    }
+
     /// Parses a comma-separated list of variation settings according to the CSS grammar.
     ///
     /// On success, yields a sequence of settings. On failure, yields a [`ParseSettingsError`].
@@ -377,14 +389,14 @@ impl<'a> Iterator for ParseCssList<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{ParseSettingsErrorKind, Setting, Tag};
+    use super::{FontFeature, FontVariation, ParseSettingsErrorKind, Tag};
     extern crate alloc;
     use alloc::vec::Vec;
 
     #[test]
     fn parse_feature_settings_css_list_ok() {
         let parsed: Result<Vec<_>, _> =
-            Setting::<u16>::parse_css_list(r#""liga" on, 'kern', "dlig" off, "salt" 3,"#).collect();
+            FontFeature::parse_css_list(r#""liga" on, 'kern', "dlig" off, "salt" 3,"#).collect();
         let settings = parsed.unwrap();
 
         assert_eq!(settings.len(), 4);
@@ -400,7 +412,7 @@ mod tests {
 
     #[test]
     fn parse_feature_settings_css_list_rejects_empty_entries() {
-        let err = Setting::<u16>::parse_css_list(r#""liga" on,, "kern""#)
+        let err = FontFeature::parse_css_list(r#""liga" on,, "kern""#)
             .collect::<Result<Vec<_>, _>>()
             .unwrap_err();
         assert_eq!(err.kind(), ParseSettingsErrorKind::InvalidSyntax);
@@ -409,7 +421,7 @@ mod tests {
 
     #[test]
     fn parse_feature_settings_css_list_out_of_range_reports_span() {
-        let err = Setting::<u16>::parse_css_list(r#""liga" 70000"#)
+        let err = FontFeature::parse_css_list(r#""liga" 70000"#)
             .next()
             .unwrap()
             .unwrap_err();
@@ -420,7 +432,7 @@ mod tests {
 
     #[test]
     fn parse_feature_settings_css_list_invalid_value_reports_span() {
-        let err = Setting::<u16>::parse_css_list(r#""liga" nope"#)
+        let err = FontFeature::parse_css_list(r#""liga" nope"#)
             .next()
             .unwrap()
             .unwrap_err();
@@ -432,10 +444,7 @@ mod tests {
     #[test]
     fn parse_feature_settings_css_list_very_large_number_is_out_of_range() {
         let s = r#""liga" 999999999999999999999"#;
-        let err = Setting::<u16>::parse_css_list(s)
-            .next()
-            .unwrap()
-            .unwrap_err();
+        let err = FontFeature::parse_css_list(s).next().unwrap().unwrap_err();
         assert_eq!(err.kind(), ParseSettingsErrorKind::OutOfRange);
         assert_eq!(err.byte_offset(), 7);
         assert_eq!(err.byte_span(), Some((7, s.len())));
@@ -443,7 +452,7 @@ mod tests {
 
     #[test]
     fn parse_feature_settings_css_list_rejects_leading_comma() {
-        let err = Setting::<u16>::parse_css_list(r#", "liga" on"#)
+        let err = FontFeature::parse_css_list(r#", "liga" on"#)
             .next()
             .unwrap()
             .unwrap_err();
@@ -454,7 +463,7 @@ mod tests {
     #[test]
     fn parse_feature_settings_css_list_rejects_separator_soup() {
         let s = r#""liga" on,,, ,   ,,,    'kern', "dlig" off, "salt" 3,"#;
-        let err = Setting::<u16>::parse_css_list(s)
+        let err = FontFeature::parse_css_list(s)
             .collect::<Result<Vec<_>, _>>()
             .unwrap_err();
         assert_eq!(err.kind(), ParseSettingsErrorKind::InvalidSyntax);
@@ -465,7 +474,7 @@ mod tests {
 
     #[test]
     fn parse_feature_settings_css_list_requires_quotes() {
-        let err = Setting::<u16>::parse_css_list("liga on")
+        let err = FontFeature::parse_css_list("liga on")
             .next()
             .unwrap()
             .unwrap_err();
@@ -476,7 +485,7 @@ mod tests {
 
     #[test]
     fn parse_feature_settings_css_list_invalid_tag_reports_span() {
-        let err = Setting::<u16>::parse_css_list(r#""lig" on"#)
+        let err = FontFeature::parse_css_list(r#""lig" on"#)
             .next()
             .unwrap()
             .unwrap_err();
@@ -488,7 +497,7 @@ mod tests {
     #[test]
     fn parse_variation_settings_css_list_ok() {
         let parsed: Result<Vec<_>, _> =
-            Setting::<f32>::parse_css_list(r#""wght" 700, "wdth" 125.5,"#).collect();
+            FontVariation::parse_css_list(r#""wght" 700, "wdth" 125.5,"#).collect();
         let settings = parsed.unwrap();
         assert_eq!(settings.len(), 2);
         assert_eq!(settings[0].tag, Tag::parse("wght").unwrap());
@@ -499,7 +508,7 @@ mod tests {
 
     #[test]
     fn parse_variation_settings_css_list_requires_value() {
-        let err = Setting::<f32>::parse_css_list(r#""wght""#)
+        let err = FontVariation::parse_css_list(r#""wght""#)
             .next()
             .unwrap()
             .unwrap_err();
@@ -509,7 +518,7 @@ mod tests {
 
     #[test]
     fn parse_variation_settings_css_list_invalid_number_reports_span() {
-        let err = Setting::<f32>::parse_css_list(r#""wght" nope"#)
+        let err = FontVariation::parse_css_list(r#""wght" nope"#)
             .next()
             .unwrap()
             .unwrap_err();
