@@ -11,8 +11,8 @@ pub(crate) use range::RangedStyleBuilder;
 use alloc::{vec, vec::Vec};
 
 use super::style::{
-    Brush, FontFamily, FontFamilyName, FontFeature, FontSettings, FontStyle, FontVariation,
-    FontWeight, FontWidth, StyleProperty,
+    Brush, FontFamily, FontFamilyName, FontFeature, FontFeatures, FontStyle, FontVariation,
+    FontVariations, FontWeight, FontWidth, StyleProperty,
 };
 use crate::font::FontContext;
 use crate::style::TextStyle;
@@ -262,15 +262,15 @@ impl ResolveContext {
     /// Resolves font variation settings.
     pub(crate) fn resolve_variations(
         &mut self,
-        variations: &FontSettings<'_, FontVariation>,
+        variations: &FontVariations<'_>,
     ) -> Resolved<FontVariation> {
         match variations {
-            FontSettings::Source(source) => {
+            FontVariations::Source(source) => {
                 self.tmp_variations.clear();
                 self.tmp_variations
-                    .extend(FontVariation::parse_list(source));
+                    .extend(FontVariation::parse_css_list(source).map_while(Result::ok));
             }
-            FontSettings::List(settings) => {
+            FontVariations::List(settings) => {
                 self.tmp_variations.clear();
                 self.tmp_variations.extend_from_slice(settings);
             }
@@ -287,14 +287,15 @@ impl ResolveContext {
     /// Resolves font feature settings.
     pub(crate) fn resolve_features(
         &mut self,
-        features: &FontSettings<'_, FontFeature>,
+        features: &FontFeatures<'_>,
     ) -> Resolved<FontFeature> {
         match features {
-            FontSettings::Source(source) => {
+            FontFeatures::Source(source) => {
                 self.tmp_features.clear();
-                self.tmp_features.extend(FontFeature::parse_list(source));
+                self.tmp_features
+                    .extend(FontFeature::parse_css_list(source).map_while(Result::ok));
             }
-            FontSettings::List(settings) => {
+            FontFeatures::List(settings) => {
                 self.tmp_features.clear();
                 self.tmp_features.extend_from_slice(settings);
             }
