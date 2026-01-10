@@ -4,6 +4,9 @@
 use core::fmt;
 
 /// A 4-byte OpenType tag (for example `wght`, `liga`).
+///
+/// This is used by [`FontFeature`] and [`FontVariation`] to identify the OpenType feature or axis
+/// being configured.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
 pub struct Tag([u8; 4]);
