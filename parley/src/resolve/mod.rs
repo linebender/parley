@@ -11,8 +11,8 @@ pub(crate) use range::RangedStyleBuilder;
 use alloc::{vec, vec::Vec};
 
 use super::style::{
-    Brush, FontFamily, FontFamilyName, FontFeature, FontFeatures, FontStyle, FontVariation,
-    FontVariations, FontWeight, FontWidth, StyleProperty,
+    Brush, FontFamily, FontFamilyName, FontFeature, FontStyle, FontVariation, FontWeight,
+    FontWidth, StyleProperty,
 };
 use crate::font::FontContext;
 use crate::style::TextStyle;
@@ -139,8 +139,12 @@ impl ResolveContext {
             StyleProperty::FontWidth(value) => FontWidth(*value),
             StyleProperty::FontStyle(value) => FontStyle(*value),
             StyleProperty::FontWeight(value) => FontWeight(*value),
-            StyleProperty::FontVariations(value) => FontVariations(self.resolve_variations(value)),
-            StyleProperty::FontFeatures(value) => FontFeatures(self.resolve_features(value)),
+            StyleProperty::FontVariations(value) => {
+                FontVariations(self.resolve_variations(value.as_ref()))
+            }
+            StyleProperty::FontFeatures(value) => {
+                FontFeatures(self.resolve_features(value.as_ref()))
+            }
             StyleProperty::Locale(value) => Locale(
                 value.and_then(|v| icu_locale_core::Locale::try_from_str(v).map(|v| v.id).ok()),
             ),
@@ -176,8 +180,8 @@ impl ResolveContext {
             font_width: raw_style.font_width,
             font_style: raw_style.font_style,
             font_weight: raw_style.font_weight,
-            font_variations: self.resolve_variations(&raw_style.font_variations),
-            font_features: self.resolve_features(&raw_style.font_features),
+            font_variations: self.resolve_variations(raw_style.font_variations.as_ref()),
+            font_features: self.resolve_features(raw_style.font_features.as_ref()),
             locale: raw_style
                 .locale
                 .and_then(|v| icu_locale_core::Locale::try_from_str(v).map(|v| v.id).ok()),
@@ -262,19 +266,10 @@ impl ResolveContext {
     /// Resolves font variation settings.
     pub(crate) fn resolve_variations(
         &mut self,
-        variations: &FontVariations<'_>,
+        variations: &[FontVariation],
     ) -> Resolved<FontVariation> {
-        match variations {
-            FontVariations::Source(source) => {
-                self.tmp_variations.clear();
-                self.tmp_variations
-                    .extend(FontVariation::parse_css_list(source).map_while(Result::ok));
-            }
-            FontVariations::List(settings) => {
-                self.tmp_variations.clear();
-                self.tmp_variations.extend_from_slice(settings);
-            }
-        }
+        self.tmp_variations.clear();
+        self.tmp_variations.extend_from_slice(variations);
         if self.tmp_variations.is_empty() {
             return Resolved::default();
         }
@@ -285,21 +280,9 @@ impl ResolveContext {
     }
 
     /// Resolves font feature settings.
-    pub(crate) fn resolve_features(
-        &mut self,
-        features: &FontFeatures<'_>,
-    ) -> Resolved<FontFeature> {
-        match features {
-            FontFeatures::Source(source) => {
-                self.tmp_features.clear();
-                self.tmp_features
-                    .extend(FontFeature::parse_css_list(source).map_while(Result::ok));
-            }
-            FontFeatures::List(settings) => {
-                self.tmp_features.clear();
-                self.tmp_features.extend_from_slice(settings);
-            }
-        }
+    pub(crate) fn resolve_features(&mut self, features: &[FontFeature]) -> Resolved<FontFeature> {
+        self.tmp_features.clear();
+        self.tmp_features.extend_from_slice(features);
         if self.tmp_features.is_empty() {
             return Resolved::default();
         }

@@ -12,7 +12,7 @@ use alloc::borrow::Cow;
 pub use brush::*;
 pub use font::{
     FontFamily, FontFamilyName, FontFeature, FontFeatures, FontStyle, FontVariation,
-    FontVariations, FontWeight, FontWidth, GenericFamily,
+    FontVariations, FontWeight, FontWidth, GenericFamily, Tag,
 };
 pub use styleset::StyleSet;
 pub use text_primitives::{OverflowWrap, TextWrapMode, WordBreak};
@@ -218,14 +218,44 @@ impl<'a, B: Brush> From<FontFamilyName<'a>> for StyleProperty<'a, B> {
 }
 
 impl<'a, B: Brush> From<FontVariations<'a>> for StyleProperty<'a, B> {
+    #[inline]
     fn from(value: FontVariations<'a>) -> Self {
         StyleProperty::FontVariations(value)
     }
 }
 
+impl<'a, B: Brush> From<&'a [FontVariation]> for StyleProperty<'a, B> {
+    #[inline]
+    fn from(value: &'a [FontVariation]) -> Self {
+        StyleProperty::FontVariations(value.into())
+    }
+}
+
+impl<'a, B: Brush, const N: usize> From<&'a [FontVariation; N]> for StyleProperty<'a, B> {
+    #[inline]
+    fn from(value: &'a [FontVariation; N]) -> Self {
+        StyleProperty::FontVariations(value.into())
+    }
+}
+
 impl<'a, B: Brush> From<FontFeatures<'a>> for StyleProperty<'a, B> {
+    #[inline]
     fn from(value: FontFeatures<'a>) -> Self {
         StyleProperty::FontFeatures(value)
+    }
+}
+
+impl<'a, B: Brush> From<&'a [FontFeature]> for StyleProperty<'a, B> {
+    #[inline]
+    fn from(value: &'a [FontFeature]) -> Self {
+        StyleProperty::FontFeatures(value.into())
+    }
+}
+
+impl<'a, B: Brush, const N: usize> From<&'a [FontFeature; N]> for StyleProperty<'a, B> {
+    #[inline]
+    fn from(value: &'a [FontFeature; N]) -> Self {
+        StyleProperty::FontFeatures(value.into())
     }
 }
 
