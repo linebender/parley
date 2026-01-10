@@ -144,6 +144,19 @@ impl<'a> FontFamilyName<'a> {
             done: false,
         }
     }
+
+    /// Returns an owned (`'static`) version of this font family name.
+    ///
+    /// This is useful when you want to store a `FontFamilyName` without borrowing from an input
+    /// string slice.
+    #[must_use]
+    #[inline]
+    pub fn into_owned(self) -> FontFamilyName<'static> {
+        match self {
+            Self::Named(name) => FontFamilyName::Named(Cow::Owned(name.into_owned())),
+            Self::Generic(g) => FontFamilyName::Generic(g),
+        }
+    }
 }
 
 impl From<GenericFamily> for FontFamilyName<'_> {
@@ -178,6 +191,25 @@ impl<'a> FontFamily<'a> {
     /// Creates a `font-family` value consisting of a single named family.
     pub const fn named(name: &'a str) -> Self {
         Self::Single(FontFamilyName::named(name))
+    }
+
+    /// Returns an owned (`'static`) version of this `font-family` value.
+    ///
+    /// This is useful when you want to store a `FontFamily` without borrowing from an input string
+    /// slice.
+    #[must_use]
+    #[inline]
+    pub fn into_owned(self) -> FontFamily<'static> {
+        match self {
+            Self::Source(source) => FontFamily::Source(Cow::Owned(source.into_owned())),
+            Self::Single(name) => FontFamily::Single(name.into_owned()),
+            Self::List(list) => FontFamily::List(Cow::Owned(
+                list.into_owned()
+                    .into_iter()
+                    .map(FontFamilyName::into_owned)
+                    .collect(),
+            )),
+        }
     }
 }
 
@@ -323,7 +355,7 @@ mod tests {
 
     use alloc::borrow::Cow;
 
-    use super::{FontFamilyName, GenericFamily, ParseFontFamilyErrorKind};
+    use super::{FontFamily, FontFamilyName, GenericFamily, ParseFontFamilyErrorKind};
 
     #[test]
     fn parse_generic_family_is_generic_when_unquoted() {
@@ -406,5 +438,44 @@ mod tests {
         assert_eq!(err.kind(), ParseFontFamilyErrorKind::InvalidSyntax);
         assert_eq!(err.byte_offset(), 18);
         assert_eq!(err.byte_span(), None);
+    }
+
+    #[test]
+    fn font_family_name_into_owned_preserves_value() {
+        let borrowed = FontFamilyName::named("Arial");
+        let owned = borrowed.into_owned();
+        assert_eq!(owned, FontFamilyName::Named(Cow::Owned("Arial".into())));
+
+        let borrowed = FontFamilyName::Generic(GenericFamily::Serif);
+        let owned = borrowed.into_owned();
+        assert_eq!(owned, FontFamilyName::Generic(GenericFamily::Serif));
+    }
+
+    #[test]
+    fn font_family_into_owned_preserves_value() {
+        let borrowed = FontFamily::from("Arial, serif");
+        let owned = borrowed.into_owned();
+        assert_eq!(owned, FontFamily::Source(Cow::Owned("Arial, serif".into())));
+
+        let borrowed = FontFamily::named("Arial");
+        let owned = borrowed.into_owned();
+        assert_eq!(
+            owned,
+            FontFamily::Single(FontFamilyName::Named(Cow::Owned("Arial".into())))
+        );
+
+        let list = [
+            FontFamilyName::named("Arial"),
+            FontFamilyName::Generic(GenericFamily::Serif),
+        ];
+        let borrowed = FontFamily::from(list.as_slice());
+        let owned = borrowed.into_owned();
+        assert_eq!(
+            owned,
+            FontFamily::List(Cow::Owned(alloc::vec![
+                FontFamilyName::Named(Cow::Owned("Arial".into())),
+                FontFamilyName::Generic(GenericFamily::Serif),
+            ]))
+        );
     }
 }
