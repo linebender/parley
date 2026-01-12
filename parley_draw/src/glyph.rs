@@ -14,6 +14,7 @@ use crate::peniko::FontData;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter};
+use core::ops::RangeInclusive;
 use hashbrown::hash_map::{Entry, RawEntryMut};
 use hashbrown::{Equivalent, HashMap};
 use skrifa::instance::{LocationRef, Size};
@@ -27,7 +28,7 @@ use skrifa::{
 
 use crate::Pixmap;
 use crate::colr::convert_bounding_box;
-use crate::kurbo::{Point, Rect};
+use crate::kurbo::{Line, ParamCurve as _, PathSeg, Point, Rect};
 use skrifa::bitmap::{BitmapData, BitmapFormat, BitmapStrikes, Origin};
 
 #[cfg(not(feature = "std"))]
@@ -119,6 +120,9 @@ pub trait GlyphRenderer {
 
     /// Stroke glyphs with the current paint and stroke settings.
     fn stroke_glyph(&mut self, glyph: PreparedGlyph<'_>);
+
+    /// Fill a rectangle with the current paint.
+    fn fill_rect(&mut self, rect: Rect);
 }
 
 /// A builder for configuring and drawing glyphs.
@@ -285,6 +289,231 @@ impl<'a, T: GlyphRenderer + 'a> GlyphRunBuilder<'a, T> {
             render_glyph(self.renderer, prepared_glyph);
         }
     }
+
+    /// Render a decoration (like an underline) that skips over glyph descenders.
+    ///
+    /// This implements `text-decoration-skip-ink`-like behavior, where the decoration line is interrupted where it
+    /// would overlap with glyph outlines.
+    ///
+    /// The `x_range` specifies the horizontal position of the decoration, and the `offset` and `size` specify its
+    /// vertical position and height (relative to the baseline). The `buffer` specifies how much horizontal space to
+    /// leave around each descender.
+    pub fn render_decoration(
+        mut self,
+        glyphs: impl Iterator<Item = Glyph>,
+        x_range: RangeInclusive<f32>,
+        baseline_y: f32,
+        offset: f32,
+        size: f32,
+        buffer: f32,
+        caches: &mut GlyphCaches,
+    ) {
+        self.decoration_spans(glyphs, x_range, baseline_y, offset, size, buffer, caches)
+            .for_each(|rect| {
+                self.renderer.fill_rect(rect);
+            });
+    }
+
+    fn decoration_spans(
+        &mut self,
+        glyphs: impl Iterator<Item = Glyph>,
+        x_range: RangeInclusive<f32>,
+        baseline_y: f32,
+        offset: f32,
+        size: f32,
+        buffer: f32,
+        caches: &mut GlyphCaches,
+    ) -> impl Iterator<Item = Rect> {
+        let font_ref =
+            FontRef::from_index(self.run.font.data.as_ref(), self.run.font.index).unwrap();
+
+        let outlines = font_ref.outline_glyphs();
+
+        let PreparedGlyphRun {
+            size: font_size,
+            hinting_instance,
+            ..
+        } = prepare_glyph_run(&self.run, &outlines, &mut caches.hinting_cache);
+
+        // The glyph_transform (e.g. skew for fake italics) affects where the outline
+        // points end up. We apply it along with the Y flip to transform from font space
+        // (Y up) to layout space (Y down).
+        let outline_transform =
+            self.run.glyph_transform.unwrap_or(Affine::IDENTITY) * Affine::FLIP_Y;
+
+        // Buffer to add around each exclusion zone
+        let buffer = f64::from(buffer);
+
+        // X range for the decoration line
+        let x0 = f64::from(*x_range.start());
+        let x1 = f64::from(*x_range.end());
+
+        // Convert offset/size to layout space (Y down).
+        // offset is positive above baseline, so negate for layout coordinates.
+        let layout_y0 = f64::from(-offset);
+        let layout_y1 = f64::from(-offset + size);
+
+        // Get a cache session for this font's variation coordinates
+        let var_key = VarLookupKey(self.run.normalized_coords);
+        let mut outline_cache_session =
+            OutlineCacheSession::new(&mut caches.outline_cache, var_key);
+
+        // Collect and merge exclusion zones from all glyphs.
+        let mut exclusions: Vec<(f64, f64)> = Vec::new();
+
+        for glyph in glyphs {
+            // TODO: skip ink for color and bitmap glyphs
+            let Some(outline) = outlines.get(GlyphId::new(glyph.id)) else {
+                continue;
+            };
+
+            let path = outline_cache_session.get_or_insert(
+                glyph.id,
+                self.run.font.data.id(),
+                self.run.font.index,
+                font_size,
+                var_key,
+                &outline,
+                hinting_instance,
+            );
+
+            // If the glyph's bounding box doesn't intersect the underline at all, we don't need to calculate
+            // intersections. This saves a lot of time, since most glyphs don't have descenders.
+            let transformed_bbox = outline_transform.transform_rect_bbox(path.bbox);
+            if transformed_bbox.y1 < layout_y0 || transformed_bbox.y0 > layout_y1 {
+                continue;
+            }
+
+            let mut rect = Rect {
+                x0: f64::INFINITY,
+                x1: f64::NEG_INFINITY,
+                y0: layout_y0,
+                y1: layout_y1,
+            };
+
+            for seg in path.path.segments() {
+                // Transform the segment to layout space
+                let seg = outline_transform * seg;
+                expand_rect_with_segment(&mut rect, seg, layout_y0..=layout_y1);
+            }
+
+            // Add glyph position and buffer, then clip to decoration x-range
+            let excl_start = (rect.x0 + f64::from(glyph.x) - buffer).max(x0);
+            let excl_end = (rect.x1 + f64::from(glyph.x) + buffer).min(x1);
+
+            // Skip if no valid exclusion (empty intersection or outside x-range)
+            if excl_start >= excl_end {
+                continue;
+            }
+
+            // Insert in sorted order and merge with overlapping ranges
+            insert_and_merge_range(&mut exclusions, excl_start, excl_end);
+        }
+
+        // Draw decoration segments, skipping the exclusion zones
+        let y0 = f64::from(baseline_y) + layout_y0;
+        let y1 = f64::from(baseline_y) + layout_y1;
+
+        let mut state = Some((exclusions.into_iter(), x0));
+        core::iter::from_fn(move || {
+            let (iter, current_x) = state.as_mut()?;
+            let Some((excl_start, excl_end)) = iter.next() else {
+                // Draw the trailing rectangle
+                let final_rect = Rect::new(*current_x, y0, x1, y1);
+                state = None;
+                return (final_rect.width() > 0.0).then_some(final_rect);
+            };
+
+            // Draw segment before this exclusion
+            let rect = Rect::new(*current_x, y0, excl_start, y1);
+            *current_x = excl_end;
+            Some(rect)
+        })
+    }
+}
+
+/// Insert a range into a sorted list, merging with any overlapping ranges.
+fn insert_and_merge_range(ranges: &mut Vec<(f64, f64)>, start: f64, end: f64) {
+    // Search backwards from the end to find insertion point. Since glyphs come in visual (left-to-right) order, new
+    // ranges are usually at or near the end, making this O(1) in the common case.
+    let insert_pos = ranges
+        .iter()
+        .rposition(|r| r.0 <= start)
+        .map_or(0, |i| i + 1);
+
+    // Check if we overlap with the previous range
+    let merge_start = insert_pos
+        .checked_sub(1)
+        .filter(|&i| ranges[i].1 >= start)
+        .unwrap_or(insert_pos);
+
+    // Find all overlapping ranges and compute merged bounds
+    let new_end = ranges[merge_start..]
+        .iter()
+        .take_while(|(s, _)| *s <= end)
+        .fold(end, |acc, (_, e)| acc.max(*e));
+
+    let merge_end = merge_start
+        + ranges[merge_start..]
+            .iter()
+            .take_while(|(s, _)| *s <= new_end)
+            .count();
+
+    // Replace the overlapping ranges with the merged range
+    if merge_start < merge_end {
+        let new_start = start.min(ranges[merge_start].0);
+        ranges.splice(merge_start..merge_end, [(new_start, new_end)]);
+    } else {
+        ranges.insert(insert_pos, (start, end));
+    }
+}
+
+fn expand_rect_with_segment(rect: &mut Rect, seg: PathSeg, y_span: RangeInclusive<f64>) {
+    // All we care about are the x-intersections. The intersection methods don't work on infinitely-long lines, so we
+    // construct a "long enough" line based on segment bounds.
+    let mut x_bounds = match seg {
+        PathSeg::Line(line) => (line.p0.x.min(line.p1.x), line.p0.x.max(line.p1.x)),
+        PathSeg::Quad(quad) => (
+            quad.p0.x.min(quad.p1.x).min(quad.p2.x),
+            quad.p0.x.max(quad.p1.x).max(quad.p2.x),
+        ),
+        PathSeg::Cubic(cubic) => (
+            cubic.p0.x.min(cubic.p1.x).min(cubic.p2.x).min(cubic.p3.x),
+            cubic.p0.x.max(cubic.p1.x).max(cubic.p2.x).max(cubic.p3.x),
+        ),
+    };
+    x_bounds.0 -= 1.0;
+    x_bounds.1 += 1.0;
+    let top_line = Line::new((x_bounds.0, *y_span.start()), (x_bounds.1, *y_span.start()));
+    let bottom_line = Line::new((x_bounds.0, *y_span.end()), (x_bounds.1, *y_span.end()));
+
+    for intersection in seg.intersect_line(top_line) {
+        let point = top_line.eval(intersection.line_t);
+        // There might be some slight inaccuracy calculating `point` from `line_t`, so we only adjust the x-values
+        // instead of using `union_pt`, which may also expand the y-values.
+        rect.x0 = rect.x0.min(point.x);
+        rect.x1 = rect.x1.max(point.x);
+    }
+
+    for intersection in seg.intersect_line(bottom_line) {
+        let point = bottom_line.eval(intersection.line_t);
+        rect.x0 = rect.x0.min(point.x);
+        rect.x1 = rect.x1.max(point.x);
+    }
+
+    // Also check segment endpoints that lie within the y-range
+    let (seg_start, seg_end) = match seg {
+        PathSeg::Line(line) => (line.p0, line.p1),
+        PathSeg::Quad(quad) => (quad.p0, quad.p2),
+        PathSeg::Cubic(cubic) => (cubic.p0, cubic.p3),
+    };
+
+    for point in [seg_start, seg_end] {
+        if (*y_span.start()..=*y_span.end()).contains(&point.y) {
+            rect.x0 = rect.x0.min(point.x);
+            rect.x1 = rect.x1.max(point.x);
+        }
+    }
 }
 
 fn prepare_outline_glyph<'a>(
@@ -337,7 +566,7 @@ fn prepare_outline_glyph<'a>(
     }
 
     (
-        GlyphType::Outline(OutlineGlyph { path: &path.0 }),
+        GlyphType::Outline(OutlineGlyph { path: &path.path }),
         Affine::new(final_transform),
     )
 }
@@ -625,11 +854,32 @@ const HINTING_OPTIONS: HintingOptions = HintingOptions {
 };
 
 #[derive(Clone, Default)]
-pub(crate) struct OutlinePath(pub(crate) BezPath);
+pub(crate) struct OutlinePath {
+    pub(crate) path: BezPath,
+    pub(crate) bbox: Rect,
+}
 
 impl OutlinePath {
     pub(crate) fn new() -> Self {
-        Self(BezPath::new())
+        Self {
+            path: BezPath::new(),
+            bbox: Rect {
+                x0: f64::INFINITY,
+                y0: f64::INFINITY,
+                x1: f64::NEG_INFINITY,
+                y1: f64::NEG_INFINITY,
+            },
+        }
+    }
+
+    fn reuse(&mut self) {
+        self.path.truncate(0);
+        self.bbox = Rect {
+            x0: f64::INFINITY,
+            y0: f64::INFINITY,
+            x1: f64::NEG_INFINITY,
+            y1: f64::NEG_INFINITY,
+        };
     }
 }
 
@@ -637,27 +887,34 @@ impl OutlinePath {
 impl OutlinePen for OutlinePath {
     #[inline]
     fn move_to(&mut self, x: f32, y: f32) {
-        self.0.move_to((x, y));
+        self.path.move_to((x, y));
+        self.bbox = self.bbox.union_pt((x, y));
     }
 
     #[inline]
     fn line_to(&mut self, x: f32, y: f32) {
-        self.0.line_to((x, y));
+        self.path.line_to((x, y));
+        self.bbox = self.bbox.union_pt((x, y));
     }
 
     #[inline]
     fn curve_to(&mut self, cx0: f32, cy0: f32, cx1: f32, cy1: f32, x: f32, y: f32) {
-        self.0.curve_to((cx0, cy0), (cx1, cy1), (x, y));
+        self.path.curve_to((cx0, cy0), (cx1, cy1), (x, y));
+        self.bbox = self.bbox.union_pt((cx0, cy0));
+        self.bbox = self.bbox.union_pt((cx1, cy1));
+        self.bbox = self.bbox.union_pt((x, y));
     }
 
     #[inline]
     fn quad_to(&mut self, cx: f32, cy: f32, x: f32, y: f32) {
-        self.0.quad_to((cx, cy), (x, y));
+        self.path.quad_to((cx, cy), (x, y));
+        self.bbox = self.bbox.union_pt((cx, cy));
+        self.bbox = self.bbox.union_pt((x, y));
     }
 
     #[inline]
     fn close(&mut self) {
-        self.0.close_path();
+        self.path.close_path();
     }
 }
 
@@ -878,7 +1135,7 @@ impl<'a> OutlineCacheSession<'a> {
                     DrawSettings::unhinted(size, var_key.0)
                 };
 
-                path.0.truncate(0);
+                path.reuse();
                 outline_glyph.draw(draw_settings, &mut path).unwrap();
 
                 let entry = entry.insert(OutlineEntry::new(path, self.serial));

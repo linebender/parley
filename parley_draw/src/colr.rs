@@ -185,7 +185,7 @@ impl ColorPainter for ColrPainter<'_> {
             &mut outline_builder,
         );
 
-        let finished = outline_builder.0;
+        let finished = outline_builder.path;
         let transformed = self.cur_transform() * finished;
 
         self.painter.push_clip_layer(&transformed);
