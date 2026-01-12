@@ -76,7 +76,7 @@ fn main() {
 
     // Set the underline & strikethrough style
     builder.push(StyleProperty::Underline(true), 141..155);
-    builder.push(StyleProperty::Strikethrough(true), 155..168);
+    builder.push(StyleProperty::Strikethrough(true), 160..173);
 
     builder.push_inline_box(InlineBox {
         id: 0,
