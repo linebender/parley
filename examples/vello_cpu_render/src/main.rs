@@ -29,7 +29,7 @@ impl Default for ColorBrush {
 fn main() {
     // The text we are going to style and lay out
     let text = String::from(
-        "Some text here. Let's make it a bit longer so that line wrapping kicks in 😊. And also some اللغة العربية arabic text.\nThis is underline and strikethrough text",
+        "Some text here. Let's make it a bit longer so that line wrapping kicks in 😊. And also some اللغة العربية arabic text.\nThis is underlining pq and strikethrough text",
     );
 
     // The display scale for HiDPI rendering
@@ -75,7 +75,7 @@ fn main() {
     builder.push(StyleProperty::FontWeight(bold), 0..4);
 
     // Set the underline & strikethrough style
-    builder.push(StyleProperty::Underline(true), 141..150);
+    builder.push(StyleProperty::Underline(true), 141..155);
     builder.push(StyleProperty::Strikethrough(true), 155..168);
 
     builder.push_inline_box(InlineBox {
@@ -139,12 +139,32 @@ fn main() {
                         let offset = decoration.offset.unwrap_or(run.metrics().underline_offset);
                         let size = decoration.size.unwrap_or(run.metrics().underline_size);
 
-                        render_decoration(
+                        renderer.set_paint(decoration.brush.color);
+                        let x = glyph_run.offset();
+                        let x1 = x + glyph_run.advance();
+                        let baseline = glyph_run.baseline();
+
+                        GlyphRunBuilder::new(
+                            run.font().clone(),
+                            *renderer.transform(),
                             &mut renderer,
-                            &decoration.brush,
-                            &glyph_run,
+                        )
+                        .font_size(run.font_size())
+                        .normalized_coords(run.normalized_coords())
+                        .render_decoration(
+                            glyph_run
+                                .positioned_glyphs()
+                                .map(|glyph| parley_draw::Glyph {
+                                    id: glyph.id,
+                                    x: glyph.x,
+                                    y: glyph.y,
+                                }),
+                            x..=x1,
+                            baseline,
                             offset,
                             size,
+                            1.0, // buffer around exclusions
+                            &mut glyph_caches,
                         );
                     }
                     if let Some(decoration) = &style.strikethrough {
@@ -153,6 +173,7 @@ fn main() {
                             .unwrap_or(run.metrics().strikethrough_offset);
                         let size = decoration.size.unwrap_or(run.metrics().strikethrough_size);
 
+                        // Strikethrough typically doesn't skip ink, so use simple rect
                         render_decoration(
                             &mut renderer,
                             &decoration.brush,
