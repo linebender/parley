@@ -9,12 +9,14 @@
 use alloc::borrow::Cow;
 use alloc::format;
 
+use crate::AlignmentOptions;
 use crate::layout::Alignment;
 use crate::setting::Tag;
-use crate::style::{FontFeature, FontFeatures, FontVariation, FontVariations, LineHeight, StyleProperty};
+use crate::style::{
+    FontFeature, FontFeatures, FontVariation, FontVariations, LineHeight, StyleProperty,
+};
 use crate::test_name;
-use crate::tests::utils::{samples, TestEnv};
-use crate::AlignmentOptions;
+use crate::tests::utils::{TestEnv, samples};
 
 // ============================================================================
 // FontSize × LineHeight Interactions
@@ -52,7 +54,9 @@ fn interaction_font_size_line_height_absolute() {
     for font_size in [12.0, 24.0, 36.0] {
         let mut builder = env.ranged_builder(text);
         builder.push_default(StyleProperty::FontSize(font_size));
-        builder.push_default(StyleProperty::LineHeight(LineHeight::Absolute(absolute_height)));
+        builder.push_default(StyleProperty::LineHeight(LineHeight::Absolute(
+            absolute_height,
+        )));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
         layout.align(None, Alignment::Start, AlignmentOptions::default());
@@ -109,8 +113,8 @@ fn interaction_font_weight_vs_variations() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::style::FontFamily;
     use crate::FontWeight;
+    use crate::style::FontFamily;
 
     // FontWeight only
     let mut builder_weight = env.ranged_builder(text);
@@ -211,7 +215,8 @@ fn interaction_underline_with_offset_and_size() {
     layout_custom.break_all_lines(None);
     layout_custom.align(None, Alignment::Start, AlignmentOptions::default());
 
-    env.with_name("custom").check_layout_snapshot(&layout_custom);
+    env.with_name("custom")
+        .check_layout_snapshot(&layout_custom);
 }
 
 // ============================================================================
@@ -246,7 +251,8 @@ fn interaction_weight_style_width() {
 
     // Light + Condensed
     let mut builder_light_condensed = env.ranged_builder(text);
-    builder_light_condensed.push_default(StyleProperty::FontFamily(FontFamily::named("Roboto Flex")));
+    builder_light_condensed
+        .push_default(StyleProperty::FontFamily(FontFamily::named("Roboto Flex")));
     builder_light_condensed.push_default(StyleProperty::FontWeight(FontWeight::LIGHT));
     builder_light_condensed.push_default(StyleProperty::FontWidth(FontWidth::CONDENSED));
     let mut layout_light_condensed = builder_light_condensed.build(text);

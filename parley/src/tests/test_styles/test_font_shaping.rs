@@ -6,12 +6,12 @@
 use alloc::borrow::Cow;
 use alloc::format;
 
+use crate::AlignmentOptions;
 use crate::layout::Alignment;
 use crate::setting::Tag;
 use crate::style::{FontFeature, FontFeatures, FontVariation, FontVariations, StyleProperty};
 use crate::test_name;
-use crate::tests::utils::{samples, TestEnv};
-use crate::AlignmentOptions;
+use crate::tests::utils::{TestEnv, samples};
 
 // ============================================================================
 // FontVariations Tests
@@ -78,8 +78,14 @@ fn style_variations_multiple_axes() {
 
     // Test multiple axes at once
     let variations = FontVariations::List(Cow::Borrowed(&[
-        FontVariation { tag: Tag::new(b"wght"), value: 700.0 },
-        FontVariation { tag: Tag::new(b"wdth"), value: 75.0 },
+        FontVariation {
+            tag: Tag::new(b"wght"),
+            value: 700.0,
+        },
+        FontVariation {
+            tag: Tag::new(b"wdth"),
+            value: 75.0,
+        },
     ]));
 
     let mut builder = env.ranged_builder(text);

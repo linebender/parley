@@ -5,11 +5,11 @@
 
 use alloc::format;
 
+use crate::AlignmentOptions;
 use crate::layout::Alignment;
 use crate::style::StyleProperty;
 use crate::test_name;
-use crate::tests::utils::{samples, TestEnv};
-use crate::AlignmentOptions;
+use crate::tests::utils::{TestEnv, samples};
 
 // ============================================================================
 // Underline Tests
@@ -174,4 +174,3 @@ fn style_underline_and_strikethrough() {
 
     env.check_layout_snapshot(&layout);
 }
-

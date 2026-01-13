@@ -8,11 +8,15 @@ use alloc::format;
 use crate::layout::Alignment;
 use crate::style::{LineHeight, StyleProperty};
 use crate::test_name;
-use crate::tests::utils::{samples, ColorBrush, TestEnv};
+use crate::tests::utils::{ColorBrush, TestEnv, samples};
 use crate::{AlignmentOptions, Layout};
 
 /// Helper to build a layout with line height applied
-fn build_with_line_height(env: &mut TestEnv, text: &str, line_height: LineHeight) -> Layout<ColorBrush> {
+fn build_with_line_height(
+    env: &mut TestEnv,
+    text: &str,
+    line_height: LineHeight,
+) -> Layout<ColorBrush> {
     let mut builder = env.ranged_builder(text);
     builder.push_default(StyleProperty::LineHeight(line_height));
     let mut layout = builder.build(text);

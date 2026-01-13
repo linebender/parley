@@ -18,4 +18,3 @@ pub(crate) const LIGATURES: &str = "fi fl ff ffi ffl office";
 
 /// Text with spaces for word spacing tests
 pub(crate) const SPACED: &str = "one two three four five";
-
