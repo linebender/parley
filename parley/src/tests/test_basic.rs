@@ -10,10 +10,9 @@ use peniko::{
 use super::utils::{
     ColorBrush, FONT_FAMILY_LIST, TestEnv, asserts::assert_eq_layout_data_alignments,
 };
-use crate::setting::{FontFeature, FontVariation};
 use crate::{
-    Alignment, AlignmentOptions, ContentWidths, FontFamily, FontFeatures, FontVariations,
-    InlineBox, Layout, LineHeight, StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
+    Alignment, AlignmentOptions, ContentWidths, FontFamily, InlineBox, Layout, LineHeight,
+    StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
 };
 
 #[test]

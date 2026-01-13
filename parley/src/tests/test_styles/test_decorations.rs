@@ -3,6 +3,8 @@
 
 //! Tests for text decoration style properties.
 
+use alloc::format;
+
 use crate::layout::Alignment;
 use crate::style::StyleProperty;
 use crate::test_name;

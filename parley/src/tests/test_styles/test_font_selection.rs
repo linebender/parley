@@ -4,6 +4,7 @@
 //! Tests for font selection style properties.
 
 use alloc::borrow::Cow;
+use alloc::format;
 
 use crate::layout::Alignment;
 use crate::style::StyleProperty;
@@ -50,7 +51,7 @@ fn style_font_weight_values() {
     let text = samples::LATIN;
 
     use crate::FontWeight;
-    use crate::style::{FontFamily, FontStack};
+    use crate::style::FontFamily;
 
     for (weight, name) in [
         (FontWeight::THIN, "thin"),
@@ -62,9 +63,7 @@ fn style_font_weight_values() {
         (FontWeight::BLACK, "black"),
     ] {
         let mut builder = env.ranged_builder(text);
-        builder.push_default(StyleProperty::FontStack(FontStack::Single(
-            FontFamily::Named(Cow::Borrowed("Roboto Flex")),
-        )));
+        builder.push_default(StyleProperty::FontFamily(FontFamily::named("Roboto Flex")));
         builder.push_default(StyleProperty::FontWeight(weight));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
@@ -84,7 +83,7 @@ fn style_font_width_values() {
     let text = samples::LATIN;
 
     use crate::FontWidth;
-    use crate::style::{FontFamily, FontStack};
+    use crate::style::FontFamily;
 
     for (width, name) in [
         (FontWidth::ULTRA_CONDENSED, "ultra_condensed"),
@@ -94,9 +93,7 @@ fn style_font_width_values() {
         (FontWidth::ULTRA_EXPANDED, "ultra_expanded"),
     ] {
         let mut builder = env.ranged_builder(text);
-        builder.push_default(StyleProperty::FontStack(FontStack::Single(
-            FontFamily::Named(Cow::Borrowed("Roboto Flex")),
-        )));
+        builder.push_default(StyleProperty::FontFamily(FontFamily::named("Roboto Flex")));
         builder.push_default(StyleProperty::FontWidth(width));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
@@ -116,21 +113,19 @@ fn style_font_style_values() {
     let text = samples::LATIN;
 
     use crate::setting::Tag;
-    use crate::style::{FontFamily, FontSettings, FontStack, FontVariation};
+    use crate::style::{FontFamily, FontVariation, FontVariations};
 
     // Using Roboto Flex with slnt axis for italic/oblique effects
     // TODO: FontStyle property doesn't automatically map to slnt axis for variable fonts,
     // so, for this test, we use FontVariations directly
     for (slnt_value, name) in [(0.0, "normal"), (-10.0, "italic"), (-10.0, "oblique")] {
-        let variations = FontSettings::List(Cow::Borrowed(&[FontVariation {
+        let variations = FontVariations::List(Cow::Borrowed(&[FontVariation {
             tag: Tag::new(b"slnt"),
             value: slnt_value,
         }]));
 
         let mut builder = env.ranged_builder(text);
-        builder.push_default(StyleProperty::FontStack(FontStack::Single(
-            FontFamily::Named(Cow::Borrowed("Roboto Flex")),
-        )));
+        builder.push_default(StyleProperty::FontFamily(FontFamily::named("Roboto Flex")));
         builder.push_default(StyleProperty::FontVariations(variations));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
@@ -141,22 +136,19 @@ fn style_font_style_values() {
 }
 
 // ============================================================================
-// FontStack Tests
+// FontFamily Tests
 // ============================================================================
 
 #[test]
-fn style_font_stack_named() {
+fn style_font_family_named() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::style::{FontFamily, FontStack};
-    use alloc::borrow::Cow;
+    use crate::style::FontFamily;
 
     // Test with Roboto (should be available in test fonts)
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::FontStack(FontStack::Single(
-        FontFamily::Named(Cow::Borrowed("Roboto")),
-    )));
+    builder.push_default(StyleProperty::FontFamily(FontFamily::named("Roboto")));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
     layout.align(None, Alignment::Start, AlignmentOptions::default());

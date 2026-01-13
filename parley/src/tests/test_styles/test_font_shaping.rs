@@ -4,10 +4,11 @@
 //! Tests for font shaping style properties.
 
 use alloc::borrow::Cow;
+use alloc::format;
 
 use crate::layout::Alignment;
 use crate::setting::Tag;
-use crate::style::{FontFeature, FontSettings, FontVariation, StyleProperty};
+use crate::style::{FontFeature, FontFeatures, FontVariation, FontVariations, StyleProperty};
 use crate::test_name;
 use crate::tests::utils::{samples, TestEnv};
 use crate::AlignmentOptions;
@@ -21,19 +22,17 @@ fn style_variations_weight_axis() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::style::{FontFamily, FontStack};
+    use crate::style::FontFamily;
 
     // Test weight axis (wght) with different values
     for weight in [100.0, 400.0, 700.0, 900.0] {
-        let variations = FontSettings::List(Cow::Borrowed(&[FontVariation {
+        let variations = FontVariations::List(Cow::Borrowed(&[FontVariation {
             tag: Tag::new(b"wght"),
             value: weight,
         }]));
 
         let mut builder = env.ranged_builder(text);
-        builder.push_default(StyleProperty::FontStack(FontStack::Single(
-            FontFamily::Named(Cow::Borrowed("Arimo")),
-        )));
+        builder.push_default(StyleProperty::FontFamily(FontFamily::named("Arimo")));
         builder.push_default(StyleProperty::FontVariations(variations));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
@@ -49,19 +48,17 @@ fn style_variations_width_axis() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::style::{FontFamily, FontStack};
+    use crate::style::FontFamily;
 
     // Test width axis (wdth) with different values
     for width in [75.0, 100.0, 125.0] {
-        let variations = FontSettings::List(Cow::Borrowed(&[FontVariation {
+        let variations = FontVariations::List(Cow::Borrowed(&[FontVariation {
             tag: Tag::new(b"wdth"),
             value: width,
         }]));
 
         let mut builder = env.ranged_builder(text);
-        builder.push_default(StyleProperty::FontStack(FontStack::Single(
-            FontFamily::Named(Cow::Borrowed("Roboto Flex")),
-        )));
+        builder.push_default(StyleProperty::FontFamily(FontFamily::named("Roboto Flex")));
         builder.push_default(StyleProperty::FontVariations(variations));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
@@ -77,18 +74,16 @@ fn style_variations_multiple_axes() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::style::{FontFamily, FontStack};
+    use crate::style::FontFamily;
 
     // Test multiple axes at once
-    let variations = FontSettings::List(Cow::Borrowed(&[
+    let variations = FontVariations::List(Cow::Borrowed(&[
         FontVariation { tag: Tag::new(b"wght"), value: 700.0 },
         FontVariation { tag: Tag::new(b"wdth"), value: 75.0 },
     ]));
 
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::FontStack(FontStack::Single(
-        FontFamily::Named(Cow::Borrowed("Roboto Flex")),
-    )));
+    builder.push_default(StyleProperty::FontFamily(FontFamily::named("Roboto Flex")));
     builder.push_default(StyleProperty::FontVariations(variations));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
@@ -107,7 +102,7 @@ fn style_features_ligatures_on() {
     let text = samples::LIGATURES;
 
     // Enable ligatures explicitly
-    let features = FontSettings::List(Cow::Borrowed(&[FontFeature {
+    let features = FontFeatures::List(Cow::Borrowed(&[FontFeature {
         tag: Tag::new(b"liga"),
         value: 1,
     }]));
@@ -127,7 +122,7 @@ fn style_features_ligatures_off() {
     let text = samples::LIGATURES;
 
     // Disable ligatures
-    let features = FontSettings::List(Cow::Borrowed(&[FontFeature {
+    let features = FontFeatures::List(Cow::Borrowed(&[FontFeature {
         tag: Tag::new(b"liga"),
         value: 0,
     }]));
@@ -147,7 +142,7 @@ fn style_features_small_caps() {
     let text = samples::LATIN;
 
     // Enable small caps
-    let features = FontSettings::List(Cow::Borrowed(&[FontFeature {
+    let features = FontFeatures::List(Cow::Borrowed(&[FontFeature {
         tag: Tag::new(b"smcp"),
         value: 1,
     }]));
@@ -266,7 +261,7 @@ fn style_locale_arabic() {
     let text = samples::ARABIC;
 
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::Locale(Some("ar")));
+    builder.push_default(StyleProperty::Locale(Some("ar".parse().unwrap())));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
     layout.align(None, Alignment::Start, AlignmentOptions::default());
@@ -281,7 +276,7 @@ fn style_locale_mixed_bidi() {
 
     // Test with Arabic locale
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::Locale(Some("ar")));
+    builder.push_default(StyleProperty::Locale(Some("ar".parse().unwrap())));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
     layout.align(None, Alignment::Start, AlignmentOptions::default());
@@ -290,11 +285,10 @@ fn style_locale_mixed_bidi() {
 
     // Test with English locale
     let mut builder_en = env.ranged_builder(text);
-    builder_en.push_default(StyleProperty::Locale(Some("en")));
+    builder_en.push_default(StyleProperty::Locale(Some("en".parse().unwrap())));
     let mut layout_en = builder_en.build(text);
     layout_en.break_all_lines(None);
     layout_en.align(None, Alignment::Start, AlignmentOptions::default());
 
     env.with_name("en").check_layout_snapshot(&layout_en);
 }
-

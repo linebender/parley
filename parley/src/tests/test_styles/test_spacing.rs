@@ -3,6 +3,8 @@
 
 //! Tests for spacing style properties.
 
+use alloc::format;
+
 use crate::layout::Alignment;
 use crate::style::{LineHeight, StyleProperty};
 use crate::test_name;

@@ -7,10 +7,11 @@
 //! especially when they might affect each other.
 
 use alloc::borrow::Cow;
+use alloc::format;
 
 use crate::layout::Alignment;
 use crate::setting::Tag;
-use crate::style::{FontFeature, FontSettings, FontVariation, LineHeight, StyleProperty};
+use crate::style::{FontFeature, FontFeatures, FontVariation, FontVariations, LineHeight, StyleProperty};
 use crate::test_name;
 use crate::tests::utils::{samples, TestEnv};
 use crate::AlignmentOptions;
@@ -72,7 +73,7 @@ fn interaction_letter_spacing_ligatures() {
     let text = samples::LIGATURES;
 
     // Without letter spacing - ligatures should form (if font supports them)
-    let features_on = FontSettings::List(Cow::Borrowed(&[FontFeature {
+    let features_on = FontFeatures::List(Cow::Borrowed(&[FontFeature {
         tag: Tag::new(b"liga"),
         value: 1,
     }]));
@@ -108,14 +109,12 @@ fn interaction_font_weight_vs_variations() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::style::{FontFamily, FontStack};
+    use crate::style::FontFamily;
     use crate::FontWeight;
 
     // FontWeight only
     let mut builder_weight = env.ranged_builder(text);
-    builder_weight.push_default(StyleProperty::FontStack(FontStack::Single(
-        FontFamily::Named(Cow::Borrowed("Arimo")),
-    )));
+    builder_weight.push_default(StyleProperty::FontFamily(FontFamily::named("Arimo")));
     builder_weight.push_default(StyleProperty::FontWeight(FontWeight::BOLD));
     let mut layout_weight = builder_weight.build(text);
     layout_weight.break_all_lines(None);
@@ -125,15 +124,13 @@ fn interaction_font_weight_vs_variations() {
         .check_layout_snapshot(&layout_weight);
 
     // FontVariations(wght) only
-    let variations = FontSettings::List(Cow::Borrowed(&[FontVariation {
+    let variations = FontVariations::List(Cow::Borrowed(&[FontVariation {
         tag: Tag::new(b"wght"),
         value: 700.0,
     }]));
 
     let mut builder_variation = env.ranged_builder(text);
-    builder_variation.push_default(StyleProperty::FontStack(FontStack::Single(
-        FontFamily::Named(Cow::Borrowed("Arimo")),
-    )));
+    builder_variation.push_default(StyleProperty::FontFamily(FontFamily::named("Arimo")));
     builder_variation.push_default(StyleProperty::FontVariations(variations.clone()));
     let mut layout_variation = builder_variation.build(text);
     layout_variation.break_all_lines(None);
@@ -144,9 +141,7 @@ fn interaction_font_weight_vs_variations() {
 
     // Both FontWeight and FontVariations - which takes precedence?
     let mut builder_both = env.ranged_builder(text);
-    builder_both.push_default(StyleProperty::FontStack(FontStack::Single(
-        FontFamily::Named(Cow::Borrowed("Arimo")),
-    )));
+    builder_both.push_default(StyleProperty::FontFamily(FontFamily::named("Arimo")));
     builder_both.push_default(StyleProperty::FontWeight(FontWeight::LIGHT)); // 300
     builder_both.push_default(StyleProperty::FontVariations(variations)); // 700
     let mut layout_both = builder_both.build(text);
@@ -229,19 +224,17 @@ fn interaction_weight_style_width() {
     let text = samples::LATIN;
 
     use crate::setting::Tag;
-    use crate::style::{FontFamily, FontSettings, FontStack, FontVariation};
+    use crate::style::FontFamily;
     use crate::{FontWeight, FontWidth};
 
     // Bold + Italic (using slnt axis)
-    let italic_variation = FontSettings::List(Cow::Borrowed(&[FontVariation {
+    let italic_variation = FontVariations::List(Cow::Borrowed(&[FontVariation {
         tag: Tag::new(b"slnt"),
         value: -10.0,
     }]));
 
     let mut builder_bold_italic = env.ranged_builder(text);
-    builder_bold_italic.push_default(StyleProperty::FontStack(FontStack::Single(
-        FontFamily::Named(Cow::Borrowed("Roboto Flex")),
-    )));
+    builder_bold_italic.push_default(StyleProperty::FontFamily(FontFamily::named("Roboto Flex")));
     builder_bold_italic.push_default(StyleProperty::FontWeight(FontWeight::BOLD));
     builder_bold_italic.push_default(StyleProperty::FontVariations(italic_variation.clone()));
     let mut layout_bold_italic = builder_bold_italic.build(text);
@@ -253,9 +246,7 @@ fn interaction_weight_style_width() {
 
     // Light + Condensed
     let mut builder_light_condensed = env.ranged_builder(text);
-    builder_light_condensed.push_default(StyleProperty::FontStack(FontStack::Single(
-        FontFamily::Named(Cow::Borrowed("Roboto Flex")),
-    )));
+    builder_light_condensed.push_default(StyleProperty::FontFamily(FontFamily::named("Roboto Flex")));
     builder_light_condensed.push_default(StyleProperty::FontWeight(FontWeight::LIGHT));
     builder_light_condensed.push_default(StyleProperty::FontWidth(FontWidth::CONDENSED));
     let mut layout_light_condensed = builder_light_condensed.build(text);
@@ -267,9 +258,7 @@ fn interaction_weight_style_width() {
 
     // Black + Expanded + Italic (using slnt axis)
     let mut builder_complex = env.ranged_builder(text);
-    builder_complex.push_default(StyleProperty::FontStack(FontStack::Single(
-        FontFamily::Named(Cow::Borrowed("Roboto Flex")),
-    )));
+    builder_complex.push_default(StyleProperty::FontFamily(FontFamily::named("Roboto Flex")));
     builder_complex.push_default(StyleProperty::FontWeight(FontWeight::BLACK));
     builder_complex.push_default(StyleProperty::FontWidth(FontWidth::EXPANDED));
     builder_complex.push_default(StyleProperty::FontVariations(italic_variation));
@@ -280,4 +269,3 @@ fn interaction_weight_style_width() {
     env.with_name("black_expanded_italic")
         .check_layout_snapshot(&layout_complex);
 }
-
