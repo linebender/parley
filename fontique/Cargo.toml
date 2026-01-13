@@ -20,7 +20,7 @@ default = ["system"]
 std = ["read-fonts/std", "dep:memmap2", "text_primitives/std"]
 libm = ["read-fonts/libm"]
 bytemuck = ["text_primitives/bytemuck"]
-icu_properties = ["dep:icu_properties"]
+icu_properties = ["dep:icu_locale_core", "dep:icu_properties"]
 unicode_script = ["dep:unicode-script"]
 # Enables support for system font backends
 system = [
@@ -47,7 +47,7 @@ smallvec = "1.15.1"
 memmap2 = { version = "0.9.9", optional = true }
 unicode-script = { version = "0.5.7", optional = true }
 icu_properties = { workspace = true, features = ["compiled_data"], optional = true }
-icu_locale_core = { workspace = true, features = ["alloc"] }
+icu_locale_core = { workspace = true, features = ["alloc"], optional = true }
 hashbrown = { workspace = true }
 text_primitives = { path = "../text_primitives", default-features = false }
 

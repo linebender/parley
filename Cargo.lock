@@ -3317,7 +3317,6 @@ dependencies = [
  "harfrust",
  "hashbrown 0.16.1",
  "icu_collections",
- "icu_locale_core",
  "icu_normalizer",
  "icu_properties",
  "icu_provider",

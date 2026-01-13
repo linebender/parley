@@ -14,6 +14,7 @@ pub use font::{
     FontFamily, FontFamilyName, FontFeature, FontFeatures, FontStyle, FontVariation,
     FontVariations, FontWeight, FontWidth, GenericFamily,
 };
+pub use fontique::Language;
 pub use styleset::StyleSet;
 pub use text_primitives::{OverflowWrap, TextWrapMode, WordBreak};
 
@@ -85,7 +86,7 @@ pub enum StyleProperty<'a, B: Brush> {
     /// Font feature settings.
     FontFeatures(FontFeatures<'a>),
     /// Locale.
-    Locale(Option<&'a str>),
+    Locale(Option<Language>),
     /// Brush for rendering text.
     Brush(B),
     /// Underline decoration.
@@ -136,7 +137,7 @@ pub struct TextStyle<'a, B: Brush> {
     /// Font feature settings.
     pub font_features: FontFeatures<'a>,
     /// Locale.
-    pub locale: Option<&'a str>,
+    pub locale: Option<Language>,
     /// Brush for rendering text.
     pub brush: B,
     /// Underline decoration.

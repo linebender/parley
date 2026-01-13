@@ -54,10 +54,10 @@ mod source;
 
 mod source_cache;
 
-pub use icu_locale_core::LanguageIdentifier as Language;
-pub use icu_locale_core::subtags::Script;
 pub use linebender_resource_handle::Blob;
 pub use script::ScriptExt;
+pub use text_primitives::Language;
+pub use text_primitives::Script;
 
 pub use attributes::Attributes;
 pub use charmap::{Charmap, CharmapIndex};

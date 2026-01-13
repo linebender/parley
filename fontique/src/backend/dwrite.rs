@@ -116,7 +116,7 @@ impl SystemFonts {
         // so here we provide a sample of the intended script instead.
         let key = key.into();
         let text = key.script().sample()?;
-        let locale = key.locale();
+        let locale = key.locale_str();
         let family_name = self.dwrite_fonts.family_name_for_text(text, locale)?;
         self.name_map.get(&family_name).map(|name| name.id())
     }

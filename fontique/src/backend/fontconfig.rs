@@ -738,7 +738,7 @@ impl SystemFonts {
 
         let mut pattern = Pattern::new()?;
 
-        let locale_lang_set = key.locale().and_then(|locale| {
+        let locale_lang_set = key.locale_str().and_then(|locale| {
             let mut lang_set = LangSet::new()?;
             lang_set.add(CString::new(locale).ok()?.as_c_str());
             Some(lang_set)
