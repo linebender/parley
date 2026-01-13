@@ -1,7 +1,15 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use std::{path::Path, str::FromStr, sync::Arc};
+use alloc::{
+    boxed::Box,
+    str::FromStr,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
+use std::path::Path;
 
 use hashbrown::HashMap;
 use icu_locale_core::subtags::script;

@@ -11,6 +11,7 @@ use super::{
     font::FontInfo,
 };
 use alloc::string::String;
+use alloc::vec;
 use hashbrown::HashMap;
 use read_fonts::{FileRef, FontRef, TableProvider as _, tables::name, types::NameId};
 use smallvec::SmallVec;

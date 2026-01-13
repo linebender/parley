@@ -8,14 +8,17 @@ use crate::{
     BoundingBox, FontContext, FontFamily, FontFamilyName, Layout, LayoutContext, LineHeight,
     PlainEditor, PlainEditorDriver, RangedBuilder, StyleProperty, TextStyle, TreeBuilder,
 };
+use alloc::{
+    borrow::Cow,
+    format,
+    string::{String, ToString},
+    sync::Arc,
+    vec::Vec,
+};
 use fontique::{Blob, Collection, CollectionOptions, SourceCache};
 use peniko::kurbo::Size;
 use std::collections::HashMap;
-use std::{
-    borrow::Cow,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::path::{Path, PathBuf};
 use tiny_skia::{Color, Pixmap};
 
 // Returns the current function name
@@ -24,7 +27,7 @@ macro_rules! test_name {
     () => {{
         fn f() {}
         fn type_name_of<T>(_: T) -> &'static str {
-            std::any::type_name::<T>()
+            core::any::type_name::<T>()
         }
         let name = type_name_of(f);
         let name = &name[..name.len() - 3];

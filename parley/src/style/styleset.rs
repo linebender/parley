@@ -39,7 +39,7 @@ impl<Brush: crate::Brush> StyleSet<Brush> {
         self.0.insert(discriminant, style)
     }
 
-    /// [Retain](std::vec::Vec::retain) only the styles for which `f` returns true.
+    /// [Retain](alloc::vec::Vec::retain) only the styles for which `f` returns true.
     ///
     /// Styles which are removed return to their default values.
     ///

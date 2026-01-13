@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 
 use crate::{GlyphRun, Layout, PositionedLayoutItem};
+use alloc::vec::Vec;
 use peniko::kurbo;
 use skrifa::{
     GlyphId, MetadataProvider, OutlineGlyph,
