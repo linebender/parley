@@ -43,6 +43,11 @@ struct LineState {
     /// Of the line currently being built, the maximum line height seen so far.
     /// This represents a lower-bound on the eventual line height of the line.
     running_line_height: f32,
+    /// This is set to true if we encounter something on the line (either a glyph or an inline box)
+    /// that is taller than the `line_max_height`. When in this state `break_next` should yield control
+    /// flow to the caller to handle the constraint violation.
+    ///
+    /// This never happens when calling `break_all_lines` as it never sets `line_max_height`, and it defaults to `f32::MAX`.
     max_height_exceeded: bool,
 
     /// We lag the text-wrap-mode by one cluster due to line-breaking boundaries only
@@ -83,7 +88,7 @@ pub struct MaxHeightBreakData {
 pub struct BoxBreakData {
     /// The user-supplied ID for the inline box
     pub inline_box_id: u64,
-    // The index of the inline box within the inline_boxes `Vec`
+    // The index of the inline box within `Layout::inline_boxes()`
     pub inline_box_index: usize,
     pub advance: f32,
 }
@@ -163,7 +168,7 @@ impl BreakerState {
 
     /// Store the current iteration state so that we can revert to it if we later want to take
     /// the line breaking opportunity at this point.
-    pub fn mark_line_break_opportunity(&mut self) {
+    fn mark_line_break_opportunity(&mut self) {
         self.prev_boundary = Some(PrevBoundaryState {
             item_idx: self.item_idx,
             run_idx: self.run_idx,
@@ -174,7 +179,7 @@ impl BreakerState {
 
     /// Store the current iteration state so that we can revert to it if we later want to take
     /// an *emergency* line breaking opportunity at this point.
-    pub fn mark_emergency_break_opportunity(&mut self) {
+    fn mark_emergency_break_opportunity(&mut self) {
         self.emergency_boundary = Some(PrevBoundaryState {
             item_idx: self.item_idx,
             run_idx: self.run_idx,
@@ -189,24 +194,57 @@ impl BreakerState {
         self.line.max_height_exceeded = self.line.running_line_height > self.line_max_height;
     }
 
+    /// Get the max-advance of the entire layout
+    #[inline(always)]
+    pub fn layout_max_advance(&mut self) -> f32 {
+        self.layout_max_advance
+    }
+    /// Set the max-advance of the entire layout
+    #[inline(always)]
     pub fn set_layout_max_advance(&mut self, advance: f32) {
         self.layout_max_advance = advance;
     }
 
+    /// Get the max-height of the current line
+    #[inline(always)]
+    pub fn line_max_advance(&mut self) -> f32 {
+        self.line_max_advance
+    }
+    /// Set the max-advance of the current line
+    #[inline(always)]
     pub fn set_line_max_advance(&mut self, advance: f32) {
         self.line_max_advance = advance;
     }
 
+    /// Get the max-height of the current line
+    #[inline(always)]
+    pub fn line_max_height(&self) -> f32 {
+        self.line_max_height
+    }
+    /// Set the max-height of the current line.
+    #[inline(always)]
+    pub fn set_line_max_height(&mut self, height: f32) {
+        self.line_max_height = height;
+    }
+
+    /// Get the x-offset of the current line
+    #[inline(always)]
     pub fn line_x(&self) -> f32 {
         self.line_x
     }
+    /// Set the x-offset for the current line.
+    #[inline(always)]
     pub fn set_line_x(&mut self, x: f32) {
         self.line_x = x;
     }
 
+    /// Get the y-offset of the current line
+    #[inline(always)]
     pub fn line_y(&self) -> f64 {
         self.line_y
     }
+    /// Set the y-offset for the current line.
+    #[inline(always)]
     pub fn set_line_y(&mut self, y: f64) {
         self.line_y = y;
     }
@@ -253,6 +291,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         Some(YieldData::LineBreak(self.last_line_data(reason)))
     }
 
+    #[inline(always)]
     fn last_line_data(&self, reason: BreakReason) -> LineBreakData {
         let line = self.lines.lines.last().unwrap();
         LineBreakData {
@@ -262,6 +301,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
     }
 
+    #[inline(always)]
     fn max_height_break_data(&self, line_height: f32) -> Option<YieldData> {
         Some(YieldData::MaxHeightExceeded(MaxHeightBreakData {
             advance: self.state.line.x,
@@ -269,10 +309,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }))
     }
 
+    #[inline(always)]
     pub fn state(&self) -> &BreakerState {
         &self.state
     }
 
+    #[inline(always)]
     pub fn state_mut(&mut self) -> &mut BreakerState {
         &mut self.state
     }
@@ -286,6 +328,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     }
 
     /// Reverts the last computed line, returning to the previous state.
+    #[inline(always)]
     pub fn revert(&mut self) -> bool {
         if let Some(state) = self.prev_state.take() {
             self.revert_to(state);
@@ -296,17 +339,20 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     }
 
     /// Returns the y-coordinate of the top of the current line
+    #[inline(always)]
     pub fn committed_y(&self) -> f64 {
         self.state.line_y
     }
 
     /// Returns true if all the text has been placed into lines.
+    #[inline(always)]
     pub fn is_done(&self) -> bool {
         self.done
     }
 
     /// Computes the next line in the paragraph. Returns the advance and size
     /// (width and height for horizontal layouts) of the line.
+    #[inline(always)]
     pub fn break_next(&mut self) -> Option<YieldData> {
         self.break_next_line_or_box()
     }
