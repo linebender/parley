@@ -31,7 +31,7 @@ accesskit = "0.22.0"
 bytemuck = { version = "1.24.0", default-features = false }
 databake = { version = "0.2", default-features = false }
 fontique = { version = "0.7.0", default-features = false, path = "fontique" }
-harfrust = { version = "0.3.2", default-features = false }
+harfrust = { version = "0.5.0", default-features = false }
 hashbrown = { version = "0.16.1", default-features = false, features = [
     "default-hasher",
     "raw-entry",
@@ -54,8 +54,8 @@ parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
 parley_draw = { default-features = false, path = "parley_draw" }
 peniko = { version = "0.4.1", default-features = false }
-read-fonts = { version = "0.35.0", default-features = false }
-skrifa = { version = "0.37.0", default-features = false }
+read-fonts = { version = "0.37.0", default-features = false }
+skrifa = { version = "0.40.0", default-features = false }
 smallvec = "1.15.1"
 swash = { version = "0.2.6", default-features = false }
 vello_common = { git = "https://github.com/linebender/vello.git", rev = "ab948fed9d6a0a79bb0eb7c72043a65b7b7a391f", default-features = false }
