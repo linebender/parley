@@ -15,7 +15,7 @@ use std::time::Duration;
 use ui_events::pointer::PointerButton;
 use ui_events::{
     keyboard::{Key, KeyboardEvent, NamedKey},
-    pointer::{PointerEvent, PointerInfo, PointerState, PointerType},
+    pointer::{PointerButtonEvent, PointerEvent, PointerInfo, PointerState, PointerType},
 };
 use vello::{
     Scene,
@@ -102,7 +102,7 @@ impl Editor {
     pub fn cursor_blink(&mut self) {
         self.cursor_visible = self.start_time.is_some_and(|start_time| {
             let elapsed = Instant::now().duration_since(start_time);
-            (elapsed.as_millis() / self.blink_period.as_millis()) % 2 == 0
+            (elapsed.as_millis() / self.blink_period.as_millis()).is_multiple_of(2)
         });
     }
 
@@ -261,7 +261,7 @@ impl Editor {
         };
         match event {
             // TODO: Handle touch long press specially, for SelectWordAtPoint.
-            PointerEvent::Down { pointer, state, .. }
+            PointerEvent::Down(PointerButtonEvent { pointer, state, .. })
                 if pressed(pointer, state) && !self.editor.is_composing() =>
             {
                 self.cursor_reset();

@@ -232,7 +232,10 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
                 ..
             }
         ) {
-            if let Some(wet) = self.event_reducer.reduce(&event) {
+            if let Some(wet) = self
+                .event_reducer
+                .reduce(render_state.window.scale_factor(), &event)
+            {
                 match wet {
                     WindowEventTranslation::Keyboard(k) => {
                         self.editor.handle_keyboard_event(&k);

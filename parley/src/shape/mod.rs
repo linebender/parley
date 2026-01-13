@@ -99,7 +99,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             .map(|x| x.0.script)
             .find(|&script| real_script(script))
             .unwrap_or(Script::Latin),
-        locale: style.locale.clone(),
+        locale: style.locale,
         variations: style.font_variations,
         features: style.font_features,
         word_spacing: style.word_spacing,
@@ -178,7 +178,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             item.size = style.font_size;
             item.level = level;
             item.script = script;
-            item.locale = style.locale.clone();
+            item.locale = style.locale;
             item.variations = style.font_variations;
             item.features = style.font_features;
             item.word_spacing = style.word_spacing;
@@ -281,14 +281,8 @@ fn shape_item<'a, B: Brush>(
     let item_infos = &infos[char_range.start..char_range.end]; // Only process current item
     let first_style_index = item_infos[0].1;
     let fb_script = convert::script_to_fontique(item.script, analysis_data_sources);
-    let mut font_selector = FontSelector::new(
-        fq,
-        rcx,
-        styles,
-        first_style_index,
-        fb_script,
-        item.locale.clone(),
-    );
+    let mut font_selector =
+        FontSelector::new(fq, rcx, styles, first_style_index, fb_script, item.locale);
 
     let grapheme_cluster_boundaries = analysis_data_sources
         .grapheme_segmenter()
@@ -384,11 +378,11 @@ fn shape_item<'a, B: Brush>(
         let language = item
             .locale
             .as_ref()
-            .and_then(|lang| lang.language.as_str().parse::<harfrust::Language>().ok());
+            .and_then(|lang| lang.language().parse::<harfrust::Language>().ok());
         scx.features.clear();
         for feature in rcx.features(item.features).unwrap_or(&[]) {
             scx.features.push(harfrust::Feature::new(
-                feature.tag,
+                harfrust::Tag::new(&feature.tag.to_bytes()),
                 feature.value as u32,
                 ..,
             ));
@@ -494,7 +488,7 @@ fn variations_iter<'a>(
             item.unwrap_or(&[])
                 .iter()
                 .map(|variation| harfrust::Variation {
-                    tag: variation.tag,
+                    tag: harfrust::Tag::new(&variation.tag.to_bytes()),
                     value: variation.value,
                 }),
         )
@@ -521,8 +515,8 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         locale: Option<Language>,
     ) -> Self {
         let style = &styles[style_index as usize].style;
-        let fonts_id = style.font_stack.id();
-        let fonts = rcx.stack(style.font_stack).unwrap_or(&[]);
+        let fonts_id = style.font_family.id();
+        let fonts = rcx.stack(style.font_family).unwrap_or(&[]);
         let attrs = fontique::Attributes {
             width: style.font_width,
             weight: style.font_weight,
@@ -558,8 +552,8 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize].style;
 
-            let fonts_id = style.font_stack.id();
-            let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
+            let fonts_id = style.font_family.id();
+            let fonts = self.rcx.stack(style.font_family).unwrap_or(&[]);
             let fonts = fonts.iter().copied().map(QueryFamily::Id);
             if is_emoji {
                 use core::iter::once;

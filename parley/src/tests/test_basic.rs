@@ -1,15 +1,19 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use alloc::{format, vec::Vec};
 use peniko::{
     color::{AlphaColor, Srgb, palette},
     kurbo::Size,
 };
 
-use super::utils::{ColorBrush, FONT_STACK, TestEnv, asserts::assert_eq_layout_data_alignments};
+use super::utils::{
+    ColorBrush, FONT_FAMILY_LIST, TestEnv, asserts::assert_eq_layout_data_alignments,
+};
+use crate::setting::{FontFeature, FontVariation};
 use crate::{
-    Alignment, AlignmentOptions, ContentWidths, FontStack, InlineBox, Layout, LineHeight,
-    StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
+    Alignment, AlignmentOptions, ContentWidths, FontFamily, FontFeatures, FontVariations,
+    InlineBox, Layout, LineHeight, StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
 };
 
 #[test]
@@ -251,7 +255,7 @@ fn leading_whitespace() {
 #[test]
 fn nested_span_inheritance() {
     let ts = |c: AlphaColor<Srgb>| TextStyle {
-        font_stack: FontStack::from(FONT_STACK),
+        font_family: FontFamily::from(FONT_FAMILY_LIST),
         font_size: 24.,
         line_height: LineHeight::Absolute(30.),
         brush: ColorBrush::new(c),

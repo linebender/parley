@@ -3,6 +3,7 @@
 
 use super::utils::TestEnv;
 use crate::{Alignment, AlignmentOptions, test_name};
+use alloc::vec::Vec;
 
 /// Test that rendering RTL text doesn't affect subsequent LTR layouts.
 /// See <https://github.com/linebender/parley/issues/489>.

@@ -1,6 +1,11 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use alloc::{
+    format,
+    string::{String, ToString},
+};
+use std::eprintln;
 use tiny_skia::{Color, Pixmap, PixmapPaint, Transform};
 
 use crate::tests::utils::renderer::{ColorBrush, RenderingConfig, render_layout};

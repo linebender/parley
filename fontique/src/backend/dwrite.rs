@@ -1,12 +1,14 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::{vec, vec::Vec};
 use hashbrown::HashMap;
 use std::{
     ffi::{OsString, c_void},
     os::windows::ffi::OsStringExt,
     path::PathBuf,
-    sync::Arc,
 };
 use windows::{
     Win32::Graphics::DirectWrite::{
@@ -114,7 +116,7 @@ impl SystemFonts {
         // so here we provide a sample of the intended script instead.
         let key = key.into();
         let text = key.script().sample()?;
-        let locale = key.locale();
+        let locale = key.locale_str();
         let family_name = self.dwrite_fonts.family_name_for_text(text, locale)?;
         self.name_map.get(&family_name).map(|name| name.id())
     }

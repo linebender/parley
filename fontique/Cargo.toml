@@ -17,10 +17,9 @@ workspace = true
 
 [features]
 default = ["system"]
-std = ["read-fonts/std", "dep:memmap2"]
-libm = ["read-fonts/libm", "dep:core_maths"]
-icu_properties = ["dep:icu_properties"]
-unicode_script = ["dep:unicode-script"]
+std = ["read-fonts/std", "dep:memmap2", "text_primitives/std"]
+libm = ["read-fonts/libm"]
+bytemuck = ["text_primitives/bytemuck"]
 # Enables support for system font backends
 system = [
     "std",
@@ -40,16 +39,12 @@ system = [
 fontconfig-dlopen = ["yeslogic-fontconfig-sys?/dlopen"]
 
 [dependencies]
-bytemuck = { workspace = true }
 read-fonts = { workspace = true }
 linebender_resource_handle = { workspace = true }
 smallvec = "1.15.1"
 memmap2 = { version = "0.9.9", optional = true }
-unicode-script = { version = "0.5.7", optional = true }
-core_maths = { version = "0.1.1", optional = true }
-icu_properties = { workspace = true, features = ["compiled_data"], optional = true }
-icu_locale_core = { workspace = true, features = ["alloc"] }
 hashbrown = { workspace = true }
+text_primitives = { path = "../text_primitives", default-features = false }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.58.0", features = [

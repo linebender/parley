@@ -5,37 +5,7 @@ use alloc::vec::Vec;
 use core::fmt::Debug;
 use core::ops::Range;
 
-use crate::TextStorage;
-
-/// The errors that might happen as a result of [applying] an attribute.
-///
-/// [applying]: AttributedText::apply_attribute
-#[derive(Copy, Clone, Debug, PartialEq)]
-#[non_exhaustive]
-pub enum ApplyAttributeError {
-    /// The bounds given were invalid.
-    ///
-    /// TODO: Store some data about this here.
-    InvalidBounds,
-    /// The range has `start > end`.
-    InvalidRange,
-    /// Either `start` or `end` is not on a UTF-8 character boundary.
-    NotOnCharBoundary,
-}
-
-impl core::fmt::Display for ApplyAttributeError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::InvalidBounds => f.write_str("attribute range is out of bounds"),
-            Self::InvalidRange => f.write_str("attribute range start is greater than end"),
-            Self::NotOnCharBoundary => {
-                f.write_str("attribute range must align to UTF-8 char boundaries")
-            }
-        }
-    }
-}
-
-impl core::error::Error for ApplyAttributeError {}
+use crate::{Endpoint, Error, TextStorage};
 
 /// A block of text with attributes applied to ranges within the text.
 #[derive(Debug)]
@@ -53,6 +23,21 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
         }
     }
 
+    /// Borrow the underlying text storage.
+    pub fn text(&self) -> &T {
+        &self.text
+    }
+
+    /// Returns the length of the underlying text, in bytes.
+    pub fn len(&self) -> usize {
+        self.text.len()
+    }
+
+    /// Returns `true` if the underlying text is empty.
+    pub fn is_empty(&self) -> bool {
+        self.text.is_empty()
+    }
+
     /// Borrow the underlying text as `&str` when the storage is contiguous.
     pub fn as_str(&self) -> &str
     where
@@ -62,23 +47,43 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
     }
 
     /// Apply an `attribute` to a `range` within the text.
-    pub fn apply_attribute(
-        &mut self,
-        range: Range<usize>,
-        attribute: Attr,
-    ) -> Result<(), ApplyAttributeError> {
+    pub fn apply_attribute(&mut self, range: Range<usize>, attribute: Attr) -> Result<(), Error> {
         let text_len = self.text.len();
         if range.start > range.end {
-            return Err(ApplyAttributeError::InvalidRange);
+            return Err(Error::invalid_range(range.start, range.end, text_len));
         }
         if range.start > text_len || range.end > text_len {
-            return Err(ApplyAttributeError::InvalidBounds);
+            return Err(Error::invalid_bounds(range.start, range.end, text_len));
         }
-        if !self.text.is_char_boundary(range.start) || !self.text.is_char_boundary(range.end) {
-            return Err(ApplyAttributeError::NotOnCharBoundary);
+        if !self.text.is_char_boundary(range.start) {
+            return Err(Error::not_on_char_boundary(
+                &self.text,
+                range.start,
+                range.end,
+                text_len,
+                Endpoint::Start,
+                range.start,
+            ));
+        }
+        if !self.text.is_char_boundary(range.end) {
+            return Err(Error::not_on_char_boundary(
+                &self.text,
+                range.start,
+                range.end,
+                text_len,
+                Endpoint::End,
+                range.end,
+            ));
         }
         self.attributes.push((range, attribute));
         Ok(())
+    }
+
+    /// Iterate over all attributes and the ranges they apply to.
+    ///
+    /// Attributes are yielded in the order they were applied.
+    pub fn attributes_iter(&self) -> impl ExactSizeIterator<Item = (&Range<usize>, &Attr)> {
+        self.attributes.iter().map(|(range, attr)| (range, attr))
     }
 
     /// Get an iterator over the attributes that apply at the given `index`.
@@ -110,11 +115,22 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
             }
         })
     }
+
+    /// Returns the number of attribute spans applied to the text.
+    pub fn attributes_len(&self) -> usize {
+        self.attributes.len()
+    }
+
+    /// Remove all applied attribute spans.
+    pub fn clear_attributes(&mut self) {
+        self.attributes.clear();
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{ApplyAttributeError, AttributedText};
+    use crate::{AttributedText, Endpoint, ErrorKind};
+    use alloc::format;
     use alloc::vec::Vec;
 
     #[derive(Debug, PartialEq)]
@@ -128,8 +144,8 @@ mod tests {
         let t = "Hello!";
         let mut at = AttributedText::new(t);
 
-        assert_eq!(at.apply_attribute(1..3, TestAttribute::Keep), Ok(()));
-        assert_eq!(at.apply_attribute(2..5, TestAttribute::Remove), Ok(()));
+        assert!(at.apply_attribute(1..3, TestAttribute::Keep).is_ok());
+        assert!(at.apply_attribute(2..5, TestAttribute::Remove).is_ok());
 
         assert!(at.attributes_at(0).collect::<Vec<_>>().is_empty());
     }
@@ -143,32 +159,81 @@ mod tests {
         let t = "Hello!";
         let mut at = AttributedText::new(t);
 
-        assert_eq!(at.apply_attribute(0..3, TestAttribute::Keep), Ok(()));
-        assert_eq!(at.apply_attribute(0..6, TestAttribute::Keep), Ok(()));
-        assert_eq!(
-            at.apply_attribute(4..3, TestAttribute::Keep),
-            Err(ApplyAttributeError::InvalidRange)
-        );
-        assert_eq!(
-            at.apply_attribute(0..7, TestAttribute::Keep),
-            Err(ApplyAttributeError::InvalidBounds)
-        );
-        assert_eq!(
-            at.apply_attribute(7..8, TestAttribute::Keep),
-            Err(ApplyAttributeError::InvalidBounds)
-        );
+        assert!(at.apply_attribute(0..3, TestAttribute::Keep).is_ok());
+        assert!(at.apply_attribute(0..6, TestAttribute::Keep).is_ok());
+        match at.apply_attribute(4..3, TestAttribute::Keep) {
+            Err(e) => {
+                assert_eq!(e.kind(), ErrorKind::InvalidRange);
+                let msg = format!("{}", e);
+                assert!(msg.contains("4..3"));
+                assert!(msg.contains("invalid range"));
+                assert!(msg.contains("start > end"));
+            }
+            _ => panic!("expected InvalidRange"),
+        }
+        match at.apply_attribute(0..7, TestAttribute::Keep) {
+            Err(e) => {
+                assert_eq!(e.kind(), ErrorKind::InvalidBounds);
+                let msg = format!("{}", e);
+                assert!(msg.contains("0..7"));
+                assert!(msg.contains("len 6"));
+            }
+            _ => panic!("expected InvalidBounds"),
+        }
+        match at.apply_attribute(7..8, TestAttribute::Keep) {
+            Err(e) => {
+                assert_eq!(e.kind(), ErrorKind::InvalidBounds);
+                assert_eq!(e.start(), 7);
+                assert_eq!(e.end(), 8);
+                assert_eq!(e.len(), 6);
+                let msg = format!("{}", e);
+                assert!(msg.contains("range 7..8"));
+                assert!(msg.contains("len 6"));
+            }
+            _ => panic!("expected InvalidBounds"),
+        }
     }
 
     #[test]
     fn not_on_char_boundary() {
-        // "é" is 2 bytes in UTF-8; index 1 is not a boundary
+        // "é" is 2 bytes in UTF-8; index 1 is not a boundary.
         let t = "éclair";
         let mut at = AttributedText::new(t);
-        assert_eq!(
-            at.apply_attribute(1..2, TestAttribute::Keep),
-            Err(ApplyAttributeError::NotOnCharBoundary)
-        );
+        // Invalid start boundary at 1
+        match at.apply_attribute(1..2, TestAttribute::Keep) {
+            Err(e) => {
+                assert_eq!(e.kind(), ErrorKind::NotOnCharBoundary);
+                let b = e.boundary().expect("boundary info");
+                assert_eq!(b.which, Endpoint::Start);
+                assert_eq!(b.index, 1);
+                assert_eq!(b.char_start, 0);
+                assert_eq!(b.char_end, 2);
+                let msg = format!("{}", e);
+                assert!(msg.contains("range 1..2"));
+                assert!(msg.contains("start"));
+                assert!(msg.contains("index 1"));
+                assert!(msg.contains("char 0..2"));
+            }
+            _ => panic!("expected NotOnCharBoundary for start"),
+        }
+        // Invalid end boundary at 1
+        match at.apply_attribute(0..1, TestAttribute::Keep) {
+            Err(e) => {
+                assert_eq!(e.kind(), ErrorKind::NotOnCharBoundary);
+                let b = e.boundary().expect("boundary info");
+                assert_eq!(b.which, Endpoint::End);
+                assert_eq!(b.index, 1);
+                assert_eq!(b.char_start, 0);
+                assert_eq!(b.char_end, 2);
+                let msg = format!("{}", e);
+                assert!(msg.contains("range 0..1"));
+                assert!(msg.contains("end"));
+                assert!(msg.contains("index 1"));
+                assert!(msg.contains("char 0..2"));
+            }
+            _ => panic!("expected NotOnCharBoundary for end"),
+        }
         // Using proper boundaries is OK
-        assert_eq!(at.apply_attribute(0..2, TestAttribute::Keep), Ok(()));
+        assert!(at.apply_attribute(0..2, TestAttribute::Keep).is_ok());
     }
 }

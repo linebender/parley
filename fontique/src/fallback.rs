@@ -81,7 +81,9 @@ impl FallbackMap {
                 existing_families.extend(families);
                 true
             } else {
-                let locale = key.locale.unwrap_or_default();
+                let locale = key
+                    .locale
+                    .expect("non-default fallback keys must have a locale");
                 let script_fallbacks = self.fallbacks.entry(script).or_default();
                 if let Some(existing_families) = script_fallbacks
                     .others
@@ -106,15 +108,14 @@ impl FallbackMap {
 
 /// Describes a selector for fallback families.
 ///
-/// This is a [`Script`] and optionally, a `locale`, represented
-/// as a `&'static str`.
+/// This is a [`Script`] and optionally, a `locale`, represented as a [`Language`].
 ///
 /// It can be constructed directly via [`FallbackKey::new`] or any of
 /// a variety of `From` implementations to improve the ease of use.
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash)]
 pub struct FallbackKey {
     script: Script,
-    locale: Option<&'static str>,
+    locale: Option<Language>,
     is_default: bool,
     is_tracked: bool,
 }
@@ -124,7 +125,7 @@ impl FallbackKey {
     pub fn new(script: impl Into<Script>, locale: Option<&Language>) -> Self {
         let script = script.into();
         let (locale, is_default, is_tracked) = match canonical_locale(script, locale) {
-            Some((is_default, locale)) => (Some(locale), is_default, true),
+            Some((is_default, locale)) => (locale, is_default, true),
             None => (None, true, false),
         };
         Self {
@@ -141,8 +142,13 @@ impl FallbackKey {
     }
 
     /// Returns a normalized version of the requested locale.
-    pub fn locale(&self) -> Option<&'static str> {
+    pub fn locale(&self) -> Option<Language> {
         self.locale
+    }
+
+    /// Returns the requested locale as a string, if present.
+    pub fn locale_str(&self) -> Option<&str> {
+        self.locale.as_ref().map(Language::as_str)
     }
 
     /// Returns `true` if the requested locale is considered the "default"
@@ -165,7 +171,7 @@ where
     S: Into<Script>,
 {
     fn from(value: (S, &str)) -> Self {
-        let locale = Language::try_from_str(value.1).ok();
+        let locale = Language::parse(value.1).ok();
         Self::new(value.0, locale.as_ref())
     }
 }
@@ -182,20 +188,16 @@ where
 #[derive(Clone, Default, Debug)]
 struct PerScript {
     default: Option<FamilyList>,
-    others: Vec<(&'static str, FamilyList)>,
+    others: Vec<(Language, FamilyList)>,
 }
 
-fn canonical_locale(script: Script, locale: Option<&Language>) -> Option<(bool, &'static str)> {
+fn canonical_locale(script: Script, locale: Option<&Language>) -> Option<(bool, Option<Language>)> {
     let Some(locale) = locale else {
-        return Some((true, ""));
+        return Some((true, None));
     };
-    let lang = locale.language.as_str();
-    let region = locale
-        .region
-        .as_ref()
-        .map(|s| s.as_str())
-        .unwrap_or_default();
-    let (is_default, token) = match &script.into_raw() {
+    let lang = locale.language();
+    let region = locale.region().unwrap_or_default();
+    let (is_default, token) = match &script.to_bytes() {
         b"Arab" => match (lang, region) {
             ("ar", "") => (true, "ar"),
             ("ar", "IR") => (false, "ar-IR"),
@@ -255,7 +257,7 @@ fn canonical_locale(script: Script, locale: Option<&Language>) -> Option<(bool, 
                     "MO" => (false, "zh-MO"),
                     "SG" => (false, "zh-SG"),
                     _ => {
-                        if locale.script.as_ref().map(|s| s.as_str()) == Some("Hant") {
+                        if locale.script() == Some("Hant") {
                             (false, "zh-TW")
                         } else {
                             // Default to simplified Chinese
@@ -278,5 +280,8 @@ fn canonical_locale(script: Script, locale: Option<&Language>) -> Option<(bool, 
         },
         _ => return None,
     };
-    Some((is_default, token))
+    Some((
+        is_default,
+        Some(Language::parse(token).expect("valid canonical locale")),
+    ))
 }

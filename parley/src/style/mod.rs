@@ -11,10 +11,12 @@ use alloc::borrow::Cow;
 
 pub use brush::*;
 pub use font::{
-    FontFamily, FontFeature, FontSettings, FontStack, FontStyle, FontVariation, FontWeight,
-    FontWidth, GenericFamily,
+    FontFamily, FontFamilyName, FontFeature, FontFeatures, FontStyle, FontVariation,
+    FontVariations, FontWeight, FontWidth, GenericFamily,
 };
+pub use fontique::Language;
 pub use styleset::StyleSet;
+pub use text_primitives::{OverflowWrap, TextWrapMode, WordBreak};
 
 use crate::util::nearly_eq;
 
@@ -22,57 +24,6 @@ use crate::util::nearly_eq;
 pub enum WhiteSpaceCollapse {
     Collapse,
     Preserve,
-}
-
-/// Control over word breaking, named for the CSS property.
-///
-/// See <https://drafts.csswg.org/css-text-3/#word-break-property> for more information.
-/// Adapted from [`icu_segmenter::options::LineBreakWordOption`].
-#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-#[repr(u8)]
-pub enum WordBreak {
-    /// Words break according to their customary rules. See the details in
-    /// <https://drafts.csswg.org/css-text-3/#valdef-word-break-normal>.
-    #[default]
-    Normal,
-
-    /// Breaking is allowed within "words".
-    /// <https://drafts.csswg.org/css-text-3/#valdef-word-break-break-all>
-    BreakAll,
-
-    /// Breaking is forbidden within "word".
-    /// <https://drafts.csswg.org/css-text-3/#valdef-word-break-keep-all>
-    KeepAll,
-}
-
-/// Control over non-"emergency" line-breaking.
-///
-/// See <https://drafts.csswg.org/css-text-4/#text-wrap-mode> for more information.
-#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-#[repr(u8)]
-pub enum TextWrapMode {
-    /// Wrap at non-emergency soft-wrap opportunities when necessary to prevent overflow.
-    #[default]
-    Wrap,
-    /// Do not wrap at non-emergency soft-wrap opportunities.
-    NoWrap,
-}
-
-/// Control over "emergency" line-breaking.
-///
-/// See <https://drafts.csswg.org/css-text/#overflow-wrap-property> for more information.
-#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
-#[repr(u8)]
-pub enum OverflowWrap {
-    /// Even with extremely long words, lines can only break at places specified in [`WordBreak`].
-    #[default]
-    Normal,
-    /// Words may be broken at an arbitrary point if there are no other places in the line to break
-    /// them.
-    Anywhere,
-    /// Like [`OverflowWrap::Anywhere`], except arbitrary wrapping opportunities are not considered
-    /// when calculating the minimum content width (see [`crate::Layout::calculate_content_widths`]).
-    BreakWord,
 }
 
 /// The height that this text takes up. The default is `MetricsRelative(1.0)`, which is the given
@@ -120,8 +71,8 @@ impl LineHeight {
 /// Properties that define a style.
 #[derive(Clone, PartialEq, Debug)]
 pub enum StyleProperty<'a, B: Brush> {
-    /// Font family stack.
-    FontStack(FontStack<'a>),
+    /// CSS `font-family` property value.
+    FontFamily(FontFamily<'a>),
     /// Font size.
     FontSize(f32),
     /// Font width.
@@ -131,11 +82,11 @@ pub enum StyleProperty<'a, B: Brush> {
     /// Font weight.
     FontWeight(FontWeight),
     /// Font variation settings.
-    FontVariations(FontSettings<'a, FontVariation>),
+    FontVariations(FontVariations<'a>),
     /// Font feature settings.
-    FontFeatures(FontSettings<'a, FontFeature>),
+    FontFeatures(FontFeatures<'a>),
     /// Locale.
-    Locale(Option<&'a str>),
+    Locale(Option<Language>),
     /// Brush for rendering text.
     Brush(B),
     /// Underline decoration.
@@ -171,8 +122,8 @@ pub enum StyleProperty<'a, B: Brush> {
 /// Unresolved styles.
 #[derive(Clone, PartialEq, Debug)]
 pub struct TextStyle<'a, B: Brush> {
-    /// Font family stack.
-    pub font_stack: FontStack<'a>,
+    /// CSS `font-family` property value.
+    pub font_family: FontFamily<'a>,
     /// Font size.
     pub font_size: f32,
     /// Font width.
@@ -182,11 +133,11 @@ pub struct TextStyle<'a, B: Brush> {
     /// Font weight.
     pub font_weight: FontWeight,
     /// Font variation settings.
-    pub font_variations: FontSettings<'a, FontVariation>,
+    pub font_variations: FontVariations<'a>,
     /// Font feature settings.
-    pub font_features: FontSettings<'a, FontFeature>,
+    pub font_features: FontFeatures<'a>,
     /// Locale.
-    pub locale: Option<&'a str>,
+    pub locale: Option<Language>,
     /// Brush for rendering text.
     pub brush: B,
     /// Underline decoration.
@@ -222,13 +173,13 @@ pub struct TextStyle<'a, B: Brush> {
 impl<B: Brush> Default for TextStyle<'_, B> {
     fn default() -> Self {
         TextStyle {
-            font_stack: FontStack::Source(Cow::Borrowed("sans-serif")),
+            font_family: FontFamily::Source(Cow::Borrowed("sans-serif")),
             font_size: 16.0,
             font_width: FontWidth::default(),
             font_style: FontStyle::default(),
             font_weight: FontWeight::default(),
-            font_variations: FontSettings::List(Cow::Borrowed(&[])),
-            font_features: FontSettings::List(Cow::Borrowed(&[])),
+            font_variations: FontVariations::empty(),
+            font_features: FontFeatures::empty(),
             locale: None,
             brush: B::default(),
             has_underline: false,
@@ -249,27 +200,39 @@ impl<B: Brush> Default for TextStyle<'_, B> {
     }
 }
 
-impl<'a, B: Brush> From<FontStack<'a>> for StyleProperty<'a, B> {
-    fn from(fs: FontStack<'a>) -> Self {
-        StyleProperty::FontStack(fs)
-    }
-}
-
-impl<'a, B: Brush> From<&'a [FontFamily<'a>]> for StyleProperty<'a, B> {
-    fn from(fs: &'a [FontFamily<'a>]) -> Self {
-        StyleProperty::FontStack(fs.into())
-    }
-}
-
 impl<'a, B: Brush> From<FontFamily<'a>> for StyleProperty<'a, B> {
-    fn from(f: FontFamily<'a>) -> Self {
-        StyleProperty::FontStack(FontStack::from(f))
+    fn from(value: FontFamily<'a>) -> Self {
+        StyleProperty::FontFamily(value)
+    }
+}
+
+impl<'a, B: Brush> From<&'a [FontFamilyName<'a>]> for StyleProperty<'a, B> {
+    fn from(value: &'a [FontFamilyName<'a>]) -> Self {
+        StyleProperty::FontFamily(value.into())
+    }
+}
+
+impl<'a, B: Brush> From<FontFamilyName<'a>> for StyleProperty<'a, B> {
+    fn from(value: FontFamilyName<'a>) -> Self {
+        StyleProperty::FontFamily(value.into())
+    }
+}
+
+impl<'a, B: Brush> From<FontVariations<'a>> for StyleProperty<'a, B> {
+    fn from(value: FontVariations<'a>) -> Self {
+        StyleProperty::FontVariations(value)
+    }
+}
+
+impl<'a, B: Brush> From<FontFeatures<'a>> for StyleProperty<'a, B> {
+    fn from(value: FontFeatures<'a>) -> Self {
+        StyleProperty::FontFeatures(value)
     }
 }
 
 impl<B: Brush> From<GenericFamily> for StyleProperty<'_, B> {
     fn from(f: GenericFamily) -> Self {
-        StyleProperty::FontStack(f.into())
+        StyleProperty::FontFamily(f.into())
     }
 }
 
