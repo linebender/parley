@@ -3,8 +3,6 @@
 
 //! Support for working with Unicode scripts.
 
-#[cfg(feature = "icu_properties")]
-use icu_locale_core::subtags::Script as IcuScript;
 use text_primitives::Script;
 
 pub trait ScriptExt {
@@ -13,20 +11,6 @@ pub trait ScriptExt {
 
     /// Returns a string containing sample characters for this script.
     fn sample(&self) -> Option<&'static str>;
-
-    /// Returns the associated [`icu_properties::props::Script`] value.
-    #[cfg(feature = "icu_properties")]
-    fn properties_script(self) -> icu_properties::props::Script;
-
-    /// Returns the associated [`unicode_script::Script`] value.
-    #[cfg(feature = "unicode_script")]
-    fn unicode_script(self) -> unicode_script::Script;
-
-    #[cfg(feature = "icu_properties")]
-    fn from_properties_script(value: icu_properties::props::Script) -> Script;
-
-    #[cfg(feature = "unicode_script")]
-    fn from_unicode_script(value: unicode_script::Script) -> Script;
 }
 
 impl ScriptExt for Script {
@@ -39,32 +23,6 @@ impl ScriptExt for Script {
             .binary_search_by(|entry| entry.0.cmp(self))
             .ok()?;
         SCRIPT_SAMPLES.get(ix).map(|entry| entry.1)
-    }
-
-    /// Returns the associated [`icu_properties::props::Script`] value.
-    #[cfg(feature = "icu_properties")]
-    fn properties_script(self) -> icu_properties::props::Script {
-        IcuScript::try_from_raw(self.to_bytes())
-            .unwrap_or_else(|_| IcuScript::try_from_raw(*b"Zzzz").unwrap())
-            .into()
-    }
-
-    /// Returns the associated [`unicode_script::Script`] value.
-    #[cfg(feature = "unicode_script")]
-    fn unicode_script(self) -> unicode_script::Script {
-        unicode_script::Script::from_short_name(self.as_str())
-            .unwrap_or(unicode_script::Script::Unknown)
-    }
-
-    #[cfg(feature = "icu_properties")]
-    fn from_properties_script(value: icu_properties::props::Script) -> Self {
-        let icu: IcuScript = value.into();
-        Self::from_bytes(icu.into_raw())
-    }
-
-    #[cfg(feature = "unicode_script")]
-    fn from_unicode_script(value: unicode_script::Script) -> Self {
-        value.short_name().parse::<Self>().unwrap_or(Self::UNKNOWN)
     }
 }
 
