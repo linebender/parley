@@ -68,7 +68,7 @@ impl SystemFonts {
     pub(crate) fn fallback(&mut self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
         let key = key.into();
         let sample = key.script().sample()?;
-        let font = create_fallback_font_for_text(sample, key.locale(), false)?;
+        let font = create_fallback_font_for_text(sample, key.locale_str(), false)?;
         let family_name = unsafe { font.family_name() };
         self.name_map.get(&family_name.to_string()).map(|n| n.id())
     }

@@ -12,7 +12,7 @@ use crate::font::FontInfoOverride;
 use super::SourceCache;
 
 use super::{
-    Blob, FontStyle, FontWeight, FontWidth, GenericFamily, Script,
+    Blob, FontStyle, FontWeight, FontWidth, GenericFamily, Language, Script,
     backend::SystemFonts,
     fallback::{FallbackKey, FallbackMap},
     family::{FamilyId, FamilyInfo},
@@ -572,7 +572,7 @@ where
 #[derive(Clone, Default)]
 struct FallbackCache {
     script: Option<Script>,
-    language: Option<&'static str>,
+    language: Option<Language>,
     families: Vec<FamilyId>,
 }
 
@@ -583,7 +583,7 @@ impl FallbackCache {
         self.families.clear();
     }
 
-    fn set(&mut self, script: Script, language: Option<&'static str>, families: &[FamilyId]) {
+    fn set(&mut self, script: Script, language: Option<Language>, families: &[FamilyId]) {
         self.script = Some(script);
         self.language = language;
         self.families.clear();

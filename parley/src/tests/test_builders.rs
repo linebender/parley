@@ -169,7 +169,7 @@ fn create_root_style() -> TextStyle<'static, ColorBrush> {
         font_weight: FontWeight::BOLD,
         font_variations: FontVariations::empty(), // TODO: Set a non-default value
         font_features: FontFeatures::empty(),     // TODO: Set a non-default value
-        locale: Some("en-US"),
+        locale: Some("en-US".parse().unwrap()),
         brush: ColorBrush::new(palette::css::GREEN),
         has_underline: true,
         underline_offset: Some(2.),
@@ -199,7 +199,7 @@ fn set_root_style(rb: &mut RangedBuilder<'_, ColorBrush>) {
     rb.push_default(StyleProperty::FontWeight(FontWeight::BOLD));
     rb.push_default(FontVariations::empty());
     rb.push_default(FontFeatures::empty());
-    rb.push_default(StyleProperty::Locale(Some("en-US")));
+    rb.push_default(StyleProperty::Locale(Some("en-US".parse().unwrap())));
     rb.push_default(StyleProperty::Brush(ColorBrush::new(palette::css::GREEN)));
     rb.push_default(StyleProperty::Underline(true));
     rb.push_default(StyleProperty::UnderlineOffset(Some(2.)));

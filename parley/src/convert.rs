@@ -11,11 +11,13 @@ pub(crate) fn script_to_fontique(
 ) -> fontique::Script {
     analysis_data_sources
         .script_short_name()
-        .get_locale_script(script)
-        .unwrap_or(icu_locale_core::subtags::script!("Zzzz"))
+        .get(script)
+        .unwrap_or("Zzzz")
+        .parse()
+        .unwrap_or(fontique::Script::UNKNOWN)
 }
 
 pub(crate) fn script_to_harfrust(script: fontique::Script) -> harfrust::Script {
-    harfrust::Script::from_iso15924_tag(harfrust::Tag::new(&script.into_raw()))
+    harfrust::Script::from_iso15924_tag(harfrust::Tag::new(&script.to_bytes()))
         .unwrap_or(harfrust::script::UNKNOWN)
 }
