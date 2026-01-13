@@ -3,6 +3,7 @@
 
 //! Test line layouts, including the vertical size and positioning of the line box.
 
+use alloc::vec::Vec;
 use peniko::kurbo::Size;
 
 use super::utils::{ColorBrush, TestEnv};

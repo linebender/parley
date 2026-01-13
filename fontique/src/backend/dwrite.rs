@@ -1,12 +1,14 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::{vec, vec::Vec};
 use hashbrown::HashMap;
 use std::{
     ffi::{OsString, c_void},
     os::windows::ffi::OsStringExt,
     path::PathBuf,
-    sync::Arc,
 };
 use windows::{
     Win32::Graphics::DirectWrite::{

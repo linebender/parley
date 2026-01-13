@@ -5,6 +5,8 @@ use super::{
     FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily, GenericFamilyMap, ScriptExt,
     scan,
 };
+use alloc::format;
+use alloc::string::ToString;
 use alloc::sync::Arc;
 use core::ptr::{null, null_mut};
 use hashbrown::HashMap;

@@ -111,6 +111,7 @@ impl FromFontconfig for FontStyle {
 mod tests {
     use super::FromFontconfig;
     use crate::{FontStyle, FontWeight, FontWidth};
+    use alloc::string::ToString;
 
     #[test]
     fn fontwidth_from_fontconfig() {

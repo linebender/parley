@@ -1166,6 +1166,8 @@ where
         #[cfg(feature = "std")]
         #[allow(clippy::print_stderr)] // reason = "unreachable debug code"
         if false {
+            use std::{eprint, eprintln};
+
             let focus = new_sel.focus();
             let cluster = focus.logical_clusters(&self.layout);
             let dbg = (
