@@ -8,8 +8,8 @@ use peniko::kurbo::Size;
 
 use super::utils::{ColorBrush, TestEnv};
 use crate::{
-    Affinity, BoundingBox, Brush, Cursor, InlineBox, Layout, LineHeight, Selection, StyleProperty,
-    test_name,
+    Affinity, BoundingBox, Brush, Cursor, InlineBox, InlineBoxKind, Layout, LineHeight, Selection,
+    StyleProperty, test_name,
 };
 
 const TEXT: &str = "Some text here. Let's make\n\
@@ -106,12 +106,14 @@ fn build_layout<A: Into<Option<f32>>>(
 
     builder.push_inline_box(InlineBox {
         id: 0,
+        kind: InlineBoxKind::InFlow,
         index: 40,
         width: 50.0,
         height: 5.0,
     });
     builder.push_inline_box(InlineBox {
         id: 1,
+        kind: InlineBoxKind::InFlow,
         index: 51,
         width: 50.0,
         height: 3.0,
@@ -160,7 +162,7 @@ fn assert_common_truths(
         assert_eq!(metrics.ascent, ascent, "expected ascent {ascent}");
         assert_eq!(metrics.descent, descent, "expected descent {descent}");
         assert_eq!(
-            metrics.max_coord - metrics.min_coord,
+            metrics.block_max_coord - metrics.block_min_coord,
             line_box_height,
             "expected line box height {line_box_height}"
         );
@@ -270,14 +272,14 @@ fn lines_integral_line_height_plus_one_leading() {
         let leading = metrics.leading - (1. - ascent.fract()) - (1. - descent.fract());
         assert_eq!(leading, 1., "expected +1 leading");
 
-        let above = line.metrics().baseline - line.metrics().min_coord;
+        let above = line.metrics().baseline - line.metrics().block_min_coord;
         assert_eq!(
             above,
             ascent.round(),
             "expected above to be exactly rounded ascent {}",
             ascent.round()
         );
-        let below = line.metrics().max_coord - line.metrics().baseline;
+        let below = line.metrics().block_max_coord - line.metrics().baseline;
         assert_eq!(
             below,
             descent.round() + 1.,
@@ -504,8 +506,8 @@ fn lines_fractional_line_height_positive_leading_internal(
             metrics.leading
         );
 
-        let above = metrics.baseline - metrics.min_coord;
-        let below = metrics.max_coord - metrics.baseline;
+        let above = metrics.baseline - metrics.block_min_coord;
+        let below = metrics.block_max_coord - metrics.baseline;
         let above_leading = above - ascent.round();
         let below_leading = below - descent.round();
         assert!(
@@ -555,11 +557,7 @@ fn lines_line_height_metrics_relative() {
     let mut layout = builder.build(TEXT);
 
     layout.break_all_lines(None);
-    layout.align(
-        None,
-        crate::Alignment::Start,
-        crate::AlignmentOptions::default(),
-    );
+    layout.align(crate::Alignment::Start, crate::AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -573,11 +571,7 @@ fn lines_line_height_size_relative() {
     let mut layout = builder.build(TEXT);
 
     layout.break_all_lines(None);
-    layout.align(
-        None,
-        crate::Alignment::Start,
-        crate::AlignmentOptions::default(),
-    );
+    layout.align(crate::Alignment::Start, crate::AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -591,10 +585,6 @@ fn lines_line_height_absolute() {
     let mut layout = builder.build(TEXT);
 
     layout.break_all_lines(None);
-    layout.align(
-        None,
-        crate::Alignment::Start,
-        crate::AlignmentOptions::default(),
-    );
+    layout.align(crate::Alignment::Start, crate::AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
