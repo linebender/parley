@@ -121,7 +121,7 @@ pub trait GlyphRenderer {
     /// Stroke glyphs with the current paint and stroke settings.
     fn stroke_glyph(&mut self, glyph: PreparedGlyph<'_>);
 
-    /// Fill a rectangle with the current paint.
+    /// Fill a rectangle with the current paint. Used for decorations, such as underlines.
     fn fill_rect(&mut self, rect: Rect);
 }
 
