@@ -8,5 +8,6 @@ mod test_cursor;
 mod test_editor;
 mod test_issues;
 mod test_lines;
+mod test_styles;
 mod test_wrap;
 mod utils;

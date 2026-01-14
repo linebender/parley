@@ -10,10 +10,9 @@ use peniko::{
 use super::utils::{
     ColorBrush, FONT_FAMILY_LIST, TestEnv, asserts::assert_eq_layout_data_alignments,
 };
-use crate::setting::{FontFeature, FontVariation};
 use crate::{
-    Alignment, AlignmentOptions, ContentWidths, FontFamily, FontFeatures, FontVariations,
-    InlineBox, Layout, LineHeight, StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
+    Alignment, AlignmentOptions, ContentWidths, FontFamily, InlineBox, Layout, LineHeight,
+    StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
 };
 
 #[test]
@@ -459,101 +458,6 @@ fn inbox_content_width() {
 }
 
 #[test]
-fn ligatures_ltr() {
-    let mut env = TestEnv::new(test_name!(), None);
-
-    let text = "abfi";
-    let builder = env.ranged_builder(text);
-    let mut layout = builder.build(text);
-    layout.break_all_lines(Some(100.0));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
-
-    let line = layout.lines().next().unwrap();
-    let item = line.items().next().unwrap();
-    let glyph_run = match item {
-        crate::PositionedLayoutItem::GlyphRun(glyph_run) => glyph_run,
-        crate::PositionedLayoutItem::InlineBox(_) => unreachable!(),
-    };
-    let mut last_advance = f32::MAX;
-    glyph_run.run().clusters().enumerate().for_each(|(i, c)| {
-        match i % 4 {
-            // 'a' and 'b' are not ligatures.
-            0 | 1 => assert!(!c.is_ligature_start() && !c.is_ligature_continuation()),
-            // "f" is the ligature start whose cluster contains the "fi" glyph.
-            2 => {
-                assert!(c.is_ligature_start());
-                assert_eq!(c.glyphs().count(), 1);
-                assert_eq!(c.text_range().len(), 1);
-                assert_eq!(c.glyphs().next().unwrap().id, 444);
-                // The glyph for this ligature lives in the start cluster and should
-                // contain the whole ligature's advance.
-                assert_eq!(c.glyphs().next().unwrap().advance, c.advance() * 2.0);
-            }
-            // "i" is the ligature continuation whose cluster shares the advance with
-            // the ligature start.
-            3 => {
-                assert!(c.is_ligature_continuation());
-                // A continuation shares its advance with the previous cluster.
-                assert_eq!(c.advance(), last_advance);
-                assert_eq!(c.text_range().len(), 1);
-                assert_eq!(c.glyphs().count(), 0);
-            }
-            _ => unreachable!(),
-        }
-        last_advance = c.advance();
-    });
-    env.check_layout_snapshot(&layout);
-}
-
-#[test]
-fn ligatures_rtl() {
-    let mut env = TestEnv::new(test_name!(), None);
-
-    let text = "احدً";
-    let builder = env.ranged_builder(text);
-    let mut layout = builder.build(text);
-    layout.break_all_lines(Some(100.0));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
-
-    let line = layout.lines().next().unwrap();
-    let item = line.items().next().unwrap();
-    let glyph_run = match item {
-        crate::PositionedLayoutItem::GlyphRun(glyph_run) => glyph_run,
-        crate::PositionedLayoutItem::InlineBox(_) => unreachable!(),
-    };
-    let mut last_advance = f32::MAX;
-    glyph_run.run().clusters().enumerate().for_each(|(i, c)| {
-        match i % 4 {
-            // "ح" and "د" are not ligatures.
-            0 | 1 => assert!(!c.is_ligature_start() && !c.is_ligature_continuation()),
-            // "د" is the ligature continuation whose cluster shares the advance with
-            // the ligature start.
-            2 => {
-                assert!(c.is_ligature_continuation());
-                assert_eq!(c.glyphs().count(), 0);
-                assert!(c.is_ligature_continuation());
-                assert_eq!(c.text_range().len(), 2);
-                assert_eq!(c.glyphs().count(), 0);
-            }
-            // The last visual character (i.e. the first logical character) is the ligature start.
-            3 => {
-                assert!(c.is_ligature_start());
-                assert_eq!(c.glyphs().count(), 2);
-                assert_eq!(c.text_range().len(), 2);
-                // The advance should be shared with the previous cluster of the ligature.
-                assert_eq!(c.advance(), last_advance);
-                // This cluster should contain the one glyph of the ligature whose advance
-                // is the sum of the advances of the component clusters.
-                assert_eq!(c.glyphs().nth(1).unwrap().advance, c.advance() * 2.0);
-            }
-            _ => unreachable!(),
-        }
-        last_advance = c.advance();
-    });
-    env.check_layout_snapshot(&layout);
-}
-
-#[test]
 fn test_cluster_info() {
     let test_name = test_name!();
     let mut env = TestEnv::new(test_name, Size::new(400.0, 200.0));
@@ -604,53 +508,6 @@ fn text_range_rtl() {
                 });
             }
         }
-    }
-}
-
-#[test]
-fn font_features() {
-    let mut env = TestEnv::new(test_name!(), None);
-
-    let text = "fi ".repeat(4);
-    let mut builder = env.ranged_builder(&text);
-    builder.push(
-        FontFeatures::from(&[FontFeature {
-            tag: crate::setting::Tag::new(b"liga"),
-            value: 1,
-        }]),
-        0..5,
-    );
-    builder.push(
-        FontFeatures::from(&[FontFeature {
-            tag: crate::setting::Tag::new(b"liga"),
-            value: 0,
-        }]),
-        5..10,
-    );
-    let mut layout = builder.build(&text);
-    layout.break_all_lines(Some(100.0));
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
-
-    env.check_layout_snapshot(&layout);
-}
-
-#[test]
-fn variable_fonts() {
-    let mut env = TestEnv::new(test_name!(), None);
-    let text = "Hello World";
-
-    for wght in [100., 500., 1000.] {
-        let mut builder = env.ranged_builder(text);
-        builder.push_default(FontFamily::named("Arimo"));
-        builder.push_default(FontVariations::from(&[FontVariation::new(
-            crate::setting::Tag::new(b"wght"),
-            wght,
-        )]));
-        let mut layout = builder.build(text);
-        layout.break_all_lines(Some(100.0));
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
-
-        env.check_layout_snapshot(&layout);
     }
 }
 
@@ -767,34 +624,6 @@ fn realign_all() {
             }
         }
     }
-}
-
-#[test]
-fn spacing_changes_per_style_run() {
-    let mut env = TestEnv::new(test_name!(), None);
-
-    let text = "foo bar";
-    let mut builder = env.ranged_builder(text);
-    builder.push(StyleProperty::WordSpacing(2.0), 3..text.len());
-    builder.push(StyleProperty::LetterSpacing(1.5), 3..text.len());
-
-    let layout = builder.build(text);
-    assert_eq!(
-        layout.data.runs.len(),
-        2,
-        "expected two runs after style break"
-    );
-
-    let first_run = &layout.data.runs[0];
-    let second_run = &layout.data.runs[1];
-
-    assert_eq!(&text[first_run.text_range.clone()], "foo");
-    assert_eq!(first_run.word_spacing, 0.0);
-    assert_eq!(first_run.letter_spacing, 0.0);
-
-    assert_eq!(&text[second_run.text_range.clone()], " bar");
-    assert_eq!(second_run.word_spacing, 2.0);
-    assert_eq!(second_run.letter_spacing, 1.5);
 }
 
 #[test]
