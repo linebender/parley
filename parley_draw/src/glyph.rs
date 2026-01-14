@@ -381,8 +381,21 @@ impl<'a, T: GlyphRenderer + 'a> GlyphRunBuilder<'a, T> {
 
             // If the glyph's bounding box doesn't intersect the underline at all, we don't need to calculate
             // intersections. This saves a lot of time, since most glyphs don't have descenders.
-            let transformed_bbox = outline_transform.transform_rect_bbox(path.bbox);
-            if transformed_bbox.y1 < layout_y0 || transformed_bbox.y0 > layout_y1 {
+            //
+            // We only need the y-extent of the transformed bbox, so we compute it directly using the formula:
+            // y' = b*x + d*y + f
+            let [_, b, _, d, _, f] = outline_transform.as_coeffs();
+            let (y_min, y_max) = {
+                let bx0 = b * path.bbox.x0;
+                let bx1 = b * path.bbox.x1;
+                let dy0 = d * path.bbox.y0;
+                let dy1 = d * path.bbox.y1;
+                (
+                    f + bx0.min(bx1) + dy0.min(dy1),
+                    f + bx0.max(bx1) + dy0.max(dy1),
+                )
+            };
+            if y_max < layout_y0 || y_min > layout_y1 {
                 continue;
             }
 
@@ -471,19 +484,42 @@ fn insert_and_merge_range(ranges: &mut Vec<(f64, f64)>, start: f64, end: f64) {
 }
 
 fn expand_rect_with_segment(rect: &mut Rect, seg: PathSeg, y_span: RangeInclusive<f64>) {
-    // All we care about are the x-intersections. The intersection methods don't work on infinitely-long lines, so we
-    // construct a "long enough" line based on segment bounds.
-    let mut x_bounds = match seg {
-        PathSeg::Line(line) => (line.p0.x.min(line.p1.x), line.p0.x.max(line.p1.x)),
+    // Calculate the rough bounds of the segment from its control points. This is *not* the same as
+    // `kurbo::Shape::bounding_box`, which returns a precise bounding box but requires expensively calculating the curve
+    // extrema.
+    let (mut x_bounds, y_bounds) = match seg {
+        PathSeg::Line(line) => (
+            (line.p0.x.min(line.p1.x), line.p0.x.max(line.p1.x)),
+            (line.p0.y.min(line.p1.y), line.p0.y.max(line.p1.y)),
+        ),
         PathSeg::Quad(quad) => (
-            quad.p0.x.min(quad.p1.x).min(quad.p2.x),
-            quad.p0.x.max(quad.p1.x).max(quad.p2.x),
+            (
+                quad.p0.x.min(quad.p1.x).min(quad.p2.x),
+                quad.p0.x.max(quad.p1.x).max(quad.p2.x),
+            ),
+            (
+                quad.p0.y.min(quad.p1.y).min(quad.p2.y),
+                quad.p0.y.max(quad.p1.y).max(quad.p2.y),
+            ),
         ),
         PathSeg::Cubic(cubic) => (
-            cubic.p0.x.min(cubic.p1.x).min(cubic.p2.x).min(cubic.p3.x),
-            cubic.p0.x.max(cubic.p1.x).max(cubic.p2.x).max(cubic.p3.x),
+            (
+                cubic.p0.x.min(cubic.p1.x).min(cubic.p2.x).min(cubic.p3.x),
+                cubic.p0.x.max(cubic.p1.x).max(cubic.p2.x).max(cubic.p3.x),
+            ),
+            (
+                cubic.p0.y.min(cubic.p1.y).min(cubic.p2.y).min(cubic.p3.y),
+                cubic.p0.y.max(cubic.p1.y).max(cubic.p2.y).max(cubic.p3.y),
+            ),
         ),
     };
+    // Skip segments entirely outside the y_span
+    if y_bounds.1 < *y_span.start() || y_bounds.0 > *y_span.end() {
+        return;
+    }
+
+    // All we care about are the x-intersections. The intersection methods don't work on infinitely-long lines, so we
+    // construct a "long enough" line based on segment bounds. This expansion allows for a little bit of error.
     x_bounds.0 -= 1.0;
     x_bounds.1 += 1.0;
     let top_line = Line::new((x_bounds.0, *y_span.start()), (x_bounds.1, *y_span.start()));
