@@ -314,7 +314,7 @@ impl<'a, T: GlyphRenderer + 'a> GlyphRunBuilder<'a, T> {
             });
     }
 
-    fn decoration_spans(
+    fn decoration_spans<'b>(
         &mut self,
         glyphs: impl Iterator<Item = Glyph>,
         x_range: RangeInclusive<f32>,
@@ -322,8 +322,8 @@ impl<'a, T: GlyphRenderer + 'a> GlyphRunBuilder<'a, T> {
         offset: f32,
         size: f32,
         buffer: f32,
-        caches: &mut GlyphCaches,
-    ) -> impl Iterator<Item = Rect> {
+        caches: &'b mut GlyphCaches,
+    ) -> impl Iterator<Item = Rect> + 'b {
         let font_ref =
             FontRef::from_index(self.run.font.data.as_ref(), self.run.font.index).unwrap();
 
@@ -359,7 +359,9 @@ impl<'a, T: GlyphRenderer + 'a> GlyphRunBuilder<'a, T> {
             OutlineCacheSession::new(&mut caches.outline_cache, var_key);
 
         // Collect and merge exclusion zones from all glyphs.
-        let mut exclusions: Vec<(f64, f64)> = Vec::new();
+        let exclusions = &mut caches.underline_exclusions;
+        // We `drain` this when creating the iterator, but just in case...
+        exclusions.truncate(0);
 
         for glyph in glyphs {
             // TODO: skip ink for color and bitmap glyphs
@@ -407,14 +409,14 @@ impl<'a, T: GlyphRenderer + 'a> GlyphRunBuilder<'a, T> {
             }
 
             // Insert in sorted order and merge with overlapping ranges
-            insert_and_merge_range(&mut exclusions, excl_start, excl_end);
+            insert_and_merge_range(exclusions, excl_start, excl_end);
         }
 
         // Draw decoration segments, skipping the exclusion zones
         let y0 = f64::from(baseline_y) + layout_y0;
         let y1 = f64::from(baseline_y) + layout_y1;
 
-        let mut state = Some((exclusions.into_iter(), x0));
+        let mut state = Some((exclusions.drain(..), x0));
         core::iter::from_fn(move || {
             let (iter, current_x) = state.as_mut()?;
             let Some((excl_start, excl_end)) = iter.next() else {
@@ -945,6 +947,8 @@ pub struct GlyphCaches {
     pub outline_cache: OutlineCache,
     /// Caches hinting instances for reuse.
     pub hinting_cache: HintCache,
+    /// Horizontal spans excluded from "ink-skipping" underlines. Cached to reuse one allocation.
+    pub underline_exclusions: Vec<(f64, f64)>,
 }
 
 impl GlyphCaches {
