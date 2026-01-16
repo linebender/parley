@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use parley::{BoundingBox, GlyphRun, Layout, PositionedLayoutItem};
+use parley::{BoundingBox, GlyphRun, InlineBoxKind, Layout, PositionedLayoutItem};
 use parley_draw::{GlyphCaches, GlyphRunBuilder};
 use peniko::{
     Color,
@@ -76,12 +76,12 @@ fn draw_line<T: Into<f64>>(renderer: &mut RenderContext, x1: T, y1: T, x2: T, y2
 ///
 /// If given [`RenderingConfig::size`] is not specified, [`Layout::width`] and [`Layout::height`]
 /// are used.
-pub(crate) fn render_layout(
+pub(crate) fn draw_layout(
     config: &RenderingConfig,
     layout: &Layout<ColorBrush>,
     cursor_rect: Option<BoundingBox>,
     selection_rects: &[(BoundingBox, usize)],
-) -> Pixmap {
+) -> RenderContext {
     let scale = config.scale;
     let padding = 20;
     let base_width = config
@@ -158,30 +158,41 @@ pub(crate) fn render_layout(
                     render_glyph_run(&glyph_run, &mut renderer, &mut caches, config);
                 }
                 PositionedLayoutItem::InlineBox(inline_box) => {
-                    draw_rect(
-                        &mut renderer,
-                        inline_box.x as f64,
-                        inline_box.y as f64,
-                        inline_box.width as f64,
-                        inline_box.height as f64,
-                        config.inline_box_color,
-                    );
+                    if inline_box.kind == InlineBoxKind::InFlow {
+                        draw_rect(
+                            &mut renderer,
+                            inline_box.x as f64,
+                            inline_box.y as f64,
+                            inline_box.width as f64,
+                            inline_box.height as f64,
+                            config.inline_box_color,
+                        );
+                    }
                 }
             };
         }
     }
 
-    let mut img = Pixmap::new(padded_width, padded_height);
+    renderer
+}
+
+/// Render the layout to a [`Pixmap`].
+///
+/// If given [`RenderingConfig::size`] is not specified, [`Layout::width`] and [`Layout::height`]
+/// are used.
+pub(crate) fn render_to_pixmap(mut renderer: RenderContext) -> Pixmap {
+    let mut img = Pixmap::new(renderer.width(), renderer.height());
+    renderer.flush();
     renderer.render_to_pixmap(&mut img);
     img
 }
 
 /// Render the layout with cluster information including measurement lines and source characters.
-pub(crate) fn render_layout_with_clusters(
+pub(crate) fn draw_layout_with_clusters(
     config: &RenderingConfig,
     layout: &Layout<ColorBrush>,
     char_layouts: &HashMap<char, Layout<ColorBrush>>,
-) -> Pixmap {
+) -> RenderContext {
     let padding = 20;
     let line_extra_spacing = 60.0; // Extra space between lines for cluster info
     let measurement_line_height = 5.0; // Height below baseline for measurement line
@@ -338,9 +349,7 @@ pub(crate) fn render_layout_with_clusters(
         y_offset += line_extra_spacing;
     }
 
-    let mut img = Pixmap::new(padded_width, padded_height);
-    renderer.render_to_pixmap(&mut img);
-    img
+    renderer
 }
 
 fn render_glyph_run(

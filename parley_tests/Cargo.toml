@@ -21,6 +21,10 @@ parley_draw = { workspace = true, features = ["std", "vello_cpu"] }
 peniko = { workspace = true, features = ["std"] }
 vello_cpu = { workspace = true, features = ["std", "png"] }
 fontique = { workspace = true, features = ["std"] }
+taffy = { git = "https://github.com/DioxusLabs/taffy", rev = "25759dad44d8350743a4e866fee54962f996895a", default-features = false, features = [
+    "std",
+    "float_layout",
+] }
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
 oxipng = { version = "9.1.5", default-features = false, features = ["freestanding"] }
