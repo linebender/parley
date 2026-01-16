@@ -973,7 +973,7 @@ pub struct GlyphCaches {
     pub outline_cache: OutlineCache,
     /// Caches hinting instances for reuse.
     pub hinting_cache: HintCache,
-    /// Horizontal spans excluded from "ink-skipping" underlines. Cached to reuse one allocation.
+    /// Horizontal spans excluded from "ink-skipping" underlines. Scratch space to reuse one allocation.
     pub underline_exclusions: Vec<(f64, f64)>,
 }
 
