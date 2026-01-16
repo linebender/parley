@@ -582,7 +582,10 @@ fn prepare_glyph_run<'a>(
         });
 
         PreparedGlyphRun {
-            transform: Affine::new([1., 0., t_c, 1., t_e, t_f]),
+            // The scale has been absorbed into the font size, so we need to remove it from the skew coefficient (t_c)
+            // as well. Otherwise the skew would be applied twice: once via the larger outline, once via the transform.
+            // The translation (t_e, t_f) stays as-is since it positions the run in scene coordinates.
+            transform: Affine::new([1., 0., t_c / t_d, 1., t_e, t_f]),
             size,
             normalized_coords: run.normalized_coords,
             hinting_instance,
