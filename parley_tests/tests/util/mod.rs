@@ -12,7 +12,7 @@ pub(crate) mod samples;
 pub(crate) use asserts::assert_eq_layout_alignments;
 pub(crate) use cursor_test::CursorTest;
 pub(crate) use env::TestEnv;
-pub(crate) use renderer::ColorBrush;
+pub(crate) use renderer::{ColorBrush, draw_layout, render_to_pixmap};
 
 /// Returns the current function name (for use in test naming).
 #[macro_export]
