@@ -21,6 +21,7 @@ glifo = { workspace = true, features = ["std", "vello_cpu", "png"] }
 peniko = { workspace = true, features = ["std"] }
 vello_cpu = { workspace = true, features = ["std", "png"] }
 fontique = { workspace = true, features = ["std"] }
+taffy = { version = "0.10", default-features = false, features = ["std", "float_layout"] }
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
 oxipng = { version = "9.1.5", default-features = false, features = ["freestanding"] }
