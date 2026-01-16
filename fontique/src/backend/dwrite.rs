@@ -19,7 +19,7 @@ use windows::{
         IDWriteFontFamily, IDWriteFontFile, IDWriteLocalFontFileLoader, IDWriteNumberSubstitution,
         IDWriteTextAnalysisSource, IDWriteTextAnalysisSource_Impl,
     },
-    core::{Interface, PCWSTR, implement},
+    core::{Interface, OutRef, PCWSTR, implement},
 };
 
 use super::{
@@ -350,10 +350,10 @@ impl IDWriteTextAnalysisSource_Impl for TextSource_Impl<'_> {
         &self,
         textposition: u32,
         textlength: *mut u32,
-        numbersubstitution: *mut Option<IDWriteNumberSubstitution>,
+        numbersubstitution: OutRef<'_, IDWriteNumberSubstitution>,
     ) -> windows::core::Result<()> {
+        numbersubstitution.write(None)?;
         unsafe {
-            *numbersubstitution = None;
             *textlength = (self.text.len() as u32).saturating_sub(textposition);
         }
         Ok(())
