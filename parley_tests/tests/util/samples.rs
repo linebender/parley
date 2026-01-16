@@ -18,3 +18,5 @@ pub(crate) const LIGATURES: &str = "fi fl ff ffi ffl office";
 
 /// Text with spaces for word spacing tests
 pub(crate) const SPACED: &str = "one two three four five";
+
+pub(crate) const LOREM_IPSUM: &str = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer cursus interdum dui, in gravida ligula aliquam in. Vivamus vitae metus pharetra, ultricies metus quis, consectetur augue. Phasellus ac mauris et nisi pretium aliquet sed ac orci. Ut mi ipsum, mollis sed placerat et, bibendum et velit. Nunc vitae ornare leo. Aliquam turpis sem, varius eget neque vel, mattis ultricies ex. Fusce metus mauris, fermentum at porttitor quis, malesuada sed elit. Integer vel eros congue, volutpat nunc in, lobortis ante.";
