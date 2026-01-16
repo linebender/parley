@@ -335,11 +335,17 @@ impl<'a, T: GlyphRenderer + 'a> GlyphRunBuilder<'a, T> {
             ..
         } = prepare_glyph_run(&self.run, &outlines, &mut caches.hinting_cache);
 
-        // The glyph_transform (e.g. skew for fake italics) affects where the outline
-        // points end up. We apply it along with the Y flip to transform from font space
-        // (Y up) to layout space (Y down).
-        let outline_transform =
-            self.run.glyph_transform.unwrap_or(Affine::IDENTITY) * Affine::FLIP_Y;
+        // The glyph_transform (e.g. skew for fake italics) affects where the outline points end up. We apply it along
+        // with the Y flip to transform from font space (Y up) to layout space (Y down).
+        //
+        // When hinting is enabled, the scale from run.transform is absorbed into font_size, so outlines are larger. We
+        // scale them back down to the nominal coordinate space. When not hinting (or hinting without scale), this is
+        // 1.0 and has no effect. The glyph-drawing path handles this by simply drawing in global space, but we need to
+        // invert it for drawing decorations.
+        let outline_to_nominal_scale = f64::from(self.run.font_size / font_size.ppem().unwrap());
+        let outline_transform = self.run.glyph_transform.unwrap_or(Affine::IDENTITY)
+            * Affine::FLIP_Y
+            * Affine::scale(outline_to_nominal_scale);
 
         // Buffer to add around each exclusion zone
         let buffer = f64::from(buffer);
