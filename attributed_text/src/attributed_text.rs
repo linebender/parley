@@ -29,6 +29,16 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
         &self.text
     }
 
+    /// Replaces the underlying text and clears all applied attribute spans.
+    ///
+    /// This retains the allocated storage for spans so the same `AttributedText` value can be
+    /// reused across rebuilds.
+    #[inline]
+    pub fn set_text(&mut self, text: T) {
+        self.text = text;
+        self.attributes.clear();
+    }
+
     /// Returns the length of the underlying text, in bytes.
     pub fn len(&self) -> usize {
         self.text.len()
@@ -188,5 +198,19 @@ mod tests {
         let range = TextRange::new(at.text(), 1..3).unwrap();
         at.apply_attribute(range, TestAttribute::Keep);
         assert_eq!(at.attributes_len(), 1);
+    }
+
+    #[test]
+    fn set_text_clears_attributes() {
+        let mut at = AttributedText::new("Hello!");
+        at.apply_attribute(
+            TextRange::new(at.text(), 0..5).unwrap(),
+            TestAttribute::Keep,
+        );
+        assert_eq!(at.attributes_len(), 1);
+
+        at.set_text("Replaced");
+        assert_eq!(at.text(), &"Replaced");
+        assert_eq!(at.attributes_len(), 0);
     }
 }
