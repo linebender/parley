@@ -121,9 +121,9 @@ pub enum StyleProperty<'a, B: Brush> {
 
 /// Unresolved styles.
 #[derive(Clone, PartialEq, Debug)]
-pub struct TextStyle<'a, B: Brush> {
+pub struct TextStyle<'family, 'settings, B: Brush> {
     /// CSS `font-family` property value.
-    pub font_family: FontFamily<'a>,
+    pub font_family: FontFamily<'family>,
     /// Font size.
     pub font_size: f32,
     /// Font width.
@@ -133,9 +133,9 @@ pub struct TextStyle<'a, B: Brush> {
     /// Font weight.
     pub font_weight: FontWeight,
     /// Font variation settings.
-    pub font_variations: FontVariations<'a>,
+    pub font_variations: FontVariations<'settings>,
     /// Font feature settings.
-    pub font_features: FontFeatures<'a>,
+    pub font_features: FontFeatures<'settings>,
     /// Locale.
     pub locale: Option<Language>,
     /// Brush for rendering text.
@@ -170,7 +170,7 @@ pub struct TextStyle<'a, B: Brush> {
     pub text_wrap_mode: TextWrapMode,
 }
 
-impl<B: Brush> Default for TextStyle<'_, B> {
+impl<B: Brush> Default for TextStyle<'static, 'static, B> {
     fn default() -> Self {
         TextStyle {
             font_family: FontFamily::Source(Cow::Borrowed("sans-serif")),

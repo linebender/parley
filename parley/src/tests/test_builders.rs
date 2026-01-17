@@ -27,7 +27,7 @@ struct TreeOptions<'a, 'b> {
     scale: f32,
     quantize: bool,
     max_advance: Option<f32>,
-    root_style: &'a TextStyle<'b, ColorBrush>,
+    root_style: &'a TextStyle<'b, 'b, ColorBrush>,
 }
 
 /// Generates a `Layout` with a ranged builder.
@@ -73,12 +73,12 @@ fn build_layout_with_tree(
 /// LayoutContext D - Tree for dirt
 /// LayoutContext D - Ranged from dirty
 /// ```
-fn assert_builders_produce_same_result<'a, 'b>(
+fn assert_builders_produce_same_result<'b>(
     text: &str,
     scale: f32,
     quantize: bool,
     max_advance: Option<f32>,
-    root_style: &'a TextStyle<'b, ColorBrush>,
+    root_style: &TextStyle<'b, 'b, ColorBrush>,
     with_ranged_builder: impl Fn(&mut RangedBuilder<'_, ColorBrush>),
     with_tree_builder: impl Fn(&mut TreeBuilder<'_, ColorBrush>),
     expect_empty: bool,
@@ -160,7 +160,7 @@ fn assert_builders_produce_same_result<'a, 'b>(
 /// Returns a root style that uses non-default values.
 ///
 /// The [`TreeBuilder`] version of [`set_root_style`].
-fn create_root_style() -> TextStyle<'static, ColorBrush> {
+fn create_root_style() -> TextStyle<'static, 'static, ColorBrush> {
     TextStyle {
         font_family: FontFamily::from(FONT_FAMILY_LIST),
         font_size: 20.,

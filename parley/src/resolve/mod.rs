@@ -165,7 +165,7 @@ impl ResolveContext {
     pub(crate) fn resolve_entire_style_set<B: Brush>(
         &mut self,
         fcx: &mut FontContext,
-        raw_style: &TextStyle<'_, B>,
+        raw_style: &TextStyle<'_, '_, B>,
         scale: f32,
     ) -> ResolvedStyle<B> {
         ResolvedStyle {
