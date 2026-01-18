@@ -10,9 +10,10 @@ use super::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
 use super::layout::Layout;
 
 use alloc::string::String;
-use core::ops::RangeBounds;
+use core::ops::{Bound, Range, RangeBounds};
 
 use crate::inline_box::InlineBox;
+use crate::resolve::RangedStyle;
 use crate::resolve::tree::ItemKind;
 
 /// Builder for constructing a text layout with ranged attributes.
@@ -54,6 +55,74 @@ impl<B: Brush> RangedBuilder<'_, B> {
         self.lcx.ranged_style_builder.finish(&mut self.lcx.styles);
 
         // Call generic layout builder method
+        build_into_layout(
+            layout,
+            self.scale,
+            self.quantize,
+            text.as_ref(),
+            self.lcx,
+            self.fcx,
+        );
+    }
+
+    pub fn build(self, text: impl AsRef<str>) -> Layout<B> {
+        let mut layout = Layout::default();
+        self.build_into(&mut layout, text);
+        layout
+    }
+}
+
+/// Builder for constructing a text layout from a sequence of non-overlapping style runs.
+#[must_use]
+pub struct StyleRunBuilder<'a, B: Brush> {
+    pub(crate) scale: f32,
+    pub(crate) quantize: bool,
+    pub(crate) len: usize,
+    pub(crate) lcx: &'a mut LayoutContext<B>,
+    pub(crate) fcx: &'a mut FontContext,
+    pub(crate) cursor: usize,
+}
+
+impl<B: Brush> StyleRunBuilder<'_, B> {
+    /// Adds a fully-specified style run covering the provided range.
+    ///
+    /// Runs must be contiguous and non-overlapping, and must cover `0..text.len()` once all runs
+    /// have been added.
+    pub fn push_style_run<'family, 'settings>(
+        &mut self,
+        style: TextStyle<'family, 'settings, B>,
+        range: impl RangeBounds<usize>,
+    ) {
+        let range = resolve_range(range, self.len);
+        assert!(
+            range.start == self.cursor,
+            "StyleRunBuilder expects contiguous non-overlapping runs"
+        );
+        assert!(
+            range.start <= range.end,
+            "StyleRunBuilder expects ordered ranges"
+        );
+
+        let resolved = self
+            .lcx
+            .rcx
+            .resolve_entire_style_set(self.fcx, &style, self.scale);
+        self.lcx.styles.push(RangedStyle {
+            style: resolved,
+            range: range.clone(),
+        });
+        self.cursor = range.end;
+    }
+
+    pub fn push_inline_box(&mut self, inline_box: InlineBox) {
+        self.lcx.inline_boxes.push(inline_box);
+    }
+
+    pub fn build_into(self, layout: &mut Layout<B>, text: impl AsRef<str>) {
+        assert!(
+            self.cursor == self.len,
+            "StyleRunBuilder requires runs that cover the full text"
+        );
         build_into_layout(
             layout,
             self.scale,
@@ -202,4 +271,18 @@ fn build_into_layout<B: Brush>(
     core::mem::swap(&mut layout.data.inline_boxes, &mut lcx.inline_boxes);
 
     layout.data.finish();
+}
+
+fn resolve_range(range: impl RangeBounds<usize>, len: usize) -> Range<usize> {
+    let start = match range.start_bound() {
+        Bound::Unbounded => 0,
+        Bound::Included(n) => *n,
+        Bound::Excluded(n) => *n + 1,
+    };
+    let end = match range.end_bound() {
+        Bound::Unbounded => len,
+        Bound::Included(n) => *n + 1,
+        Bound::Excluded(n) => *n,
+    };
+    start.min(len)..end.min(len)
 }

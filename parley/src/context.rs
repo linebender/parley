@@ -6,7 +6,7 @@
 use alloc::{vec, vec::Vec};
 
 use super::FontContext;
-use super::builder::RangedBuilder;
+use super::builder::{RangedBuilder, StyleRunBuilder};
 use super::resolve::tree::TreeStyleBuilder;
 use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle};
 use super::style::{Brush, TextStyle};
@@ -102,6 +102,33 @@ impl<B: Brush> LayoutContext<B> {
             quantize,
             lcx: self,
             fcx,
+        }
+    }
+
+    /// Create a builder for constructing a layout from non-overlapping style runs.
+    ///
+    /// Unlike [`Self::ranged_builder`], this builder expects the caller to provide a complete
+    /// sequence of **contiguous**, **non-overlapping** spans that cover `0..text.len()`. Each span
+    /// carries a fully specified [`TextStyle`], and Parley skips its internal range-splitting
+    /// logic.
+    pub fn style_run_builder<'a>(
+        &'a mut self,
+        fcx: &'a mut FontContext,
+        text: &'a str,
+        scale: f32,
+        quantize: bool,
+    ) -> StyleRunBuilder<'a, B> {
+        self.begin();
+
+        fcx.source_cache.prune(128, false);
+
+        StyleRunBuilder {
+            scale,
+            quantize,
+            len: text.len(),
+            lcx: self,
+            fcx,
+            cursor: 0,
         }
     }
 

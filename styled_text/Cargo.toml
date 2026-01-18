@@ -1,0 +1,29 @@
+[package]
+name = "styled_text"
+version = "0.1.0"
+description = "Attributed text + CSS-inspired span styles"
+keywords = ["text", "style", "attributed text"]
+categories = ["graphics", "text"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+publish = false
+
+[package.metadata.docs.rs]
+all-features = true
+# There are no platform specific docs.
+default-target = "x86_64-unknown-linux-gnu"
+targets = []
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+attributed_text.workspace = true
+text_primitives.workspace = true
+
+[lints]
+workspace = true
