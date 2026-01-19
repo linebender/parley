@@ -252,6 +252,116 @@ fn leading_whitespace() {
 }
 
 #[test]
+fn hanging_whitespace_does_not_contribute_to_align() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    for (alignment, test_case_name) in [
+        (Alignment::Start, "start"),
+        (Alignment::End, "end"),
+        (Alignment::Center, "center"),
+        (Alignment::Justify, "justify"),
+    ] {
+        let text = "First                                                 Second";
+        let builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(50.0));
+        layout.align(None, alignment, AlignmentOptions::default());
+
+        assert_eq!(layout.lines().count(), 2);
+        env.with_name(test_case_name).check_layout_snapshot(&layout);
+    }
+}
+
+/// Test that `num_non_trailing_spaces` is correctly computed when there is trailing/hanging whitespace.
+#[test]
+fn hanging_whitespace_num_non_trailing_spaces() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Test 1: Single word followed by many spaces then another word
+    // Line 1 should have "First" with trailing whitespace hanging - num_spaces = 0
+    // Line 2 should have "Second" with no spaces - num_spaces = 0
+    {
+        let text = "First                                                 Second";
+        let builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(50.0));
+
+        assert_eq!(layout.lines().count(), 2, "Expected 2 lines");
+        assert_eq!(
+            layout.data.lines[0].num_non_trailing_spaces, 0,
+            "First line should have no inter-word spaces (trailing whitespace doesn't count)"
+        );
+        assert_eq!(
+            layout.data.lines[1].num_non_trailing_spaces, 0,
+            "Second line should have no spaces"
+        );
+
+        env.with_name("single_word").check_layout_snapshot(&layout);
+    }
+
+    // Test 2: Multiple words with spaces that fit, followed by word that wraps
+    // Line 1: "AAA BBB " - has one space between words (trailing space excluded)
+    // Line 2: "CCC" - no spaces
+    {
+        let text = "AAA BBB CCC";
+        let builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        // Use a max_advance that fits "AAA BBB " but not "AAA BBB CCC"
+        layout.break_all_lines(Some(75.0));
+        layout.align(None, Alignment::Justify, AlignmentOptions::default());
+
+        assert_eq!(layout.lines().count(), 2, "Expected 2 lines");
+        // The space between AAA and BBB should count, the trailing space before CCC should not
+        assert_eq!(
+            layout.data.lines[0].num_non_trailing_spaces, 1,
+            "First line should have 1 inter-word space"
+        );
+        assert_eq!(
+            layout.data.lines[1].num_non_trailing_spaces, 0,
+            "Second line should have no spaces"
+        );
+
+        env.with_name("multiword").check_layout_snapshot(&layout);
+    }
+
+    // Test 3: Words with multiple spaces between them
+    // Line 1: "AA  BB " (two spaces between words, one trailing) - 2 inter-word spaces count
+    // Line 2: "CC" - no spaces
+    {
+        let text = "AA  BB CC";
+        let builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(55.0));
+        layout.align(None, Alignment::Justify, AlignmentOptions::default());
+
+        assert_eq!(layout.lines().count(), 2, "Expected 2 lines");
+        // Both spaces between AA and BB should count, trailing space before CC should not
+        assert_eq!(
+            layout.data.lines[0].num_non_trailing_spaces, 2,
+            "First line should have 2 inter-word spaces"
+        );
+
+        env.with_name("double_space").check_layout_snapshot(&layout);
+    }
+
+    // Test 4: Final line should have its trailing whitespace spaces removed
+    {
+        let text = "AAA BBB CCC      ";
+        let builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(75.0));
+        layout.align(None, Alignment::Justify, AlignmentOptions::default());
+
+        assert_eq!(
+            layout.data.lines[1].num_non_trailing_spaces, 0,
+            "Second line should have no spaces"
+        );
+
+        env.with_name("final_line").check_layout_snapshot(&layout);
+    }
+}
+
+#[test]
 fn nested_span_inheritance() {
     let ts = |c: AlphaColor<Srgb>| TextStyle {
         font_family: FontFamily::from(FONT_FAMILY_LIST),

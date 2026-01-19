@@ -141,7 +141,7 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
                 // gaps to adjust. In that case, start-align, i.e., left-align for LTR text and
                 // right-align for RTL text.
                 if matches!(line.break_reason, BreakReason::None | BreakReason::Explicit)
-                    || line.num_spaces == 0
+                    || line.num_non_trailing_spaces == 0
                 {
                     if is_rtl {
                         line.metrics.offset += free_space;
@@ -149,8 +149,8 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
                     continue;
                 }
 
-                let adjustment =
-                    free_space / line.num_spaces as f32 * if UNDO_JUSTIFICATION { -1. } else { 1. };
+                let adjustment = free_space / line.num_non_trailing_spaces as f32
+                    * if UNDO_JUSTIFICATION { -1. } else { 1. };
                 let mut applied = 0;
                 // Iterate over text runs in the line and clusters in the text run
                 //   - Iterate forwards for even bidi levels (which represent LTR runs)
@@ -172,7 +172,7 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
                                 &mut clusters.iter_mut()
                             };
                         clusters.for_each(|cluster| {
-                            if applied == line.num_spaces {
+                            if applied == line.num_non_trailing_spaces {
                                 return;
                             }
                             if cluster.info.whitespace().is_space_or_nbsp() {
