@@ -2380,17 +2380,6 @@ dependencies = [
 
 [[package]]
 name = "kurbo"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce9729cc38c18d86123ab736fd2e7151763ba226ac2490ec092d1dd148825e32"
-dependencies = [
- "arrayvec",
- "euclid",
- "smallvec",
-]
-
-[[package]]
-name = "kurbo"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7564e90fe3c0d5771e1f0bc95322b21baaeaa0d9213fa6a0b61c99f8b17b3bfb"
@@ -3401,7 +3390,7 @@ checksum = "9a2b6aadb221872732e87d465213e9be5af2849b0e8cc5300a8ba98fffa2e00a"
 dependencies = [
  "bytemuck",
  "color",
- "kurbo 0.13.0",
+ "kurbo",
  "linebender_resource_handle",
  "smallvec",
 ]
@@ -4644,20 +4633,20 @@ dependencies = [
 
 [[package]]
 name = "ui-events"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a57da61c5700db75d28822c56068295055ec216996560af57a5d4a457914d34"
+checksum = "e3e29e3e199888d594edd191c5917a2d5c1893b8bf20076c2bf4df7a40a2ee71"
 dependencies = [
  "dpi",
  "keyboard-types",
- "kurbo 0.12.0",
+ "kurbo",
 ]
 
 [[package]]
 name = "ui-events-winit"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3ef6b086ceb9e4bbf0148e494959b18cf08de7604f8d8e958a94e73fc2d531e"
+checksum = "de12c5f7e256ff97aa9a710a5e2fb345bb59302c98d77a3d2f249100d92145d4"
 dependencies = [
  "ui-events",
  "web-time",
