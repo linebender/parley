@@ -233,4 +233,8 @@ pub struct RunMetrics {
     pub strikethrough_size: f32,
     /// The line height
     pub line_height: f32,
+    /// Distance from the baseline to the top of short lowercase letters.
+    pub x_height: Option<f32>,
+    /// Distance from the baseline to the top of capital letters.
+    pub cap_height: Option<f32>,
 }
