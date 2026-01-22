@@ -8,7 +8,7 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-vello = "0.5.1"
+vello = "0.7.0"
 anyhow = "1.0.100"
 pollster = "0.4.0"
 ui-events-winit = "0.2"
