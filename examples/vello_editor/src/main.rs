@@ -363,7 +363,7 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
                 // Queue the texture to be presented on the surface.
                 surface_texture.present();
 
-                device_handle.device.poll(wgpu::Maintain::Poll);
+                device_handle.device.poll(wgpu::PollType::Poll).unwrap();
             }
             _ => {}
         }

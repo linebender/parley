@@ -30,4 +30,4 @@ hashbrown = { workspace = true }
 skrifa = { workspace = true }
 smallvec = { workspace = true }
 vello_common = { workspace = true }
-vello_cpu = { workspace = true, optional = true }
+vello_cpu = { workspace = true, optional = true, features = ["u8_pipeline"] }
