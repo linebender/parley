@@ -1,9 +1,11 @@
-// Copyright 2025 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::utils::TestEnv;
-use crate::{Alignment, AlignmentOptions, test_name};
-use alloc::vec::Vec;
+//! Regression tests for specific issues.
+
+use crate::test_name;
+use crate::util::TestEnv;
+use parley::{Alignment, AlignmentOptions, PositionedLayoutItem};
 
 /// Test that rendering RTL text doesn't affect subsequent LTR layouts.
 /// See <https://github.com/linebender/parley/issues/489>.
@@ -35,8 +37,8 @@ fn issue_489() {
         let line = layout.lines().next().unwrap();
         let item = line.items().next().unwrap();
         let glyph_run = match item {
-            crate::PositionedLayoutItem::GlyphRun(glyph_run) => glyph_run,
-            crate::PositionedLayoutItem::InlineBox(_) => unreachable!(),
+            PositionedLayoutItem::GlyphRun(glyph_run) => glyph_run,
+            PositionedLayoutItem::InlineBox(_) => unreachable!(),
         };
 
         assert!(!glyph_run.run().is_rtl());

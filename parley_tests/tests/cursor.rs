@@ -1,8 +1,13 @@
-// Copyright 2024 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::tests::utils::CursorTest;
-use crate::{Cursor, FontContext, LayoutContext, Selection};
+//! Cursor navigation tests.
+
+// TODO: these should use the create_font_context helper to avoid introducing
+// accidental dependencies on system fonts
+
+use crate::util::{ColorBrush, CursorTest};
+use parley::{Affinity, Cursor, FontContext, LayoutContext, Selection};
 
 #[test]
 fn cursor_previous_visual() {
@@ -32,15 +37,13 @@ fn cursor_next_visual() {
 
 #[test]
 fn cursor_ligature_selection() {
-    use crate::tests::utils::ColorBrush;
-    use crate::{Affinity, Cursor};
     let (mut lcx, mut fcx): (LayoutContext<ColorBrush>, _) =
         (LayoutContext::new(), FontContext::new());
 
     // Test with ligature text "fi" using serif font which should support ligatures
     let text = "fi";
     let mut builder = lcx.ranged_builder(&mut fcx, text, 1.0, true);
-    builder.push_default(crate::style::GenericFamily::Serif);
+    builder.push_default(parley::style::GenericFamily::Serif);
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
 

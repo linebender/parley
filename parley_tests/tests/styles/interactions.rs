@@ -1,4 +1,4 @@
-// Copyright 2024 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Tests for style property interactions.
@@ -6,17 +6,16 @@
 //! These tests verify behavior when multiple style properties are combined,
 //! especially when they might affect each other.
 
-use alloc::borrow::Cow;
-use alloc::format;
+use std::borrow::Cow;
 
-use crate::AlignmentOptions;
-use crate::layout::Alignment;
-use crate::setting::Tag;
-use crate::style::{
+use crate::test_name;
+use crate::util::{TestEnv, samples};
+use parley::AlignmentOptions;
+use parley::layout::Alignment;
+use parley::setting::Tag;
+use parley::style::{
     FontFeature, FontFeatures, FontVariation, FontVariations, LineHeight, StyleProperty,
 };
-use crate::test_name;
-use crate::tests::utils::{TestEnv, samples};
 
 // ============================================================================
 // FontSize × LineHeight Interactions
@@ -113,8 +112,8 @@ fn interaction_font_weight_vs_variations() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::FontWeight;
-    use crate::style::FontFamily;
+    use parley::FontWeight;
+    use parley::style::FontFamily;
 
     // FontWeight only
     let mut builder_weight = env.ranged_builder(text);
@@ -228,9 +227,9 @@ fn interaction_weight_style_width() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::setting::Tag;
-    use crate::style::FontFamily;
-    use crate::{FontWeight, FontWidth};
+    use parley::setting::Tag;
+    use parley::style::FontFamily;
+    use parley::{FontWeight, FontWidth};
 
     // Bold + Italic (using slnt axis)
     let italic_variation = FontVariations::List(Cow::Borrowed(&[FontVariation {

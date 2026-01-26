@@ -95,7 +95,7 @@ impl ClusterInfo {
         self.source_char.is_whitespace()
     }
 
-    #[cfg(test)]
+    /// Returns the cluster's original character.
     pub(crate) fn source_char(self) -> char {
         self.source_char
     }

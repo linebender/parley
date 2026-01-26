@@ -1,19 +1,16 @@
-// Copyright 2024 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use alloc::{format, vec::Vec};
-use peniko::{
-    color::{AlphaColor, Srgb, palette},
-    kurbo::Size,
-};
+//! Basic (and assorted) layout tests.
 
-use super::utils::{
-    ColorBrush, FONT_FAMILY_LIST, TestEnv, asserts::assert_eq_layout_data_alignments,
-};
-use crate::{
+use crate::util::TestEnv;
+use crate::{test_name, util::ColorBrush};
+use parley::{
     Alignment, AlignmentOptions, ContentWidths, FontFamily, InlineBox, Layout, LineHeight,
-    StyleProperty, TextStyle, WhiteSpaceCollapse, test_name,
+    PositionedLayoutItem, StyleProperty, TextStyle, WhiteSpaceCollapse,
 };
+use peniko::color::{AlphaColor, Srgb, palette};
+use peniko::kurbo::Size;
 
 #[test]
 fn plain_multiline_text() {
@@ -254,7 +251,7 @@ fn leading_whitespace() {
 #[test]
 fn nested_span_inheritance() {
     let ts = |c: AlphaColor<Srgb>| TextStyle {
-        font_family: FontFamily::from(FONT_FAMILY_LIST),
+        font_family: FontFamily::from(crate::util::env::FONT_FAMILY_LIST),
         font_size: 24.,
         line_height: LineHeight::Absolute(30.),
         brush: ColorBrush::new(c),
@@ -500,7 +497,7 @@ fn text_range_rtl() {
 
     for line in layout.lines() {
         for item in line.items() {
-            if let crate::PositionedLayoutItem::GlyphRun(glyph_run) = item {
+            if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
                 glyph_run.run().clusters().for_each(|c| {
                     if !c.is_space_or_nbsp() {
                         assert_eq!(c.text_range().len(), 2);
@@ -614,9 +611,9 @@ fn realign_all() {
                         let top_layout_truth = &layouts[jdx];
                         jdx += 1;
 
-                        assert_eq_layout_data_alignments(
-                            &top_layout_truth.data,
-                            &top_layout.data,
+                        crate::util::assert_eq_layout_alignments(
+                            top_layout_truth,
+                            &top_layout,
                             &format!("{base_name} -> {top_name}"),
                         );
                     }

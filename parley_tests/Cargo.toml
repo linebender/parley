@@ -1,0 +1,30 @@
+[package]
+name = "parley_tests"
+description = "Integration tests for Parley."
+categories = ["gui", "graphics"]
+keywords = ["text", "layout"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+autotests = false
+
+[[test]]
+name = "tests"
+path = "tests/mod.rs"
+
+[dependencies]
+# TODO: the cursor_ligature_selection test depends on system fonts.
+parley = { workspace = true, features = ["std", "system"] }
+parley_dev = { workspace = true }
+peniko = { workspace = true, features = ["std"] }
+tiny-skia = "0.11.4"
+skrifa = { workspace = true }
+fontique = { workspace = true, features = ["std"] }
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+oxipng = { version = "9.1.5", default-features = false, features = ["freestanding"] }
+
+[lints]
+workspace = true

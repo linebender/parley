@@ -1,52 +1,31 @@
-// Copyright 2024 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::tests::utils::renderer::{
-    ColorBrush, RenderingConfig, render_layout, render_layout_with_clusters,
-};
-use crate::{
-    BoundingBox, FontContext, FontFamily, FontFamilyName, Layout, LayoutContext, LineHeight,
-    PlainEditor, PlainEditorDriver, RangedBuilder, StyleProperty, TextStyle, TreeBuilder,
-};
-use alloc::{
-    borrow::Cow,
-    format,
-    string::{String, ToString},
-    sync::Arc,
-    vec::Vec,
-};
-use fontique::{Blob, Collection, CollectionOptions, SourceCache};
-use peniko::kurbo::Size;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use fontique::{Blob, Collection, CollectionOptions, SourceCache};
+use parley::{
+    BoundingBox, FontContext, FontFamily, Layout, LayoutContext, LineHeight, PlainEditor,
+    PlainEditorDriver, RangedBuilder, StyleProperty, TextStyle, TreeBuilder,
+};
+use peniko::kurbo::Size;
 use tiny_skia::{Color, Pixmap};
 
-// Returns the current function name
-#[macro_export]
-macro_rules! test_name {
-    () => {{
-        fn f() {}
-        fn type_name_of<T>(_: T) -> &'static str {
-            core::any::type_name::<T>()
-        }
-        let name = type_name_of(f);
-        let name = &name[..name.len() - 3];
-        let name = &name[name.rfind(':').map(|x| x + 1).unwrap_or(0)..];
+use crate::util::renderer::render_layout_with_clusters;
 
-        name
-    }};
-}
+use super::renderer::{ColorBrush, RenderingConfig, render_layout};
+
+use parley::FontFamilyName;
 
 fn current_imgs_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("current")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("current")
 }
 
 fn snapshot_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("snapshots")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("snapshots")
 }
 
 pub(crate) const FONT_FAMILY_LIST: &[FontFamilyName<'_>] = &[
@@ -232,7 +211,8 @@ impl TestEnv {
             assert!(
                 test_case_name
                     .chars()
-                    .all(|c| c == '_' || char::is_alphanumeric(c))
+                    .all(|c| c == '_' || char::is_alphanumeric(c)),
+                "snapshot filename should not contain special characters"
             );
             format!("{}-{}.png", self.test_name, test_case_name)
         }

@@ -1,15 +1,13 @@
-// Copyright 2024 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Tests for text decoration style properties.
 
-use alloc::format;
-
-use crate::AlignmentOptions;
-use crate::layout::Alignment;
-use crate::style::StyleProperty;
 use crate::test_name;
-use crate::tests::utils::{TestEnv, samples};
+use crate::util::{TestEnv, samples};
+use parley::AlignmentOptions;
+use parley::layout::Alignment;
+use parley::style::StyleProperty;
 
 // ============================================================================
 // Underline Tests

@@ -1,7 +1,7 @@
-// Copyright 2024 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! A simple example that lays out some text using Parley, extracts outlines using Skrifa and
+//! A simple renderer that lays out some text using Parley, extracts outlines using Skrifa and
 //! then paints those outlines using Tiny-Skia.
 //!
 //! Note: Emoji rendering is not currently implemented in this example. See the swash example
@@ -9,13 +9,12 @@
 
 use std::collections::HashMap;
 
-use crate::{GlyphRun, Layout, PositionedLayoutItem};
-use alloc::vec::Vec;
+use parley::{BoundingBox, GlyphRun, Layout, PositionedLayoutItem};
 use peniko::kurbo;
 use skrifa::{
-    GlyphId, MetadataProvider, OutlineGlyph,
+    GlyphId, MetadataProvider,
     instance::{LocationRef, NormalizedCoord, Size},
-    outline::{DrawSettings, OutlinePen},
+    outline::{DrawSettings, OutlineGlyph, OutlinePen},
     raw::FontRef as ReadFontsRef,
 };
 use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Rect, Transform};
@@ -67,8 +66,8 @@ fn draw_rect(pen: &mut TinySkiaPen<'_>, x: f32, y: f32, width: f32, height: f32,
 pub(crate) fn render_layout(
     config: &RenderingConfig,
     layout: &Layout<ColorBrush>,
-    cursor_rect: Option<crate::BoundingBox>,
-    selection_rects: &[(crate::BoundingBox, usize)],
+    cursor_rect: Option<BoundingBox>,
+    selection_rects: &[(BoundingBox, usize)],
 ) -> Pixmap {
     let padding = 20;
     let width = config
@@ -211,7 +210,7 @@ pub(crate) fn render_layout_with_clusters(
                     let cluster_width = cluster.advance();
 
                     // Use the test-specific methods we added to Cluster
-                    let source_char = cluster.info().source_char();
+                    let source_char = cluster.source_char();
                     let expected_len = source_char.len_utf8() as u8;
                     let actual_len = cluster.text_len();
 
@@ -280,7 +279,7 @@ pub(crate) fn render_layout_with_clusters(
                                 let glyph_y = measure_y + char_display_offset - glyph.y;
                                 glyph_x_offset += glyph.advance;
 
-                                let glyph_id = GlyphId::from(glyph.id as u16);
+                                let glyph_id = GlyphId::from(glyph.id);
                                 if let Some(glyph_outline) = outlines.get(glyph_id) {
                                     pen.set_origin(glyph_x, glyph_y);
                                     pen.draw_glyph(&glyph_outline, char_info_font_size, &[]);
@@ -339,7 +338,7 @@ fn render_glyph_run_with_offset(
         let glyph_y = run_y - glyph.y + padding as f32 + y_offset;
         run_x += glyph.advance;
 
-        let glyph_id = GlyphId::from(glyph.id as u16);
+        let glyph_id = GlyphId::from(glyph.id);
         if let Some(glyph_outline) = outlines.get(glyph_id) {
             pen.set_origin(glyph_x, glyph_y);
             pen.set_color(brush.color);
@@ -378,18 +377,6 @@ fn render_glyph_run_with_offset(
             y_offset,
         );
     }
-}
-
-#[allow(dead_code)]
-fn render_decoration(
-    pen: &mut TinySkiaPen<'_>,
-    glyph_run: &GlyphRun<'_, ColorBrush>,
-    brush: ColorBrush,
-    offset: f32,
-    width: f32,
-    padding: u32,
-) {
-    render_decoration_with_offset(pen, glyph_run, brush, offset, width, padding, 0.0);
 }
 
 fn render_decoration_with_offset(

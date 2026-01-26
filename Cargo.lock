@@ -3371,6 +3371,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "parley_tests"
+version = "0.0.0"
+dependencies = [
+ "fontique",
+ "oxipng",
+ "parley",
+ "parley_dev",
+ "peniko",
+ "skrifa 0.40.0",
+ "tiny-skia",
+]
+
+[[package]]
 name = "parse-zoneinfo"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
