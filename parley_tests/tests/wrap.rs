@@ -1,13 +1,12 @@
-// Copyright 2025 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+//! Text wrapping tests.
+
+use crate::test_name;
+use crate::util::{ColorBrush, TestEnv};
+use parley::{Alignment, AlignmentOptions, OverflowWrap, StyleProperty, TextWrapMode, WordBreak};
 use peniko::color::palette::css;
-
-use crate::{
-    Alignment, AlignmentOptions, OverflowWrap, StyleProperty, TextWrapMode, WordBreak, test_name,
-};
-
-use super::utils::{ColorBrush, TestEnv};
 
 fn test_wrap(
     env: &mut TestEnv,

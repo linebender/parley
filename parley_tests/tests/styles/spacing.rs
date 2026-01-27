@@ -1,15 +1,13 @@
-// Copyright 2024 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Tests for spacing style properties.
 
-use alloc::format;
-
-use crate::layout::Alignment;
-use crate::style::{LineHeight, StyleProperty};
 use crate::test_name;
-use crate::tests::utils::{ColorBrush, TestEnv, samples};
-use crate::{AlignmentOptions, Layout};
+use crate::util::{ColorBrush, TestEnv, samples};
+use parley::layout::Alignment;
+use parley::style::{LineHeight, StyleProperty};
+use parley::{AlignmentOptions, Layout};
 
 /// Helper to build a layout with line height applied
 fn build_with_line_height(
@@ -178,21 +176,22 @@ fn spacing_causes_style_run_breaks() {
     builder.push(StyleProperty::WordSpacing(2.0), 3..text.len());
     builder.push(StyleProperty::LetterSpacing(1.5), 3..text.len());
 
-    let layout = builder.build(text);
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+
+    // Collect all runs from the layout
+    let runs: Vec<_> = layout.lines().flat_map(|line| line.runs()).collect();
+
     assert_eq!(
-        layout.data.runs.len(),
+        runs.len(),
         2,
         "expected two runs after spacing property changes"
     );
 
-    let first_run = &layout.data.runs[0];
-    let second_run = &layout.data.runs[1];
+    // Verify text ranges are split correctly
+    assert_eq!(&text[runs[0].text_range()], "foo",);
+    assert_eq!(&text[runs[1].text_range()], " bar",);
 
-    assert_eq!(&text[first_run.text_range.clone()], "foo");
-    assert_eq!(first_run.word_spacing, 0.0);
-    assert_eq!(first_run.letter_spacing, 0.0);
-
-    assert_eq!(&text[second_run.text_range.clone()], " bar");
-    assert_eq!(second_run.word_spacing, 2.0);
-    assert_eq!(second_run.letter_spacing, 1.5);
+    env.with_name("spacing_style_run_breaks")
+        .check_layout_snapshot(&layout);
 }

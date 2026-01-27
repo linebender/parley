@@ -1,16 +1,15 @@
-// Copyright 2024 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Tests for font selection style properties.
 
-use alloc::borrow::Cow;
-use alloc::format;
+use std::borrow::Cow;
 
-use crate::layout::Alignment;
-use crate::style::StyleProperty;
 use crate::test_name;
-use crate::tests::utils::{ColorBrush, TestEnv, samples};
-use crate::{AlignmentOptions, Layout};
+use crate::util::{ColorBrush, TestEnv, samples};
+use parley::layout::Alignment;
+use parley::style::StyleProperty;
+use parley::{AlignmentOptions, Layout};
 
 /// Helper to build a layout with a single font size applied
 fn build_with_font_size(env: &mut TestEnv, text: &str, size: f32) -> Layout<ColorBrush> {
@@ -50,8 +49,8 @@ fn style_font_weight_values() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::FontWeight;
-    use crate::style::FontFamily;
+    use parley::FontWeight;
+    use parley::style::FontFamily;
 
     for (weight, name) in [
         (FontWeight::THIN, "thin"),
@@ -82,8 +81,8 @@ fn style_font_width_values() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::FontWidth;
-    use crate::style::FontFamily;
+    use parley::FontWidth;
+    use parley::style::FontFamily;
 
     for (width, name) in [
         (FontWidth::ULTRA_CONDENSED, "ultra_condensed"),
@@ -112,8 +111,8 @@ fn style_font_style_values() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::setting::Tag;
-    use crate::style::{FontFamily, FontVariation, FontVariations};
+    use parley::setting::Tag;
+    use parley::style::{FontFamily, FontVariation, FontVariations};
 
     // Using Roboto Flex with slnt axis for italic/oblique effects
     // TODO: FontStyle property doesn't automatically map to slnt axis for variable fonts,
@@ -144,7 +143,7 @@ fn style_font_family_named() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::style::FontFamily;
+    use parley::style::FontFamily;
 
     // Test with Roboto (should be available in test fonts)
     let mut builder = env.ranged_builder(text);

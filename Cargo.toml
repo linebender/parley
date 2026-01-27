@@ -10,6 +10,7 @@ members = [
     "parley_data_gen",
     "parley_dev",
     "parley_draw",
+    "parley_tests",
     "text_primitives",
     "examples/swash_render",
     "examples/tiny_skia_render",

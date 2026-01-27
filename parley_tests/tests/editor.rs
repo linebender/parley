@@ -1,9 +1,10 @@
-// Copyright 2024 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::test_name;
+//! `PlainEditor` tests.
 
-use super::utils::TestEnv;
+use crate::test_name;
+use crate::util::TestEnv;
 
 // TODO - Use CursorTest API for these tests
 

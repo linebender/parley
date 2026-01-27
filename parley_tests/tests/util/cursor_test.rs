@@ -1,15 +1,10 @@
-// Copyright 2024 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use alloc::{
-    format,
-    string::{String, ToString},
-};
-use std::eprintln;
 use tiny_skia::{Color, Pixmap, PixmapPaint, Transform};
 
-use crate::tests::utils::renderer::{ColorBrush, RenderingConfig, render_layout};
-use crate::{Affinity, Cursor, FontContext, Layout, LayoutContext};
+use super::renderer::{ColorBrush, RenderingConfig, render_layout};
+use parley::{Affinity, Cursor, FontContext, Layout, LayoutContext};
 
 // Note: This module is only compiled when running tests, which requires std,
 // so we don't have to worry about being no_std-compatible.
@@ -67,7 +62,7 @@ impl CursorTest {
         }
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "this will be used for the editor tests later")]
     /// Returns the text that was used to create the layout.
     pub(crate) fn text(&self) -> &str {
         &self.text
@@ -236,8 +231,16 @@ impl CursorTest {
             &[],
         );
 
-        assert_eq!(img_expected.width(), img_actual.width());
-        assert_eq!(img_expected.height(), img_actual.height());
+        assert_eq!(
+            img_expected.width(),
+            img_actual.width(),
+            "expected and actual snapshot dimensions match"
+        );
+        assert_eq!(
+            img_expected.height(),
+            img_actual.height(),
+            "expected and actual snapshot dimensions match"
+        );
 
         let mut full_img = Pixmap::new(img_actual.width(), img_actual.height() * 2).unwrap();
         full_img.draw_pixmap(
@@ -333,7 +336,7 @@ impl CursorTest {
     ///
     /// - If the cursors don't have the same index.
     /// - If the cursors don't have the same affinity.
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "this will be used for the editor tests later")]
     #[track_caller]
     pub(crate) fn assert_cursor_is(&self, expected: Cursor, cursor: Cursor) {
         self.cursor_assertion(expected, cursor);
@@ -343,7 +346,7 @@ impl CursorTest {
     ///
     /// Uses the same format as assertion failures.
     #[track_caller]
-    #[allow(clippy::print_stderr)]
+    #[allow(clippy::print_stderr, reason = "the logging here is intentional")]
     pub(crate) fn print_cursor(&self, cursor: Cursor) {
         eprintln!(
             concat!(
@@ -362,8 +365,8 @@ impl CursorTest {
     ///
     /// Uses the same visual format as assertion failures.
     #[track_caller]
-    #[allow(clippy::print_stderr)]
-    #[allow(dead_code)]
+    #[allow(clippy::print_stderr, reason = "the logging here is intentional")]
+    #[allow(dead_code, reason = "this will be used for the editor tests later")]
     pub(crate) fn render_cursor(&self, cursor: Cursor) {
         let background_color = Color::from_rgba8(255, 255, 255, 255);
         let padding_color = Color::from_rgba8(166, 200, 255, 255);
@@ -406,25 +409,5 @@ impl CursorTest {
             "screenshot saved in '{screenshot_path}'\n",
             screenshot_path = screenshot_path.display(),
         );
-    }
-}
-
-// ---
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn cursor_next_visual() {
-        let (mut lcx, mut fcx) = (LayoutContext::new(), FontContext::new());
-        let text = "Lorem ipsum dolor sit amet";
-        let layout = CursorTest::single_line(text, &mut lcx, &mut fcx);
-
-        let mut cursor: Cursor = layout.cursor_before("dolor");
-        layout.print_cursor(cursor);
-        cursor = cursor.next_visual(&layout.layout);
-
-        layout.assert_cursor_is_after("ipsum d", cursor);
     }
 }

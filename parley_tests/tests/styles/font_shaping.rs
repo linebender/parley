@@ -1,17 +1,16 @@
-// Copyright 2024 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Tests for font shaping style properties.
 
-use alloc::borrow::Cow;
-use alloc::format;
+use std::borrow::Cow;
 
-use crate::AlignmentOptions;
-use crate::layout::Alignment;
-use crate::setting::Tag;
-use crate::style::{FontFeature, FontFeatures, FontVariation, FontVariations, StyleProperty};
 use crate::test_name;
-use crate::tests::utils::{TestEnv, samples};
+use crate::util::{TestEnv, samples};
+use parley::AlignmentOptions;
+use parley::layout::Alignment;
+use parley::setting::Tag;
+use parley::style::{FontFeature, FontFeatures, FontVariation, FontVariations, StyleProperty};
 
 // ============================================================================
 // FontVariations Tests
@@ -22,7 +21,7 @@ fn style_variations_weight_axis() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::style::FontFamily;
+    use parley::style::FontFamily;
 
     // Test weight axis (wght) with different values
     for weight in [100.0, 400.0, 700.0, 900.0] {
@@ -48,7 +47,7 @@ fn style_variations_width_axis() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::style::FontFamily;
+    use parley::style::FontFamily;
 
     // Test width axis (wdth) with different values
     for width in [75.0, 100.0, 125.0] {
@@ -74,7 +73,7 @@ fn style_variations_multiple_axes() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use crate::style::FontFamily;
+    use parley::style::FontFamily;
 
     // Test multiple axes at once
     let variations = FontVariations::List(Cow::Borrowed(&[
@@ -175,8 +174,8 @@ fn style_features_ligatures_ltr_cluster_details() {
     let line = layout.lines().next().unwrap();
     let item = line.items().next().unwrap();
     let glyph_run = match item {
-        crate::PositionedLayoutItem::GlyphRun(glyph_run) => glyph_run,
-        crate::PositionedLayoutItem::InlineBox(_) => unreachable!(),
+        parley::PositionedLayoutItem::GlyphRun(glyph_run) => glyph_run,
+        parley::PositionedLayoutItem::InlineBox(_) => unreachable!(),
     };
     let mut last_advance = f32::MAX;
     glyph_run.run().clusters().enumerate().for_each(|(i, c)| {
@@ -222,8 +221,8 @@ fn style_features_ligatures_rtl_cluster_details() {
     let line = layout.lines().next().unwrap();
     let item = line.items().next().unwrap();
     let glyph_run = match item {
-        crate::PositionedLayoutItem::GlyphRun(glyph_run) => glyph_run,
-        crate::PositionedLayoutItem::InlineBox(_) => unreachable!(),
+        parley::PositionedLayoutItem::GlyphRun(glyph_run) => glyph_run,
+        parley::PositionedLayoutItem::InlineBox(_) => unreachable!(),
     };
     let mut last_advance = f32::MAX;
     glyph_run.run().clusters().enumerate().for_each(|(i, c)| {

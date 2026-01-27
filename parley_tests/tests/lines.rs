@@ -1,16 +1,18 @@
-// Copyright 2025 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Test line layouts, including the vertical size and positioning of the line box.
+//! Line layout tests.
+//!
+//! These tests validate the vertical positioning of lines, including metrics like
+//! ascent, descent, and line box height.
 
-use alloc::vec::Vec;
-use peniko::kurbo::Size;
-
-use super::utils::{ColorBrush, TestEnv};
-use crate::{
-    Affinity, BoundingBox, Brush, Cursor, InlineBox, Layout, LineHeight, Selection, StyleProperty,
-    test_name,
+use crate::test_name;
+use crate::util::{ColorBrush, TestEnv};
+use parley::{
+    Affinity, Alignment, AlignmentOptions, BoundingBox, Brush, Cursor, InlineBox, Layout,
+    LineHeight, Selection, StyleProperty,
 };
+use peniko::kurbo::Size;
 
 const TEXT: &str = "Some text here. Let's make\n\
         it a bit longer so that\n \
@@ -555,11 +557,7 @@ fn lines_line_height_metrics_relative() {
     let mut layout = builder.build(TEXT);
 
     layout.break_all_lines(None);
-    layout.align(
-        None,
-        crate::Alignment::Start,
-        crate::AlignmentOptions::default(),
-    );
+    layout.align(None, Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -573,11 +571,7 @@ fn lines_line_height_size_relative() {
     let mut layout = builder.build(TEXT);
 
     layout.break_all_lines(None);
-    layout.align(
-        None,
-        crate::Alignment::Start,
-        crate::AlignmentOptions::default(),
-    );
+    layout.align(None, Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -591,10 +585,6 @@ fn lines_line_height_absolute() {
     let mut layout = builder.build(TEXT);
 
     layout.break_all_lines(None);
-    layout.align(
-        None,
-        crate::Alignment::Start,
-        crate::AlignmentOptions::default(),
-    );
+    layout.align(None, Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
