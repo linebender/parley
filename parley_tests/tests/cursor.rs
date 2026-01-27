@@ -6,12 +6,15 @@
 // TODO: these should use the create_font_context helper to avoid introducing
 // accidental dependencies on system fonts
 
-use crate::util::{ColorBrush, CursorTest};
-use parley::{Affinity, Cursor, FontContext, LayoutContext, Selection};
+use crate::{
+    test_name,
+    util::{CursorTest, TestEnv, env::create_font_context},
+};
+use parley::{Affinity, Cursor, LayoutContext, Selection};
 
 #[test]
 fn cursor_previous_visual() {
-    let (mut lcx, mut fcx) = (LayoutContext::new(), FontContext::new());
+    let (mut lcx, mut fcx) = (LayoutContext::new(), create_font_context());
     let text = "Lorem ipsum dolor sit amet";
     let layout = CursorTest::single_line(text, &mut lcx, &mut fcx);
 
@@ -24,7 +27,7 @@ fn cursor_previous_visual() {
 
 #[test]
 fn cursor_next_visual() {
-    let (mut lcx, mut fcx) = (LayoutContext::new(), FontContext::new());
+    let (mut lcx, mut fcx) = (LayoutContext::new(), create_font_context());
     let text = "Lorem ipsum dolor sit amet";
     let layout = CursorTest::single_line(text, &mut lcx, &mut fcx);
 
@@ -37,15 +40,19 @@ fn cursor_next_visual() {
 
 #[test]
 fn cursor_ligature_selection() {
-    let (mut lcx, mut fcx): (LayoutContext<ColorBrush>, _) =
-        (LayoutContext::new(), FontContext::new());
-
-    // Test with ligature text "fi" using serif font which should support ligatures
+    let mut env = TestEnv::new(test_name!(), None);
+    // Test with ligature text "fi" using a font which has that ligature
     let text = "fi";
-    let mut builder = lcx.ranged_builder(&mut fcx, text, 1.0, true);
-    builder.push_default(parley::style::GenericFamily::Serif);
+    let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
+
+    // Make sure there's actually only one glyph (the ligature)
+    let line = layout.lines().next().unwrap();
+    let run = line.runs().next().unwrap();
+    let cluster = run.clusters().next().unwrap();
+    let glyphs: Vec<_> = cluster.glyphs().collect();
+    assert_eq!(glyphs.len(), 1);
 
     // Test cursor positioning at the end of the text (byte index 2)
     // This should position the cursor at the end, not at the start of the cluster
