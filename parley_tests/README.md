@@ -4,9 +4,9 @@ Integration test suite for the Parley text layout library.
 
 ## Overview
 
-This crate contains the integration test suite for `parley`. It follows a similar
-architecture to `vello_sparse_tests` and uses snapshot testing to validate layout
-correctness.
+This crate contains the integration test suite for `parley`. It follows a similar architecture to
+[`vello_sparse_tests`](https://github.com/linebender/vello/tree/main/sparse_strips/vello_sparse_tests) and uses snapshot
+testing to validate layout correctness.
 
 ## Running Tests
 
@@ -41,7 +41,7 @@ cargo xtask review
 
 ## Detect dead snapshots
 
-The following command shows snapshots that are not used in any test. The command also allows to delete such snaphosts.
+The following command shows snapshots that are not used in any test. The command also allows to delete such snapshots.
 
 ```bash
 cargo xtask dead-snapshots
