@@ -15,7 +15,7 @@ name = "tests"
 path = "tests/mod.rs"
 
 [dependencies]
-# TODO: the cursor_ligature_selection test depends on system fonts.
+# TODO: fix the cursor_ligature_selection test so it doesn't depend on system fonts, then remove the "system" feature
 parley = { workspace = true, features = ["std", "system"] }
 parley_dev = { workspace = true }
 peniko = { workspace = true, features = ["std"] }
