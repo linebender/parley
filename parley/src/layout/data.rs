@@ -421,6 +421,8 @@ impl<B: Brush> LayoutData<B> {
                 strikethrough_offset,
                 strikethrough_size,
                 line_height,
+                x_height: metrics.x_height,
+                cap_height: metrics.cap_height,
             }
         };
 
