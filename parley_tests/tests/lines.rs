@@ -311,7 +311,6 @@ fn lines_integral_line_height_ascent_descent_rounding() {
 
     // Compute
     let (mut env, layout, selections) = compute(test_name!(), font_size, line_height_px);
-    *env.max_screenshot_size() = Some(10 * 1024);
 
     // Confirm metrics
     assert_common_truths(&layout, ascent, descent, line_box_height, line_height_px);
