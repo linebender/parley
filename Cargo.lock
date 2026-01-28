@@ -3378,9 +3378,9 @@ dependencies = [
  "oxipng",
  "parley",
  "parley_dev",
+ "parley_draw",
  "peniko",
- "skrifa 0.40.0",
- "tiny-skia",
+ "vello_cpu",
 ]
 
 [[package]]

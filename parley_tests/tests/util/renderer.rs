@@ -10,14 +10,14 @@
 use std::collections::HashMap;
 
 use parley::{BoundingBox, GlyphRun, Layout, PositionedLayoutItem};
-use peniko::kurbo;
-use skrifa::{
-    GlyphId, MetadataProvider,
-    instance::{LocationRef, NormalizedCoord, Size},
-    outline::{DrawSettings, OutlineGlyph, OutlinePen},
-    raw::FontRef as ReadFontsRef,
+use parley_draw::{GlyphCaches, GlyphRunBuilder};
+use peniko::{
+    Color,
+    kurbo::{self, BezPath, Rect, Stroke},
 };
-use tiny_skia::{Color, FillRule, Paint, PathBuilder, Pixmap, PixmapMut, Rect, Transform};
+use vello_cpu::{Pixmap, RenderContext};
+
+use crate::util::env::CLUSTER_INFO_COLOR;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct ColorBrush {
@@ -25,11 +25,8 @@ pub(crate) struct ColorBrush {
 }
 
 impl ColorBrush {
-    pub(crate) fn new(color: peniko::Color) -> Self {
-        let rgba8 = color.to_rgba8();
-        Self {
-            color: Color::from_rgba8(rgba8.r, rgba8.g, rgba8.b, rgba8.a),
-        }
+    pub(crate) fn new(color: Color) -> Self {
+        Self { color }
     }
 }
 
@@ -53,10 +50,17 @@ pub(crate) struct RenderingConfig {
     pub size: Option<kurbo::Size>,
 }
 
-fn draw_rect(pen: &mut TinySkiaPen<'_>, x: f32, y: f32, width: f32, height: f32, color: Color) {
-    pen.set_origin(x, y);
-    pen.set_color(color);
-    pen.fill_rect(width, height);
+fn draw_rect(renderer: &mut RenderContext, x: f64, y: f64, width: f64, height: f64, color: Color) {
+    renderer.set_paint(color);
+    renderer.fill_rect(&Rect::new(x, y, x + width, y + height));
+}
+
+fn draw_line<T: Into<f64>>(renderer: &mut RenderContext, x1: T, y1: T, x2: T, y2: T) {
+    let mut path = BezPath::new();
+    path.move_to((x1.into(), y1.into()));
+    path.line_to((x2.into(), y2.into()));
+    renderer.set_stroke(Stroke::new(1.0));
+    renderer.stroke_path(&path);
 }
 
 /// Render the layout to a [`Pixmap`].
@@ -74,49 +78,53 @@ pub(crate) fn render_layout(
         .size
         .map(|size| size.width as f32)
         .unwrap_or(layout.width())
-        .ceil() as u32;
+        .ceil() as u16;
     let height = config
         .size
         .map(|size| size.height as f32)
         .unwrap_or(layout.height())
-        .ceil() as u32;
+        .ceil() as u16;
     let padded_width = width + padding * 2;
     let padded_height = height + padding * 2;
-    let fpadding = padding as f32;
+    let fpadding = padding as f64;
 
-    let mut img = Pixmap::new(padded_width, padded_height).unwrap();
-
-    img.fill(config.padding_color);
-
-    let mut pen = TinySkiaPen::new(img.as_mut());
-
+    let mut renderer = RenderContext::new(padded_width, padded_height);
+    let mut caches = GlyphCaches::new();
     draw_rect(
-        &mut pen,
+        &mut renderer,
+        0.0,
+        0.0,
+        padded_width as f64,
+        padded_height as f64,
+        config.padding_color,
+    );
+    draw_rect(
+        &mut renderer,
         fpadding,
         fpadding,
-        width as f32,
-        height as f32,
+        width as f64,
+        height as f64,
         config.background_color,
     );
 
     for (rect, lidx) in selection_rects {
         draw_rect(
-            &mut pen,
-            fpadding + rect.x0 as f32,
-            fpadding + rect.y0 as f32,
-            rect.width() as f32,
-            rect.height() as f32,
+            &mut renderer,
+            fpadding + rect.x0,
+            fpadding + rect.y0,
+            rect.width(),
+            rect.height(),
             config.selection_colors[lidx % 2],
         );
     }
 
     if let Some(rect) = cursor_rect {
         draw_rect(
-            &mut pen,
-            fpadding + rect.x0 as f32,
-            fpadding + rect.y0 as f32,
-            rect.width() as f32,
-            rect.height() as f32,
+            &mut renderer,
+            fpadding + rect.x0,
+            fpadding + rect.y0,
+            rect.width(),
+            rect.height(),
             config.cursor_color,
         );
     }
@@ -126,21 +134,24 @@ pub(crate) fn render_layout(
         for item in line.items() {
             match item {
                 PositionedLayoutItem::GlyphRun(glyph_run) => {
-                    render_glyph_run(&glyph_run, &mut pen, padding);
+                    render_glyph_run(&glyph_run, &mut renderer, &mut caches, padding);
                 }
                 PositionedLayoutItem::InlineBox(inline_box) => {
                     draw_rect(
-                        &mut pen,
-                        inline_box.x + fpadding,
-                        inline_box.y + fpadding,
-                        inline_box.width,
-                        inline_box.height,
+                        &mut renderer,
+                        inline_box.x as f64 + fpadding,
+                        inline_box.y as f64 + fpadding,
+                        inline_box.width as f64,
+                        inline_box.height as f64,
                         config.inline_box_color,
                     );
                 }
             };
         }
     }
+
+    let mut img = Pixmap::new(padded_width, padded_height);
+    renderer.render_to_pixmap(&mut img);
     img
 }
 
@@ -149,7 +160,6 @@ pub(crate) fn render_layout_with_clusters(
     config: &RenderingConfig,
     layout: &Layout<ColorBrush>,
     char_layouts: &HashMap<char, Layout<ColorBrush>>,
-    char_info_font_size: f32,
 ) -> Pixmap {
     let padding = 20;
     let line_extra_spacing = 60.0; // Extra space between lines for cluster info
@@ -161,25 +171,30 @@ pub(crate) fn render_layout_with_clusters(
         .size
         .map(|size| size.width as f32)
         .unwrap_or(layout.width())
-        .ceil() as u32;
+        .ceil() as u16;
     let base_height = layout.height();
     let num_lines = layout.len();
-    let height = (base_height + (line_extra_spacing * num_lines as f32)).ceil() as u32;
+    let height = (base_height + (line_extra_spacing * num_lines as f32)).ceil() as u16;
     let padded_width = width + padding * 2;
     let padded_height = height + padding * 2;
-    let fpadding = padding as f32;
+    let fpadding = padding as f64;
 
-    let mut img = Pixmap::new(padded_width, padded_height).unwrap();
-    img.fill(config.padding_color);
-
-    let mut pen = TinySkiaPen::new(img.as_mut());
-
+    let mut renderer = RenderContext::new(padded_width, padded_height);
+    let mut caches = GlyphCaches::new();
     draw_rect(
-        &mut pen,
+        &mut renderer,
+        0.0,
+        0.0,
+        padded_width as f64,
+        padded_height as f64,
+        config.padding_color,
+    );
+    draw_rect(
+        &mut renderer,
         fpadding,
         fpadding,
-        width as f32,
-        height as f32,
+        width as f64,
+        height as f64,
         config.background_color,
     );
 
@@ -192,7 +207,13 @@ pub(crate) fn render_layout_with_clusters(
         for item in line.items() {
             match item {
                 PositionedLayoutItem::GlyphRun(glyph_run) => {
-                    render_glyph_run_with_offset(&glyph_run, &mut pen, padding, y_offset);
+                    render_glyph_run_with_offset(
+                        &glyph_run,
+                        &mut renderer,
+                        &mut caches,
+                        padding,
+                        (0.0, y_offset),
+                    );
                 }
                 PositionedLayoutItem::InlineBox(_) => {
                     panic!("Inline boxes are not supported in cluster rendering");
@@ -221,23 +242,31 @@ pub(crate) fn render_layout_with_clusters(
                     );
 
                     // Draw measurement line
-                    let measure_y = line_y + measurement_line_height + fpadding;
-                    let measure_x_start = x_offset + fpadding;
-                    let measure_x_end = x_offset + cluster_width + fpadding;
+                    let measure_y = line_y as f64 + measurement_line_height + fpadding;
+                    let measure_x_start = x_offset as f64 + fpadding;
+                    let measure_x_end = x_offset as f64 + cluster_width as f64 + fpadding;
 
                     // Draw horizontal measurement line
-                    pen.set_color(Color::from_rgba8(100, 100, 100, 255));
-                    pen.draw_line(measure_x_start, measure_y, measure_x_end, measure_y);
+                    renderer.set_paint(CLUSTER_INFO_COLOR);
+                    draw_line(
+                        &mut renderer,
+                        measure_x_start,
+                        measure_y,
+                        measure_x_end,
+                        measure_y,
+                    );
 
                     // Draw small vertical ticks at start and end
-                    const TICK_HEIGHT: f32 = 3.0;
-                    pen.draw_line(
+                    const TICK_HEIGHT: f64 = 3.0;
+                    draw_line(
+                        &mut renderer,
                         measure_x_start,
                         measure_y - TICK_HEIGHT,
                         measure_x_start,
                         measure_y + TICK_HEIGHT,
                     );
-                    pen.draw_line(
+                    draw_line(
+                        &mut renderer,
                         measure_x_end,
                         measure_y - TICK_HEIGHT,
                         measure_x_end,
@@ -261,30 +290,20 @@ pub(crate) fn render_layout_with_clusters(
                                     panic!("Inline boxes are not supported in cluster rendering");
                                 }
                             };
-                            let font = glyph_run.run().font();
-                            let font_collection_ref = font.data.as_ref();
-                            let font_ref =
-                                ReadFontsRef::from_index(font_collection_ref, font.index).unwrap();
-                            let outlines = font_ref.outline_glyphs();
 
-                            // Calculate total width of the character's glyphs to center them
-                            let char_total_width: f32 = glyph_run.glyphs().map(|g| g.advance).sum();
-                            let char_x_offset = (cluster_width - char_total_width) / 2.0;
-
-                            let mut glyph_x_offset = 0.0;
-                            // Iterates over the glyphs in the GlyphRun
-                            for glyph in glyph_run.glyphs() {
-                                let glyph_x =
-                                    measure_x_start + char_x_offset + glyph.x + glyph_x_offset;
-                                let glyph_y = measure_y + char_display_offset + glyph.y;
-                                glyph_x_offset += glyph.advance;
-
-                                let glyph_id = GlyphId::from(glyph.id);
-                                if let Some(glyph_outline) = outlines.get(glyph_id) {
-                                    pen.set_origin(glyph_x, glyph_y);
-                                    pen.draw_glyph(&glyph_outline, char_info_font_size, &[]);
-                                }
-                            }
+                            // Center each "reference" glyph within the tick marks
+                            let char_x_offset =
+                                x_offset + ((cluster_width - line.metrics().advance) / 2.0);
+                            let char_y_offset = line_y + measurement_line_height as f32
+                                - line.metrics().baseline
+                                + char_display_offset;
+                            render_glyph_run_with_offset(
+                                &glyph_run,
+                                &mut renderer,
+                                &mut caches,
+                                padding,
+                                (char_x_offset, char_y_offset),
+                            );
                         }
                     };
                     x_offset += cluster_width;
@@ -295,203 +314,96 @@ pub(crate) fn render_layout_with_clusters(
         y_offset += line_extra_spacing;
     }
 
+    let mut img = Pixmap::new(padded_width, padded_height);
+    renderer.render_to_pixmap(&mut img);
     img
 }
 
-fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<'_>, padding: u32) {
-    render_glyph_run_with_offset(glyph_run, pen, padding, 0.0);
+fn render_glyph_run(
+    glyph_run: &GlyphRun<'_, ColorBrush>,
+    renderer: &mut RenderContext,
+    caches: &mut GlyphCaches,
+    padding: u16,
+) {
+    render_glyph_run_with_offset(glyph_run, renderer, caches, padding, (0.0, 0.0));
 }
 
 fn render_glyph_run_with_offset(
     glyph_run: &GlyphRun<'_, ColorBrush>,
-    pen: &mut TinySkiaPen<'_>,
-    padding: u32,
-    y_offset: f32,
+    renderer: &mut RenderContext,
+    caches: &mut GlyphCaches,
+    padding: u16,
+    offset: (f32, f32),
 ) {
-    // Resolve properties of the GlyphRun
-    let mut run_x = glyph_run.offset();
-    let run_y = glyph_run.baseline();
-    let style = glyph_run.style();
-    let brush = style.brush;
-
-    // Get the "Run" from the "GlyphRun"
+    let padding = padding as f32;
+    let (x_offset, y_offset) = offset;
+    renderer.set_paint(glyph_run.style().brush.color);
     let run = glyph_run.run();
+    GlyphRunBuilder::new(run.font().clone(), *renderer.transform(), renderer)
+        .font_size(run.font_size())
+        .hint(false)
+        .normalized_coords(run.normalized_coords())
+        .fill_glyphs(
+            glyph_run
+                .positioned_glyphs()
+                .map(|glyph| parley_draw::Glyph {
+                    id: glyph.id,
+                    x: glyph.x + padding + x_offset,
+                    y: glyph.y + padding + y_offset,
+                }),
+            caches,
+        );
 
-    // Resolve properties of the Run
-    let font = run.font();
-    let font_size = run.font_size();
-
-    let normalized_coords = run
-        .normalized_coords()
-        .iter()
-        .map(|coord| NormalizedCoord::from_bits(*coord))
-        .collect::<Vec<_>>();
-
-    // Get glyph outlines using Skrifa. This can be cached in production code.
-    let font_collection_ref = font.data.as_ref();
-    let font_ref = ReadFontsRef::from_index(font_collection_ref, font.index).unwrap();
-    let outlines = font_ref.outline_glyphs();
-
-    // Iterates over the glyphs in the GlyphRun
-    for glyph in glyph_run.glyphs() {
-        let glyph_x = run_x + glyph.x + padding as f32;
-        let glyph_y = run_y + glyph.y + padding as f32 + y_offset;
-        run_x += glyph.advance;
-
-        let glyph_id = GlyphId::from(glyph.id);
-        if let Some(glyph_outline) = outlines.get(glyph_id) {
-            pen.set_origin(glyph_x, glyph_y);
-            pen.set_color(brush.color);
-            pen.draw_glyph(&glyph_outline, font_size, &normalized_coords);
-        }
-    }
-
-    // Draw decorations: underline & strikethrough
     let style = glyph_run.style();
-    let run_metrics = run.metrics();
     if let Some(decoration) = &style.underline {
-        let offset = decoration.offset.unwrap_or(run_metrics.underline_offset);
-        let size = decoration.size.unwrap_or(run_metrics.underline_size);
+        let offset = decoration.offset.unwrap_or(run.metrics().underline_offset);
+        let size = decoration.size.unwrap_or(run.metrics().underline_size);
+
         render_decoration_with_offset(
-            pen,
+            renderer,
             glyph_run,
             decoration.brush,
-            offset,
-            size,
-            padding,
-            y_offset,
+            offset as f64,
+            size as f64,
+            padding as f64,
+            y_offset as f64,
         );
     }
     if let Some(decoration) = &style.strikethrough {
         let offset = decoration
             .offset
-            .unwrap_or(run_metrics.strikethrough_offset);
-        let size = decoration.size.unwrap_or(run_metrics.strikethrough_size);
+            .unwrap_or(run.metrics().strikethrough_offset);
+        let size = decoration.size.unwrap_or(run.metrics().strikethrough_size);
+
         render_decoration_with_offset(
-            pen,
+            renderer,
             glyph_run,
             decoration.brush,
-            offset,
-            size,
-            padding,
-            y_offset,
+            offset as f64,
+            size as f64,
+            padding as f64,
+            y_offset as f64,
         );
     }
 }
 
 fn render_decoration_with_offset(
-    pen: &mut TinySkiaPen<'_>,
+    renderer: &mut RenderContext,
     glyph_run: &GlyphRun<'_, ColorBrush>,
     brush: ColorBrush,
-    offset: f32,
-    width: f32,
-    padding: u32,
-    y_offset: f32,
+    offset: f64,
+    width: f64,
+    padding: f64,
+    y_offset: f64,
 ) {
-    let y = glyph_run.baseline() - offset + padding as f32 + y_offset;
-    let x = glyph_run.offset() + padding as f32;
-    pen.set_color(brush.color);
-    pen.set_origin(x, y);
-    pen.fill_rect(glyph_run.advance(), width);
-}
-
-struct TinySkiaPen<'a> {
-    pixmap: PixmapMut<'a>,
-    x: f32,
-    y: f32,
-    paint: Paint<'static>,
-    open_path: PathBuilder,
-}
-
-impl TinySkiaPen<'_> {
-    fn new(pixmap: PixmapMut<'_>) -> TinySkiaPen<'_> {
-        TinySkiaPen {
-            pixmap,
-            x: 0.0,
-            y: 0.0,
-            paint: Paint::default(),
-            open_path: PathBuilder::new(),
-        }
-    }
-
-    fn set_origin(&mut self, x: f32, y: f32) {
-        self.x = x;
-        self.y = y;
-    }
-
-    fn set_color(&mut self, color: Color) {
-        self.paint.set_color(color);
-    }
-
-    fn fill_rect(&mut self, width: f32, height: f32) {
-        let rect = Rect::from_xywh(self.x, self.y, width, height).expect("Invalid rect");
-        self.pixmap
-            .fill_rect(rect, &self.paint, Transform::identity(), None);
-    }
-
-    fn draw_line(&mut self, x1: f32, y1: f32, x2: f32, y2: f32) {
-        let mut pb = PathBuilder::new();
-        pb.move_to(x1, y1);
-        pb.line_to(x2, y2);
-        if let Some(path) = pb.finish() {
-            let stroke = tiny_skia::Stroke {
-                width: 1.0,
-                ..tiny_skia::Stroke::default()
-            };
-            self.pixmap
-                .stroke_path(&path, &self.paint, &stroke, Transform::identity(), None);
-        }
-    }
-
-    fn draw_glyph(
-        &mut self,
-        glyph: &OutlineGlyph<'_>,
-        size: f32,
-        normalized_coords: &[NormalizedCoord],
-    ) {
-        let location_ref = LocationRef::new(normalized_coords);
-        let settings = DrawSettings::unhinted(Size::new(size), location_ref);
-        glyph.draw(settings, self).unwrap();
-
-        let builder = core::mem::replace(&mut self.open_path, PathBuilder::new());
-        if let Some(path) = builder.finish() {
-            self.pixmap.fill_path(
-                &path,
-                &self.paint,
-                FillRule::Winding,
-                Transform::identity(),
-                None,
-            );
-        }
-    }
-}
-
-impl OutlinePen for TinySkiaPen<'_> {
-    fn move_to(&mut self, x: f32, y: f32) {
-        self.open_path.move_to(self.x + x, self.y - y);
-    }
-
-    fn line_to(&mut self, x: f32, y: f32) {
-        self.open_path.line_to(self.x + x, self.y - y);
-    }
-
-    fn quad_to(&mut self, cx0: f32, cy0: f32, x: f32, y: f32) {
-        self.open_path
-            .quad_to(self.x + cx0, self.y - cy0, self.x + x, self.y - y);
-    }
-
-    fn curve_to(&mut self, cx0: f32, cy0: f32, cx1: f32, cy1: f32, x: f32, y: f32) {
-        self.open_path.cubic_to(
-            self.x + cx0,
-            self.y - cy0,
-            self.x + cx1,
-            self.y - cy1,
-            self.x + x,
-            self.y - y,
-        );
-    }
-
-    fn close(&mut self) {
-        self.open_path.close();
-    }
+    let y = glyph_run.baseline() as f64 - offset + padding + y_offset;
+    let x = glyph_run.offset() as f64 + padding;
+    draw_rect(
+        renderer,
+        x,
+        y,
+        glyph_run.advance() as f64,
+        width,
+        brush.color,
+    );
 }

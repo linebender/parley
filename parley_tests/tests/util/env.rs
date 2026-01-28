@@ -3,22 +3,19 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use fontique::{Blob, Collection, CollectionOptions, SourceCache};
 use parley::{
-    BoundingBox, FontContext, FontFamily, Layout, LayoutContext, LineHeight, PlainEditor,
-    PlainEditorDriver, RangedBuilder, StyleProperty, TextStyle, TreeBuilder,
+    BoundingBox, FontContext, FontFamily, FontFamilyName, Layout, LayoutContext, LineHeight,
+    PlainEditor, PlainEditorDriver, RangedBuilder, StyleProperty, TextStyle, TreeBuilder,
 };
-use peniko::kurbo::Size;
-use tiny_skia::{Color, Pixmap};
+use peniko::{Color, kurbo::Size};
+use vello_cpu::Pixmap;
 
-use crate::util::renderer::render_layout_with_clusters;
-
-use super::renderer::{ColorBrush, RenderingConfig, render_layout};
-
-use parley::FontFamilyName;
+use super::renderer::{ColorBrush, RenderingConfig, render_layout, render_layout_with_clusters};
 
 fn current_imgs_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("current")
@@ -32,6 +29,8 @@ pub(crate) const FONT_FAMILY_LIST: &[FontFamilyName<'_>] = &[
     FontFamilyName::Named(Cow::Borrowed("Roboto")),
     FontFamilyName::Named(Cow::Borrowed("Noto Kufi Arabic")),
 ];
+
+pub(crate) const CLUSTER_INFO_COLOR: Color = Color::from_rgba8(100, 100, 100, 255);
 
 pub(crate) struct TestEnv {
     test_name: String,
@@ -142,7 +141,7 @@ impl TestEnv {
             cursor_size: 2.0,
             errors: Vec::new(),
             next_test_case_name: String::new(),
-            max_screenshot_size: Some(8 * 1024),
+            max_screenshot_size: Some(32 * 1024),
         }
     }
 
@@ -150,6 +149,7 @@ impl TestEnv {
         &mut self.rendering_config
     }
 
+    #[allow(dead_code, reason = "this may be useful for future tests")]
     pub(crate) fn max_screenshot_size(&mut self) -> &mut Option<usize> {
         &mut self.max_screenshot_size
     }
@@ -222,7 +222,8 @@ impl TestEnv {
         if !snapshot_path.is_file() {
             return Err(format!("Cannot find snapshot {}", snapshot_path.display()));
         }
-        let snapshot_img = Pixmap::load_png(snapshot_path).unwrap();
+        let snapshot_file = File::open(snapshot_path).unwrap();
+        let snapshot_img = Pixmap::from_png(snapshot_file).unwrap();
         if snapshot_img.width() != current_img.width()
             || snapshot_img.height() != current_img.height()
         {
@@ -237,13 +238,13 @@ impl TestEnv {
 
         let mut n_different_pixels = 0;
         let mut color_cumulative_difference = 0.0;
-        for (pixel1, pixel2) in snapshot_img.pixels().iter().zip(current_img.pixels()) {
+        for (pixel1, pixel2) in snapshot_img.data().iter().zip(current_img.data()) {
             if pixel1 != pixel2 {
                 n_different_pixels += 1;
             }
-            let diff_r = (pixel1.red() as f32 - pixel2.red() as f32).abs();
-            let diff_g = (pixel1.green() as f32 - pixel2.green() as f32).abs();
-            let diff_b = (pixel1.blue() as f32 - pixel2.blue() as f32).abs();
+            let diff_r = (pixel1.r as f32 - pixel2.r as f32).abs();
+            let diff_g = (pixel1.g as f32 - pixel2.g as f32).abs();
+            let diff_b = (pixel1.b as f32 - pixel2.b as f32).abs();
             color_cumulative_difference += diff_r.max(diff_g).max(diff_b);
         }
         if color_cumulative_difference > self.tolerance {
@@ -291,18 +292,19 @@ impl TestEnv {
     ) {
         let mut char_layouts = HashMap::new();
         for char in text.chars() {
-            let char_text = char.to_string();
-            let mut layout = self.ranged_builder(&char_text).build(&char_text);
-            layout.break_all_lines(Some(400.0));
-            char_layouts.insert(char, layout);
+            char_layouts.entry(char).or_insert_with(|| {
+                let char_text = char.to_string();
+                let mut builder = self.ranged_builder(&char_text);
+                builder.push_default(StyleProperty::FontSize(char_info_font_size));
+                builder.push_default(StyleProperty::Brush(ColorBrush::new(CLUSTER_INFO_COLOR)));
+                let mut layout = builder.build(&char_text);
+                layout.break_all_lines(Some(400.0));
+                layout
+            });
         }
 
-        let current_img = render_layout_with_clusters(
-            &self.rendering_config,
-            layout,
-            &char_layouts,
-            char_info_font_size,
-        );
+        let current_img =
+            render_layout_with_clusters(&self.rendering_config, layout, &char_layouts);
         self.check_image(&current_img);
     }
 
@@ -318,7 +320,7 @@ impl TestEnv {
         fn save_image(image: &Pixmap, path: &PathBuf, max_size: Option<usize>) {
             use oxipng::{Options, optimize_from_memory};
 
-            let image_data = image.encode_png().unwrap();
+            let image_data = image.clone().into_png().unwrap();
 
             let data = optimize_from_memory(&image_data, &Options::from_preset(5)).unwrap();
             let saved_len = data.len();
