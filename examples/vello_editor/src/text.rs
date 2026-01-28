@@ -418,7 +418,7 @@ impl Editor {
                         Fill::NonZero,
                         glyph_run.glyphs().map(|glyph| {
                             let gx = x + glyph.x;
-                            let gy = y - glyph.y;
+                            let gy = y + glyph.y;
                             x += glyph.advance;
                             vello::Glyph {
                                 id: glyph.id,
