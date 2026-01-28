@@ -15,6 +15,12 @@ You can find its changes [documented below](#060---2025-11-24).
 
 This release has an [MSRV] of 1.88.
 
+### Changed
+
+#### Parley
+
+- Breaking change: `Glyph::y` is now in Y-down coordinate space instead of Y-up coordinate space. ([#528][] by [@valadaptive][])
+
 ## [0.7.0] - 2025-11-24
 
 This release has an [MSRV] of 1.83.
@@ -438,6 +444,7 @@ This release has an [MSRV][] of 1.70.
 [#451]: https://github.com/linebender/parley/pull/451
 [#467]: https://github.com/linebender/parley/pull/467
 [#468]: https://github.com/linebender/parley/pull/468
+[#528]: https://github.com/linebender/parley/pull/528
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.7.0...HEAD
 [0.7.0]: https://github.com/linebender/parley/compare/v0.6.0...v0.7.0
