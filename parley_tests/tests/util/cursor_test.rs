@@ -1,7 +1,8 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use tiny_skia::{Color, Pixmap, PixmapPaint, Transform};
+use peniko::Color;
+use vello_cpu::Pixmap;
 
 use super::renderer::{ColorBrush, RenderingConfig, render_layout};
 use parley::{Affinity, Cursor, FontContext, Layout, LayoutContext};
@@ -242,23 +243,12 @@ impl CursorTest {
             "expected and actual snapshot dimensions match"
         );
 
-        let mut full_img = Pixmap::new(img_actual.width(), img_actual.height() * 2).unwrap();
-        full_img.draw_pixmap(
-            0,
-            0,
-            img_expected.as_ref(),
-            &PixmapPaint::default(),
-            Transform::identity(),
-            None,
-        );
-        full_img.draw_pixmap(
-            0,
-            img_expected.height() as i32,
-            img_actual.as_ref(),
-            &PixmapPaint::default(),
-            Transform::identity(),
-            None,
-        );
+        let mut full_img = Pixmap::new(img_actual.width(), img_actual.height() * 2);
+        // vello_cpu currently doesn't have a simple "blit pixmap with no scaling" API, so just copy the data to get the
+        // expected and actual images in a vertical stack
+        let num_pixels = img_actual.width() as usize * img_actual.height() as usize;
+        full_img.data_mut()[..num_pixels].copy_from_slice(img_expected.data());
+        full_img.data_mut()[num_pixels..].copy_from_slice(img_actual.data());
 
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -269,7 +259,7 @@ impl CursorTest {
         // TODO - If possible, display the image in the terminal using Kitty Image Protocol
         // https://sw.kovidgoyal.net/kitty/graphics-protocol/
         // (probably with kitty_image crate)
-        full_img.save_png(&screenshot_path).unwrap();
+        std::fs::write(&screenshot_path, full_img.into_png().unwrap()).unwrap();
 
         panic!(
             concat!(
@@ -403,7 +393,7 @@ impl CursorTest {
 
         // TODO - If possible, display the image in the terminal,
         // see comment in cursor_assertion
-        img_cursor.save_png(&screenshot_path).unwrap();
+        std::fs::write(&screenshot_path, img_cursor.into_png().unwrap()).unwrap();
 
         eprintln!(
             "screenshot saved in '{screenshot_path}'\n",
