@@ -110,7 +110,7 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
 
         // Compute free space.
         let free_space =
-            layout.alignment_width - line.metrics.advance + line.metrics.trailing_whitespace;
+            layout.alignment_width - line.unjustified_advance + line.metrics.trailing_whitespace;
 
         if !options.align_when_overflowing && free_space <= 0.0 {
             if is_rtl {
@@ -177,6 +177,7 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
                             }
                             if cluster.info.whitespace().is_space_or_nbsp() {
                                 cluster.advance += adjustment;
+                                line.metrics.advance += adjustment;
                                 applied += 1;
                             }
                         });
