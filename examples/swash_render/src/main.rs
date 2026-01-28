@@ -251,7 +251,7 @@ fn render_glyph_run(
     // Iterates over the glyphs in the GlyphRun
     for glyph in glyph_run.glyphs() {
         let glyph_x = run_x + glyph.x + (padding as f32);
-        let glyph_y = run_y - glyph.y + (padding as f32);
+        let glyph_y = run_y + glyph.y + (padding as f32);
         run_x += glyph.advance;
 
         render_glyph(img, &mut scaler, color, glyph, glyph_x, glyph_y);
