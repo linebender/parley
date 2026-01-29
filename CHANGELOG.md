@@ -21,6 +21,30 @@ This release has an [MSRV] of 1.88.
 
 - Breaking change: `Glyph::y` is now in Y-down coordinate space instead of Y-up coordinate space. ([#528][] by [@valadaptive][])
 
+  **This does not change the API surface, but *will* change the behavior of existing code!** If you're iterating over non-positioned glyphs using the `GlyphRun::glyphs` method and positioning each glyph yourself, with code like:
+
+  ```rust
+  let run_y = glyph_run.baseline();
+  for glyph in glyph_run.glyphs() {
+    let glyph_y = run_y - glyph.y;
+    ...
+  }
+  ```
+
+  You'll need to update your code to *add* `glyph.y`, instead of subtracting it:
+
+  ```rust
+  let run_y = glyph_run.baseline();
+  for glyph in glyph_run.glyphs() {
+    let glyph_y = run_y + glyph.y;
+    ...
+  }
+  ```
+
+  If you instead use the `GlyphRun::positioned_glyphs` method, your code will not need to change.
+
+
+
 ## [0.7.0] - 2025-11-24
 
 This release has an [MSRV] of 1.83.
