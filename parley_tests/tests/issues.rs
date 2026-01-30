@@ -98,7 +98,7 @@ And, finally, yet another sentence."#;
 fn max_context_with_mandatory_breaks() {
     let mut env = TestEnv::new(test_name!(), None);
 
-let text = "First line of text.
+    let text = "First line of text.
 Second line of text.
 Third line that ends with newlines\n\n";
 
