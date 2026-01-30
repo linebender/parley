@@ -556,6 +556,7 @@ impl<B: Brush> LayoutData<B> {
                             min_width = min_width.max(running_min_width - trailing_whitespace);
                             running_min_width = 0.0;
                             if boundary == Boundary::Mandatory {
+                                max_width = max_width.max(running_max_width - trailing_whitespace);
                                 running_max_width = 0.0;
                             }
                         }

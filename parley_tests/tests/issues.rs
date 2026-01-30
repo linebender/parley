@@ -5,7 +5,7 @@
 
 use crate::test_name;
 use crate::util::TestEnv;
-use parley::{Alignment, AlignmentOptions, PositionedLayoutItem};
+use parley::{Alignment, AlignmentOptions, PositionedLayoutItem, StyleProperty, TextWrapMode};
 
 /// Test that rendering RTL text doesn't affect subsequent LTR layouts.
 /// See <https://github.com/linebender/parley/issues/489>.
@@ -82,4 +82,35 @@ And, finally, yet another sentence."#;
         layout.align(None, Alignment::Justify, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
+}
+
+/// Test that mandatory line breaks don't zero-out the max content width.
+///
+/// When a mandatory line break occurs we should set the `running_max_width`
+/// to 0 and start counting `running_max_width` again. However, we should first
+/// accumulate the `running_max_width` into the overall `max_width`. Otherwise
+/// the width of the line we have just ended is not accounted for.
+///
+/// This was causing text in Blitz to wrap to the min-content width in cases
+/// where a paragraph ended with a newline as the max-content width was
+/// entirely zeroed out!
+#[test]
+fn max_context_with_mandatory_breaks() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "First line of text.
+Second line of text.
+Third line that ends with newlines\n\n";
+
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::TextWrapMode(TextWrapMode::NoWrap));
+    let mut layout = builder.build(text);
+
+    let content_widths = layout.calculate_content_widths();
+    assert!(content_widths.max != 0.0);
+
+    layout.break_all_lines(Some(content_widths.max));
+    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    env.with_name("max_context_with_mandatory_breaks")
+        .check_layout_snapshot(&layout);
 }
