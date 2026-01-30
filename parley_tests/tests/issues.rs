@@ -98,9 +98,9 @@ And, finally, yet another sentence."#;
 fn max_context_with_mandatory_breaks() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    let text = "A sentence across two lines.
-And another sentence that breaks across, hopefully, three lines.
-And, finally, yet another sentence that ends with newlines\n\n";
+let text = "First line of text.
+Second line of text.
+Third line that ends with newlines\n\n";
 
     let mut builder = env.ranged_builder(text);
     builder.push_default(StyleProperty::TextWrapMode(TextWrapMode::NoWrap));
