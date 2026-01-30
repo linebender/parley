@@ -748,7 +748,8 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
             id: glyph_info.glyph_id,
             style_index: char_info.1,
             x: (glyph_pos.x_offset as f32) * scale_factor,
-            y: (glyph_pos.y_offset as f32) * scale_factor,
+            // Convert from font space (Y-up) to layout space (Y-down)
+            y: -(glyph_pos.y_offset as f32) * scale_factor,
             advance: (glyph_pos.x_advance as f32) * scale_factor,
         };
         cluster_advance += glyph.advance;

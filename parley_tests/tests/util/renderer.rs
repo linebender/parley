@@ -276,7 +276,7 @@ pub(crate) fn render_layout_with_clusters(
                             for glyph in glyph_run.glyphs() {
                                 let glyph_x =
                                     measure_x_start + char_x_offset + glyph.x + glyph_x_offset;
-                                let glyph_y = measure_y + char_display_offset - glyph.y;
+                                let glyph_y = measure_y + char_display_offset + glyph.y;
                                 glyph_x_offset += glyph.advance;
 
                                 let glyph_id = GlyphId::from(glyph.id);
@@ -335,7 +335,7 @@ fn render_glyph_run_with_offset(
     // Iterates over the glyphs in the GlyphRun
     for glyph in glyph_run.glyphs() {
         let glyph_x = run_x + glyph.x + padding as f32;
-        let glyph_y = run_y - glyph.y + padding as f32 + y_offset;
+        let glyph_y = run_y + glyph.y + padding as f32 + y_offset;
         run_x += glyph.advance;
 
         let glyph_id = GlyphId::from(glyph.id);
