@@ -95,14 +95,25 @@ impl GlyphRenderer for RenderContext {
                     pix
                 };
 
+                let has_skew = prepared_glyph.transform.as_coeffs()[1] != 0.0
+                    || prepared_glyph.transform.as_coeffs()[2] != 0.0;
+
                 let image = Image {
                     image: ImageSource::Pixmap(Arc::new(glyph_pixmap)),
                     sampler: ImageSampler {
                         x_extend: peniko::Extend::Pad,
                         y_extend: peniko::Extend::Pad,
-                        // Since the pixmap will already have the correct size, no need to
-                        // use a different image quality here.
-                        quality: peniko::ImageQuality::Low,
+
+                        quality: if has_skew {
+                            // Even though the pixmap has the "correct" size, the skewing
+                            // might cause aliasing artifacts since the pixels don't map
+                            // perfectly to the pixmap, so we use bilinear scaling here.
+                            peniko::ImageQuality::Medium
+                        } else {
+                            // Since the pixmap will already have the correct size, no need to
+                            // use a different image quality here.
+                            peniko::ImageQuality::Low
+                        },
                         alpha: 1.0,
                     },
                 };
