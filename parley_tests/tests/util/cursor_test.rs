@@ -206,6 +206,9 @@ impl CursorTest {
             cursor_color: cursor_color_expected,
             selection_colors: selection_colors_expected,
             size: None,
+            scale: 1.0,
+            hint: false,
+            glyph_transform: None,
         };
         let rendering_config_actual = RenderingConfig {
             background_color: bg_color_actual,
@@ -214,6 +217,9 @@ impl CursorTest {
             cursor_color: cursor_color_actual,
             selection_colors: selection_colors_actual,
             size: None,
+            scale: 1.0,
+            hint: false,
+            glyph_transform: None,
         };
 
         let rect_expected = expected.geometry(&self.layout, CURSOR_WIDTH);
@@ -374,6 +380,9 @@ impl CursorTest {
             cursor_color,
             selection_colors,
             size: None,
+            scale: 1.0,
+            hint: false,
+            glyph_transform: None,
         };
 
         let rect_cursor = cursor.geometry(&self.layout, CURSOR_WIDTH);
