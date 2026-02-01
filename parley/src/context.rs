@@ -53,6 +53,73 @@ impl<B: Brush> LayoutContext<B> {
         }
     }
 
+    /// Loads runtime segmenter models for improved word/line breaking.
+    ///
+    /// By default, Parley uses rule-based segmentation which works well for most languages but produces suboptimal
+    /// results for languages like Thai, Lao, Khmer, and Burmese that don't use spaces between words.
+    ///
+    /// This method allows loading LSTM models at runtime to enable proper word segmentation for these languages. CJK
+    /// text uses dictionary data.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use parley::{LayoutContext, FontContext, SegmenterModelData};
+    ///
+    /// let mut layout_ctx = LayoutContext::new();
+    ///
+    /// // Load Thai and Khmer LSTM models from files
+    /// let thai_blob = std::fs::read("Thai_codepoints_exclusive_model4_heavy.postcard")?;
+    /// let thai_model = SegmenterModelData::from_blob(thai_blob.into_boxed_slice())?;
+    ///
+    /// let khmer_blob = std::fs::read("Khmer_codepoints_exclusive_model4_heavy.postcard")?;
+    /// let khmer_model = SegmenterModelData::from_blob(khmer_blob.into_boxed_slice())?;
+    ///
+    /// layout_ctx.load_segmenter_models_auto([thai_model, khmer_model]);
+    /// ```
+    #[cfg(feature = "runtime-segmenter-data")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "runtime-segmenter-data")))]
+    pub fn load_segmenter_models_auto(
+        &mut self,
+        models: impl IntoIterator<Item = crate::SegmenterModelData>,
+    ) {
+        self.analysis_data_sources.load_segmenter_models(
+            models.into_iter().map(|model| model.provider).collect(),
+            crate::analysis::SegmenterMode::Auto,
+        );
+    }
+
+    /// Loads runtime dictionary segmenter models for word/line breaking.
+    ///
+    /// Unlike [`Self::load_segmenter_models_auto`] which uses LSTM for Southeast Asian scripts, this uses dictionary
+    /// data for all complex scripts. Dictionary models may be faster at runtime but require more data.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use parley::{LayoutContext, FontContext};
+    /// use parley_data::SegmenterModelData;
+    ///
+    /// let mut layout_ctx = LayoutContext::new();
+    ///
+    /// // Load Thai dictionary model
+    /// let thai_blob = std::fs::read("thaidict.postcard")?;
+    /// let thai_model = SegmenterModelData::from_blob(thai_blob.into_boxed_slice())?;
+    ///
+    /// layout_ctx.load_segmenter_models_dictionary([thai_model]);
+    /// ```
+    #[cfg(feature = "runtime-segmenter-data")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "runtime-segmenter-data")))]
+    pub fn load_segmenter_models_dictionary(
+        &mut self,
+        models: impl IntoIterator<Item = crate::SegmenterModelData>,
+    ) {
+        self.analysis_data_sources.load_segmenter_models(
+            models.into_iter().map(|model| model.provider).collect(),
+            crate::analysis::SegmenterMode::Dictionary,
+        );
+    }
+
     fn resolve_style_set(
         &mut self,
         font_ctx: &mut FontContext,

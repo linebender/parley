@@ -23,6 +23,14 @@ libm = ["fontique/libm", "peniko/libm", "skrifa/libm", "dep:core_maths"]
 # Enables support for system font backends
 system = ["std", "fontique/system"]
 accesskit = ["dep:accesskit"]
+## Enables runtime loading of segmenter models for language-specific word/line breaking.
+## This allows applications to load additional segmentation data (e.g., for Thai, Lao,
+## Khmer, Burmese, Chinese, Japanese) at runtime rather than baking it into the binary.
+runtime-segmenter-data = [
+    "dep:icu_provider_adapters",
+    "dep:icu_provider_blob",
+    "icu_segmenter/serde",
+]
 
 [dependencies]
 skrifa = { workspace = true }
@@ -38,6 +46,8 @@ icu_collections = { workspace = true }
 icu_normalizer = { workspace = true }
 icu_properties = { workspace = true }
 icu_provider = { workspace = true }
+icu_provider_blob = { workspace = true, optional = true }
+icu_provider_adapters = { workspace = true, optional = true }
 icu_segmenter = { workspace = true, features = ["auto"] }
 # Used in ICU4X baked data sources
 zerovec = { workspace = true }

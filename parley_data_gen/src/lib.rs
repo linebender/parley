@@ -13,6 +13,7 @@ use icu_properties::{
         BidiClass, Emoji, ExtendedPictographic, LineBreak, RegionalIndicator, VariationSelector,
     },
 };
+use icu_provider_export::blob_exporter::BlobExporter;
 use icu_provider_export::prelude::*;
 use icu_provider_source::SourceDataProvider;
 use parley_data::Properties;
@@ -42,6 +43,8 @@ pub fn generate(out: std::path::PathBuf) {
             icu_segmenter::provider::SegmenterBreakGraphemeClusterV1::INFO,
             icu_segmenter::provider::SegmenterBreakWordOverrideV1::INFO,
             icu_segmenter::provider::SegmenterLstmAutoV1::INFO,
+            icu_segmenter::provider::SegmenterDictionaryAutoV1::INFO,
+            icu_segmenter::provider::SegmenterDictionaryExtendedV1::INFO,
             icu_segmenter::provider::SegmenterBreakWordV1::INFO,
             icu_segmenter::provider::SegmenterBreakLineV1::INFO,
             icu_normalizer::provider::NormalizerNfcV1::INFO,
@@ -127,6 +130,50 @@ pub fn generate(out: std::path::PathBuf) {
             databake::Bake::bake(&trie, &databake::CrateEnv::default())
         )
         .unwrap();
+    }
+
+    // Generate segmenter model blobs (LSTM models for Thai, Lao, Khmer, Burmese)
+    {
+        let models_dir = out.join("icu4x_data").join("segmenter_models");
+        std::fs::create_dir_all(&models_dir).unwrap();
+
+        for model in [
+            "Burmese_codepoints_exclusive_model4_heavy",
+            "Khmer_codepoints_exclusive_model4_heavy",
+            "Lao_codepoints_exclusive_model4_heavy",
+            "Thai_codepoints_exclusive_model4_heavy",
+            "cjdict",
+            "burmesedict",
+            "khmerdict",
+            "laodict",
+            "thaidict",
+        ] {
+            let blob_path = models_dir.join(format!("{model}.postcard"));
+            let mut blob: Vec<u8> = Vec::new();
+
+            ExportDriver::new(
+                [DataLocaleFamily::single(DataLocale::default())],
+                DeduplicationStrategy::None.into(),
+                LocaleFallbacker::new_without_data(),
+            )
+            .with_markers([
+                icu_segmenter::provider::SegmenterLstmAutoV1::INFO,
+                icu_segmenter::provider::SegmenterDictionaryAutoV1::INFO,
+                // SegmenterDictionaryAutoV1 only includes dictionary data for scripts with no LSTM model
+                icu_segmenter::provider::SegmenterDictionaryExtendedV1::INFO,
+                icu_segmenter::provider::SegmenterBreakWordV1::INFO,
+                icu_segmenter::provider::SegmenterBreakWordOverrideV1::INFO,
+                icu_segmenter::provider::SegmenterBreakLineV1::INFO,
+            ])
+            .with_segmenter_models([(*model).to_string()])
+            .export(
+                &icu4x_source_provider,
+                BlobExporter::new_with_sink(Box::new(&mut blob)),
+            )
+            .unwrap_or_else(|e| panic!("Failed to export {model}: {e}"));
+
+            std::fs::write(&blob_path, &blob).unwrap();
+        }
     }
 
     let mut file = BufWriter::new(std::fs::File::create(out.join("mod.rs")).unwrap());

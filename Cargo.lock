@@ -1079,6 +1079,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "embedded-io"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef1a6892d9eef45c8fa6b9e0086428a2cca8491aca8f787c534a3d6d0bcb3ced"
+
+[[package]]
+name = "embedded-io"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
+
+[[package]]
 name = "encode_unicode"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2083,6 +2095,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "icu_provider_adapters"
+version = "2.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37dafa75fcb2ca73939cf7e7f4967d30be122b5e1d10f2b344e0addca8fa9446"
+dependencies = [
+ "icu_locale",
+ "icu_provider",
+]
+
+[[package]]
 name = "icu_provider_baked"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2098,6 +2120,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "icu_provider_blob"
+version = "2.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bcd377d80121ab5d320c90f914cf7145a6881556d886c2aa2c6f89cdae5f7a30"
+dependencies = [
+ "icu_provider",
+ "log",
+ "postcard",
+ "serde",
+ "writeable",
+ "zerotrie",
+ "zerovec",
+]
+
+[[package]]
 name = "icu_provider_export"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2107,6 +2144,7 @@ dependencies = [
  "icu_locale",
  "icu_provider",
  "icu_provider_baked",
+ "icu_provider_blob",
  "log",
  "writeable",
 ]
@@ -3303,6 +3341,8 @@ dependencies = [
  "icu_normalizer",
  "icu_properties",
  "icu_provider",
+ "icu_provider_adapters",
+ "icu_provider_blob",
  "icu_segmenter",
  "linebender_resource_handle",
  "oxipng",
@@ -3377,6 +3417,7 @@ dependencies = [
  "fontique",
  "oxipng",
  "parley",
+ "parley_data",
  "parley_dev",
  "parley_draw",
  "peniko",
@@ -3537,6 +3578,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6764c3b5dd454e283a30e6dfe78e9b31096d9e32036b5d1eaac7a6119ccb9a24"
 dependencies = [
  "cobs",
+ "embedded-io 0.4.0",
+ "embedded-io 0.6.1",
  "serde",
 ]
 
