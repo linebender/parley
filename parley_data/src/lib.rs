@@ -5,7 +5,7 @@
 //!
 //! - Re-exported ICU4X data providers for grapheme, word, and line breaking, plus Unicode normalization tables used by Parley.
 //! - A locale-invariant `CompositeProps` provider backed by a compact `CodePointTrie`, allowing the engine to obtain all required character properties with a single lookup.
-//! - Runtime loading of segmenter models for language-specific word/line breaking (via [`SegmenterModelData`]).
+//! - Runtime loading of segmenter models for language-specific word/line breaking (via Parley's `SegmenterModelData`).
 //!
 //! # Pluggable segmenter models
 //!
