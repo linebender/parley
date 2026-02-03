@@ -11,7 +11,7 @@
 //!
 //! By default, Parley uses ICU4X's rule-based segmentation. This works well for most languages, but produces suboptimal results for languages like Thai, Lao, Khmer, Burmese, Chinese, and Japanese that don't use spaces between words.
 //!
-//! For better segmentation in these languages, you can load LSTM or dictionary models at runtime.
+//! For better segmentation in these languages, you can load LSTM models or dictionaries at runtime.
 //! These models are included here if you enable the `bundled-segmenter-models` feature, but you may want to export them from this crate at build time and load them dynamically.
 
 #![no_std]
@@ -226,7 +226,7 @@ pub mod bundled_models {
     pub const BURMESE_DICT: &[u8] =
         include_bytes!("generated/icu4x_data/segmenter_models/burmesedict.postcard");
 
-    /// All bundled LSTM models as (model ID, blob) pairs.
+    /// All bundled LSTM-based segmenters as (model ID, blob) pairs.
     pub const ALL_LSTM: &[(&str, &[u8])] = &[
         ("Thai_codepoints_exclusive_model4_heavy", THAI_LSTM),
         ("Lao_codepoints_exclusive_model4_heavy", LAO_LSTM),
@@ -234,7 +234,7 @@ pub mod bundled_models {
         ("Burmese_codepoints_exclusive_model4_heavy", BURMESE_LSTM),
     ];
 
-    /// All bundled "preferred" models (LSTM when possible, dictionary if not) as (model ID, blob) pairs.
+    /// All bundled "preferred" segmenters (LSTM when possible, dictionary if not) as (model ID, blob) pairs.
     pub const ALL_AUTO: &[(&str, &[u8])] = &[
         ("cjdict", CJ_DICT),
         ("Thai_codepoints_exclusive_model4_heavy", THAI_LSTM),
@@ -243,7 +243,7 @@ pub mod bundled_models {
         ("Burmese_codepoints_exclusive_model4_heavy", BURMESE_LSTM),
     ];
 
-    /// All bundled dictionary models as (model ID, blob) pairs.
+    /// All bundled dictionary-based segmenters as (model ID, blob) pairs.
     pub const ALL_DICT: &[(&str, &[u8])] = &[
         ("cjdict", CJ_DICT),
         ("thaidict", THAI_DICT),
@@ -252,8 +252,8 @@ pub mod bundled_models {
         ("burmesedict", BURMESE_DICT),
     ];
 
-    /// All bundled models, LSTM and dictionary, as (model ID, blob) pairs. Note that you cannot load both LSTM and
-    /// dictionary models for the same locale at runtime.
+    /// All bundled segmenters, LSTM and dictionary, as (model ID, blob) pairs. Note that you cannot load both LSTM and
+    /// dictionary segmenters for the same locale at runtime.
     pub const ALL: &[(&str, &[u8])] = &[
         ("Thai_codepoints_exclusive_model4_heavy", THAI_LSTM),
         ("Lao_codepoints_exclusive_model4_heavy", LAO_LSTM),

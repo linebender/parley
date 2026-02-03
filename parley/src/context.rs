@@ -92,7 +92,7 @@ impl<B: Brush> LayoutContext<B> {
     /// Loads runtime dictionary segmenter models for word/line breaking.
     ///
     /// Unlike [`Self::load_segmenter_models_auto`] which uses LSTM for Southeast Asian scripts, this uses dictionary
-    /// data for all complex scripts. Dictionary models may be faster at runtime but require more data.
+    /// data for all complex scripts. Dictionaries may be faster at runtime but require more data.
     ///
     /// # Example
     ///
@@ -102,7 +102,7 @@ impl<B: Brush> LayoutContext<B> {
     ///
     /// let mut layout_ctx = LayoutContext::new();
     ///
-    /// // Load Thai dictionary model
+    /// // Load Thai dictionary-based segmenter
     /// let thai_blob = std::fs::read("thaidict.postcard")?;
     /// let thai_model = SegmenterModelData::from_blob(thai_blob.into_boxed_slice())?;
     ///
