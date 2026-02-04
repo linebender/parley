@@ -382,14 +382,15 @@ fn render_glyph_run_impl(
     let run = glyph_run.run();
 
     // Collect glyphs for reuse (needed for both fill and underline)
-    let glyphs: Vec<parley_draw::Glyph> = glyph_run
-        .positioned_glyphs()
-        .map(|glyph| parley_draw::Glyph {
-            id: glyph.id,
-            x: glyph.x + x_offset,
-            y: glyph.y + y_offset,
-        })
-        .collect();
+    let glyphs = || {
+        glyph_run
+            .positioned_glyphs()
+            .map(|glyph| parley_draw::Glyph {
+                id: glyph.id,
+                x: glyph.x + x_offset,
+                y: glyph.y + y_offset,
+            })
+    };
 
     let mut builder = GlyphRunBuilder::new(run.font().clone(), *renderer.transform(), renderer)
         .font_size(run.font_size())
@@ -398,7 +399,7 @@ fn render_glyph_run_impl(
     if let Some(glyph_transform) = config.glyph_transform {
         builder = builder.glyph_transform(glyph_transform);
     }
-    builder.fill_glyphs(glyphs.iter().copied(), caches);
+    builder.fill_glyphs(glyphs(), caches);
 
     let style = glyph_run.style();
     if let Some(decoration) = &style.underline {
@@ -418,12 +419,12 @@ fn render_glyph_run_impl(
             builder = builder.glyph_transform(glyph_transform);
         }
         builder.render_decoration(
-            glyphs.iter().copied(),
+            glyphs(),
             x..=x1,
             baseline,
             underline_offset,
             size,
-            1.0, // buffer around exclusions
+            size, // buffer around exclusions; let's match the underline thickness
             caches,
         );
     }
