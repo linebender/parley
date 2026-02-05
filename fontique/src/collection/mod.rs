@@ -469,11 +469,10 @@ impl Inner {
     pub fn load_fonts_from_paths(&mut self, paths: impl IntoIterator<Item = impl AsRef<Path>>) {
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
-            let result = shared.data.lock().unwrap().load_fonts_from_paths(paths);
+            shared.data.lock().unwrap().load_fonts_from_paths(paths);
             shared.bump_version();
-            result
         } else {
-            self.data.load_fonts_from_paths(paths)
+            self.data.load_fonts_from_paths(paths);
         }
         #[cfg(not(feature = "std"))]
         self.data.register_fonts(paths)
@@ -733,6 +732,8 @@ impl CommonData {
                         return;
                     };
                     scratch_family_name.extend(family_chars);
+
+                    #[allow(clippy::needless_borrow)] // false positive
                     &scratch_family_name
                 };
 
