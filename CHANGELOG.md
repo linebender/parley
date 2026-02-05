@@ -19,6 +19,7 @@ This release has an [MSRV] of 1.88.
 
 #### Parley
 
+- AccessKit has been updated to v0.23 ([#532][] by [@valadaptive][])
 - Breaking change: `Glyph::y` is now in Y-down coordinate space instead of Y-up coordinate space. ([#528][] by [@valadaptive][])
 
   **This does not change the API surface, but *will* change the behavior of existing code!** If you're iterating over non-positioned glyphs using the `GlyphRun::glyphs` method and positioning each glyph yourself, with code like:
@@ -469,6 +470,7 @@ This release has an [MSRV][] of 1.70.
 [#467]: https://github.com/linebender/parley/pull/467
 [#468]: https://github.com/linebender/parley/pull/468
 [#528]: https://github.com/linebender/parley/pull/528
+[#532]: https://github.com/linebender/parley/pull/532
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.7.0...HEAD
 [0.7.0]: https://github.com/linebender/parley/compare/v0.6.0...v0.7.0

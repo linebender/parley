@@ -17,7 +17,7 @@ winit = "0.30.12"
 parley = { workspace = true, default-features = true, features = ["accesskit"] }
 peniko = { workspace = true }
 accesskit = { workspace = true }
-accesskit_winit = "0.30.0"
+accesskit_winit = "0.32.0"
 
 [lints]
 workspace = true
