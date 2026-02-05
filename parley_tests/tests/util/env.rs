@@ -29,6 +29,7 @@ pub(crate) const FONT_FAMILY_LIST: &[FontFamilyName<'_>] = &[
     FontFamilyName::Named(Cow::Borrowed("Roboto")),
     FontFamilyName::Named(Cow::Borrowed("Noto Kufi Arabic")),
     FontFamilyName::Named(Cow::Borrowed("Noto Sans Thai")),
+    FontFamilyName::Named(Cow::Borrowed("Noto Sans Myanmar")),
 ];
 
 pub(crate) const CLUSTER_INFO_COLOR: Color = Color::from_rgba8(100, 100, 100, 255);
