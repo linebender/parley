@@ -93,11 +93,6 @@ impl Collection {
         }
     }
 
-    /// Load system fonts. If system fonts are already loaded then they will be reloaded.
-    pub fn reload_system_fonts(&mut self) {
-        self.inner.load_system_fonts();
-    }
-
     /// Loads all fonts contained within the specified directory(s)
     #[cfg(feature = "std")]
     pub fn load_fonts_from_paths(&mut self, paths: impl IntoIterator<Item = impl AsRef<Path>>) {
