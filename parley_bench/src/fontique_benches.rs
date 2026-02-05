@@ -46,4 +46,3 @@ pub fn system_fonts_init() -> Vec<Benchmark> {
 pub fn system_fonts_init() -> Vec<Benchmark> {
     Vec::new()
 }
-
