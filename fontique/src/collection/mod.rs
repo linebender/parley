@@ -86,7 +86,6 @@ impl Collection {
     }
 
     /// Load system fonts. If system fonts are already loaded then this does nothing.
-    /// See [`Self::reload_system_fonts`] to reload already-loaded system fonts.
     pub fn load_system_fonts(&mut self) {
         if self.inner.system.is_none() {
             self.inner.load_system_fonts();
