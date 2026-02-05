@@ -28,6 +28,7 @@ mod draw;
 mod editor;
 mod issues;
 mod lines;
+mod segmenter;
 mod styles;
 mod wrap;
 #[macro_use]

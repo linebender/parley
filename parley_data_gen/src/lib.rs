@@ -13,9 +13,11 @@ use icu_properties::{
         BidiClass, Emoji, ExtendedPictographic, LineBreak, RegionalIndicator, VariationSelector,
     },
 };
+use icu_provider_export::blob_exporter::BlobExporter;
 use icu_provider_export::prelude::*;
 use icu_provider_source::SourceDataProvider;
 use parley_data::Properties;
+use std::fs::File;
 use std::io::{BufWriter, Write};
 
 const COPYRIGHT_HEADER: &str =
@@ -42,6 +44,8 @@ pub fn generate(out: std::path::PathBuf) {
             icu_segmenter::provider::SegmenterBreakGraphemeClusterV1::INFO,
             icu_segmenter::provider::SegmenterBreakWordOverrideV1::INFO,
             icu_segmenter::provider::SegmenterLstmAutoV1::INFO,
+            icu_segmenter::provider::SegmenterDictionaryAutoV1::INFO,
+            icu_segmenter::provider::SegmenterDictionaryExtendedV1::INFO,
             icu_segmenter::provider::SegmenterBreakWordV1::INFO,
             icu_segmenter::provider::SegmenterBreakLineV1::INFO,
             icu_normalizer::provider::NormalizerNfcV1::INFO,
@@ -109,7 +113,7 @@ pub fn generate(out: std::path::PathBuf) {
         if !composite_dir.exists() {
             std::fs::create_dir(&composite_dir).unwrap();
         }
-        let mut file = BufWriter::new(std::fs::File::create(composite_dir.join("mod.rs")).unwrap());
+        let mut file = BufWriter::new(File::create(composite_dir.join("mod.rs")).unwrap());
 
         writeln!(&mut file, "{COPYRIGHT_HEADER}").unwrap();
         writeln!(&mut file, "/// Backing data for the `CompositeProps`").unwrap();
@@ -129,7 +133,50 @@ pub fn generate(out: std::path::PathBuf) {
         .unwrap();
     }
 
-    let mut file = BufWriter::new(std::fs::File::create(out.join("mod.rs")).unwrap());
+    // Generate segmenter model blobs (LSTM models for Thai, Lao, Khmer, Burmese)
+    {
+        let models_dir = out.join("icu4x_data").join("segmenter_models");
+        std::fs::create_dir_all(&models_dir).unwrap();
+
+        for model in [
+            "Burmese_codepoints_exclusive_model4_heavy",
+            "Khmer_codepoints_exclusive_model4_heavy",
+            "Lao_codepoints_exclusive_model4_heavy",
+            "Thai_codepoints_exclusive_model4_heavy",
+            "cjdict",
+            "burmesedict",
+            "khmerdict",
+            "laodict",
+            "thaidict",
+        ] {
+            let blob_path = models_dir.join(format!("{model}.postcard"));
+
+            ExportDriver::new(
+                [DataLocaleFamily::single(DataLocale::default())],
+                DeduplicationStrategy::None.into(),
+                LocaleFallbacker::new_without_data(),
+            )
+            .with_markers([
+                icu_segmenter::provider::SegmenterLstmAutoV1::INFO,
+                icu_segmenter::provider::SegmenterDictionaryAutoV1::INFO,
+                // SegmenterDictionaryAutoV1 only includes dictionary data for scripts with no LSTM model
+                icu_segmenter::provider::SegmenterDictionaryExtendedV1::INFO,
+                icu_segmenter::provider::SegmenterBreakWordV1::INFO,
+                icu_segmenter::provider::SegmenterBreakWordOverrideV1::INFO,
+                icu_segmenter::provider::SegmenterBreakLineV1::INFO,
+            ])
+            .with_segmenter_models([(*model).to_string()])
+            .export(
+                &icu4x_source_provider,
+                BlobExporter::new_with_sink(Box::new(&mut BufWriter::new(
+                    File::create(&blob_path).unwrap(),
+                ))),
+            )
+            .unwrap_or_else(|e| panic!("Failed to export {model}: {e}"));
+        }
+    }
+
+    let mut file = BufWriter::new(File::create(out.join("mod.rs")).unwrap());
 
     writeln!(&mut file, "{COPYRIGHT_HEADER}").unwrap();
     writeln!(&mut file, "mod composite;").unwrap();

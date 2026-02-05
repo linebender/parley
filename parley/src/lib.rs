@@ -128,6 +128,8 @@ mod tests;
 pub use linebender_resource_handle::FontData;
 pub use util::BoundingBox;
 
+#[cfg(feature = "runtime-segmenter-data")]
+pub use analysis::SegmenterModelData;
 pub use builder::{RangedBuilder, TreeBuilder};
 pub use context::LayoutContext;
 pub use font::FontContext;

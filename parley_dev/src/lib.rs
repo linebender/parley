@@ -19,7 +19,13 @@ pub fn font_dirs() -> impl Iterator<Item = PathBuf> {
 }
 
 /// The font families that are available in the assets/fonts directory.
-pub const FONT_FAMILIES: &[&str] = &["Arimo", "Roboto", "Noto Kufi Arabic"];
+pub static FONT_FAMILIES: &[&str] = &[
+    "Arimo",
+    "Roboto",
+    "Noto Kufi Arabic",
+    "Noto Sans Thai",
+    "Noto Sans Myanmar",
+];
 
 /// A sample to be used for development.
 #[derive(Debug)]

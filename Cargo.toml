@@ -45,9 +45,10 @@ icu_normalizer = { version = "~2.1.1", default-features = false }
 icu_properties = { version = "~2.1.2", default-features = false }
 icu_provider = { version = "2.1.1", default-features = false }
 icu_provider_adapters = { version = "2.1.1", default-features = false }
+icu_provider_blob = { version = "2.1.1", default-features = false, features = ["alloc"] }
 icu_provider_export = { version = "2.1.1", default-features = false }
 icu_provider_source = { version = "2.1.1", default-features = false }
-icu_segmenter = { version = "~2.1.1", default-features = false }
+icu_segmenter = { version = "~2.1.2", default-features = false }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
 parley = { version = "0.7.0", default-features = false, path = "parley" }
 parley_data = { path = "parley_data", default-features = false }
