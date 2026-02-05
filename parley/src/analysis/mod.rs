@@ -187,7 +187,7 @@ impl AnalysisDataSources {
     pub(crate) fn new() -> Self {
         Self {
             grapheme_segmenter: GraphemeClusterSegmenter::try_new_unstable(&PROVIDER).unwrap(),
-            word_segmenter: WordSegmenter::try_new_auto_unstable(
+            word_segmenter: WordSegmenter::try_new_for_non_complex_scripts(
                 &PROVIDER,
                 WordBreakOptions::default(),
             )
