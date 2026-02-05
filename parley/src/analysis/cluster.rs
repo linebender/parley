@@ -3,8 +3,8 @@
 
 use alloc::vec::Vec;
 
+use crate::analysis::CompositeProps;
 use icu_normalizer::properties::{CanonicalComposition, CanonicalDecomposition, Decomposed};
-use parley_data::Properties;
 
 /// The maximum number of characters in a single cluster.
 const MAX_CLUSTER_SIZE: usize = 32;
@@ -117,7 +117,7 @@ impl CharCluster {
 
     #[inline(always)]
     fn contributes_to_shaping(ch: char) -> bool {
-        let props = Properties::get(ch);
+        let props = CompositeProps.properties(ch as u32);
         crate::analysis::contributes_to_shaping(props.general_category(), props.script())
     }
 

@@ -10,11 +10,12 @@ publish = false
 
 [features]
 default = ["baked"]
-baked = ["dep:icu_collections", "dep:zerovec"]
+baked = ["dep:zerovec"]
+datagen = []
 
 [dependencies]
 icu_properties = { workspace = true }
-icu_collections = { workspace = true, optional = true }
+icu_collections = { workspace = true }
 zerovec = { workspace = true, optional = true }
 
 [lints]

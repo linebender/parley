@@ -12,6 +12,19 @@ use icu_properties::props::{BidiClass, GeneralCategory, GraphemeClusterBreak, Sc
 #[cfg(feature = "baked")]
 pub mod generated;
 
+/// Lookup for [`Properties`]
+#[derive(Clone, Debug, Copy)]
+pub struct CompositeProps;
+
+#[cfg(feature = "baked")]
+impl CompositeProps {
+    /// Returns the properties for a given character.
+    #[inline(always)]
+    pub fn properties(&self, ch: u32) -> Properties {
+        Properties(generated::COMPOSITE.get32(ch))
+    }
+}
+
 /// Unicode character properties relevant for text analysis.
 #[derive(Copy, Clone, Debug)]
 pub struct Properties(u32);
@@ -38,13 +51,8 @@ impl Properties {
     const IS_MANDATORY_LINE_BREAK_SHIFT: u32 =
         Self::IS_REGION_INDICATOR_SHIFT + Self::IS_REGION_INDICATOR_BITS;
 
-    #[cfg(feature = "baked")]
-    /// Returns the properties for a given character.
-    pub fn get(ch: char) -> Self {
-        Self(generated::COMPOSITE.get(ch))
-    }
-
-    /// Creates a new [`Properties`] from the given properties
+    /// Packs the given arguments into a single u32.
+    #[cfg(feature = "datagen")]
     pub fn new(
         script: Script,
         gc: GeneralCategory,
@@ -73,7 +81,7 @@ impl Properties {
     }
 
     #[inline(always)]
-    fn bits(&self, shift: u32, bits: u32) -> u32 {
+    fn get(&self, shift: u32, bits: u32) -> u32 {
         (self.0 >> shift) & ((1 << bits) - 1)
     }
 
@@ -84,7 +92,7 @@ impl Properties {
             clippy::cast_possible_truncation,
             reason = "script data only occupies SCRIPT_BITS bits; we cast to `u16` to fulfil the `from_icu4c_value` contract."
         )]
-        Script::from_icu4c_value(self.bits(Self::SCRIPT_SHIFT, Self::SCRIPT_BITS) as u16)
+        Script::from_icu4c_value(self.get(Self::SCRIPT_SHIFT, Self::SCRIPT_BITS) as u16)
     }
 
     /// Returns the general category for the character.
@@ -94,7 +102,7 @@ impl Properties {
             clippy::cast_possible_truncation,
             reason = "general category data only occupies GC_BITS bits."
         )]
-        GeneralCategory::try_from(self.bits(Self::GC_SHIFT, Self::GC_BITS) as u8).unwrap()
+        GeneralCategory::try_from(self.get(Self::GC_SHIFT, Self::GC_BITS) as u8).unwrap()
     }
 
     /// Returns the grapheme cluster break for the character.
@@ -104,7 +112,7 @@ impl Properties {
             clippy::cast_possible_truncation,
             reason = "cluster break data only occupies GCB_BITS bits"
         )]
-        GraphemeClusterBreak::from_icu4c_value(self.bits(Self::GCB_SHIFT, Self::GCB_BITS) as u8)
+        GraphemeClusterBreak::from_icu4c_value(self.get(Self::GCB_SHIFT, Self::GCB_BITS) as u8)
     }
 
     /// Returns the bidirectional class for the character.
@@ -114,13 +122,13 @@ impl Properties {
             clippy::cast_possible_truncation,
             reason = "bidi class data only occupies BIDI_BITS bits"
         )]
-        BidiClass::from_icu4c_value(self.bits(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8)
+        BidiClass::from_icu4c_value(self.get(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8)
     }
 
     /// Returns whether the character is an emoji or pictograph.
     #[inline(always)]
     pub fn is_emoji_or_pictograph(&self) -> bool {
-        self.bits(
+        self.get(
             Self::IS_EMOJI_OR_PICTOGRAPH_SHIFT,
             Self::IS_EMOJI_OR_PICTOGRAPH_BITS,
         ) != 0
@@ -129,7 +137,7 @@ impl Properties {
     /// Returns whether the character is a variation selector.
     #[inline(always)]
     pub fn is_variation_selector(&self) -> bool {
-        self.bits(
+        self.get(
             Self::IS_VARIATION_SELECTOR_SHIFT,
             Self::IS_VARIATION_SELECTOR_BITS,
         ) != 0
@@ -138,7 +146,7 @@ impl Properties {
     /// Returns whether the character is a region indicator.
     #[inline(always)]
     pub fn is_region_indicator(&self) -> bool {
-        self.bits(
+        self.get(
             Self::IS_REGION_INDICATOR_SHIFT,
             Self::IS_REGION_INDICATOR_BITS,
         ) != 0
@@ -147,7 +155,7 @@ impl Properties {
     /// Returns whether the character is a mandatory linebreak.
     #[inline(always)]
     pub fn is_mandatory_linebreak(&self) -> bool {
-        self.bits(
+        self.get(
             Self::IS_MANDATORY_LINE_BREAK_SHIFT,
             Self::IS_MANDATORY_LINE_BREAK_BITS,
         ) != 0
