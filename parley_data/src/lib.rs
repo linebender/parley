@@ -186,47 +186,47 @@ impl From<Properties> for u32 {
 /// your Parley-using application and load dynamically.
 pub mod bundled_models {
     /// Thai LSTM model for word/line segmentation.
-    pub static THAI_LSTM: &[u8] = include_bytes!(
+    pub const THAI_LSTM: &[u8] = include_bytes!(
         "generated/icu4x_data/segmenter_models/Thai_codepoints_exclusive_model4_heavy.postcard"
     );
 
     /// Lao LSTM model for word/line segmentation.
-    pub static LAO_LSTM: &[u8] = include_bytes!(
+    pub const LAO_LSTM: &[u8] = include_bytes!(
         "generated/icu4x_data/segmenter_models/Lao_codepoints_exclusive_model4_heavy.postcard"
     );
 
     /// Khmer LSTM model for word/line segmentation.
-    pub static KHMER_LSTM: &[u8] = include_bytes!(
+    pub const KHMER_LSTM: &[u8] = include_bytes!(
         "generated/icu4x_data/segmenter_models/Khmer_codepoints_exclusive_model4_heavy.postcard"
     );
 
     /// Burmese LSTM model for word/line segmentation.
-    pub static BURMESE_LSTM: &[u8] = include_bytes!(
+    pub const BURMESE_LSTM: &[u8] = include_bytes!(
         "generated/icu4x_data/segmenter_models/Burmese_codepoints_exclusive_model4_heavy.postcard"
     );
 
     /// Chinese/Japanese dictionary for word segmentation.
-    pub static CJ_DICT: &[u8] =
+    pub const CJ_DICT: &[u8] =
         include_bytes!("generated/icu4x_data/segmenter_models/cjdict.postcard");
 
     /// Thai dictionary for word segmentation.
-    pub static THAI_DICT: &[u8] =
+    pub const THAI_DICT: &[u8] =
         include_bytes!("generated/icu4x_data/segmenter_models/thaidict.postcard");
 
     /// Lao dictionary for word segmentation.
-    pub static LAO_DICT: &[u8] =
+    pub const LAO_DICT: &[u8] =
         include_bytes!("generated/icu4x_data/segmenter_models/laodict.postcard");
 
     /// Khmer dictionary for word segmentation.
-    pub static KHMER_DICT: &[u8] =
+    pub const KHMER_DICT: &[u8] =
         include_bytes!("generated/icu4x_data/segmenter_models/khmerdict.postcard");
 
     /// Burmese dictionary for word segmentation.
-    pub static BURMESE_DICT: &[u8] =
+    pub const BURMESE_DICT: &[u8] =
         include_bytes!("generated/icu4x_data/segmenter_models/burmesedict.postcard");
 
     /// All bundled LSTM-based segmenters as (model ID, blob) pairs.
-    pub static ALL_LSTM: &[(&str, &[u8])] = &[
+    pub const ALL_LSTM: &[(&str, &[u8])] = &[
         ("Thai_codepoints_exclusive_model4_heavy", THAI_LSTM),
         ("Lao_codepoints_exclusive_model4_heavy", LAO_LSTM),
         ("Khmer_codepoints_exclusive_model4_heavy", KHMER_LSTM),
@@ -234,7 +234,7 @@ pub mod bundled_models {
     ];
 
     /// All bundled "preferred" segmenters (LSTM when possible, dictionary if not) as (model ID, blob) pairs.
-    pub static ALL_AUTO: &[(&str, &[u8])] = &[
+    pub const ALL_AUTO: &[(&str, &[u8])] = &[
         ("cjdict", CJ_DICT),
         ("Thai_codepoints_exclusive_model4_heavy", THAI_LSTM),
         ("Lao_codepoints_exclusive_model4_heavy", LAO_LSTM),
@@ -243,7 +243,7 @@ pub mod bundled_models {
     ];
 
     /// All bundled dictionary-based segmenters as (model ID, blob) pairs.
-    pub static ALL_DICT: &[(&str, &[u8])] = &[
+    pub const ALL_DICT: &[(&str, &[u8])] = &[
         ("cjdict", CJ_DICT),
         ("thaidict", THAI_DICT),
         ("laodict", LAO_DICT),
@@ -253,7 +253,7 @@ pub mod bundled_models {
 
     /// All bundled segmenters, LSTM and dictionary, as (model ID, blob) pairs. Note that you cannot load both LSTM and
     /// dictionary segmenters for the same locale at runtime.
-    pub static ALL: &[(&str, &[u8])] = &[
+    pub const ALL: &[(&str, &[u8])] = &[
         ("Thai_codepoints_exclusive_model4_heavy", THAI_LSTM),
         ("Lao_codepoints_exclusive_model4_heavy", LAO_LSTM),
         ("Khmer_codepoints_exclusive_model4_heavy", KHMER_LSTM),
