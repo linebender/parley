@@ -83,6 +83,19 @@ impl Collection {
         }
     }
 
+    /// Load system fonts. If system fonts are already loaded then this does nothing.
+    /// See [`Self::reload_system_fonts`] to reload already-loaded system fonts.
+    pub fn load_system_fonts(&mut self) {
+        if self.inner.system.is_none() {
+            self.inner.load_system_fonts();
+        }
+    }
+
+    /// Load system fonts. If system fonts are already loaded then they will be reloaded.
+    pub fn reload_system_fonts(&mut self) {
+        self.inner.load_system_fonts();
+    }
+
     /// Returns an iterator over all available family names in the collection.
     ///
     /// If `fontique` was compiled with the `"system"` feature, then it will
@@ -237,6 +250,11 @@ impl Inner {
             shared_version: 0,
             fallback_cache: FallbackCache::default(),
         }
+    }
+
+    /// Load system fonts. If system fonts are already loaded then they will be reloaded.
+    pub fn load_system_fonts(&mut self) {
+        self.system = Some(System::new());
     }
 
     /// Returns an iterator over all available family names in the collection.
