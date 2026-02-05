@@ -204,6 +204,29 @@ impl AnalysisDataSources {
     }
 
     #[cfg(feature = "runtime-segmenter-data")]
+    fn reinitialize_word_segmenter(&mut self) {
+        let Some(buffer_provider) = self.runtime_buffer_provider.as_ref() else {
+            return;
+        };
+        // Combine the complex script providers with the baked data for non-complex scripts.
+        let combined =
+            ForkByMarkerProvider::new(buffer_provider.provider.as_deserializing(), &PROVIDER);
+
+        self.word_segmenter = match buffer_provider.segmenter_mode {
+            SegmenterMode::Auto => {
+                WordSegmenter::try_new_auto_unstable(&combined, WordBreakOptions::default())
+            }
+            SegmenterMode::Dictionary => {
+                WordSegmenter::try_new_dictionary_unstable(&combined, WordBreakOptions::default())
+            }
+        }
+        .expect("Failed to create WordSegmenter with runtime models");
+
+        // Clear cached line segmenters; they will be lazily recreated with the new mode.
+        self.line_segmenters = LineSegmenters::default();
+    }
+
+    #[cfg(feature = "runtime-segmenter-data")]
     pub(crate) fn load_segmenter_models(
         &mut self,
         providers: Vec<icu_provider_blob::BlobDataProvider>,
@@ -217,25 +240,32 @@ impl AnalysisDataSources {
             ),
             segmenter_mode: mode,
         };
+        self.runtime_buffer_provider = Some(buffer_provider);
 
-        // Then combine with the baked data for non-complex scripts.
-        let combined =
-            ForkByMarkerProvider::new(buffer_provider.provider.as_deserializing(), &PROVIDER);
+        self.reinitialize_word_segmenter();
+    }
 
-        self.word_segmenter = match mode {
-            SegmenterMode::Auto => {
-                WordSegmenter::try_new_auto_unstable(&combined, WordBreakOptions::default())
+    #[cfg(feature = "runtime-segmenter-data")]
+    pub(crate) fn append_segmenter_model(
+        &mut self,
+        provider: icu_provider_blob::BlobDataProvider,
+        mode: SegmenterMode,
+    ) {
+        match self.runtime_buffer_provider.as_mut() {
+            None => {
+                self.load_segmenter_models(alloc::vec![provider], mode);
             }
-            SegmenterMode::Dictionary => {
-                WordSegmenter::try_new_dictionary_unstable(&combined, WordBreakOptions::default())
+            Some(buffer_provider) => {
+                let cur_mode = buffer_provider.segmenter_mode;
+                assert_eq!(
+                    cur_mode, mode,
+                    "Tried to load a {mode:?} segmenter model, but the current segmenters are {cur_mode:?}"
+                );
+
+                buffer_provider.provider.push(provider);
+                self.reinitialize_word_segmenter();
             }
         }
-        .expect("Failed to create WordSegmenter with runtime models");
-
-        // Clear cached line segmenters; they will be lazily recreated with the new mode.
-        self.line_segmenters = LineSegmenters::default();
-
-        self.runtime_buffer_provider = Some(buffer_provider);
     }
 
     #[inline(always)]

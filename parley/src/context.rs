@@ -120,6 +120,30 @@ impl<B: Brush> LayoutContext<B> {
         );
     }
 
+    /// Add a runtime segmenter model for improved word/line breaking. See [`Self::load_segmenter_models_auto`] for
+    /// more.
+    ///
+    /// This method does *not* handle duplicates--if you load the same model twice, it will simply attempt to use it
+    /// twice during text analysis and make things slower.
+    #[cfg(feature = "runtime-segmenter-data")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "runtime-segmenter-data")))]
+    pub fn append_segmenter_model_auto(&mut self, model: crate::SegmenterModelData) {
+        self.analysis_data_sources
+            .append_segmenter_model(model.provider, crate::analysis::SegmenterMode::Auto);
+    }
+
+    /// Add a runtime segmenter model for improved word/line breaking. See [`Self::load_segmenter_models_dictionary`]
+    /// for more.
+    ///
+    /// This method does *not* handle duplicates--if you load the same model twice, it will simply attempt to use it
+    /// twice during text analysis and make things slower.
+    #[cfg(feature = "runtime-segmenter-data")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "runtime-segmenter-data")))]
+    pub fn append_segmenter_model_dictionary(&mut self, model: crate::SegmenterModelData) {
+        self.analysis_data_sources
+            .append_segmenter_model(model.provider, crate::analysis::SegmenterMode::Dictionary);
+    }
+
     fn resolve_style_set(
         &mut self,
         font_ctx: &mut FontContext,
