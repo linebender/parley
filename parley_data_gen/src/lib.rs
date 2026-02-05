@@ -17,6 +17,7 @@ use icu_provider_export::blob_exporter::BlobExporter;
 use icu_provider_export::prelude::*;
 use icu_provider_source::SourceDataProvider;
 use parley_data::Properties;
+use std::fs::File;
 use std::io::{BufWriter, Write};
 
 const COPYRIGHT_HEADER: &str =
@@ -112,7 +113,7 @@ pub fn generate(out: std::path::PathBuf) {
         if !composite_dir.exists() {
             std::fs::create_dir(&composite_dir).unwrap();
         }
-        let mut file = BufWriter::new(std::fs::File::create(composite_dir.join("mod.rs")).unwrap());
+        let mut file = BufWriter::new(File::create(composite_dir.join("mod.rs")).unwrap());
 
         writeln!(&mut file, "{COPYRIGHT_HEADER}").unwrap();
         writeln!(&mut file, "/// Backing data for the `CompositeProps`").unwrap();
@@ -149,7 +150,6 @@ pub fn generate(out: std::path::PathBuf) {
             "thaidict",
         ] {
             let blob_path = models_dir.join(format!("{model}.postcard"));
-            let mut blob: Vec<u8> = Vec::new();
 
             ExportDriver::new(
                 [DataLocaleFamily::single(DataLocale::default())],
@@ -168,15 +168,15 @@ pub fn generate(out: std::path::PathBuf) {
             .with_segmenter_models([(*model).to_string()])
             .export(
                 &icu4x_source_provider,
-                BlobExporter::new_with_sink(Box::new(&mut blob)),
+                BlobExporter::new_with_sink(Box::new(&mut BufWriter::new(
+                    File::create(&blob_path).unwrap(),
+                ))),
             )
             .unwrap_or_else(|e| panic!("Failed to export {model}: {e}"));
-
-            std::fs::write(&blob_path, &blob).unwrap();
         }
     }
 
-    let mut file = BufWriter::new(std::fs::File::create(out.join("mod.rs")).unwrap());
+    let mut file = BufWriter::new(File::create(out.join("mod.rs")).unwrap());
 
     writeln!(&mut file, "{COPYRIGHT_HEADER}").unwrap();
     writeln!(&mut file, "mod composite;").unwrap();
