@@ -28,7 +28,7 @@ license = "Apache-2.0 OR MIT"
 repository = "https://github.com/linebender/parley"
 
 [workspace.dependencies]
-accesskit = "0.23.0"
+accesskit = "0.24.0"
 bytemuck = { version = "1.24.0", default-features = false }
 databake = { version = "0.2", default-features = false }
 fontique = { version = "0.7.0", default-features = false, path = "fontique" }
