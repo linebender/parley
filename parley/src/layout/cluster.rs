@@ -79,7 +79,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
         let mut path = ClusterPath::default();
         if let Some((line_index, line)) = layout.line_for_offset(y) {
             path.line_index = line_index as u32;
-            let mut offset = line.metrics().offset;
+            let mut offset = line.metrics().offset + line.metrics().inline_min_coord;
             let last_run_index = line.len().saturating_sub(1);
             for item in line.items_nonpositioned() {
                 match item {
@@ -563,8 +563,7 @@ mod tests {
 
     fn cluster_from_position_with_alignment(alignment: Alignment) {
         let mut layout = create_unaligned_layout();
-        let width = layout.full_width();
-        layout.align(Some(width + 100.), alignment, AlignmentOptions::default());
+        layout.align(alignment, AlignmentOptions::default());
         assert_eq!(
             layout.len(),
             1,
