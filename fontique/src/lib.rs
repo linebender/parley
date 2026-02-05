@@ -13,7 +13,7 @@
 #![cfg_attr(target_pointer_width = "64", warn(clippy::trivially_copy_pass_by_ref))]
 // END LINEBENDER LINT SET
 #![cfg_attr(docsrs, feature(doc_cfg))]
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
 #![allow(unsafe_code, reason = "We access platform libraries using ffi.")]
 #![allow(missing_docs, reason = "We have many as-yet undocumented items.")]
 #![expect(
@@ -34,6 +34,9 @@ compile_error!("fontique requires either the `std` or `libm` feature to be enabl
 
 extern crate alloc;
 
+#[cfg(feature = "std")]
+extern crate std;
+
 mod attributes;
 mod backend;
 mod charmap;
@@ -43,6 +46,7 @@ mod family;
 mod family_name;
 mod font;
 mod generic;
+mod impl_fontconfig;
 mod matching;
 mod scan;
 mod script;
@@ -50,19 +54,20 @@ mod source;
 
 mod source_cache;
 
-pub use icu_locale_core::LanguageIdentifier as Language;
-pub use icu_locale_core::subtags::Script;
 pub use linebender_resource_handle::Blob;
 pub use script::ScriptExt;
+pub use text_primitives::Language;
+pub use text_primitives::Script;
 
-pub use attributes::{Attributes, FontStyle, FontWeight, FontWidth};
+pub use attributes::Attributes;
 pub use charmap::{Charmap, CharmapIndex};
 pub use collection::{Collection, CollectionOptions, Query, QueryFamily, QueryFont, QueryStatus};
 pub use fallback::FallbackKey;
 pub use family::{FamilyId, FamilyInfo};
 pub use font::{AxisInfo, FontInfo, FontInfoOverride, Synthesis};
-pub use generic::GenericFamily;
+pub use impl_fontconfig::FromFontconfig;
 pub use source::{SourceId, SourceInfo, SourceKind};
+pub use text_primitives::{FontStyle, FontWeight, FontWidth, GenericFamily};
 
 #[cfg(all(feature = "system", target_vendor = "apple"))]
 use objc2 as _;

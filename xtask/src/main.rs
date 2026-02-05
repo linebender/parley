@@ -26,8 +26,7 @@ fn main() -> kompari::Result<()> {
     let tests_path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
-        .join("parley")
-        .join("tests");
+        .join("parley_tests");
 
     let snapshots_path = tests_path.join("snapshots");
     let current_path = tests_path.join("current");

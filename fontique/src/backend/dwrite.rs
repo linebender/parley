@@ -1,12 +1,14 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use alloc::string::String;
+use alloc::sync::Arc;
+use alloc::{vec, vec::Vec};
 use hashbrown::HashMap;
 use std::{
     ffi::{OsString, c_void},
     os::windows::ffi::OsStringExt,
     path::PathBuf,
-    sync::Arc,
 };
 use windows::{
     Win32::Graphics::DirectWrite::{
@@ -17,7 +19,7 @@ use windows::{
         IDWriteFontFamily, IDWriteFontFile, IDWriteLocalFontFileLoader, IDWriteNumberSubstitution,
         IDWriteTextAnalysisSource, IDWriteTextAnalysisSource_Impl,
     },
-    core::{Interface, PCWSTR, implement},
+    core::{Interface, OutRef, PCWSTR, implement},
 };
 
 use super::{
@@ -114,7 +116,7 @@ impl SystemFonts {
         // so here we provide a sample of the intended script instead.
         let key = key.into();
         let text = key.script().sample()?;
-        let locale = key.locale();
+        let locale = key.locale_str();
         let family_name = self.dwrite_fonts.family_name_for_text(text, locale)?;
         self.name_map.get(&family_name).map(|name| name.id())
     }
@@ -348,10 +350,10 @@ impl IDWriteTextAnalysisSource_Impl for TextSource_Impl<'_> {
         &self,
         textposition: u32,
         textlength: *mut u32,
-        numbersubstitution: *mut Option<IDWriteNumberSubstitution>,
+        numbersubstitution: OutRef<'_, IDWriteNumberSubstitution>,
     ) -> windows::core::Result<()> {
+        numbersubstitution.write(None)?;
         unsafe {
-            *numbersubstitution = None;
             *textlength = (self.text.len() as u32).saturating_sub(textposition);
         }
         Ok(())

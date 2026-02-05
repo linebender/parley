@@ -1,0 +1,29 @@
+[package]
+name = "parley_tests"
+description = "Integration tests for Parley."
+categories = ["gui", "graphics"]
+keywords = ["text", "layout"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+autotests = false
+
+[[test]]
+name = "tests"
+path = "tests/mod.rs"
+
+[dependencies]
+parley = { workspace = true, features = ["std"] }
+parley_dev = { workspace = true }
+parley_draw = { workspace = true, features = ["std", "vello_cpu"] }
+peniko = { workspace = true, features = ["std"] }
+vello_cpu = { workspace = true, features = ["std", "png"] }
+fontique = { workspace = true, features = ["std"] }
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+oxipng = { version = "9.1.5", default-features = false, features = ["freestanding"] }
+
+[lints]
+workspace = true

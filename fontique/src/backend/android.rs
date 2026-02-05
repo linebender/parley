@@ -1,10 +1,17 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use std::{path::Path, str::FromStr, sync::Arc};
+use alloc::{
+    boxed::Box,
+    str::FromStr,
+    string::{String, ToString},
+    sync::Arc,
+    vec,
+    vec::Vec,
+};
+use std::path::Path;
 
 use hashbrown::HashMap;
-use icu_locale_core::subtags::script;
 use roxmltree::{Document, Node};
 
 use super::{
@@ -35,7 +42,7 @@ pub(crate) struct SystemFonts {
     pub(crate) name_map: Arc<FamilyNameMap>,
     pub(crate) generic_families: Arc<GenericFamilyMap>,
     family_map: HashMap<FamilyId, FamilyInfo>,
-    locale_fallback: Box<[(Box<str>, FamilyId)]>,
+    locale_fallback: Box<[(Language, FamilyId)]>,
     script_fallback: Box<[(Script, FamilyId)]>,
 }
 
@@ -125,27 +132,29 @@ impl SystemFonts {
                                                 if let Some(scr) = lang.strip_prefix("und-") {
                                                     // Undefined lang for script-only fallbacks
                                                     script_fallback.push((
-                                                        scr.parse().unwrap_or(script!("Zzzz")),
+                                                        scr.parse().unwrap_or(Script::UNKNOWN),
                                                         *family,
                                                     ));
-                                                } else if let Ok(locale) =
-                                                    Language::try_from_str(lang)
-                                                {
-                                                    if let Some(scr) = locale.script {
+                                                } else if let Ok(locale) = Language::parse(lang) {
+                                                    if let Some(scr) = locale
+                                                        .script()
+                                                        .and_then(|s| s.parse::<Script>().ok())
+                                                    {
                                                         // Also fallback for the script on its own
                                                         script_fallback.push((scr, *family));
-                                                        if script!("Hant") == scr {
+                                                        if Script::from_bytes(*b"Hant") == scr {
                                                             // This works around ambiguous han char­
                                                             // acters going unmapped with current
                                                             // fallback code. This should be done in
                                                             // a locale-dependent manner, since that
                                                             // is the norm.
-                                                            script_fallback
-                                                                .push((script!("Hani"), *family));
+                                                            script_fallback.push((
+                                                                Script::from_bytes(*b"Hani"),
+                                                                *family,
+                                                            ));
                                                         }
                                                     }
-                                                    locale_fallback
-                                                        .push((locale.to_string().into(), *family));
+                                                    locale_fallback.push((locale, *family));
                                                 }
                                             }
                                         }
@@ -190,10 +199,10 @@ impl SystemFonts {
         let script = key.script();
 
         key.locale()
-            .and_then(|li| {
+            .and_then(|locale| {
                 self.locale_fallback
                     .iter()
-                    .find(|(lid, _)| li == lid.as_ref())
+                    .find(|(other, _)| locale == *other)
                     .map(|(_, fid)| *fid)
             })
             .or_else(|| {

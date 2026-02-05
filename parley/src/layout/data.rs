@@ -12,9 +12,6 @@ use alloc::vec::Vec;
 
 use crate::analysis::cluster::Whitespace;
 use crate::analysis::{Boundary, CharInfo};
-#[cfg(feature = "libm")]
-#[allow(unused_imports)]
-use core_maths::CoreFloat;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct ClusterData {
@@ -98,7 +95,7 @@ impl ClusterInfo {
         self.source_char.is_whitespace()
     }
 
-    #[cfg(test)]
+    /// Returns the cluster's original character.
     pub(crate) fn source_char(self) -> char {
         self.source_char
     }
@@ -559,6 +556,7 @@ impl<B: Brush> LayoutData<B> {
                             min_width = min_width.max(running_min_width - trailing_whitespace);
                             running_min_width = 0.0;
                             if boundary == Boundary::Mandatory {
+                                max_width = max_width.max(running_max_width - trailing_whitespace);
                                 running_max_width = 0.0;
                             }
                         }
@@ -751,7 +749,8 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
             id: glyph_info.glyph_id,
             style_index: char_info.1,
             x: (glyph_pos.x_offset as f32) * scale_factor,
-            y: (glyph_pos.y_offset as f32) * scale_factor,
+            // Convert from font space (Y-up) to layout space (Y-down)
+            y: -(glyph_pos.y_offset as f32) * scale_factor,
             advance: (glyph_pos.x_advance as f32) * scale_factor,
         };
         cluster_advance += glyph.advance;

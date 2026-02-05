@@ -81,7 +81,7 @@ pub struct TreeBuilder<'a, B: Brush> {
 }
 
 impl<B: Brush> TreeBuilder<'_, B> {
-    pub fn push_style_span(&mut self, style: TextStyle<'_, B>) {
+    pub fn push_style_span(&mut self, style: TextStyle<'_, '_, B>) {
         let resolved = self
             .lcx
             .rcx
