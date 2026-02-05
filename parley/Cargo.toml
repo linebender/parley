@@ -27,7 +27,7 @@ accesskit = ["dep:accesskit"]
 [dependencies]
 skrifa = { workspace = true }
 linebender_resource_handle = { workspace = true }
-fontique = { workspace = true, features = ["icu_properties"] }
+fontique = { workspace = true }
 core_maths = { version = "0.1.1", optional = true }
 parley_data = { workspace = true, features = ["baked"] }
 accesskit = { workspace = true, optional = true }

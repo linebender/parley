@@ -193,6 +193,7 @@ fn build_into_layout<B: Brush>(
             &mut lcx.scx,
             text,
             layout,
+            &lcx.analysis_data_sources,
         );
     }
 

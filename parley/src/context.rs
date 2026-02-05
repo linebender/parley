@@ -11,7 +11,7 @@ use super::resolve::tree::TreeStyleBuilder;
 use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle};
 use super::style::{Brush, TextStyle};
 
-use crate::analysis::CharInfo;
+use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::bidi::BidiResolver;
 use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
@@ -33,6 +33,9 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     // u16: style index for character
     pub(crate) info: Vec<(CharInfo, u16)>,
     pub(crate) scx: ShapeContext,
+
+    // Unicode analysis data sources (provided by icu)
+    pub(crate) analysis_data_sources: AnalysisDataSources,
 }
 
 impl<B: Brush> LayoutContext<B> {
@@ -45,6 +48,7 @@ impl<B: Brush> LayoutContext<B> {
             ranged_style_builder: RangedStyleBuilder::default(),
             tree_style_builder: TreeStyleBuilder::default(),
             info: vec![],
+            analysis_data_sources: AnalysisDataSources::new(),
             scx: ShapeContext::default(),
         }
     }

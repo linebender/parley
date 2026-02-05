@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use alloc::vec::Vec;
+use icu_normalizer::properties::Decomposed;
 
-use crate::analysis::CompositeProps;
-use icu_normalizer::properties::{CanonicalComposition, CanonicalDecomposition, Decomposed};
+use crate::analysis::AnalysisDataSources;
 
 /// The maximum number of characters in a single cluster.
 const MAX_CLUSTER_SIZE: usize = 32;
@@ -116,12 +116,12 @@ impl CharCluster {
     }
 
     #[inline(always)]
-    fn contributes_to_shaping(ch: char) -> bool {
-        let props = CompositeProps.properties(ch as u32);
+    fn contributes_to_shaping(ch: char, analysis_data_sources: &AnalysisDataSources) -> bool {
+        let props = analysis_data_sources.composite().properties(ch as u32);
         crate::analysis::contributes_to_shaping(props.general_category(), props.script())
     }
 
-    fn decomposed(&mut self) -> Option<&[Char]> {
+    fn decomposed(&mut self, analysis_data_sources: &AnalysisDataSources) -> Option<&[Char]> {
         match self.decomp.state {
             FormState::Invalid => None,
             FormState::None => {
@@ -132,7 +132,8 @@ impl CharCluster {
                     return None;
                 }
 
-                let decomp = CanonicalDecomposition::new().decompose(self.chars[0].ch);
+                let decomposer = analysis_data_sources.decomposing_normalizer();
+                let decomp = decomposer.decompose(self.chars[0].ch);
                 match decomp {
                     Decomposed::Default | Decomposed::Singleton(_) => {
                         return None;
@@ -140,11 +141,13 @@ impl CharCluster {
                     Decomposed::Expansion(a, b) => {
                         let mut copy = self.chars[0];
                         copy.ch = a;
-                        copy.contributes_to_shaping = Self::contributes_to_shaping(a);
+                        copy.contributes_to_shaping =
+                            Self::contributes_to_shaping(a, analysis_data_sources);
                         self.decomp.chars[0] = copy;
 
                         copy.ch = b;
-                        copy.contributes_to_shaping = Self::contributes_to_shaping(b);
+                        copy.contributes_to_shaping =
+                            Self::contributes_to_shaping(b, analysis_data_sources);
                         self.decomp.chars[1] = copy;
 
                         self.decomp.len = 2;
@@ -159,7 +162,7 @@ impl CharCluster {
         }
     }
 
-    fn composed(&mut self) -> Option<&[Char]> {
+    fn composed(&mut self, analysis_data_sources: &AnalysisDataSources) -> Option<&[Char]> {
         match self.comp.state {
             FormState::Invalid => None,
             FormState::None => {
@@ -170,13 +173,15 @@ impl CharCluster {
                     return None;
                 }
 
-                let comp = CanonicalComposition::new().compose(self.chars[0].ch, self.chars[1].ch);
+                let composer = analysis_data_sources.composing_normalizer();
+                let comp = composer.compose(self.chars[0].ch, self.chars[1].ch);
                 match comp {
                     None => {}
                     Some(ch) => {
                         let mut copy = self.chars[0];
                         copy.ch = ch;
-                        copy.contributes_to_shaping = Self::contributes_to_shaping(ch);
+                        copy.contributes_to_shaping =
+                            Self::contributes_to_shaping(ch, analysis_data_sources);
                         self.comp.chars[0] = copy;
                         self.comp.len = 1;
                     }
@@ -190,7 +195,11 @@ impl CharCluster {
         }
     }
 
-    pub(crate) fn map(&mut self, f: impl Fn(char) -> GlyphId) -> Status {
+    pub(crate) fn map(
+        &mut self,
+        f: impl Fn(char) -> GlyphId,
+        analysis_data_sources: &AnalysisDataSources,
+    ) -> Status {
         let len = self.len();
         if len == 0 {
             return Status::Complete;
@@ -198,7 +207,7 @@ impl CharCluster {
         let mut glyph_ids = [0_u16; MAX_CLUSTER_SIZE];
         let prev_ratio = self.best_ratio;
         let mut ratio;
-        if self.force_normalize && self.composed().is_some() {
+        if self.force_normalize && self.composed(analysis_data_sources).is_some() {
             ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
@@ -220,7 +229,7 @@ impl CharCluster {
                 return Status::Complete;
             }
         }
-        if self.decomposed().is_some() {
+        if self.decomposed(analysis_data_sources).is_some() {
             ratio = self.decomp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
@@ -229,7 +238,7 @@ impl CharCluster {
                     return Status::Complete;
                 }
             }
-            if !self.force_normalize && self.composed().is_some() {
+            if !self.force_normalize && self.composed(analysis_data_sources).is_some() {
                 ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
                 if ratio > self.best_ratio {
                     self.best_ratio = ratio;
