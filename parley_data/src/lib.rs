@@ -12,7 +12,7 @@
 //! By default, Parley uses ICU4X's rule-based segmentation. This works well for most languages, but produces suboptimal results for languages like Thai, Lao, Khmer, Burmese, Chinese, and Japanese that don't use spaces between words.
 //!
 //! For better segmentation in these languages, you can load LSTM models or dictionaries at runtime.
-//! These models are included here if you enable the `bundled-segmenter-models` feature, but you may want to export them from this crate at build time and load them dynamically.
+//! These models are included here if you want to import them directly, but if you want to reduce code size, you may want to export them from this crate at build time and load them dynamically.
 
 #![no_std]
 
@@ -184,7 +184,6 @@ impl From<Properties> for u32 {
 ///
 /// You can also depend on `parley_data` in your build, and export these models to files that you can ship alongside
 /// your Parley-using application and load dynamically.
-#[cfg(feature = "bundled-segmenter-models")]
 pub mod bundled_models {
     /// Thai LSTM model for word/line segmentation.
     pub static THAI_LSTM: &[u8] = include_bytes!(

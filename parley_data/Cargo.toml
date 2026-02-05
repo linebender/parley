@@ -12,7 +12,6 @@ publish = false
 default = ["baked"]
 baked = ["dep:zerovec"]
 datagen = []
-bundled-segmenter-models = []
 
 [dependencies]
 icu_properties = { workspace = true }

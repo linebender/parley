@@ -36,8 +36,8 @@ use icu_provider_adapters::fork::{
 /// Segmenter model data that can be loaded at runtime.
 ///
 /// This type wraps binary blob data containing LSTM models or dictionaries for language-specific word/line
-/// segmentation. The blobs are exported from `parley_data` with the `bundled-segmenter-models` feature, and can be
-/// included at compile time or exported from `parley_data` and loaded as files at runtime.
+/// segmentation. The blobs are exported from `parley_data`, and can be included at compile time or saved as files from
+/// `parley_data` at build time and later loaded as files at runtime.
 ///
 /// # Example
 ///
