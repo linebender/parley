@@ -335,15 +335,6 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
         }
     }
 
-    let mut line_segmenters = core::mem::take(&mut lcx.analysis_data_sources.line_segmenters);
-
-    // Collect boundary byte positions compactly
-    let mut wb_iter = lcx
-        .analysis_data_sources
-        .word_segmenter()
-        .segment_str(text)
-        .peekable();
-
     // Line boundaries (word break naming refers to the line boundary determination config).
     //
     // This breaks text into sequences with similar line boundary config (part of style
@@ -361,7 +352,9 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
     {
         // Fast path for text with a single word-break option.
         if substring_index == 0 && last {
-            let mut lb_iter = line_segmenters
+            let mut lb_iter = lcx
+                .analysis_data_sources
+                .line_segmenters
                 .get(word_break_strength)
                 .segment_str(substring);
 
@@ -383,7 +376,9 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
             break;
         }
 
-        let line_boundaries_iter = line_segmenters
+        let line_boundaries_iter = lcx
+            .analysis_data_sources
+            .line_segmenters
             .get(word_break_strength)
             .segment_str(substring);
 
@@ -415,6 +410,13 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
             global_offset += substring.len() - last_len;
         }
     }
+
+    // Collect boundary byte positions compactly
+    let mut wb_iter = lcx
+        .analysis_data_sources
+        .word_segmenter()
+        .segment_str(text)
+        .peekable();
 
     // Merge boundaries - line takes precedence over word
     let mut lb_iter = line_boundary_positions.iter().peekable();
@@ -527,9 +529,6 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
             None,
         );
     }
-
-    // Restore line segmenters
-    lcx.analysis_data_sources.line_segmenters = line_segmenters;
 }
 
 /// All characters contribute to shaping except:
