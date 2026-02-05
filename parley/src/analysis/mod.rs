@@ -147,7 +147,7 @@ impl LineSegmenters {
                         }
                     }
                 } else {
-                    LineSegmenter::try_new_auto_unstable(&PROVIDER, line_break_opts)
+                    LineSegmenter::try_new_for_non_complex_scripts(&PROVIDER, line_break_opts)
                 }
                 .expect("Failed to create LineSegmenter")
             })
