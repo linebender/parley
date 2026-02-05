@@ -23,5 +23,5 @@ cargo export target/benchmarks -- bench --bench=main
 # Apply changes to Parley
 
 # Compare changes with baseline
-cargo bench -q --bench=main -- compare target/benchmarks/main
+cargo bench -q --bench=main -- compare target/benchmarks/main -p
 ```
