@@ -144,6 +144,10 @@ impl GlyphRenderer for RenderContext {
             }
         }
     }
+
+    fn fill_rect(&mut self, rect: kurbo::Rect) {
+        self.fill_rect(&rect);
+    }
 }
 
 impl ColrRenderer for RenderContext {
