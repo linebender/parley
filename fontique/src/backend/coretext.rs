@@ -9,12 +9,17 @@ use alloc::format;
 use alloc::string::ToString;
 use alloc::sync::Arc;
 use core::ptr::{null, null_mut};
-use hashbrown::HashMap;
-use objc2_core_foundation::{CFDictionary, CFRange, CFRetained, CFString};
-use objc2_core_text::{CTFont, CTFontDescriptor, CTFontUIFontType};
+use hashbrown::{HashMap, HashSet};
+use objc2_core_foundation::{
+    CFArray, CFDictionary, CFRange, CFRetained, CFString, CFType, CFURL, CFURLPathStyle,
+};
+use objc2_core_text::{
+    CTFont, CTFontCollection, CTFontDescriptor, CTFontUIFontType, kCTFontURLAttribute,
+};
 use objc2_foundation::{
     NSSearchPathDirectory, NSSearchPathDomainMask, NSSearchPathForDirectoriesInDomains,
 };
+use std::path::PathBuf;
 
 const DEFAULT_GENERIC_FAMILIES: &[(GenericFamily, &[&str])] = &[
     (GenericFamily::Serif, &["Times", "Times New Roman"]),
@@ -35,14 +40,9 @@ pub(crate) struct SystemFonts {
 
 impl SystemFonts {
     pub(crate) fn new() -> Self {
-        let paths = NSSearchPathForDirectoriesInDomains(
-            NSSearchPathDirectory::LibraryDirectory,
-            NSSearchPathDomainMask::AllDomainsMask,
-            true,
-        )
-        .into_iter()
-        .map(|p| format!("{p}/Fonts/"));
-        let scanned = scan::ScannedCollection::from_paths(paths, 8);
+        // CoreText can enumerate fonts that are not stored under Library/Fonts (e.g. system UI
+        // fonts). If it fails for any reason, fall back to the original file-based scan.
+        let scanned = scan_coretext_available_fonts().unwrap_or_else(scan_fallback_files);
         let name_map = scanned.family_names;
         let mut generic_families = GenericFamilyMap::default();
         for (family, names) in DEFAULT_GENERIC_FAMILIES {
@@ -72,6 +72,66 @@ impl SystemFonts {
         let family_name = unsafe { font.family_name() };
         self.name_map.get(&family_name.to_string()).map(|n| n.id())
     }
+}
+
+/// Enumerate available fonts via CoreText, extract their file paths, and reuse the existing scan
+/// pipeline for reading and indexing font metadata.
+fn scan_coretext_available_fonts() -> Option<scan::ScannedCollection> {
+    // SAFETY: Calls into CoreText. If anything fails we return None and use the fallback scan.
+    let collection = unsafe { CTFontCollection::from_available_fonts(None) };
+    let descriptors = unsafe { collection.matching_font_descriptors()? };
+    let descriptors: CFRetained<CFArray<CTFontDescriptor>> =
+        unsafe { CFRetained::cast_unchecked(descriptors) };
+
+    // Collect unique font file paths to avoid redundant scanning.
+    let mut paths: HashSet<PathBuf> = HashSet::new();
+    for index in 0..descriptors.len() {
+        let Some(descriptor) = descriptors.get(index) else {
+            continue;
+        };
+
+        let Some(url_cf): Option<CFRetained<CFType>> =
+            (unsafe { descriptor.attribute(&kCTFontURLAttribute) })
+        else {
+            continue;
+        };
+
+        // The attribute is typed as CFType; attempt to downcast to CFURL.
+        let Ok(url_cf): Result<CFRetained<CFURL>, _> = url_cf.downcast::<CFURL>() else {
+            continue;
+        };
+
+        // Convert the file URL into a POSIX path.
+        let Some(path_cf): Option<CFRetained<CFString>> =
+            url_cf.file_system_path(CFURLPathStyle::CFURLPOSIXPathStyle)
+        else {
+            continue;
+        };
+
+        let path = PathBuf::from(path_cf.to_string());
+        if path.exists() {
+            paths.insert(path);
+        }
+    }
+
+    if paths.is_empty() {
+        return None;
+    }
+
+    Some(scan::ScannedCollection::from_paths(paths.iter(), 8))
+}
+
+/// Fallback scan that matches the previous behavior: enumerate and scan all Library/Fonts
+/// directories across domains.
+fn scan_fallback_files() -> scan::ScannedCollection {
+    let paths = NSSearchPathForDirectoriesInDomains(
+        NSSearchPathDirectory::LibraryDirectory,
+        NSSearchPathDomainMask::AllDomainsMask,
+        true,
+    )
+    .into_iter()
+    .map(|p| format!("{p}/Fonts/"));
+    scan::ScannedCollection::from_paths(paths, 8)
 }
 
 fn create_base_font(prefer_ui_font: bool) -> CFRetained<CTFont> {
