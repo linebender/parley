@@ -116,11 +116,12 @@ struct LineSegmenters {
 }
 
 impl LineSegmenters {
-    #[cfg(feature = "runtime-segmenter-data")]
     fn get(
         &mut self,
-        runtime_buffer_provider: Option<&RuntimeBufferProvider>,
         word_break_strength: WordBreak,
+        #[cfg(feature = "runtime-segmenter-data")] runtime_buffer_provider: Option<
+            &RuntimeBufferProvider,
+        >,
     ) -> LineSegmenterBorrowed<'_> {
         let segmenter = match word_break_strength {
             WordBreak::Normal => &mut self.normal,
@@ -130,7 +131,15 @@ impl LineSegmenters {
 
         segmenter
             .get_or_insert_with(|| {
-                let line_break_opts = Self::make_line_break_opts(word_break_strength);
+                let mut line_break_opts = LineBreakOptions::default();
+                let word_break_strength_icu = match word_break_strength {
+                    WordBreak::Normal => LineBreakWordOption::Normal,
+                    WordBreak::BreakAll => LineBreakWordOption::BreakAll,
+                    WordBreak::KeepAll => LineBreakWordOption::KeepAll,
+                };
+                line_break_opts.word_option = Some(word_break_strength_icu);
+
+                #[cfg(feature = "runtime-segmenter-data")]
                 if let Some(&RuntimeBufferProvider {
                     ref provider,
                     segmenter_mode,
@@ -138,7 +147,7 @@ impl LineSegmenters {
                 {
                     let combined =
                         ForkByMarkerProvider::new(provider.as_deserializing(), &PROVIDER);
-                    match segmenter_mode {
+                    return match segmenter_mode {
                         SegmenterMode::Auto => {
                             LineSegmenter::try_new_auto_unstable(&combined, line_break_opts)
                         }
@@ -146,40 +155,13 @@ impl LineSegmenters {
                             LineSegmenter::try_new_dictionary_unstable(&combined, line_break_opts)
                         }
                     }
-                } else {
-                    LineSegmenter::try_new_for_non_complex_scripts(&PROVIDER, line_break_opts)
+                    .expect("Failed to create LineSegmenter");
                 }
-                .expect("Failed to create LineSegmenter")
-            })
-            .as_borrowed()
-    }
 
-    #[cfg(not(feature = "runtime-segmenter-data"))]
-    fn get(&self, word_break_strength: WordBreak) -> LineSegmenterBorrowed<'_> {
-        let segmenter = match word_break_strength {
-            WordBreak::Normal => &self.normal,
-            WordBreak::KeepAll => &self.keep_all,
-            WordBreak::BreakAll => &self.break_all,
-        };
-
-        segmenter
-            .get_or_init(|| {
-                let line_break_opts = Self::make_line_break_opts(word_break_strength);
-                LineSegmenter::try_new_auto_unstable(&PROVIDER, line_break_opts)
+                LineSegmenter::try_new_for_non_complex_scripts_unstable(&PROVIDER, line_break_opts)
                     .expect("Failed to create LineSegmenter")
             })
             .as_borrowed()
-    }
-
-    fn make_line_break_opts(word_break_strength: WordBreak) -> LineBreakOptions<'static> {
-        let mut line_break_opts = LineBreakOptions::default();
-        let word_break_strength_icu = match word_break_strength {
-            WordBreak::Normal => LineBreakWordOption::Normal,
-            WordBreak::BreakAll => LineBreakWordOption::BreakAll,
-            WordBreak::KeepAll => LineBreakWordOption::KeepAll,
-        };
-        line_break_opts.word_option = Some(word_break_strength_icu);
-        line_break_opts
     }
 }
 
@@ -187,7 +169,7 @@ impl AnalysisDataSources {
     pub(crate) fn new() -> Self {
         Self {
             grapheme_segmenter: GraphemeClusterSegmenter::try_new_unstable(&PROVIDER).unwrap(),
-            word_segmenter: WordSegmenter::try_new_for_non_complex_scripts(
+            word_segmenter: WordSegmenter::try_new_for_non_complex_scripts_unstable(
                 &PROVIDER,
                 WordBreakOptions::default(),
             )
@@ -281,7 +263,7 @@ impl AnalysisDataSources {
         #[cfg(feature = "runtime-segmenter-data")]
         {
             self.line_segmenters
-                .get(self.runtime_buffer_provider.as_ref(), word_break_strength)
+                .get(word_break_strength, self.runtime_buffer_provider.as_ref())
         }
         #[cfg(not(feature = "runtime-segmenter-data"))]
         {
