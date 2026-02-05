@@ -22,7 +22,7 @@ use icu_segmenter::{
     GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter,
     LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed,
 };
-use parley_data::CompositeProps;
+use parley_data::Properties;
 
 pub(crate) struct AnalysisDataSources;
 
@@ -32,8 +32,8 @@ impl AnalysisDataSources {
     }
 
     #[inline(always)]
-    pub(crate) fn composite(&self) -> CompositeProps {
-        const { CompositeProps }
+    pub(crate) fn properties(&self, c: char) -> Properties {
+        Properties::get(c)
     }
 
     #[inline(always)]
@@ -424,7 +424,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
         (boundary, ch)
     });
 
-    let composite = lcx.analysis_data_sources.composite();
+    let properties = |c| lcx.analysis_data_sources.properties(c);
 
     let mut needs_bidi_resolution = false;
 
@@ -435,7 +435,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
         // character's index, but we need our iterators to align, and the rest are simply
         // character-indexed.
         .fold(false, |is_mandatory_linebreak, (boundary, ch)| {
-            let properties = composite.properties(ch as u32);
+            let properties = properties(ch);
             let script = properties.script();
             let grapheme_cluster_break = properties.grapheme_cluster_break();
             let bidi_class = properties.bidi_class();
@@ -465,7 +465,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
             };
 
             needs_bidi_resolution |= crate::bidi::needs_bidi_resolution(bidi_class);
-            // TODO: maybe extend CompositeProps to u64 to fit BidiMirroringGlyph
+            // TODO: maybe extend Properties to u64 to fit BidiMirroringGlyph
             let bracket = lcx.analysis_data_sources.brackets().get(ch);
 
             lcx.info.push((
