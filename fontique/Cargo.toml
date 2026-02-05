@@ -64,10 +64,12 @@ objc2-foundation = { version = "0.3.2", optional = true, default-features = fals
 ] }
 objc2-core-foundation = { version = "0.3.2", optional = true, default-features = false, features = [
     "CFBase",
+    "CFURL",
 ] }
 objc2-core-text = { version = "0.3.2", optional = true, default-features = false, features = [
     "CTFont",
     "CTFontDescriptor",
+    "CTFontCollection",
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
