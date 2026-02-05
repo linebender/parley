@@ -91,7 +91,7 @@ fn scan_coretext_available_fonts() -> Option<scan::ScannedCollection> {
         };
 
         let Some(url_cf): Option<CFRetained<CFType>> =
-            (unsafe { descriptor.attribute(&kCTFontURLAttribute) })
+            (unsafe { descriptor.attribute(kCTFontURLAttribute) })
         else {
             continue;
         };
