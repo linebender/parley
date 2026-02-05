@@ -3,7 +3,7 @@
 
 //! # Draw Benchmarks
 //!
-//! Benchmarks for text rendering using parley_draw with vello_cpu.
+//! Benchmarks for text rendering using `parley_draw` with `vello_cpu`.
 
 use crate::{ColorBrush, FONT_FAMILY_LIST, with_contexts};
 use parley::{
@@ -132,7 +132,15 @@ fn render_layout(
 
 /// Creates the render context for drawing.
 fn create_renderer(layout: &Layout<ColorBrush>) -> RenderContext {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the layout's not *that* big"
+    )]
     let width = layout.width().ceil() as u16 + PADDING * 2;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the layout's not *that* big"
+    )]
     let height = layout.height().ceil() as u16 + PADDING * 2;
 
     let mut renderer = RenderContext::new(width, height);
