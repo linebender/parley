@@ -381,25 +381,24 @@ fn render_glyph_run_impl(
     renderer.set_paint(glyph_run.style().brush.color);
     let run = glyph_run.run();
 
-    // Collect glyphs for reuse (needed for both fill and underline)
-    let glyphs = || {
-        glyph_run
-            .positioned_glyphs()
-            .map(|glyph| parley_draw::Glyph {
-                id: glyph.id,
-                x: glyph.x + x_offset,
-                y: glyph.y + y_offset,
-            })
-    };
-
-    let mut builder = GlyphRunBuilder::new(run.font().clone(), *renderer.transform(), renderer)
+    let mut builder = GlyphRunBuilder::new(run.font().clone(), *renderer.transform())
         .font_size(run.font_size())
         .hint(config.hint)
         .normalized_coords(run.normalized_coords());
     if let Some(glyph_transform) = config.glyph_transform {
         builder = builder.glyph_transform(glyph_transform);
     }
-    builder.fill_glyphs(glyphs(), caches);
+    let mut run_renderer = builder.build(
+        glyph_run
+            .positioned_glyphs()
+            .map(|glyph| parley_draw::Glyph {
+                id: glyph.id,
+                x: glyph.x + x_offset,
+                y: glyph.y + y_offset,
+            }),
+        caches,
+    );
+    run_renderer.fill_glyphs(renderer);
 
     let style = glyph_run.style();
     if let Some(decoration) = &style.underline {
@@ -412,21 +411,13 @@ fn render_glyph_run_impl(
         let baseline = glyph_run.baseline() + y_offset;
 
         // Use ink-skipping underline rendering
-        let mut builder = GlyphRunBuilder::new(run.font().clone(), *renderer.transform(), renderer)
-            .font_size(run.font_size())
-            .hint(config.hint)
-            .normalized_coords(run.normalized_coords());
-        if let Some(glyph_transform) = config.glyph_transform {
-            builder = builder.glyph_transform(glyph_transform);
-        }
-        builder.render_decoration(
-            glyphs(),
+        run_renderer.render_decoration(
             x..=x1,
             baseline,
             underline_offset,
             size,
             size, // buffer around exclusions; let's match the underline thickness
-            caches,
+            renderer,
         );
     }
     if let Some(decoration) = &style.strikethrough {
