@@ -399,12 +399,12 @@ fn render_layout_glyphs(
         for item in line.items() {
             if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
                 let run = glyph_run.run();
-                GlyphRunBuilder::new(run.font().clone(), kurbo::Affine::IDENTITY, renderer)
+                GlyphRunBuilder::new(run.font().clone(), kurbo::Affine::IDENTITY)
                     .font_size(run.font_size())
                     .hint(true)
                     .normalized_coords(run.normalized_coords())
                     .atlas_cache(use_cache)
-                    .fill_glyphs(
+                    .build(
                         glyph_run
                             .positioned_glyphs()
                             .map(|glyph| parley_draw::Glyph {
@@ -414,7 +414,8 @@ fn render_layout_glyphs(
                             }),
                         glyph_caches,
                         image_cache,
-                    );
+                    )
+                    .fill_glyphs(renderer);
             }
         }
     }
