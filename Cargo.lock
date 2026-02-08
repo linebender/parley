@@ -3324,8 +3324,10 @@ version = "0.0.0"
 dependencies = [
  "parley",
  "parley_dev",
+ "parley_draw",
  "skrifa 0.40.0",
  "tango-bench",
+ "vello_cpu",
 ]
 
 [[package]]
