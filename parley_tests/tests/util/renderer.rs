@@ -414,6 +414,7 @@ fn render_glyph_run_impl(
         // Use ink-skipping underline rendering
         let mut builder = GlyphRunBuilder::new(run.font().clone(), *renderer.transform(), renderer)
             .font_size(run.font_size())
+            .hint(config.hint)
             .normalized_coords(run.normalized_coords());
         if let Some(glyph_transform) = config.glyph_transform {
             builder = builder.glyph_transform(glyph_transform);

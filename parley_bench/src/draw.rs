@@ -107,6 +107,7 @@ fn render_layout(
                                 renderer,
                             )
                             .font_size(run.font_size())
+                            .hint(true)
                             .normalized_coords(run.normalized_coords())
                             .render_decoration(
                                 glyph_run.positioned_glyphs().map(|glyph| Glyph {
