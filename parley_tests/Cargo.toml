@@ -15,7 +15,8 @@ name = "tests"
 path = "tests/mod.rs"
 
 [dependencies]
-parley = { workspace = true, features = ["std"] }
+parley = { workspace = true, features = ["std", "runtime-segmenter-data"] }
+parley_data = { workspace = true }
 parley_dev = { workspace = true }
 parley_draw = { workspace = true, features = ["std", "vello_cpu"] }
 peniko = { workspace = true, features = ["std"] }

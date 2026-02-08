@@ -28,6 +28,8 @@ fn snapshot_dir() -> PathBuf {
 pub(crate) const FONT_FAMILY_LIST: &[FontFamilyName<'_>] = &[
     FontFamilyName::Named(Cow::Borrowed("Roboto")),
     FontFamilyName::Named(Cow::Borrowed("Noto Kufi Arabic")),
+    FontFamilyName::Named(Cow::Borrowed("Noto Sans Thai")),
+    FontFamilyName::Named(Cow::Borrowed("Noto Sans Myanmar")),
 ];
 
 pub(crate) const CLUSTER_INFO_COLOR: Color = Color::from_rgba8(100, 100, 100, 255);
@@ -187,6 +189,10 @@ impl TestEnv {
                 .tree_builder(&mut self.font_cx, 1.0, true, &TextStyle::default());
         builder.push_style_modification_span(&default_style);
         builder
+    }
+
+    pub(crate) fn layout_context_mut(&mut self) -> &mut LayoutContext<ColorBrush> {
+        &mut self.layout_cx
     }
 
     pub(crate) fn driver<'a>(

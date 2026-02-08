@@ -5,7 +5,9 @@
 // @generated
 include!("normalizer_nfd_tables_v1.rs.data");
 include!("normalizer_nfd_supplement_v1.rs.data");
+include!("segmenter_dictionary_auto_v1.rs.data");
 include!("segmenter_break_grapheme_cluster_v1.rs.data");
+include!("segmenter_dictionary_extended_v1.rs.data");
 include!("segmenter_break_line_v1.rs.data");
 include!("normalizer_nfc_v1.rs.data");
 include!("segmenter_lstm_auto_v1.rs.data");
@@ -52,7 +54,9 @@ macro_rules! impl_data_provider {
         make_provider!($provider);
         impl_normalizer_nfd_tables_v1!($provider);
         impl_normalizer_nfd_supplement_v1!($provider);
+        impl_segmenter_dictionary_auto_v1!($provider);
         impl_segmenter_break_grapheme_cluster_v1!($provider);
+        impl_segmenter_dictionary_extended_v1!($provider);
         impl_segmenter_break_line_v1!($provider);
         impl_normalizer_nfc_v1!($provider);
         impl_segmenter_lstm_auto_v1!($provider);

@@ -7,7 +7,7 @@ The generator requires a network connection the first time it runs so that `icu_
 ## Usage
 
 ```
-cargo run -p parley_data_gen -- <output-dir>
+cargo run --release -p parley_data_gen -- <output-dir>
 ```
 
 The `output-dir` is created if it does not exist. After the command completes, the directory will contain:
