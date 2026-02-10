@@ -39,6 +39,7 @@ impl Properties {
         Self::IS_REGION_INDICATOR_SHIFT + Self::IS_REGION_INDICATOR_BITS;
 
     #[cfg(feature = "baked")]
+    #[inline(always)]
     /// Returns the properties for a given character.
     pub fn get(ch: char) -> Self {
         Self(generated::COMPOSITE.get(ch))
