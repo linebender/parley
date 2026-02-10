@@ -1,17 +1,14 @@
 # Unicode Data
 
-`parley_data` packages the Unicode data that Parley's text analysis and shaping pipeline needs at runtime. It exposes a locale-invariant `CompositePropsV1` provider backed by a compact `CodePointTrie`, allowing the engine to obtain all required character properties with a single lookup.
+`parley_data` packages the Unicode data that Parley's text analysis and shaping pipeline needs at runtime. It exposes a locale-invariant `CompositeProps` data backed by a compact `CodePointTrie`, allowing the engine to obtain all required character properties with a single lookup.
 
 ## What is included
 
-- `CompositePropsV1Data`, a trie that holds script, general category, grapheme cluster break, bidi class, and several emoji-related flags per scalar value.
-- Re-exported ICU4X data providers for grapheme, word, and line breaking, plus Unicode normalization tables used by Parley.
-- An implementation of `unicode_bidi::BidiDataSource`, making the composite provider plug directly into Unicode bidi processing.
+- `CompositeProps`, a trie that holds script, general category, grapheme cluster break, bidi class, and several emoji-related flags per scalar value.
 
 ## Cargo features
 
 - `baked` *(default)* embeds pre-generated ICU4X and composite data from `src/generated`, enabling use in `no_std` targets without a filesystem.
-- `datagen` enables serialization, `databake`, and ICU provider export traits so the crate can participate in regeneration workflows. This feature is intended for developer use when refreshing the baked data and principally used by `../parley_data_gen`.
 
 ## Regenerating the baked data
 
@@ -26,7 +23,7 @@ The generator downloads the latest ICU4X upstream data and recomputes the compos
 
 ## Why have this crate?
 
-You may wonder why we can't simply run `parley_data_gen` within a `build.rs` file of `Parley`. Although being possible, that option increases build time by over a minute and requires a `std` compatible environment.
+You may wonder why we can't simply run `parley_data_gen` within a `build.rs` file of `Parley`. Although being possible, that option increases build time and requires a `std` compatible environment.
 
 ## License
 

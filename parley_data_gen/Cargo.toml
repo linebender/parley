@@ -9,16 +9,11 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-databake = { workspace = true, features = ["derive"] }
+databake = { workspace = true }
 icu_codepointtrie_builder = { workspace = true, features = ["wasm"] }
 icu_collections = { workspace = true, features = ["databake"] }
-icu_locale = { workspace = true }
-icu_normalizer = { workspace = true, features = ["compiled_data"] }
 icu_properties = { workspace = true, features = ["compiled_data"] }
-icu_provider_export = { workspace = true, features = ["baked_exporter"] }
-icu_provider_source = { workspace = true, features = ["networking", "use_wasm"] }
-icu_segmenter = { workspace = true }
-parley_data = { workspace = true, default-features = false, features = ["datagen"] }
+parley_data = { workspace = true }
 
 [lints]
 workspace = true
