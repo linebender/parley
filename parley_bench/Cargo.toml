@@ -12,8 +12,10 @@ publish = false
 [dependencies]
 parley = { workspace = true, default-features = true }
 parley_dev = { workspace = true }
+parley_draw = { workspace = true, default-features = false, features = ["std", "vello_cpu", "png"] }
 skrifa = { workspace = true }
 tango-bench = "0.6"
+vello_cpu = { workspace = true, default-features = false, features = ["std", "png", "text"] }
 
 [[bench]]
 name = "main"

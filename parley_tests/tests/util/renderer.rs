@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 
 use parley::{BoundingBox, GlyphRun, Layout, PositionedLayoutItem};
-use parley_draw::{GlyphCaches, GlyphRunBuilder};
+use parley_draw::{AtlasConfig, CpuGlyphCaches, GlyphRunBuilder, ImageCache};
 use peniko::{
     Color,
     kurbo::{self, BezPath, Rect, Stroke},
@@ -89,7 +89,8 @@ pub(crate) fn render_layout(
     let fpadding = padding as f64;
 
     let mut renderer = RenderContext::new(padded_width, padded_height);
-    let mut caches = GlyphCaches::new();
+    let mut caches = CpuGlyphCaches::new();
+    let mut image_cache = ImageCache::new_with_config(AtlasConfig::default());
     draw_rect(
         &mut renderer,
         0.0,
@@ -134,7 +135,13 @@ pub(crate) fn render_layout(
         for item in line.items() {
             match item {
                 PositionedLayoutItem::GlyphRun(glyph_run) => {
-                    render_glyph_run(&glyph_run, &mut renderer, &mut caches, padding);
+                    render_glyph_run(
+                        &glyph_run,
+                        &mut renderer,
+                        &mut caches,
+                        &mut image_cache,
+                        padding,
+                    );
                 }
                 PositionedLayoutItem::InlineBox(inline_box) => {
                     draw_rect(
@@ -180,7 +187,8 @@ pub(crate) fn render_layout_with_clusters(
     let fpadding = padding as f64;
 
     let mut renderer = RenderContext::new(padded_width, padded_height);
-    let mut caches = GlyphCaches::new();
+    let mut caches = CpuGlyphCaches::new();
+    let mut image_cache = ImageCache::new_with_config(AtlasConfig::default());
     draw_rect(
         &mut renderer,
         0.0,
@@ -211,6 +219,7 @@ pub(crate) fn render_layout_with_clusters(
                         &glyph_run,
                         &mut renderer,
                         &mut caches,
+                        &mut image_cache,
                         padding,
                         (0.0, y_offset),
                     );
@@ -301,6 +310,7 @@ pub(crate) fn render_layout_with_clusters(
                                 &glyph_run,
                                 &mut renderer,
                                 &mut caches,
+                                &mut image_cache,
                                 padding,
                                 (char_x_offset, char_y_offset),
                             );
@@ -322,16 +332,20 @@ pub(crate) fn render_layout_with_clusters(
 fn render_glyph_run(
     glyph_run: &GlyphRun<'_, ColorBrush>,
     renderer: &mut RenderContext,
-    caches: &mut GlyphCaches,
+    caches: &mut CpuGlyphCaches,
+    image_cache: &mut ImageCache,
     padding: u16,
 ) {
-    render_glyph_run_with_offset(glyph_run, renderer, caches, padding, (0.0, 0.0));
+    render_glyph_run_with_offset(
+        glyph_run, renderer, caches, image_cache, padding, (0.0, 0.0),
+    );
 }
 
 fn render_glyph_run_with_offset(
     glyph_run: &GlyphRun<'_, ColorBrush>,
     renderer: &mut RenderContext,
-    caches: &mut GlyphCaches,
+    caches: &mut CpuGlyphCaches,
+    image_cache: &mut ImageCache,
     padding: u16,
     offset: (f32, f32),
 ) {
@@ -352,6 +366,7 @@ fn render_glyph_run_with_offset(
                     y: glyph.y + padding + y_offset,
                 }),
             caches,
+            image_cache,
         );
 
     let style = glyph_run.style();

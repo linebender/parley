@@ -5,11 +5,10 @@
 
 use crate::color::Srgb;
 use crate::color::{AlphaColor, DynamicColor};
-use crate::glyph::{ColorGlyph, OutlinePath};
+use crate::glyph::{ColrGlyph, OutlinePath};
 use crate::kurbo::{Affine, BezPath, Point, Rect, Shape};
 use crate::math::FloatExt;
 use crate::peniko::{self, BlendMode, ColorStops, Compose, Extend, Gradient, Mix};
-use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt::Debug;
@@ -40,7 +39,7 @@ pub trait ColrRenderer {
 /// An abstraction for painting COLR glyphs.
 pub struct ColrPainter<'a> {
     transforms: Vec<Affine>,
-    color_glyph: Box<ColorGlyph<'a>>,
+    colr_glyph: &'a ColrGlyph<'a>,
     context_color: AlphaColor<Srgb>,
     painter: &'a mut dyn ColrRenderer,
     layer_count: u32,
@@ -55,13 +54,13 @@ impl Debug for ColrPainter<'_> {
 impl<'a> ColrPainter<'a> {
     /// Create a new COLR painter.
     pub fn new(
-        color_glyph: Box<ColorGlyph<'a>>,
+        colr_glyph: &'a ColrGlyph<'a>,
         context_color: AlphaColor<Srgb>,
         painter: &'a mut impl ColrRenderer,
     ) -> Self {
         Self {
-            transforms: vec![color_glyph.draw_transform],
-            color_glyph,
+            transforms: vec![colr_glyph.draw_transform],
+            colr_glyph,
             context_color,
             painter,
             layer_count: 0,
@@ -70,10 +69,10 @@ impl<'a> ColrPainter<'a> {
 
     /// Paint the underlying glyph.
     pub fn paint(&mut self) {
-        let color_glyph = self.color_glyph.skrifa_glyph.clone();
-        let location_ref = self.color_glyph.location;
+        let skrifa_glyph = self.colr_glyph.skrifa_glyph.clone();
+        let location_ref = self.colr_glyph.location;
         // Ignore errors for now.
-        let _ = color_glyph.paint(location_ref, self);
+        let _ = skrifa_glyph.paint(location_ref, self);
 
         // In certain malformed fonts (i.e. if there is a cycle), skrifa will not
         // ensure that the push/pop count is the same, so we pop the remaining ones here.
@@ -89,7 +88,7 @@ impl<'a> ColrPainter<'a> {
     fn palette_index_to_color(&self, palette_index: u16, alpha: f32) -> Option<AlphaColor<Srgb>> {
         if palette_index != u16::MAX {
             let color = self
-                .color_glyph
+                .colr_glyph
                 .font_ref
                 .cpal()
                 .ok()?
@@ -172,7 +171,7 @@ impl ColorPainter for ColrPainter<'_> {
     fn push_clip_glyph(&mut self, glyph_id: GlyphId) {
         let mut outline_builder = OutlinePath::new();
 
-        let outline_glyphs = self.color_glyph.font_ref.outline_glyphs();
+        let outline_glyphs = self.colr_glyph.font_ref.outline_glyphs();
         let Some(outline_glyph) = outline_glyphs.get(glyph_id) else {
             return;
         };
@@ -180,7 +179,7 @@ impl ColorPainter for ColrPainter<'_> {
         let _ = outline_glyph.draw(
             DrawSettings::unhinted(
                 skrifa::instance::Size::unscaled(),
-                self.color_glyph.location,
+                self.colr_glyph.location,
             ),
             &mut outline_builder,
         );
@@ -400,4 +399,48 @@ pub(crate) fn convert_bounding_box(rect: BoundingBox<f32>) -> Rect {
         f64::from(rect.x_max),
         f64::from(rect.y_max),
     )
+}
+
+// ---------------------------------------------------------------------------
+// ColrRenderer for AtlasCommandRecorder
+// ---------------------------------------------------------------------------
+
+use crate::atlas::commands::AtlasCommandRecorder;
+
+impl ColrRenderer for AtlasCommandRecorder {
+    fn push_clip_layer(&mut self, clip: &BezPath) {
+        self.push_clip_layer(clip);
+    }
+
+    fn push_blend_layer(&mut self, blend_mode: BlendMode) {
+        self.push_blend_layer(blend_mode);
+    }
+
+    fn fill_solid(&mut self, color: AlphaColor<Srgb>) {
+        self.set_paint(color);
+        self.fill_rect(&Rect::new(
+            0.0,
+            0.0,
+            f64::from(self.width()),
+            f64::from(self.height()),
+        ));
+    }
+
+    fn fill_gradient(&mut self, gradient: Gradient) {
+        self.set_paint(gradient);
+        self.fill_rect(&Rect::new(
+            0.0,
+            0.0,
+            f64::from(self.width()),
+            f64::from(self.height()),
+        ));
+    }
+
+    fn set_paint_transform(&mut self, affine: Affine) {
+        self.set_paint_transform(affine);
+    }
+
+    fn pop_layer(&mut self) {
+        self.pop_layer();
+    }
 }

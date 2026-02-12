@@ -4,125 +4,72 @@
 //! A simple example that lays out some text using Parley, extracts outlines using Skrifa and
 //! then paints those outlines using Vello CPU through Parley Draw.
 
-#![expect(clippy::cast_possible_truncation, reason = "Deferred")]
+use std::path::Path;
+use std::thread;
+use std::time::{Duration, Instant};
 
-use parley::{
-    Alignment, AlignmentOptions, FontContext, FontWeight, GenericFamily, GlyphRun, InlineBox,
-    Layout, LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty,
+use parley::{GlyphRun, PositionedLayoutItem};
+use parley_draw::renderers::vello_renderer::replay_atlas_commands;
+use parley_draw::{AtlasConfig, CpuGlyphCaches, GlyphCache, GlyphRunBuilder, ImageCache};
+use parley_examples_common::{ColorBrush, FrameStats, output_dir, prepare_example_layout};
+use peniko::Color;
+use vello_cpu::{
+    Pixmap, RenderContext,
+    kurbo::{Affine, Rect, Vec2},
 };
-use parley_draw::{GlyphCaches, GlyphRunBuilder};
-use vello_cpu::{Pixmap, RenderContext, kurbo, peniko::Color};
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-struct ColorBrush {
-    color: Color,
-}
-
-impl Default for ColorBrush {
-    fn default() -> Self {
-        Self {
-            color: Color::BLACK,
-        }
-    }
-}
 
 fn main() {
-    // The text we are going to style and lay out
-    let text = String::from(
-        "Some text here. Let's make it a bit longer so that line wrapping kicks in 😊. And also some اللغة العربية arabic text.\nThis is underline and strikethrough text",
-    );
+    let start_time = Instant::now();
 
-    // The display scale for HiDPI rendering
-    let display_scale = 1.0;
+    let (layout, width, height, config) = prepare_example_layout();
 
-    // Whether to automatically align the output to pixel boundaries, to avoid blurry text.
-    let quantize = true;
+    let mut stats = FrameStats::new();
 
-    // The width for line wrapping
-    let max_advance = Some(200.0 * display_scale);
+    stats.start("prepare_rendering");
+    let (mut renderer, mut glyph_renderer, mut glyph_caches, mut image_cache) =
+        prepare_rendering(width, height);
+    stats.end("prepare_rendering");
 
-    // Colours for rendering
-    let foreground_color = Color::BLACK;
-    let background_color = Color::WHITE;
+    let num_frames = 5;
+    let frame_delay = Duration::from_millis(100);
 
-    // Padding around the output image
-    let padding = 20;
+    for frame in 0..num_frames {
+        stats.start("total_frame");
+        println!("Rendering frame {}/{}", frame + 1, num_frames);
 
-    // Create a FontContext, LayoutContext
-    //
-    // These are both intended to be constructed rarely (perhaps even once per app (or once per thread))
-    // and provide caches and scratch space to avoid allocations
-    let mut font_cx = FontContext::new();
-    let mut layout_cx = LayoutContext::new();
+        stats.start("reset_renderer");
+        reset_renderer(
+            &mut renderer,
+            &mut glyph_renderer,
+            width,
+            height,
+            config.padding,
+            config.background_color,
+        );
+        stats.end("reset_renderer");
 
-    // Create a RangedBuilder
-    let mut builder = layout_cx.ranged_builder(&mut font_cx, &text, display_scale, quantize);
+        // Enable accumulation mode for metrics that are measured many times per frame
+        stats.start_accumulating("fill_glyphs");
+        stats.start_accumulating("render_decoration");
 
-    // Set default text colour styles (set foreground text color)
-    let foreground_brush = ColorBrush {
-        color: foreground_color,
-    };
-    let brush_style = StyleProperty::Brush(foreground_brush);
-    builder.push_default(brush_style);
+        // Render each glyph run
+        for line in layout.lines() {
+            for item in line.items() {
+                match item {
+                    PositionedLayoutItem::GlyphRun(glyph_run) => {
+                        renderer.set_paint(glyph_run.style().brush.color);
+                        let run = glyph_run.run();
 
-    // Set default font family
-    builder.push_default(GenericFamily::SystemUi);
-    builder.push_default(LineHeight::FontSizeRelative(1.3));
-    builder.push_default(StyleProperty::FontSize(16.0));
-
-    // Set the first 4 characters to bold
-    let bold = FontWeight::new(600.0);
-    builder.push(StyleProperty::FontWeight(bold), 0..4);
-
-    // Set the underline & strikethrough style
-    builder.push(StyleProperty::Underline(true), 141..150);
-    builder.push(StyleProperty::Strikethrough(true), 155..168);
-
-    builder.push_inline_box(InlineBox {
-        id: 0,
-        index: 40,
-        width: 50.0,
-        height: 50.0,
-    });
-
-    // Build the builder into a Layout
-    let mut layout: Layout<ColorBrush> = builder.build(&text);
-
-    // Perform layout (including bidi resolution and shaping) with start alignment
-    layout.break_all_lines(max_advance);
-    layout.align(max_advance, Alignment::Start, AlignmentOptions::default());
-    let width = layout.width().ceil() as u16;
-    let height = layout.height().ceil() as u16;
-    let padded_width = width + padding * 2;
-    let padded_height = height + padding * 2;
-
-    // The renderer and glyph caches should be created once per app (or per thread).
-    let mut renderer = RenderContext::new(padded_width, padded_height);
-    let mut glyph_caches = GlyphCaches::new();
-
-    renderer.set_paint(background_color);
-    renderer.fill_rect(&kurbo::Rect::new(
-        0.0,
-        0.0,
-        padded_width as f64,
-        padded_height as f64,
-    ));
-    renderer.set_transform(kurbo::Affine::translate(kurbo::Vec2::new(
-        padding as f64,
-        padding as f64,
-    )));
-
-    // Render each glyph run
-    for line in layout.lines() {
-        for item in line.items() {
-            match item {
-                PositionedLayoutItem::GlyphRun(glyph_run) => {
-                    renderer.set_paint(glyph_run.style().brush.color);
-                    let run = glyph_run.run();
-                    GlyphRunBuilder::new(run.font().clone(), *renderer.transform(), &mut renderer)
+                        stats.start("fill_glyphs");
+                        GlyphRunBuilder::new(
+                            run.font().clone(),
+                            *renderer.transform(),
+                            &mut renderer,
+                        )
                         .font_size(run.font_size())
                         .hint(true)
                         .normalized_coords(run.normalized_coords())
+                        .bitmap_cache(true)
                         .fill_glyphs(
                             glyph_run
                                 .positioned_glyphs()
@@ -132,65 +79,124 @@ fn main() {
                                     y: glyph.y,
                                 }),
                             &mut glyph_caches,
+                            &mut image_cache,
                         );
+                        stats.end("fill_glyphs");
 
-                    let style = glyph_run.style();
-                    if let Some(decoration) = &style.underline {
-                        let offset = decoration.offset.unwrap_or(run.metrics().underline_offset);
-                        let size = decoration.size.unwrap_or(run.metrics().underline_size);
+                        let style = glyph_run.style();
+                        if let Some(decoration) = &style.underline {
+                            let offset =
+                                decoration.offset.unwrap_or(run.metrics().underline_offset);
+                            let size = decoration.size.unwrap_or(run.metrics().underline_size);
 
-                        render_decoration(
-                            &mut renderer,
-                            &decoration.brush,
-                            &glyph_run,
-                            offset,
-                            size,
-                        );
+                            stats.start("render_decoration");
+                            render_decoration(
+                                &mut renderer,
+                                &decoration.brush,
+                                &glyph_run,
+                                offset,
+                                size,
+                            );
+                            stats.end("render_decoration");
+                        }
+                        if let Some(decoration) = &style.strikethrough {
+                            let offset = decoration
+                                .offset
+                                .unwrap_or(run.metrics().strikethrough_offset);
+                            let size = decoration.size.unwrap_or(run.metrics().strikethrough_size);
+
+                            stats.start("render_decoration");
+                            render_decoration(
+                                &mut renderer,
+                                &decoration.brush,
+                                &glyph_run,
+                                offset,
+                                size,
+                            );
+                            stats.end("render_decoration");
+                        }
                     }
-                    if let Some(decoration) = &style.strikethrough {
-                        let offset = decoration
-                            .offset
-                            .unwrap_or(run.metrics().strikethrough_offset);
-                        let size = decoration.size.unwrap_or(run.metrics().strikethrough_size);
 
-                        render_decoration(
-                            &mut renderer,
-                            &decoration.brush,
-                            &glyph_run,
-                            offset,
-                            size,
-                        );
+                    PositionedLayoutItem::InlineBox(inline_box) => {
+                        renderer.set_paint(config.foreground_color);
+                        let (x0, y0) = (inline_box.x as f64, inline_box.y as f64);
+                        let (x1, y1) =
+                            (x0 + inline_box.width as f64, y0 + inline_box.height as f64);
+                        renderer.fill_rect(&Rect::new(x0, y0, x1, y1));
                     }
-                }
-                PositionedLayoutItem::InlineBox(inline_box) => {
-                    renderer.set_paint(foreground_color);
-                    let (x0, y0) = (inline_box.x as f64, inline_box.y as f64);
-                    let (x1, y1) = (x0 + inline_box.width as f64, y0 + inline_box.height as f64);
-                    renderer.fill_rect(&kurbo::Rect::new(x0, y0, x1, y1));
                 }
             }
         }
+
+        // Record accumulated totals for this frame
+        stats.finish_accumulating("fill_glyphs");
+        stats.finish_accumulating("render_decoration");
+
+        let output_path = output_dir(file!()).join("vello_cpu_render.png");
+        stats.start("render");
+        let (_render_core_time, _io_time) = render(
+            &mut renderer,
+            &mut glyph_caches,
+            &mut image_cache,
+            width,
+            height,
+            &mut glyph_renderer,
+            &output_path,
+        );
+        stats.end("render");
+
+        stats.end("total_frame");
+
+        if frame < num_frames - 1 {
+            thread::sleep(frame_delay);
+        }
     }
 
-    let mut pixmap = Pixmap::new(padded_width, padded_height);
-    renderer.render_to_pixmap(&mut pixmap);
-    // After rendering, we must `maintain` the glyph caches to evict unused cache entries.
-    glyph_caches.maintain();
+    let wall_clock_time = start_time.elapsed();
 
-    // Write image to PNG file in examples/_output dir
-    let output_path = {
-        let path = std::path::PathBuf::from(file!());
-        let mut path = std::fs::canonicalize(path).unwrap();
-        path.pop();
-        path.pop();
-        path.pop();
-        path.push("_output");
-        drop(std::fs::create_dir(path.clone()));
-        path.push("vello_cpu_render.png");
-        path
-    };
-    let png = pixmap.into_png().unwrap();
-    std::fs::write(output_path, png).unwrap();
+    thread::sleep(frame_delay);
+
+    println!("\n=== CPU Render Performance ===");
+    stats.print_summary();
+
+    println!("\nOverall:");
+    println!("  Frames rendered:   {}", num_frames);
+    println!("  Wall clock time:   {:?}", wall_clock_time);
+}
+
+/// Create the renderer and glyph caches (once per app or per thread).
+fn prepare_rendering(
+    width: u16,
+    height: u16,
+) -> (RenderContext, RenderContext, CpuGlyphCaches, ImageCache) {
+    let renderer = RenderContext::new(width, height);
+    let atlas_size = (256, 256);
+    let image_cache = ImageCache::new_with_config(AtlasConfig {
+        initial_atlas_count: 0,
+        max_atlases: 1,
+        atlas_size: (atlas_size.0 as u32, atlas_size.1 as u32),
+        auto_grow: true,
+        ..Default::default()
+    });
+    let glyph_renderer = RenderContext::new(atlas_size.0, atlas_size.1);
+    let glyph_caches = CpuGlyphCaches::with_page_size(256, 256);
+    (renderer, glyph_renderer, glyph_caches, image_cache)
+}
+
+/// Reset render context, clear background, and set transform for the frame.
+fn reset_renderer(
+    renderer: &mut RenderContext,
+    glyph_renderer: &mut RenderContext,
+    width: u16,
+    height: u16,
+    padding: u32,
+    background_color: Color,
+) {
+    renderer.reset();
+    glyph_renderer.reset();
+    renderer.set_paint(background_color);
+    renderer.fill_rect(&Rect::new(0.0, 0.0, width as f64, height as f64));
+    renderer.set_transform(Affine::translate(Vec2::new(padding as f64, padding as f64)));
 }
 
 fn render_decoration(
@@ -205,5 +211,113 @@ fn render_decoration(
     let x = glyph_run.offset();
     let x1 = x + glyph_run.advance();
     let y1 = y + size;
-    renderer.fill_rect(&kurbo::Rect::new(x as f64, y as f64, x1 as f64, y1 as f64));
+    renderer.fill_rect(&Rect::new(x as f64, y as f64, x1 as f64, y1 as f64));
+}
+
+/// Rasterize to pixmap, maintain caches, optionally save debug artifacts, write PNG.
+fn render(
+    renderer: &mut RenderContext,
+    glyph_caches: &mut CpuGlyphCaches,
+    image_cache: &mut ImageCache,
+    width: u16,
+    height: u16,
+    glyph_renderer: &mut RenderContext,
+    output_path: &Path,
+) -> (Duration, Duration) {
+    let render_start = Instant::now();
+
+    // Replay deferred outline/COLR atlas commands into the glyph renderer,
+    // one recorder per atlas page. A single glyph_renderer is reused for all pages.
+    for recorder in glyph_caches.bitmap_cache.take_pending_atlas_commands() {
+        glyph_renderer.reset();
+        replay_atlas_commands(&recorder.commands, glyph_renderer);
+        glyph_renderer.flush();
+        if let Some(atlas_pixmap) =
+            glyph_caches.bitmap_cache.page_pixmap_mut(recorder.page_index as usize)
+        {
+            glyph_renderer.render_to_pixmap_region(atlas_pixmap, 0, 0);
+        }
+    }
+
+    // Process pending bitmap uploads BEFORE registering atlas pages.
+    // We need mutable access to the atlas pixmaps, which won't be available
+    // after we clone them into the renderer via register_image().
+    for upload in glyph_caches.bitmap_cache.take_pending_uploads() {
+        let atlas_idx = upload.atlas_slot.page_index as usize;
+
+        let Some(atlas_pixmap) = glyph_caches.bitmap_cache.page_pixmap_mut(atlas_idx) else {
+            continue;
+        };
+
+        copy_pixmap_to_atlas(
+            &upload.pixmap,
+            atlas_pixmap,
+            upload.atlas_slot.x,
+            upload.atlas_slot.y,
+            upload.atlas_slot.width,
+            upload.atlas_slot.height,
+        );
+    }
+
+    // Register atlas pages with the render context
+    let page_count = glyph_caches.bitmap_cache.page_count();
+    for page_index in 0..page_count {
+        if let Some(page_pixmap) = glyph_caches.bitmap_cache.page_pixmap(page_index) {
+            renderer.register_image(page_pixmap.clone());
+        }
+    }
+
+    let mut pixmap = Pixmap::new(width, height);
+    renderer.render_to_pixmap(&mut pixmap);
+    glyph_caches.maintain(image_cache);
+
+    let render_core_time = render_start.elapsed();
+
+    #[cfg(all(debug_assertions, feature = "png"))]
+    glyph_caches.save_atlas_pages();
+
+    #[cfg(feature = "debug_glyph_bounds")]
+    {
+        glyph_caches.bitmap_cache.print_stats();
+        println!();
+        glyph_caches.bitmap_cache.print_keys_grouped();
+    }
+
+    let io_start = Instant::now();
+    let png = pixmap.into_png().unwrap();
+    std::fs::write(output_path, &png).unwrap();
+    let io_time = io_start.elapsed();
+
+    (render_core_time, io_time)
+}
+
+/// Copy a pixmap to a region in the atlas.
+///
+/// This is a utility function for copying bitmap glyph pixels to the atlas
+/// after draining pending uploads. Used by the CPU backend example.
+pub fn copy_pixmap_to_atlas(
+    src: &Pixmap,
+    dst: &mut Pixmap,
+    dst_x: u16,
+    dst_y: u16,
+    width: u16,
+    height: u16,
+) {
+    let copy_width = width as usize;
+    let copy_height = height as usize;
+    let src_stride = src.width() as usize;
+    let dst_stride = dst.width() as usize;
+
+    // Use data_as_u8_slice for byte-level access (data() returns &[PremulRgba8])
+    let src_data = src.data_as_u8_slice();
+    let dst_data = dst.data_as_u8_slice_mut();
+
+    for y in 0..copy_height {
+        let src_row_start = y * src_stride * 4;
+        let src_row_end = src_row_start + copy_width * 4;
+        let dst_row_start = ((dst_y as usize + y) * dst_stride + dst_x as usize) * 4;
+        let dst_row_end = dst_row_start + copy_width * 4;
+
+        dst_data[dst_row_start..dst_row_end].copy_from_slice(&src_data[src_row_start..src_row_end]);
+    }
 }

@@ -5,7 +5,7 @@
 
 use tango_bench::{tango_benchmarks, tango_main};
 
-use parley_bench::benches::{defaults, styled};
+use parley_bench::benches::{defaults, glyph_cache, styled};
 
-tango_benchmarks!(defaults(), styled());
+tango_benchmarks!(defaults(), styled(), glyph_cache());
 tango_main!();
