@@ -119,20 +119,22 @@ fn main() {
                 PositionedLayoutItem::GlyphRun(glyph_run) => {
                     renderer.set_paint(glyph_run.style().brush.color);
                     let run = glyph_run.run();
-                    GlyphRunBuilder::new(run.font().clone(), *renderer.transform(), &mut renderer)
-                        .font_size(run.font_size())
-                        .hint(true)
-                        .normalized_coords(run.normalized_coords())
-                        .fill_glyphs(
-                            glyph_run
-                                .positioned_glyphs()
-                                .map(|glyph| parley_draw::Glyph {
-                                    id: glyph.id,
-                                    x: glyph.x,
-                                    y: glyph.y,
-                                }),
-                            &mut glyph_caches,
-                        );
+                    let mut run_renderer =
+                        GlyphRunBuilder::new(run.font().clone(), *renderer.transform())
+                            .font_size(run.font_size())
+                            .hint(true)
+                            .normalized_coords(run.normalized_coords())
+                            .build(
+                                glyph_run
+                                    .positioned_glyphs()
+                                    .map(|glyph| parley_draw::Glyph {
+                                        id: glyph.id,
+                                        x: glyph.x,
+                                        y: glyph.y,
+                                    }),
+                                &mut glyph_caches,
+                            );
+                    run_renderer.fill_glyphs(&mut renderer);
 
                     let style = glyph_run.style();
                     if let Some(decoration) = &style.underline {
@@ -144,27 +146,13 @@ fn main() {
                         let x1 = x + glyph_run.advance();
                         let baseline = glyph_run.baseline();
 
-                        GlyphRunBuilder::new(
-                            run.font().clone(),
-                            *renderer.transform(),
-                            &mut renderer,
-                        )
-                        .font_size(run.font_size())
-                        .normalized_coords(run.normalized_coords())
-                        .render_decoration(
-                            glyph_run
-                                .positioned_glyphs()
-                                .map(|glyph| parley_draw::Glyph {
-                                    id: glyph.id,
-                                    x: glyph.x,
-                                    y: glyph.y,
-                                }),
+                        run_renderer.render_decoration(
                             x..=x1,
                             baseline,
                             offset,
                             size,
                             1.0, // buffer around exclusions
-                            &mut glyph_caches,
+                            &mut renderer,
                         );
                     }
                     if let Some(decoration) = &style.strikethrough {

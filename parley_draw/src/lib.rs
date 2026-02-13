@@ -39,6 +39,6 @@ pub mod renderers;
 
 pub use colr::{ColrPainter, ColrRenderer};
 pub use glyph::{
-    BitmapGlyph, ColorGlyph, Glyph, GlyphCaches, GlyphRenderer, GlyphRunBuilder, GlyphType,
-    HintCache, HintKey, OutlineCache, OutlineGlyph, PreparedGlyph,
+    BitmapGlyph, ColorGlyph, Glyph, GlyphCaches, GlyphRenderer, GlyphRunBuilder, GlyphRunRenderer,
+    GlyphType, HintCache, HintKey, OutlineCache, OutlineGlyph, PreparedGlyph,
 };
