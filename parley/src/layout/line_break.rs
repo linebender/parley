@@ -254,8 +254,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         self.state
                             .append_inline_box_to_line(next_x, inline_box.height);
 
-                        // We can always line break after an inline box
-                        self.state.mark_line_break_opportunity();
+                        // Mark an emergency (rather than regular) line break opportunity
+                        // after inline boxes so that when text using BreakAll/Anywhere
+                        // follows, character-level emergency breaks closer to the overflow
+                        // point are preferred over this one instead of the inline box
+                        // boundary unconditionally winning and separating the box onto
+                        // its own line.
+                        self.state.mark_emergency_break_opportunity();
                     } else {
                         // If we're at the start of the line, this box will never fit, so consume it and accept the overflow.
                         if self.state.line.x == 0.0 {
