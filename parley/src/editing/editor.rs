@@ -1147,7 +1147,7 @@ where
 
         self.update_layout(font_cx, layout_cx);
         let new_index = start.saturating_add(s.len());
-        let affinity = if s.ends_with("\n") {
+        let affinity = if s.ends_with(['\n', '\r', '\u{2028}', '\u{2029}']) {
             Affinity::Downstream
         } else {
             Affinity::Upstream
