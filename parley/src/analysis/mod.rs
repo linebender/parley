@@ -515,4 +515,8 @@ pub(crate) fn contributes_to_shaping(general_category: GeneralCategory, script: 
 #[inline(always)]
 fn is_control(general_category: GeneralCategory) -> bool {
     general_category == GeneralCategory::Control
+        || matches!(
+            general_category,
+            GeneralCategory::LineSeparator | GeneralCategory::ParagraphSeparator
+        )
 }

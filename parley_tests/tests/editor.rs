@@ -5,6 +5,7 @@
 
 use crate::test_name;
 use crate::util::TestEnv;
+use parley::Affinity;
 
 // TODO - Use CursorTest API for these tests
 
@@ -71,4 +72,47 @@ fn editor_double_newline() {
     let mut editor = env.editor("Hi, all!\n\nNext");
     env.driver(&mut editor).select_all();
     env.check_editor_snapshot(&mut editor);
+}
+
+#[test]
+fn editor_insert_line_endings_set_downstream_affinity() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    for (insert, expected_text) in [
+        ("\n", "A\nB"),
+        ("\r", "A\rB"),
+        ("\u{2028}", "A\u{2028}B"),
+        ("\u{2029}", "A\u{2029}B"),
+        ("X\n", "AX\nB"),
+        ("X\r", "AX\rB"),
+        ("X\u{2028}", "AX\u{2028}B"),
+        ("X\u{2029}", "AX\u{2029}B"),
+    ] {
+        let mut editor = env.editor("AB");
+        env.driver(&mut editor).move_right(); // between A and B
+        env.driver(&mut editor).insert_or_replace_selection(insert);
+
+        assert_eq!(editor.raw_text(), expected_text);
+
+        let sel = editor.raw_selection();
+        assert!(sel.is_collapsed());
+        assert_eq!(sel.focus().index(), expected_text.len() - 1);
+        assert_eq!(sel.focus().affinity(), Affinity::Downstream);
+    }
+}
+
+#[test]
+fn editor_insert_regular_text_set_upstream_affinity() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let mut editor = env.editor("AB");
+    env.driver(&mut editor).move_right(); // between A and B
+    env.driver(&mut editor).insert_or_replace_selection("X");
+
+    assert_eq!(editor.raw_text(), "AXB");
+
+    let sel = editor.raw_selection();
+    assert!(sel.is_collapsed());
+    assert_eq!(sel.focus().index(), 2);
+    assert_eq!(sel.focus().affinity(), Affinity::Upstream);
 }

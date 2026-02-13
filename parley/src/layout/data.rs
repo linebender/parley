@@ -101,12 +101,14 @@ impl ClusterInfo {
     }
 }
 
-fn to_whitespace(c: char) -> Whitespace {
+const fn to_whitespace(c: char) -> Whitespace {
     match c {
         ' ' => Whitespace::Space,
         '\t' => Whitespace::Tab,
         '\n' => Whitespace::Newline,
         '\r' => Whitespace::Newline,
+        '\u{2028}' => Whitespace::Newline, // LINE SEPARATOR
+        '\u{2029}' => Whitespace::Newline, // PARAGRAPH SEPARATOR
         '\u{00A0}' => Whitespace::NoBreakSpace,
         _ => Whitespace::None,
     }
