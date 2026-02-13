@@ -477,7 +477,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
                     bracket,
                     is_variation_selector,
                     is_region_indicator,
-                    is_control(general_category),
+                    general_category == GeneralCategory::Control,
                     is_emoji_or_pictograph,
                     contributes_to_shaping(general_category, script),
                     force_normalize,
@@ -505,14 +505,14 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
 /// - Format characters, unless they use the "Inherited" script
 #[inline(always)]
 pub(crate) fn contributes_to_shaping(general_category: GeneralCategory, script: Script) -> bool {
-    if is_control(general_category) {
+    if matches!(
+        general_category,
+        GeneralCategory::Control
+            | GeneralCategory::LineSeparator
+            | GeneralCategory::ParagraphSeparator
+    ) {
         return false;
     }
 
     !(general_category == GeneralCategory::Format && script != Script::Inherited)
-}
-
-#[inline(always)]
-fn is_control(general_category: GeneralCategory) -> bool {
-    general_category == GeneralCategory::Control
 }

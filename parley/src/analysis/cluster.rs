@@ -68,7 +68,7 @@ pub(crate) enum Whitespace {
     NoBreakSpace = 2,
     /// Horizontal tab.
     Tab = 3,
-    /// Newline (CR, LF, or CRLF).
+    /// Newline (CR, LF, CRLF, LS, or PS).
     Newline = 4,
 }
 
