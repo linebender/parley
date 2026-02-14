@@ -104,7 +104,8 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
 
         if is_rtl {
             // In RTL text, trailing whitespace is on the left. As we hang that whitespace, offset
-            // the line to the left.
+            // the line to the left. Note: indent is not subtracted here because `free_space` below
+            // already accounts for it.
             line.metrics.offset = -line.metrics.trailing_whitespace;
         } else {
             line.metrics.offset = indent;

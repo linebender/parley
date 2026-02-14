@@ -211,11 +211,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             } else {
                 self.lines.lines.is_empty()
             };
-            if self.layout.data.indent_options.hanging {
-                !is_scope_line
-            } else {
-                is_scope_line
-            }
+            is_scope_line ^ self.layout.data.indent_options.hanging
         };
         let line_indent = if should_indent {
             self.layout.data.indent_amount
