@@ -85,6 +85,12 @@ impl Collection {
         }
     }
 
+    /// Converts an unshared collection into a shared collection
+    #[cfg(feature = "std")]
+    pub fn make_shared(&mut self) {
+        self.inner.make_shared();
+    }
+
     /// Load system fonts. If system fonts are already loaded then this does nothing.
     pub fn load_system_fonts(&mut self) {
         if self.inner.system.is_none() {
@@ -251,6 +257,16 @@ impl Inner {
             shared,
             shared_version: 0,
             fallback_cache: FallbackCache::default(),
+        }
+    }
+
+    #[cfg(feature = "std")]
+    pub fn make_shared(&mut self) {
+        if self.shared.is_none() {
+            self.shared = Some(Arc::new(Shared {
+                data: Mutex::new(core::mem::take(&mut self.data)),
+                version: AtomicCounter::new(self.shared_version),
+            }));
         }
     }
 
