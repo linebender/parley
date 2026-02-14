@@ -34,7 +34,7 @@ fn interaction_font_size_line_height_relative() {
         builder.push_default(StyleProperty::LineHeight(LineHeight::FontSizeRelative(1.5)));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name(&format!("size_{font_size}"))
             .check_layout_snapshot(&layout);
@@ -58,7 +58,7 @@ fn interaction_font_size_line_height_absolute() {
         )));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name(&format!("size_{font_size}"))
             .check_layout_snapshot(&layout);
@@ -86,7 +86,7 @@ fn interaction_letter_spacing_ligatures() {
     builder_no_spacing.push_default(StyleProperty::LetterSpacing(0.0));
     let mut layout_no_spacing = builder_no_spacing.build(text);
     layout_no_spacing.break_all_lines(None);
-    layout_no_spacing.align(None, Alignment::Start, AlignmentOptions::default());
+    layout_no_spacing.align(Alignment::Start, AlignmentOptions::default());
 
     env.with_name("no_spacing")
         .check_layout_snapshot(&layout_no_spacing);
@@ -97,7 +97,7 @@ fn interaction_letter_spacing_ligatures() {
     builder_with_spacing.push_default(StyleProperty::LetterSpacing(2.0));
     let mut layout_with_spacing = builder_with_spacing.build(text);
     layout_with_spacing.break_all_lines(None);
-    layout_with_spacing.align(None, Alignment::Start, AlignmentOptions::default());
+    layout_with_spacing.align(Alignment::Start, AlignmentOptions::default());
 
     env.with_name("with_spacing")
         .check_layout_snapshot(&layout_with_spacing);
@@ -121,7 +121,7 @@ fn interaction_font_weight_vs_variations() {
     builder_weight.push_default(StyleProperty::FontWeight(FontWeight::BOLD));
     let mut layout_weight = builder_weight.build(text);
     layout_weight.break_all_lines(None);
-    layout_weight.align(None, Alignment::Start, AlignmentOptions::default());
+    layout_weight.align(Alignment::Start, AlignmentOptions::default());
 
     env.with_name("weight_only")
         .check_layout_snapshot(&layout_weight);
@@ -137,7 +137,7 @@ fn interaction_font_weight_vs_variations() {
     builder_variation.push_default(StyleProperty::FontVariations(variations.clone()));
     let mut layout_variation = builder_variation.build(text);
     layout_variation.break_all_lines(None);
-    layout_variation.align(None, Alignment::Start, AlignmentOptions::default());
+    layout_variation.align(Alignment::Start, AlignmentOptions::default());
 
     env.with_name("variation_only")
         .check_layout_snapshot(&layout_variation);
@@ -149,7 +149,7 @@ fn interaction_font_weight_vs_variations() {
     builder_both.push_default(StyleProperty::FontVariations(variations)); // 700
     let mut layout_both = builder_both.build(text);
     layout_both.break_all_lines(None);
-    layout_both.align(None, Alignment::Start, AlignmentOptions::default());
+    layout_both.align(Alignment::Start, AlignmentOptions::default());
 
     env.with_name("both").check_layout_snapshot(&layout_both);
 }
@@ -170,7 +170,7 @@ fn interaction_word_spacing_justify() {
     builder_no_spacing.push_default(StyleProperty::WordSpacing(0.0));
     let mut layout_no_spacing = builder_no_spacing.build(text);
     layout_no_spacing.break_all_lines(Some(200.0));
-    layout_no_spacing.align(Some(200.0), Alignment::Justify, AlignmentOptions::default());
+    layout_no_spacing.align(Alignment::Justify, AlignmentOptions::default());
 
     env.with_name("justify_no_spacing")
         .check_layout_snapshot(&layout_no_spacing);
@@ -180,7 +180,7 @@ fn interaction_word_spacing_justify() {
     builder_with_spacing.push_default(StyleProperty::WordSpacing(4.0));
     let mut layout_with_spacing = builder_with_spacing.build(text);
     layout_with_spacing.break_all_lines(Some(200.0));
-    layout_with_spacing.align(Some(200.0), Alignment::Justify, AlignmentOptions::default());
+    layout_with_spacing.align(Alignment::Justify, AlignmentOptions::default());
 
     env.with_name("justify_with_spacing")
         .check_layout_snapshot(&layout_with_spacing);
@@ -200,7 +200,7 @@ fn interaction_underline_with_offset_and_size() {
     builder_default.push_default(StyleProperty::Underline(true));
     let mut layout_default = builder_default.build(text);
     layout_default.break_all_lines(None);
-    layout_default.align(None, Alignment::Start, AlignmentOptions::default());
+    layout_default.align(Alignment::Start, AlignmentOptions::default());
 
     env.with_name("default")
         .check_layout_snapshot(&layout_default);
@@ -212,7 +212,7 @@ fn interaction_underline_with_offset_and_size() {
     builder_custom.push_default(StyleProperty::UnderlineSize(Some(2.0)));
     let mut layout_custom = builder_custom.build(text);
     layout_custom.break_all_lines(None);
-    layout_custom.align(None, Alignment::Start, AlignmentOptions::default());
+    layout_custom.align(Alignment::Start, AlignmentOptions::default());
 
     env.with_name("custom")
         .check_layout_snapshot(&layout_custom);
@@ -243,7 +243,7 @@ fn interaction_weight_style_width() {
     builder_bold_italic.push_default(StyleProperty::FontVariations(italic_variation.clone()));
     let mut layout_bold_italic = builder_bold_italic.build(text);
     layout_bold_italic.break_all_lines(None);
-    layout_bold_italic.align(None, Alignment::Start, AlignmentOptions::default());
+    layout_bold_italic.align(Alignment::Start, AlignmentOptions::default());
 
     env.with_name("bold_italic")
         .check_layout_snapshot(&layout_bold_italic);
@@ -256,7 +256,7 @@ fn interaction_weight_style_width() {
     builder_light_condensed.push_default(StyleProperty::FontWidth(FontWidth::CONDENSED));
     let mut layout_light_condensed = builder_light_condensed.build(text);
     layout_light_condensed.break_all_lines(None);
-    layout_light_condensed.align(None, Alignment::Start, AlignmentOptions::default());
+    layout_light_condensed.align(Alignment::Start, AlignmentOptions::default());
 
     env.with_name("light_condensed")
         .check_layout_snapshot(&layout_light_condensed);
@@ -269,7 +269,7 @@ fn interaction_weight_style_width() {
     builder_complex.push_default(StyleProperty::FontVariations(italic_variation));
     let mut layout_complex = builder_complex.build(text);
     layout_complex.break_all_lines(None);
-    layout_complex.align(None, Alignment::Start, AlignmentOptions::default());
+    layout_complex.align(Alignment::Start, AlignmentOptions::default());
 
     env.with_name("black_expanded_italic")
         .check_layout_snapshot(&layout_complex);

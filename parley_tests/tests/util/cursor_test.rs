@@ -4,7 +4,7 @@
 use peniko::Color;
 use vello_cpu::Pixmap;
 
-use super::renderer::{ColorBrush, RenderingConfig, render_layout};
+use super::renderer::{ColorBrush, RenderingConfig, draw_layout, render_to_pixmap};
 use parley::{Affinity, Cursor, FontContext, Layout, LayoutContext};
 
 // Note: This module is only compiled when running tests, which requires std,
@@ -225,18 +225,18 @@ impl CursorTest {
         let rect_expected = expected.geometry(&self.layout, CURSOR_WIDTH);
         let rect_actual = actual.geometry(&self.layout, CURSOR_WIDTH);
 
-        let img_expected = render_layout(
+        let img_expected = render_to_pixmap(draw_layout(
             &rendering_config_expected,
             &self.layout,
             Some(rect_expected),
             &[],
-        );
-        let img_actual = render_layout(
+        ));
+        let img_actual = render_to_pixmap(draw_layout(
             &rendering_config_actual,
             &self.layout,
             Some(rect_actual),
             &[],
-        );
+        ));
 
         assert_eq!(
             img_expected.width(),
@@ -387,12 +387,12 @@ impl CursorTest {
 
         let rect_cursor = cursor.geometry(&self.layout, CURSOR_WIDTH);
 
-        let img_cursor = render_layout(
+        let img_cursor = render_to_pixmap(draw_layout(
             &rendering_config_cursor,
             &self.layout,
             Some(rect_cursor),
             &[],
-        );
+        ));
 
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
