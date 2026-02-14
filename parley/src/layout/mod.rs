@@ -85,3 +85,14 @@ pub struct ContentWidths {
     /// opportunities are taken.
     pub max: f32,
 }
+
+/// Options controlling text-indent behavior, corresponding to CSS `text-indent` keywords.
+#[derive(Copy, Clone, Default, PartialEq, Debug)]
+pub struct IndentOptions {
+    /// If `true`, indent also applies after every hard line break, not just to the first line.
+    /// Corresponds to the CSS `each-line` keyword. Defaults to `false`.
+    pub each_line: bool,
+    /// If `true`, inverts which lines are indented: continuation lines are indented
+    /// instead of the first line(s). Corresponds to the CSS `hanging` keyword. Defaults to `false`.
+    pub hanging: bool,
+}
