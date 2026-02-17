@@ -120,6 +120,14 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
         self.attributes.len()
     }
 
+    /// Returns the `(range, attribute)` pair at the given insertion-order span index.
+    #[inline]
+    pub(crate) fn attribute_at_idx(&self, index: usize) -> Option<(&Range<usize>, &Attr)> {
+        self.attributes
+            .get(index)
+            .map(|(range, attr)| (range, attr))
+    }
+
     /// Remove all applied attribute spans.
     pub fn clear_attributes(&mut self) {
         self.attributes.clear();
