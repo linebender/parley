@@ -12,7 +12,8 @@ use text_primitives::FontFamilyName;
 use super::utils::{ColorBrush, asserts::assert_eq_layout_data};
 use crate::{
     FontContext, FontFamily, FontFeatures, FontVariations, Layout, LayoutContext, LineHeight,
-    OverflowWrap, RangedBuilder, StyleProperty, TextStyle, TextWrapMode, TreeBuilder, WordBreak,
+    OverflowWrap, RangedBuilder, StyleProperty, StyleRunBuilder, TextStyle, TextWrapMode,
+    TreeBuilder, WordBreak,
 };
 
 // TODO: `FONT_FAMILY_LIST`, `load_fonts`, and `create_font_context` are
@@ -109,6 +110,20 @@ fn build_layout_with_tree(
     let mut tb = lcx.tree_builder(fcx, opts.scale, opts.quantize, opts.root_style);
     with_builder(&mut tb);
     let (mut layout, _) = tb.build();
+    layout.break_all_lines(opts.max_advance);
+    layout
+}
+
+/// Generates a `Layout` with a style run builder.
+fn build_layout_with_style_runs(
+    fcx: &mut FontContext,
+    lcx: &mut LayoutContext<ColorBrush>,
+    opts: &RangedOptions<'_>,
+    with_builder: impl Fn(&mut StyleRunBuilder<'_, ColorBrush>),
+) -> Layout<ColorBrush> {
+    let mut rb = lcx.style_run_builder(fcx, opts.text, opts.scale, opts.quantize);
+    with_builder(&mut rb);
+    let mut layout = rb.build(opts.text);
     layout.break_all_lines(opts.max_advance);
     layout
 }
@@ -304,6 +319,69 @@ fn builders_default() {
         with_tree_builder,
         false,
     );
+}
+
+/// Test that `StyleRunBuilder` produces the same result as `RangedBuilder` when given equivalent
+/// styles.
+#[test]
+fn builders_style_runs_match_ranged() {
+    let text = "Builders often wear hard hats.";
+    let scale = 2.;
+    let quantize = false;
+    let max_advance = Some(120.);
+
+    let root_style: TextStyle<'static, 'static, ColorBrush> = TextStyle {
+        font_family: FontFamily::from(FONT_FAMILY_LIST),
+        ..TextStyle::default()
+    };
+
+    let split = text.len() / 2;
+    let mut modified_style = root_style.clone();
+    modified_style.font_size = 40.;
+    modified_style.letter_spacing = 1.25;
+
+    let mut fcx = create_font_context();
+    let mut lcx_a: LayoutContext<ColorBrush> = LayoutContext::new();
+    let mut lcx_b: LayoutContext<ColorBrush> = LayoutContext::new();
+
+    let ropts = RangedOptions {
+        scale,
+        quantize,
+        max_advance,
+        text,
+    };
+
+    let ranged = build_layout_with_ranged(&mut fcx, &mut lcx_a, &ropts, |rb| {
+        rb.push_default(FontFamily::from(FONT_FAMILY_LIST));
+        rb.push(
+            StyleProperty::FontSize(modified_style.font_size),
+            split..text.len(),
+        );
+        rb.push(
+            StyleProperty::LetterSpacing(modified_style.letter_spacing),
+            split..text.len(),
+        );
+    });
+
+    let runs = build_layout_with_style_runs(&mut fcx, &mut lcx_b, &ropts, |rb| {
+        let family: FontFamily<'static> = root_style.font_family.clone().into_owned();
+        let root_run: TextStyle<'static, 'static, ColorBrush> = TextStyle {
+            font_family: family.clone(),
+            ..root_style.clone()
+        };
+
+        let modified_run: TextStyle<'static, 'static, ColorBrush> = TextStyle {
+            font_family: family,
+            ..modified_style.clone()
+        };
+
+        let root_index = rb.push_style(root_run);
+        let modified_index = rb.push_style(modified_run);
+        rb.push_style_run(root_index, 0..split);
+        rb.push_style_run(modified_index, split..text.len());
+    });
+
+    assert_eq_layout_data(&ranged.data, &runs.data, "style_runs_match_ranged");
 }
 
 /// Test that all the builders behave the same when given the same root style.

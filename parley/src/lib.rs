@@ -7,15 +7,18 @@
 //! - [`FontContext`] and [`LayoutContext`] are resources which should be shared globally (or at coarse-grained boundaries).
 //!   - [`FontContext`] is database of fonts.
 //!   - [`LayoutContext`] is scratch space that allows for reuse of allocations between layouts.
-//! - [`RangedBuilder`] and [`TreeBuilder`] which are builders for creating a [`Layout`].
-//!     - [`RangedBuilder`] allows styles to be specified as a flat `Vec` of spans
-//!     - [`TreeBuilder`] allows styles to be specified as a tree of spans
+//! - Builders for creating a [`Layout`]:
+//!   - [`RangedBuilder`]: styles specified as a flat `Vec` of property spans
+//!   - [`TreeBuilder`]: styles specified as a tree of spans
+//!   - [`StyleRunBuilder`]: styles specified as a shared style table plus non-overlapping indexed runs
 //!
-//!   They are constructed using the [`ranged_builder`](LayoutContext::ranged_builder) and [`tree_builder`](LayoutContext::ranged_builder) methods on [`LayoutContext`].
+//!   They are constructed using [`LayoutContext::ranged_builder`], [`LayoutContext::tree_builder`],
+//!   and [`LayoutContext::style_run_builder`].
 //! - [`Layout`] which represents styled paragraph(s) of text and can perform shaping, line-breaking, bidi-reordering, and alignment of that text.
 //!
 //!   `Layout` supports re-linebreaking and re-aligning many times (in case the width at which wrapping should occur changes). But if the text content or
-//!   the styles applied to that content change then a new `Layout` must be created using a new `RangedBuilder` or `TreeBuilder`.
+//!   the styles applied to that content change then a new `Layout` must be created using a new
+//!   `RangedBuilder`, `TreeBuilder`, or `StyleRunBuilder`.
 //!
 //! ## Usage Example
 //!
@@ -128,7 +131,7 @@ mod tests;
 pub use linebender_resource_handle::FontData;
 pub use util::BoundingBox;
 
-pub use builder::{RangedBuilder, TreeBuilder};
+pub use builder::{RangedBuilder, StyleRunBuilder, TreeBuilder};
 pub use context::LayoutContext;
 pub use font::FontContext;
 pub use inline_box::InlineBox;
