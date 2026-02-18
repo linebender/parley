@@ -3,10 +3,43 @@
 
 //! Various helper functions to assert truths during testing.
 
+use std::vec::Vec;
+
 use crate::{Brush, data::LayoutData};
+
+fn canonicalize_layout_data<B: Brush>(layout_data: &LayoutData<B>) -> LayoutData<B> {
+    let mut normalized = layout_data.clone();
+    let mut canonical_styles = Vec::with_capacity(normalized.styles.len());
+    let mut remap = Vec::with_capacity(normalized.styles.len());
+
+    for style in &normalized.styles {
+        if let Some(index) = canonical_styles
+            .iter()
+            .position(|existing| existing == style)
+        {
+            remap.push(index as u16);
+        } else {
+            let index = canonical_styles.len() as u16;
+            canonical_styles.push(style.clone());
+            remap.push(index);
+        }
+    }
+
+    for cluster in &mut normalized.clusters {
+        cluster.style_index = remap[cluster.style_index as usize];
+    }
+    for glyph in &mut normalized.glyphs {
+        glyph.style_index = remap[glyph.style_index as usize];
+    }
+    normalized.styles = canonical_styles;
+    normalized
+}
 
 /// Assert that the two provided `LayoutData` are equal.
 pub(crate) fn assert_eq_layout_data<B: Brush>(a: &LayoutData<B>, b: &LayoutData<B>, case: &str) {
+    let a = canonicalize_layout_data(a);
+    let b = canonicalize_layout_data(b);
+
     assert_eq!(a.scale, b.scale, "{case} scale mismatch");
     assert_eq!(a.quantize, b.quantize, "{case} quantize mismatch");
     assert_eq!(a.base_level, b.base_level, "{case} base_level mismatch");
