@@ -212,6 +212,13 @@ impl AttributeSegmentsWorkspace {
 ///     .map(|(_, c)| c)
 ///     .collect();
 /// assert_eq!(colors, vec![&Color::Red, &Color::Blue]);
+///
+/// let active = segments.active_spans();
+/// let mut count = 0;
+/// for (_range, _attr) in &active {
+///     count += 1;
+/// }
+/// assert_eq!(count, 2);
 /// ```
 ///
 /// # Implementation notes
@@ -308,27 +315,53 @@ pub struct ActiveSpans<'s, 'a, T: Debug + TextStorage, Attr: Debug> {
     attributed: &'a AttributedText<T, Attr>,
 }
 
+/// Iterator over active spans in application order.
+///
+/// Obtain this by calling [`ActiveSpans::iter`] or by iterating `&ActiveSpans`
+/// via [`IntoIterator`].
+#[derive(Clone, Debug)]
+pub struct ActiveSpansIter<'s, 'a, T: Debug + TextStorage, Attr: Debug> {
+    ids: core::slice::Iter<'s, u32>,
+    attributed: &'a AttributedText<T, Attr>,
+}
+
+impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> Iterator for ActiveSpansIter<'s, 'a, T, Attr> {
+    type Item = (&'a Range<usize>, &'a Attr);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let &attr_index = self.ids.next()?;
+        Some(
+            self.attributed
+                .attribute_at_idx(attr_index as usize)
+                .expect("span attribute index should be valid"),
+        )
+    }
+}
+
+impl<T: Debug + TextStorage, Attr: Debug> ExactSizeIterator for ActiveSpansIter<'_, '_, T, Attr> {}
+
+impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> DoubleEndedIterator
+    for ActiveSpansIter<'s, 'a, T, Attr>
+{
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let &attr_index = self.ids.next_back()?;
+        Some(
+            self.attributed
+                .attribute_at_idx(attr_index as usize)
+                .expect("span attribute index should be valid"),
+        )
+    }
+}
+
 impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> ActiveSpans<'s, 'a, T, Attr> {
     /// Iterate over the active spans in application order (ascending span id).
     ///
     /// Each item is `(&Range<usize>, &Attr)`.
-    pub fn iter(&self) -> impl ExactSizeIterator<Item = (&'a Range<usize>, &'a Attr)> + '_ {
-        self.active_ids.iter().map(|&attr_index| {
-            self.attributed
-                .attribute_at_idx(attr_index as usize)
-                .expect("span attribute index should be valid")
-        })
-    }
-
-    /// Iterate over the active spans in reverse application order (descending span id).
-    ///
-    /// Useful for last-writer-wins resolution where later-applied attributes take priority.
-    pub fn iter_rev(&self) -> impl ExactSizeIterator<Item = (&'a Range<usize>, &'a Attr)> + '_ {
-        self.active_ids.iter().rev().map(|&attr_index| {
-            self.attributed
-                .attribute_at_idx(attr_index as usize)
-                .expect("span attribute index should be valid")
-        })
+    pub fn iter(&self) -> ActiveSpansIter<'_, 'a, T, Attr> {
+        ActiveSpansIter {
+            ids: self.active_ids.iter(),
+            attributed: self.attributed,
+        }
     }
 
     /// Returns `true` if no attribute spans are active in this segment.
@@ -339,6 +372,17 @@ impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> ActiveSpans<'s, 'a, T, Attr> {
     /// Returns the number of active attribute spans.
     pub fn len(&self) -> usize {
         self.active_ids.len()
+    }
+}
+
+impl<'active, 's, 'a, T: Debug + TextStorage, Attr: Debug> IntoIterator
+    for &'active ActiveSpans<'s, 'a, T, Attr>
+{
+    type Item = (&'a Range<usize>, &'a Attr);
+    type IntoIter = ActiveSpansIter<'active, 'a, T, Attr>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
@@ -459,7 +503,12 @@ mod tests {
         let forward: Vec<_> = segments.active_spans().iter().map(|(_, c)| c).collect();
         assert_eq!(forward, vec![&Color::Red, &Color::Blue, &Color::Green]);
 
-        let reverse: Vec<_> = segments.active_spans().iter_rev().map(|(_, c)| c).collect();
+        let reverse: Vec<_> = segments
+            .active_spans()
+            .iter()
+            .rev()
+            .map(|(_, c)| c)
+            .collect();
         assert_eq!(reverse, vec![&Color::Green, &Color::Blue, &Color::Red]);
         assert_eq!(segments.next(), None);
     }
@@ -504,6 +553,29 @@ mod tests {
         assert_eq!(segments.active_spans().len(), 1);
         assert_eq!(segments.next(), None);
         assert!(segments.active_spans().is_empty());
+    }
+
+    #[test]
+    fn active_spans_into_iter_works_for_reference() {
+        let mut at = AttributedText::new("abcd");
+        at.apply_attribute(TextRange::new(at.text(), 0..4).unwrap(), Color::Red);
+        at.apply_attribute(TextRange::new(at.text(), 1..3).unwrap(), Color::Blue);
+        let mut workspace = AttributeSegmentsWorkspace::new();
+        let mut segments = workspace.segments(&at);
+
+        assert_eq!(segments.next(), Some(0..1));
+        let first: Vec<_> = (&segments.active_spans())
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect();
+        assert_eq!(first, vec![&Color::Red]);
+
+        assert_eq!(segments.next(), Some(1..3));
+        let overlap: Vec<_> = (&segments.active_spans())
+            .into_iter()
+            .map(|(_, c)| c)
+            .collect();
+        assert_eq!(overlap, vec![&Color::Red, &Color::Blue]);
     }
 
     #[test]

@@ -26,7 +26,9 @@ mod error;
 mod text_range;
 mod text_storage;
 
-pub use crate::attribute_segments::{ActiveSpans, AttributeSegments, AttributeSegmentsWorkspace};
+pub use crate::attribute_segments::{
+    ActiveSpans, ActiveSpansIter, AttributeSegments, AttributeSegmentsWorkspace,
+};
 pub use crate::attributed_text::AttributedText;
 pub use crate::error::{BoundaryInfo, Endpoint, Error, ErrorKind};
 pub use crate::text_range::TextRange;
