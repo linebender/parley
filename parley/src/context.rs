@@ -8,7 +8,7 @@ use alloc::{vec, vec::Vec};
 use super::FontContext;
 use super::builder::RangedBuilder;
 use super::resolve::tree::TreeStyleBuilder;
-use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle};
+use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle, StyleRun};
 use super::style::{Brush, TextStyle};
 
 use crate::analysis::{AnalysisDataSources, CharInfo};
@@ -23,6 +23,8 @@ use crate::shape::ShapeContext;
 pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) rcx: ResolveContext,
     pub(crate) styles: Vec<RangedStyle<B>>,
+    pub(crate) style_table: Vec<ResolvedStyle<B>>,
+    pub(crate) style_runs: Vec<StyleRun>,
     pub(crate) inline_boxes: Vec<InlineBox>,
     pub(crate) bidi: BidiResolver,
 
@@ -43,6 +45,8 @@ impl<B: Brush> LayoutContext<B> {
         Self {
             rcx: ResolveContext::default(),
             styles: vec![],
+            style_table: vec![],
+            style_runs: vec![],
             inline_boxes: vec![],
             bidi: BidiResolver::new(),
             ranged_style_builder: RangedStyleBuilder::default(),
@@ -149,6 +153,8 @@ impl<B: Brush> LayoutContext<B> {
     fn begin(&mut self) {
         self.rcx.clear();
         self.styles.clear();
+        self.style_table.clear();
+        self.style_runs.clear();
         self.inline_boxes.clear();
         self.info.clear();
         self.bidi.clear();

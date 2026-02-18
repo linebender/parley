@@ -9,7 +9,7 @@ use core::mem;
 use core::ops::RangeInclusive;
 
 use super::layout::Layout;
-use super::resolve::{RangedStyle, ResolveContext, Resolved};
+use super::resolve::{ResolveContext, Resolved, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
 use crate::analysis::cluster::{Char, CharCluster, Status};
 use crate::analysis::{AnalysisDataSources, CharInfo};
@@ -64,7 +64,7 @@ struct Item {
 pub(crate) fn shape_text<'a, B: Brush>(
     rcx: &'a ResolveContext,
     mut fq: Query<'a>,
-    styles: &'a [RangedStyle<B>],
+    styles: &'a [ResolvedStyle<B>],
     inline_boxes: &[InlineBox],
     infos: &[(CharInfo, u16)],
     levels: &[u8],
@@ -89,7 +89,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 
     // Setup mutable state for iteration
-    let mut style = &styles[0].style;
+    let mut style = &styles[0];
     let mut item = Item {
         style_index: 0,
         size: style.font_size,
@@ -124,7 +124,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         let level = levels.get(char_index).copied().unwrap_or(0);
         if item.style_index != *style_index {
             item.style_index = *style_index;
-            style = &styles[*style_index as usize].style;
+            style = &styles[*style_index as usize];
             if !nearly_eq(style.font_size, item.size)
                 || style.locale != item.locale
                 || style.font_variations != item.variations
@@ -267,7 +267,7 @@ fn fill_cluster_in_place(
 fn shape_item<'a, B: Brush>(
     fq: &mut Query<'a>,
     rcx: &'a ResolveContext,
-    styles: &'a [RangedStyle<B>],
+    styles: &'a [ResolvedStyle<B>],
     item: &Item,
     scx: &mut ShapeContext,
     text: &str,
@@ -498,7 +498,7 @@ struct FontSelector<'a, 'b, B: Brush> {
     query: &'b mut Query<'a>,
     fonts_id: Option<usize>,
     rcx: &'a ResolveContext,
-    styles: &'a [RangedStyle<B>],
+    styles: &'a [ResolvedStyle<B>],
     style_index: u16,
     attrs: fontique::Attributes,
     variations: &'a [FontVariation],
@@ -509,12 +509,12 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
     fn new(
         query: &'b mut Query<'a>,
         rcx: &'a ResolveContext,
-        styles: &'a [RangedStyle<B>],
+        styles: &'a [ResolvedStyle<B>],
         style_index: u16,
         fb_script: fontique::Script,
         locale: Option<Language>,
     ) -> Self {
-        let style = &styles[style_index as usize].style;
+        let style = &styles[style_index as usize];
         let fonts_id = style.font_family.id();
         let fonts = rcx.stack(style.font_family).unwrap_or(&[]);
         let attrs = fontique::Attributes {
@@ -550,7 +550,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         let is_emoji = cluster.is_emoji;
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
             self.style_index = style_index;
-            let style = &self.styles[style_index as usize].style;
+            let style = &self.styles[style_index as usize];
 
             let fonts_id = style.font_family.id();
             let fonts = self.rcx.stack(style.font_family).unwrap_or(&[]);

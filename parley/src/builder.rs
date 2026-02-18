@@ -9,11 +9,11 @@ use super::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
 
 use super::layout::Layout;
 
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use core::ops::RangeBounds;
 
 use crate::inline_box::InlineBox;
-use crate::resolve::tree::ItemKind;
+use crate::resolve::{ResolvedStyle, StyleRun, tree::ItemKind};
 
 /// Builder for constructing a text layout with ranged attributes.
 #[must_use]
@@ -52,6 +52,11 @@ impl<B: Brush> RangedBuilder<'_, B> {
     pub fn build_into(self, layout: &mut Layout<B>, text: impl AsRef<str>) {
         // Apply RangedStyleBuilder styles to LayoutContext
         self.lcx.ranged_style_builder.finish(&mut self.lcx.styles);
+        lower_resolved_styles(
+            &self.lcx.styles,
+            &mut self.lcx.style_table,
+            &mut self.lcx.style_runs,
+        );
 
         // Call generic layout builder method
         build_into_layout(
@@ -132,6 +137,11 @@ impl<B: Brush> TreeBuilder<'_, B> {
     pub fn build_into(self, layout: &mut Layout<B>) -> String {
         // Apply TreeStyleBuilder styles to LayoutContext
         let text = self.lcx.tree_style_builder.finish(&mut self.lcx.styles);
+        lower_resolved_styles(
+            &self.lcx.styles,
+            &mut self.lcx.style_table,
+            &mut self.lcx.style_runs,
+        );
 
         // Call generic layout builder method
         build_into_layout(layout, self.scale, self.quantize, &text, self.lcx, self.fcx);
@@ -155,6 +165,18 @@ fn build_into_layout<B: Brush>(
     lcx: &mut LayoutContext<B>,
     fcx: &mut FontContext,
 ) {
+    if text.is_empty() && lcx.style_runs.is_empty() {
+        lcx.style_table.push(ResolvedStyle::default());
+        lcx.style_runs.push(StyleRun {
+            style_index: 0,
+            range: 0..0,
+        });
+    }
+    assert!(
+        !lcx.style_runs.is_empty(),
+        "at least one style run is required"
+    );
+
     crate::analysis::analyze_text(lcx, text);
 
     layout.data.clear();
@@ -164,9 +186,9 @@ fn build_into_layout<B: Brush>(
     layout.data.text_len = text.len();
 
     let mut char_index = 0;
-    for (i, style) in lcx.styles.iter().enumerate() {
-        for _ in text[style.range.clone()].chars() {
-            lcx.info[char_index].1 = i as u16;
+    for style_run in &lcx.style_runs {
+        for _ in text[style_run.range.clone()].chars() {
+            lcx.info[char_index].1 = style_run.style_index;
             char_index += 1;
         }
     }
@@ -175,7 +197,7 @@ fn build_into_layout<B: Brush>(
     layout
         .data
         .styles
-        .extend(lcx.styles.iter().map(|s| s.style.as_layout_style()));
+        .extend(lcx.style_table.iter().map(|s| s.as_layout_style()));
 
     // Sort the inline boxes as subsequent code assumes that they are in text index order.
     // Note: It's important that this is a stable sort to allow users to control the order of contiguous inline boxes
@@ -186,7 +208,7 @@ fn build_into_layout<B: Brush>(
         super::shape::shape_text(
             &lcx.rcx,
             query,
-            &lcx.styles,
+            &lcx.style_table,
             &lcx.inline_boxes,
             &lcx.info,
             lcx.bidi.levels(),
@@ -202,4 +224,28 @@ fn build_into_layout<B: Brush>(
     core::mem::swap(&mut layout.data.inline_boxes, &mut lcx.inline_boxes);
 
     layout.data.finish();
+}
+
+/// Lowers ranged resolved styles into a style table and style-id runs.
+///
+/// This preserves builder output ordering (one run per ranged style) while making
+/// downstream analysis/shaping consume a single indexed representation.
+fn lower_resolved_styles<B: Brush>(
+    styles: &[crate::resolve::RangedStyle<B>],
+    style_table_out: &mut Vec<ResolvedStyle<B>>,
+    style_runs_out: &mut Vec<StyleRun>,
+) {
+    let mut style_table = Vec::with_capacity(styles.len());
+    let mut style_runs = Vec::with_capacity(styles.len());
+
+    for (style_index, style) in styles.iter().enumerate() {
+        style_table.push(style.style.clone());
+        style_runs.push(StyleRun {
+            style_index: style_index as u16,
+            range: style.range.clone(),
+        });
+    }
+
+    *style_table_out = style_table;
+    *style_runs_out = style_runs;
 }

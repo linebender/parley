@@ -6,7 +6,7 @@ pub(crate) mod cluster;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use crate::resolve::{RangedStyle, ResolvedStyle};
+use crate::resolve::StyleRun;
 use crate::{Brush, LayoutContext, WordBreak};
 
 use icu_normalizer::properties::{
@@ -217,7 +217,8 @@ pub(crate) enum Boundary {
 pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str) {
     struct WordBreakSegmentIter<'a, I: Iterator, B: Brush> {
         text: &'a str,
-        styles: I,
+        style_runs: I,
+        lcx: &'a LayoutContext<B>,
         char_indices: core::str::CharIndices<'a>,
         current_char: (usize, char),
         building_range_start: usize,
@@ -228,19 +229,26 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
 
     impl<'a, I, B: Brush + 'a> WordBreakSegmentIter<'a, I, B>
     where
-        I: Iterator<Item = &'a RangedStyle<B>>,
+        I: Iterator<Item = &'a StyleRun>,
     {
-        fn new(text: &'a str, styles: I, first_style: &RangedStyle<B>) -> Self {
+        fn new(
+            text: &'a str,
+            style_runs: I,
+            lcx: &'a LayoutContext<B>,
+            first_style_run: &StyleRun,
+        ) -> Self {
             let mut char_indices = text.char_indices();
             let current_char_len = char_indices.next().unwrap();
+            let first_style = &lcx.style_table[first_style_run.style_index as usize];
 
             Self {
                 text,
-                styles,
+                style_runs,
+                lcx,
                 char_indices,
                 current_char: current_char_len,
-                building_range_start: first_style.range.start,
-                previous_word_break_style: first_style.style.word_break,
+                building_range_start: first_style_run.range.start,
+                previous_word_break_style: first_style.word_break,
                 done: false,
                 _phantom: PhantomData,
             }
@@ -249,7 +257,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
 
     impl<'a, I, B: Brush + 'a> Iterator for WordBreakSegmentIter<'a, I, B>
     where
-        I: Iterator<Item = &'a RangedStyle<B>>,
+        I: Iterator<Item = &'a StyleRun>,
     {
         type Item = (&'a str, WordBreak, bool);
 
@@ -258,11 +266,11 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
                 return None;
             }
 
-            for style in self.styles.by_ref() {
+            for style_run in self.style_runs.by_ref() {
                 // Empty style ranges are disallowed.
-                assert!(style.range.start < style.range.end);
+                assert!(style_run.range.start < style_run.range.end);
 
-                let style_start_index = style.range.start;
+                let style_start_index = style_run.range.start;
                 let mut prev_char_index = self.current_char;
 
                 // Find the character at the style boundary
@@ -271,7 +279,8 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
                     self.current_char = self.char_indices.next().unwrap();
                 }
 
-                let current_word_break_style = style.style.word_break;
+                let current_word_break_style =
+                    self.lcx.style_table[style_run.style_index as usize].word_break;
                 if self.previous_word_break_style == current_word_break_style {
                     continue;
                 }
@@ -298,24 +307,19 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
 
     if text.is_empty() {
         text = " ";
-        if lcx.styles.is_empty() {
-            lcx.styles.push(RangedStyle {
-                style: ResolvedStyle::default(),
-                range: 0..0,
-            });
-        }
     }
 
     // Line boundaries (word break naming refers to the line boundary determination config).
     //
     // This breaks text into sequences with similar line boundary config (part of style
     // information). If this config is consistent for all text, we use a fast path through this.
-    let Some((first_style, rest)) = lcx.styles.split_first() else {
-        panic!("No style info");
-    };
+    let (first_style_run, rest_runs) = lcx
+        .style_runs
+        .split_first()
+        .expect("analyze_text requires at least one style run");
 
     let contiguous_word_break_substrings =
-        WordBreakSegmentIter::new(text, rest.iter(), first_style);
+        WordBreakSegmentIter::new(text, rest_runs.iter(), lcx, first_style_run);
     let mut global_offset = 0;
     let mut line_boundary_positions: Vec<usize> = Vec::new();
     for (substring_index, (substring, word_break_strength, last)) in
