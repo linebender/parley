@@ -6,8 +6,8 @@
 use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
-    Alignment, AlignmentOptions, ContentWidths, FontFamily, InlineBox, Layout, LineHeight,
-    PositionedLayoutItem, StyleProperty, TextStyle, WhiteSpaceCollapse,
+    Alignment, AlignmentOptions, BreakReason, ContentWidths, FontFamily, InlineBox, Layout,
+    LineHeight, PositionedLayoutItem, StyleProperty, TextStyle, WhiteSpaceCollapse,
 };
 use peniko::color::{AlphaColor, Srgb, palette};
 use peniko::kurbo::Size;
@@ -23,6 +23,33 @@ fn plain_multiline_text() {
     layout.align(None, Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn unicode_separators_break_lines() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "A\u{2028}B\u{2029}C";
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+
+    assert_eq!(layout.len(), 3, "expected 3 lines from U+2028 and U+2029");
+    assert_eq!(
+        layout.get(0).unwrap().break_reason(),
+        BreakReason::Explicit,
+        "expected U+2028 to cause an explicit break"
+    );
+    assert_eq!(
+        layout.get(1).unwrap().break_reason(),
+        BreakReason::Explicit,
+        "expected U+2029 to cause an explicit break"
+    );
+    assert_ne!(
+        layout.get(2).unwrap().break_reason(),
+        BreakReason::Explicit,
+        "did not expect a trailing explicit break"
+    );
 }
 
 #[test]
