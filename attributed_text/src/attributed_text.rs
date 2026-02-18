@@ -89,6 +89,8 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
     ///
     /// Attributes are yielded in the order they were applied. This doesn't handle conflicting
     /// attributes, it just reports everything.
+    ///
+    /// This performs a full scan of all attributes on each call (`O(n)` in applied span count).
     pub fn attributes_at(&self, index: usize) -> impl Iterator<Item = (&Range<usize>, &Attr)> {
         self.attributes.iter().filter_map(move |(attr_span, attr)| {
             if attr_span.contains(&index) {
@@ -103,6 +105,13 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
     ///
     /// Attributes are yielded in the order they were applied. This doesn't handle conflicting
     /// attributes, it just reports everything.
+    ///
+    /// This performs a full scan of all attributes on each call (`O(n)` in applied span count).
+    ///
+    /// Use this for one-off overlap queries. For many queries over the same text, prefer
+    /// segment-based iteration with [`AttributeSegmentsWorkspace`](crate::AttributeSegmentsWorkspace):
+    /// segment once, then intersect your query ranges with yielded segments (which also provides
+    /// the exact covered subranges).
     pub fn attributes_for_range(
         &self,
         range: Range<usize>,
