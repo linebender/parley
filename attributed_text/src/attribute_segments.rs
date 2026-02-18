@@ -263,20 +263,38 @@ impl<'w, 'a, T: Debug + TextStorage, Attr: Debug> AttributeSegments<'w, 'a, T, A
 impl<T: Debug + TextStorage, Attr: Debug> Iterator for AttributeSegments<'_, '_, T, Attr> {
     type Item = Range<usize>;
 
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        // Remaining segments are remaining adjacent boundary pairs: [i, i + 1).
+        let remaining = self
+            .workspace
+            .boundaries
+            .len()
+            .saturating_sub(self.index + 1);
+        (remaining, Some(remaining))
+    }
+
     fn next(&mut self) -> Option<Self::Item> {
-        while self.index + 1 < self.workspace.boundaries.len() {
+        if self.index + 1 < self.workspace.boundaries.len() {
             self.update_active_for_boundary(self.index);
             let start = self.workspace.boundaries[self.index] as usize;
             let end = self.workspace.boundaries[self.index + 1] as usize;
             self.index += 1;
-            if start == end {
-                continue;
-            }
+            debug_assert!(start < end, "boundaries are sorted + deduped");
 
             return Some(start..end);
         }
         self.workspace.active.clear();
         None
+    }
+}
+
+impl<T: Debug + TextStorage, Attr: Debug> ExactSizeIterator for AttributeSegments<'_, '_, T, Attr> {
+    fn len(&self) -> usize {
+        // Remaining segments are remaining adjacent boundary pairs: [i, i + 1).
+        self.workspace
+            .boundaries
+            .len()
+            .saturating_sub(self.index + 1)
     }
 }
 
@@ -353,6 +371,23 @@ mod tests {
         let mut segments = workspace.segments(&at);
         assert_eq!(segments.next(), Some(0..5));
         assert!(segments.active_spans().is_empty());
+        assert_eq!(segments.next(), None);
+    }
+
+    #[test]
+    fn size_hint_tracks_remaining_segments() {
+        let mut at = AttributedText::new("hello");
+        at.apply_attribute(TextRange::new(at.text(), 1..3).unwrap(), Color::Red);
+        let mut workspace = AttributeSegmentsWorkspace::new();
+        let mut segments = workspace.segments(&at);
+
+        assert_eq!(segments.size_hint(), (3, Some(3)));
+        assert_eq!(segments.next(), Some(0..1));
+        assert_eq!(segments.size_hint(), (2, Some(2)));
+        assert_eq!(segments.next(), Some(1..3));
+        assert_eq!(segments.size_hint(), (1, Some(1)));
+        assert_eq!(segments.next(), Some(3..5));
+        assert_eq!(segments.size_hint(), (0, Some(0)));
         assert_eq!(segments.next(), None);
     }
 
