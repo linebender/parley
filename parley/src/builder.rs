@@ -132,13 +132,11 @@ impl<B: Brush> TreeBuilder<'_, B> {
 
     #[inline]
     pub fn build_into(self, layout: &mut Layout<B>) -> String {
-        // Apply TreeStyleBuilder styles to LayoutContext
-        let text = self.lcx.tree_style_builder.finish(&mut self.lcx.styles);
-        lower_resolved_styles(
-            &self.lcx.styles,
-            &mut self.lcx.style_table,
-            &mut self.lcx.style_runs,
-        );
+        // Apply TreeStyleBuilder styles to LayoutContext.
+        let text = self
+            .lcx
+            .tree_style_builder
+            .finish(&mut self.lcx.style_table, &mut self.lcx.style_runs);
 
         // Call generic layout builder method
         build_into_layout(layout, self.scale, self.quantize, &text, self.lcx, self.fcx);
