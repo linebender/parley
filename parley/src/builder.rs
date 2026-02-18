@@ -9,7 +9,7 @@ use super::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
 
 use super::layout::Layout;
 
-use alloc::{string::String, vec::Vec};
+use alloc::string::String;
 use core::ops::RangeBounds;
 
 use crate::inline_box::InlineBox;
@@ -50,13 +50,10 @@ impl<B: Brush> RangedBuilder<'_, B> {
     }
 
     pub fn build_into(self, layout: &mut Layout<B>, text: impl AsRef<str>) {
-        // Apply RangedStyleBuilder styles to LayoutContext
-        self.lcx.ranged_style_builder.finish(&mut self.lcx.styles);
-        lower_resolved_styles(
-            &self.lcx.styles,
-            &mut self.lcx.style_table,
-            &mut self.lcx.style_runs,
-        );
+        // Apply RangedStyleBuilder styles directly to style-table/style-run state.
+        self.lcx
+            .ranged_style_builder
+            .finish(&mut self.lcx.style_table, &mut self.lcx.style_runs);
 
         // Call generic layout builder method
         build_into_layout(
@@ -224,28 +221,4 @@ fn build_into_layout<B: Brush>(
     core::mem::swap(&mut layout.data.inline_boxes, &mut lcx.inline_boxes);
 
     layout.data.finish();
-}
-
-/// Lowers ranged resolved styles into a style table and style-id runs.
-///
-/// This preserves builder output ordering (one run per ranged style) while making
-/// downstream analysis/shaping consume a single indexed representation.
-fn lower_resolved_styles<B: Brush>(
-    styles: &[crate::resolve::RangedStyle<B>],
-    style_table_out: &mut Vec<ResolvedStyle<B>>,
-    style_runs_out: &mut Vec<StyleRun>,
-) {
-    let mut style_table = Vec::with_capacity(styles.len());
-    let mut style_runs = Vec::with_capacity(styles.len());
-
-    for (style_index, style) in styles.iter().enumerate() {
-        style_table.push(style.style.clone());
-        style_runs.push(StyleRun {
-            style_index: style_index as u16,
-            range: style.range.clone(),
-        });
-    }
-
-    *style_table_out = style_table;
-    *style_runs_out = style_runs;
 }

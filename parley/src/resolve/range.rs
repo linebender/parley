@@ -5,7 +5,7 @@
 
 use alloc::vec;
 
-use super::{Brush, RangedProperty, RangedStyle, ResolvedProperty, ResolvedStyle, Vec};
+use super::{Brush, RangedProperty, RangedStyle, ResolvedProperty, ResolvedStyle, StyleRun, Vec};
 use core::ops::{Bound, Range, RangeBounds};
 
 /// Builder for constructing an ordered sequence of non-overlapping ranged
@@ -13,6 +13,7 @@ use core::ops::{Bound, Range, RangeBounds};
 #[derive(Clone)]
 pub(crate) struct RangedStyleBuilder<B: Brush> {
     properties: Vec<RangedProperty<B>>,
+    scratch_styles: Vec<RangedStyle<B>>,
     root_style: ResolvedStyle<B>,
     len: usize,
 }
@@ -21,6 +22,7 @@ impl<B: Brush> Default for RangedStyleBuilder<B> {
     fn default() -> Self {
         Self {
             properties: vec![],
+            scratch_styles: vec![],
             root_style: ResolvedStyle::default(),
             // We use `usize::MAX` as a sentinel that `begin` hasn't been called.
             // This is required (rather than requiring the root style in the constructor)
@@ -36,6 +38,7 @@ impl<B: Brush> RangedStyleBuilder<B> {
     /// The provided `root_style` is the default style applied to all text unless overridden.
     pub(crate) fn begin(&mut self, root_style: ResolvedStyle<B>, len: usize) {
         self.properties.clear();
+        self.scratch_styles.clear();
         self.root_style = root_style;
         self.len = len;
     }
@@ -67,13 +70,21 @@ impl<B: Brush> RangedStyleBuilder<B> {
         self.properties.push(RangedProperty { property, range });
     }
 
-    /// Computes the sequence of ranged styles.
-    pub(crate) fn finish(&mut self, styles: &mut Vec<RangedStyle<B>>) {
+    /// Computes style table + style runs for the ranged properties.
+    pub(crate) fn finish(
+        &mut self,
+        style_table: &mut Vec<ResolvedStyle<B>>,
+        style_runs: &mut Vec<StyleRun>,
+    ) {
+        style_table.clear();
+        style_runs.clear();
         if self.len == usize::MAX {
             self.properties.clear();
+            self.scratch_styles.clear();
             self.root_style = ResolvedStyle::default();
             return;
         }
+        let styles = &mut self.scratch_styles;
         styles.push(RangedStyle {
             style: self.root_style.clone(),
             range: 0..self.len,
@@ -141,6 +152,16 @@ impl<B: Brush> RangedStyleBuilder<B> {
             }
         }
         styles.truncate(styles.len() - merged_count);
+
+        style_table.reserve(styles.len());
+        style_runs.reserve(styles.len());
+        for (style_index, style) in styles.drain(..).enumerate() {
+            style_table.push(style.style);
+            style_runs.push(StyleRun {
+                style_index: style_index as u16,
+                range: style.range,
+            });
+        }
 
         self.properties.clear();
         self.root_style = ResolvedStyle::default();
