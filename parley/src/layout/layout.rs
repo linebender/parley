@@ -96,7 +96,9 @@ impl<B: Brush> Layout<B> {
     }
 
     /// Returns an iterator over the lines in the layout.
-    pub fn lines(&self) -> impl ExactSizeIterator<Item = Line<'_, B>> + '_ + Clone {
+    pub fn lines(
+        &self,
+    ) -> impl ExactSizeIterator<Item = Line<'_, B>> + DoubleEndedIterator + '_ + Clone {
         self.data
             .lines
             .iter()

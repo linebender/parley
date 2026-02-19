@@ -15,6 +15,12 @@ You can find its changes [documented below](#060---2025-11-24).
 
 This release has an [MSRV] of 1.88.
 
+### Added
+
+#### Parley
+
+- `Layout::lines` now returns an iterator that also implements `ExactSizeIterator` and `DoubleEndedIterator`. ([#554][], [#560][] by [@xStrom])
+
 ### Changed
 
 #### Parley
@@ -471,6 +477,8 @@ This release has an [MSRV][] of 1.70.
 [#468]: https://github.com/linebender/parley/pull/468
 [#528]: https://github.com/linebender/parley/pull/528
 [#532]: https://github.com/linebender/parley/pull/532
+[#554]: https://github.com/linebender/parley/pull/554
+[#560]: https://github.com/linebender/parley/pull/560
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.7.0...HEAD
 [0.7.0]: https://github.com/linebender/parley/compare/v0.6.0...v0.7.0
