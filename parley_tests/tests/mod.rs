@@ -29,6 +29,7 @@ mod editor;
 mod issues;
 mod lines;
 mod styles;
+mod text_indent;
 mod wrap;
 #[macro_use]
 mod util;
