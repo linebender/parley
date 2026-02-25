@@ -121,6 +121,8 @@ pub(crate) struct RunData {
     pub(crate) font_index: usize,
     /// Font size.
     pub(crate) font_size: f32,
+    /// Font attributes, needed for accessibility.
+    pub(crate) font_attrs: fontique::Attributes,
     /// Synthesis for rendering (contains variation settings)
     pub(crate) synthesis: fontique::Synthesis,
     /// Range of normalized coordinates in the layout data.
@@ -286,6 +288,10 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) line_items: Vec<LineItemData>,
 
     // Output of alignment
+    #[cfg(feature = "accesskit")]
+    /// Directly store the alignment if accessibility is enabled so we can
+    /// set the corresponding AccessKit property.
+    pub(crate) alignment: Option<super::Alignment>,
     /// Whether the layout is aligned with [`crate::Alignment::Justify`].
     pub(crate) is_aligned_justified: bool,
     /// The width the layout was aligned to.
@@ -312,6 +318,8 @@ impl<B: Brush> Default for LayoutData<B> {
             glyphs: Vec::new(),
             lines: Vec::new(),
             line_items: Vec::new(),
+            #[cfg(feature = "accesskit")]
+            alignment: None,
             is_aligned_justified: false,
             alignment_width: 0.0,
         }
@@ -356,6 +364,7 @@ impl<B: Brush> LayoutData<B> {
         &mut self,
         font: FontData,
         font_size: f32,
+        font_attrs: fontique::Attributes,
         synthesis: fontique::Synthesis,
         glyph_buffer: &harfrust::GlyphBuffer,
         bidi_level: u8,
@@ -433,6 +442,7 @@ impl<B: Brush> LayoutData<B> {
         let mut run = RunData {
             font_index,
             font_size,
+            font_attrs,
             synthesis,
             coords_range: coords_start..coords_end,
             text_range,

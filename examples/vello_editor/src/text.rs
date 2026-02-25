@@ -20,7 +20,7 @@ use ui_events::{
 use vello::{
     Scene,
     kurbo::{Affine, Line, Stroke},
-    peniko::color::palette,
+    peniko::color::{AlphaColor, Srgb, palette},
     peniko::{Brush, Fill},
 };
 use winit::event::{Ime, WindowEvent};
@@ -30,6 +30,7 @@ use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorDriver};
 
 use crate::access_ids::next_node_id;
 
+pub const BACKGROUND_COLOR: AlphaColor<Srgb> = palette::css::STEEL_BLUE;
 pub const INSET: f32 = 32.0;
 
 pub struct Editor {
@@ -342,7 +343,7 @@ impl Editor {
             scene.fill(
                 Fill::NonZero,
                 transform,
-                palette::css::STEEL_BLUE,
+                BACKGROUND_COLOR,
                 None,
                 &convert_rect(&rect),
             );

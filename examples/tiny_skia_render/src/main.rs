@@ -26,6 +26,8 @@ struct ColorBrush {
     color: Color,
 }
 
+impl parley::Brush for ColorBrush {}
+
 impl Default for ColorBrush {
     fn default() -> Self {
         Self {

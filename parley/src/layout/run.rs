@@ -51,6 +51,11 @@ impl<'a, B: Brush> Run<'a, B> {
         self.data.font_size
     }
 
+    /// Returns the font attributes for the run.
+    pub fn font_attrs(&self) -> &fontique::Attributes {
+        &self.data.font_attrs
+    }
+
     /// Returns the synthesis suggestions for the font associated with the run.
     pub fn synthesis(&self) -> Synthesis {
         self.data.synthesis

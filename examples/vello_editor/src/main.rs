@@ -65,6 +65,13 @@ impl ActiveRenderState<'_> {
                 x1: size.width as _,
                 y1: size.height as _,
             });
+            let rgba = text::BACKGROUND_COLOR.to_rgba8();
+            node.set_background_color(accesskit::Color {
+                red: rgba.r,
+                green: rgba.g,
+                blue: rgba.b,
+                alpha: rgba.a,
+            });
             editor.accessibility(&mut update, &mut node);
             update.nodes.push((TEXT_INPUT_ID, node));
             update
