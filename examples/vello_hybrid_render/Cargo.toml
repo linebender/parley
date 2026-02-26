@@ -1,5 +1,5 @@
 [package]
-name = "vello_cpu_render"
+name = "vello_hybrid_render"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -9,11 +9,20 @@ publish = false
 
 [dependencies]
 parley = { workspace = true, default-features = true }
-parley_draw = { workspace = true, default-features = false, features = ["std", "png", "vello_cpu"] }
+parley_draw = { workspace = true, default-features = false, features = [
+    "std",
+    "png",
+    "vello_hybrid",
+] }
 parley_examples_common = { path = "../common" }
 peniko = { workspace = true }
-vello_cpu = { workspace = true, default-features = false, features = ["std", "png"] }
+vello_hybrid = { workspace = true, default-features = true }
+vello_common = { workspace = true, default-features = false, features = ["std", "png"] }
 skrifa = { workspace = true }
+pollster = "0.4"
+wgpu = "27"
+bytemuck = { workspace = true }
+png = "0.17"
 
 [features]
 default = ["png"]

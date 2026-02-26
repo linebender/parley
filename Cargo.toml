@@ -12,10 +12,12 @@ members = [
     "parley_draw",
     "parley_tests",
     "text_primitives",
+    "examples/common",
     "examples/swash_render",
     "examples/tiny_skia_render",
     "examples/vello_cpu_render",
     "examples/vello_editor",
+    "examples/vello_hybrid_render",
     "xtask",
 ]
 
@@ -33,6 +35,7 @@ bytemuck = { version = "1.24.0", default-features = false }
 databake = { version = "0.2", default-features = false }
 fontique = { version = "0.7.0", default-features = false, path = "fontique" }
 harfrust = { version = "0.5.0", default-features = false }
+foldhash = { version = "0.2.0", default-features = false }
 hashbrown = { version = "0.16.1", default-features = false, features = [
     "default-hasher",
     "raw-entry",
@@ -55,7 +58,8 @@ skrifa = { version = "0.40.0", default-features = false }
 smallvec = "1.15.1"
 swash = { version = "0.2.6", default-features = false }
 vello_common = { version = "0.0.6", default-features = false }
-vello_cpu = { version = "0.0.6", default-features = false }
+vello_cpu = { version = "0.0.6", default-features = false, features = ["u8_pipeline"] }
+vello_hybrid = { version = "0.0.6", default-features = false }
 zerovec = { version = "0.11.5", default-features = false }
 
 [workspace.lints]
@@ -106,3 +110,12 @@ clippy.negative_feature_names = "warn"
 clippy.redundant_feature_names = "warn"
 clippy.wildcard_dependencies = "warn"
 # END LINEBENDER LINT SET
+
+[patch.crates-io]
+vello_common = { git = "https://github.com/linebender/vello.git", branch = "gemberg/glyph-cache-rect-allocator" }
+vello_cpu = { git = "https://github.com/linebender/vello.git", branch = "gemberg/glyph-cache-rect-allocator" }
+vello_hybrid = { git = "https://github.com/linebender/vello.git", branch = "gemberg/glyph-cache-rect-allocator" }
+
+[profile.profiling]
+inherits = "release"
+debug = true

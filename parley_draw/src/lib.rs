@@ -26,19 +26,33 @@
 #![no_std]
 
 extern crate alloc;
+#[cfg(feature = "libm")]
+use core_maths as _;
 #[cfg(feature = "std")]
 extern crate std;
 
 use vello_common::{color, kurbo, peniko, pixmap::Pixmap};
 
+pub mod atlas;
 mod colr;
 mod glyph;
 mod math;
 
 pub mod renderers;
 
+pub use atlas::{
+    AtlasCommand, AtlasCommandRecorder, AtlasConfig, AtlasPaint, AtlasSlot, GLYPH_PADDING,
+    GlyphAtlas, GlyphCache, GlyphCacheConfig, GlyphCacheKey, ImageCache, PendingClearRect,
+    RasterMetrics,
+};
 pub use colr::{ColrPainter, ColrRenderer};
 pub use glyph::{
-    BitmapGlyph, ColorGlyph, Glyph, GlyphCaches, GlyphRenderer, GlyphRunBuilder, GlyphType,
-    HintCache, HintKey, OutlineCache, OutlineGlyph, PreparedGlyph,
+    CachedGlyphType, ColrGlyph, Glyph, GlyphBitmap, GlyphCaches, GlyphOutline, GlyphRenderer,
+    GlyphRunBuilder, GlyphType, HintCache, HintKey, OutlineCache, PreparedGlyph,
 };
+
+#[cfg(feature = "vello_cpu")]
+pub use renderers::vello_cpu::{CpuGlyphAtlas, CpuGlyphCaches};
+
+#[cfg(feature = "vello_hybrid")]
+pub use renderers::vello_hybrid::{GpuGlyphAtlas, GpuGlyphCaches};
