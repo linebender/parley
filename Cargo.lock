@@ -2003,18 +2003,6 @@ dependencies = [
 
 [[package]]
 name = "kurbo"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce9729cc38c18d86123ab736fd2e7151763ba226ac2490ec092d1dd148825e32"
-dependencies = [
- "arrayvec",
- "euclid",
- "libm",
- "smallvec",
-]
-
-[[package]]
-name = "kurbo"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7564e90fe3c0d5771e1f0bc95322b21baaeaa0d9213fa6a0b61c99f8b17b3bfb"
@@ -2865,7 +2853,7 @@ dependencies = [
  "oxipng",
  "parley_data",
  "parley_dev",
- "peniko 0.4.0",
+ "peniko",
  "skrifa 0.40.0",
  "text_primitives",
  "tiny-skia",
@@ -2932,7 +2920,7 @@ dependencies = [
  "parley",
  "parley_dev",
  "parley_draw",
- "peniko 0.4.0",
+ "peniko",
  "vello_cpu",
 ]
 
@@ -2944,24 +2932,13 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "peniko"
-version = "0.4.0"
-source = "git+https://github.com/linebender/peniko?rev=dde968cf406be54d3211fe422bdd066f891ab632#dde968cf406be54d3211fe422bdd066f891ab632"
-dependencies = [
- "color",
- "kurbo 0.12.0",
- "linebender_resource_handle",
- "smallvec",
-]
-
-[[package]]
-name = "peniko"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a2b6aadb221872732e87d465213e9be5af2849b0e8cc5300a8ba98fffa2e00a"
 dependencies = [
  "bytemuck",
  "color",
- "kurbo 0.13.0",
+ "kurbo",
  "linebender_resource_handle",
  "smallvec",
 ]
@@ -4033,7 +4010,7 @@ checksum = "e3e29e3e199888d594edd191c5917a2d5c1893b8bf20076c2bf4df7a40a2ee71"
 dependencies = [
  "dpi",
  "keyboard-types",
- "kurbo 0.13.0",
+ "kurbo",
 ]
 
 [[package]]
@@ -4097,7 +4074,7 @@ dependencies = [
  "bytemuck",
  "futures-intrusive",
  "log",
- "peniko 0.6.0",
+ "peniko",
  "png 0.17.16",
  "skrifa 0.40.0",
  "static_assertions",
@@ -4118,7 +4095,7 @@ dependencies = [
  "hashbrown 0.16.1",
  "libm",
  "log",
- "peniko 0.6.0",
+ "peniko",
  "png 0.17.16",
  "skrifa 0.40.0",
  "smallvec",
@@ -4154,7 +4131,7 @@ dependencies = [
  "anyhow",
  "clipboard-rs",
  "parley",
- "peniko 0.4.0",
+ "peniko",
  "pollster",
  "ui-events",
  "ui-events-winit",
@@ -4171,7 +4148,7 @@ checksum = "24c91203ec4b483440614a9a5c7c2d991932af72c5349659a63ec49476f0b79c"
 dependencies = [
  "bytemuck",
  "guillotiere",
- "peniko 0.6.0",
+ "peniko",
  "skrifa 0.40.0",
  "smallvec",
 ]

@@ -49,7 +49,7 @@ parley_data = { path = "parley_data", default-features = false }
 parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
 parley_draw = { default-features = false, path = "parley_draw" }
-peniko = { git = "https://github.com/linebender/peniko", rev = "dde968cf406be54d3211fe422bdd066f891ab632", default-features = false }
+peniko = { version = "0.6.0", default-features = false }
 read-fonts = { version = "0.37.0", default-features = false }
 skrifa = { version = "0.40.0", default-features = false }
 smallvec = "1.15.1"

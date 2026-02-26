@@ -153,15 +153,15 @@ pub enum BreakReason {
 }
 
 #[derive(Clone, Default, Debug, PartialEq)]
-pub(crate) struct LineData {
+pub struct LineData {
     /// Range of the source text.
-    pub(crate) text_range: Range<usize>,
+    pub text_range: Range<usize>,
     /// Range of line items.
-    pub(crate) item_range: Range<usize>,
+    pub item_range: Range<usize>,
     /// Metrics for the line.
-    pub(crate) metrics: LineMetrics,
+    pub metrics: LineMetrics,
     /// The cause of the line break.
-    pub(crate) break_reason: BreakReason,
+    pub break_reason: BreakReason,
     /// Maximum advance for the line.
     pub(crate) max_advance: f32,
     /// Number of justified clusters on the line.
@@ -175,7 +175,7 @@ impl LineData {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct LineItemData {
+pub struct LineItemData {
     /// Whether the item is a run or an inline box
     pub(crate) kind: LayoutItemKind,
     /// The index of the run or inline box in the runs or `inline_boxes` vec
@@ -194,7 +194,7 @@ pub(crate) struct LineItemData {
     /// Range of the source text.
     pub(crate) text_range: Range<usize>,
     /// Range of clusters.
-    pub(crate) cluster_range: Range<usize>,
+    pub cluster_range: Range<usize>,
 }
 
 impl LineItemData {
@@ -260,7 +260,7 @@ pub(crate) struct LayoutItem {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct LayoutData<B: Brush> {
+pub struct LayoutData<B: Brush> {
     pub(crate) scale: f32,
     pub(crate) quantize: bool,
     pub(crate) base_level: u8,
@@ -282,8 +282,8 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) glyphs: Vec<Glyph>,
 
     // Output of line breaking
-    pub(crate) lines: Vec<LineData>,
-    pub(crate) line_items: Vec<LineItemData>,
+    pub lines: Vec<LineData>,
+    pub line_items: Vec<LineItemData>,
 
     // Output of alignment
     /// Whether the layout is aligned with [`crate::Alignment::Justify`].
