@@ -3,15 +3,72 @@
 
 //! Test that the various builders produce the same results.
 
-use fontique::{FontStyle, FontWeight, FontWidth};
-use peniko::color::palette;
-use std::borrow::Cow;
+use std::{borrow::Cow, path::PathBuf, sync::Arc};
 
-use super::utils::{ColorBrush, FONT_STACK, asserts::assert_eq_layout_data, create_font_context};
+use fontique::{Collection, CollectionOptions, FontStyle, FontWeight, FontWidth, SourceCache};
+use peniko::{Blob, color::palette};
+use text_primitives::FontFamilyName;
+
+use super::utils::{ColorBrush, asserts::assert_eq_layout_data};
 use crate::{
-    FontContext, FontSettings, FontStack, Layout, LayoutContext, LineHeight, OverflowWrap,
-    RangedBuilder, StyleProperty, TextStyle, TextWrapMode, TreeBuilder, WordBreak,
+    FontContext, FontFamily, FontFeatures, FontVariations, Layout, LayoutContext, LineHeight,
+    OverflowWrap, RangedBuilder, StyleProperty, StyleRunBuilder, TextStyle, TextWrapMode,
+    TreeBuilder, WordBreak,
 };
+
+// TODO: `FONT_FAMILY_LIST`, `load_fonts`, and `create_font_context` are
+// duplicated between this crate and `parley_test`. We can't move the builder
+// tests into `parley_test` because they use private APIs, but should eventually
+// figure out some way to reduce the duplication.
+const FONT_FAMILY_LIST: &[FontFamilyName<'_>] = &[
+    FontFamilyName::Named(Cow::Borrowed("Roboto")),
+    FontFamilyName::Named(Cow::Borrowed("Noto Kufi Arabic")),
+];
+
+pub(crate) fn load_fonts(
+    collection: &mut Collection,
+    font_dirs: impl Iterator<Item = PathBuf>,
+) -> std::io::Result<()> {
+    for dir in font_dirs {
+        let paths = std::fs::read_dir(dir)?;
+        for entry in paths {
+            let entry = entry?;
+            if !entry.metadata()?.is_file() {
+                continue;
+            }
+            let path = entry.path();
+            if path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .is_none_or(|ext| !["ttf", "otf", "ttc", "otc"].contains(&ext))
+            {
+                continue;
+            }
+            let font_data = std::fs::read(&path)?;
+            collection.register_fonts(Blob::new(Arc::new(font_data)), None);
+        }
+    }
+    Ok(())
+}
+
+fn create_font_context() -> FontContext {
+    let mut collection = Collection::new(CollectionOptions {
+        shared: false,
+        system_fonts: false,
+    });
+    load_fonts(&mut collection, parley_dev::font_dirs()).unwrap();
+    for font in FONT_FAMILY_LIST {
+        if let FontFamilyName::Named(font_name) = font {
+            collection
+                .family_id(font_name)
+                .unwrap_or_else(|| panic!("{font_name} font not found"));
+        }
+    }
+    FontContext {
+        collection,
+        source_cache: SourceCache::default(),
+    }
+}
 
 /// Set of options for [`build_layout_with_ranged`].
 struct RangedOptions<'a> {
@@ -26,7 +83,7 @@ struct TreeOptions<'a, 'b> {
     scale: f32,
     quantize: bool,
     max_advance: Option<f32>,
-    root_style: &'a TextStyle<'b, ColorBrush>,
+    root_style: &'a TextStyle<'b, 'b, ColorBrush>,
 }
 
 /// Generates a `Layout` with a ranged builder.
@@ -57,6 +114,20 @@ fn build_layout_with_tree(
     layout
 }
 
+/// Generates a `Layout` with a style run builder.
+fn build_layout_with_style_runs(
+    fcx: &mut FontContext,
+    lcx: &mut LayoutContext<ColorBrush>,
+    opts: &RangedOptions<'_>,
+    with_builder: impl Fn(&mut StyleRunBuilder<'_, ColorBrush>),
+) -> Layout<ColorBrush> {
+    let mut rb = lcx.style_run_builder(fcx, opts.text, opts.scale, opts.quantize);
+    with_builder(&mut rb);
+    let mut layout = rb.build(opts.text);
+    layout.break_all_lines(opts.max_advance);
+    layout
+}
+
 /// Computes layout in various ways to ensure they all produce the same result.
 ///
 /// ```text
@@ -72,14 +143,15 @@ fn build_layout_with_tree(
 /// LayoutContext D - Tree for dirt
 /// LayoutContext D - Ranged from dirty
 /// ```
-fn assert_builders_produce_same_result<'a, 'b>(
+fn assert_builders_produce_same_result<'b>(
     text: &str,
     scale: f32,
     quantize: bool,
     max_advance: Option<f32>,
-    root_style: &'a TextStyle<'b, ColorBrush>,
+    root_style: &TextStyle<'b, 'b, ColorBrush>,
     with_ranged_builder: impl Fn(&mut RangedBuilder<'_, ColorBrush>),
     with_tree_builder: impl Fn(&mut TreeBuilder<'_, ColorBrush>),
+    expect_empty: bool,
 ) {
     let mut fcx = create_font_context();
 
@@ -104,14 +176,14 @@ fn assert_builders_produce_same_result<'a, 'b>(
     // Source of truth - ranged builder from a clean layout context
     let layout_truth = build_layout_with_ranged(&mut fcx, &mut lcx_a, &ropts, &with_ranged_builder);
     assert!(
-        !layout_truth.data.runs.is_empty(),
+        layout_truth.data.runs.is_empty() == expect_empty,
         "expected runs to exist for lcx_a_rb_one"
     );
 
     // Testing idempotence of ranged builder creation
     let layout = build_layout_with_ranged(&mut fcx, &mut lcx_a, &ropts, &with_ranged_builder);
     assert!(
-        !layout.data.runs.is_empty(),
+        layout.data.runs.is_empty() == expect_empty,
         "expected runs to exist for lcx_a_rb_two"
     );
     assert_eq_layout_data(&layout_truth.data, &layout.data, "lcx_a_rb_two");
@@ -119,7 +191,7 @@ fn assert_builders_produce_same_result<'a, 'b>(
     // Basic builder compatibility - tree builder from a clean layout context
     let layout = build_layout_with_tree(&mut fcx, &mut lcx_b, &topts, &with_tree_builder);
     assert!(
-        !layout.data.runs.is_empty(),
+        layout.data.runs.is_empty() == expect_empty,
         "expected runs to exist for lcx_b_tb_one"
     );
     assert_eq_layout_data(&layout_truth.data, &layout.data, "lcx_b_tb_one");
@@ -127,7 +199,7 @@ fn assert_builders_produce_same_result<'a, 'b>(
     // Testing idempotence of tree builder creation
     let layout = build_layout_with_tree(&mut fcx, &mut lcx_b, &topts, &with_tree_builder);
     assert!(
-        !layout.data.runs.is_empty(),
+        layout.data.runs.is_empty() == expect_empty,
         "expected runs to exist for lcx_b_tb_two"
     );
     assert_eq_layout_data(&layout_truth.data, &layout.data, "lcx_b_tb_two");
@@ -138,7 +210,7 @@ fn assert_builders_produce_same_result<'a, 'b>(
     // Testing tree builder creation with a dirty layout context
     let layout = build_layout_with_tree(&mut fcx, &mut lcx_c, &topts, &with_tree_builder);
     assert!(
-        !layout.data.runs.is_empty(),
+        layout.data.runs.is_empty() == expect_empty,
         "expected runs to exist for lcx_c_tb_one"
     );
     assert_eq_layout_data(&layout_truth.data, &layout.data, "lcx_c_tb_one");
@@ -149,7 +221,7 @@ fn assert_builders_produce_same_result<'a, 'b>(
     // Testing ranged builder creation with a dirty layout context
     let layout = build_layout_with_ranged(&mut fcx, &mut lcx_d, &ropts, &with_ranged_builder);
     assert!(
-        !layout.data.runs.is_empty(),
+        layout.data.runs.is_empty() == expect_empty,
         "expected runs to exist for lcx_d_rb_one"
     );
     assert_eq_layout_data(&layout_truth.data, &layout.data, "lcx_d_rb_one");
@@ -158,16 +230,16 @@ fn assert_builders_produce_same_result<'a, 'b>(
 /// Returns a root style that uses non-default values.
 ///
 /// The [`TreeBuilder`] version of [`set_root_style`].
-fn create_root_style() -> TextStyle<'static, ColorBrush> {
+fn create_root_style() -> TextStyle<'static, 'static, ColorBrush> {
     TextStyle {
-        font_stack: FontStack::from(FONT_STACK),
+        font_family: FontFamily::from(FONT_FAMILY_LIST),
         font_size: 20.,
         font_width: FontWidth::CONDENSED,
         font_style: FontStyle::Italic,
         font_weight: FontWeight::BOLD,
-        font_variations: FontSettings::List(Cow::Borrowed(&[])), // TODO: Set a non-default value
-        font_features: FontSettings::List(Cow::Borrowed(&[])),   // TODO: Set a non-default value
-        locale: Some("en-US"),
+        font_variations: FontVariations::empty(), // TODO: Set a non-default value
+        font_features: FontFeatures::empty(),     // TODO: Set a non-default value
+        locale: Some("en-US".parse().unwrap()),
         brush: ColorBrush::new(palette::css::GREEN),
         has_underline: true,
         underline_offset: Some(2.),
@@ -190,18 +262,14 @@ fn create_root_style() -> TextStyle<'static, ColorBrush> {
 ///
 /// The [`RangedBuilder`] version of [`create_root_style`].
 fn set_root_style(rb: &mut RangedBuilder<'_, ColorBrush>) {
-    rb.push_default(FontStack::from(FONT_STACK));
+    rb.push_default(FontFamily::from(FONT_FAMILY_LIST));
     rb.push_default(StyleProperty::FontSize(20.));
     rb.push_default(StyleProperty::FontWidth(FontWidth::CONDENSED));
     rb.push_default(StyleProperty::FontStyle(FontStyle::Italic));
     rb.push_default(StyleProperty::FontWeight(FontWeight::BOLD));
-    rb.push_default(StyleProperty::FontVariations(FontSettings::List(
-        Cow::Borrowed(&[]),
-    )));
-    rb.push_default(StyleProperty::FontFeatures(FontSettings::List(
-        Cow::Borrowed(&[]),
-    )));
-    rb.push_default(StyleProperty::Locale(Some("en-US")));
+    rb.push_default(FontVariations::empty());
+    rb.push_default(FontFeatures::empty());
+    rb.push_default(StyleProperty::Locale(Some("en-US".parse().unwrap())));
     rb.push_default(StyleProperty::Brush(ColorBrush::new(palette::css::GREEN)));
     rb.push_default(StyleProperty::Underline(true));
     rb.push_default(StyleProperty::UnderlineOffset(Some(2.)));
@@ -230,12 +298,12 @@ fn builders_default() {
     let quantize = false;
     let max_advance = Some(50.);
     let root_style = TextStyle {
-        font_stack: FontStack::from(FONT_STACK),
+        font_family: FontFamily::from(FONT_FAMILY_LIST),
         ..TextStyle::default()
     };
 
     let with_ranged_builder = |rb: &mut RangedBuilder<'_, ColorBrush>| {
-        rb.push_default(FontStack::from(FONT_STACK));
+        rb.push_default(FontFamily::from(FONT_FAMILY_LIST));
     };
     let with_tree_builder = |tb: &mut TreeBuilder<'_, ColorBrush>| {
         tb.push_text(text);
@@ -249,7 +317,71 @@ fn builders_default() {
         &root_style,
         with_ranged_builder,
         with_tree_builder,
+        false,
     );
+}
+
+/// Test that `StyleRunBuilder` produces the same result as `RangedBuilder` when given equivalent
+/// styles.
+#[test]
+fn builders_style_runs_match_ranged() {
+    let text = "Builders often wear hard hats.";
+    let scale = 2.;
+    let quantize = false;
+    let max_advance = Some(120.);
+
+    let root_style: TextStyle<'static, 'static, ColorBrush> = TextStyle {
+        font_family: FontFamily::from(FONT_FAMILY_LIST),
+        ..TextStyle::default()
+    };
+
+    let split = text.len() / 2;
+    let mut modified_style = root_style.clone();
+    modified_style.font_size = 40.;
+    modified_style.letter_spacing = 1.25;
+
+    let mut fcx = create_font_context();
+    let mut lcx_a: LayoutContext<ColorBrush> = LayoutContext::new();
+    let mut lcx_b: LayoutContext<ColorBrush> = LayoutContext::new();
+
+    let ropts = RangedOptions {
+        scale,
+        quantize,
+        max_advance,
+        text,
+    };
+
+    let ranged = build_layout_with_ranged(&mut fcx, &mut lcx_a, &ropts, |rb| {
+        rb.push_default(FontFamily::from(FONT_FAMILY_LIST));
+        rb.push(
+            StyleProperty::FontSize(modified_style.font_size),
+            split..text.len(),
+        );
+        rb.push(
+            StyleProperty::LetterSpacing(modified_style.letter_spacing),
+            split..text.len(),
+        );
+    });
+
+    let runs = build_layout_with_style_runs(&mut fcx, &mut lcx_b, &ropts, |rb| {
+        let family: FontFamily<'static> = root_style.font_family.clone().into_owned();
+        let root_run: TextStyle<'static, 'static, ColorBrush> = TextStyle {
+            font_family: family.clone(),
+            ..root_style.clone()
+        };
+
+        let modified_run: TextStyle<'static, 'static, ColorBrush> = TextStyle {
+            font_family: family,
+            ..modified_style.clone()
+        };
+
+        let root_index = rb.push_style(root_run);
+        let modified_index = rb.push_style(modified_run);
+        rb.push_style_run(root_index, 0..split);
+        rb.push_style_run(modified_index, split..text.len());
+    });
+
+    assert_eq_layout_data(&ranged.data, &runs.data, "style_runs_match_ranged");
 }
 
 /// Test that all the builders behave the same when given the same root style.
@@ -276,6 +408,31 @@ fn builders_root_only() {
         &root_style,
         with_ranged_builder,
         with_tree_builder,
+        false,
+    );
+}
+
+/// Test that an empty layout doesn't crash
+#[test]
+fn builders_empty() {
+    let text = "";
+    let scale = 1.;
+    let quantize = false;
+    let max_advance = Some(50.);
+    let root_style = create_root_style();
+
+    let with_ranged_builder = |_rb: &mut RangedBuilder<'_, ColorBrush>| {};
+    let with_tree_builder = |_tb: &mut TreeBuilder<'_, ColorBrush>| {};
+
+    assert_builders_produce_same_result(
+        text,
+        scale,
+        quantize,
+        max_advance,
+        &root_style,
+        with_ranged_builder,
+        with_tree_builder,
+        true,
     );
 }
 
@@ -330,5 +487,6 @@ fn builders_mixed_styles() {
         &root_style,
         with_ranged_builder,
         with_tree_builder,
+        false,
     );
 }

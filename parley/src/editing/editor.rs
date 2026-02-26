@@ -1147,7 +1147,7 @@ where
 
         self.update_layout(font_cx, layout_cx);
         let new_index = start.saturating_add(s.len());
-        let affinity = if s.ends_with("\n") {
+        let affinity = if s.ends_with(['\n', '\r', '\u{2028}', '\u{2029}']) {
             Affinity::Downstream
         } else {
             Affinity::Upstream
@@ -1166,6 +1166,8 @@ where
         #[cfg(feature = "std")]
         #[allow(clippy::print_stderr)] // reason = "unreachable debug code"
         if false {
+            use std::{eprint, eprintln};
+
             let focus = new_sel.focus();
             let cluster = focus.logical_clusters(&self.layout);
             let dbg = (

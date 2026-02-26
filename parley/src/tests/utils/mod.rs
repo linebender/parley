@@ -1,11 +1,28 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-pub(crate) mod asserts;
-mod cursor_test;
-mod env;
-mod renderer;
+use peniko::Color;
 
-pub(crate) use cursor_test::CursorTest;
-pub(crate) use env::{FONT_STACK, TestEnv, create_font_context};
-pub(crate) use renderer::ColorBrush;
+pub(crate) mod asserts;
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct ColorBrush {
+    pub(crate) color: Color,
+}
+
+impl ColorBrush {
+    pub(crate) fn new(color: Color) -> Self {
+        let rgba8 = color.to_rgba8();
+        Self {
+            color: Color::from_rgba8(rgba8.r, rgba8.g, rgba8.b, rgba8.a),
+        }
+    }
+}
+
+impl Default for ColorBrush {
+    fn default() -> Self {
+        Self {
+            color: Color::BLACK,
+        }
+    }
+}

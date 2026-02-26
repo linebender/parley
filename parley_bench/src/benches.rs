@@ -5,9 +5,9 @@
 //!
 //! This module provides a benchmark for the default style.
 
-use crate::{ColorBrush, FONT_STACK, get_samples, with_contexts};
+use crate::{ColorBrush, FONT_FAMILY_LIST, get_samples, with_contexts};
 use parley::{
-    Alignment, AlignmentOptions, FontStack, FontStyle, FontWeight, Layout, RangedBuilder,
+    Alignment, AlignmentOptions, FontFamily, FontStyle, FontWeight, Layout, RangedBuilder,
     StyleProperty,
 };
 use std::hint::black_box;
@@ -32,9 +32,7 @@ pub fn defaults() -> Vec<Benchmark> {
                         with_contexts(|font_cx, layout_cx| {
                             let mut builder =
                                 layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
-                            builder.push_default(StyleProperty::FontStack(FontStack::List(
-                                FONT_STACK.into(),
-                            )));
+                            builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
 
                             let mut layout: Layout<ColorBrush> = builder.build(text);
                             layout.break_all_lines(Some(MAX_ADVANCE));
@@ -89,9 +87,7 @@ pub fn styled() -> Vec<Benchmark> {
                         with_contexts(|font_cx, layout_cx| {
                             let mut builder =
                                 layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
-                            builder.push_default(StyleProperty::FontStack(FontStack::List(
-                                FONT_STACK.into(),
-                            )));
+                            builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
 
                             // Apply different styles every `style_interval` characters
                             let style_interval = (text.len() / 5).min(10);

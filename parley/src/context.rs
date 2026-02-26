@@ -6,9 +6,9 @@
 use alloc::{vec, vec::Vec};
 
 use super::FontContext;
-use super::builder::RangedBuilder;
+use super::builder::{RangedBuilder, StyleRunBuilder};
 use super::resolve::tree::TreeStyleBuilder;
-use super::resolve::{RangedStyle, RangedStyleBuilder, ResolveContext, ResolvedStyle};
+use super::resolve::{RangedStyleBuilder, ResolveContext, ResolvedStyle, StyleRun};
 use super::style::{Brush, TextStyle};
 
 use crate::analysis::{AnalysisDataSources, CharInfo};
@@ -22,7 +22,8 @@ use crate::shape::ShapeContext;
 /// This type is designed to be a global resource with only one per-application (or per-thread).
 pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) rcx: ResolveContext,
-    pub(crate) styles: Vec<RangedStyle<B>>,
+    pub(crate) style_table: Vec<ResolvedStyle<B>>,
+    pub(crate) style_runs: Vec<StyleRun>,
     pub(crate) inline_boxes: Vec<InlineBox>,
     pub(crate) bidi: BidiResolver,
 
@@ -42,7 +43,8 @@ impl<B: Brush> LayoutContext<B> {
     pub fn new() -> Self {
         Self {
             rcx: ResolveContext::default(),
-            styles: vec![],
+            style_table: vec![],
+            style_runs: vec![],
             inline_boxes: vec![],
             bidi: BidiResolver::new(),
             ranged_style_builder: RangedStyleBuilder::default(),
@@ -57,7 +59,7 @@ impl<B: Brush> LayoutContext<B> {
         &mut self,
         font_ctx: &mut FontContext,
         scale: f32,
-        raw_style: &TextStyle<'_, B>,
+        raw_style: &TextStyle<'_, '_, B>,
     ) -> ResolvedStyle<B> {
         self.rcx
             .resolve_entire_style_set(font_ctx, raw_style, scale)
@@ -105,6 +107,35 @@ impl<B: Brush> LayoutContext<B> {
         }
     }
 
+    /// Create a builder for constructing a layout from indexed style runs.
+    ///
+    /// Unlike [`Self::ranged_builder`], this builder expects callers to provide:
+    /// - a style table of fully specified [`TextStyle`] values (via [`StyleRunBuilder::push_style`])
+    /// - a complete sequence of **contiguous**, **non-overlapping** spans that cover
+    ///   `0..text.len()` and reference style indices (via [`StyleRunBuilder::push_style_run`])
+    ///
+    /// Parley then skips its internal range-splitting logic.
+    pub fn style_run_builder<'a>(
+        &'a mut self,
+        fcx: &'a mut FontContext,
+        text: &'a str,
+        scale: f32,
+        quantize: bool,
+    ) -> StyleRunBuilder<'a, B> {
+        self.begin();
+
+        fcx.source_cache.prune(128, false);
+
+        StyleRunBuilder {
+            scale,
+            quantize,
+            len: text.len(),
+            lcx: self,
+            fcx,
+            cursor: 0,
+        }
+    }
+
     /// Create a tree style layout builder.
     ///
     /// Set `quantize` as `true` to have the layout coordinates aligned to pixel boundaries.
@@ -129,7 +160,7 @@ impl<B: Brush> LayoutContext<B> {
         fcx: &'a mut FontContext,
         scale: f32,
         quantize: bool,
-        root_style: &TextStyle<'_, B>,
+        root_style: &TextStyle<'_, '_, B>,
     ) -> TreeBuilder<'a, B> {
         self.begin();
 
@@ -148,7 +179,8 @@ impl<B: Brush> LayoutContext<B> {
 
     fn begin(&mut self) {
         self.rcx.clear();
-        self.styles.clear();
+        self.style_table.clear();
+        self.style_runs.clear();
         self.inline_boxes.clear();
         self.info.clear();
         self.bidi.clear();

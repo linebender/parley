@@ -453,9 +453,9 @@ fn last_line_cursor_rect<B: Brush>(layout: &Layout<B>, size: f32) -> BoundingBox
     if let Some(line) = layout.get(layout.len().saturating_sub(1)) {
         let metrics = line.metrics();
         BoundingBox::new(
-            0.0,
+            metrics.offset as f64,
             metrics.min_coord as f64,
-            size as f64,
+            (metrics.offset + size) as f64,
             metrics.max_coord as f64,
         )
     } else {

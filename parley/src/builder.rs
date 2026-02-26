@@ -10,10 +10,10 @@ use super::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
 use super::layout::Layout;
 
 use alloc::string::String;
-use core::ops::RangeBounds;
+use core::ops::{Bound, Range, RangeBounds};
 
 use crate::inline_box::InlineBox;
-use crate::resolve::tree::ItemKind;
+use crate::resolve::{ResolvedStyle, StyleRun, tree::ItemKind};
 
 /// Builder for constructing a text layout with ranged attributes.
 #[must_use]
@@ -50,10 +50,102 @@ impl<B: Brush> RangedBuilder<'_, B> {
     }
 
     pub fn build_into(self, layout: &mut Layout<B>, text: impl AsRef<str>) {
-        // Apply RangedStyleBuilder styles to LayoutContext
-        self.lcx.ranged_style_builder.finish(&mut self.lcx.styles);
+        // Apply RangedStyleBuilder styles directly to style-table/style-run state.
+        self.lcx
+            .ranged_style_builder
+            .finish(&mut self.lcx.style_table, &mut self.lcx.style_runs);
 
         // Call generic layout builder method
+        build_into_layout(
+            layout,
+            self.scale,
+            self.quantize,
+            text.as_ref(),
+            self.lcx,
+            self.fcx,
+        );
+    }
+
+    pub fn build(self, text: impl AsRef<str>) -> Layout<B> {
+        let mut layout = Layout::default();
+        self.build_into(&mut layout, text);
+        layout
+    }
+}
+
+/// Builder for constructing a text layout from a style table and
+/// indexed style runs.
+#[must_use]
+pub struct StyleRunBuilder<'a, B: Brush> {
+    pub(crate) scale: f32,
+    pub(crate) quantize: bool,
+    pub(crate) len: usize,
+    pub(crate) lcx: &'a mut LayoutContext<B>,
+    pub(crate) fcx: &'a mut FontContext,
+    pub(crate) cursor: usize,
+}
+
+impl<B: Brush> StyleRunBuilder<'_, B> {
+    /// Reserves additional capacity for styles and runs.
+    ///
+    /// This is an optional optimization for callers that know counts
+    /// up front; call it before pushing styles and runs to reduce
+    /// reallocations.
+    pub fn reserve(&mut self, additional_styles: usize, additional_runs: usize) {
+        self.lcx.style_table.reserve(additional_styles);
+        self.lcx.style_runs.reserve(additional_runs);
+    }
+
+    /// Adds a fully-specified style to the shared style table and
+    /// returns its index.
+    pub fn push_style<'family, 'settings>(
+        &mut self,
+        style: TextStyle<'family, 'settings, B>,
+    ) -> u16 {
+        let resolved = self
+            .lcx
+            .rcx
+            .resolve_entire_style_set(self.fcx, &style, self.scale);
+        let style_index = self.lcx.style_table.len();
+        assert!(style_index <= u16::MAX as usize, "too many styles");
+        self.lcx.style_table.push(resolved);
+        style_index as u16
+    }
+
+    /// Adds a style run referencing an entry from the style table.
+    ///
+    /// Runs must be contiguous and non-overlapping, and must cover
+    /// `0..text.len()` once all runs have been added.
+    pub fn push_style_run(&mut self, style_index: u16, range: impl RangeBounds<usize>) {
+        let range = resolve_range(range, self.len);
+        assert!(
+            range.start == self.cursor,
+            "StyleRunBuilder expects contiguous non-overlapping runs"
+        );
+        assert!(
+            range.start <= range.end,
+            "StyleRunBuilder expects ordered ranges"
+        );
+        assert!(
+            (style_index as usize) < self.lcx.style_table.len(),
+            "StyleRunBuilder expects style indices that were previously added via push_style"
+        );
+        self.lcx.style_runs.push(StyleRun {
+            style_index,
+            range: range.clone(),
+        });
+        self.cursor = range.end;
+    }
+
+    pub fn push_inline_box(&mut self, inline_box: InlineBox) {
+        self.lcx.inline_boxes.push(inline_box);
+    }
+
+    pub fn build_into(self, layout: &mut Layout<B>, text: impl AsRef<str>) {
+        assert!(
+            self.cursor == self.len,
+            "StyleRunBuilder requires runs that cover the full text"
+        );
         build_into_layout(
             layout,
             self.scale,
@@ -81,7 +173,7 @@ pub struct TreeBuilder<'a, B: Brush> {
 }
 
 impl<B: Brush> TreeBuilder<'_, B> {
-    pub fn push_style_span(&mut self, style: TextStyle<'_, B>) {
+    pub fn push_style_span(&mut self, style: TextStyle<'_, '_, B>) {
         let resolved = self
             .lcx
             .rcx
@@ -130,8 +222,11 @@ impl<B: Brush> TreeBuilder<'_, B> {
 
     #[inline]
     pub fn build_into(self, layout: &mut Layout<B>) -> String {
-        // Apply TreeStyleBuilder styles to LayoutContext
-        let text = self.lcx.tree_style_builder.finish(&mut self.lcx.styles);
+        // Apply TreeStyleBuilder styles to LayoutContext.
+        let text = self
+            .lcx
+            .tree_style_builder
+            .finish(&mut self.lcx.style_table, &mut self.lcx.style_runs);
 
         // Call generic layout builder method
         build_into_layout(layout, self.scale, self.quantize, &text, self.lcx, self.fcx);
@@ -155,6 +250,18 @@ fn build_into_layout<B: Brush>(
     lcx: &mut LayoutContext<B>,
     fcx: &mut FontContext,
 ) {
+    if text.is_empty() && lcx.style_runs.is_empty() {
+        lcx.style_table.push(ResolvedStyle::default());
+        lcx.style_runs.push(StyleRun {
+            style_index: 0,
+            range: 0..0,
+        });
+    }
+    assert!(
+        !lcx.style_runs.is_empty(),
+        "at least one style run is required"
+    );
+
     crate::analysis::analyze_text(lcx, text);
 
     layout.data.clear();
@@ -164,9 +271,9 @@ fn build_into_layout<B: Brush>(
     layout.data.text_len = text.len();
 
     let mut char_index = 0;
-    for (i, style) in lcx.styles.iter().enumerate() {
-        for _ in text[style.range.clone()].chars() {
-            lcx.info[char_index].1 = i as u16;
+    for style_run in &lcx.style_runs {
+        for _ in text[style_run.range.clone()].chars() {
+            lcx.info[char_index].1 = style_run.style_index;
             char_index += 1;
         }
     }
@@ -175,7 +282,7 @@ fn build_into_layout<B: Brush>(
     layout
         .data
         .styles
-        .extend(lcx.styles.iter().map(|s| s.style.as_layout_style()));
+        .extend(lcx.style_table.iter().map(|s| s.as_layout_style()));
 
     // Sort the inline boxes as subsequent code assumes that they are in text index order.
     // Note: It's important that this is a stable sort to allow users to control the order of contiguous inline boxes
@@ -186,7 +293,7 @@ fn build_into_layout<B: Brush>(
         super::shape::shape_text(
             &lcx.rcx,
             query,
-            &lcx.styles,
+            &lcx.style_table,
             &lcx.inline_boxes,
             &lcx.info,
             lcx.bidi.levels(),
@@ -202,4 +309,18 @@ fn build_into_layout<B: Brush>(
     core::mem::swap(&mut layout.data.inline_boxes, &mut lcx.inline_boxes);
 
     layout.data.finish();
+}
+
+fn resolve_range(range: impl RangeBounds<usize>, len: usize) -> Range<usize> {
+    let start = match range.start_bound() {
+        Bound::Unbounded => 0,
+        Bound::Included(n) => *n,
+        Bound::Excluded(n) => *n + 1,
+    };
+    let end = match range.end_bound() {
+        Bound::Unbounded => len,
+        Bound::Included(n) => *n + 1,
+        Bound::Excluded(n) => *n,
+    };
+    start.min(len)..end.min(len)
 }

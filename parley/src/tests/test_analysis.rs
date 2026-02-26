@@ -3,6 +3,7 @@
 
 use crate::analysis::Boundary;
 use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty, WordBreak};
+use alloc::{vec, vec::Vec};
 use fontique::FontWeight;
 use icu_properties::props::{GraphemeClusterBreak, Script};
 
@@ -173,6 +174,20 @@ fn test_mandatory_break_in_text() {
         .expect_force_normalize_list(vec![
             false, false, false, false, false, false, false, false, false,
         ]);
+}
+
+#[test]
+fn test_line_separator_is_hard_break() {
+    verify_analysis("A\u{2028}B", |_| {})
+        .expect_boundary_list(vec![Boundary::Word, Boundary::Word, Boundary::Mandatory])
+        .expect_contributes_to_shaping_list(vec![true, false, true]);
+}
+
+#[test]
+fn test_paragraph_separator_is_hard_break() {
+    verify_analysis("A\u{2029}B", |_| {})
+        .expect_boundary_list(vec![Boundary::Word, Boundary::Word, Boundary::Mandatory])
+        .expect_contributes_to_shaping_list(vec![true, false, true]);
 }
 
 #[test]

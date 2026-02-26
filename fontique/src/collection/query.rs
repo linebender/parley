@@ -83,6 +83,9 @@ impl<'a> Query<'a> {
             for family in &mut self.state.families {
                 family.clear_fonts();
             }
+            for family in &mut self.state.fallback_families {
+                family.clear_fonts();
+            }
             self.attributes = attributes;
         }
     }

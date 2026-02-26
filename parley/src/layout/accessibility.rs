@@ -104,17 +104,12 @@ impl LayoutAccessibility {
                 let mut cluster_offset = 0.0;
                 let mut character_positions = Vec::new();
                 let mut character_widths = Vec::new();
-                let mut word_lengths = Vec::new();
-                let mut last_word_start = 0;
+                let mut word_starts = Vec::new();
 
                 for cluster in run.clusters() {
                     let cluster_text = &text[cluster.text_range()];
-                    if cluster.is_word_boundary()
-                        && !cluster.is_space_or_nbsp()
-                        && !character_lengths.is_empty()
-                    {
-                        word_lengths.push((character_lengths.len() - last_word_start) as _);
-                        last_word_start = character_lengths.len();
+                    if cluster.is_word_boundary() && !cluster.is_space_or_nbsp() {
+                        word_starts.push(character_lengths.len() as _);
                     }
                     character_lengths.push(cluster_text.len() as _);
                     character_positions.push(cluster_offset);
@@ -122,11 +117,10 @@ impl LayoutAccessibility {
                     cluster_offset += cluster.advance();
                 }
 
-                word_lengths.push((character_lengths.len() - last_word_start) as _);
                 node.set_character_lengths(character_lengths);
                 node.set_character_positions(character_positions);
                 node.set_character_widths(character_widths);
-                node.set_word_lengths(word_lengths);
+                node.set_word_starts(word_starts);
 
                 last_node = Some((id, node));
             }

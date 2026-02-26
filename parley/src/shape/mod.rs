@@ -9,7 +9,7 @@ use core::mem;
 use core::ops::RangeInclusive;
 
 use super::layout::Layout;
-use super::resolve::{RangedStyle, ResolveContext, Resolved};
+use super::resolve::{ResolveContext, Resolved, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
 use crate::analysis::cluster::{Char, CharCluster, Status};
 use crate::analysis::{AnalysisDataSources, CharInfo};
@@ -64,7 +64,7 @@ struct Item {
 pub(crate) fn shape_text<'a, B: Brush>(
     rcx: &'a ResolveContext,
     mut fq: Query<'a>,
-    styles: &'a [RangedStyle<B>],
+    styles: &'a [ResolvedStyle<B>],
     inline_boxes: &[InlineBox],
     infos: &[(CharInfo, u16)],
     levels: &[u8],
@@ -89,7 +89,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 
     // Setup mutable state for iteration
-    let mut style = &styles[0].style;
+    let mut style = &styles[0];
     let mut item = Item {
         style_index: 0,
         size: style.font_size,
@@ -99,7 +99,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             .map(|x| x.0.script)
             .find(|&script| real_script(script))
             .unwrap_or(Script::Latin),
-        locale: style.locale.clone(),
+        locale: style.locale,
         variations: style.font_variations,
         features: style.font_features,
         word_spacing: style.word_spacing,
@@ -124,7 +124,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         let level = levels.get(char_index).copied().unwrap_or(0);
         if item.style_index != *style_index {
             item.style_index = *style_index;
-            style = &styles[*style_index as usize].style;
+            style = &styles[*style_index as usize];
             if !nearly_eq(style.font_size, item.size)
                 || style.locale != item.locale
                 || style.font_variations != item.variations
@@ -178,7 +178,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             item.size = style.font_size;
             item.level = level;
             item.script = script;
-            item.locale = style.locale.clone();
+            item.locale = style.locale;
             item.variations = style.font_variations;
             item.features = style.font_features;
             item.word_spacing = style.word_spacing;
@@ -267,7 +267,7 @@ fn fill_cluster_in_place(
 fn shape_item<'a, B: Brush>(
     fq: &mut Query<'a>,
     rcx: &'a ResolveContext,
-    styles: &'a [RangedStyle<B>],
+    styles: &'a [ResolvedStyle<B>],
     item: &Item,
     scx: &mut ShapeContext,
     text: &str,
@@ -281,14 +281,8 @@ fn shape_item<'a, B: Brush>(
     let item_infos = &infos[char_range.start..char_range.end]; // Only process current item
     let first_style_index = item_infos[0].1;
     let fb_script = convert::script_to_fontique(item.script, analysis_data_sources);
-    let mut font_selector = FontSelector::new(
-        fq,
-        rcx,
-        styles,
-        first_style_index,
-        fb_script,
-        item.locale.clone(),
-    );
+    let mut font_selector =
+        FontSelector::new(fq, rcx, styles, first_style_index, fb_script, item.locale);
 
     let grapheme_cluster_boundaries = analysis_data_sources
         .grapheme_segmenter()
@@ -384,11 +378,11 @@ fn shape_item<'a, B: Brush>(
         let language = item
             .locale
             .as_ref()
-            .and_then(|lang| lang.language.as_str().parse::<harfrust::Language>().ok());
+            .and_then(|lang| lang.language().parse::<harfrust::Language>().ok());
         scx.features.clear();
         for feature in rcx.features(item.features).unwrap_or(&[]) {
             scx.features.push(harfrust::Feature::new(
-                feature.tag,
+                harfrust::Tag::new(&feature.tag.to_bytes()),
                 feature.value as u32,
                 ..,
             ));
@@ -494,7 +488,7 @@ fn variations_iter<'a>(
             item.unwrap_or(&[])
                 .iter()
                 .map(|variation| harfrust::Variation {
-                    tag: variation.tag,
+                    tag: harfrust::Tag::new(&variation.tag.to_bytes()),
                     value: variation.value,
                 }),
         )
@@ -504,7 +498,7 @@ struct FontSelector<'a, 'b, B: Brush> {
     query: &'b mut Query<'a>,
     fonts_id: Option<usize>,
     rcx: &'a ResolveContext,
-    styles: &'a [RangedStyle<B>],
+    styles: &'a [ResolvedStyle<B>],
     style_index: u16,
     attrs: fontique::Attributes,
     variations: &'a [FontVariation],
@@ -515,14 +509,14 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
     fn new(
         query: &'b mut Query<'a>,
         rcx: &'a ResolveContext,
-        styles: &'a [RangedStyle<B>],
+        styles: &'a [ResolvedStyle<B>],
         style_index: u16,
         fb_script: fontique::Script,
         locale: Option<Language>,
     ) -> Self {
-        let style = &styles[style_index as usize].style;
-        let fonts_id = style.font_stack.id();
-        let fonts = rcx.stack(style.font_stack).unwrap_or(&[]);
+        let style = &styles[style_index as usize];
+        let fonts_id = style.font_family.id();
+        let fonts = rcx.stack(style.font_family).unwrap_or(&[]);
         let attrs = fontique::Attributes {
             width: style.font_width,
             weight: style.font_weight,
@@ -556,10 +550,10 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         let is_emoji = cluster.is_emoji;
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
             self.style_index = style_index;
-            let style = &self.styles[style_index as usize].style;
+            let style = &self.styles[style_index as usize];
 
-            let fonts_id = style.font_stack.id();
-            let fonts = self.rcx.stack(style.font_stack).unwrap_or(&[]);
+            let fonts_id = style.font_family.id();
+            let fonts = self.rcx.stack(style.font_family).unwrap_or(&[]);
             let fonts = fonts.iter().copied().map(QueryFamily::Id);
             if is_emoji {
                 use core::iter::once;

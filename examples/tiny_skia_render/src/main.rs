@@ -172,7 +172,7 @@ fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<
     // Iterates over the glyphs in the GlyphRun
     for glyph in glyph_run.glyphs() {
         let glyph_x = run_x + glyph.x + padding as f32;
-        let glyph_y = run_y - glyph.y + padding as f32;
+        let glyph_y = run_y + glyph.y + padding as f32;
         run_x += glyph.advance;
 
         let glyph_id = GlyphId::from(glyph.id);

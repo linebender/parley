@@ -89,6 +89,7 @@ impl<ID, T> LruCache<ID, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::string::{String, ToString};
 
     #[derive(Debug, Clone, PartialEq)]
     struct TestId(String);
