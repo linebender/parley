@@ -898,9 +898,18 @@ fn try_commit_line<B: Brush>(
     //     return false;
     // }
 
-    // Q: why this special case?
+    // Exclude the trailing space from justification space count.
+    // Only subtract if the line actually ends with a space — with
+    // WordBreak::BreakAll, regular breaks can land between non-space
+    // characters, in which case there is no trailing space to exclude.
     let mut num_spaces = state.num_spaces;
-    if break_reason == BreakReason::Regular {
+    if break_reason == BreakReason::Regular
+        && state.clusters.start < state.clusters.end
+        && layout.data.clusters[state.clusters.end - 1]
+            .info
+            .whitespace()
+            .is_space_or_nbsp()
+    {
         num_spaces = num_spaces.saturating_sub(1);
     }
 
