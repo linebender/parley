@@ -253,7 +253,6 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
         if self.last_drawn_generation != self.editor.generation() {
             render_state.window.request_redraw();
             let area = self.editor.editor().ime_cursor_area();
-            //let area = vello::kurbo::Rect::new(area.x0, area.y0, area.x1, area.y1);
             if self.last_sent_ime_cursor_area != area {
                 self.last_sent_ime_cursor_area = area;
                 // Note: on X11 `set_ime_cursor_area` may cause the exclusion area to be obscured
@@ -268,9 +267,9 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
                 );
             }
         }
-        render_state
-            .window
-            .set_cursor(winit::window::Cursor::Icon(winit::window::CursorIcon::Text));
+        // render_state
+        //     .window
+        //     .set_cursor(winit::window::Cursor::Icon(winit::window::CursorIcon::Text));
 
         match event {
             // Exit the event loop when a close is requested (e.g. window's close button is pressed)
