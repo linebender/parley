@@ -13,7 +13,7 @@ use core::{
 };
 
 use crate::editing::{Cursor, Selection};
-use crate::layout::{Affinity, Alignment, AlignmentOptions, Layout, Style};
+use crate::layout::{Affinity, Alignment, AlignmentOptions, Layout};
 use crate::style::Brush;
 use crate::{BoundingBox, FontContext, LayoutContext, StyleProperty, StyleSet};
 
@@ -779,7 +779,7 @@ where
         next_node_id: impl FnMut() -> NodeId,
         x_offset: f64,
         y_offset: f64,
-        set_brush_properties: impl Fn(&mut Node, &Style<T>),
+        set_brush_properties: impl Fn(&mut Node, &crate::Style<T>),
     ) -> Option<()> {
         self.refresh_layout();
         self.editor.accessibility_unchecked(
@@ -1077,7 +1077,7 @@ where
         next_node_id: impl FnMut() -> NodeId,
         x_offset: f64,
         y_offset: f64,
-        set_brush_properties: impl Fn(&mut Node, &Style<T>),
+        set_brush_properties: impl Fn(&mut Node, &crate::Style<T>),
     ) -> Option<()> {
         if self.layout_dirty {
             return None;
@@ -1245,7 +1245,7 @@ where
         next_node_id: impl FnMut() -> NodeId,
         x_offset: f64,
         y_offset: f64,
-        set_brush_properties: impl Fn(&mut Node, &Style<T>),
+        set_brush_properties: impl Fn(&mut Node, &crate::Style<T>),
     ) {
         self.layout_access.build_nodes(
             &self.buffer,
