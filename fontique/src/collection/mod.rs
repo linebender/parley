@@ -750,7 +750,7 @@ impl CommonData {
                 font.apply_override(info_override);
             }
 
-            let name = self.family_names.get_or_insert(scratch_family_name);
+            let name = self.family_names.get_or_insert(family_name);
             families
                 .entry(name.id())
                 .or_insert_with(|| (name, Vec::default()))
