@@ -10,8 +10,6 @@ pub(crate) struct ColorBrush {
     pub(crate) color: Color,
 }
 
-impl crate::Brush for ColorBrush {}
-
 impl ColorBrush {
     pub(crate) fn new(color: Color) -> Self {
         let rgba8 = color.to_rgba8();

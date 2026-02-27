@@ -6,10 +6,10 @@ use std::time::Instant;
 #[cfg(target_arch = "wasm32")]
 use web_time::Instant;
 
-use accesskit::{Node, TreeUpdate};
+use accesskit::{Node, TextDecoration, TextDecorationStyle, TreeUpdate};
 use core::default::Default;
 use parley::editing::SplitString;
-use parley::layout::PositionedLayoutItem;
+use parley::layout::{PositionedLayoutItem, Style};
 use parley::{GenericFamily, StyleProperty};
 use std::time::Duration;
 use ui_events::pointer::PointerButton;
@@ -44,6 +44,42 @@ pub struct Editor {
 
 fn convert_rect(rect: &parley::BoundingBox) -> peniko::kurbo::Rect {
     peniko::kurbo::Rect::new(rect.x0, rect.y0, rect.x1, rect.y1)
+}
+
+fn to_accesskit_color(brush: &Brush) -> Option<accesskit::Color> {
+    if let Brush::Solid(color) = brush {
+        let rgba = color.to_rgba8();
+        Some(accesskit::Color {
+            red: rgba.r,
+            green: rgba.g,
+            blue: rgba.b,
+            alpha: rgba.a,
+        })
+    } else {
+        None
+    }
+}
+
+fn set_accesskit_brush_properties(node: &mut Node, style: &Style<Brush>) {
+    if let Some(color) = to_accesskit_color(&style.brush) {
+        node.set_foreground_color(color);
+    }
+    if let Some(deco) = &style.underline {
+        if let Some(color) = to_accesskit_color(&deco.brush) {
+            node.set_underline(TextDecoration {
+                style: TextDecorationStyle::Solid,
+                color,
+            });
+        }
+    }
+    if let Some(deco) = &style.strikethrough {
+        if let Some(color) = to_accesskit_color(&deco.brush) {
+            node.set_strikethrough(TextDecoration {
+                style: TextDecorationStyle::Solid,
+                color,
+            });
+        }
+    }
 }
 
 impl Editor {
@@ -464,7 +500,14 @@ impl Editor {
 
     pub fn accessibility(&mut self, update: &mut TreeUpdate, node: &mut Node) {
         let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
-        drv.accessibility(update, node, next_node_id, INSET.into(), INSET.into());
+        drv.accessibility(
+            update,
+            node,
+            next_node_id,
+            INSET.into(),
+            INSET.into(),
+            set_accesskit_brush_properties,
+        );
     }
 }
 

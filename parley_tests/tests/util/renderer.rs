@@ -24,8 +24,6 @@ pub(crate) struct ColorBrush {
     pub(crate) color: Color,
 }
 
-impl parley::Brush for ColorBrush {}
-
 impl ColorBrush {
     pub(crate) fn new(color: Color) -> Self {
         Self { color }

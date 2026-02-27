@@ -25,8 +25,6 @@ pub mod fontique_benches;
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct ColorBrush {}
 
-impl parley::Brush for ColorBrush {}
-
 std::thread_local! {
     static FONT_CX_TL: RefCell<FontContext> = RefCell::new(create_font_context());
     static LAYOUT_CX_TL: RefCell<LayoutContext<ColorBrush>> = RefCell::new(LayoutContext::new());

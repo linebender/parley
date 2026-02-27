@@ -23,8 +23,6 @@ struct ColorBrush {
     color: Rgba<u8>,
 }
 
-impl parley::Brush for ColorBrush {}
-
 impl Default for ColorBrush {
     fn default() -> Self {
         Self {

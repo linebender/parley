@@ -6,9 +6,7 @@ use alloc::{
     vec::Vec,
 };
 
-use accesskit::{
-    Node, NodeId, Role, TextAlign, TextDecoration, TextDecorationStyle, TextDirection, TreeUpdate,
-};
+use accesskit::{Node, NodeId, Role, TextAlign, TextDirection, TreeUpdate};
 use hashbrown::{HashMap, HashSet};
 use skrifa::{
     FontRef,
@@ -16,7 +14,7 @@ use skrifa::{
 };
 
 use crate::style::Brush;
-use crate::{Alignment, ClusterPath, FontStyle, Layout, LineMetrics, Run};
+use crate::{Alignment, ClusterPath, FontStyle, Layout, LineMetrics, Run, Style};
 
 fn link_spans(prev_id: NodeId, prev: &mut Node, next_id: NodeId, next: &mut Node) {
     prev.set_next_on_line(next_id);
@@ -160,6 +158,7 @@ impl LayoutAccessibility {
         mut next_node_id: impl FnMut() -> NodeId,
         x_offset: f64,
         y_offset: f64,
+        set_brush_properties: impl Fn(&mut Node, &Style<B>),
     ) {
         self.span_paths_by_cluster_path.clear();
         // Build a set of node IDs for the runs encountered in this pass.
@@ -255,25 +254,7 @@ impl LayoutAccessibility {
                     if prev_style_index.is_none() {
                         prev_style_index = Some(style_index);
                         let style = cluster.first_style();
-                        if let Some(color) = style.brush.to_accesskit_color() {
-                            node.set_foreground_color(color);
-                        }
-                        if let Some(d) = &style.underline {
-                            if let Some(color) = d.brush.to_accesskit_color() {
-                                node.set_underline(TextDecoration {
-                                    style: TextDecorationStyle::Solid,
-                                    color,
-                                });
-                            }
-                        }
-                        if let Some(d) = &style.strikethrough {
-                            if let Some(color) = d.brush.to_accesskit_color() {
-                                node.set_strikethrough(TextDecoration {
-                                    style: TextDecorationStyle::Solid,
-                                    color,
-                                });
-                            }
-                        }
+                        set_brush_properties(&mut node, style);
                         if let Some(locale) = &style.locale {
                             node.set_language(locale.as_str());
                         }
