@@ -191,5 +191,3 @@ impl<B: Brush> Default for Layout<B> {
         }
     }
 }
-
-

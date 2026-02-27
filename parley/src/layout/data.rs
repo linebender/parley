@@ -152,6 +152,7 @@ pub enum BreakReason {
     Emergency,
 }
 
+#[allow(unnameable_types)]
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct LineData {
     /// Range of the source text.
@@ -174,6 +175,7 @@ impl LineData {
     }
 }
 
+#[allow(unnameable_types)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct LineItemData {
     /// Whether the item is a run or an inline box
@@ -259,6 +261,7 @@ pub(crate) struct LayoutItem {
     pub(crate) bidi_level: u8,
 }
 
+#[allow(unnameable_types)]
 #[derive(Clone, Debug, PartialEq)]
 pub struct LayoutData<B: Brush> {
     pub(crate) scale: f32,
