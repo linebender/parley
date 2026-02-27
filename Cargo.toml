@@ -54,8 +54,8 @@ read-fonts = { version = "0.37.0", default-features = false }
 skrifa = { version = "0.40.0", default-features = false }
 smallvec = "1.15.1"
 swash = { version = "0.2.6", default-features = false }
-vello_common = { version = "0.0.6", default-features = false }
-vello_cpu = { version = "0.0.6", default-features = false }
+vello_common = { git = "https://github.com/taj-p/vello.git", rev = "d9b47b2ab2b3f19443f6f98dd19b06d09bb5a0a3" }
+vello_cpu = { git = "https://github.com/taj-p/vello.git", rev = "d9b47b2ab2b3f19443f6f98dd19b06d09bb5a0a3" }
 zerovec = { version = "0.11.5", default-features = false }
 
 [workspace.lints]

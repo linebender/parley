@@ -4085,10 +4085,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "vello_api"
+version = "0.7.0"
+source = "git+https://github.com/taj-p/vello.git?rev=d9b47b2ab2b3f19443f6f98dd19b06d09bb5a0a3#d9b47b2ab2b3f19443f6f98dd19b06d09bb5a0a3"
+dependencies = [
+ "bytemuck",
+ "peniko",
+]
+
+[[package]]
 name = "vello_common"
 version = "0.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bd1a4c633ce09e7d713df1a6e036644a125e15e0c169cfb5180ddf5836ca04b"
+source = "git+https://github.com/taj-p/vello.git?rev=d9b47b2ab2b3f19443f6f98dd19b06d09bb5a0a3#d9b47b2ab2b3f19443f6f98dd19b06d09bb5a0a3"
 dependencies = [
  "bytemuck",
  "fearless_simd",
@@ -4104,11 +4112,11 @@ dependencies = [
 [[package]]
 name = "vello_cpu"
 version = "0.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0162bfe48aabf6a9fdcd401b628c7d9f260c2cbabb343c70a65feba6f7849edc"
+source = "git+https://github.com/taj-p/vello.git?rev=d9b47b2ab2b3f19443f6f98dd19b06d09bb5a0a3#d9b47b2ab2b3f19443f6f98dd19b06d09bb5a0a3"
 dependencies = [
  "bytemuck",
  "hashbrown 0.16.1",
+ "vello_api",
  "vello_common",
 ]
 
