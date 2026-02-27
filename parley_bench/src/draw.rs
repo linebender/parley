@@ -78,18 +78,20 @@ fn render_layout(
             match item {
                 PositionedLayoutItem::GlyphRun(glyph_run) => {
                     let run = glyph_run.run();
-                    GlyphRunBuilder::new(run.font().clone(), *renderer.transform(), renderer)
+
+                    let builder = GlyphRunBuilder::new(run.font().clone(), *renderer.transform())
                         .font_size(run.font_size())
                         .hint(true)
-                        .normalized_coords(run.normalized_coords())
-                        .fill_glyphs(
-                            glyph_run.positioned_glyphs().map(|glyph| Glyph {
-                                id: glyph.id,
-                                x: glyph.x,
-                                y: glyph.y,
-                            }),
-                            glyph_caches,
-                        );
+                        .normalized_coords(run.normalized_coords());
+                    let mut run_renderer = builder.build(
+                        glyph_run.positioned_glyphs().map(|glyph| Glyph {
+                            id: glyph.id,
+                            x: glyph.x,
+                            y: glyph.x,
+                        }),
+                        glyph_caches,
+                    );
+                    run_renderer.fill_glyphs(renderer);
 
                     if with_underline {
                         if let Some(decoration) = &glyph_run.style().underline {
@@ -101,25 +103,13 @@ fn render_layout(
                             let x1 = x + glyph_run.advance();
                             let baseline = glyph_run.baseline();
 
-                            GlyphRunBuilder::new(
-                                run.font().clone(),
-                                *renderer.transform(),
-                                renderer,
-                            )
-                            .font_size(run.font_size())
-                            .normalized_coords(run.normalized_coords())
-                            .render_decoration(
-                                glyph_run.positioned_glyphs().map(|glyph| Glyph {
-                                    id: glyph.id,
-                                    x: glyph.x,
-                                    y: glyph.y,
-                                }),
+                            run_renderer.render_decoration(
                                 x..=x1,
                                 baseline,
                                 offset,
                                 size,
                                 1.0, // buffer around exclusions
-                                glyph_caches,
+                                renderer,
                             );
                         }
                     }
