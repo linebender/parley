@@ -40,9 +40,7 @@ pub(crate) struct SystemFonts {
 
 impl SystemFonts {
     pub(crate) fn new() -> Self {
-        // CoreText can enumerate fonts that are not stored under Library/Fonts (e.g. system UI
-        // fonts). If it fails for any reason, fall back to the original file-based scan.
-        let scanned = scan_coretext_available_fonts().unwrap_or_else(scan_fallback_files);
+        let scanned = scan_system_fonts().unwrap_or_default();
         let name_map = scanned.family_names;
         let mut generic_families = GenericFamilyMap::default();
         for (family, names) in DEFAULT_GENERIC_FAMILIES {
@@ -74,9 +72,9 @@ impl SystemFonts {
     }
 }
 
-/// Enumerate available fonts via CoreText, extract their file paths, and reuse the existing scan
-/// pipeline for reading and indexing font metadata.
-fn scan_coretext_available_fonts() -> Option<scan::ScannedCollection> {
+/// Discover system fonts by combining CoreText enumeration with a directory scan of all
+/// Library/Fonts paths, then index them through the shared scan pipeline.
+fn scan_system_fonts() -> Option<scan::ScannedCollection> {
     // SAFETY: Calls into CoreText. If anything fails we return None and use the fallback scan.
     let collection = unsafe { CTFontCollection::from_available_fonts(None) };
     let descriptors = unsafe { collection.matching_font_descriptors()? };
@@ -114,6 +112,10 @@ fn scan_coretext_available_fonts() -> Option<scan::ScannedCollection> {
         }
     }
 
+    // Apple hides certain fonts from CTFontCollection (notably SFNS.ttf, the San Francisco
+    // system UI font). Scanning Library/Fonts directories catches what CoreText omits.
+    paths.extend(library_font_dirs());
+
     if paths.is_empty() {
         return None;
     }
@@ -121,17 +123,15 @@ fn scan_coretext_available_fonts() -> Option<scan::ScannedCollection> {
     Some(scan::ScannedCollection::from_paths(paths.iter(), 8))
 }
 
-/// Fallback scan that matches the previous behavior: enumerate and scan all Library/Fonts
-/// directories across domains.
-fn scan_fallback_files() -> scan::ScannedCollection {
-    let paths = NSSearchPathForDirectoriesInDomains(
+fn library_font_dirs() -> impl Iterator<Item = PathBuf> {
+    NSSearchPathForDirectoriesInDomains(
         NSSearchPathDirectory::LibraryDirectory,
         NSSearchPathDomainMask::AllDomainsMask,
         true,
     )
     .into_iter()
-    .map(|p| format!("{p}/Fonts/"));
-    scan::ScannedCollection::from_paths(paths, 8)
+    .map(|p| PathBuf::from(format!("{p}/Fonts")))
+    .filter(|p| p.is_dir())
 }
 
 fn create_base_font(prefer_ui_font: bool) -> CFRetained<CTFont> {
