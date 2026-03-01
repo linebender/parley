@@ -28,6 +28,8 @@
 extern crate alloc;
 #[cfg(feature = "libm")]
 use core_maths as _;
+#[cfg(feature = "png")]
+use png as _;
 #[cfg(feature = "std")]
 extern crate std;
 
@@ -47,7 +49,7 @@ pub use atlas::{
 };
 pub use colr::{ColrPainter, ColrRenderer};
 pub use glyph::{
-    CachedGlyphType, ColrGlyph, Glyph, GlyphBitmap, GlyphCaches, GlyphOutline, GlyphRenderer,
+    CachedGlyphType, Glyph, GlyphBitmap, GlyphCaches, GlyphColr, GlyphOutline, GlyphRenderer,
     GlyphRunBuilder, GlyphType, HintCache, HintKey, OutlineCache, PreparedGlyph,
 };
 

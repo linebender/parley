@@ -1,4 +1,4 @@
-// Copyright 2025 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Deferred atlas rendering commands.
@@ -12,7 +12,7 @@
 //! This approach:
 //! - Supports multiple atlas pages (not just page 0)
 //! - Keeps a single glyph renderer (same atlas page size)
-//! - Mirrors the `take_pending_uploads` pattern used for bitmap glyphs
+//! - Mirrors the `drain_pending_uploads` pattern used for bitmap glyphs
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -22,14 +22,11 @@ use crate::kurbo::{Affine, BezPath, Rect};
 use crate::peniko::{BlendMode, Gradient};
 
 /// Paint type for atlas commands.
-///
-/// Covers the subset of paint types used when rendering glyphs to the atlas:
-/// solid colours (outlines, COLR solid fills) and gradients (COLR gradient fills).
 #[derive(Clone, Debug)]
 pub enum AtlasPaint {
-    /// A solid colour.
+    /// A solid colour (used for outlines and COLR solid fills).
     Solid(AlphaColor<Srgb>),
-    /// A gradient.
+    /// A gradient (used for COLR gradient fills).
     Gradient(Gradient),
 }
 
@@ -117,26 +114,31 @@ impl AtlasCommandRecorder {
     }
 
     /// Set the current transform.
+    #[inline]
     pub fn set_transform(&mut self, t: Affine) {
         self.commands.push(AtlasCommand::SetTransform(t));
     }
 
     /// Set the current paint (accepts `AlphaColor<Srgb>` or `Gradient`).
+    #[inline]
     pub fn set_paint(&mut self, paint: impl Into<AtlasPaint>) {
         self.commands.push(AtlasCommand::SetPaint(paint.into()));
     }
 
     /// Set the paint transform.
+    #[inline]
     pub fn set_paint_transform(&mut self, t: Affine) {
         self.commands.push(AtlasCommand::SetPaintTransform(t));
     }
 
     /// Fill a path with the current paint and transform.
+    #[inline]
     pub fn fill_path(&mut self, path: &Arc<BezPath>) {
         self.commands.push(AtlasCommand::FillPath(Arc::clone(path)));
     }
 
     /// Fill a rectangle with the current paint and transform.
+    #[inline]
     pub fn fill_rect(&mut self, rect: &Rect) {
         self.commands.push(AtlasCommand::FillRect(*rect));
     }
@@ -145,17 +147,20 @@ impl AtlasCommandRecorder {
     ///
     /// Takes ownership of the `BezPath` and wraps it in `Arc`. COLR clip paths
     /// are always freshly constructed, so this avoids any cloning.
+    #[inline]
     pub fn push_clip_layer(&mut self, clip: BezPath) {
         self.commands
             .push(AtlasCommand::PushClipLayer(Arc::new(clip)));
     }
 
     /// Push a blend/compositing layer.
+    #[inline]
     pub fn push_blend_layer(&mut self, blend_mode: BlendMode) {
         self.commands.push(AtlasCommand::PushBlendLayer(blend_mode));
     }
 
     /// Pop the most recent clip or blend layer.
+    #[inline]
     pub fn pop_layer(&mut self) {
         self.commands.push(AtlasCommand::PopLayer);
     }

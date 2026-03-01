@@ -119,3 +119,4 @@ vello_hybrid = { git = "https://github.com/linebender/vello.git", branch = "gemb
 [profile.profiling]
 inherits = "release"
 debug = true
+strip = "none"

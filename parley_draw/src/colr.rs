@@ -6,7 +6,7 @@
 use crate::AtlasCommandRecorder;
 use crate::color::Srgb;
 use crate::color::{AlphaColor, DynamicColor};
-use crate::glyph::{ColrGlyph, OutlinePath};
+use crate::glyph::{GlyphColr, OutlinePath};
 use crate::kurbo::{Affine, BezPath, Point, Rect, Shape};
 use crate::math::FloatExt;
 use crate::peniko::{self, BlendMode, ColorStops, Compose, Extend, Gradient, Mix};
@@ -40,7 +40,7 @@ pub trait ColrRenderer {
 /// An abstraction for painting COLR glyphs.
 pub struct ColrPainter<'a> {
     transforms: Vec<Affine>,
-    colr_glyph: &'a ColrGlyph<'a>,
+    colr_glyph: &'a GlyphColr<'a>,
     context_color: AlphaColor<Srgb>,
     painter: &'a mut dyn ColrRenderer,
     layer_count: u32,
@@ -55,7 +55,7 @@ impl Debug for ColrPainter<'_> {
 impl<'a> ColrPainter<'a> {
     /// Create a new COLR painter.
     pub fn new(
-        colr_glyph: &'a ColrGlyph<'a>,
+        colr_glyph: &'a GlyphColr<'a>,
         context_color: AlphaColor<Srgb>,
         painter: &'a mut impl ColrRenderer,
     ) -> Self {
@@ -400,14 +400,17 @@ pub(crate) fn convert_bounding_box(rect: BoundingBox<f32>) -> Rect {
 }
 
 impl ColrRenderer for AtlasCommandRecorder {
+    #[inline]
     fn push_clip_layer(&mut self, clip: BezPath) {
         self.push_clip_layer(clip);
     }
 
+    #[inline]
     fn push_blend_layer(&mut self, blend_mode: BlendMode) {
         self.push_blend_layer(blend_mode);
     }
 
+    #[inline]
     fn fill_solid(&mut self, color: AlphaColor<Srgb>) {
         self.set_paint(color);
         self.fill_rect(&Rect::new(
@@ -418,6 +421,7 @@ impl ColrRenderer for AtlasCommandRecorder {
         ));
     }
 
+    #[inline]
     fn fill_gradient(&mut self, gradient: Gradient) {
         self.set_paint(gradient);
         self.fill_rect(&Rect::new(
@@ -428,10 +432,12 @@ impl ColrRenderer for AtlasCommandRecorder {
         ));
     }
 
+    #[inline]
     fn set_paint_transform(&mut self, affine: Affine) {
         self.set_paint_transform(affine);
     }
 
+    #[inline]
     fn pop_layer(&mut self) {
         self.pop_layer();
     }

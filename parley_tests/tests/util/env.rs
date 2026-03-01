@@ -40,6 +40,10 @@ pub(crate) struct TestEnv {
     text_color: Color,
     rendering_config: RenderingConfig,
     cursor_size: f32,
+    // TODO: tolerance should be 0 once vello's `Pixmap::from_png` uses rounded
+    // premultiplication (`(e * a + 127) / 255` instead of `(e * a) / 255`).
+    // The current truncation causes a ±1 drift per channel on pixels with
+    // non-255 alpha after a PNG round-trip.
     tolerance: f32,
     // TODO: Add core::panic::Location for case.
     errors: Vec<(PathBuf, String)>,
@@ -150,6 +154,10 @@ impl TestEnv {
 
     pub(crate) fn rendering_config(&mut self) -> &mut RenderingConfig {
         &mut self.rendering_config
+    }
+
+    pub(crate) fn set_tolerance(&mut self, tolerance: f32) {
+        self.tolerance = tolerance;
     }
 
     #[allow(dead_code, reason = "this may be useful for future tests")]

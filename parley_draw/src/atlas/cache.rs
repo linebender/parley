@@ -1,4 +1,4 @@
-// Copyright 2025 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Glyph atlas cache with LRU eviction.
@@ -9,6 +9,7 @@ use super::key::SUBPIXEL_BUCKETS;
 use super::region::{AtlasSlot, RasterMetrics};
 use crate::Pixmap;
 use alloc::sync::Arc;
+use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter};
 use foldhash::fast::FixedState;
@@ -28,6 +29,15 @@ use vello_common::paint::ImageId;
 /// reproducible atlas packing regardless of which binary (CPU / hybrid) runs.
 type FixedHashMap<K, V> = HashMap<K, V, FixedState>;
 
+/// Fixed seed for deterministic hashing across all glyph cache maps.
+const HASH_SEED: u64 = 0;
+/// Compile-time empty map for static (non-variable) glyph entries.
+const EMPTY_GLYPH_MAP: FixedHashMap<GlyphCacheKey, GlyphCacheEntry> =
+    FixedHashMap::with_hasher(FixedState::with_seed(HASH_SEED));
+/// Compile-time empty map for variable-font glyph entries, keyed by variation coordinates.
+const EMPTY_VAR_MAP: FixedHashMap<VarKey, FixedHashMap<GlyphCacheKey, GlyphCacheEntry>> =
+    FixedHashMap::with_hasher(FixedState::with_seed(HASH_SEED));
+
 /// Padding in pixels added to each side of a glyph to prevent texture bleeding.
 ///
 /// The hybrid (GPU) renderer samples atlas sub-images via `Extend::Pad`, which
@@ -35,18 +45,21 @@ type FixedHashMap<K, V> = HashMap<K, V, FixedState>;
 /// transparent padding, strip-rasteriser overshoot at glyph boundaries would
 /// either duplicate the edge row/column or bleed in content from a neighbouring
 /// glyph allocation. 1px is sufficient: the overshoot is sub-pixel, and the
-/// transparent padding absorbs it.
-///
-/// TODO(atlas): Remove this padding once we have a way to handle overshoot.
+/// transparent padding absorbs it. This padding also enables a future switch to
+/// native bilinear sampling in the hybrid renderer.
 pub const GLYPH_PADDING: u16 = 1;
 
-/// Configuration for glyph cache eviction behavior.
+/// Configuration for glyph cache behavior.
 #[derive(Clone, Debug)]
 pub struct GlyphCacheConfig {
     /// Maximum age (in frames) before an unused entry is evicted.
-    pub max_entry_age: u32,
+    pub max_entry_age: u64,
     /// How often (in frames) to run the eviction pass.
-    pub eviction_frequency: u32,
+    pub eviction_frequency: u64,
+    /// Maximum font size (in ppem) that will be cached. Glyphs rendered at
+    /// sizes above this threshold are drawn directly each frame, since very
+    /// large glyphs consume disproportionate atlas space.
+    pub max_cached_font_size: f32,
 }
 
 impl Default for GlyphCacheConfig {
@@ -54,16 +67,15 @@ impl Default for GlyphCacheConfig {
         Self {
             max_entry_age: 64,
             eviction_frequency: 64,
+            max_cached_font_size: 128.0,
         }
     }
 }
 
 /// Common interface for glyph atlas caches.
 ///
-/// Both the CPU and hybrid (GPU) renderers use this trait to interact with the
-/// glyph cache. Shared rendering code in `vello_renderer` is generic over this
-/// trait, so different backends can provide different storage strategies without
-/// duplicating orchestration logic.
+/// Rendering code is generic over this trait, so different backends can provide
+/// different storage strategies without duplicating orchestration logic.
 pub trait GlyphCache {
     /// Look up a cached glyph.
     ///
@@ -91,19 +103,22 @@ pub trait GlyphCache {
         atlas_slot: AtlasSlot,
     );
 
-    /// Take all pending bitmap uploads, leaving the internal queue empty.
-    fn take_pending_uploads(&mut self) -> Vec<PendingBitmapUpload>;
+    /// Drain all pending bitmap uploads, keeping the allocation for reuse.
+    fn drain_pending_uploads(&mut self) -> vec::Drain<'_, PendingBitmapUpload>;
 
-    /// Take all pending atlas command recorders (one per dirty page),
-    /// leaving the internal collection empty.
-    fn take_pending_atlas_commands(&mut self) -> Vec<AtlasCommandRecorder>;
+    /// Replay all pending atlas command recorders (one per dirty page).
+    ///
+    /// The closure receives each non-empty recorder by mutable reference.
+    /// After the closure returns, the recorder's commands are cleared but
+    /// the allocation is kept for reuse next frame.
+    fn replay_pending_atlas_commands(&mut self, f: impl FnMut(&mut AtlasCommandRecorder));
 
-    /// Take all pending clear rects, leaving the internal queue empty.
+    /// Drain all pending clear rects, keeping the allocation for reuse.
     ///
     /// Each rect describes an atlas region that was freed during
     /// [`maintain`](GlyphCache::maintain) and must be zeroed to transparent.
     /// Drain these **after** calling `maintain`.
-    fn take_pending_clear_rects(&mut self) -> Vec<PendingClearRect>;
+    fn drain_pending_clear_rects(&mut self) -> vec::Drain<'_, PendingClearRect>;
 
     /// Advance the frame counter and potentially evict old entries.
     fn maintain(&mut self, image_cache: &mut ImageCache);
@@ -125,13 +140,16 @@ pub trait GlyphCache {
 
     /// Reset cache hit/miss counters without clearing the cache itself.
     fn clear_stats(&mut self);
+
+    /// Returns the cache configuration.
+    fn config(&self) -> &GlyphCacheConfig;
 }
 
 /// A bitmap glyph pixmap awaiting GPU upload.
 ///
 /// Accumulated during glyph encoding when a bitmap glyph is inserted into the
 /// atlas cache. The application must drain these via
-/// [`GlyphCache::take_pending_uploads`] and upload each pixmap to the
+/// [`GlyphCache::drain_pending_uploads`] and upload each pixmap to the
 /// GPU atlas at the position indicated by `image_id` (look up via
 /// `ImageCache::get` to obtain atlas layer and offset).
 #[derive(Debug)]
@@ -149,7 +167,7 @@ pub struct PendingBitmapUpload {
 ///
 /// Accumulated during eviction ([`GlyphAtlas::maintain`]) for every evicted
 /// glyph. The application must drain these via
-/// [`GlyphCache::take_pending_clear_rects`] **after** calling `maintain` so
+/// [`GlyphCache::drain_pending_clear_rects`] **after** calling `maintain` so
 /// that freed atlas regions are zeroed before the slot is reused on a
 /// subsequent frame. This prevents stale pixel data from bleeding through
 /// when the renderer composites (`SrcOver`) onto the atlas.
@@ -180,9 +198,9 @@ pub struct GlyphAtlas {
     /// Entries for variable fonts, keyed by variation coordinates.
     variable_entries: FixedHashMap<VarKey, FixedHashMap<GlyphCacheKey, GlyphCacheEntry>>,
     /// Current frame serial for LRU tracking.
-    serial: u32,
+    serial: u64,
     /// Serial of last eviction pass.
-    last_eviction_serial: u32,
+    last_eviction_serial: u64,
     /// Total cached glyph count (across all maps).
     entry_count: usize,
     /// Bitmap glyphs awaiting GPU upload.
@@ -209,8 +227,8 @@ impl GlyphAtlas {
     pub fn with_config(eviction_config: GlyphCacheConfig) -> Self {
         Self {
             eviction_config,
-            static_entries: FixedHashMap::with_hasher(FixedState::with_seed(0)),
-            variable_entries: FixedHashMap::with_hasher(FixedState::with_seed(0)),
+            static_entries: EMPTY_GLYPH_MAP,
+            variable_entries: EMPTY_VAR_MAP,
             serial: 0,
             last_eviction_serial: 0,
             entry_count: 0,
@@ -220,6 +238,11 @@ impl GlyphAtlas {
             cache_hits: 0,
             cache_misses: 0,
         }
+    }
+
+    /// Returns a reference to the cache configuration.
+    pub fn config(&self) -> &GlyphCacheConfig {
+        &self.eviction_config
     }
 
     /// Look up a cached glyph.
@@ -304,13 +327,7 @@ impl GlyphAtlas {
                 .from_key(&VarLookupKey(&key.var_coords))
             {
                 RawEntryMut::Occupied(e) => e.into_mut(),
-                RawEntryMut::Vacant(e) => {
-                    e.insert(
-                        key.var_coords.clone(),
-                        FixedHashMap::with_hasher(FixedState::with_seed(0)),
-                    )
-                    .1
-                }
+                RawEntryMut::Vacant(e) => e.insert(key.var_coords.clone(), EMPTY_GLYPH_MAP).1,
             }
         };
 
@@ -320,14 +337,14 @@ impl GlyphAtlas {
         Some((page_index, atlas_slot.x, atlas_slot.y, atlas_slot))
     }
 
-    /// Take all pending bitmap uploads, leaving the internal queue empty.
-    pub fn take_pending_uploads(&mut self) -> Vec<PendingBitmapUpload> {
-        core::mem::take(&mut self.pending_uploads)
+    /// Drain all pending bitmap uploads, keeping the allocation for reuse.
+    pub fn drain_pending_uploads(&mut self) -> vec::Drain<'_, PendingBitmapUpload> {
+        self.pending_uploads.drain(..)
     }
 
-    /// Take all pending clear rects, leaving the internal queue empty.
-    pub fn take_pending_clear_rects(&mut self) -> Vec<PendingClearRect> {
-        core::mem::take(&mut self.pending_clear_rects)
+    /// Drain all pending clear rects, keeping the allocation for reuse.
+    pub fn drain_pending_clear_rects(&mut self) -> vec::Drain<'_, PendingClearRect> {
+        self.pending_clear_rects.drain(..)
     }
 
     /// Queue a bitmap pixmap for later processing.
@@ -344,9 +361,20 @@ impl GlyphAtlas {
         });
     }
 
-    /// Take all pending atlas command recorders, leaving the internal collection empty.
-    pub fn take_pending_atlas_commands(&mut self) -> SmallVec<[Option<AtlasCommandRecorder>; 1]> {
-        core::mem::take(&mut self.pending_atlas_commands)
+    /// Replay all pending atlas command recorders (one per dirty page).
+    ///
+    /// The closure receives each non-empty recorder by mutable reference.
+    /// After the closure returns, the recorder's commands are cleared but
+    /// the allocation is kept for reuse next frame.
+    pub fn replay_pending_atlas_commands(&mut self, mut f: impl FnMut(&mut AtlasCommandRecorder)) {
+        for slot in &mut self.pending_atlas_commands {
+            if let Some(recorder) = slot.as_mut() {
+                if !recorder.commands.is_empty() {
+                    f(recorder);
+                    recorder.commands.clear();
+                }
+            }
+        }
     }
 
     /// Get (or create) the command recorder for the given atlas page.
@@ -367,7 +395,7 @@ impl GlyphAtlas {
     /// Advance the frame counter and potentially evict old entries.
     pub fn maintain(&mut self, image_cache: &mut ImageCache) {
         self.tick();
-        let frames_since_eviction = self.serial.wrapping_sub(self.last_eviction_serial);
+        let frames_since_eviction = self.serial - self.last_eviction_serial;
         if frames_since_eviction < self.eviction_config.eviction_frequency {
             return;
         }
@@ -378,14 +406,14 @@ impl GlyphAtlas {
 
     /// Advance the frame counter.
     fn tick(&mut self) {
-        self.serial = self.serial.wrapping_add(1);
+        self.serial += 1;
     }
 
     /// Evict entries that haven't been used recently.
     ///
     /// For each evicted entry, queues a [`PendingClearRect`] covering the full
     /// padded atlas region. The application must drain these via
-    /// [`take_pending_clear_rects`](GlyphAtlas::take_pending_clear_rects) and
+    /// [`drain_pending_clear_rects`](GlyphAtlas::drain_pending_clear_rects) and
     /// zero each region so that stale pixel data doesn't bleed through when
     /// the slot is later reused and composited with `SrcOver`.
     fn evict_old_entries(&mut self, image_cache: &mut ImageCache) {
@@ -394,8 +422,8 @@ impl GlyphAtlas {
         let entry_count = &mut self.entry_count;
         let pending_clear_rects = &mut self.pending_clear_rects;
 
-        self.static_entries.retain(|_, entry| {
-            let age = serial.wrapping_sub(entry.serial);
+        let mut should_retain = |entry: &GlyphCacheEntry| -> bool {
+            let age = serial - entry.serial;
             if age > max_entry_age {
                 image_cache.deallocate(entry.atlas_slot.image_id);
                 *entry_count = entry_count.saturating_sub(1);
@@ -404,20 +432,12 @@ impl GlyphAtlas {
             } else {
                 true
             }
-        });
+        };
+
+        self.static_entries.retain(|_, entry| should_retain(entry));
 
         self.variable_entries.retain(|_, entries| {
-            entries.retain(|_, entry| {
-                let age = serial.wrapping_sub(entry.serial);
-                if age > max_entry_age {
-                    image_cache.deallocate(entry.atlas_slot.image_id);
-                    *entry_count = entry_count.saturating_sub(1);
-                    push_clear_rect_for_slot(pending_clear_rects, &entry.atlas_slot);
-                    false
-                } else {
-                    true
-                }
-            });
+            entries.retain(|_, entry| should_retain(entry));
             !entries.is_empty()
         });
     }
@@ -486,8 +506,6 @@ fn push_clear_rect_for_slot(pending: &mut Vec<PendingClearRect>, slot: &AtlasSlo
 #[cfg(debug_assertions)]
 #[derive(Debug)]
 pub struct GlyphCacheStats {
-    /// Total number of cached glyph entries.
-    pub total_glyphs: usize,
     /// Number of glyphs from static (non-variable) fonts.
     pub static_glyphs: usize,
     /// Number of glyphs from variable fonts.
@@ -500,6 +518,14 @@ pub struct GlyphCacheStats {
     pub subpixel_distribution: [usize; SUBPIXEL_BUCKETS as usize],
     /// List of unique font sizes used.
     pub sizes_used: Vec<f32>,
+}
+
+#[cfg(debug_assertions)]
+impl GlyphCacheStats {
+    /// Total number of cached glyph entries (static + variable).
+    pub fn total_glyphs(&self) -> usize {
+        self.static_glyphs + self.variable_glyphs
+    }
 }
 
 #[cfg(debug_assertions)]
@@ -527,7 +553,6 @@ impl GlyphAtlas {
         }
 
         GlyphCacheStats {
-            total_glyphs: self.entry_count,
             static_glyphs: self.static_entries.len(),
             variable_glyphs: variable_count,
             page_count,
@@ -537,7 +562,7 @@ impl GlyphAtlas {
         }
     }
 
-    /// Log cache hit/miss statistics at info level.
+    /// Log cache hit/miss statistics at debug level.
     pub fn log_hit_miss_stats(&self) {
         let total = self.cache_hits + self.cache_misses;
         let hit_rate = if total > 0 {
@@ -545,41 +570,39 @@ impl GlyphAtlas {
         } else {
             0.0
         };
-        log::info!("=== Cache Hit/Miss Statistics ===");
-        log::info!("Cache hits:   {}", self.cache_hits);
-        log::info!("Cache misses: {}", self.cache_misses);
-        log::info!("Total lookups: {}", total);
-        log::info!("Hit rate:     {:.2}%", hit_rate);
+        log::debug!("=== Cache Hit/Miss Statistics ===");
+        log::debug!("Cache hits:   {}", self.cache_hits);
+        log::debug!("Cache misses: {}", self.cache_misses);
+        log::debug!("Total lookups: {}", total);
+        log::debug!("Hit rate:     {:.2}%", hit_rate);
     }
 
-    /// Log detailed atlas statistics at info level.
+    /// Log detailed atlas statistics at debug level.
     pub fn log_atlas_stats(&self, page_count: usize) {
         let stats = self.stats(page_count);
-        log::info!("=== Glyph Atlas Statistics ===");
-        log::info!("Total cached glyphs: {}", stats.total_glyphs);
-        log::info!("Unique glyph IDs: {}", stats.unique_glyph_ids);
-        log::info!("Atlas pages: {}", stats.page_count);
-        log::info!("Static font glyphs: {}", stats.static_glyphs);
-        log::info!("Variable font glyphs: {}", stats.variable_glyphs);
-        log::info!("Subpixel distribution: {:?}", stats.subpixel_distribution);
-        log::info!("Font sizes: {:?}", stats.sizes_used);
+        log::debug!("=== Glyph Atlas Statistics ===");
+        log::debug!("Total cached glyphs: {}", stats.total_glyphs());
+        log::debug!("Unique glyph IDs: {}", stats.unique_glyph_ids);
+        log::debug!("Atlas pages: {}", stats.page_count);
+        log::debug!("Static font glyphs: {}", stats.static_glyphs);
+        log::debug!("Variable font glyphs: {}", stats.variable_glyphs);
+        log::debug!("Subpixel distribution: {:?}", stats.subpixel_distribution);
+        log::debug!("Font sizes: {:?}", stats.sizes_used);
 
         if stats.unique_glyph_ids > 0 {
-            let ratio = stats.total_glyphs as f32 / stats.unique_glyph_ids as f32;
-            log::info!("Avg entries per unique glyph: {:.2}", ratio);
+            let ratio = stats.total_glyphs() as f32 / stats.unique_glyph_ids as f32;
+            log::debug!("Avg entries per unique glyph: {:.2}", ratio);
         }
     }
 
     /// Returns all cached glyph keys (for debugging).
-    pub fn all_keys(&self) -> Vec<&GlyphCacheKey> {
-        let mut keys: Vec<_> = self.static_entries.keys().collect();
-        for entries in self.variable_entries.values() {
-            keys.extend(entries.keys());
-        }
-        keys
+    pub fn all_keys(&self) -> impl Iterator<Item = &GlyphCacheKey> {
+        self.static_entries
+            .keys()
+            .chain(self.variable_entries.values().flat_map(|e| e.keys()))
     }
 
-    /// Log all cached keys grouped by glyph ID at info level.
+    /// Log all cached keys grouped by glyph ID at debug level.
     ///
     /// This is useful for understanding why the same glyph appears multiple
     /// times in the atlas (e.g., different subpixel positions or sizes).
@@ -601,7 +624,7 @@ impl GlyphAtlas {
             }
         }
 
-        log::info!(
+        log::debug!(
             "=== Glyph Keys Grouped by ID ({} unique) ===",
             by_glyph.len()
         );
@@ -612,9 +635,9 @@ impl GlyphAtlas {
         for glyph_id in ids {
             let keys = &by_glyph[&glyph_id];
             let suffix = if keys.len() == 1 { "entry" } else { "entries" };
-            log::info!("glyph_id {:4} ({} {}):", glyph_id, keys.len(), suffix);
+            log::debug!("glyph_id {:4} ({} {}):", glyph_id, keys.len(), suffix);
             for (k, source) in keys {
-                log::info!(
+                log::debug!(
                     "    [{}] subpx: {}, size: {:.2}, hinted: {}, font_id: {:016x}, font_index: {}",
                     source,
                     k.subpixel_x,
@@ -645,38 +668,12 @@ impl Debug for GlyphAtlas {
     }
 }
 
-/// Save a pixmap to a PNG file (diagnostic utility).
-#[cfg(all(debug_assertions, feature = "png"))]
-pub fn save_pixmap_to_png(pixmap: &Pixmap, path: &std::path::Path) -> std::io::Result<()> {
-    use std::fs::File;
-    use std::io::BufWriter;
-
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-
-    let file = File::create(path)?;
-    let w = BufWriter::new(file);
-
-    let mut encoder = png::Encoder::new(w, pixmap.width() as u32, pixmap.height() as u32);
-    encoder.set_color(png::ColorType::Rgba);
-    encoder.set_depth(png::BitDepth::Eight);
-
-    let mut writer = encoder.write_header().map_err(std::io::Error::other)?;
-
-    writer
-        .write_image_data(pixmap.data_as_u8_slice())
-        .map_err(std::io::Error::other)?;
-
-    Ok(())
-}
-
 /// Internal cache entry storing atlas slot and access time.
 struct GlyphCacheEntry {
     /// Atlas slot information for blitting.
     atlas_slot: AtlasSlot,
     /// Frame serial when last accessed (for LRU eviction).
-    serial: u32,
+    serial: u64,
 }
 
 /// Key for variable font caches (owned version).

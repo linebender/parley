@@ -69,6 +69,8 @@ impl Default for ExampleConfig {
             background_color: Color::WHITE,
             padding: 20,
             hint: true,
+            // Vello Hybrid doesn't support uploading bitmap pixmaps directly yet
+            // (see vello#1459), so disabling the atlas cache will panic on bitmap emojis.
             use_atlas_cache: true,
         }
     }
@@ -290,15 +292,12 @@ pub fn frame_sequence() -> Vec<FrameSpec> {
     ]
 }
 
-/// Resolve the `examples/_output` directory from a `file!()` macro path.
-pub fn output_dir(crate_file: &str) -> PathBuf {
-    let mut path = PathBuf::from(crate_file);
-    if let Ok(canon) = std::fs::canonicalize(&path) {
-        path = canon;
-    }
-    for _ in 0..3 {
-        path.pop();
-    }
+/// Resolve the `examples/_output` directory from a crate's `CARGO_MANIFEST_DIR`.
+///
+/// Callers should pass `env!("CARGO_MANIFEST_DIR")`.
+pub fn output_dir(manifest_dir: &str) -> PathBuf {
+    let mut path = PathBuf::from(manifest_dir);
+    path.pop();
     path.push("_output");
     let _ = std::fs::create_dir(&path);
     path

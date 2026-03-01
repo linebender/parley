@@ -12,6 +12,7 @@ only break in edge cases, and some of them are also only related to conversions 
 use crate::Pixmap;
 use crate::atlas::AtlasSlot;
 use crate::atlas::GlyphCacheKey;
+use crate::atlas::key::pack_color;
 use crate::atlas::{GlyphCache, ImageCache};
 use crate::colr::convert_bounding_box;
 use crate::kurbo::Point;
@@ -38,7 +39,17 @@ use skrifa::raw::TableProvider;
 use skrifa::{FontRef, OutlineGlyphCollection};
 use skrifa::{GlyphId, MetadataProvider};
 use smallvec::SmallVec;
+use vello_common::color::PremulRgba8;
 use vello_common::color::palette::css::BLACK;
+
+/// Pre-packed `BLACK` color as a `u32` for use in `GlyphCacheKey`.
+const BLACK_PACKED: u32 = PremulRgba8 {
+    r: 0,
+    g: 0,
+    b: 0,
+    a: 255,
+}
+.to_u32();
 
 /// Positioned glyph.
 #[derive(Copy, Clone, Default, Debug)]
@@ -62,7 +73,7 @@ pub enum GlyphType<'a> {
     /// A bitmap glyph.
     Bitmap(GlyphBitmap),
     /// A COLR glyph.
-    Colr(Box<ColrGlyph<'a>>),
+    Colr(Box<GlyphColr<'a>>),
 }
 
 /// Type hint for cached glyph rendering.
@@ -116,7 +127,7 @@ pub struct GlyphBitmap {
 /// Clients are supposed to first draw the glyph into an intermediate image texture/pixmap
 /// and then render that into the actual scene, in a similar fashion to
 /// bitmap glyphs.
-pub struct ColrGlyph<'a> {
+pub struct GlyphColr<'a> {
     /// The original skrifa color glyph.
     pub skrifa_glyph: skrifa::color::ColorGlyph<'a>,
     /// The location of the glyph.
@@ -134,9 +145,9 @@ pub struct ColrGlyph<'a> {
     pub pix_height: u16,
 }
 
-impl Debug for ColrGlyph<'_> {
+impl Debug for GlyphColr<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "ColrGlyph")
+        write!(f, "GlyphColr")
     }
 }
 
@@ -360,36 +371,81 @@ impl<'a, T: 'a> GlyphRunBuilder<'a, T> {
         } = prepare_glyph_run(&self.run, &outlines, hinting_cache);
 
         let ppem = size.ppem().unwrap_or(self.run.font_size);
+
+        // COLR/bitmap glyphs are never hinted. `prepare_glyph_run` may absorb
+        // the scale into the font size, so we keep the original transform for
+        // their metric calculations.
+        let unhinted_transform =
+            self.run.transform * self.run.glyph_transform.unwrap_or(Affine::IDENTITY);
         let font_id = self.run.font.data.id();
         let font_index = self.run.font.index;
         let hinted = hinting_instance.is_some();
+
+        let cache_enabled =
+            self.atlas_cache_enabled && ppem <= glyph_atlas.config().max_cached_font_size;
 
         let render_glyph: fn(&mut T, PreparedGlyph<'_>, &mut C, &mut ImageCache) = match style {
             Style::Fill => GlyphRenderer::<C>::fill_glyph,
             Style::Stroke => GlyphRenderer::<C>::stroke_glyph,
         };
 
+        let context_color = self.renderer.get_context_color();
+        let context_color_packed = pack_color(context_color);
+
         for glyph in glyphs {
             let glyph_id = GlyphId::new(glyph.id);
+
+            // ── Speculative outline cache check ─────────────────────────
+            // ~99% of glyphs are outlines. The transform and cache key are
+            // pure arithmetic, so we probe the cache before the expensive
+            // color_glyphs.get() / bitmaps.glyph_for_size() font-table lookups.
+            // On a miss we keep both for reuse in the outline branch below.
+            let outline_transform = calculate_outline_transform(
+                glyph,
+                initial_transform,
+                self.run.transform,
+                hinting_instance,
+            );
+            let outline_cache_key = cache_enabled.then(|| {
+                let fractional_x = outline_transform.translation().x.fract() as f32;
+                GlyphCacheKey::new(
+                    font_id,
+                    font_index,
+                    glyph.id,
+                    ppem,
+                    hinted,
+                    fractional_x,
+                    BLACK,
+                    BLACK_PACKED,
+                    normalized_coords,
+                )
+            });
+            if let Some(ref key) = outline_cache_key {
+                if let Some(cached_slot) = glyph_atlas.get(key) {
+                    self.renderer.render_cached_glyph(
+                        cached_slot,
+                        outline_transform,
+                        CachedGlyphType::Outline,
+                    );
+                    continue;
+                }
+            }
 
             // ── COLR Glyphs ───────────────────────────────────────────
             if let Some(color_glyph) = color_glyphs.get(glyph_id) {
                 let metrics = calculate_colr_metrics(
                     self.run.font_size,
                     upem,
-                    initial_transform,
+                    unhinted_transform,
                     glyph.x,
                     glyph.y,
                     &color_glyph,
                 );
                 let transform = calculate_colr_transform(&metrics);
 
-                // Must be extracted before any closure that borrows `self.renderer`.
-                let context_color = self.renderer.get_context_color();
-
                 // COLR glyphs are never hinted and have no sub-pixel offset;
                 // context_color is part of the key because it affects painted layers.
-                let cache_key = self.atlas_cache_enabled.then(|| GlyphCacheKey {
+                let cache_key = cache_enabled.then(|| GlyphCacheKey {
                     font_id,
                     font_index,
                     glyph_id: glyph.id,
@@ -397,6 +453,7 @@ impl<'a, T: 'a> GlyphRunBuilder<'a, T> {
                     hinted: false,
                     subpixel_x: 0,
                     context_color,
+                    context_color_packed,
                     var_coords: SmallVec::from_slice(normalized_coords),
                 });
 
@@ -456,7 +513,7 @@ impl<'a, T: 'a> GlyphRunBuilder<'a, T> {
                 let transform = calculate_bitmap_transform(
                     glyph,
                     &pixmap,
-                    initial_transform,
+                    unhinted_transform,
                     self.run.font_size,
                     upem,
                     &bitmap_glyph,
@@ -465,7 +522,7 @@ impl<'a, T: 'a> GlyphRunBuilder<'a, T> {
 
                 // Bitmaps are not hinted and have no sub-pixel offset or
                 // context color; variation coords are irrelevant for fixed strikes.
-                let cache_key = self.atlas_cache_enabled.then(|| GlyphCacheKey {
+                let cache_key = cache_enabled.then(|| GlyphCacheKey {
                     font_id,
                     font_index,
                     glyph_id: glyph.id,
@@ -473,6 +530,7 @@ impl<'a, T: 'a> GlyphRunBuilder<'a, T> {
                     hinted: false,
                     subpixel_x: 0,
                     context_color: BLACK,
+                    context_color_packed: BLACK_PACKED,
                     var_coords: SmallVec::new(),
                 });
 
@@ -504,46 +562,15 @@ impl<'a, T: 'a> GlyphRunBuilder<'a, T> {
             }
 
             // ── Outline Glyphs ──────────────────────────────────────────
+            // Transform and cache key were already computed at the top of the
+            // loop for the speculative check. Reuse them here on a cache miss.
+
+            // Cache miss — fetch the outline from skrifa (expensive: parses font
+            // tables), then build the path. Deferred to here so cache hits skip it.
             let Some(outline) = outlines.get(glyph_id) else {
-                // Glyph has no outline, bitmap, or COLR representation — skip.
                 continue;
             };
 
-            let transform = calculate_outline_transform(
-                glyph,
-                initial_transform,
-                self.run.transform,
-                hinting_instance,
-            );
-
-            // Sub-pixel x offset is quantized into the cache key so that glyphs
-            // at different fractional positions get distinct cached bitmaps.
-            let cache_key = self.atlas_cache_enabled.then(|| {
-                let fractional_x = transform.translation().x.fract() as f32;
-                GlyphCacheKey::new(
-                    font_id,
-                    font_index,
-                    glyph.id,
-                    ppem,
-                    hinted,
-                    fractional_x,
-                    BLACK,
-                    normalized_coords,
-                )
-            });
-
-            if let Some(ref key) = cache_key {
-                if let Some(cached_slot) = glyph_atlas.get(key) {
-                    self.renderer.render_cached_glyph(
-                        cached_slot,
-                        transform,
-                        CachedGlyphType::Outline,
-                    );
-                    continue;
-                }
-            }
-
-            // Cache miss — build the outline path (may hit the outline cache).
             let glyph_type = create_outline_glyph(
                 glyph.id,
                 self.run.font.data.id(),
@@ -559,8 +586,8 @@ impl<'a, T: 'a> GlyphRunBuilder<'a, T> {
                 self.renderer,
                 PreparedGlyph {
                     glyph_type,
-                    transform,
-                    cache_key,
+                    transform: outline_transform,
+                    cache_key: outline_cache_key,
                 },
                 glyph_atlas,
                 image_cache,
@@ -1004,7 +1031,7 @@ struct ColrMetrics {
 
 /// Calculate COLR glyph metrics (scale factors, bounding box, etc.).
 ///
-/// This computes the intermediate values needed for both creating the `ColrGlyph`
+/// This computes the intermediate values needed for both creating the `GlyphColr`
 /// and calculating its positioning transform.
 fn calculate_colr_metrics(
     font_size: f32,
@@ -1116,7 +1143,7 @@ fn create_colr_glyph<'a>(
         metrics.scaled_bbox.height(),
     );
 
-    GlyphType::Colr(Box::new(ColrGlyph {
+    GlyphType::Colr(Box::new(GlyphColr {
         skrifa_glyph: color_glyph,
         font_ref,
         location: LocationRef::new(normalized_coords),

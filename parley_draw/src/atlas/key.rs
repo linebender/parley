@@ -1,4 +1,4 @@
-// Copyright 2025 the Parley Authors
+// Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Cache key for glyph bitmaps stored in the atlas.
@@ -27,8 +27,11 @@ pub(crate) const SUBPIXEL_BUCKETS: u8 = 4;
 /// the same cached bitmap. The key includes all parameters that affect
 /// the glyph's appearance.
 ///
-/// All fields including `var_coords` are included in Hash/Eq, so glyphs
-/// with different variation settings are treated as distinct cache entries.
+/// `var_coords` is deliberately excluded from `Hash`/`Eq` because the
+/// [`GlyphAtlas`](crate::atlas::cache::GlyphAtlas) uses a two-level map
+/// structure that already partitions entries by variation coordinates.
+/// Callers that use a flat map must ensure equivalent `var_coords`
+/// externally.
 #[derive(Clone, Debug)]
 pub struct GlyphCacheKey {
     /// Unique identifier for the font blob.
@@ -43,8 +46,10 @@ pub struct GlyphCacheKey {
     pub hinted: bool,
     /// Horizontal subpixel position (0 to SUBPIXEL_BUCKETS-1).
     pub subpixel_x: u8,
-    /// Context color for COLR glyphs (packed RGBA). 0 for non-COLR glyphs.
+    /// Context color for COLR glyphs. Only used for rendering, not for Hash/Eq.
     pub context_color: AlphaColor<Srgb>,
+    /// Pre-packed context color (premultiplied RGBA8 as u32) used in Hash/Eq.
+    pub context_color_packed: u32,
     /// Variation coordinates for variable fonts.
     pub var_coords: SmallVec<[NormalizedCoord; 4]>,
 }
@@ -63,6 +68,7 @@ impl GlyphCacheKey {
         hinted: bool,
         fractional_x: f32,
         context_color: AlphaColor<Srgb>,
+        context_color_packed: u32,
         var_coords: &[NormalizedCoord],
     ) -> Self {
         Self {
@@ -73,14 +79,16 @@ impl GlyphCacheKey {
             hinted,
             subpixel_x: quantize_subpixel(fractional_x),
             context_color,
+            context_color_packed,
             var_coords: SmallVec::from_slice(var_coords),
         }
     }
 }
 
-/// Manual `Hash` and `PartialEq` are required because `AlphaColor<Srgb>`
-/// does not implement `Hash`/`Eq`. We pack it into a `u32` (premultiplied RGBA8)
-/// so that the color participates in hashing and comparison deterministically.
+/// Manual `Hash` and `PartialEq` use the pre-packed `context_color_packed` field
+/// (a premultiplied RGBA8 `u32`) instead of `AlphaColor<Srgb>`, which doesn't
+/// implement `Hash`/`Eq`. Packing once at construction avoids repeated work
+/// during lookups. `glyph_id` is compared first for early short-circuit.
 impl Hash for GlyphCacheKey {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -90,23 +98,20 @@ impl Hash for GlyphCacheKey {
         self.size_bits.hash(state);
         self.hinted.hash(state);
         self.subpixel_x.hash(state);
-        let context_color = pack_color(self.context_color);
-        context_color.hash(state);
-        self.var_coords.hash(state);
+        self.context_color_packed.hash(state);
     }
 }
 
 impl PartialEq for GlyphCacheKey {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
-        self.font_id == other.font_id
+        self.glyph_id == other.glyph_id
+            && self.subpixel_x == other.subpixel_x
+            && self.font_id == other.font_id
             && self.font_index == other.font_index
-            && self.glyph_id == other.glyph_id
             && self.size_bits == other.size_bits
             && self.hinted == other.hinted
-            && self.subpixel_x == other.subpixel_x
-            && pack_color(self.context_color) == pack_color(other.context_color)
-            && self.var_coords == other.var_coords
+            && self.context_color_packed == other.context_color_packed
     }
 }
 
@@ -119,6 +124,11 @@ pub(crate) fn pack_color(color: AlphaColor<Srgb>) -> u32 {
 }
 
 /// Quantize a fractional pixel offset into one of [`SUBPIXEL_BUCKETS`] buckets.
+///
+/// Values near 1.0 (>= 0.875 with 4 buckets) are clamped to the last bucket
+/// rather than wrapping to 0. Wrapping to bucket 0 without also incrementing the
+/// integer pixel coordinate would shift the glyph by ~0.75px in the wrong
+/// direction. Clamping keeps the worst-case error to 0.125px.
 #[expect(
     clippy::cast_possible_truncation,
     reason = "result is clamped to SUBPIXEL_BUCKETS-1 which fits in u8"
@@ -172,15 +182,18 @@ mod tests {
 
     #[test]
     fn test_key_equality() {
-        let key1 = GlyphCacheKey::new(1, 0, 42, 16.0, true, 0.3, BLACK, &[]);
-        let key2 = GlyphCacheKey::new(1, 0, 42, 16.0, true, 0.3, BLACK, &[]);
+        let packed = pack_color(BLACK);
+        let key1 = GlyphCacheKey::new(1, 0, 42, 16.0, true, 0.3, BLACK, packed, &[]);
+        let key2 = GlyphCacheKey::new(1, 0, 42, 16.0, true, 0.3, BLACK, packed, &[]);
         assert_eq!(key1, key2);
     }
 
     #[test]
-    fn test_var_coords_in_equality() {
-        // Two keys with different var_coords should NOT be equal
-        let key1 = GlyphCacheKey::new(1, 0, 42, 16.0, true, 0.3, BLACK, &[]);
+    fn test_var_coords_excluded_from_equality() {
+        let packed = pack_color(BLACK);
+        // var_coords is excluded from Hash/Eq (two-level map handles it),
+        // so keys differing only in var_coords are considered equal.
+        let key1 = GlyphCacheKey::new(1, 0, 42, 16.0, true, 0.3, BLACK, packed, &[]);
         let key2 = GlyphCacheKey::new(
             1,
             0,
@@ -189,21 +202,9 @@ mod tests {
             true,
             0.3,
             BLACK,
+            packed,
             &[NormalizedCoord::from_bits(100)],
         );
-        assert_ne!(key1, key2);
-
-        // Two keys with the same var_coords should be equal
-        let key3 = GlyphCacheKey::new(
-            1,
-            0,
-            42,
-            16.0,
-            true,
-            0.3,
-            BLACK,
-            &[NormalizedCoord::from_bits(100)],
-        );
-        assert_eq!(key2, key3);
+        assert_eq!(key1, key2);
     }
 }

@@ -51,7 +51,7 @@ async fn run() {
         mut glyph_caches,
     } = prepare_rendering(width, height).await;
     stats.end("prepare_rendering");
-    let output_path = output_dir(file!()).join("vello_hybrid_render.png");
+    let output_path = output_dir(env!("CARGO_MANIFEST_DIR")).join("vello_hybrid_render.png");
 
     for frame in &frame_sequence() {
         println!("\n=== {} ===", frame.label);
@@ -309,6 +309,7 @@ async fn prepare_rendering(width: u16, height: u16) -> HybridRendering {
     let glyph_caches = GpuGlyphCaches::with_config(GlyphCacheConfig {
         max_entry_age: 2,
         eviction_frequency: 2,
+        max_cached_font_size: 128.0,
     });
 
     HybridRendering {
@@ -381,24 +382,26 @@ fn render(
     });
 
     // Replay outline/COLR draw commands into each atlas page via the GPU.
-    for mut recorder in glyph_caches.glyph_atlas.take_pending_atlas_commands() {
-        glyph_renderer.reset();
-        replay_atlas_commands(&mut recorder.commands, glyph_renderer);
-        renderer
-            .render_to_atlas(
-                glyph_renderer,
-                device,
-                queue,
-                AtlasId::new(recorder.page_index),
-            )
-            .expect("Failed to render glyphs to atlas");
-    }
+    glyph_caches
+        .glyph_atlas
+        .replay_pending_atlas_commands(|recorder| {
+            glyph_renderer.reset();
+            replay_atlas_commands(&mut recorder.commands, glyph_renderer);
+            renderer
+                .render_to_atlas(
+                    glyph_renderer,
+                    device,
+                    queue,
+                    AtlasId::new(recorder.page_index),
+                )
+                .expect("Failed to render glyphs to atlas");
+        });
 
     // Upload bitmap glyphs to the GPU atlas. The write offset is
     // allocation_origin + GLYPH_PADDING so the bitmap sits inside its
     // padded slot, matching the CPU backend's placement.
     let padding = u32::from(GLYPH_PADDING);
-    for upload in glyph_caches.glyph_atlas.take_pending_uploads() {
+    for upload in glyph_caches.glyph_atlas.drain_pending_uploads() {
         let resource = renderer
             .image_cache
             .get(upload.image_id)
@@ -438,7 +441,7 @@ fn render(
     clear_atlas_regions(
         queue,
         renderer,
-        &glyph_caches.glyph_atlas.take_pending_clear_rects(),
+        glyph_caches.glyph_atlas.drain_pending_clear_rects(),
     );
 
     println!(
@@ -455,13 +458,19 @@ fn render(
 /// Uses `queue.write_texture` to write transparent pixels to each clear rect,
 /// preventing stale data from evicted glyphs from bleeding through when the
 /// slot is reused on a subsequent frame.
-fn clear_atlas_regions(queue: &wgpu::Queue, renderer: &Renderer, rects: &[PendingClearRect]) {
-    if rects.is_empty() {
-        return;
-    }
+///
+// TODO: Add Vello Hybrid's GPU support for clearing atlas regions.
+fn clear_atlas_regions(
+    queue: &wgpu::Queue,
+    renderer: &Renderer,
+    rects: impl Iterator<Item = PendingClearRect>,
+) {
     let atlas_texture = renderer.atlas_texture();
+    let mut zeroed: Vec<u8> = Vec::new();
+
     for rect in rects {
-        let zeroed = vec![0_u8; rect.width as usize * rect.height as usize * 4];
+        let byte_count = rect.width as usize * rect.height as usize * 4;
+        zeroed.resize(byte_count, 0);
         queue.write_texture(
             wgpu::TexelCopyTextureInfo {
                 texture: atlas_texture,
@@ -473,7 +482,7 @@ fn clear_atlas_regions(queue: &wgpu::Queue, renderer: &Renderer, rects: &[Pendin
                 },
                 aspect: wgpu::TextureAspect::All,
             },
-            &zeroed,
+            &zeroed[..byte_count],
             wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(rect.width as u32 * 4),
@@ -576,7 +585,7 @@ fn save_atlas_pages(device: &wgpu::Device, queue: &wgpu::Queue, renderer: &Rende
     let atlas_height = size.height as u16;
     let layer_count = size.depth_or_array_layers;
 
-    let output_dir = output_dir(file!());
+    let output_dir = output_dir(env!("CARGO_MANIFEST_DIR"));
     let _ = std::fs::create_dir_all(&output_dir);
 
     let bytes_per_row = (u32::from(atlas_width) * 4).next_multiple_of(256);

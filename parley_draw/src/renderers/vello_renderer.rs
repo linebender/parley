@@ -1,4 +1,4 @@
-// Copyright 2025 the Vello Authors and the Parley Authors
+// Copyright 2026 the Vello Authors and the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Shared glyph rendering logic for all Vello backends.
@@ -15,13 +15,15 @@
 use crate::atlas::commands::{AtlasCommand, AtlasCommandRecorder, AtlasPaint};
 use crate::atlas::key::subpixel_offset;
 use crate::atlas::{AtlasSlot, GlyphCache, GlyphCacheKey, ImageCache, RasterMetrics};
-use crate::glyph::{ColrGlyph, GlyphBitmap, GlyphRenderer, GlyphType, PreparedGlyph};
+use crate::colr::ColrPainter;
+use crate::glyph::{GlyphBitmap, GlyphColr, GlyphRenderer, GlyphType, PreparedGlyph};
 use crate::{kurbo, peniko};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 #[cfg(not(feature = "std"))]
 use core_maths::CoreFloat as _;
 use kurbo::{Affine, BezPath, Rect, Shape};
+use peniko::color::palette::css::BLACK;
 use peniko::color::{AlphaColor, Srgb};
 use peniko::{BlendMode, Gradient, ImageQuality};
 use vello_common::paint::{Tint, TintMode};
@@ -53,39 +55,6 @@ pub(crate) trait GlyphAtlasBackend {
     /// The glyph atlas cache type for this backend.
     type Cache: GlyphCache;
 
-    // ---- Atlas population ------------------------------------------------
-
-    /// Record outline glyph draw commands into the atlas command recorder.
-    fn render_outline_to_atlas(
-        path: &Arc<BezPath>,
-        subpixel_offset: f32,
-        recorder: &mut AtlasCommandRecorder,
-        dst_x: u16,
-        dst_y: u16,
-        raster_metrics: RasterMetrics,
-    );
-
-    /// Record COLR glyph draw commands into the atlas command recorder.
-    fn render_colr_to_atlas(
-        glyph: &ColrGlyph<'_>,
-        context_color: AlphaColor<Srgb>,
-        recorder: &mut AtlasCommandRecorder,
-        dst_x: u16,
-        dst_y: u16,
-    );
-
-    /// Queue a bitmap glyph for deferred atlas insertion.
-    ///
-    /// The actual pixel copy happens later:
-    /// - CPU backend — copies into the per-page `Pixmap` before `render_to_pixmap`.
-    /// - Hybrid backend — uploaded via `Renderer::write_to_atlas` before the
-    ///   main GPU render pass.
-    fn queue_bitmap_upload_to_atlas(
-        glyph: &GlyphBitmap,
-        glyph_atlas: &mut Self::Cache,
-        atlas_slot: AtlasSlot,
-    );
-
     // ---- Atlas rendering -------------------------------------------------
 
     /// Draw a cached glyph from the atlas into the scene.
@@ -115,8 +84,11 @@ pub(crate) trait GlyphAtlasBackend {
 
     // ---- Direct rendering (uncached) -------------------------------------
 
-    /// Render an outline glyph directly (not using cache).
-    fn render_outline_directly(renderer: &mut Self::Renderer, path: &BezPath, transform: Affine);
+    /// Fill an outline glyph directly (not using cache).
+    fn fill_outline_directly(renderer: &mut Self::Renderer, path: &BezPath, transform: Affine);
+
+    /// Stroke an outline glyph directly (not using cache).
+    fn stroke_outline_directly(renderer: &mut Self::Renderer, path: &BezPath, transform: Affine);
 
     /// Render a bitmap glyph directly (not using cache).
     fn render_bitmap_directly(renderer: &mut Self::Renderer, glyph: GlyphBitmap, transform: Affine);
@@ -124,7 +96,7 @@ pub(crate) trait GlyphAtlasBackend {
     /// Render a COLR glyph directly (not using cache).
     fn render_colr_directly(
         renderer: &mut Self::Renderer,
-        glyph: &ColrGlyph<'_>,
+        glyph: &GlyphColr<'_>,
         transform: Affine,
         context_color: AlphaColor<Srgb>,
     );
@@ -140,14 +112,14 @@ pub(crate) fn fill_glyph<B: GlyphAtlasBackend>(
 ) where
     B::Renderer: GlyphRenderer<B::Cache>,
 {
-    let cache_key = prepared_glyph.cache_key;
+    let mut cache_key = prepared_glyph.cache_key;
     let transform = prepared_glyph.transform;
 
     match prepared_glyph.glyph_type {
         GlyphType::Outline(glyph) => {
             let tint_color = renderer.get_context_color();
-            if let Some(ref key) = cache_key {
-                if let CacheResult::CachedAndRendered = render_outline_via_cache::<B>(
+            if let Some(key) = cache_key.take() {
+                if let CacheResult::CachedAndRendered = insert_and_render_outline::<B>(
                     renderer,
                     &glyph.path,
                     transform,
@@ -160,11 +132,11 @@ pub(crate) fn fill_glyph<B: GlyphAtlasBackend>(
                 }
             }
 
-            B::render_outline_directly(renderer, &glyph.path, transform);
+            B::fill_outline_directly(renderer, &glyph.path, transform);
         }
         GlyphType::Bitmap(glyph) => {
-            if let Some(ref key) = cache_key {
-                if let CacheResult::CachedAndRendered = render_bitmap_via_cache::<B>(
+            if let Some(key) = cache_key.take() {
+                if let CacheResult::CachedAndRendered = insert_and_render_bitmap::<B>(
                     renderer,
                     &glyph,
                     transform,
@@ -179,8 +151,8 @@ pub(crate) fn fill_glyph<B: GlyphAtlasBackend>(
             B::render_bitmap_directly(renderer, glyph, transform);
         }
         GlyphType::Colr(glyph) => {
-            if let Some(key) = cache_key {
-                if let CacheResult::CachedAndRendered = render_colr_via_cache::<B>(
+            if let Some(key) = cache_key.take() {
+                if let CacheResult::CachedAndRendered = insert_and_render_colr::<B>(
                     renderer,
                     &glyph,
                     transform,
@@ -210,12 +182,12 @@ pub(crate) fn stroke_glyph<B: GlyphAtlasBackend>(
 {
     match prepared_glyph.glyph_type {
         GlyphType::Outline(glyph) => {
-            let cache_key = prepared_glyph.cache_key;
+            let mut cache_key = prepared_glyph.cache_key;
             let transform = prepared_glyph.transform;
             let tint_color = renderer.get_context_color();
 
-            if let Some(ref key) = cache_key {
-                if let CacheResult::CachedAndRendered = render_outline_via_cache::<B>(
+            if let Some(key) = cache_key.take() {
+                if let CacheResult::CachedAndRendered = insert_and_render_outline::<B>(
                     renderer,
                     &glyph.path,
                     transform,
@@ -228,7 +200,7 @@ pub(crate) fn stroke_glyph<B: GlyphAtlasBackend>(
                 }
             }
 
-            B::render_outline_directly(renderer, &glyph.path, transform);
+            B::stroke_outline_directly(renderer, &glyph.path, transform);
         }
         GlyphType::Bitmap(_) | GlyphType::Colr(_) => {
             // The definitions of COLR and bitmap glyphs can't meaningfully support being stroked.
@@ -238,16 +210,48 @@ pub(crate) fn stroke_glyph<B: GlyphAtlasBackend>(
     }
 }
 
-/// Try to render an outline glyph via the atlas cache.
+/// Record outline glyph draw commands into the atlas command recorder.
+fn render_outline_to_atlas(
+    path: &Arc<BezPath>,
+    subpixel_offset: f32,
+    recorder: &mut AtlasCommandRecorder,
+    dst_x: u16,
+    dst_y: u16,
+    raster_metrics: RasterMetrics,
+) {
+    let outline_transform = Affine::scale_non_uniform(1.0, -1.0).then_translate(kurbo::Vec2::new(
+        dst_x as f64 - raster_metrics.bearing_x as f64 + subpixel_offset as f64,
+        dst_y as f64 - raster_metrics.bearing_y as f64,
+    ));
+    recorder.set_transform(outline_transform);
+    recorder.set_paint(BLACK);
+    recorder.fill_path(path);
+}
+
+/// Record COLR glyph draw commands into the atlas command recorder.
+fn render_colr_to_atlas(
+    glyph: &GlyphColr<'_>,
+    context_color: AlphaColor<Srgb>,
+    recorder: &mut AtlasCommandRecorder,
+    dst_x: u16,
+    dst_y: u16,
+) {
+    recorder.set_transform(Affine::translate((dst_x as f64, dst_y as f64)));
+
+    let mut colr_painter = ColrPainter::new(glyph, context_color, recorder);
+    colr_painter.paint();
+}
+
+/// Insert an outline glyph into the atlas and render it from there.
 ///
-/// On cache miss, allocates atlas space (the insert returns the per-page
-/// command recorder) and delegates rasterisation to the backend via
-/// [`GlyphAtlasBackend::render_outline_to_atlas`].
-fn render_outline_via_cache<B: GlyphAtlasBackend>(
+/// Allocates atlas space (the insert returns the per-page command recorder)
+/// and records rasterisation commands. The upstream caller is responsible for
+/// checking the cache first and only calling this on a miss.
+fn insert_and_render_outline<B: GlyphAtlasBackend>(
     renderer: &mut B::Renderer,
     path: &Arc<BezPath>,
     transform: Affine,
-    cache_key: &GlyphCacheKey,
+    cache_key: GlyphCacheKey,
     glyph_atlas: &mut B::Cache,
     image_cache: &mut ImageCache,
     tint_color: AlphaColor<Srgb>,
@@ -262,12 +266,12 @@ fn render_outline_via_cache<B: GlyphAtlasBackend>(
     let subpixel_offset = subpixel_offset(cache_key.subpixel_x);
 
     let Some((dst_x, dst_y, atlas_slot, recorder)) =
-        glyph_atlas.insert(image_cache, cache_key.clone(), raster_metrics)
+        glyph_atlas.insert(image_cache, cache_key, raster_metrics)
     else {
         return CacheResult::AtlasFull;
     };
 
-    B::render_outline_to_atlas(
+    render_outline_to_atlas(
         path,
         subpixel_offset,
         recorder,
@@ -280,15 +284,16 @@ fn render_outline_via_cache<B: GlyphAtlasBackend>(
     CacheResult::CachedAndRendered
 }
 
-/// Try to render a bitmap glyph via the atlas cache.
+/// Insert a bitmap glyph into the atlas and render it from there.
 ///
-/// On cache miss, delegates atlas population to the backend via
-/// [`GlyphAtlasBackend::queue_bitmap_upload_to_atlas`].
-fn render_bitmap_via_cache<B: GlyphAtlasBackend>(
+/// Delegates atlas population via [`GlyphCache::push_pending_upload`].
+/// The upstream caller is responsible for checking the cache first
+/// and only calling this on a miss.
+fn insert_and_render_bitmap<B: GlyphAtlasBackend>(
     renderer: &mut B::Renderer,
     glyph: &GlyphBitmap,
     transform: Affine,
-    cache_key: &GlyphCacheKey,
+    cache_key: GlyphCacheKey,
     glyph_atlas: &mut B::Cache,
     image_cache: &mut ImageCache,
 ) -> CacheResult {
@@ -305,14 +310,14 @@ fn render_bitmap_via_cache<B: GlyphAtlasBackend>(
     // Bitmap glyphs already have pixel data — no draw commands to record,
     // so we discard the returned dst coordinates and recorder.
     let Some((_dst_x, _dst_y, atlas_slot, _)) =
-        glyph_atlas.insert(image_cache, cache_key.clone(), raster_metrics)
+        glyph_atlas.insert(image_cache, cache_key, raster_metrics)
     else {
         return CacheResult::AtlasFull;
     };
 
     // Both backends defer the actual pixel copy/upload; it completes before
     // the render pass that resolves image references.
-    B::queue_bitmap_upload_to_atlas(glyph, glyph_atlas, atlas_slot);
+    glyph_atlas.push_pending_upload(atlas_slot.image_id, Arc::clone(&glyph.pixmap), atlas_slot);
 
     let paint_transform = B::paint_transform(&atlas_slot);
     B::render_from_atlas(
@@ -327,14 +332,15 @@ fn render_bitmap_via_cache<B: GlyphAtlasBackend>(
     CacheResult::CachedAndRendered
 }
 
-/// Try to render a COLR glyph via the atlas cache.
+/// Insert a COLR glyph into the atlas and render it from there.
 ///
-/// On cache miss, allocates atlas space (the insert returns the per-page
-/// command recorder) and delegates rasterisation to the backend via
-/// [`GlyphAtlasBackend::render_colr_to_atlas`].
-fn render_colr_via_cache<B: GlyphAtlasBackend>(
+/// Allocates atlas space (the insert returns the per-page command recorder)
+/// and records rasterisation commands via [`render_colr_to_atlas`].
+/// The upstream caller is responsible for checking the cache first
+/// and only calling this on a miss.
+fn insert_and_render_colr<B: GlyphAtlasBackend>(
     renderer: &mut B::Renderer,
-    glyph: &ColrGlyph<'_>,
+    glyph: &GlyphColr<'_>,
     transform: Affine,
     cache_key: GlyphCacheKey,
     glyph_atlas: &mut B::Cache,
@@ -352,13 +358,14 @@ fn render_colr_via_cache<B: GlyphAtlasBackend>(
 
     let area = glyph.area;
 
+    let context_color = cache_key.context_color;
     let Some((dst_x, dst_y, atlas_slot, recorder)) =
-        glyph_atlas.insert(image_cache, cache_key.clone(), raster_metrics)
+        glyph_atlas.insert(image_cache, cache_key, raster_metrics)
     else {
         return CacheResult::AtlasFull;
     };
 
-    B::render_colr_to_atlas(glyph, cache_key.context_color, recorder, dst_x, dst_y);
+    render_colr_to_atlas(glyph, context_color, recorder, dst_x, dst_y);
 
     let paint_transform = B::paint_transform(&atlas_slot);
 

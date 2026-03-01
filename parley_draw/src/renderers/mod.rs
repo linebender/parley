@@ -14,3 +14,7 @@ pub mod vello_cpu;
 
 #[cfg(feature = "vello_hybrid")]
 pub mod vello_hybrid;
+
+#[doc(hidden)]
+#[cfg(debug_assertions)]
+pub mod debug;

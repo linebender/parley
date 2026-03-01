@@ -1,4 +1,4 @@
-// Copyright 2025 the Vello Authors and the Parley Authors
+// Copyright 2026 the Vello Authors and the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! Vello Hybrid (GPU) glyph rendering backend.
@@ -20,9 +20,10 @@ use crate::{GlyphCaches, HintCache, OutlineCache, kurbo, peniko};
 use crate::{
     Pixmap,
     colr::{ColrPainter, ColrRenderer},
-    glyph::{CachedGlyphType, ColrGlyph, GlyphBitmap, GlyphRenderer, PreparedGlyph},
+    glyph::{CachedGlyphType, GlyphBitmap, GlyphColr, GlyphRenderer, PreparedGlyph},
 };
 use alloc::sync::Arc;
+use alloc::vec::Drain;
 use alloc::vec::Vec;
 use kurbo::{Affine, BezPath, Rect};
 use peniko::color::palette::css::BLACK;
@@ -44,6 +45,7 @@ pub struct GpuGlyphAtlas {
 
 impl GpuGlyphAtlas {
     /// Creates a new hybrid glyph atlas cache with default eviction settings.
+    #[inline]
     pub fn new() -> Self {
         Self {
             inner: GlyphAtlas::new(),
@@ -51,6 +53,7 @@ impl GpuGlyphAtlas {
     }
 
     /// Creates a new hybrid glyph atlas cache with custom eviction settings.
+    #[inline]
     pub fn with_config(eviction_config: GlyphCacheConfig) -> Self {
         Self {
             inner: GlyphAtlas::with_config(eviction_config),
@@ -61,10 +64,12 @@ impl GpuGlyphAtlas {
 /// Thin delegation to the inner [`GlyphAtlas`]. No page-level pixel storage
 /// to manage here — the GPU owns atlas textures.
 impl GlyphCache for GpuGlyphAtlas {
+    #[inline(always)]
     fn get(&mut self, key: &GlyphCacheKey) -> Option<AtlasSlot> {
         self.inner.get(key)
     }
 
+    #[inline]
     fn insert(
         &mut self,
         image_cache: &mut ImageCache,
@@ -87,6 +92,7 @@ impl GlyphCache for GpuGlyphAtlas {
         Some((x, y, atlas_slot, recorder))
     }
 
+    #[inline]
     fn push_pending_upload(
         &mut self,
         image_id: ImageId,
@@ -96,48 +102,59 @@ impl GlyphCache for GpuGlyphAtlas {
         self.inner.push_pending_upload(image_id, pixmap, atlas_slot);
     }
 
-    fn take_pending_uploads(&mut self) -> Vec<PendingBitmapUpload> {
-        self.inner.take_pending_uploads()
+    #[inline]
+    fn drain_pending_uploads(&mut self) -> Drain<'_, PendingBitmapUpload> {
+        self.inner.drain_pending_uploads()
     }
 
-    fn take_pending_atlas_commands(&mut self) -> Vec<AtlasCommandRecorder> {
-        self.inner
-            .take_pending_atlas_commands()
-            .into_iter()
-            .flatten()
-            .collect()
+    #[inline]
+    fn replay_pending_atlas_commands(&mut self, f: impl FnMut(&mut AtlasCommandRecorder)) {
+        self.inner.replay_pending_atlas_commands(f);
     }
 
-    fn take_pending_clear_rects(&mut self) -> Vec<PendingClearRect> {
-        self.inner.take_pending_clear_rects()
+    #[inline]
+    fn drain_pending_clear_rects(&mut self) -> Drain<'_, PendingClearRect> {
+        self.inner.drain_pending_clear_rects()
     }
 
+    #[inline]
     fn maintain(&mut self, image_cache: &mut ImageCache) {
         self.inner.maintain(image_cache);
     }
 
+    #[inline]
     fn clear(&mut self) {
         self.inner.clear();
     }
 
+    #[inline]
     fn len(&self) -> usize {
         self.inner.len()
     }
 
+    #[inline]
     fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
+    #[inline]
     fn cache_hits(&self) -> u64 {
         self.inner.cache_hits()
     }
 
+    #[inline]
     fn cache_misses(&self) -> u64 {
         self.inner.cache_misses()
     }
 
+    #[inline]
     fn clear_stats(&mut self) {
         self.inner.clear_stats();
+    }
+
+    #[inline]
+    fn config(&self) -> &GlyphCacheConfig {
+        self.inner.config()
     }
 }
 
@@ -159,6 +176,7 @@ impl GpuGlyphCaches {
 /// Bridges Parley's [`GlyphRenderer`] trait to the shared
 /// [`vello_renderer`] cache orchestration for the hybrid backend.
 impl GlyphRenderer<GpuGlyphAtlas> for Scene {
+    #[inline]
     fn fill_glyph(
         &mut self,
         prepared_glyph: PreparedGlyph<'_>,
@@ -168,6 +186,7 @@ impl GlyphRenderer<GpuGlyphAtlas> for Scene {
         vello_renderer::fill_glyph::<HybridBackend>(self, prepared_glyph, glyph_atlas, image_cache);
     }
 
+    #[inline]
     fn stroke_glyph(
         &mut self,
         prepared_glyph: PreparedGlyph<'_>,
@@ -182,6 +201,7 @@ impl GlyphRenderer<GpuGlyphAtlas> for Scene {
         );
     }
 
+    #[inline]
     fn render_cached_glyph(
         &mut self,
         cached_slot: AtlasSlot,
@@ -216,10 +236,12 @@ impl GlyphRenderer<GpuGlyphAtlas> for Scene {
         }
     }
 
+    #[inline]
     fn fill_rect(&mut self, rect: Rect) {
         self.fill_rect(&rect);
     }
 
+    #[inline]
     fn get_context_color(&self) -> AlphaColor<Srgb> {
         // Non-solid paints (gradients, images) have no single color to
         // extract, so fall back to black — the CSS default for `currentColor`.
@@ -280,51 +302,17 @@ impl GlyphAtlasBackend for HybridBackend {
         Affine::translate((-padding, -padding))
     }
 
-    fn render_outline_to_atlas(
-        path: &Arc<BezPath>,
-        subpixel_offset: f32,
-        recorder: &mut AtlasCommandRecorder,
-        dst_x: u16,
-        dst_y: u16,
-        raster_metrics: RasterMetrics,
-    ) {
-        let outline_transform =
-            Affine::scale_non_uniform(1.0, -1.0).then_translate(kurbo::Vec2::new(
-                dst_x as f64 - raster_metrics.bearing_x as f64 + subpixel_offset as f64,
-                dst_y as f64 - raster_metrics.bearing_y as f64,
-            ));
-        recorder.set_transform(outline_transform);
-        recorder.set_paint(BLACK);
-        recorder.fill_path(path);
-    }
-
-    fn render_colr_to_atlas(
-        glyph: &ColrGlyph<'_>,
-        context_color: AlphaColor<Srgb>,
-        recorder: &mut AtlasCommandRecorder,
-        dst_x: u16,
-        dst_y: u16,
-    ) {
-        recorder.set_transform(Affine::translate((dst_x as f64, dst_y as f64)));
-
-        let mut colr_painter = ColrPainter::new(glyph, context_color, recorder);
-        colr_painter.paint();
-    }
-
-    fn queue_bitmap_upload_to_atlas(
-        glyph: &GlyphBitmap,
-        glyph_atlas: &mut GpuGlyphAtlas,
-        atlas_slot: AtlasSlot,
-    ) {
-        // Queue for GPU upload; the application drains pending uploads and calls
-        // Renderer::write_to_atlas before the main render pass.
-        glyph_atlas.push_pending_upload(atlas_slot.image_id, Arc::clone(&glyph.pixmap), atlas_slot);
-    }
-
-    fn render_outline_directly(renderer: &mut Scene, path: &BezPath, transform: Affine) {
+    fn fill_outline_directly(renderer: &mut Scene, path: &BezPath, transform: Affine) {
         let state = renderer.take_current_state();
         renderer.set_transform(transform);
         renderer.fill_path(path);
+        renderer.restore_state(state);
+    }
+
+    fn stroke_outline_directly(renderer: &mut Scene, path: &BezPath, transform: Affine) {
+        let state = renderer.take_current_state();
+        renderer.set_transform(transform);
+        renderer.stroke_path(path);
         renderer.restore_state(state);
     }
 
@@ -348,7 +336,7 @@ impl GlyphAtlasBackend for HybridBackend {
 
     fn render_colr_directly(
         renderer: &mut Scene,
-        glyph: &ColrGlyph<'_>,
+        glyph: &GlyphColr<'_>,
         transform: Affine,
         context_color: AlphaColor<Srgb>,
     ) {
@@ -367,6 +355,9 @@ impl GlyphAtlasBackend for HybridBackend {
 /// `fill_solid` and `fill_gradient` fill the entire surface because COLR
 /// compositing relies on clip layers to restrict the painted region.
 impl ColrRenderer for Scene {
+    // TODO: Use `push_clip_path` instead of `push_layer` to take advantage of
+    // Vello Hybrid fast paths. This requires tracking blend layers vs clip paths
+    // separately in `colr.rs`.
     fn push_clip_layer(&mut self, clip: BezPath) {
         self.push_layer(Some(&clip), None, None, None, None);
     }
@@ -407,38 +398,47 @@ impl ColrRenderer for Scene {
 /// Allows recorded [`AtlasCommand`](crate::atlas::commands::AtlasCommand)s
 /// to be replayed into a hybrid [`Scene`].
 impl AtlasReplayTarget for Scene {
+    #[inline]
     fn set_transform(&mut self, t: Affine) {
         Self::set_transform(self, t);
     }
 
+    #[inline]
     fn set_paint_solid(&mut self, color: AlphaColor<Srgb>) {
         self.set_paint(color);
     }
 
+    #[inline]
     fn set_paint_gradient(&mut self, gradient: Gradient) {
         self.set_paint(gradient);
     }
 
+    #[inline]
     fn set_paint_transform(&mut self, t: Affine) {
         Self::set_paint_transform(self, t);
     }
 
+    #[inline]
     fn fill_path(&mut self, path: &BezPath) {
         Self::fill_path(self, path);
     }
 
+    #[inline]
     fn fill_rect(&mut self, rect: &Rect) {
         Self::fill_rect(self, rect);
     }
 
+    #[inline]
     fn push_clip_layer(&mut self, clip: &BezPath) {
         self.push_layer(Some(clip), None, None, None, None);
     }
 
+    #[inline]
     fn push_blend_layer(&mut self, blend_mode: BlendMode) {
         self.push_layer(None, Some(blend_mode), None, None, None);
     }
 
+    #[inline]
     fn pop_layer(&mut self) {
         Self::pop_layer(self);
     }

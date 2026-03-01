@@ -12,10 +12,6 @@
 //! any GPU upload step.
 
 use super::vello_renderer;
-#[cfg(debug_assertions)]
-use crate::atlas::GlyphCacheStats;
-#[cfg(all(debug_assertions, feature = "png"))]
-use crate::atlas::cache::save_pixmap_to_png;
 use crate::atlas::{
     AtlasCommandRecorder, AtlasSlot, GlyphAtlas, GlyphCache, GlyphCacheConfig, GlyphCacheKey,
     ImageCache, PendingBitmapUpload, PendingClearRect, RasterMetrics,
@@ -26,11 +22,10 @@ use crate::{GlyphCaches, kurbo, peniko};
 use crate::{
     Pixmap,
     colr::{ColrPainter, ColrRenderer},
-    glyph::{CachedGlyphType, ColrGlyph, GlyphBitmap, GlyphRenderer, PreparedGlyph},
+    glyph::{CachedGlyphType, GlyphBitmap, GlyphColr, GlyphRenderer, PreparedGlyph},
 };
-#[cfg(all(debug_assertions, feature = "png"))]
-use alloc::format;
 use alloc::sync::Arc;
+use alloc::vec::Drain;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter};
 use kurbo::{Affine, BezPath, Rect};
@@ -47,10 +42,10 @@ use vello_cpu::{Image, ImageSource, PaintType, RenderContext, color::palette::cs
 /// so that glyphs can be rasterized directly into CPU-accessible memory.
 pub struct CpuGlyphAtlas {
     /// Shared cache data.
-    inner: GlyphAtlas,
+    pub(crate) inner: GlyphAtlas,
     /// One `Pixmap` per atlas page, grown on demand. Wrapped in `Arc` so
     /// callers can cheaply share a page with a render context.
-    pixmaps: Vec<Arc<Pixmap>>,
+    pub(crate) pixmaps: Vec<Arc<Pixmap>>,
     /// Width of each atlas page in pixels.
     page_width: u16,
     /// Height of each atlas page in pixels.
@@ -59,11 +54,13 @@ pub struct CpuGlyphAtlas {
 
 impl CpuGlyphAtlas {
     /// Creates a new atlas with the given page dimensions and default eviction settings.
+    #[inline]
     pub fn new(page_width: u16, page_height: u16) -> Self {
         Self::with_config(page_width, page_height, GlyphCacheConfig::default())
     }
 
     /// Creates a new atlas with custom page dimensions and eviction settings.
+    #[inline]
     pub fn with_config(
         page_width: u16,
         page_height: u16,
@@ -79,11 +76,13 @@ impl CpuGlyphAtlas {
 
     /// Returns a reference to the `Arc<Pixmap>` for `page_index`, allowing
     /// cheap `Arc::clone` when registering the page with a render context.
+    #[inline]
     pub fn page_pixmap(&self, page_index: usize) -> Option<&Arc<Pixmap>> {
         self.pixmaps.get(page_index)
     }
 
     /// Returns a mutable reference to the pixmap for `page_index`.
+    #[inline]
     pub fn page_pixmap_mut(&mut self, page_index: usize) -> Option<&mut Pixmap> {
         self.pixmaps.get_mut(page_index).and_then(Arc::get_mut)
     }
@@ -92,6 +91,19 @@ impl CpuGlyphAtlas {
     #[inline]
     pub fn page_count(&self) -> usize {
         self.pixmaps.len()
+    }
+
+    /// Replay pending atlas commands with access to the per-page pixmaps.
+    ///
+    /// The closure receives `(recorder, pixmaps)`, allowing the caller to
+    /// composite into the target page pixmap without a borrow conflict.
+    #[inline]
+    pub fn replay_pending_atlas_commands_with_pixmaps(
+        &mut self,
+        mut f: impl FnMut(&mut AtlasCommandRecorder, &mut Vec<Arc<Pixmap>>),
+    ) {
+        self.inner
+            .replay_pending_atlas_commands(|recorder| f(recorder, &mut self.pixmaps));
     }
 }
 
@@ -115,10 +127,12 @@ impl Debug for CpuGlyphAtlas {
 /// Delegates to the inner [`GlyphAtlas`], additionally growing the `pixmaps`
 /// vector when `insert` opens a new atlas page.
 impl GlyphCache for CpuGlyphAtlas {
+    #[inline(always)]
     fn get(&mut self, key: &GlyphCacheKey) -> Option<AtlasSlot> {
         self.inner.get(key)
     }
 
+    #[inline]
     fn insert(
         &mut self,
         image_cache: &mut ImageCache,
@@ -153,6 +167,7 @@ impl GlyphCache for CpuGlyphAtlas {
         Some((x, y, atlas_slot, recorder))
     }
 
+    #[inline]
     fn push_pending_upload(
         &mut self,
         image_id: ImageId,
@@ -162,99 +177,60 @@ impl GlyphCache for CpuGlyphAtlas {
         self.inner.push_pending_upload(image_id, pixmap, atlas_slot);
     }
 
-    fn take_pending_uploads(&mut self) -> Vec<PendingBitmapUpload> {
-        self.inner.take_pending_uploads()
+    #[inline]
+    fn drain_pending_uploads(&mut self) -> Drain<'_, PendingBitmapUpload> {
+        self.inner.drain_pending_uploads()
     }
 
-    fn take_pending_atlas_commands(&mut self) -> Vec<AtlasCommandRecorder> {
-        self.inner
-            .take_pending_atlas_commands()
-            .into_iter()
-            .flatten()
-            .collect()
+    #[inline]
+    fn replay_pending_atlas_commands(&mut self, f: impl FnMut(&mut AtlasCommandRecorder)) {
+        self.inner.replay_pending_atlas_commands(f);
     }
 
-    fn take_pending_clear_rects(&mut self) -> Vec<PendingClearRect> {
-        self.inner.take_pending_clear_rects()
+    #[inline]
+    fn drain_pending_clear_rects(&mut self) -> Drain<'_, PendingClearRect> {
+        self.inner.drain_pending_clear_rects()
     }
 
+    #[inline]
     fn maintain(&mut self, image_cache: &mut ImageCache) {
         self.inner.maintain(image_cache);
     }
 
+    #[inline]
     fn clear(&mut self) {
         self.inner.clear();
         self.pixmaps.clear();
     }
 
+    #[inline]
     fn len(&self) -> usize {
         self.inner.len()
     }
 
+    #[inline]
     fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
+    #[inline]
     fn cache_hits(&self) -> u64 {
         self.inner.cache_hits()
     }
 
+    #[inline]
     fn cache_misses(&self) -> u64 {
         self.inner.cache_misses()
     }
 
+    #[inline]
     fn clear_stats(&mut self) {
         self.inner.clear_stats();
     }
-}
 
-#[cfg(all(debug_assertions, feature = "png"))]
-impl CpuGlyphAtlas {
-    /// Save every atlas page as `{path_prefix}_atlas_page_{index}.png`.
-    pub fn save_atlas_pages_to(&self, path_prefix: &str) {
-        for (i, pixmap) in self.pixmaps.iter().enumerate() {
-            let path = format!("{path_prefix}_atlas_page_{i}.png");
-            let _ = save_pixmap_to_png(pixmap, std::path::Path::new(&path));
-        }
-    }
-}
-
-#[cfg(all(debug_assertions, feature = "png"))]
-impl CpuGlyphAtlas {
-    /// Save every atlas page under `examples/_output/vello_cpu_atlas_page_{index}.png`.
-    pub fn save_atlas_pages(&self) {
-        for (i, pixmap) in self.pixmaps.iter().enumerate() {
-            let mut path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-            path.pop(); // up from parley_draw to workspace root
-            path.push("examples");
-            path.push("_output");
-            let _ = std::fs::create_dir_all(&path);
-            path.push(format!("vello_cpu_atlas_page_{i}.png"));
-            let _ = save_pixmap_to_png(pixmap, &path);
-        }
-    }
-}
-
-#[cfg(debug_assertions)]
-impl CpuGlyphAtlas {
-    /// Get detailed statistics about cached glyphs.
-    pub fn stats(&self) -> GlyphCacheStats {
-        self.inner.stats(self.pixmaps.len())
-    }
-
-    /// Log detailed atlas statistics at info level.
-    pub fn log_atlas_stats(&self) {
-        self.inner.log_atlas_stats(self.pixmaps.len());
-    }
-
-    /// Returns all cached glyph keys (for debugging).
-    pub fn all_keys(&self) -> Vec<&GlyphCacheKey> {
-        self.inner.all_keys()
-    }
-
-    /// Log all cached keys grouped by glyph ID at info level.
-    pub fn log_keys_grouped(&self) {
-        self.inner.log_keys_grouped();
+    #[inline]
+    fn config(&self) -> &GlyphCacheConfig {
+        self.inner.config()
     }
 }
 
@@ -281,29 +257,12 @@ impl CpuGlyphCaches {
             glyph_atlas: CpuGlyphAtlas::with_config(page_width, page_height, eviction_config),
         }
     }
-
-    /// Save all atlas pages to PNG files for debugging.
-    ///
-    /// Files are saved to `examples/_output/vello_cpu_atlas_page_{index}.png`.
-    /// Only available in debug builds with the `png` feature.
-    #[cfg(all(debug_assertions, feature = "png"))]
-    pub fn save_atlas_pages(&self) {
-        self.glyph_atlas.save_atlas_pages();
-    }
-
-    /// Save all atlas pages to PNG files with a custom path prefix.
-    ///
-    /// Files are saved as `{path_prefix}_atlas_page_{index}.png`.
-    /// Only available with the `png` feature in debug builds.
-    #[cfg(all(debug_assertions, feature = "png"))]
-    pub fn save_atlas_pages_to(&self, path_prefix: &str) {
-        self.glyph_atlas.save_atlas_pages_to(path_prefix);
-    }
 }
 
 /// Bridges Parley's [`GlyphRenderer`] trait to the shared
 /// [`vello_renderer`] cache orchestration for the CPU backend.
 impl GlyphRenderer<CpuGlyphAtlas> for RenderContext {
+    #[inline]
     fn fill_glyph(
         &mut self,
         prepared_glyph: PreparedGlyph<'_>,
@@ -313,6 +272,7 @@ impl GlyphRenderer<CpuGlyphAtlas> for RenderContext {
         vello_renderer::fill_glyph::<CpuBackend>(self, prepared_glyph, glyph_atlas, image_cache);
     }
 
+    #[inline]
     fn stroke_glyph(
         &mut self,
         prepared_glyph: PreparedGlyph<'_>,
@@ -322,6 +282,7 @@ impl GlyphRenderer<CpuGlyphAtlas> for RenderContext {
         vello_renderer::stroke_glyph::<CpuBackend>(self, prepared_glyph, glyph_atlas, image_cache);
     }
 
+    #[inline]
     fn render_cached_glyph(
         &mut self,
         cached_slot: AtlasSlot,
@@ -356,10 +317,12 @@ impl GlyphRenderer<CpuGlyphAtlas> for RenderContext {
         }
     }
 
+    #[inline]
     fn fill_rect(&mut self, rect: Rect) {
         self.fill_rect(&rect);
     }
 
+    #[inline]
     fn get_context_color(&self) -> AlphaColor<Srgb> {
         // Non-solid paints (gradients, images) have no single color to
         // extract, so fall back to black — the CSS default for `currentColor`.
@@ -421,50 +384,17 @@ impl GlyphAtlasBackend for CpuBackend {
         Affine::translate((-(atlas_slot.x as f64), -(atlas_slot.y as f64)))
     }
 
-    fn render_outline_to_atlas(
-        path: &Arc<BezPath>,
-        subpixel_offset: f32,
-        recorder: &mut AtlasCommandRecorder,
-        dst_x: u16,
-        dst_y: u16,
-        raster_metrics: RasterMetrics,
-    ) {
-        let outline_transform =
-            Affine::scale_non_uniform(1.0, -1.0).then_translate(kurbo::Vec2::new(
-                dst_x as f64 - raster_metrics.bearing_x as f64 + subpixel_offset as f64,
-                dst_y as f64 - raster_metrics.bearing_y as f64,
-            ));
-        recorder.set_transform(outline_transform);
-        recorder.set_paint(BLACK);
-        recorder.fill_path(path);
-    }
-
-    fn render_colr_to_atlas(
-        glyph: &ColrGlyph<'_>,
-        context_color: AlphaColor<Srgb>,
-        recorder: &mut AtlasCommandRecorder,
-        dst_x: u16,
-        dst_y: u16,
-    ) {
-        recorder.set_transform(Affine::translate((dst_x as f64, dst_y as f64)));
-
-        let mut colr_painter = ColrPainter::new(glyph, context_color, recorder);
-        colr_painter.paint();
-    }
-
-    fn queue_bitmap_upload_to_atlas(
-        glyph: &GlyphBitmap,
-        glyph_atlas: &mut CpuGlyphAtlas,
-        atlas_slot: AtlasSlot,
-    ) {
-        // Deferred: the copy to atlas pixmap happens before render_to_pixmap().
-        glyph_atlas.push_pending_upload(atlas_slot.image_id, Arc::clone(&glyph.pixmap), atlas_slot);
-    }
-
-    fn render_outline_directly(renderer: &mut RenderContext, path: &BezPath, transform: Affine) {
+    fn fill_outline_directly(renderer: &mut RenderContext, path: &BezPath, transform: Affine) {
         let state = renderer.take_current_state();
         renderer.set_transform(transform);
         renderer.fill_path(path);
+        renderer.restore_state(state);
+    }
+
+    fn stroke_outline_directly(renderer: &mut RenderContext, path: &BezPath, transform: Affine) {
+        let state = renderer.take_current_state();
+        renderer.set_transform(transform);
+        renderer.stroke_path(path);
         renderer.restore_state(state);
     }
 
@@ -488,7 +418,7 @@ impl GlyphAtlasBackend for CpuBackend {
 
     fn render_colr_directly(
         renderer: &mut RenderContext,
-        glyph: &ColrGlyph<'_>,
+        glyph: &GlyphColr<'_>,
         transform: Affine,
         context_color: AlphaColor<Srgb>,
     ) {
@@ -544,38 +474,47 @@ impl ColrRenderer for RenderContext {
 /// Allows recorded [`AtlasCommand`](crate::atlas::commands::AtlasCommand)s
 /// to be replayed into a CPU [`RenderContext`].
 impl AtlasReplayTarget for RenderContext {
+    #[inline]
     fn set_transform(&mut self, t: Affine) {
         Self::set_transform(self, t);
     }
 
+    #[inline]
     fn set_paint_solid(&mut self, color: AlphaColor<Srgb>) {
         self.set_paint(color);
     }
 
+    #[inline]
     fn set_paint_gradient(&mut self, gradient: Gradient) {
         self.set_paint(gradient);
     }
 
+    #[inline]
     fn set_paint_transform(&mut self, t: Affine) {
         Self::set_paint_transform(self, t);
     }
 
+    #[inline]
     fn fill_path(&mut self, path: &BezPath) {
         Self::fill_path(self, path);
     }
 
+    #[inline]
     fn fill_rect(&mut self, rect: &Rect) {
         Self::fill_rect(self, rect);
     }
 
+    #[inline]
     fn push_clip_layer(&mut self, clip: &BezPath) {
         Self::push_clip_layer(self, clip);
     }
 
+    #[inline]
     fn push_blend_layer(&mut self, blend_mode: BlendMode) {
         Self::push_blend_layer(self, blend_mode);
     }
 
+    #[inline]
     fn pop_layer(&mut self) {
         Self::pop_layer(self);
     }

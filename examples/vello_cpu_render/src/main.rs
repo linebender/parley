@@ -5,6 +5,7 @@
 //! then paints those outlines using Vello CPU through Parley Draw.
 
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Instant;
 
 use parley::{GlyphRun, Layout, PositionedLayoutItem};
@@ -38,7 +39,7 @@ fn main() {
     let (mut renderer, mut glyph_renderer, mut glyph_caches, mut image_cache) =
         prepare_rendering(width, height);
     stats.end("prepare_rendering");
-    let output_path = output_dir(file!()).join("vello_cpu_render.png");
+    let output_path = output_dir(env!("CARGO_MANIFEST_DIR")).join("vello_cpu_render.png");
 
     for frame in &frame_sequence() {
         println!("\n=== {} ===", frame.label);
@@ -219,6 +220,7 @@ fn prepare_rendering(
         GlyphCacheConfig {
             max_entry_age: 2,
             eviction_frequency: 2,
+            max_cached_font_size: 128.0,
         },
     );
     (renderer, glyph_renderer, glyph_caches, image_cache)
@@ -269,21 +271,26 @@ fn render(
     glyph_renderer: &mut RenderContext,
 ) -> Pixmap {
     // Replay outline/COLR draw commands into each atlas page's pixmap.
-    for mut recorder in glyph_caches.glyph_atlas.take_pending_atlas_commands() {
-        glyph_renderer.reset();
-        replay_atlas_commands(&mut recorder.commands, glyph_renderer);
-        glyph_renderer.flush();
-        if let Some(atlas_pixmap) = glyph_caches
-            .glyph_atlas
-            .page_pixmap_mut(recorder.page_index as usize)
-        {
-            glyph_renderer.composite_to_pixmap_at_offset(atlas_pixmap, 0, 0);
-        }
-    }
+    glyph_caches
+        .glyph_atlas
+        .replay_pending_atlas_commands_with_pixmaps(|recorder, pixmaps| {
+            glyph_renderer.reset();
+            replay_atlas_commands(&mut recorder.commands, glyph_renderer);
+            glyph_renderer.flush();
+            if let Some(atlas_pixmap) = pixmaps
+                .get_mut(recorder.page_index as usize)
+                .and_then(Arc::get_mut)
+            {
+                glyph_renderer.composite_to_pixmap_at_offset(atlas_pixmap, 0, 0);
+            }
+        });
 
     // Bitmap uploads must happen before register_image(): after registration the
     // Arc is shared and page_pixmap_mut() returns None.
-    for upload in glyph_caches.glyph_atlas.take_pending_uploads() {
+    // TODO: the drain().collect() calls below are needed because the loop bodies
+    // re-borrow the atlas via page_pixmap_mut(). Consider using a different approach.
+    let uploads: Vec<_> = glyph_caches.glyph_atlas.drain_pending_uploads().collect();
+    for upload in uploads {
         let page_index = upload.atlas_slot.page_index as usize;
 
         let Some(atlas_pixmap) = glyph_caches.glyph_atlas.page_pixmap_mut(page_index) else {
@@ -315,7 +322,11 @@ fn render(
 
     // Clear padded regions for all evicted glyphs so that stale pixel data
     // doesn't bleed through when the slot is reused on a subsequent frame.
-    for rect in glyph_caches.glyph_atlas.take_pending_clear_rects() {
+    let clear_rects: Vec<_> = glyph_caches
+        .glyph_atlas
+        .drain_pending_clear_rects()
+        .collect();
+    for rect in clear_rects {
         if let Some(atlas_pixmap) = glyph_caches
             .glyph_atlas
             .page_pixmap_mut(rect.page_index as usize)

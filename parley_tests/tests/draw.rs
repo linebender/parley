@@ -8,6 +8,7 @@
 
 use crate::test_name;
 use crate::util::TestEnv;
+use parley::style::FontFamily;
 use parley::{Alignment, AlignmentOptions, Layout, StyleProperty};
 use peniko::kurbo::Affine;
 
@@ -109,6 +110,46 @@ fn draw_underline_descenders() {
     test_with_configs(&mut env, |env| {
         let mut builder = env.ranged_builder(text);
         builder.push_default(StyleProperty::Underline(true));
+        builder.push_default(StyleProperty::FontSize(24.0));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout
+    });
+}
+
+/// Test bitmap (CBTF) emoji rendering across different hinting, per-glyph transform, and scale configurations.
+#[test]
+fn draw_bitmap_emoji() {
+    let mut env = TestEnv::new(test_name!(), None);
+    env.set_tolerance(5.0);
+    let text = "\u{2705}\u{1f440}\u{1f389}\u{1f920}";
+
+    test_with_configs(&mut env, |env| {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::FontFamily(FontFamily::named(
+            "Noto Color Emoji CBTF",
+        )));
+        builder.push_default(StyleProperty::FontSize(24.0));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout
+    });
+}
+
+/// Test COLR emoji rendering across different hinting, per-glyph transform, and scale configurations.
+#[test]
+fn draw_colr_emoji() {
+    let mut env = TestEnv::new(test_name!(), None);
+    env.set_tolerance(5.0);
+    let text = "\u{2705}\u{1f440}\u{1f389}\u{1f920}";
+
+    test_with_configs(&mut env, |env| {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::FontFamily(FontFamily::named(
+            "Noto Color Emoji",
+        )));
         builder.push_default(StyleProperty::FontSize(24.0));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
