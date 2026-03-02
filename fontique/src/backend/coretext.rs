@@ -8,6 +8,7 @@ use super::{
 use alloc::format;
 use alloc::string::ToString;
 use alloc::sync::Arc;
+use alloc::vec::Vec;
 use core::ptr::{null, null_mut};
 use hashbrown::{HashMap, HashSet};
 use objc2_core_foundation::{
@@ -19,7 +20,7 @@ use objc2_core_text::{
 use objc2_foundation::{
     NSSearchPathDirectory, NSSearchPathDomainMask, NSSearchPathForDirectoriesInDomains,
 };
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const DEFAULT_GENERIC_FAMILIES: &[(GenericFamily, &[&str])] = &[
     (GenericFamily::Serif, &["Times", "Times New Roman"]),
@@ -114,24 +115,44 @@ fn scan_system_fonts() -> Option<scan::ScannedCollection> {
 
     // Apple hides certain fonts from CTFontCollection (notably SFNS.ttf, the San Francisco
     // system UI font). Scanning Library/Fonts directories catches what CoreText omits.
-    paths.extend(library_font_dirs());
+    paths.extend(library_font_files());
 
     if paths.is_empty() {
         return None;
     }
 
-    Some(scan::ScannedCollection::from_paths(paths.iter(), 8))
+    Some(scan::ScannedCollection::from_paths(paths.iter(), 0))
 }
 
-fn library_font_dirs() -> impl Iterator<Item = PathBuf> {
-    NSSearchPathForDirectoriesInDomains(
+fn library_font_files() -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    for dir in NSSearchPathForDirectoriesInDomains(
         NSSearchPathDirectory::LibraryDirectory,
         NSSearchPathDomainMask::AllDomainsMask,
         true,
-    )
-    .into_iter()
-    .map(|p| PathBuf::from(format!("{p}/Fonts")))
-    .filter(|p| p.is_dir())
+    ) {
+        let font_dir = PathBuf::from(format!("{dir}/Fonts"));
+        if font_dir.is_dir() {
+            collect_files(&font_dir, 8, 0, &mut files);
+        }
+    }
+    files
+}
+
+fn collect_files(dir: &Path, max_depth: u32, depth: u32, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.filter_map(|e| e.ok()) {
+        let path = entry.path();
+        if path.is_dir() {
+            if depth < max_depth {
+                collect_files(&path, max_depth, depth + 1, out);
+            }
+        } else {
+            out.push(path);
+        }
+    }
 }
 
 fn create_base_font(prefer_ui_font: bool) -> CFRetained<CTFont> {
