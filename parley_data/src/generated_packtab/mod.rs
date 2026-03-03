@@ -3,7 +3,7 @@
 
 //! Backing data for composite properties (PackTab, compression=5, unsafe=false)
 
-#![allow(unsafe_code, trivial_numeric_casts, missing_docs)]
+#![allow(unsafe_code, trivial_numeric_casts, missing_docs, clippy::allow_attributes_without_reason, clippy::unseparated_literal_suffix, clippy::double_parens, clippy::unnecessary_cast, reason = "packtab generated code")]
 
 #[allow(dead_code, non_upper_case_globals)]
 static composite_packtab_u8: [u8; 2176] =

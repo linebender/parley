@@ -8,7 +8,7 @@
 
 use icu_properties::props::{BidiClass, GeneralCategory, GraphemeClusterBreak, Script};
 
-/// Baked data (CodePointTrie via databake).
+/// Baked data (`CodePointTrie` via databake).
 #[cfg(feature = "baked")]
 pub mod generated;
 

@@ -121,7 +121,7 @@ pub fn generate_packtab(out: std::path::PathBuf, config: &PacktabConfig) {
     writeln!(&mut file).unwrap();
     writeln!(
         &mut file,
-        "#![allow(unsafe_code, trivial_numeric_casts, missing_docs)]"
+        "#![allow(unsafe_code, trivial_numeric_casts, missing_docs, clippy::allow_attributes_without_reason, clippy::unseparated_literal_suffix, clippy::double_parens, clippy::unnecessary_cast, reason = \"packtab generated code\")]"
     )
     .unwrap();
     writeln!(&mut file).unwrap();
