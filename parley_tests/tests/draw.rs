@@ -8,6 +8,7 @@
 
 use crate::test_name;
 use crate::util::TestEnv;
+use parley::style::FontFamily;
 use parley::{Alignment, AlignmentOptions, Layout, StyleProperty};
 use peniko::kurbo::Affine;
 
@@ -109,6 +110,61 @@ fn draw_underline_descenders() {
     test_with_configs(&mut env, |env| {
         let mut builder = env.ranged_builder(text);
         builder.push_default(StyleProperty::Underline(true));
+        builder.push_default(StyleProperty::FontSize(24.0));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout
+    });
+}
+
+/// Test bitmap (CBTF) emoji rendering across different hinting, per-glyph transform, and scale configurations.
+///
+/// Disabled: snapshots were generated on macOS (ARM/NEON) but fail on
+/// x86-64 (Ubuntu).
+///
+/// Proven:
+/// - PNG roundtrip (`into_png` → `from_png`) is lossless — 0 differing
+///   pixels when round-tripping the current render.
+///
+/// Hypothesis (not yet proven at the SIMD level):
+/// - The vello CPU renderer's bicubic image filter (`FilteredImagePainter<2>`)
+///   produces different edge-pixel values on ARM/NEON vs x86-64 (AVX2/SSE4.2)
+///   due to floating-point differences in the SIMD paths.
+///
+/// Snapshots need to be regenerated per platform.
+#[test]
+#[ignore]
+fn draw_bitmap_emoji() {
+    let mut env = TestEnv::new(test_name!(), None);
+    env.set_tolerance(5.0);
+    let text = "\u{2705}\u{1f440}\u{1f389}\u{1f920}";
+
+    test_with_configs(&mut env, |env| {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::FontFamily(FontFamily::named(
+            "Noto Color Emoji CBTF",
+        )));
+        builder.push_default(StyleProperty::FontSize(24.0));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout
+    });
+}
+
+/// Test COLR emoji rendering across different hinting, per-glyph transform, and scale configurations.
+#[test]
+fn draw_colr_emoji() {
+    let mut env = TestEnv::new(test_name!(), None);
+    env.set_tolerance(5.0);
+    let text = "\u{2705}\u{1f440}\u{1f389}\u{1f920}";
+
+    test_with_configs(&mut env, |env| {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::FontFamily(FontFamily::named(
+            "Noto Color Emoji",
+        )));
         builder.push_default(StyleProperty::FontSize(24.0));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);

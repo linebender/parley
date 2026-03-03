@@ -17,7 +17,7 @@ path = "tests/mod.rs"
 [dependencies]
 parley = { workspace = true, features = ["std"] }
 parley_dev = { workspace = true }
-parley_draw = { workspace = true, features = ["std", "vello_cpu"] }
+parley_draw = { workspace = true, features = ["std", "vello_cpu", "png"] }
 peniko = { workspace = true, features = ["std"] }
 vello_cpu = { workspace = true, features = ["std", "png"] }
 fontique = { workspace = true, features = ["std"] }

@@ -9,7 +9,7 @@ use crate::{ColorBrush, FONT_FAMILY_LIST, with_contexts};
 use parley::{
     Alignment, AlignmentOptions, FontFamily, Layout, PositionedLayoutItem, StyleProperty,
 };
-use parley_draw::{Glyph, GlyphCaches, GlyphRunBuilder};
+use parley_draw::{AtlasConfig, CpuGlyphCaches, Glyph, GlyphRunBuilder, ImageCache};
 use std::hint::black_box;
 use tango_bench::{Benchmark, benchmark_fn};
 use vello_cpu::{RenderContext, kurbo};
@@ -70,7 +70,8 @@ fn build_layout(text: &str, underline: bool) -> Layout<ColorBrush> {
 fn render_layout(
     layout: &Layout<ColorBrush>,
     renderer: &mut RenderContext,
-    glyph_caches: &mut GlyphCaches,
+    glyph_caches: &mut CpuGlyphCaches,
+    image_cache: &mut ImageCache,
     with_underline: bool,
 ) {
     for line in layout.lines() {
@@ -89,6 +90,7 @@ fn render_layout(
                                 y: glyph.y,
                             }),
                             glyph_caches,
+                            image_cache,
                         );
 
                     if with_underline {
@@ -159,8 +161,15 @@ pub fn draw_no_underline_cold_cache() -> Vec<Benchmark> {
         b.iter(move || {
             let layout = layout.clone();
             let mut renderer = create_renderer(&layout);
-            let mut glyph_caches = GlyphCaches::new();
-            render_layout(&layout, &mut renderer, &mut glyph_caches, false);
+            let mut glyph_caches = CpuGlyphCaches::default();
+            let mut image_cache = ImageCache::new_with_config(AtlasConfig::default());
+            render_layout(
+                &layout,
+                &mut renderer,
+                &mut glyph_caches,
+                &mut image_cache,
+                false,
+            );
             black_box(&renderer);
         })
     })]
@@ -170,12 +179,19 @@ pub fn draw_no_underline_cold_cache() -> Vec<Benchmark> {
 pub fn draw_no_underline_warm_cache() -> Vec<Benchmark> {
     vec![benchmark_fn("Draw - No underline (warm cache)", |b| {
         let layout = build_layout(SAMPLE_TEXT, false);
-        let mut glyph_caches = GlyphCaches::new();
+        let mut glyph_caches = CpuGlyphCaches::default();
+        let mut image_cache = ImageCache::new_with_config(AtlasConfig::default());
 
         b.iter(move || {
             let mut renderer = create_renderer(&layout);
-            render_layout(&layout, &mut renderer, &mut glyph_caches, false);
-            glyph_caches.maintain();
+            render_layout(
+                &layout,
+                &mut renderer,
+                &mut glyph_caches,
+                &mut image_cache,
+                false,
+            );
+            glyph_caches.maintain(&mut image_cache);
             black_box(&renderer);
         })
     })]
@@ -189,8 +205,15 @@ pub fn draw_with_underline_cold_cache() -> Vec<Benchmark> {
         b.iter(move || {
             let layout = layout.clone();
             let mut renderer = create_renderer(&layout);
-            let mut glyph_caches = GlyphCaches::new();
-            render_layout(&layout, &mut renderer, &mut glyph_caches, true);
+            let mut glyph_caches = CpuGlyphCaches::default();
+            let mut image_cache = ImageCache::new_with_config(AtlasConfig::default());
+            render_layout(
+                &layout,
+                &mut renderer,
+                &mut glyph_caches,
+                &mut image_cache,
+                true,
+            );
             black_box(&renderer);
         })
     })]
@@ -200,12 +223,19 @@ pub fn draw_with_underline_cold_cache() -> Vec<Benchmark> {
 pub fn draw_with_underline_warm_cache() -> Vec<Benchmark> {
     vec![benchmark_fn("Draw - With underline (warm cache)", |b| {
         let layout = build_layout(SAMPLE_TEXT, true);
-        let mut glyph_caches = GlyphCaches::new();
+        let mut glyph_caches = CpuGlyphCaches::default();
+        let mut image_cache = ImageCache::new_with_config(AtlasConfig::default());
 
         b.iter(move || {
             let mut renderer = create_renderer(&layout);
-            render_layout(&layout, &mut renderer, &mut glyph_caches, true);
-            glyph_caches.maintain();
+            render_layout(
+                &layout,
+                &mut renderer,
+                &mut glyph_caches,
+                &mut image_cache,
+                true,
+            );
+            glyph_caches.maintain(&mut image_cache);
             black_box(&renderer);
         })
     })]
