@@ -9,7 +9,6 @@ use super::key::SUBPIXEL_BUCKETS;
 use super::region::{AtlasSlot, RasterMetrics};
 use crate::Pixmap;
 use alloc::sync::Arc;
-use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter};
 use foldhash::fast::FixedState;
@@ -104,7 +103,7 @@ pub trait GlyphCache {
     );
 
     /// Drain all pending bitmap uploads, keeping the allocation for reuse.
-    fn drain_pending_uploads(&mut self) -> vec::Drain<'_, PendingBitmapUpload>;
+    fn drain_pending_uploads(&mut self) -> impl Iterator<Item = PendingBitmapUpload> + '_;
 
     /// Replay all pending atlas command recorders (one per dirty page).
     ///
@@ -118,7 +117,7 @@ pub trait GlyphCache {
     /// Each rect describes an atlas region that was freed during
     /// [`maintain`](GlyphCache::maintain) and must be zeroed to transparent.
     /// Drain these **after** calling `maintain`.
-    fn drain_pending_clear_rects(&mut self) -> vec::Drain<'_, PendingClearRect>;
+    fn drain_pending_clear_rects(&mut self) -> impl Iterator<Item = PendingClearRect> + '_;
 
     /// Advance the frame counter and potentially evict old entries.
     fn maintain(&mut self, image_cache: &mut ImageCache);
@@ -338,12 +337,12 @@ impl GlyphAtlas {
     }
 
     /// Drain all pending bitmap uploads, keeping the allocation for reuse.
-    pub fn drain_pending_uploads(&mut self) -> vec::Drain<'_, PendingBitmapUpload> {
+    pub fn drain_pending_uploads(&mut self) -> impl Iterator<Item = PendingBitmapUpload> + '_ {
         self.pending_uploads.drain(..)
     }
 
     /// Drain all pending clear rects, keeping the allocation for reuse.
-    pub fn drain_pending_clear_rects(&mut self) -> vec::Drain<'_, PendingClearRect> {
+    pub fn drain_pending_clear_rects(&mut self) -> impl Iterator<Item = PendingClearRect> + '_ {
         self.pending_clear_rects.drain(..)
     }
 

@@ -25,7 +25,6 @@ use crate::{
     glyph::{CachedGlyphType, GlyphBitmap, GlyphColr, GlyphRenderer, PreparedGlyph},
 };
 use alloc::sync::Arc;
-use alloc::vec::Drain;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter};
 use kurbo::{Affine, BezPath, Rect};
@@ -178,7 +177,7 @@ impl GlyphCache for CpuGlyphAtlas {
     }
 
     #[inline]
-    fn drain_pending_uploads(&mut self) -> Drain<'_, PendingBitmapUpload> {
+    fn drain_pending_uploads(&mut self) -> impl Iterator<Item = PendingBitmapUpload> + '_ {
         self.inner.drain_pending_uploads()
     }
 
@@ -188,7 +187,7 @@ impl GlyphCache for CpuGlyphAtlas {
     }
 
     #[inline]
-    fn drain_pending_clear_rects(&mut self) -> Drain<'_, PendingClearRect> {
+    fn drain_pending_clear_rects(&mut self) -> impl Iterator<Item = PendingClearRect> + '_ {
         self.inner.drain_pending_clear_rects()
     }
 
