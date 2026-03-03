@@ -50,7 +50,7 @@ impl Properties {
         Self(generated::COMPOSITE.get(ch))
     }
 
-    #[cfg(all(feature = "baked", feature = "packtab"))]
+    #[cfg(feature = "packtab")]
     #[inline(always)]
     /// Returns the properties for a given character.
     pub fn get(ch: char) -> Self {

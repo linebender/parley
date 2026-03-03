@@ -44,7 +44,7 @@ fn build_composite_values() -> Vec<u32> {
     values
 }
 
-/// Exports ICU data as a CodePointTrie (databake) into the `out` directory.
+/// Exports ICU data as a `CodePointTrie` (databake) into the `out` directory.
 pub fn generate(out: std::path::PathBuf) {
     let values = build_composite_values();
 
@@ -76,7 +76,7 @@ pub fn generate(out: std::path::PathBuf) {
     .unwrap();
 }
 
-/// PackTab generation configuration.
+/// `PackTab` generation configuration.
 #[derive(Debug)]
 pub struct PacktabConfig {
     /// Compression level (1.0 = balanced, 5.0 = smaller, 9.0 = smallest).
@@ -85,7 +85,7 @@ pub struct PacktabConfig {
     pub unsafe_access: bool,
 }
 
-/// Exports ICU data as PackTab lookup tables + generated Rust code into the `out` directory.
+/// Exports ICU data as `PackTab` lookup tables + generated Rust code into the `out` directory.
 pub fn generate_packtab(out: std::path::PathBuf, config: &PacktabConfig) {
     let values = build_composite_values();
     let scalar_data: Vec<i64> = values.iter().map(|&v| v as i64).collect();
