@@ -173,7 +173,7 @@ impl From<Properties> for u32 {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, any(feature = "baked", feature = "packtab")))]
 mod tests {
     use super::Properties;
     use icu_properties::props::{

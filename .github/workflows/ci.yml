@@ -401,6 +401,9 @@ jobs:
       - name: regenerate unicode data (PackTab)
         run: cargo run --locked -p parley_data_gen -- ./parley_data/src/generated_packtab --packtab --compression=5
 
+      - name: format generated code
+        run: cargo fmt -p parley_data
+
       - name: check for differences
         run: git diff --exit-code
 
