@@ -395,8 +395,11 @@ jobs:
         with:
           save-if: ${{ github.event_name != 'merge_group' }}
 
-      - name: regenerate unicode data
+      - name: regenerate unicode data (CodePointTrie)
         run: cargo run --locked -p parley_data_gen -- ./parley_data/src/generated
+
+      - name: regenerate unicode data (PackTab)
+        run: cargo run --locked -p parley_data_gen -- ./parley_data/src/generated_packtab --packtab --compression=5
 
       - name: check for differences
         run: git diff --exit-code

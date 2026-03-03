@@ -8,9 +8,14 @@
 
 use icu_properties::props::{BidiClass, GeneralCategory, GraphemeClusterBreak, Script};
 
-/// Baked data.
+/// Baked data (CodePointTrie via databake).
 #[cfg(feature = "baked")]
 pub mod generated;
+
+/// Baked data (PackTab multi-level tables).
+#[cfg(feature = "packtab")]
+#[path = "generated_packtab/mod.rs"]
+pub mod generated_packtab;
 
 /// Unicode character properties relevant for text analysis.
 #[derive(Copy, Clone, Debug)]
@@ -38,11 +43,18 @@ impl Properties {
     const IS_MANDATORY_LINE_BREAK_SHIFT: u32 =
         Self::IS_REGION_INDICATOR_SHIFT + Self::IS_REGION_INDICATOR_BITS;
 
-    #[cfg(feature = "baked")]
+    #[cfg(all(feature = "baked", not(feature = "packtab")))]
     #[inline(always)]
     /// Returns the properties for a given character.
     pub fn get(ch: char) -> Self {
         Self(generated::COMPOSITE.get(ch))
+    }
+
+    #[cfg(all(feature = "baked", feature = "packtab"))]
+    #[inline(always)]
+    /// Returns the properties for a given character.
+    pub fn get(ch: char) -> Self {
+        Self(generated_packtab::composite_get(ch as u32))
     }
 
     /// Creates a new [`Properties`] from the given properties
@@ -158,5 +170,52 @@ impl Properties {
 impl From<Properties> for u32 {
     fn from(value: Properties) -> Self {
         value.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Properties;
+    use icu_properties::props::{
+        BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak,
+        RegionalIndicator, Script, VariationSelector,
+    };
+    use icu_properties::{CodePointMapData, CodePointSetData};
+
+    fn expected_properties(cp: u32) -> Properties {
+        Properties::new(
+            CodePointMapData::<Script>::new().get32(cp),
+            CodePointMapData::<GeneralCategory>::new().get32(cp),
+            CodePointMapData::<GraphemeClusterBreak>::new().get32(cp),
+            CodePointMapData::<BidiClass>::new().get32(cp),
+            CodePointSetData::new::<Emoji>().contains32(cp)
+                || CodePointSetData::new::<ExtendedPictographic>().contains32(cp),
+            CodePointSetData::new::<VariationSelector>().contains32(cp),
+            CodePointSetData::new::<RegionalIndicator>().contains32(cp),
+            matches!(
+                CodePointMapData::<LineBreak>::new().get32(cp),
+                LineBreak::MandatoryBreak
+                    | LineBreak::CarriageReturn
+                    | LineBreak::LineFeed
+                    | LineBreak::NextLine
+            ),
+        )
+    }
+
+    #[test]
+    fn properties_match_icu4x() {
+        // Asserts that every character's properties match ICU4X's canonical data (whether for CodePointTrie or PackTab data).
+        for cp in 0_u32..=0x10FFFF {
+            let Some(ch) = char::from_u32(cp) else {
+                continue;
+            };
+            let actual = Properties::get(ch);
+            let expected = expected_properties(cp);
+            assert_eq!(
+                u32::from(actual),
+                u32::from(expected),
+                "mismatch at U+{cp:04X}: actual={actual:?}, expected={expected:?}"
+            );
+        }
     }
 }

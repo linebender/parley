@@ -2808,6 +2808,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "packtab"
+version = "1.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10827714fc634bed0c27bcb542e90e751ac071bc2d78af5d68945b38339cc4aa"
+
+[[package]]
 name = "parking"
 version = "2.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2891,6 +2897,7 @@ dependencies = [
  "icu_codepointtrie_builder",
  "icu_collections",
  "icu_properties",
+ "packtab",
  "parley_data",
 ]
 

@@ -11,11 +11,15 @@ publish = false
 [features]
 default = ["baked"]
 baked = ["dep:icu_collections", "dep:zerovec"]
+packtab = []
 
 [dependencies]
 icu_properties = { workspace = true }
 icu_collections = { workspace = true, optional = true }
 zerovec = { workspace = true, optional = true }
+
+[dev-dependencies]
+icu_properties = { workspace = true, features = ["compiled_data"] }
 
 [lints]
 workspace = true
