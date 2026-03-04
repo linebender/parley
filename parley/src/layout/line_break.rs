@@ -202,21 +202,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 max_advance
             };
 
-        let should_indent = {
-            let is_scope_line = if self.layout.data.indent_options.each_line {
-                self.lines.lines.is_empty()
-                    || self.lines.lines.last().map(|l| l.break_reason)
-                        == Some(BreakReason::Explicit)
-            } else {
-                self.lines.lines.is_empty()
-            };
-            is_scope_line ^ self.layout.data.indent_options.hanging
-        };
-        let line_indent = if should_indent {
-            self.layout.data.indent_amount
-        } else {
-            0.0
-        };
+        let line_indent = self.resolve_indent();
+
         let max_advance = max_advance - line_indent;
 
         // This macro simply calls the `commit_line` with the provided arguments and some parts of self.
@@ -475,6 +462,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
         self.prev_state = Some(self.state.clone());
 
+        let line_indent = self.resolve_indent();
+
         // Track cluster count for this line
         let mut char_count: u32 = 0;
 
@@ -487,6 +476,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     &mut self.state.line,
                     f32::MAX, // No advance limit
                     $break_reason,
+                    line_indent,
                 )
             };
         }
@@ -659,6 +649,25 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 line.text_range = 0..0;
                 line.cluster_range = 0..0;
             }
+        }
+    }
+
+    fn resolve_indent(&mut self) -> f32 {
+        let should_indent = {
+            let is_scope_line = if self.layout.data.indent_options.each_line {
+                self.lines.lines.is_empty()
+                    || self.lines.lines.last().map(|l| l.break_reason)
+                    == Some(BreakReason::Explicit)
+            } else {
+                self.lines.lines.is_empty()
+            };
+            is_scope_line ^ self.layout.data.indent_options.hanging
+        };
+
+        if should_indent {
+            self.layout.data.indent_amount
+        } else {
+            0.0
         }
     }
 

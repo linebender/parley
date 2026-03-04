@@ -4099,7 +4099,7 @@ dependencies = [
 [[package]]
 name = "vello_api"
 version = "0.7.0"
-source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
+source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
 dependencies = [
  "bytemuck",
  "peniko",
@@ -4108,10 +4108,11 @@ dependencies = [
 [[package]]
 name = "vello_common"
 version = "0.0.6"
-source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
+source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
 dependencies = [
  "bytemuck",
  "fearless_simd",
+ "guillotiere",
  "hashbrown 0.16.1",
  "libm",
  "log",
@@ -4125,7 +4126,7 @@ dependencies = [
 [[package]]
 name = "vello_cpu"
 version = "0.0.6"
-source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
+source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
 dependencies = [
  "bytemuck",
  "hashbrown 0.16.1",
@@ -4179,9 +4180,10 @@ dependencies = [
 [[package]]
 name = "vello_hybrid"
 version = "0.0.6"
-source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
+source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
 dependencies = [
  "bytemuck",
+ "guillotiere",
  "hashbrown 0.16.1",
  "log",
  "thiserror 2.0.17",
@@ -4224,7 +4226,7 @@ dependencies = [
 [[package]]
 name = "vello_sparse_shaders"
 version = "0.0.6"
-source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
+source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
 
 [[package]]
 name = "version_check"
@@ -5656,3 +5658,18 @@ dependencies = [
  "syn",
  "winnow",
 ]
+
+[[patch.unused]]
+name = "vello_common"
+version = "0.0.6"
+source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
+
+[[patch.unused]]
+name = "vello_cpu"
+version = "0.0.6"
+source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
+
+[[patch.unused]]
+name = "vello_hybrid"
+version = "0.0.6"
+source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
