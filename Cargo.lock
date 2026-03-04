@@ -1149,11 +1149,10 @@ dependencies = [
 
 [[package]]
 name = "fearless_simd"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fb2907d1f08b2b316b9223ced5b0e89d87028ba8deae9764741dba8ff7f3903"
+checksum = "76258897e51fd156ee03b6246ea53f3e0eb395d0b327e9961c4fc4c8b2fa151a"
 dependencies = [
- "bytemuck",
  "libm",
 ]
 
@@ -4087,7 +4086,7 @@ dependencies = [
 [[package]]
 name = "vello_api"
 version = "0.7.0"
-source = "git+https://github.com/taj-p/vello.git?rev=d9b47b2ab2b3f19443f6f98dd19b06d09bb5a0a3#d9b47b2ab2b3f19443f6f98dd19b06d09bb5a0a3"
+source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
 dependencies = [
  "bytemuck",
  "peniko",
@@ -4096,10 +4095,11 @@ dependencies = [
 [[package]]
 name = "vello_common"
 version = "0.0.6"
-source = "git+https://github.com/taj-p/vello.git?rev=d9b47b2ab2b3f19443f6f98dd19b06d09bb5a0a3#d9b47b2ab2b3f19443f6f98dd19b06d09bb5a0a3"
+source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
 dependencies = [
  "bytemuck",
  "fearless_simd",
+ "guillotiere",
  "hashbrown 0.16.1",
  "libm",
  "log",
@@ -4107,12 +4107,13 @@ dependencies = [
  "png 0.17.16",
  "skrifa 0.40.0",
  "smallvec",
+ "thiserror 2.0.17",
 ]
 
 [[package]]
 name = "vello_cpu"
 version = "0.0.6"
-source = "git+https://github.com/taj-p/vello.git?rev=d9b47b2ab2b3f19443f6f98dd19b06d09bb5a0a3#d9b47b2ab2b3f19443f6f98dd19b06d09bb5a0a3"
+source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
 dependencies = [
  "bytemuck",
  "hashbrown 0.16.1",
