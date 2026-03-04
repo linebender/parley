@@ -2903,11 +2903,24 @@ name = "parley_draw"
 version = "0.0.0"
 dependencies = [
  "bytemuck",
+ "core_maths",
+ "foldhash 0.2.0",
  "hashbrown 0.16.1",
+ "log",
+ "png 0.17.16",
  "skrifa 0.40.0",
  "smallvec",
  "vello_common",
  "vello_cpu",
+ "vello_hybrid",
+]
+
+[[package]]
+name = "parley_examples_common"
+version = "0.1.0"
+dependencies = [
+ "parley",
+ "peniko",
 ]
 
 [[package]]
@@ -4086,7 +4099,7 @@ dependencies = [
 [[package]]
 name = "vello_api"
 version = "0.7.0"
-source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
+source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
 dependencies = [
  "bytemuck",
  "peniko",
@@ -4095,11 +4108,10 @@ dependencies = [
 [[package]]
 name = "vello_common"
 version = "0.0.6"
-source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
+source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
 dependencies = [
  "bytemuck",
  "fearless_simd",
- "guillotiere",
  "hashbrown 0.16.1",
  "libm",
  "log",
@@ -4113,7 +4125,7 @@ dependencies = [
 [[package]]
 name = "vello_cpu"
 version = "0.0.6"
-source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
+source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
 dependencies = [
  "bytemuck",
  "hashbrown 0.16.1",
@@ -4127,6 +4139,8 @@ version = "0.1.0"
 dependencies = [
  "parley",
  "parley_draw",
+ "parley_examples_common",
+ "peniko",
  "skrifa 0.40.0",
  "vello_cpu",
 ]
@@ -4163,6 +4177,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "vello_hybrid"
+version = "0.0.6"
+source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
+dependencies = [
+ "bytemuck",
+ "hashbrown 0.16.1",
+ "log",
+ "thiserror 2.0.17",
+ "vello_api",
+ "vello_common",
+ "vello_sparse_shaders",
+ "wgpu",
+]
+
+[[package]]
+name = "vello_hybrid_render"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "parley",
+ "parley_draw",
+ "parley_examples_common",
+ "peniko",
+ "png 0.17.16",
+ "pollster",
+ "skrifa 0.40.0",
+ "vello_common",
+ "vello_hybrid",
+ "wgpu",
+]
+
+[[package]]
 name = "vello_shaders"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4174,6 +4220,11 @@ dependencies = [
  "thiserror 2.0.17",
  "vello_encoding",
 ]
+
+[[package]]
+name = "vello_sparse_shaders"
+version = "0.0.6"
+source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
 
 [[package]]
 name = "version_check"

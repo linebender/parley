@@ -202,6 +202,23 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 max_advance
             };
 
+        let should_indent = {
+            let is_scope_line = if self.layout.data.indent_options.each_line {
+                self.lines.lines.is_empty()
+                    || self.lines.lines.last().map(|l| l.break_reason)
+                        == Some(BreakReason::Explicit)
+            } else {
+                self.lines.lines.is_empty()
+            };
+            is_scope_line ^ self.layout.data.indent_options.hanging
+        };
+        let line_indent = if should_indent {
+            self.layout.data.indent_amount
+        } else {
+            0.0
+        };
+        let max_advance = max_advance - line_indent;
+
         // This macro simply calls the `commit_line` with the provided arguments and some parts of self.
         // It exists solely to cut down on the boilerplate for accessing the self variables while
         // keeping the borrow checker happy
@@ -213,6 +230,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     &mut self.state.line,
                     max_advance,
                     $break_reason,
+                    line_indent,
                 )
             };
         }
@@ -866,8 +884,10 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
         let mut full_width = 0_f32;
         let mut height = 0_f64; // f32 causes test failures due to accumulated error
         for line in &self.lines.lines {
-            width = width.max(line.metrics.advance - line.metrics.trailing_whitespace);
-            full_width = full_width.max(line.metrics.advance);
+            let indent_extra = line.indent.max(0.0);
+            width =
+                width.max(line.metrics.advance + indent_extra - line.metrics.trailing_whitespace);
+            full_width = full_width.max(line.metrics.advance + indent_extra);
             height += line.metrics.line_height as f64;
         }
 
@@ -942,6 +962,7 @@ fn try_commit_line<B: Brush>(
     state: &mut LineState,
     max_advance: f32,
     break_reason: BreakReason,
+    line_indent: f32,
 ) -> bool {
     // Ensure that the cluster and item endpoints are within range
     state.clusters.end = state.clusters.end.min(layout.data.clusters.len());
@@ -1052,9 +1073,18 @@ fn try_commit_line<B: Brush>(
     //     return false;
     // }
 
-    // Q: why this special case?
+    // Exclude the trailing space from justification space count.
+    // Only subtract if the line actually ends with a space — with
+    // WordBreak::BreakAll, regular breaks can land between non-space
+    // characters, in which case there is no trailing space to exclude.
     let mut num_spaces = state.num_spaces;
-    if break_reason == BreakReason::Regular {
+    if break_reason == BreakReason::Regular
+        && state.clusters.start < state.clusters.end
+        && layout.data.clusters[state.clusters.end - 1]
+            .info
+            .whitespace()
+            .is_space_or_nbsp()
+    {
         num_spaces = num_spaces.saturating_sub(1);
     }
 
@@ -1063,6 +1093,7 @@ fn try_commit_line<B: Brush>(
         max_advance,
         break_reason,
         num_spaces,
+        indent: line_indent,
         metrics: LineMetrics {
             advance: state.x,
             ..Default::default()

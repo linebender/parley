@@ -432,6 +432,7 @@ impl Inner {
         families: impl Iterator<Item = FamilyId>,
     ) -> bool {
         self.sync_shared();
+        self.fallback_cache.reset();
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             let result = shared.data.lock().unwrap().fallbacks.set(key, families);
@@ -451,6 +452,7 @@ impl Inner {
         families: impl Iterator<Item = FamilyId>,
     ) -> bool {
         self.sync_shared();
+        self.fallback_cache.reset();
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             let result = shared.data.lock().unwrap().fallbacks.append(key, families);
@@ -750,7 +752,7 @@ impl CommonData {
                 font.apply_override(info_override);
             }
 
-            let name = self.family_names.get_or_insert(scratch_family_name);
+            let name = self.family_names.get_or_insert(family_name);
             families
                 .entry(name.id())
                 .or_insert_with(|| (name, Vec::default()))
