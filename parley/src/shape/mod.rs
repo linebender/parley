@@ -235,6 +235,7 @@ fn fill_cluster_in_place(
 
     let mut force_normalize = false;
     let mut is_emoji_or_pictograph = false;
+    let mut map_len: u8 = 0;
     let start = *code_unit_offset_in_string as u32;
 
     for ((_, ch), (info, style_index)) in segment_text.char_indices().zip(item_infos_iter.by_ref())
@@ -246,9 +247,14 @@ fn fill_cluster_in_place(
         is_emoji_or_pictograph |= info.is_emoji_or_pictograph();
         *code_unit_offset_in_string += ch.len_utf8();
 
+        let contributes_to_shaping = info.contributes_to_shaping();
+        if contributes_to_shaping {
+            map_len += 1;
+        }
+
         char_cluster.chars.push(Char {
             ch,
-            contributes_to_shaping: info.contributes_to_shaping(),
+            contributes_to_shaping,
             glyph_id: 0,
             style_index: *style_index,
             is_control_character: info.is_control(),
@@ -258,7 +264,7 @@ fn fill_cluster_in_place(
     // Finalize cluster metadata
     let end = *code_unit_offset_in_string as u32;
     char_cluster.is_emoji = is_emoji_or_pictograph;
-    char_cluster.map_len = 0;
+    char_cluster.map_len = map_len;
     char_cluster.start = start;
     char_cluster.end = end;
     char_cluster.force_normalize = force_normalize;
