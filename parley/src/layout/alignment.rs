@@ -64,6 +64,10 @@ pub(crate) fn align<B: Brush>(
     alignment: Alignment,
     options: AlignmentOptions,
 ) {
+    #[cfg(feature = "accesskit")]
+    {
+        layout.alignment = Some(alignment);
+    }
     layout.alignment_width = alignment_width.unwrap_or(layout.width);
     layout.is_aligned_justified = alignment == Alignment::Justify;
 

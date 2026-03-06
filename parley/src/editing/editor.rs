@@ -779,10 +779,17 @@ where
         next_node_id: impl FnMut() -> NodeId,
         x_offset: f64,
         y_offset: f64,
+        set_brush_properties: impl Fn(&mut Node, &crate::Style<T>),
     ) -> Option<()> {
         self.refresh_layout();
-        self.editor
-            .accessibility_unchecked(update, node, next_node_id, x_offset, y_offset);
+        self.editor.accessibility_unchecked(
+            update,
+            node,
+            next_node_id,
+            x_offset,
+            y_offset,
+            set_brush_properties,
+        );
         Some(())
     }
 
@@ -1070,11 +1077,19 @@ where
         next_node_id: impl FnMut() -> NodeId,
         x_offset: f64,
         y_offset: f64,
+        set_brush_properties: impl Fn(&mut Node, &crate::Style<T>),
     ) -> Option<()> {
         if self.layout_dirty {
             return None;
         }
-        self.accessibility_unchecked(update, node, next_node_id, x_offset, y_offset);
+        self.accessibility_unchecked(
+            update,
+            node,
+            next_node_id,
+            x_offset,
+            y_offset,
+            set_brush_properties,
+        );
         Some(())
     }
 
@@ -1230,6 +1245,7 @@ where
         next_node_id: impl FnMut() -> NodeId,
         x_offset: f64,
         y_offset: f64,
+        set_brush_properties: impl Fn(&mut Node, &crate::Style<T>),
     ) {
         self.layout_access.build_nodes(
             &self.buffer,
@@ -1239,6 +1255,7 @@ where
             next_node_id,
             x_offset,
             y_offset,
+            set_brush_properties,
         );
         if self.show_cursor {
             if let Some(selection) = self

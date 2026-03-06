@@ -4,9 +4,9 @@
 use crate::BoundingBox;
 #[cfg(feature = "accesskit")]
 use crate::analysis::cluster::Whitespace;
-#[cfg(feature = "accesskit")]
-use crate::layout::LayoutAccessibility;
 use crate::layout::{Affinity, BreakReason, Cluster, ClusterSide, Layout, Line};
+#[cfg(feature = "accesskit")]
+use crate::layout::{ClusterPath, LayoutAccessibility};
 use crate::style::Brush;
 #[cfg(feature = "accesskit")]
 use accesskit::TextPosition;
@@ -72,11 +72,10 @@ impl Cursor {
         layout: &Layout<B>,
         layout_access: &LayoutAccessibility,
     ) -> Option<Self> {
-        let (line_index, run_index) = *layout_access.run_paths_by_access_id.get(&pos.node)?;
-        let line = layout.get(line_index)?;
-        let run = line.item(run_index)?.run()?;
+        let span_path = layout_access.span_paths_by_access_id.get(&pos.node)?;
+        let run = span_path.run(layout)?;
         let index = run
-            .get(pos.character_index)
+            .get(span_path.logical_index() + pos.character_index)
             .map(|cluster| cluster.text_range().start)
             .unwrap_or(layout.data.text_len);
         Some(Self::from_byte_index(layout, index, Affinity::Downstream))
@@ -385,7 +384,9 @@ impl Cursor {
             // If the text is empty, just return the first node with a
             // character index of 0.
             return Some(TextPosition {
-                node: *layout_access.access_ids_by_run_path.get(&(0, 0))?,
+                node: *layout_access
+                    .access_ids_by_span_path
+                    .get(&ClusterPath::new(0, 0, 0))?,
                 character_index: 0,
             });
         }
@@ -402,7 +403,7 @@ impl Cursor {
         // If we're at the end of the layout and the layout ends with a newline
         // then make sure we use the "phantom" run at the end so that
         // AccessKit has correct visual geometry for the cursor.
-        let (run_path, character_index) = if self.index == layout.data.text_len
+        let (span_path, character_index) = if self.index == layout.data.text_len
             && layout
                 .data
                 .clusters
@@ -410,14 +411,15 @@ impl Cursor {
                 .map(|cluster| cluster.info.whitespace() == Whitespace::Newline)
                 .unwrap_or_default()
         {
-            ((path.line_index() + 1, 0), 0)
+            (ClusterPath::new(path.line_index + 1, 0, 0), 0)
         } else {
+            let span_path = layout_access.span_paths_by_cluster_path.get(&path).unwrap();
             (
-                (path.line_index(), path.run_index()),
-                path.logical_index() + offset,
+                *span_path,
+                path.logical_index() - span_path.logical_index() + offset,
             )
         };
-        let id = layout_access.access_ids_by_run_path.get(&run_path)?;
+        let id = layout_access.access_ids_by_span_path.get(&span_path)?;
         Some(TextPosition {
             node: *id,
             character_index,

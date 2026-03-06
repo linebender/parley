@@ -458,6 +458,7 @@ fn shape_item<'a, B: Brush>(
         layout.data.push_run(
             FontData::new(font.font.blob.clone(), font.font.index),
             item.size,
+            font.attrs,
             font.font.synthesis,
             &glyph_buffer,
             item.level,
@@ -608,16 +609,25 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
 
             match map_status {
                 Status::Complete => {
-                    selected_font = Some(font.into());
+                    selected_font = Some(SelectedFont {
+                        font: font.clone(),
+                        attrs: self.attrs,
+                    });
                     fontique::QueryStatus::Stop
                 }
                 Status::Keep => {
-                    selected_font = Some(font.into());
+                    selected_font = Some(SelectedFont {
+                        font: font.clone(),
+                        attrs: self.attrs,
+                    });
                     fontique::QueryStatus::Continue
                 }
                 Status::Discard => {
                     if selected_font.is_none() {
-                        selected_font = Some(font.into());
+                        selected_font = Some(SelectedFont {
+                            font: font.clone(),
+                            attrs: self.attrs,
+                        });
                     }
                     fontique::QueryStatus::Continue
                 }
@@ -629,12 +639,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
 
 struct SelectedFont {
     font: QueryFont,
-}
-
-impl From<&QueryFont> for SelectedFont {
-    fn from(font: &QueryFont) -> Self {
-        Self { font: font.clone() }
-    }
+    attrs: fontique::Attributes,
 }
 
 impl PartialEq for SelectedFont {
