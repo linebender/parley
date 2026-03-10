@@ -17,32 +17,6 @@ use std::io::{BufWriter, Write};
 const COPYRIGHT_HEADER: &str =
     "// Copyright 2025 the Parley Authors\n// SPDX-License-Identifier: Apache-2.0 OR MIT\n";
 
-/// Build the dense composite properties array for all Unicode code points.
-fn build_composite_values() -> Vec<u32> {
-    let mut values = Vec::<u32>::with_capacity(0x110000);
-    for cp in 0_u32..=0x10FFFF {
-        let v = Properties::new(
-            CodePointMapData::<Script>::new().get32(cp),
-            CodePointMapData::<GeneralCategory>::new().get32(cp),
-            CodePointMapData::<GraphemeClusterBreak>::new().get32(cp),
-            CodePointMapData::<BidiClass>::new().get32(cp),
-            CodePointSetData::new::<Emoji>().contains32(cp)
-                || CodePointSetData::new::<ExtendedPictographic>().contains32(cp),
-            CodePointSetData::new::<VariationSelector>().contains32(cp),
-            CodePointSetData::new::<RegionalIndicator>().contains32(cp),
-            matches!(
-                CodePointMapData::<LineBreak>::new().get32(cp),
-                LineBreak::MandatoryBreak
-                    | LineBreak::CarriageReturn
-                    | LineBreak::LineFeed
-                    | LineBreak::NextLine
-            ),
-        );
-        values.push(v.into());
-    }
-    values
-}
-
 /// Generation configuration.
 #[derive(Debug)]
 pub struct Config {
@@ -54,7 +28,33 @@ pub struct Config {
 
 /// Exports ICU data as `PackTab` lookup tables + generated Rust code into the `out` directory.
 pub fn generate(out: std::path::PathBuf, config: &Config) {
-    let values = build_composite_values();
+    // Generate the data required for `CompositeProps`.
+    let values = {
+        // Dense values table for 0..=0x10FFFF
+        let mut values = Vec::<u32>::with_capacity(0x110000);
+        for cp in 0_u32..=0x10FFFF {
+            let v = Properties::new(
+                CodePointMapData::<Script>::new().get32(cp),
+                CodePointMapData::<GeneralCategory>::new().get32(cp),
+                CodePointMapData::<GraphemeClusterBreak>::new().get32(cp),
+                CodePointMapData::<BidiClass>::new().get32(cp),
+                CodePointSetData::new::<Emoji>().contains32(cp)
+                    || CodePointSetData::new::<ExtendedPictographic>().contains32(cp),
+                CodePointSetData::new::<VariationSelector>().contains32(cp),
+                CodePointSetData::new::<RegionalIndicator>().contains32(cp),
+                // See: https://github.com/unicode-org/icu4x/blob/ee5399a77a6b94efb5d4b60678bb458c5eedb25d/components/segmenter/src/line.rs#L338-L351
+                matches!(
+                    CodePointMapData::<LineBreak>::new().get32(cp),
+                    LineBreak::MandatoryBreak
+                        | LineBreak::CarriageReturn
+                        | LineBreak::LineFeed
+                        | LineBreak::NextLine
+                ),
+            );
+            values.push(v.into());
+        }
+        values
+    };
     let scalar_data: Vec<i64> = values.iter().map(|&v| v as i64).collect();
 
     let (info, best) = packtab::pack_table(&scalar_data, Some(0), config.compression);
