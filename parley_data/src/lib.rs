@@ -2,20 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! `parley_data` packages the Unicode data that Parley's text analysis and shaping pipeline needs at runtime.
-//! It exposes a locale-invariant `CompositeProps` data backed by a compact `CodePointTrie`, allowing the engine to obtain all required character properties with a single lookup.
+//! It exposes a locale-invariant `CompositeProps` data backed by compact PackTab lookup tables, allowing the engine to obtain all required character properties with a single lookup.
 
 #![no_std]
 
 use icu_properties::props::{BidiClass, GeneralCategory, GraphemeClusterBreak, Script};
 
-/// Baked data (`CodePointTrie` via databake).
+/// Baked data (PackTab tables).
 #[cfg(feature = "baked")]
 pub mod generated;
-
-/// Baked data (PackTab multi-level tables).
-#[cfg(feature = "packtab")]
-#[path = "generated_packtab/mod.rs"]
-pub mod generated_packtab;
 
 /// Unicode character properties relevant for text analysis.
 #[derive(Copy, Clone, Debug)]
@@ -43,18 +38,11 @@ impl Properties {
     const IS_MANDATORY_LINE_BREAK_SHIFT: u32 =
         Self::IS_REGION_INDICATOR_SHIFT + Self::IS_REGION_INDICATOR_BITS;
 
-    #[cfg(all(feature = "baked", not(feature = "packtab")))]
+    #[cfg(feature = "baked")]
     #[inline(always)]
     /// Returns the properties for a given character.
     pub fn get(ch: char) -> Self {
-        Self(generated::COMPOSITE.get(ch))
-    }
-
-    #[cfg(feature = "packtab")]
-    #[inline(always)]
-    /// Returns the properties for a given character.
-    pub fn get(ch: char) -> Self {
-        Self(generated_packtab::composite_get(ch as u32))
+        Self(generated::composite_get(ch as u32))
     }
 
     /// Creates a new [`Properties`] from the given properties
@@ -173,7 +161,7 @@ impl From<Properties> for u32 {
     }
 }
 
-#[cfg(all(test, any(feature = "baked", feature = "packtab")))]
+#[cfg(all(test, feature = "baked"))]
 mod tests {
     use super::Properties;
     use icu_properties::props::{
@@ -204,7 +192,7 @@ mod tests {
 
     #[test]
     fn properties_match_icu4x() {
-        // Asserts that every character's properties match ICU4X's canonical data (whether for CodePointTrie or PackTab data).
+        // Asserts that every character's properties match ICU4X's canonical data.
         for cp in 0_u32..=0x10FFFF {
             let Some(ch) = char::from_u32(cp) else {
                 continue;

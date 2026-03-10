@@ -9,10 +9,6 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
-[features]
-default = []
-packtab = ["parley/packtab"]
-
 [dependencies]
 parley = { workspace = true, default-features = true }
 parley_dev = { workspace = true }

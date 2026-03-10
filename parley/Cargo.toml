@@ -23,10 +23,6 @@ libm = ["fontique/libm", "peniko/libm", "skrifa/libm", "dep:core_maths"]
 # Enables support for system font backends
 system = ["std", "fontique/system"]
 accesskit = ["dep:accesskit"]
-# Experimental.
-# Use PackTab for `parley_data` lookup tables instead of ICU4X's `CodePointTrie`. 
-# Offers reduced binary size and small improvement to overall performance.
-packtab = ["parley_data/packtab"]
 
 [dependencies]
 skrifa = { workspace = true }

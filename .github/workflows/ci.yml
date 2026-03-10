@@ -395,11 +395,12 @@ jobs:
         with:
           save-if: ${{ github.event_name != 'merge_group' }}
 
-      - name: regenerate unicode data (CodePointTrie)
-        run: cargo run --locked -p parley_data_gen -- ./parley_data/src/generated
-
-      - name: regenerate unicode data (PackTab)
-        run: cargo run --locked -p parley_data_gen -- ./parley_data/src/generated_packtab --packtab --compression=5
+      - name: regenerate unicode data
+        # Compression level 5 was chosen because:
+        # - Level 5 produced the greatest performance gain
+        # - Levels 5 through 9 produced the same output
+        # - Level 10 regressed performance but only reduced binary size by 128 bytes
+        run: cargo run --locked -p parley_data_gen -- ./parley_data/src/generated --compression=5
 
       - name: format generated code
         run: cargo fmt -p parley_data

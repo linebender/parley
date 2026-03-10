@@ -3,8 +3,6 @@
 
 //! See `./main.rs`.
 
-use icu_codepointtrie_builder::{CodePointTrieBuilder, CodePointTrieBuilderData};
-use icu_collections::codepointtrie::TrieType;
 use icu_properties::props::{GeneralCategory, GraphemeClusterBreak, Script};
 use icu_properties::{
     CodePointMapData, CodePointSetData,
@@ -45,49 +43,17 @@ fn build_composite_values() -> Vec<u32> {
     values
 }
 
-/// Exports ICU data as a `CodePointTrie` (databake) into the `out` directory.
-pub fn generate(out: std::path::PathBuf) {
-    let values = build_composite_values();
-
-    let trie = CodePointTrieBuilder {
-        data: CodePointTrieBuilderData::ValuesByCodePoint(&values),
-        default_value: 0,
-        error_value: 0,
-        trie_type: TrieType::Small,
-    }
-    .build();
-
-    let mut file = BufWriter::new(std::fs::File::create(out.join("mod.rs")).unwrap());
-
-    writeln!(&mut file, "{COPYRIGHT_HEADER}").unwrap();
-    writeln!(&mut file, "/// Backing data for the `CompositeProps`").unwrap();
-    writeln!(
-        &mut file,
-        "/// Expected size: {}B",
-        size_of_val(&trie) + databake::BakeSize::borrows_size(&trie)
-    )
-    .unwrap();
-    writeln!(&mut file, "#[rustfmt::skip]").unwrap();
-    writeln!(&mut file, "#[allow(unsafe_code, unused_unsafe, clippy::unseparated_literal_suffix, reason = \"databake behaviour\")]").unwrap();
-    writeln!(
-        &mut file,
-        "pub const COMPOSITE: icu_collections::codepointtrie::CodePointTrie<'static, u32> = {};",
-        databake::Bake::bake(&trie, &databake::CrateEnv::default())
-    )
-    .unwrap();
-}
-
-/// `PackTab` generation configuration.
+/// Generation configuration.
 #[derive(Debug)]
-pub struct PacktabConfig {
-    /// Compression level (1.0 = balanced, 5.0 = smaller, 9.0 = smallest).
+pub struct Config {
+    /// Compression level (1.0 = balanced, 5.0 = smaller, 9.0 = even smaller, 10.0 = smallest).
     pub compression: f64,
     /// Whether to use unsafe array access in generated code.
     pub unsafe_access: bool,
 }
 
 /// Exports ICU data as `PackTab` lookup tables + generated Rust code into the `out` directory.
-pub fn generate_packtab(out: std::path::PathBuf, config: &PacktabConfig) {
+pub fn generate(out: std::path::PathBuf, config: &Config) {
     let values = build_composite_values();
     let scalar_data: Vec<i64> = values.iter().map(|&v| v as i64).collect();
 

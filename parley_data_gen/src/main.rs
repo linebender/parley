@@ -15,7 +15,7 @@ fn main() {
 
     let Some(out_arg) = args.next() else {
         eprintln!(
-            "Usage: {} <output-dir> [--packtab --compression=N --unsafe]",
+            "Usage: {} <output-dir> [--compression=N --unsafe]",
             exe.to_string_lossy()
         );
         process::exit(1);
@@ -33,22 +33,17 @@ fn main() {
     }
 
     let remaining: Vec<String> = args.map(|a| a.to_string_lossy().into_owned()).collect();
-    let use_packtab = remaining.iter().any(|a| a == "--packtab");
 
-    if use_packtab {
-        let compression = remaining
-            .iter()
-            .find_map(|a| a.strip_prefix("--compression="))
-            .and_then(|v| v.parse::<f64>().ok())
-            .unwrap_or(1.0);
-        let unsafe_access = remaining.iter().any(|a| a == "--unsafe");
+    let compression = remaining
+        .iter()
+        .find_map(|a| a.strip_prefix("--compression="))
+        .and_then(|v| v.parse::<f64>().ok())
+        .unwrap_or(1.0);
+    let unsafe_access = remaining.iter().any(|a| a == "--unsafe");
 
-        let config = parley_data_gen::PacktabConfig {
-            compression,
-            unsafe_access,
-        };
-        parley_data_gen::generate_packtab(out_path, &config);
-    } else {
-        parley_data_gen::generate(out_path);
-    }
+    let config = parley_data_gen::Config {
+        compression,
+        unsafe_access,
+    };
+    parley_data_gen::generate(out_path, &config);
 }
