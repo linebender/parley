@@ -13,6 +13,7 @@ use icu_properties::{
     },
 };
 use parley_data::Properties;
+use std::fmt::Write as _;
 use std::io::{BufWriter, Write};
 
 const COPYRIGHT_HEADER: &str =
@@ -106,9 +107,11 @@ pub fn generate_packtab(out: std::path::PathBuf, config: &PacktabConfig) {
         code.push('\n');
     }
     code.push('\n');
-    code.push_str(&format!(
+    write!(
+        code,
         "#[inline]\npub fn composite_get(cp: u32) -> u32 {{\n    {namespace}_get(cp as usize)\n}}\n"
-    ));
+    )
+    .unwrap();
 
     let mut file = BufWriter::new(std::fs::File::create(out.join("mod.rs")).unwrap());
     writeln!(&mut file, "{COPYRIGHT_HEADER}").unwrap();
