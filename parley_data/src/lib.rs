@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! `parley_data` packages the Unicode data that Parley's text analysis and shaping pipeline needs at runtime.
-//! It exposes a locale-invariant `CompositeProps` data backed by compact PackTab lookup tables, allowing the engine to obtain all required character properties with a single lookup.
+//! It exposes a locale-invariant `CompositeProps` data backed by compact `PackTab` lookup tables, allowing the engine to obtain all required character properties with a single lookup.
 
 #![no_std]
 
 use icu_properties::props::{BidiClass, GeneralCategory, GraphemeClusterBreak, Script};
 
-/// Baked data (PackTab tables).
+/// Baked data (`PackTab` tables).
 #[cfg(feature = "baked")]
 pub mod generated;
 
