@@ -33,8 +33,8 @@ log = { version = "0.4", default-features = false }
 hashbrown = { workspace = true }
 skrifa = { workspace = true }
 smallvec = { workspace = true }
-vello_common = { workspace = true }
-vello_cpu = { workspace = true, optional = true, features = ["u8_pipeline", "text"] }
-vello_hybrid = { workspace = true, optional = true, features = ["text"] }
+vello_common = { workspace = true, default-features = false, features = ["std"] }
+vello_cpu = { workspace = true, optional = true, default-features = false, features = ["u8_pipeline", "std"] }
+vello_hybrid = { workspace = true, optional = true, default-features = false, features = ["std"]}
 png = { version = "0.17", optional = true }
 core_maths = { version = "0.1.1", optional = true }

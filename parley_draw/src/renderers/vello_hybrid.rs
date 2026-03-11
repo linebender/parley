@@ -281,6 +281,15 @@ impl GlyphAtlasBackend for HybridBackend {
             },
         };
 
+        let composed = rect_transform * paint_transform;
+        log::debug!(
+            "[glyph_atlas] HybridBackend::render_from_atlas: \
+             rect_transform={rect_transform:?}, paint_transform={paint_transform:?}, \
+             composed={composed:?}, area={area:?}, quality={quality:?}, \
+             image_id={:?}",
+            atlas_slot.image_id,
+        );
+
         let state = renderer.save_current_state();
 
         renderer.set_tint(tint);

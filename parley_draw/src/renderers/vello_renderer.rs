@@ -395,13 +395,26 @@ pub(crate) fn render_outline_glyph_from_atlas<B: GlyphAtlasBackend>(
     transform: Affine,
     tint_color: AlphaColor<Srgb>,
 ) {
-    let [_, _, _, _, tx, ty] = transform.as_coeffs();
+    let coeffs = transform.as_coeffs();
+    let [_, _, _, _, tx, ty] = coeffs;
     let rect_transform = Affine::translate((
         tx.floor() + atlas_slot.bearing_x as f64,
         ty.floor() + atlas_slot.bearing_y as f64,
     ));
     let area = Rect::new(0.0, 0.0, atlas_slot.width as f64, atlas_slot.height as f64);
     let paint_transform = B::paint_transform(&atlas_slot);
+
+    log::debug!(
+        "[glyph_atlas] render_outline_glyph_from_atlas: \
+         transform_coeffs={coeffs:?}, tx={tx}, ty={ty}, \
+         bearing=({}, {}), slot=({}, {}, {}x{}), \
+         rect_transform={rect_transform:?}, paint_transform={paint_transform:?}, \
+         area={area:?}, image_id={:?}",
+        atlas_slot.bearing_x, atlas_slot.bearing_y,
+        atlas_slot.x, atlas_slot.y, atlas_slot.width, atlas_slot.height,
+        atlas_slot.image_id,
+    );
+
     B::render_from_atlas(
         renderer,
         atlas_slot,
