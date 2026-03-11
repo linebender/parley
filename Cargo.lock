@@ -4099,7 +4099,7 @@ dependencies = [
 [[package]]
 name = "vello_api"
 version = "0.7.0"
-source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
+source = "git+https://github.com/linebender/vello.git?rev=190f5a2b77ca2433f7ec5781b2855a7b4625b8f4#190f5a2b77ca2433f7ec5781b2855a7b4625b8f4"
 dependencies = [
  "bytemuck",
  "peniko",
@@ -4108,7 +4108,7 @@ dependencies = [
 [[package]]
 name = "vello_common"
 version = "0.0.6"
-source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
+source = "git+https://github.com/linebender/vello.git?rev=190f5a2b77ca2433f7ec5781b2855a7b4625b8f4#190f5a2b77ca2433f7ec5781b2855a7b4625b8f4"
 dependencies = [
  "bytemuck",
  "fearless_simd",
@@ -4126,7 +4126,7 @@ dependencies = [
 [[package]]
 name = "vello_cpu"
 version = "0.0.6"
-source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
+source = "git+https://github.com/linebender/vello.git?rev=190f5a2b77ca2433f7ec5781b2855a7b4625b8f4#190f5a2b77ca2433f7ec5781b2855a7b4625b8f4"
 dependencies = [
  "bytemuck",
  "hashbrown 0.16.1",
@@ -4180,7 +4180,7 @@ dependencies = [
 [[package]]
 name = "vello_hybrid"
 version = "0.0.6"
-source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
+source = "git+https://github.com/linebender/vello.git?rev=190f5a2b77ca2433f7ec5781b2855a7b4625b8f4#190f5a2b77ca2433f7ec5781b2855a7b4625b8f4"
 dependencies = [
  "bytemuck",
  "guillotiere",
@@ -4226,7 +4226,7 @@ dependencies = [
 [[package]]
 name = "vello_sparse_shaders"
 version = "0.0.6"
-source = "git+https://github.com/conor-93/vello.git?rev=d453786a34c0f9de737f90fcc705729abbdfd62c#d453786a34c0f9de737f90fcc705729abbdfd62c"
+source = "git+https://github.com/linebender/vello.git?rev=190f5a2b77ca2433f7ec5781b2855a7b4625b8f4#190f5a2b77ca2433f7ec5781b2855a7b4625b8f4"
 
 [[package]]
 name = "version_check"

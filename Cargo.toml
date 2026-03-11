@@ -112,9 +112,9 @@ clippy.wildcard_dependencies = "warn"
 # END LINEBENDER LINT SET
 
 [patch.crates-io]
-vello_common = { git = "https://github.com/linebender/vello.git", branch = "gemberg/glyph-cache-rect-allocator" }
-vello_cpu = { git = "https://github.com/linebender/vello.git", branch = "gemberg/glyph-cache-rect-allocator" }
-vello_hybrid = { git = "https://github.com/linebender/vello.git", branch = "gemberg/glyph-cache-rect-allocator" }
+vello_common = { git = "https://github.com/linebender/vello.git", rev = "190f5a2b77ca2433f7ec5781b2855a7b4625b8f4" }
+vello_cpu = { git = "https://github.com/linebender/vello.git", rev = "190f5a2b77ca2433f7ec5781b2855a7b4625b8f4" }
+vello_hybrid = { git = "https://github.com/linebender/vello.git", rev = "190f5a2b77ca2433f7ec5781b2855a7b4625b8f4" }
 
 [profile.profiling]
 inherits = "release"
