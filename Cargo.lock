@@ -4149,7 +4149,7 @@ dependencies = [
 [[package]]
 name = "vello_api"
 version = "0.7.0"
-source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
+source = "git+https://github.com/linebender/vello.git?rev=190f5a2b77ca2433f7ec5781b2855a7b4625b8f4#190f5a2b77ca2433f7ec5781b2855a7b4625b8f4"
 dependencies = [
  "bytemuck",
  "peniko",
@@ -4158,7 +4158,7 @@ dependencies = [
 [[package]]
 name = "vello_common"
 version = "0.0.6"
-source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
+source = "git+https://github.com/linebender/vello.git?rev=190f5a2b77ca2433f7ec5781b2855a7b4625b8f4#190f5a2b77ca2433f7ec5781b2855a7b4625b8f4"
 dependencies = [
  "bytemuck",
  "fearless_simd",
@@ -4175,7 +4175,7 @@ dependencies = [
 [[package]]
 name = "vello_cpu"
 version = "0.0.6"
-source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
+source = "git+https://github.com/linebender/vello.git?rev=190f5a2b77ca2433f7ec5781b2855a7b4625b8f4#190f5a2b77ca2433f7ec5781b2855a7b4625b8f4"
 dependencies = [
  "bytemuck",
  "hashbrown 0.16.1",
@@ -4229,7 +4229,7 @@ dependencies = [
 [[package]]
 name = "vello_hybrid"
 version = "0.0.6"
-source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
+source = "git+https://github.com/linebender/vello.git?rev=190f5a2b77ca2433f7ec5781b2855a7b4625b8f4#190f5a2b77ca2433f7ec5781b2855a7b4625b8f4"
 dependencies = [
  "bytemuck",
  "hashbrown 0.16.1",
@@ -4274,7 +4274,7 @@ dependencies = [
 [[package]]
 name = "vello_sparse_shaders"
 version = "0.0.6"
-source = "git+https://github.com/linebender/vello.git?branch=gemberg%2Fglyph-cache-rect-allocator#855760a6f9c98487b23fa027859059a8a1146aca"
+source = "git+https://github.com/linebender/vello.git?rev=190f5a2b77ca2433f7ec5781b2855a7b4625b8f4#190f5a2b77ca2433f7ec5781b2855a7b4625b8f4"
 
 [[package]]
 name = "version_check"

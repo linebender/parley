@@ -364,7 +364,7 @@ impl GlyphAtlasBackend for CpuBackend {
             },
         };
 
-        let state = renderer.take_current_state();
+        let state = renderer.save_current_state();
 
         renderer.set_tint(tint);
         renderer.set_transform(rect_transform);
@@ -384,14 +384,14 @@ impl GlyphAtlasBackend for CpuBackend {
     }
 
     fn fill_outline_directly(renderer: &mut RenderContext, path: &BezPath, transform: Affine) {
-        let state = renderer.take_current_state();
+        let state = renderer.save_current_state();
         renderer.set_transform(transform);
         renderer.fill_path(path);
         renderer.restore_state(state);
     }
 
     fn stroke_outline_directly(renderer: &mut RenderContext, path: &BezPath, transform: Affine) {
-        let state = renderer.take_current_state();
+        let state = renderer.save_current_state();
         renderer.set_transform(transform);
         renderer.stroke_path(path);
         renderer.restore_state(state);
@@ -408,7 +408,7 @@ impl GlyphAtlasBackend for CpuBackend {
             },
         };
 
-        let state = renderer.take_current_state();
+        let state = renderer.save_current_state();
         renderer.set_paint(image);
         renderer.set_transform(transform);
         renderer.fill_rect(&glyph.area);
@@ -421,7 +421,7 @@ impl GlyphAtlasBackend for CpuBackend {
         transform: Affine,
         context_color: AlphaColor<Srgb>,
     ) {
-        let state = renderer.take_current_state();
+        let state = renderer.save_current_state();
         renderer.set_transform(transform);
 
         let mut colr_painter = ColrPainter::new(glyph, context_color, renderer);
