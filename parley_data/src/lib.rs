@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 //! `parley_data` packages the Unicode data that Parley's text analysis and shaping pipeline needs at runtime.
-//! It exposes a locale-invariant `CompositeProps` data backed by a compact `CodePointTrie`, allowing the engine to obtain all required character properties with a single lookup.
+//! It exposes a locale-invariant `CompositeProps` data backed by compact `PackTab` lookup tables, allowing the engine to obtain all required character properties with a single lookup.
 
 #![no_std]
 
 use icu_properties::props::{BidiClass, GeneralCategory, GraphemeClusterBreak, Script};
 
-/// Baked data.
+/// Baked data (`PackTab` tables).
 #[cfg(feature = "baked")]
 pub mod generated;
 
@@ -42,7 +42,7 @@ impl Properties {
     #[inline(always)]
     /// Returns the properties for a given character.
     pub fn get(ch: char) -> Self {
-        Self(generated::COMPOSITE.get(ch))
+        Self(generated::composite_get(ch as u32))
     }
 
     /// Creates a new [`Properties`] from the given properties
@@ -158,5 +158,52 @@ impl Properties {
 impl From<Properties> for u32 {
     fn from(value: Properties) -> Self {
         value.0
+    }
+}
+
+#[cfg(all(test, feature = "baked"))]
+mod tests {
+    use super::Properties;
+    use icu_properties::props::{
+        BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak,
+        RegionalIndicator, Script, VariationSelector,
+    };
+    use icu_properties::{CodePointMapData, CodePointSetData};
+
+    fn expected_properties(cp: u32) -> Properties {
+        Properties::new(
+            CodePointMapData::<Script>::new().get32(cp),
+            CodePointMapData::<GeneralCategory>::new().get32(cp),
+            CodePointMapData::<GraphemeClusterBreak>::new().get32(cp),
+            CodePointMapData::<BidiClass>::new().get32(cp),
+            CodePointSetData::new::<Emoji>().contains32(cp)
+                || CodePointSetData::new::<ExtendedPictographic>().contains32(cp),
+            CodePointSetData::new::<VariationSelector>().contains32(cp),
+            CodePointSetData::new::<RegionalIndicator>().contains32(cp),
+            matches!(
+                CodePointMapData::<LineBreak>::new().get32(cp),
+                LineBreak::MandatoryBreak
+                    | LineBreak::CarriageReturn
+                    | LineBreak::LineFeed
+                    | LineBreak::NextLine
+            ),
+        )
+    }
+
+    #[test]
+    fn properties_match_icu4x() {
+        // Asserts that every character's properties match ICU4X's canonical data.
+        for cp in 0_u32..=0x10FFFF {
+            let Some(ch) = char::from_u32(cp) else {
+                continue;
+            };
+            let actual = Properties::get(ch);
+            let expected = expected_properties(cp);
+            assert_eq!(
+                u32::from(actual),
+                u32::from(expected),
+                "mismatch at U+{cp:04X}: actual={actual:?}, expected={expected:?}"
+            );
+        }
     }
 }

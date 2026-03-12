@@ -9,10 +9,8 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-databake = { workspace = true }
-icu_codepointtrie_builder = { workspace = true, features = ["wasm"] }
-icu_collections = { workspace = true, features = ["databake"] }
 icu_properties = { workspace = true, features = ["compiled_data"] }
+packtab = { workspace = true }
 parley_data = { workspace = true }
 
 [lints]

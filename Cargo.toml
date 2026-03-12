@@ -32,7 +32,6 @@ repository = "https://github.com/linebender/parley"
 [workspace.dependencies]
 accesskit = "0.24.0"
 bytemuck = { version = "1.24.0", default-features = false }
-databake = { version = "0.2", default-features = false }
 fontique = { version = "0.7.0", default-features = false, path = "fontique" }
 harfrust = { version = "0.5.0", default-features = false }
 foldhash = { version = "0.2.0", default-features = false }
@@ -40,13 +39,12 @@ hashbrown = { version = "0.16.1", default-features = false, features = [
     "default-hasher",
     "raw-entry",
 ] }
-icu_codepointtrie_builder = { version = "0.5.1", default-features = false, features = ["wasm"] }
-icu_collections = { version = "2.1.1", default-features = false }
 icu_locale_core = { version = "2.1.1", default-features = false }
 icu_normalizer = { version = "2.1.1", default-features = false }
 icu_properties = { version = "2.1.2", default-features = false }
 icu_segmenter = { version = "2.1.2", default-features = false }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
+packtab = { version = "1.7.0" }
 parley = { version = "0.7.0", default-features = false, path = "parley" }
 parley_data = { path = "parley_data", default-features = false }
 parley_data_gen = { path = "parley_data_gen" }
@@ -60,7 +58,6 @@ swash = { version = "0.2.6", default-features = false }
 vello_common = { version = "0.0.6", default-features = false }
 vello_cpu = { version = "0.0.6", default-features = false, features = ["u8_pipeline"] }
 vello_hybrid = { version = "0.0.6", default-features = false }
-zerovec = { version = "0.11.5", default-features = false }
 
 [workspace.lints]
 rust.unsafe_code = "deny"
