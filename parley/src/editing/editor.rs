@@ -996,6 +996,15 @@ where
         self.layout_dirty = true;
     }
 
+    /// Get the current scale for the layout.
+    pub fn get_scale(&self) -> f32 {
+        self.scale
+    }
+
+    pub fn get_font_size(&self) -> f32 {
+        self.font_size
+    }
+
     /// Set whether to quantize the layout coordinates.
     ///
     /// Set `quantize` as `true` to have the layout coordinates aligned to pixel boundaries.
@@ -1024,6 +1033,11 @@ where
     pub fn edit_styles(&mut self) -> &mut StyleSet<T> {
         self.layout_dirty = true;
         &mut self.default_style
+    }
+
+    /// Get the current default styles for this editor.
+    pub fn get_styles(&self) -> &StyleSet<T> {
+        &self.default_style
     }
 
     /// Whether the editor is currently in IME composing mode.
