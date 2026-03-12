@@ -827,3 +827,42 @@ impl Shared {
         self.version.fetch_add(1, Ordering::Release);
     }
 }
+
+#[test]
+#[cfg(feature = "std")]
+fn make_shared_matches_local() {
+    use crate::{Collection, CollectionOptions};
+
+    let mut collection = Collection::new(CollectionOptions {
+        shared: false,
+        system_fonts: false,
+    });
+
+    let font_dirs: Vec<std::path::PathBuf> = [
+        #[cfg(target_os = "macos")]
+        "/Library/Fonts",
+        #[cfg(target_os = "linux")]
+        "/usr/share/fonts",
+        #[cfg(target_os = "windows")]
+        "C:\\Windows\\Fonts",
+    ]
+    .iter()
+    .map(std::path::PathBuf::from)
+    .filter(|p| p.is_dir())
+    .collect();
+
+    if font_dirs.is_empty() {
+        std::eprintln!("No system font directories found — cannot demonstrate the bug.");
+        return;
+    }
+
+    collection.load_fonts_from_paths(&font_dirs);
+
+    let names_before: Vec<String> = collection.family_names().map(String::from).collect();
+
+    collection.make_shared();
+
+    let names_after: Vec<String> = collection.family_names().map(String::from).collect();
+
+    assert_eq!(names_before.len(), names_after.len());
+}
