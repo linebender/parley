@@ -26,6 +26,7 @@ mod basic;
 mod cursor;
 mod draw;
 mod editor;
+mod floats;
 mod issues;
 mod lines;
 mod styles;

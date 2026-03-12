@@ -39,11 +39,7 @@ pub fn defaults() -> Vec<Benchmark> {
 
                             let mut layout: Layout<ColorBrush> = builder.build(text);
                             layout.break_all_lines(Some(MAX_ADVANCE));
-                            layout.align(
-                                Some(MAX_ADVANCE),
-                                Alignment::Start,
-                                AlignmentOptions::default(),
-                            );
+                            layout.align(Alignment::Start, AlignmentOptions::default());
 
                             black_box(layout);
                         });
@@ -114,11 +110,7 @@ pub fn styled() -> Vec<Benchmark> {
 
                             let mut layout: Layout<ColorBrush> = builder.build(text);
                             layout.break_all_lines(Some(MAX_ADVANCE));
-                            layout.align(
-                                Some(MAX_ADVANCE),
-                                Alignment::Start,
-                                AlignmentOptions::default(),
-                            );
+                            layout.align(Alignment::Start, AlignmentOptions::default());
 
                             black_box(layout);
                         });
@@ -179,11 +171,7 @@ pub fn glyph_cache() -> Vec<Benchmark> {
                         builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
                         let mut layout: Layout<ColorBrush> = builder.build(&text);
                         layout.break_all_lines(Some(MAX_ADVANCE));
-                        layout.align(
-                            Some(MAX_ADVANCE),
-                            Alignment::Start,
-                            AlignmentOptions::default(),
-                        );
+                        layout.align(Alignment::Start, AlignmentOptions::default());
                         layout
                     });
 
