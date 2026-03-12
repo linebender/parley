@@ -57,9 +57,9 @@ read-fonts = { version = "0.37.0", default-features = false }
 skrifa = { version = "0.40.0", default-features = false }
 smallvec = "1.15.1"
 swash = { version = "0.2.6", default-features = false }
-vello_common = {path = "../vello/sparse_strips/vello_common", default-features = false }
-vello_cpu = {path = "../vello/sparse_strips/vello_cpu", default-features = false }
-vello_hybrid = { path = "../vello/sparse_strips/vello_hybrid", default-features = false }
+vello_common = { git = "https://github.com/linebender/vello.git", rev = "e0d7493905366bdc5c352e577f897ecd1727abde", default-features = false } # { path = "../vello/sparse_strips/vello_common", default-features = false }
+vello_cpu = { git = "https://github.com/linebender/vello.git", rev = "e0d7493905366bdc5c352e577f897ecd1727abde", default-features = false } # {path = "../vello/sparse_strips/vello_cpu", default-features = false }
+vello_hybrid = { git = "https://github.com/linebender/vello.git", rev = "e0d7493905366bdc5c352e577f897ecd1727abde", default-features = false } # { path = "../vello/sparse_strips/vello_hybrid", default-features = false }
 zerovec = { version = "0.11.5", default-features = false }
 
 [workspace.lints]
