@@ -4162,7 +4162,7 @@ dependencies = [
 [[package]]
 name = "vello_api"
 version = "0.7.0"
-source = "git+https://github.com/linebender/vello.git?rev=e0d7493905366bdc5c352e577f897ecd1727abde#e0d7493905366bdc5c352e577f897ecd1727abde"
+source = "git+https://github.com/linebender/vello.git?rev=99d90982f650c0e0738426250bc7305a1c2d93db#99d90982f650c0e0738426250bc7305a1c2d93db"
 dependencies = [
  "bytemuck",
  "peniko",
@@ -4171,7 +4171,7 @@ dependencies = [
 [[package]]
 name = "vello_common"
 version = "0.0.6"
-source = "git+https://github.com/linebender/vello.git?rev=e0d7493905366bdc5c352e577f897ecd1727abde#e0d7493905366bdc5c352e577f897ecd1727abde"
+source = "git+https://github.com/linebender/vello.git?rev=99d90982f650c0e0738426250bc7305a1c2d93db#99d90982f650c0e0738426250bc7305a1c2d93db"
 dependencies = [
  "bytemuck",
  "fearless_simd",
@@ -4188,7 +4188,7 @@ dependencies = [
 [[package]]
 name = "vello_cpu"
 version = "0.0.6"
-source = "git+https://github.com/linebender/vello.git?rev=e0d7493905366bdc5c352e577f897ecd1727abde#e0d7493905366bdc5c352e577f897ecd1727abde"
+source = "git+https://github.com/linebender/vello.git?rev=99d90982f650c0e0738426250bc7305a1c2d93db#99d90982f650c0e0738426250bc7305a1c2d93db"
 dependencies = [
  "bytemuck",
  "hashbrown 0.16.1",
@@ -4242,7 +4242,7 @@ dependencies = [
 [[package]]
 name = "vello_hybrid"
 version = "0.0.6"
-source = "git+https://github.com/linebender/vello.git?rev=e0d7493905366bdc5c352e577f897ecd1727abde#e0d7493905366bdc5c352e577f897ecd1727abde"
+source = "git+https://github.com/linebender/vello.git?rev=99d90982f650c0e0738426250bc7305a1c2d93db#99d90982f650c0e0738426250bc7305a1c2d93db"
 dependencies = [
  "bytemuck",
  "hashbrown 0.16.1",
@@ -4289,7 +4289,7 @@ dependencies = [
 [[package]]
 name = "vello_sparse_shaders"
 version = "0.0.6"
-source = "git+https://github.com/linebender/vello.git?rev=e0d7493905366bdc5c352e577f897ecd1727abde#e0d7493905366bdc5c352e577f897ecd1727abde"
+source = "git+https://github.com/linebender/vello.git?rev=99d90982f650c0e0738426250bc7305a1c2d93db#99d90982f650c0e0738426250bc7305a1c2d93db"
 dependencies = [
  "naga 28.0.0",
 ]
