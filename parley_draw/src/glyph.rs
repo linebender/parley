@@ -1198,12 +1198,36 @@ fn prepare_glyph_run<'a>(
     outlines: &OutlineGlyphCollection<'_>,
     hint_cache: &'a mut HintCache,
 ) -> PreparedGlyphRun<'a> {
+    let total_transform = run.transform * run.glyph_transform.unwrap_or(Affine::IDENTITY);
+    let [t_a, t_b, t_c, t_d, t_e, t_f] = total_transform.as_coeffs();
+    let uniform_scale = t_a == t_d;
+
     if !run.hint {
-        return PreparedGlyphRun {
-            transform: run.transform * run.glyph_transform.unwrap_or(Affine::IDENTITY),
-            font_size: run.font_size,
-            normalized_coords: run.normalized_coords,
-            hinting_instance: None,
+        let no_skew = t_b.abs() <= 1e-6 && t_c.abs() <= 1e-6;
+
+        return if no_skew && uniform_scale {
+            // TODO: This is a temporary hack. Our current glyph caching code has two issues:
+            // 1) It tries to cache glyphs even if they have skewing/non-uniform scaling, which will
+            // lead to wrong results when rendering a cached glyph.
+            // 2) It doesn't take the scaling factor of the transform into account when generating
+            // the cache key.
+            // For now, we therefore always try to merge the scaling factor into the font size.
+            // A more principled solution should be implemented in the glyph caching logic itself.
+            let font_size = run.font_size * t_d.abs() as f32;
+
+            PreparedGlyphRun {
+                transform: Affine::new([1., 0., 0., 1., t_e, t_f]),
+                font_size,
+                normalized_coords: run.normalized_coords,
+                hinting_instance: None,
+            }
+        } else {
+            PreparedGlyphRun {
+                transform: total_transform,
+                font_size: run.font_size,
+                normalized_coords: run.normalized_coords,
+                hinting_instance: None,
+            }
         };
     }
 
@@ -1217,10 +1241,6 @@ fn prepare_glyph_run<'a>(
     //
     // As the hinting is vertical-only, we can handle horizontal skew, but not vertical skew or
     // rotations.
-    let total_transform = run.transform * run.glyph_transform.unwrap_or(Affine::IDENTITY);
-    let [t_a, t_b, t_c, t_d, t_e, t_f] = total_transform.as_coeffs();
-
-    let uniform_scale = t_a == t_d;
     let vertically_uniform = t_b == 0.;
 
     if uniform_scale && vertically_uniform {
