@@ -264,7 +264,7 @@ impl Inner {
     pub fn make_shared(&mut self) {
         if self.shared.is_none() {
             self.shared = Some(Arc::new(Shared {
-                data: Mutex::new(core::mem::take(&mut self.data)),
+                data: Mutex::new(self.data.clone()),
                 version: AtomicCounter::new(self.shared_version),
             }));
         }
