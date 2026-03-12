@@ -365,12 +365,10 @@ impl<'a, T: 'a> GlyphRunBuilder<'a, T> {
             OutlineCacheSession::new(outline_cache, VarLookupKey(self.run.normalized_coords));
         let PreparedGlyphRun {
             transform: initial_transform,
-            size,
+            font_size,
             normalized_coords,
             hinting_instance,
         } = prepare_glyph_run(&self.run, &outlines, hinting_cache);
-
-        let ppem = size.ppem().unwrap_or(self.run.font_size);
 
         // COLR/bitmap glyphs are never hinted. `prepare_glyph_run` may absorb
         // the scale into the font size, so we keep the original transform for
@@ -382,7 +380,7 @@ impl<'a, T: 'a> GlyphRunBuilder<'a, T> {
         let hinted = hinting_instance.is_some();
 
         let cache_enabled =
-            self.atlas_cache_enabled && ppem <= glyph_atlas.config().max_cached_font_size;
+            self.atlas_cache_enabled && font_size <= glyph_atlas.config().max_cached_font_size;
 
         let render_glyph: fn(&mut T, PreparedGlyph<'_>, &mut C, &mut ImageCache) = match style {
             Style::Fill => GlyphRenderer::<C>::fill_glyph,
@@ -412,7 +410,7 @@ impl<'a, T: 'a> GlyphRunBuilder<'a, T> {
                     font_id,
                     font_index,
                     glyph.id,
-                    ppem,
+                    font_size,
                     hinted,
                     fractional_x,
                     BLACK,
@@ -449,7 +447,7 @@ impl<'a, T: 'a> GlyphRunBuilder<'a, T> {
                     font_id,
                     font_index,
                     glyph_id: glyph.id,
-                    size_bits: ppem.to_bits(),
+                    size_bits: font_size.to_bits(),
                     hinted: false,
                     subpixel_x: 0,
                     context_color,
@@ -576,7 +574,7 @@ impl<'a, T: 'a> GlyphRunBuilder<'a, T> {
                 self.run.font.data.id(),
                 self.run.font.index,
                 &mut outline_cache_session,
-                size,
+                font_size,
                 &outline,
                 hinting_instance,
                 normalized_coords,
@@ -637,7 +635,7 @@ impl<'a, T: 'a> GlyphRunBuilder<'a, T> {
         let outlines = font_ref.outline_glyphs();
 
         let PreparedGlyphRun {
-            size: font_size,
+            font_size,
             hinting_instance,
             ..
         } = prepare_glyph_run(&self.run, &outlines, &mut caches.hinting_cache);
@@ -649,7 +647,7 @@ impl<'a, T: 'a> GlyphRunBuilder<'a, T> {
         // scale them back down to the nominal coordinate space. When not hinting (or hinting without scale), this is
         // 1.0 and has no effect. The glyph-drawing path handles this by simply drawing in global space, but we need to
         // invert it for drawing decorations.
-        let outline_to_nominal_scale = f64::from(self.run.font_size / font_size.ppem().unwrap());
+        let outline_to_nominal_scale = f64::from(self.run.font_size / font_size);
         let outline_transform = self.run.glyph_transform.unwrap_or(Affine::IDENTITY)
             * Affine::FLIP_Y
             * Affine::scale(outline_to_nominal_scale);
@@ -876,7 +874,7 @@ fn create_outline_glyph<'a>(
     font_id: u64,
     font_index: u32,
     outline_cache: &'a mut OutlineCacheSession<'_>,
-    size: Size,
+    size: f32,
     outline_glyph: &skrifa::outline::OutlineGlyph<'a>,
     hinting_instance: Option<&HintingInstance>,
     normalized_coords: &[skrifa::instance::NormalizedCoord],
@@ -1186,7 +1184,7 @@ struct PreparedGlyphRun<'a> {
     /// translation.
     transform: Affine,
     /// The font size to generate glyph outlines for.
-    size: Size,
+    font_size: f32,
     normalized_coords: &'a [skrifa::instance::NormalizedCoord],
     hinting_instance: Option<&'a HintingInstance>,
 }
@@ -1203,7 +1201,7 @@ fn prepare_glyph_run<'a>(
     if !run.hint {
         return PreparedGlyphRun {
             transform: run.transform * run.glyph_transform.unwrap_or(Affine::IDENTITY),
-            size: Size::new(run.font_size),
+            font_size: run.font_size,
             normalized_coords: run.normalized_coords,
             hinting_instance: None,
         };
@@ -1227,13 +1225,12 @@ fn prepare_glyph_run<'a>(
 
     if uniform_scale && vertically_uniform {
         let vertical_font_size = run.font_size * t_d as f32;
-        let size = Size::new(vertical_font_size);
 
         let hinting_instance = hint_cache.get(&HintKey {
             font_id: run.font.data.id(),
             font_index: run.font.index,
             outlines,
-            size,
+            size: vertical_font_size,
             coords: run.normalized_coords,
         });
 
@@ -1242,14 +1239,14 @@ fn prepare_glyph_run<'a>(
             // as well. Otherwise the skew would be applied twice: once via the larger outline, once via the transform.
             // The translation (t_e, t_f) stays as-is since it positions the run in scene coordinates.
             transform: Affine::new([1., 0., t_c / t_d, 1., t_e, t_f]),
-            size,
+            font_size: vertical_font_size,
             normalized_coords: run.normalized_coords,
             hinting_instance,
         }
     } else {
         PreparedGlyphRun {
             transform: total_transform,
-            size: Size::new(run.font_size),
+            font_size: run.font_size,
             normalized_coords: run.normalized_coords,
             hinting_instance: None,
         }
@@ -1568,7 +1565,7 @@ impl<'a> OutlineCacheSession<'a> {
         glyph_id: u32,
         font_id: u64,
         font_index: u32,
-        size: Size,
+        size: f32,
         var_key: VarLookupKey<'_>,
         outline_glyph: &skrifa::outline::OutlineGlyph<'_>,
         hinting_instance: Option<&HintingInstance>,
@@ -1577,7 +1574,7 @@ impl<'a> OutlineCacheSession<'a> {
             glyph_id,
             font_id,
             font_index,
-            size_bits: size.ppem().unwrap().to_bits(),
+            size_bits: size.to_bits(),
             hint: hinting_instance.is_some(),
         };
 
@@ -1597,7 +1594,7 @@ impl<'a> OutlineCacheSession<'a> {
                 let draw_settings = if let Some(hinting_instance) = hinting_instance {
                     DrawSettings::hinted(hinting_instance, false)
                 } else {
-                    DrawSettings::unhinted(size, var_key.0)
+                    DrawSettings::unhinted(Size::new(size), var_key.0)
                 };
 
                 drawing_buf.reuse();
@@ -1649,13 +1646,19 @@ pub struct HintKey<'a> {
     font_id: u64,
     font_index: u32,
     outlines: &'a OutlineGlyphCollection<'a>,
-    size: Size,
+    size: f32,
     coords: &'a [skrifa::instance::NormalizedCoord],
 }
 
 impl HintKey<'_> {
     fn instance(&self) -> Option<HintingInstance> {
-        HintingInstance::new(self.outlines, self.size, self.coords, HINTING_OPTIONS).ok()
+        HintingInstance::new(
+            self.outlines,
+            Size::new(self.size),
+            self.coords,
+            HINTING_OPTIONS,
+        )
+        .ok()
     }
 }
 
@@ -1697,7 +1700,12 @@ impl HintCache {
             entry.font_index = key.font_index;
             entry
                 .instance
-                .reconfigure(key.outlines, key.size, key.coords, HINTING_OPTIONS)
+                .reconfigure(
+                    key.outlines,
+                    Size::new(key.size),
+                    key.coords,
+                    HINTING_OPTIONS,
+                )
                 .ok()?;
         }
         Some(&entry.instance)
@@ -1724,7 +1732,7 @@ fn find_hint_entry(entries: &mut Vec<HintEntry>, key: &HintKey<'_>) -> Option<(u
     for (ix, entry) in entries.iter().enumerate() {
         if entry.font_id == key.font_id
             && entry.font_index == key.font_index
-            && entry.instance.size() == key.size
+            && entry.instance.size() == Size::new(key.size)
             && entry.instance.location().coords() == key.coords
         {
             return Some((ix, true));
