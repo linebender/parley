@@ -104,26 +104,27 @@ fn render_frame(
         for item in line.items() {
             match item {
                 PositionedLayoutItem::GlyphRun(glyph_run) => {
-                    renderer.set_paint(glyph_run.style().brush.color);
                     let run = glyph_run.run();
-
+                    let mut run_renderer =
+                        GlyphRunBuilder::new(run.font().clone(), *renderer.transform())
+                            .font_size(run.font_size())
+                            .hint(config.hint)
+                            .normalized_coords(run.normalized_coords())
+                            .atlas_cache(config.use_atlas_cache)
+                            .build(
+                                glyph_run
+                                    .positioned_glyphs()
+                                    .map(|glyph| parley_draw::Glyph {
+                                        id: glyph.id,
+                                        x: glyph.x,
+                                        y: glyph.y,
+                                    }),
+                                glyph_caches,
+                                image_cache,
+                            );
                     stats.start("fill_glyphs");
-                    GlyphRunBuilder::new(run.font().clone(), *renderer.transform(), renderer)
-                        .font_size(run.font_size())
-                        .hint(config.hint)
-                        .normalized_coords(run.normalized_coords())
-                        .atlas_cache(config.use_atlas_cache)
-                        .fill_glyphs(
-                            glyph_run
-                                .positioned_glyphs()
-                                .map(|glyph| parley_draw::Glyph {
-                                    id: glyph.id,
-                                    x: glyph.x,
-                                    y: glyph.y,
-                                }),
-                            glyph_caches,
-                            image_cache,
-                        );
+                    renderer.set_paint(glyph_run.style().brush.color);
+                    run_renderer.fill_glyphs(renderer);
                     stats.end("fill_glyphs");
 
                     let style = glyph_run.style();
@@ -137,24 +138,14 @@ fn render_frame(
                         let x1 = x + glyph_run.advance();
                         let baseline = glyph_run.baseline();
 
-                        GlyphRunBuilder::new(run.font().clone(), *renderer.transform(), renderer)
-                            .font_size(run.font_size())
-                            .normalized_coords(run.normalized_coords())
-                            .render_decoration(
-                                glyph_run
-                                    .positioned_glyphs()
-                                    .map(|glyph| parley_draw::Glyph {
-                                        id: glyph.id,
-                                        x: glyph.x,
-                                        y: glyph.y,
-                                    }),
-                                x..=x1,
-                                baseline,
-                                offset,
-                                size,
-                                1.0, // buffer around exclusions
-                                glyph_caches,
-                            );
+                        run_renderer.render_decoration(
+                            x..=x1,
+                            baseline,
+                            offset,
+                            size,
+                            1.0, // buffer around exclusions
+                            renderer,
+                        );
                         stats.end("render_underline");
                     }
                     if let Some(decoration) = &style.strikethrough {
