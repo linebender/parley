@@ -276,14 +276,17 @@ impl<'a, 'b, Glyphs: Iterator<Item = Glyph> + Clone, C: GlyphCache>
         // COLR/bitmap glyphs are never hinted. `prepare_glyph_run` may absorb
         // the scale into the font size, so we keep the original transform for
         // their metric calculations.
-        let unhinted_transform =
-            self.prepared_run.run_transform * self.prepared_run.glyph_transform.unwrap_or(Affine::IDENTITY);
+        let unhinted_transform = self.prepared_run.run_transform
+            * self
+                .prepared_run
+                .glyph_transform
+                .unwrap_or(Affine::IDENTITY);
         let font_id = self.prepared_run.font.data.id();
         let font_index = self.prepared_run.font.index;
         let hinted = hinting_instance.is_some();
 
-        let cache_enabled =
-            self.atlas_cache_enabled && hinted_size <= self.glyph_atlas.config().max_cached_font_size;
+        let cache_enabled = self.atlas_cache_enabled
+            && hinted_size <= self.glyph_atlas.config().max_cached_font_size;
 
         let render_glyph: fn(&mut R, PreparedGlyph<'_>, &mut C, &mut ImageCache) = match style {
             Style::Fill => R::fill_glyph,
@@ -543,8 +546,7 @@ impl<'a, 'b, Glyphs: Iterator<Item = Glyph> + Clone, C: GlyphCache>
         // scale them back down to the nominal coordinate space. When not hinting (or hinting without scale), this is
         // 1.0 and has no effect. The glyph-drawing path handles this by simply drawing in global space, but we need to
         // invert it for drawing decorations.
-        let outline_to_nominal_scale =
-            f64::from(self.prepared_run.font_size / hinted_size);
+        let outline_to_nominal_scale = f64::from(self.prepared_run.font_size / hinted_size);
         let outline_transform = self
             .prepared_run
             .glyph_transform
@@ -1428,8 +1430,8 @@ impl<C: GlyphCache> GlyphCaches<C> {
     /// Maintains the glyph caches by evicting unused cache entries.
     ///
     /// The `image_cache` must be the same allocator passed to
-    /// [`GlyphRunBuilder::fill_glyphs`] / [`GlyphRunBuilder::stroke_glyphs`]
-    /// so that evicted entries are deallocated from the correct allocator.
+    /// [`GlyphRunBuilder::build`] so that evicted entries are deallocated from
+    /// the correct allocator.
     ///
     /// Should be called once per scene rendering.
     pub fn maintain(&mut self, image_cache: &mut ImageCache) {
