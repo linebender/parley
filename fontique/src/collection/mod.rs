@@ -852,7 +852,6 @@ fn make_shared_matches_local() {
     .collect();
 
     if font_dirs.is_empty() {
-        std::eprintln!("No system font directories found — cannot demonstrate the bug.");
         return;
     }
 
