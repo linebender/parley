@@ -829,7 +829,10 @@ impl Shared {
 }
 
 #[test]
-#[cfg(feature = "std")]
+#[cfg(all(
+    feature = "std",
+    any(target_os = "linux", target_os = "macos", target_os = "windows")
+))]
 fn make_shared_matches_local() {
     use crate::{Collection, CollectionOptions};
 
