@@ -203,21 +203,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 max_advance
             };
 
-        let should_indent = {
-            let is_scope_line = if self.layout.data.indent_options.each_line {
-                self.lines.lines.is_empty()
-                    || self.lines.lines.last().map(|l| l.break_reason)
-                        == Some(BreakReason::Explicit)
-            } else {
-                self.lines.lines.is_empty()
-            };
-            is_scope_line ^ self.layout.data.indent_options.hanging
-        };
-        let line_indent = if should_indent {
-            self.layout.data.indent_amount
-        } else {
-            0.0
-        };
+        let line_indent = self.resolve_indent();
+
         let max_advance = max_advance - line_indent;
 
         // This macro simply calls the `commit_line` with the provided arguments and some parts of self.
@@ -461,6 +448,168 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         None
     }
 
+    /// Computes the next line in the paragraph by character count.
+    ///
+    /// This method breaks lines based on the number of characters rather than advance width.
+    /// Each text cluster (including whitespace and newlines) counts as 1 character.
+    /// Each inline box also counts as 1 character.
+    /// Ligature components each count separately (matching character count).
+    ///
+    /// Unlike `break_next`, this method does not respect normal line break opportunities and
+    /// will break exactly when the character limit is reached. It does not break on newlines, for example.
+    pub fn break_next_with_length(&mut self, max_chars: u32) -> Option<()> {
+        if self.done {
+            return None;
+        }
+        self.prev_state = Some(self.state.clone());
+
+        let line_indent = self.resolve_indent();
+
+        // Track cluster count for this line
+        let mut char_count: u32 = 0;
+
+        // This macro simply calls the `commit_line` with the provided arguments and some parts of self.
+        macro_rules! try_commit_line {
+            ($break_reason:expr) => {
+                try_commit_line(
+                    self.layout,
+                    &mut self.lines,
+                    &mut self.state.line,
+                    f32::MAX, // No advance limit
+                    $break_reason,
+                    line_indent,
+                )
+            };
+        }
+
+        let item_count = self.layout.data.items.len();
+        while self.state.item_idx < item_count {
+            let item = &self.layout.data.items[self.state.item_idx];
+
+            match item.kind {
+                LayoutItemKind::InlineBox => {
+                    let inline_box = &self.layout.data.inline_boxes[item.index];
+
+                    // Check if adding this box would exceed the limit
+                    if char_count >= max_chars && max_chars != 0 {
+                        // Break before this box
+                        if try_commit_line!(BreakReason::Regular) {
+                            self.start_new_line();
+                            return Some(());
+                        }
+                    }
+
+                    // Compute the x position for the line width tracking
+                    let next_x = self.state.line.x + inline_box.width;
+                    self.state.item_idx += 1;
+                    self.state
+                        .append_inline_box_to_line(next_x, inline_box.height);
+                    char_count += 1;
+
+                    // Check if we've reached the limit after adding this box
+                    if char_count >= max_chars {
+                        // Check if we've consumed all content (this is the last line).
+                        let is_last_item = self.state.item_idx >= self.layout.data.items.len();
+                        let break_reason = if is_last_item {
+                            BreakReason::None
+                        } else {
+                            BreakReason::Regular
+                        };
+
+                        if try_commit_line!(break_reason) {
+                            if break_reason == BreakReason::None {
+                                self.done = true;
+                            }
+                            self.start_new_line();
+                            return Some(());
+                        }
+                    }
+                }
+                LayoutItemKind::TextRun => {
+                    let run_idx = item.index;
+                    let run_data = &self.layout.data.runs[run_idx];
+                    let run = Run::new(self.layout, 0, 0, run_data, None);
+                    let cluster_start = run_data.cluster_range.start;
+                    let cluster_end = run_data.cluster_range.end;
+
+                    while self.state.cluster_idx < cluster_end {
+                        let cluster = run.get(self.state.cluster_idx - cluster_start).unwrap();
+
+                        // Check if we should break before this cluster
+                        if char_count >= max_chars
+                            && max_chars != 0
+                            && try_commit_line!(BreakReason::Regular)
+                        {
+                            self.start_new_line();
+                            return Some(());
+                        }
+
+                        let whitespace = cluster.info().whitespace();
+                        let is_newline = whitespace == Whitespace::Newline;
+                        let is_space = whitespace.is_space_or_nbsp();
+                        let advance = cluster.advance();
+
+                        // Compute the x position.
+                        // Newlines don't contribute to line width (matching break_next behavior).
+                        let next_x = if is_newline {
+                            self.state.line.x
+                        } else {
+                            self.state.line.x + advance
+                        };
+                        let line_height = run.metrics().line_height;
+                        self.state.append_cluster_to_line(next_x, line_height);
+                        self.state.cluster_idx += 1;
+                        char_count += 1;
+
+                        if is_space {
+                            self.state.line.num_spaces += 1;
+                        }
+
+                        // Check if we've reached the limit after adding this cluster
+                        if char_count >= max_chars {
+                            // Determine the break reason:
+                            // - BreakReason::None for the last line (end of content)
+                            // - BreakReason::Explicit if this line ends with a newline
+                            // - BreakReason::Regular for soft wraps
+                            let is_last_cluster_of_run = self.state.cluster_idx >= cluster_end;
+                            let is_last_item =
+                                self.state.item_idx + 1 >= self.layout.data.items.len();
+                            let break_reason = if is_last_cluster_of_run && is_last_item {
+                                BreakReason::None
+                            } else if is_newline {
+                                BreakReason::Explicit
+                            } else {
+                                BreakReason::Regular
+                            };
+
+                            if try_commit_line!(break_reason) {
+                                if break_reason == BreakReason::None {
+                                    self.done = true;
+                                }
+                                self.start_new_line();
+                                return Some(());
+                            }
+                        }
+                    }
+                    self.state.run_idx += 1;
+                    self.state.item_idx += 1;
+                }
+            }
+        }
+
+        // Commit the final line (only reached if content remains after all break_next_with_length calls)
+        if self.state.line.items.end == 0 {
+            self.state.line.items.end = 1;
+        }
+        if try_commit_line!(BreakReason::None) {
+            self.done = true;
+            self.start_new_line();
+            return Some(());
+        }
+
+        None
+    }
+
     /// Reverts the last computed line, returning to the previous state.
     pub fn revert(&mut self) -> bool {
         if let Some(state) = self.prev_state.take() {
@@ -501,6 +650,26 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 line.text_range = 0..0;
                 line.cluster_range = 0..0;
             }
+        }
+    }
+
+    #[inline]
+    fn resolve_indent(&mut self) -> f32 {
+        let should_indent = {
+            let is_scope_line = if self.layout.data.indent_options.each_line {
+                self.lines.lines.is_empty()
+                    || self.lines.lines.last().map(|l| l.break_reason)
+                        == Some(BreakReason::Explicit)
+            } else {
+                self.lines.lines.is_empty()
+            };
+            is_scope_line ^ self.layout.data.indent_options.hanging
+        };
+
+        if should_indent {
+            self.layout.data.indent_amount
+        } else {
+            0.0
         }
     }
 
