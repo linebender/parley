@@ -75,7 +75,7 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
     code.push('\n');
     write!(
         code,
-        "#[inline]\npub fn composite_get(cp: u32) -> u32 {{\n    {namespace}_get(cp as usize)\n}}\n"
+        "#[allow(missing_docs, reason = \"packtab generated code\")]\n#[inline]\npub fn composite_get(cp: u32) -> u32 {{\n    {namespace}_get(cp as usize)\n}}\n"
     )
     .unwrap();
 
@@ -87,21 +87,6 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
         config.compression, config.unsafe_access
     )
     .unwrap();
-    writeln!(&mut file).unwrap();
-    writeln!(&mut file, "#![allow(").unwrap();
-    for lint in [
-        "unsafe_code",
-        "trivial_numeric_casts",
-        "missing_docs",
-        "clippy::allow_attributes_without_reason",
-        "clippy::unseparated_literal_suffix",
-        "clippy::double_parens",
-        "clippy::unnecessary_cast",
-    ] {
-        writeln!(&mut file, "    {lint},").unwrap();
-    }
-    writeln!(&mut file, "    reason = \"packtab generated code\"").unwrap();
-    writeln!(&mut file, ")]").unwrap();
     writeln!(&mut file).unwrap();
     write!(&mut file, "{code}").unwrap();
 }

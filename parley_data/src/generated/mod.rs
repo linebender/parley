@@ -3,17 +3,6 @@
 
 //! Backing data for composite properties (PackTab, compression=5, unsafe=false)
 
-#![allow(
-    unsafe_code,
-    trivial_numeric_casts,
-    missing_docs,
-    clippy::allow_attributes_without_reason,
-    clippy::unseparated_literal_suffix,
-    clippy::double_parens,
-    clippy::unnecessary_cast,
-    reason = "packtab generated code"
-)]
-
 #[allow(
     dead_code,
     non_upper_case_globals,
@@ -1005,6 +994,7 @@ pub(crate) fn composite_packtab_get(u: usize) -> u32 {
     }
 }
 
+#[allow(missing_docs, reason = "packtab generated code")]
 #[inline]
 pub fn composite_get(cp: u32) -> u32 {
     composite_packtab_get(cp as usize)
