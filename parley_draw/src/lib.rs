@@ -50,7 +50,7 @@ pub use atlas::{
 pub use colr::{ColrPainter, ColrRenderer};
 pub use glyph::{
     CachedGlyphType, Glyph, GlyphBitmap, GlyphCaches, GlyphColr, GlyphOutline, GlyphRenderer,
-    GlyphRunBuilder, GlyphType, HintCache, HintKey, OutlineCache, PreparedGlyph,
+    GlyphRunBuilder, GlyphRunRenderer, GlyphType, HintCache, HintKey, OutlineCache, PreparedGlyph,
 };
 
 #[cfg(feature = "vello_cpu")]
