@@ -40,6 +40,7 @@ impl<ID, T> LruCache<ID, T> {
     {
         match self.find_entry(id, make_data) {
             (true, index) => {
+                self.epoch += 1;
                 let entry = &mut self.entries[index];
                 entry.epoch = self.epoch;
                 &entry.data
@@ -174,5 +175,39 @@ mod tests {
             20
         });
         assert!(was_created, "key2 should have been evicted");
+    }
+
+    #[test]
+    fn test_lru_eviction_after_multiple_hits() {
+        let mut cache = LruCache::new(3);
+
+        cache.entry(TestLookupKey("key1"), || 1);
+        cache.entry(TestLookupKey("key2"), || 2);
+        cache.entry(TestLookupKey("key3"), || 3);
+
+        // Hit all three in order: key3 first (making it LRU among hits),
+        // then key1, then key2 (most recently used).
+        cache.entry(TestLookupKey("key3"), || panic!("Should not create"));
+        cache.entry(TestLookupKey("key1"), || panic!("Should not create"));
+        cache.entry(TestLookupKey("key2"), || panic!("Should not create"));
+
+        // Insert key4 — should evict key3 (least recently accessed)
+        cache.entry(TestLookupKey("key4"), || 4);
+
+        // key1 and key2 should still be present with original values
+        // (check these first since verifying key3 eviction will trigger another eviction)
+        let v1 = cache.entry(TestLookupKey("key1"), || panic!("key1 should still be present"));
+        assert_eq!(*v1, 1);
+
+        let v2 = cache.entry(TestLookupKey("key2"), || panic!("key2 should still be present"));
+        assert_eq!(*v2, 2);
+
+        // key3 should have been evicted
+        let mut key3_recreated = false;
+        cache.entry(TestLookupKey("key3"), || {
+            key3_recreated = true;
+            30
+        });
+        assert!(key3_recreated, "key3 should have been evicted as the LRU");
     }
 }
