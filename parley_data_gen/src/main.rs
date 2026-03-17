@@ -14,7 +14,10 @@ fn main() {
         .unwrap_or_else(|| OsString::from("parley_data_gen"));
 
     let Some(out_arg) = args.next() else {
-        eprintln!("Usage: {} <output-dir>", exe.to_string_lossy());
+        eprintln!(
+            "Usage: {} <output-dir> [--compression=N --unsafe]",
+            exe.to_string_lossy()
+        );
         process::exit(1);
     };
 
@@ -29,5 +32,18 @@ fn main() {
         process::exit(1);
     }
 
-    parley_data_gen::generate(out_path);
+    let remaining: Vec<String> = args.map(|a| a.to_string_lossy().into_owned()).collect();
+
+    let compression = remaining
+        .iter()
+        .find_map(|a| a.strip_prefix("--compression="))
+        .and_then(|v| v.parse::<f64>().ok())
+        .unwrap_or(1.0);
+    let unsafe_access = remaining.iter().any(|a| a == "--unsafe");
+
+    let config = parley_data_gen::Config {
+        compression,
+        unsafe_access,
+    };
+    parley_data_gen::generate(out_path, &config);
 }

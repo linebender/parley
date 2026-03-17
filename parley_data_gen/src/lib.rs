@@ -3,8 +3,6 @@
 
 //! See `./main.rs`.
 
-use icu_codepointtrie_builder::{CodePointTrieBuilder, CodePointTrieBuilderData};
-use icu_collections::codepointtrie::TrieType;
 use icu_properties::props::{GeneralCategory, GraphemeClusterBreak, Script};
 use icu_properties::{
     CodePointMapData, CodePointSetData,
@@ -13,15 +11,25 @@ use icu_properties::{
     },
 };
 use parley_data::Properties;
+use std::fmt::Write as _;
 use std::io::{BufWriter, Write};
 
 const COPYRIGHT_HEADER: &str =
     "// Copyright 2025 the Parley Authors\n// SPDX-License-Identifier: Apache-2.0 OR MIT\n";
 
-/// Exports ICU data provider as Rust code into the `out` directory.
-pub fn generate(out: std::path::PathBuf) {
-    // Generate `CompositeProps` data
-    {
+/// Generation configuration.
+#[derive(Debug)]
+pub struct Config {
+    /// Compression level (1.0 = balanced, 5.0 = smaller, 9.0 = even smaller, 10.0 = smallest).
+    pub compression: f64,
+    /// Whether to use unsafe array access in generated code.
+    pub unsafe_access: bool,
+}
+
+/// Exports ICU data as `PackTab` lookup tables + generated Rust code into the `out` directory.
+pub fn generate(out: std::path::PathBuf, config: &Config) {
+    // Generate the data required for `CompositeProps`.
+    let values = {
         // Dense values table for 0..=0x10FFFF
         let mut values = Vec::<u32>::with_capacity(0x110000);
         for cp in 0_u32..=0x10FFFF {
@@ -45,32 +53,40 @@ pub fn generate(out: std::path::PathBuf) {
             );
             values.push(v.into());
         }
+        values
+    };
+    let scalar_data: Vec<i64> = values.iter().map(|&v| v as i64).collect();
 
-        let trie = CodePointTrieBuilder {
-            data: CodePointTrieBuilderData::ValuesByCodePoint(&values),
-            default_value: 0, // not observed; we filled all entries
-            error_value: 0,
-            trie_type: TrieType::Small,
-        }
-        .build();
+    let (info, best) = packtab::pack_table(&scalar_data, Some(0), config.compression);
 
-        let mut file = BufWriter::new(std::fs::File::create(out.join("mod.rs")).unwrap());
+    let namespace = "composite_packtab";
+    let mut code = packtab::generate(
+        &info,
+        best,
+        namespace,
+        packtab::codegen::Language::Rust {
+            unsafe_access: config.unsafe_access,
+        },
+    );
 
-        writeln!(&mut file, "{COPYRIGHT_HEADER}").unwrap();
-        writeln!(&mut file, "/// Backing data for the `CompositeProps`").unwrap();
-        writeln!(
-            &mut file,
-            "/// Expected size: {}B",
-            size_of_val(&trie) + databake::BakeSize::borrows_size(&trie)
-        )
-        .unwrap();
-        writeln!(&mut file, "#[rustfmt::skip]").unwrap();
-        writeln!(&mut file, "#[allow(unsafe_code, unused_unsafe, clippy::unseparated_literal_suffix, reason = \"databake behaviour\")]").unwrap();
-        writeln!(
-            &mut file,
-            "pub const COMPOSITE: icu_collections::codepointtrie::CodePointTrie<'static, u32> = {};",
-            databake::Bake::bake(&trie, &databake::CrateEnv::default())
-        )
-        .unwrap();
+    if !code.ends_with('\n') {
+        code.push('\n');
     }
+    code.push('\n');
+    write!(
+        code,
+        "#[allow(missing_docs, reason = \"packtab generated code\")]\n#[inline]\npub fn composite_get(cp: u32) -> u32 {{\n    {namespace}_get(cp as usize)\n}}\n"
+    )
+    .unwrap();
+
+    let mut file = BufWriter::new(std::fs::File::create(out.join("mod.rs")).unwrap());
+    writeln!(&mut file, "{COPYRIGHT_HEADER}").unwrap();
+    writeln!(
+        &mut file,
+        "//! Backing data for composite properties (PackTab, compression={}, unsafe={})",
+        config.compression, config.unsafe_access
+    )
+    .unwrap();
+    writeln!(&mut file).unwrap();
+    write!(&mut file, "{code}").unwrap();
 }
