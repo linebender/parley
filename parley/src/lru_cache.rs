@@ -196,10 +196,14 @@ mod tests {
 
         // key1 and key2 should still be present with original values
         // (check these first since verifying key3 eviction will trigger another eviction)
-        let v1 = cache.entry(TestLookupKey("key1"), || panic!("key1 should still be present"));
+        let v1 = cache.entry(TestLookupKey("key1"), || {
+            panic!("key1 should still be present")
+        });
         assert_eq!(*v1, 1);
 
-        let v2 = cache.entry(TestLookupKey("key2"), || panic!("key2 should still be present"));
+        let v2 = cache.entry(TestLookupKey("key2"), || {
+            panic!("key2 should still be present")
+        });
         assert_eq!(*v2, 2);
 
         // key3 should have been evicted
