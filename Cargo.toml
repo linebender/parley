@@ -44,7 +44,7 @@ icu_normalizer = { version = "2.1.1", default-features = false }
 icu_properties = { version = "2.1.2", default-features = false }
 icu_segmenter = { version = "2.1.2", default-features = false }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
-packtab = { git = "https://github.com/behdad/packtab.rs.git", rev = "126e0dd86b900958843955d098181e35409981c5" }
+packtab = { version = "1.8.0" }
 parley = { version = "0.7.0", default-features = false, path = "parley" }
 parley_data = { path = "parley_data", default-features = false }
 parley_data_gen = { path = "parley_data_gen" }
