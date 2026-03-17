@@ -14,7 +14,11 @@
     reason = "packtab generated code"
 )]
 
-#[allow(dead_code, non_upper_case_globals)]
+#[allow(
+    dead_code,
+    non_upper_case_globals,
+    clippy::allow_attributes_without_reason
+)]
 static composite_packtab_u8: [u8; 2176] = [
     16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
     40, 41, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 42, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
@@ -87,7 +91,11 @@ static composite_packtab_u8: [u8; 2176] = [
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 15,
 ];
-#[allow(dead_code, non_upper_case_globals)]
+#[allow(
+    dead_code,
+    non_upper_case_globals,
+    clippy::allow_attributes_without_reason
+)]
 static composite_packtab_u16: [u16; 13136] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
@@ -739,7 +747,11 @@ static composite_packtab_u16: [u16; 13136] = [
     0, 20, 20, 20, 20, 20, 20, 20, 164, 1436, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 4, 4, 1436, 0, 0, 2866,
     12, 12, 12, 12, 12, 12, 12,
 ];
-#[allow(dead_code, non_upper_case_globals)]
+#[allow(
+    dead_code,
+    non_upper_case_globals,
+    clippy::allow_attributes_without_reason
+)]
 static composite_packtab_u32: [u32; 2868] = [
     103, 103, 4455, 4455, 1297, 1297, 58642, 58642, 1434, 1434, 1351, 1351, 4726887, 4726887,
     2628352, 2628352, 4711, 4711, 262247, 262247, 8388711, 8388711, 11016960, 11016960, 6912, 6912,
@@ -965,7 +977,16 @@ static composite_packtab_u32: [u32; 2868] = [
     8388711, 4726887, 4730880,
 ];
 
-#[allow(dead_code, unused_parens)]
+#[allow(
+    dead_code,
+    unused_parens,
+    trivial_numeric_casts,
+    clippy::allow_attributes_without_reason,
+    clippy::unseparated_literal_suffix,
+    clippy::double_parens,
+    clippy::unnecessary_cast,
+    missing_docs
+)]
 #[inline]
 pub(crate) fn composite_packtab_get(u: usize) -> u32 {
     /* packtab: [2^8,2^5,2^3,2^1] */
