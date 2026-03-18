@@ -1,6 +1,8 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::VerticalAlign;
+
 /// A box to be laid out inline with text
 #[derive(PartialEq, Debug, Clone)]
 pub struct InlineBox {
@@ -14,4 +16,7 @@ pub struct InlineBox {
     pub width: f32,
     /// The height of the box in pixels
     pub height: f32,
+    /// Vertical alignment of the box relative to the line baseline.
+    /// Defaults to `VerticalAlign::Baseline`.
+    pub vertical_align: VerticalAlign,
 }

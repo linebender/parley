@@ -20,6 +20,57 @@ pub use text_primitives::{OverflowWrap, TextWrapMode, WordBreak};
 
 use crate::util::nearly_eq;
 
+/// CSS `vertical-align` property for inline-level elements.
+///
+/// Controls how an inline element is positioned relative to the line's baseline.
+/// Positive `Length` values raise the element; negative values lower it.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum VerticalAlign {
+    /// Align the baseline of the element with the baseline of the parent.
+    #[default]
+    Baseline,
+    /// Lower the element as appropriate for subscripts.
+    Sub,
+    /// Raise the element as appropriate for superscripts.
+    Super,
+    /// Align the top of the element with the top of the line box.
+    Top,
+    /// Align the bottom of the element with the bottom of the line box.
+    Bottom,
+    /// Align the top of the element with the top of the parent's font.
+    TextTop,
+    /// Align the bottom of the element with the bottom of the parent's font.
+    TextBottom,
+    /// Align the midpoint of the element with the baseline plus half the x-height.
+    Middle,
+    /// Raise (positive) or lower (negative) by the given amount in layout units.
+    Length(f32),
+}
+
+impl VerticalAlign {
+    pub(crate) fn nearly_eq(self, other: Self) -> bool {
+        match (self, other) {
+            (Self::Baseline, Self::Baseline)
+            | (Self::Sub, Self::Sub)
+            | (Self::Super, Self::Super)
+            | (Self::Top, Self::Top)
+            | (Self::Bottom, Self::Bottom)
+            | (Self::TextTop, Self::TextTop)
+            | (Self::TextBottom, Self::TextBottom)
+            | (Self::Middle, Self::Middle) => true,
+            (Self::Length(a), Self::Length(b)) => nearly_eq(a, b),
+            _ => false,
+        }
+    }
+
+    pub(crate) fn scale(self, scale: f32) -> Self {
+        match self {
+            Self::Length(value) => Self::Length(value * scale),
+            value => value,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum WhiteSpaceCollapse {
     Collapse,
@@ -117,6 +168,8 @@ pub enum StyleProperty<'a, B: Brush> {
     OverflowWrap(OverflowWrap),
     /// Control over non-"emergency" line-breaking.
     TextWrapMode(TextWrapMode),
+    /// Vertical alignment of inline elements.
+    VerticalAlign(VerticalAlign),
 }
 
 /// Unresolved styles.
@@ -168,6 +221,8 @@ pub struct TextStyle<'family, 'settings, B: Brush> {
     pub overflow_wrap: OverflowWrap,
     /// Control over non-"emergency" line-breaking.
     pub text_wrap_mode: TextWrapMode,
+    /// Vertical alignment of inline elements.
+    pub vertical_align: VerticalAlign,
 }
 
 impl<B: Brush> Default for TextStyle<'static, 'static, B> {
@@ -196,6 +251,7 @@ impl<B: Brush> Default for TextStyle<'static, 'static, B> {
             word_break: WordBreak::default(),
             overflow_wrap: OverflowWrap::default(),
             text_wrap_mode: TextWrapMode::default(),
+            vertical_align: VerticalAlign::default(),
         }
     }
 }
@@ -239,5 +295,11 @@ impl<B: Brush> From<GenericFamily> for StyleProperty<'_, B> {
 impl<B: Brush> From<LineHeight> for StyleProperty<'_, B> {
     fn from(value: LineHeight) -> Self {
         StyleProperty::LineHeight(value)
+    }
+}
+
+impl<B: Brush> From<VerticalAlign> for StyleProperty<'_, B> {
+    fn from(value: VerticalAlign) -> Self {
+        StyleProperty::VerticalAlign(value)
     }
 }

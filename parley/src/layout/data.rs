@@ -189,6 +189,9 @@ pub(crate) struct LineItemData {
     /// Advance (size in direction of text flow) for the run.
     pub(crate) advance: f32,
 
+    /// Offset from the line baseline for vertical alignment (positive = down).
+    pub(crate) baseline_offset: f32,
+
     // Fields that only apply to text runs (Ignored for boxes)
     // TODO: factor this out?
     /// True if the run is composed entirely of whitespace.

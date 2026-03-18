@@ -17,7 +17,7 @@ use crate::layout::{
     LineMetrics, Run,
 };
 use crate::style::Brush;
-use crate::{OverflowWrap, TextWrapMode};
+use crate::{OverflowWrap, TextWrapMode, VerticalAlign};
 
 use core::ops::Range;
 
@@ -693,59 +693,170 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         if line.item_range.is_empty() {
             line.text_range = self.layout.data.text_len..self.layout.data.text_len;
         }
-        // Compute metrics for the line, but ignore trailing whitespace.
+        // Two-pass vertical alignment algorithm:
+        //
+        // Pass 0: Pre-compute whitespace properties, text ranges, advance, bidi,
+        //         and identify trailing whitespace (which doesn't contribute to metrics).
+        //
+        // Pass 1: Process baseline-relative items (everything except Top/Bottom).
+        //         Compute each item's baseline_offset and accumulate line ascent/descent
+        //         accounting for shifted positions.
+        //
+        // Pass 2: Process Top/Bottom items now that line metrics are finalized.
+
         let mut have_metrics = false;
         let mut needs_reorder = false;
-        for line_item in self.lines.line_items[line.item_range.clone()]
-            .iter_mut()
-            .rev()
-        {
+
+        // Index of the first trailing-whitespace-only text run (from the end).
+        // Items at or after this index are trailing whitespace and don't contribute to metrics.
+        let mut trailing_ws_start = line.item_range.end;
+
+        // Pass 0: pre-compute per-item properties and find trailing whitespace boundary
+        for item_idx in line.item_range.clone() {
+            let line_item = &mut self.lines.line_items[item_idx];
             match line_item.kind {
-                LayoutItemKind::InlineBox => {
-                    let item = &self.layout.data.inline_boxes[line_item.index];
-
-                    // Advance is already computed in "commit line" for items
-
-                    // Default vertical alignment is to align the bottom of boxes with the text baseline.
-                    // This is equivalent to the entire height of the box being "ascent"
-                    line.metrics.ascent = line.metrics.ascent.max(item.height);
-
-                    // Mark us as having seen non-whitespace content on this line
-                    have_metrics = true;
-                }
+                LayoutItemKind::InlineBox => {}
                 LayoutItemKind::TextRun => {
                     line_item.compute_whitespace_properties(&self.layout.data);
 
-                    // Compute the text range for the line
-                    // Q: Can we not simplify this computation by assuming that items are in order?
                     line.text_range.end = line.text_range.end.max(line_item.text_range.end);
                     line.text_range.start = line.text_range.start.min(line_item.text_range.start);
 
-                    // Mark line as needing bidi re-ordering if it contains any runs with non-zero bidi level
-                    // (zero is the default level, so this is equivalent to marking lines that have multiple levels)
                     if line_item.bidi_level != 0 {
                         needs_reorder = true;
                     }
 
-                    // Compute the run's advance by summing the advances of its constituent clusters
                     line_item.advance = self.layout.data.clusters[line_item.cluster_range.clone()]
                         .iter()
                         .map(|c| c.advance)
                         .sum();
+                }
+            }
+        }
 
-                    // Ignore trailing whitespace for metrics computation
-                    // (we are iterating backwards so trailing whitespace comes first)
-                    if !have_metrics && line_item.is_whitespace {
+        // Walk backwards to find trailing whitespace boundary
+        for item_idx in line.item_range.clone().rev() {
+            let line_item = &self.lines.line_items[item_idx];
+            match line_item.kind {
+                LayoutItemKind::InlineBox => break, // Inline box ends trailing whitespace
+                LayoutItemKind::TextRun => {
+                    if line_item.is_whitespace {
+                        trailing_ws_start = item_idx;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Pass 1: baseline-relative items
+        for item_idx in line.item_range.clone() {
+            let is_trailing_ws = item_idx >= trailing_ws_start;
+            let line_item = &mut self.lines.line_items[item_idx];
+            match line_item.kind {
+                LayoutItemKind::InlineBox => {
+                    let item = &self.layout.data.inline_boxes[line_item.index];
+
+                    // Compute baseline_offset based on vertical_align (positive = down)
+                    let offset = match item.vertical_align {
+                        VerticalAlign::Baseline => 0.0,
+                        VerticalAlign::Sub => item.height * 0.25,
+                        VerticalAlign::Super => -(item.height * 0.4),
+                        VerticalAlign::Middle => -(item.height * 0.5),
+                        VerticalAlign::Length(v) => -v,
+                        VerticalAlign::TextTop => -(line.metrics.ascent - item.height),
+                        VerticalAlign::TextBottom => line.metrics.descent,
+                        // Top/Bottom deferred to pass 2
+                        VerticalAlign::Top | VerticalAlign::Bottom => 0.0,
+                    };
+                    line_item.baseline_offset = offset;
+
+                    // Contribute to line metrics considering the offset.
+                    // Inline boxes sit with bottom at baseline by default,
+                    // so effective_ascent = height - offset, effective_descent = offset
+                    if !matches!(item.vertical_align, VerticalAlign::Top | VerticalAlign::Bottom) {
+                        let effective_ascent = (item.height - offset).max(0.0);
+                        let effective_descent = offset.max(0.0);
+                        line.metrics.ascent = line.metrics.ascent.max(effective_ascent);
+                        line.metrics.descent = line.metrics.descent.max(effective_descent);
+                    }
+
+                    have_metrics = true;
+                }
+                LayoutItemKind::TextRun => {
+                    // Get the vertical_align for this run from its style
+                    let vertical_align = get_run_vertical_align(line_item, &self.layout.data);
+                    let run = &self.layout.data.runs[line_item.index];
+
+                    // Compute baseline_offset (positive = down)
+                    let offset = match vertical_align {
+                        VerticalAlign::Baseline => 0.0,
+                        VerticalAlign::Sub => run.metrics.descent,
+                        VerticalAlign::Super => -(run.metrics.ascent * 0.4),
+                        VerticalAlign::Middle => {
+                            let x_height = run
+                                .metrics
+                                .x_height
+                                .unwrap_or(run.metrics.ascent * 0.5);
+                            -(x_height * 0.5)
+                        }
+                        VerticalAlign::Length(v) => -v,
+                        VerticalAlign::TextTop => -(line.metrics.ascent - run.metrics.ascent),
+                        VerticalAlign::TextBottom => line.metrics.descent - run.metrics.descent,
+                        // Deferred to pass 2
+                        VerticalAlign::Top | VerticalAlign::Bottom => 0.0,
+                    };
+                    line_item.baseline_offset = offset;
+
+                    // Skip trailing whitespace for metrics contribution
+                    if is_trailing_ws {
                         continue;
                     }
 
-                    // Compute the run's vertical metrics
-                    let run = &self.layout.data.runs[line_item.index];
-                    line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent);
-                    line.metrics.descent = line.metrics.descent.max(run.metrics.descent);
+                    // Contribute to line metrics considering the offset
+                    if !matches!(vertical_align, VerticalAlign::Top | VerticalAlign::Bottom) {
+                        let effective_ascent = (run.metrics.ascent - offset).max(0.0);
+                        let effective_descent = (run.metrics.descent + offset).max(0.0);
+                        line.metrics.ascent = line.metrics.ascent.max(effective_ascent);
+                        line.metrics.descent = line.metrics.descent.max(effective_descent);
+                    }
 
-                    // Mark us as having seen non-whitespace content on this line
                     have_metrics = true;
+                }
+            }
+        }
+
+        // Pass 2: Top/Bottom items — position them relative to the finalized line box
+        for item_idx in line.item_range.clone() {
+            let line_item = &mut self.lines.line_items[item_idx];
+            match line_item.kind {
+                LayoutItemKind::InlineBox => {
+                    let item = &self.layout.data.inline_boxes[line_item.index];
+                    match item.vertical_align {
+                        VerticalAlign::Top => {
+                            // Align top of box with top of line
+                            line_item.baseline_offset = -(line.metrics.ascent - item.height);
+                        }
+                        VerticalAlign::Bottom => {
+                            // Align bottom of box with bottom of line
+                            line_item.baseline_offset = line.metrics.descent;
+                        }
+                        _ => {}
+                    }
+                }
+                LayoutItemKind::TextRun => {
+                    let vertical_align = get_run_vertical_align(line_item, &self.layout.data);
+                    let run = &self.layout.data.runs[line_item.index];
+                    match vertical_align {
+                        VerticalAlign::Top => {
+                            line_item.baseline_offset = -(line.metrics.ascent - run.metrics.ascent);
+                        }
+                        VerticalAlign::Bottom => {
+                            line_item.baseline_offset =
+                                line.metrics.descent - run.metrics.descent;
+                        }
+                        _ => {}
+                    }
                 }
             }
         }
@@ -817,6 +928,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         index,
                         bidi_level: 0,
                         advance: 0.,
+                        baseline_offset: 0.0,
                         is_whitespace: false,
                         has_trailing_whitespace: false,
                         cluster_range: cluster..cluster,
@@ -998,6 +1110,7 @@ fn try_commit_line<B: Brush>(
                     index: item.index,
                     bidi_level: item.bidi_level,
                     advance: inline_box.width,
+                    baseline_offset: 0.0,
 
                     // These properties are ignored for inline boxes. So we just put a dummy value.
                     is_whitespace: false,
@@ -1050,6 +1163,7 @@ fn try_commit_line<B: Brush>(
                     index: item.index,
                     bidi_level: run_data.bidi_level,
                     advance: 0.,
+                    baseline_offset: 0.0,
                     is_whitespace: false,
                     has_trailing_whitespace: false,
                     cluster_range,
@@ -1115,6 +1229,18 @@ fn try_commit_line<B: Brush>(
     };
 
     true
+}
+
+/// Get the `VerticalAlign` for a text run's `LineItemData` by looking up its first cluster's style.
+fn get_run_vertical_align<B: Brush>(
+    line_item: &LineItemData,
+    data: &LayoutData<B>,
+) -> VerticalAlign {
+    if line_item.cluster_range.is_empty() {
+        return VerticalAlign::Baseline;
+    }
+    let cluster = &data.clusters[line_item.cluster_range.start];
+    data.styles[cluster.style_index as usize].vertical_align
 }
 
 /// Reorder items within line according to the bidi levels of the items

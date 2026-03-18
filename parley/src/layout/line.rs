@@ -253,12 +253,23 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                 LineItem::InlineBox(inline_box) => {
                     let x = self.offset + self.line.data.metrics.offset;
 
+                    // Get baseline_offset from the corresponding LineItemData
+                    let abs_item_idx = self.line.data.item_range.start + self.item_index;
+                    let baseline_offset = self
+                        .line
+                        .layout
+                        .data
+                        .line_items
+                        .get(abs_item_idx)
+                        .map(|li| li.baseline_offset)
+                        .unwrap_or(0.0);
+
                     self.item_index += 1;
                     self.glyph_start = 0;
                     self.offset += inline_box.width;
                     return Some(PositionedLayoutItem::InlineBox(PositionedInlineBox {
                         x,
-                        y: self.line.data.metrics.baseline - inline_box.height,
+                        y: self.line.data.metrics.baseline + baseline_offset - inline_box.height,
                         width: inline_box.width,
                         height: inline_box.height,
                         id: inline_box.id,
@@ -279,6 +290,18 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                             advance += glyph.advance;
                         }
                         let style = run.layout.data.styles.get(style_index)?;
+
+                        // Get baseline_offset from the corresponding LineItemData
+                        let abs_item_idx = self.line.data.item_range.start + self.item_index;
+                        let baseline_offset = self
+                            .line
+                            .layout
+                            .data
+                            .line_items
+                            .get(abs_item_idx)
+                            .map(|li| li.baseline_offset)
+                            .unwrap_or(0.0);
+
                         let glyph_start = self.glyph_start;
                         self.glyph_start += glyph_count;
                         let offset = self.offset;
@@ -289,7 +312,7 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                             glyph_start,
                             glyph_count,
                             offset: offset + self.line.data.metrics.offset,
-                            baseline: self.line.data.metrics.baseline,
+                            baseline: self.line.data.metrics.baseline + baseline_offset,
                             advance,
                         }));
                     }
