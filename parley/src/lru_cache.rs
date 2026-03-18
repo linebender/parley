@@ -38,23 +38,14 @@ impl<ID, T> LruCache<ID, T> {
     where
         K: Equivalent<ID> + Into<ID>,
     {
-        match self.find_entry(id, make_data) {
-            (true, index) => {
-                self.epoch += 1;
-                let entry = &mut self.entries[index];
-                entry.epoch = self.epoch;
-                &entry.data
-            }
-            (false, index) => {
-                self.epoch += 1;
-                let entry = &mut self.entries[index];
-                entry.epoch = self.epoch;
-                &entry.data
-            }
-        }
+        let index = self.find_entry(id, make_data);
+        self.epoch += 1;
+        let entry = &mut self.entries[index];
+        entry.epoch = self.epoch;
+        &entry.data
     }
 
-    fn find_entry<K>(&mut self, id: K, make_data: impl FnOnce() -> T) -> (bool, usize)
+    fn find_entry<K>(&mut self, id: K, make_data: impl FnOnce() -> T) -> usize
     where
         K: Equivalent<ID> + Into<ID>,
     {
@@ -63,7 +54,7 @@ impl<ID, T> LruCache<ID, T> {
         let mut lowest_index = 0;
         for (i, entry) in self.entries.iter().enumerate() {
             if id.equivalent(&entry.id) {
-                return (true, i);
+                return i;
             }
             if entry.epoch < lowest_serial {
                 lowest_serial = entry.epoch;
@@ -83,7 +74,7 @@ impl<ID, T> LruCache<ID, T> {
             entry.id = id.into();
             entry.data = make_data();
         }
-        (false, lowest_index)
+        lowest_index
     }
 }
 
