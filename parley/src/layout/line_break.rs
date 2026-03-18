@@ -457,11 +457,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     ///
     /// Unlike `break_next`, this method does not respect normal line break opportunities and
     /// will break exactly when the character limit is reached. It does not break on newlines, for example.
+    ///
+    /// Inline boxes are supported and each contributes as 1 character.
     pub fn break_next_with_length(&mut self, max_chars: u32) -> Option<()> {
         if self.done {
             return None;
         }
-        self.prev_state = Some(self.state.clone());
 
         let line_indent = self.resolve_indent();
 
@@ -654,7 +655,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     }
 
     #[inline]
-    fn resolve_indent(&mut self) -> f32 {
+    fn resolve_indent(&self) -> f32 {
         let should_indent = {
             let is_scope_line = if self.layout.data.indent_options.each_line {
                 self.lines.lines.is_empty()
