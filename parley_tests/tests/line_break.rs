@@ -8,6 +8,7 @@
 
 use crate::test_name;
 use crate::util::TestEnv;
+use parley::style::FontFamily;
 use parley::{Alignment, AlignmentOptions, InlineBox, PositionedLayoutItem, StyleProperty};
 
 #[test]
@@ -138,7 +139,7 @@ fn break_by_length_multiple_inline_boxes() {
     env.check_layout_snapshot(&layout);
 }
 
-/// This test verifies that breaking in the middle of a ligature produces valid glyphs.
+/// This test verifies that breaking in the middle of a ligature does NOT produce valid glyphs.
 ///
 /// When "abfi" is broken after 3 characters, the "fi" ligature is split with "f" on line 1
 /// and "i" on line 2. For proper rendering, the "i" cluster on line 2 should contain a
@@ -221,6 +222,83 @@ fn break_by_length_single_cluster_lines() {
 
     assert_eq!(layout.len(), 3, "Expected 3 lines");
     env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn break_by_length_with_emoji() {
+    let mut env = TestEnv::new(test_name!(), None);
+    env.set_tolerance(5.0);
+
+    let text = "✅👀🎉🤠✅👀";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::FontFamily(FontFamily::named(
+        "Noto Color Emoji",
+    )));
+    let mut layout = builder.build(text);
+
+    // Break at 1, 3, 2 clusters -> expect 3 lines
+    let mut breaker = layout.break_lines();
+    breaker.break_next_with_length(1);
+    breaker.break_next_with_length(3);
+    breaker.break_next_with_length(2);
+    breaker.finish();
+
+    assert_eq!(layout.len(), 3, "Expected 3 lines");
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn break_by_length_with_emoji_only() {
+    let mut env = TestEnv::new(test_name!(), None);
+    env.set_tolerance(5.0);
+
+    let text = "✅👀🎉🤠";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::FontFamily(FontFamily::named(
+        "Noto Color Emoji",
+    )));
+    let mut layout = builder.build(text);
+
+    // Break at 2 clusters each -> expect 2 lines
+    let mut breaker = layout.break_lines();
+    breaker.break_next_with_length(2);
+    breaker.break_next_with_length(2);
+    breaker.finish();
+
+    assert_eq!(layout.len(), 2, "Expected 2 lines");
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn break_by_length_with_multi_codepoint_emoji() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Family emoji (ZWJ sequence): 👨‍👩‍👧‍👦 = 7 codepoints
+    // Flag emoji: 🇺🇸 = 2 codepoints
+    // Simple emoji: ✅ = 1 codepoint (in the bundled subset)
+    // Total = 10 clusters
+    let text = "👨‍👩‍👧‍👦🇺🇸✅";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::FontFamily(FontFamily::named(
+        "Noto Color Emoji",
+    )));
+    let mut layout = builder.build(text);
+
+    // Break at visual emoji boundaries: 7 (family), 2 (flag), 1 (simple)
+    let mut breaker = layout.break_lines();
+    breaker.break_next_with_length(7); // 👨‍👩‍👧‍👦
+    breaker.break_next_with_length(2); // 🇺🇸
+    breaker.break_next_with_length(1); // ✅
+    breaker.finish();
+
+    assert_eq!(layout.len(), 3, "Expected 3 lines");
+
+    // Verify cluster counts per line match codepoint counts
+    let clusters_per_line: Vec<usize> = layout
+        .lines()
+        .map(|line| line.runs().map(|run| run.clusters().count()).sum())
+        .collect();
+    assert_eq!(clusters_per_line, vec![7, 2, 1]);
 }
 
 /// This test verifies that `break_next_with_length` produces the same layout metrics as
