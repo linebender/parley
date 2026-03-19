@@ -306,6 +306,17 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) indent_amount: f32,
     /// Options controlling text-indent behavior (each-line, hanging).
     pub(crate) indent_options: IndentOptions,
+
+    // CSS strut metrics (CSS2.1 §10.8.1): the root style's font metrics
+    // that establish minimum line box height for every line.
+    /// Strut font ascent (from root style's font).
+    pub(crate) strut_ascent: f32,
+    /// Strut font descent (from root style's font).
+    pub(crate) strut_descent: f32,
+    /// Strut line height (from root style's line-height).
+    pub(crate) strut_line_height: f32,
+    /// Strut x-height (from root style's font, for vertical-align: middle).
+    pub(crate) strut_x_height: f32,
 }
 
 impl<B: Brush> Default for LayoutData<B> {
@@ -334,6 +345,10 @@ impl<B: Brush> Default for LayoutData<B> {
             alignment_width: 0.0,
             indent_amount: 0.0,
             indent_options: IndentOptions::default(),
+            strut_ascent: 0.0,
+            strut_descent: 0.0,
+            strut_line_height: 0.0,
+            strut_x_height: 0.0,
         }
     }
 }
@@ -357,6 +372,10 @@ impl<B: Brush> LayoutData<B> {
         self.glyphs.clear();
         self.lines.clear();
         self.line_items.clear();
+        self.strut_ascent = 0.0;
+        self.strut_descent = 0.0;
+        self.strut_line_height = 0.0;
+        self.strut_x_height = 0.0;
     }
 
     /// Push an inline box to the list of items

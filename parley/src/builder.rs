@@ -146,6 +146,7 @@ impl<B: Brush> StyleRunBuilder<'_, B> {
             self.cursor == self.len,
             "StyleRunBuilder requires runs that cover the full text"
         );
+
         build_into_layout(
             layout,
             self.scale,

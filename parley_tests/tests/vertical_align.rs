@@ -670,3 +670,157 @@ fn vertical_align_combined_text_top_with_shift() {
         "TextTop + Length(2) should raise by ~{expected_diff}: actual diff {actual_diff}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// Tests: first_baseline on InlineBox
+// ---------------------------------------------------------------------------
+
+#[test]
+fn vertical_align_inline_box_first_baseline() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let box_height = 30.0;
+    let first_baseline_val = 10.0; // baseline is 10px from the top of the box
+
+    // Box with first_baseline set — its internal baseline should align with the line baseline
+    let layout = build_layout_with_boxes(
+        &mut env,
+        "Hello",
+        vec![InlineBox {
+            id: 0,
+            index: 5,
+            width: 20.0,
+            height: box_height,
+            alignment_baseline: AlignmentBaseline::Baseline,
+            baseline_shift: BaselineShift::None,
+            baseline_source: BaselineSource::default(),
+            first_baseline: Some(first_baseline_val),
+        }],
+        None,
+    );
+
+    let line = layout.lines().next().unwrap();
+    let baseline = line.metrics().baseline;
+
+    for item in first_line_items(&layout) {
+        if let PositionedLayoutItem::InlineBox(ib) = item {
+            // With first_baseline = 10, box top should be at baseline - 10
+            // y = baseline + offset - height, where offset = -(height - first_baseline)
+            let expected_y = baseline - first_baseline_val;
+            assert!(
+                (ib.y - expected_y).abs() < 0.5,
+                "first_baseline box y should be {expected_y}, got {} (box top at baseline - {first_baseline_val})",
+                ib.y
+            );
+        }
+    }
+}
+
+#[test]
+fn vertical_align_inline_box_first_baseline_none_matches_default() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Box without first_baseline (None) — bottom at baseline, same as original behavior
+    let layout_none = build_layout_with_boxes(
+        &mut env,
+        "Hello",
+        vec![make_box(0, 5, 20.0, 30.0, AlignmentBaseline::Baseline, BaselineShift::None)],
+        None,
+    );
+
+    // Box with first_baseline = height — baseline at bottom, same as None
+    let layout_full = build_layout_with_boxes(
+        &mut env,
+        "Hello",
+        vec![InlineBox {
+            id: 0,
+            index: 5,
+            width: 20.0,
+            height: 30.0,
+            alignment_baseline: AlignmentBaseline::Baseline,
+            baseline_shift: BaselineShift::None,
+            baseline_source: BaselineSource::default(),
+            first_baseline: Some(30.0), // baseline at bottom = same as None
+        }],
+        None,
+    );
+
+    let y_none = first_line_items(&layout_none)
+        .iter()
+        .find_map(|item| {
+            if let PositionedLayoutItem::InlineBox(ib) = item { Some(ib.y) } else { None }
+        })
+        .unwrap();
+
+    let y_full = first_line_items(&layout_full)
+        .iter()
+        .find_map(|item| {
+            if let PositionedLayoutItem::InlineBox(ib) = item { Some(ib.y) } else { None }
+        })
+        .unwrap();
+
+    assert!(
+        (y_none - y_full).abs() < 0.01,
+        "first_baseline=height should match None: none={y_none}, full={y_full}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Tests: Font-metric Sub/Super offsets
+// ---------------------------------------------------------------------------
+
+#[test]
+fn vertical_align_sub_super_use_font_metrics() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Build a layout with Sub and Super text to verify they produce different offsets
+    // from each other and from the baseline. The exact values depend on the font's
+    // OS/2 table, but we can verify the structural properties.
+    let layout = build_layout_with_valign_text(
+        &mut env,
+        &[
+            ("Normal", DEFAULT.0, DEFAULT.1),
+            ("sub", AlignmentBaseline::Baseline, BaselineShift::Sub),
+            ("sup", AlignmentBaseline::Baseline, BaselineShift::Super),
+        ],
+    );
+
+    let items = first_line_items(&layout);
+    let mut baselines: Vec<(String, f32)> = Vec::new();
+    for item in &items {
+        if let PositionedLayoutItem::GlyphRun(gr) = item {
+            let text: String = gr.run().clusters().map(|c| c.source_char()).collect();
+
+            // Verify the run actually has font metrics available
+            let metrics = gr.run().metrics();
+            // subscript_offset and superscript_offset should be populated from the font
+            // (Roboto has an OS/2 table, so these should be Some)
+            if text.starts_with('s') {
+                assert!(
+                    metrics.subscript_offset.is_some() || metrics.superscript_offset.is_some(),
+                    "Test font should provide OS/2 subscript/superscript metrics"
+                );
+            }
+
+            baselines.push((text, gr.baseline()));
+        }
+    }
+
+    let normal = baselines.iter().find(|(t, _)| t.starts_with('N')).unwrap().1;
+    let sub = baselines.iter().find(|(t, _)| t == "sub").unwrap().1;
+    let sup = baselines.iter().find(|(t, _)| t == "sup").unwrap().1;
+
+    // Structural properties: super is above normal, sub is below normal
+    assert!(sup < normal, "Super should be above normal: {sup} vs {normal}");
+    assert!(sub > normal, "Sub should be below normal: {sub} vs {normal}");
+
+    // The offsets should be non-trivial (at least 1px with 16px default font size)
+    assert!(
+        normal - sup > 1.0,
+        "Super offset should be significant: {}", normal - sup
+    );
+    assert!(
+        sub - normal > 1.0,
+        "Sub offset should be significant: {}", sub - normal
+    );
+}

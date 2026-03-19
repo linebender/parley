@@ -688,7 +688,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.offset = 0.;
         line.text_range.start = usize::MAX;
 
-        line.metrics.line_height = line_height;
+        // Apply CSS strut: line_height is at least the root style's line_height
+        #[cfg(feature = "std")]
+        std::eprintln!(
+            "[strut] line_height_in={line_height:.1} strut_asc={:.1} strut_desc={:.1} strut_lh={:.1}",
+            self.layout.data.strut_ascent, self.layout.data.strut_descent, self.layout.data.strut_line_height
+        );
+        line.metrics.line_height = line_height.max(self.layout.data.strut_line_height);
 
         if line.item_range.is_empty() {
             line.text_range = self.layout.data.text_len..self.layout.data.text_len;
@@ -761,8 +767,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
         }
 
-        // Fall back to 0 if there are no text runs on the line (e.g. boxes-only line)
-        let line_x_height = line_x_height.unwrap_or(0.0);
+        // Fall back to strut x-height if there are no text runs on the line (e.g. boxes-only line).
+        // This ensures vertical-align: middle works correctly even without text.
+        let line_x_height = line_x_height.unwrap_or(self.layout.data.strut_x_height);
 
         // Walk backwards to find trailing whitespace boundary
         for item_idx in line.item_range.clone().rev() {
@@ -813,7 +820,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     //   offset = -(height - first_baseline)
                     // which is equivalent to: the box top is at baseline - first_baseline.
                     let box_ascent = item.first_baseline.unwrap_or(item.height);
-                    let box_descent = item.height - box_ascent;
 
                     let align_offset = match item.alignment_baseline {
                         // Baseline: align box's baseline with line baseline.
@@ -821,7 +827,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // Without: bottom of box sits at baseline (offset = 0)
                         AlignmentBaseline::Baseline => {
                             if item.first_baseline.is_some() {
-                                -(item.height - box_ascent)
+                                // offset = height - first_baseline so the box's internal
+                                // baseline aligns with the line baseline.
+                                // y = baseline + offset - height = baseline - first_baseline
+                                item.height - box_ascent
                             } else {
                                 0.0
                             }
@@ -852,11 +861,20 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     line_item.baseline_offset = offset;
 
                     // Contribute to line metrics (skip Top/Bottom — they're resolved in pass 2).
-                    // When first_baseline is set, box_ascent/box_descent split the height;
-                    // otherwise the entire height is ascent (box bottom at baseline).
+                    // The box spans from (offset - height) to (offset) relative to the
+                    // line baseline, so:
+                    //   space above baseline = max(0, -(offset - height)) = max(0, height - offset)
+                    //   space below baseline = max(0, offset)
+                    //
+                    // When first_baseline is set and extends beyond the box (e.g. an
+                    // inline-block with explicit height < its internal line baseline),
+                    // the box's contribution to line metrics is clamped to its actual
+                    // dimensions. The baseline alignment still uses the true offset, but
+                    // the overflow beyond the box doesn't force the parent line to expand.
                     if !is_line_relative {
-                        let effective_ascent = (box_ascent - offset).max(0.0);
-                        let effective_descent = (box_descent + offset).max(0.0);
+                        let effective_ascent =
+                            (item.height - offset).max(0.0).min(item.height);
+                        let effective_descent = offset.max(0.0).min(item.height);
                         line.metrics.ascent = line.metrics.ascent.max(effective_ascent);
                         line.metrics.descent = line.metrics.descent.max(effective_descent);
                     }
@@ -937,6 +955,17 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     have_metrics = true;
                 }
             }
+        }
+
+        // CSS strut (CSS2.1 §10.8.1): apply root style's font ascent/descent as
+        // minimum contributions, as if each line starts with a zero-width inline box
+        // using the root element's font and line-height.
+        let strut_ascent = self.layout.data.strut_ascent;
+        let strut_descent = self.layout.data.strut_descent;
+        if strut_ascent > 0.0 || strut_descent > 0.0 {
+            line.metrics.ascent = line.metrics.ascent.max(strut_ascent);
+            line.metrics.descent = line.metrics.descent.max(strut_descent);
+            have_metrics = true;
         }
 
         // Pass 2: Top/Bottom items — position them relative to the finalized line box
