@@ -11,7 +11,7 @@ use core::ops::RangeInclusive;
 use super::layout::Layout;
 use super::resolve::{ResolveContext, Resolved, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
-use crate::VerticalAlign;
+use crate::{AlignmentBaseline, BaselineShift, BaselineSource};
 use crate::analysis::cluster::{Char, CharCluster, Status};
 use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::convert::script_to_harfrust;
@@ -59,7 +59,9 @@ struct Item {
     features: Resolved<FontFeature>,
     word_spacing: f32,
     letter_spacing: f32,
-    vertical_align: VerticalAlign,
+    alignment_baseline: AlignmentBaseline,
+    baseline_shift: BaselineShift,
+    baseline_source: BaselineSource,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -106,7 +108,9 @@ pub(crate) fn shape_text<'a, B: Brush>(
         features: style.font_features,
         word_spacing: style.word_spacing,
         letter_spacing: style.letter_spacing,
-        vertical_align: style.vertical_align,
+        alignment_baseline: style.alignment_baseline,
+        baseline_shift: style.baseline_shift,
+        baseline_source: style.baseline_source,
     };
 
     let mut char_range = 0..0;
@@ -134,7 +138,9 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 || style.font_features != item.features
                 || !nearly_eq(style.letter_spacing, item.letter_spacing)
                 || !nearly_eq(style.word_spacing, item.word_spacing)
-                || !style.vertical_align.nearly_eq(item.vertical_align)
+                || style.alignment_baseline != item.alignment_baseline
+                || !style.baseline_shift.nearly_eq(item.baseline_shift)
+                || style.baseline_source != item.baseline_source
             {
                 break_run = true;
             }
@@ -187,7 +193,9 @@ pub(crate) fn shape_text<'a, B: Brush>(
             item.features = style.font_features;
             item.word_spacing = style.word_spacing;
             item.letter_spacing = style.letter_spacing;
-            item.vertical_align = style.vertical_align;
+            item.alignment_baseline = style.alignment_baseline;
+            item.baseline_shift = style.baseline_shift;
+            item.baseline_source = style.baseline_source;
             text_range.start = text_range.end;
             char_range.start = char_range.end;
         }

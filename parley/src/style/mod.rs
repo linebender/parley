@@ -20,15 +20,30 @@ pub use text_primitives::{OverflowWrap, TextWrapMode, WordBreak};
 
 use crate::util::nearly_eq;
 
-/// CSS `vertical-align` property for inline-level elements.
+/// Which baseline of the element aligns with the parent's baseline.
 ///
-/// Controls how an inline element is positioned relative to the line's baseline.
-/// Positive `Length` values raise the element; negative values lower it.
+/// Corresponds to CSS `alignment-baseline` (CSS Inline Level 3).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub enum VerticalAlign {
-    /// Align the baseline of the element with the baseline of the parent.
+pub enum AlignmentBaseline {
+    /// Align the element's baseline with the parent's baseline.
     #[default]
     Baseline,
+    /// Align the top of the element with the top of the parent's font.
+    TextTop,
+    /// Align the bottom of the element with the bottom of the parent's font.
+    TextBottom,
+    /// Align the midpoint of the element with the baseline plus half the x-height.
+    Middle,
+}
+
+/// How much to shift from the chosen alignment baseline.
+///
+/// Corresponds to CSS `baseline-shift` (CSS Inline Level 3).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum BaselineShift {
+    /// No shift — stay at the alignment baseline.
+    #[default]
+    None,
     /// Lower the element as appropriate for subscripts.
     Sub,
     /// Raise the element as appropriate for superscripts.
@@ -37,27 +52,18 @@ pub enum VerticalAlign {
     Top,
     /// Align the bottom of the element with the bottom of the line box.
     Bottom,
-    /// Align the top of the element with the top of the parent's font.
-    TextTop,
-    /// Align the bottom of the element with the bottom of the parent's font.
-    TextBottom,
-    /// Align the midpoint of the element with the baseline plus half the x-height.
-    Middle,
-    /// Raise (positive) or lower (negative) by the given amount in layout units.
+    /// Shift by the given amount in layout units (positive = raise, negative = lower).
     Length(f32),
 }
 
-impl VerticalAlign {
+impl BaselineShift {
     pub(crate) fn nearly_eq(self, other: Self) -> bool {
         match (self, other) {
-            (Self::Baseline, Self::Baseline)
+            (Self::None, Self::None)
             | (Self::Sub, Self::Sub)
             | (Self::Super, Self::Super)
             | (Self::Top, Self::Top)
-            | (Self::Bottom, Self::Bottom)
-            | (Self::TextTop, Self::TextTop)
-            | (Self::TextBottom, Self::TextBottom)
-            | (Self::Middle, Self::Middle) => true,
+            | (Self::Bottom, Self::Bottom) => true,
             (Self::Length(a), Self::Length(b)) => nearly_eq(a, b),
             _ => false,
         }
@@ -69,6 +75,20 @@ impl VerticalAlign {
             value => value,
         }
     }
+}
+
+/// Which baseline set (first or last) to use for alignment.
+///
+/// Corresponds to CSS `baseline-source` (CSS Inline Level 3).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub enum BaselineSource {
+    /// Use the first baseline set (default for most inline elements).
+    #[default]
+    Auto,
+    /// Use the first baseline set.
+    First,
+    /// Use the last baseline set.
+    Last,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -168,8 +188,12 @@ pub enum StyleProperty<'a, B: Brush> {
     OverflowWrap(OverflowWrap),
     /// Control over non-"emergency" line-breaking.
     TextWrapMode(TextWrapMode),
-    /// Vertical alignment of inline elements.
-    VerticalAlign(VerticalAlign),
+    /// Which baseline to align to (CSS `alignment-baseline`).
+    AlignmentBaseline(AlignmentBaseline),
+    /// How much to shift from the alignment baseline (CSS `baseline-shift`).
+    BaselineShift(BaselineShift),
+    /// Which baseline set to use (CSS `baseline-source`).
+    BaselineSource(BaselineSource),
 }
 
 /// Unresolved styles.
@@ -221,8 +245,12 @@ pub struct TextStyle<'family, 'settings, B: Brush> {
     pub overflow_wrap: OverflowWrap,
     /// Control over non-"emergency" line-breaking.
     pub text_wrap_mode: TextWrapMode,
-    /// Vertical alignment of inline elements.
-    pub vertical_align: VerticalAlign,
+    /// Which baseline to align to (CSS `alignment-baseline`).
+    pub alignment_baseline: AlignmentBaseline,
+    /// How much to shift from the alignment baseline (CSS `baseline-shift`).
+    pub baseline_shift: BaselineShift,
+    /// Which baseline set to use (CSS `baseline-source`).
+    pub baseline_source: BaselineSource,
 }
 
 impl<B: Brush> Default for TextStyle<'static, 'static, B> {
@@ -251,7 +279,9 @@ impl<B: Brush> Default for TextStyle<'static, 'static, B> {
             word_break: WordBreak::default(),
             overflow_wrap: OverflowWrap::default(),
             text_wrap_mode: TextWrapMode::default(),
-            vertical_align: VerticalAlign::default(),
+            alignment_baseline: AlignmentBaseline::default(),
+            baseline_shift: BaselineShift::default(),
+            baseline_source: BaselineSource::default(),
         }
     }
 }
@@ -298,8 +328,20 @@ impl<B: Brush> From<LineHeight> for StyleProperty<'_, B> {
     }
 }
 
-impl<B: Brush> From<VerticalAlign> for StyleProperty<'_, B> {
-    fn from(value: VerticalAlign) -> Self {
-        StyleProperty::VerticalAlign(value)
+impl<B: Brush> From<AlignmentBaseline> for StyleProperty<'_, B> {
+    fn from(value: AlignmentBaseline) -> Self {
+        StyleProperty::AlignmentBaseline(value)
+    }
+}
+
+impl<B: Brush> From<BaselineShift> for StyleProperty<'_, B> {
+    fn from(value: BaselineShift) -> Self {
+        StyleProperty::BaselineShift(value)
+    }
+}
+
+impl<B: Brush> From<BaselineSource> for StyleProperty<'_, B> {
+    fn from(value: BaselineSource) -> Self {
+        StyleProperty::BaselineSource(value)
     }
 }

@@ -1,7 +1,7 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::VerticalAlign;
+use crate::{AlignmentBaseline, BaselineShift, BaselineSource};
 
 /// A box to be laid out inline with text
 #[derive(PartialEq, Debug, Clone)]
@@ -16,7 +16,10 @@ pub struct InlineBox {
     pub width: f32,
     /// The height of the box in pixels
     pub height: f32,
-    /// Vertical alignment of the box relative to the line baseline.
-    /// Defaults to `VerticalAlign::Baseline`.
-    pub vertical_align: VerticalAlign,
+    /// Which baseline to align to (CSS `alignment-baseline`).
+    pub alignment_baseline: AlignmentBaseline,
+    /// How much to shift from the alignment baseline (CSS `baseline-shift`).
+    pub baseline_shift: BaselineShift,
+    /// Which baseline set to use (CSS `baseline-source`).
+    pub baseline_source: BaselineSource,
 }

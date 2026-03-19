@@ -42,7 +42,7 @@ pub use crate::editing::{Cursor, Selection};
 // TODO - Move the following to `style` module and submodules.
 
 use crate::style::Brush;
-use crate::{LineHeight, OverflowWrap, TextWrapMode, VerticalAlign};
+use crate::{AlignmentBaseline, BaselineShift, BaselineSource, LineHeight, OverflowWrap, TextWrapMode};
 
 #[allow(clippy::partial_pub_fields)]
 /// Style properties.
@@ -60,8 +60,12 @@ pub struct Style<B: Brush> {
     pub(crate) overflow_wrap: OverflowWrap,
     /// Per-cluster text-wrap-mode setting
     pub(crate) text_wrap_mode: TextWrapMode,
-    /// Vertical alignment of inline elements
-    pub(crate) vertical_align: VerticalAlign,
+    /// Which baseline to align to (CSS `alignment-baseline`)
+    pub(crate) alignment_baseline: AlignmentBaseline,
+    /// How much to shift from the alignment baseline (CSS `baseline-shift`)
+    pub(crate) baseline_shift: BaselineShift,
+    /// Which baseline set to use (CSS `baseline-source`)
+    pub(crate) baseline_source: BaselineSource,
     #[cfg(feature = "accesskit")]
     /// Locale if any, so we can set the corresponding AccessKit property
     pub(crate) locale: Option<fontique::Language>,

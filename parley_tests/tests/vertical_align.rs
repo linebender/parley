@@ -1,13 +1,13 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Tests for CSS `vertical-align` support.
+//! Tests for CSS `vertical-align` support (CSS Inline Level 3 decomposition).
 
 use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
-    Alignment, AlignmentOptions, InlineBox, Layout, PositionedLayoutItem, StyleProperty,
-    VerticalAlign,
+    Alignment, AlignmentBaseline, AlignmentOptions, BaselineShift, BaselineSource, InlineBox,
+    Layout, PositionedLayoutItem, StyleProperty,
 };
 
 /// Helper: build a single-line layout with the given text and inline boxes,
@@ -29,13 +29,17 @@ fn build_layout_with_boxes(
 }
 
 /// Helper: build a layout with mixed vertical-align text runs using the tree builder.
+/// Each segment specifies alignment_baseline and baseline_shift independently.
 fn build_layout_with_valign_text(
     env: &mut TestEnv,
-    segments: &[(&str, VerticalAlign)],
+    segments: &[(&str, AlignmentBaseline, BaselineShift)],
 ) -> Layout<ColorBrush> {
     let mut builder = env.tree_builder();
-    for (text, valign) in segments {
-        builder.push_style_modification_span(&[StyleProperty::VerticalAlign(*valign)]);
+    for (text, ab, bs) in segments {
+        builder.push_style_modification_span(&[
+            StyleProperty::AlignmentBaseline(*ab),
+            StyleProperty::BaselineShift(*bs),
+        ]);
         builder.push_text(text);
         builder.pop_style_span();
     }
@@ -45,7 +49,11 @@ fn build_layout_with_valign_text(
     layout
 }
 
-/// Collect all positioned items from the first line as (baseline_or_y, kind) pairs.
+/// Shorthand: default alignment (baseline, no shift).
+const DEFAULT: (AlignmentBaseline, BaselineShift) =
+    (AlignmentBaseline::Baseline, BaselineShift::None);
+
+/// Collect all positioned items from the first line.
 fn first_line_items(layout: &Layout<ColorBrush>) -> Vec<PositionedLayoutItem<'_, ColorBrush>> {
     layout
         .lines()
@@ -65,6 +73,26 @@ fn first_glyph_run_baseline(layout: &Layout<ColorBrush>) -> f32 {
     panic!("no glyph run found");
 }
 
+/// Helper: create a default InlineBox with overrides for alignment.
+fn make_box(
+    id: u64,
+    index: usize,
+    width: f32,
+    height: f32,
+    alignment_baseline: AlignmentBaseline,
+    baseline_shift: BaselineShift,
+) -> InlineBox {
+    InlineBox {
+        id,
+        index,
+        width,
+        height,
+        alignment_baseline,
+        baseline_shift,
+        baseline_source: BaselineSource::default(),
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests: Baseline (default) — should produce identical output to no vertical-align
 // ---------------------------------------------------------------------------
@@ -80,10 +108,12 @@ fn vertical_align_baseline_is_default() {
     layout_default.break_all_lines(None);
     layout_default.align(None, Alignment::Start, AlignmentOptions::default());
 
-    // Layout with explicit Baseline vertical-align
-    let layout_explicit = build_layout_with_valign_text(&mut env, &[("Hello world", VerticalAlign::Baseline)]);
+    // Layout with explicit Baseline + no shift
+    let layout_explicit = build_layout_with_valign_text(
+        &mut env,
+        &[("Hello world", DEFAULT.0, DEFAULT.1)],
+    );
 
-    // Both should produce the same baseline
     let baseline_default = first_glyph_run_baseline(&layout_default);
     let baseline_explicit = first_glyph_run_baseline(&layout_explicit);
     assert!(
@@ -103,13 +133,7 @@ fn vertical_align_inline_box_baseline() {
     let layout = build_layout_with_boxes(
         &mut env,
         "Hello",
-        vec![InlineBox {
-            id: 0,
-            index: 5,
-            width: 20.0,
-            height: 30.0,
-            vertical_align: VerticalAlign::Baseline,
-        }],
+        vec![make_box(0, 5, 20.0, 30.0, AlignmentBaseline::Baseline, BaselineShift::None)],
         None,
     );
 
@@ -117,11 +141,8 @@ fn vertical_align_inline_box_baseline() {
     let line = layout.lines().next().unwrap();
     let baseline = line.metrics().baseline;
 
-    // Find the inline box
     for item in &items {
         if let PositionedLayoutItem::InlineBox(ib) = item {
-            // Baseline: box bottom should sit at the text baseline
-            // y = baseline + 0 - height = baseline - height
             let expected_y = baseline - 30.0;
             assert!(
                 (ib.y - expected_y).abs() < 0.01,
@@ -140,13 +161,7 @@ fn vertical_align_inline_box_length_raises() {
     let layout = build_layout_with_boxes(
         &mut env,
         "Hello",
-        vec![InlineBox {
-            id: 0,
-            index: 5,
-            width: 20.0,
-            height: 30.0,
-            vertical_align: VerticalAlign::Length(raise),
-        }],
+        vec![make_box(0, 5, 20.0, 30.0, AlignmentBaseline::Baseline, BaselineShift::Length(raise))],
         None,
     );
 
@@ -154,8 +169,6 @@ fn vertical_align_inline_box_length_raises() {
 
     for item in first_line_items(&layout) {
         if let PositionedLayoutItem::InlineBox(ib) = item {
-            // Length(10) means raise by 10, so offset = -10 (positive-down convention)
-            // y = baseline + (-10) - height
             let expected_y = baseline - raise - 30.0;
             assert!(
                 (ib.y - expected_y).abs() < 0.01,
@@ -170,17 +183,11 @@ fn vertical_align_inline_box_length_raises() {
 fn vertical_align_inline_box_length_lowers() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    let lower = -8.0; // negative = lower
+    let lower = -8.0;
     let layout = build_layout_with_boxes(
         &mut env,
         "Hello",
-        vec![InlineBox {
-            id: 0,
-            index: 5,
-            width: 20.0,
-            height: 30.0,
-            vertical_align: VerticalAlign::Length(lower),
-        }],
+        vec![make_box(0, 5, 20.0, 30.0, AlignmentBaseline::Baseline, BaselineShift::Length(lower))],
         None,
     );
 
@@ -188,8 +195,6 @@ fn vertical_align_inline_box_length_lowers() {
 
     for item in first_line_items(&layout) {
         if let PositionedLayoutItem::InlineBox(ib) = item {
-            // Length(-8) means lower by 8, offset = -(-8) = 8
-            // y = baseline + 8 - height
             let expected_y = baseline - lower - 30.0;
             assert!(
                 (ib.y - expected_y).abs() < 0.01,
@@ -206,25 +211,12 @@ fn vertical_align_inline_box_top_bottom() {
 
     let box_height = 10.0;
 
-    // Two boxes: one Top, one Bottom
     let layout = build_layout_with_boxes(
         &mut env,
         "Hello",
         vec![
-            InlineBox {
-                id: 0,
-                index: 5,
-                width: 20.0,
-                height: box_height,
-                vertical_align: VerticalAlign::Top,
-            },
-            InlineBox {
-                id: 1,
-                index: 5,
-                width: 20.0,
-                height: box_height,
-                vertical_align: VerticalAlign::Bottom,
-            },
+            make_box(0, 5, 20.0, box_height, AlignmentBaseline::Baseline, BaselineShift::Top),
+            make_box(1, 5, 20.0, box_height, AlignmentBaseline::Baseline, BaselineShift::Bottom),
         ],
         None,
     );
@@ -251,16 +243,12 @@ fn vertical_align_inline_box_top_bottom() {
     let top_y = top_y.expect("Top box not found");
     let bottom_y = bottom_y.expect("Bottom box not found");
 
-    // Top: box top aligns with line top
-    // offset = -(ascent - height), y = baseline + offset - height = baseline - ascent
     let expected_top_y = baseline - ascent;
     assert!(
         (top_y - expected_top_y).abs() < 0.5,
         "Top box top edge should be at line top: expected {expected_top_y}, got {top_y}"
     );
 
-    // Bottom: box bottom aligns with line bottom
-    // offset = descent, y = baseline + descent - height
     let expected_bottom_y = baseline + descent - box_height;
     assert!(
         (bottom_y - expected_bottom_y).abs() < 0.5,
@@ -269,7 +257,7 @@ fn vertical_align_inline_box_top_bottom() {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: Text run vertical-align variants
+// Tests: Text run baseline-shift variants
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -278,7 +266,10 @@ fn vertical_align_text_sub_lowers_baseline() {
 
     let layout = build_layout_with_valign_text(
         &mut env,
-        &[("Normal", VerticalAlign::Baseline), ("sub", VerticalAlign::Sub)],
+        &[
+            ("Normal", DEFAULT.0, DEFAULT.1),
+            ("sub", AlignmentBaseline::Baseline, BaselineShift::Sub),
+        ],
     );
 
     let items = first_line_items(&layout);
@@ -291,12 +282,7 @@ fn vertical_align_text_sub_lowers_baseline() {
         }
     }
 
-    // Sub text should have a higher baseline value (lower on screen, since y increases downward)
-    assert!(
-        baselines.len() >= 2,
-        "Expected at least 2 glyph runs, got {}",
-        baselines.len()
-    );
+    assert!(baselines.len() >= 2, "Expected at least 2 glyph runs, got {}", baselines.len());
 
     let normal_baseline = baselines.iter().find(|(t, _)| t.starts_with('N')).unwrap().1;
     let sub_baseline = baselines.iter().find(|(t, _)| t.starts_with('s')).unwrap().1;
@@ -313,7 +299,10 @@ fn vertical_align_text_super_raises_baseline() {
 
     let layout = build_layout_with_valign_text(
         &mut env,
-        &[("Normal", VerticalAlign::Baseline), ("sup", VerticalAlign::Super)],
+        &[
+            ("Normal", DEFAULT.0, DEFAULT.1),
+            ("sup", AlignmentBaseline::Baseline, BaselineShift::Super),
+        ],
     );
 
     let items = first_line_items(&layout);
@@ -343,8 +332,8 @@ fn vertical_align_text_length_positive_raises() {
     let layout = build_layout_with_valign_text(
         &mut env,
         &[
-            ("Normal", VerticalAlign::Baseline),
-            ("raised", VerticalAlign::Length(raise)),
+            ("Normal", DEFAULT.0, DEFAULT.1),
+            ("raised", AlignmentBaseline::Baseline, BaselineShift::Length(raise)),
         ],
     );
 
@@ -361,7 +350,6 @@ fn vertical_align_text_length_positive_raises() {
     let normal_baseline = baselines.iter().find(|(t, _)| t.starts_with('N')).unwrap().1;
     let raised_baseline = baselines.iter().find(|(t, _)| t.starts_with('r')).unwrap().1;
 
-    // Length(5) => offset = -5 => baseline should be 5 less
     let expected_diff = raise;
     let actual_diff = normal_baseline - raised_baseline;
     assert!(
@@ -378,8 +366,8 @@ fn vertical_align_text_length_negative_lowers() {
     let layout = build_layout_with_valign_text(
         &mut env,
         &[
-            ("Normal", VerticalAlign::Baseline),
-            ("lowered", VerticalAlign::Length(lower)),
+            ("Normal", DEFAULT.0, DEFAULT.1),
+            ("lowered", AlignmentBaseline::Baseline, BaselineShift::Length(lower)),
         ],
     );
 
@@ -396,7 +384,6 @@ fn vertical_align_text_length_negative_lowers() {
     let normal_baseline = baselines.iter().find(|(t, _)| t.starts_with('N')).unwrap().1;
     let lowered_baseline = baselines.iter().find(|(t, _)| t.starts_with('l')).unwrap().1;
 
-    // Length(-5) => offset = 5 => baseline should be 5 more (lower)
     assert!(
         lowered_baseline > normal_baseline,
         "Length({lower}) should lower baseline: lowered={lowered_baseline}, normal={normal_baseline}"
@@ -417,21 +404,21 @@ fn vertical_align_text_length_negative_lowers() {
 fn vertical_align_sub_expands_line_descent() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    // Layout with only normal text
     let layout_normal = build_layout_with_valign_text(
         &mut env,
-        &[("Hello world", VerticalAlign::Baseline)],
+        &[("Hello world", DEFAULT.0, DEFAULT.1)],
     );
     let metrics_normal = *layout_normal.lines().next().unwrap().metrics();
 
-    // Layout with sub text — should expand descent
     let layout_sub = build_layout_with_valign_text(
         &mut env,
-        &[("Hello ", VerticalAlign::Baseline), ("world", VerticalAlign::Sub)],
+        &[
+            ("Hello ", DEFAULT.0, DEFAULT.1),
+            ("world", AlignmentBaseline::Baseline, BaselineShift::Sub),
+        ],
     );
     let metrics_sub = *layout_sub.lines().next().unwrap().metrics();
 
-    // The line with sub text should have at least as much descent as the normal line
     assert!(
         metrics_sub.descent >= metrics_normal.descent - 0.01,
         "Sub text should not reduce descent: sub={}, normal={}",
@@ -444,21 +431,21 @@ fn vertical_align_sub_expands_line_descent() {
 fn vertical_align_super_expands_line_ascent() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    // Layout with only normal text
     let layout_normal = build_layout_with_valign_text(
         &mut env,
-        &[("Hello world", VerticalAlign::Baseline)],
+        &[("Hello world", DEFAULT.0, DEFAULT.1)],
     );
     let metrics_normal = *layout_normal.lines().next().unwrap().metrics();
 
-    // Layout with super text — should expand ascent
     let layout_super = build_layout_with_valign_text(
         &mut env,
-        &[("Hello ", VerticalAlign::Baseline), ("world", VerticalAlign::Super)],
+        &[
+            ("Hello ", DEFAULT.0, DEFAULT.1),
+            ("world", AlignmentBaseline::Baseline, BaselineShift::Super),
+        ],
     );
     let metrics_super = *layout_super.lines().next().unwrap().metrics();
 
-    // Super text pushes content above the normal baseline, expanding effective ascent
     assert!(
         metrics_super.ascent >= metrics_normal.ascent - 0.01,
         "Super text should not reduce ascent: super={}, normal={}",
@@ -473,15 +460,17 @@ fn vertical_align_large_length_expands_line_visual_extent() {
 
     let layout_normal = build_layout_with_valign_text(
         &mut env,
-        &[("Hello", VerticalAlign::Baseline)],
+        &[("Hello", DEFAULT.0, DEFAULT.1)],
     );
     let metrics_normal = *layout_normal.lines().next().unwrap().metrics();
     let extent_normal = metrics_normal.max_coord - metrics_normal.min_coord;
 
-    // Raise text by a large amount — should expand the visual extent of the line
     let layout_raised = build_layout_with_valign_text(
         &mut env,
-        &[("Hello ", VerticalAlign::Baseline), ("UP", VerticalAlign::Length(50.0))],
+        &[
+            ("Hello ", DEFAULT.0, DEFAULT.1),
+            ("UP", AlignmentBaseline::Baseline, BaselineShift::Length(50.0)),
+        ],
     );
     let metrics_raised = *layout_raised.lines().next().unwrap().metrics();
     let extent_raised = metrics_raised.max_coord - metrics_raised.min_coord;
@@ -491,7 +480,6 @@ fn vertical_align_large_length_expands_line_visual_extent() {
         "Large Length(50) should expand visual extent: raised={extent_raised}, normal={extent_normal}"
     );
 
-    // The ascent should be significantly larger due to the raised text
     assert!(
         metrics_raised.ascent > metrics_normal.ascent + 10.0,
         "Raised text should increase ascent: raised={}, normal={}",
@@ -511,9 +499,9 @@ fn vertical_align_mixed_runs_all_different() {
     let layout = build_layout_with_valign_text(
         &mut env,
         &[
-            ("A", VerticalAlign::Super),
-            ("B", VerticalAlign::Baseline),
-            ("C", VerticalAlign::Sub),
+            ("A", AlignmentBaseline::Baseline, BaselineShift::Super),
+            ("B", DEFAULT.0, DEFAULT.1),
+            ("C", AlignmentBaseline::Baseline, BaselineShift::Sub),
         ],
     );
 
@@ -531,7 +519,6 @@ fn vertical_align_mixed_runs_all_different() {
     let b_baseline = baselines.iter().find(|(c, _)| *c == 'B').unwrap().1;
     let c_baseline = baselines.iter().find(|(c, _)| *c == 'C').unwrap().1;
 
-    // Super < Baseline < Sub (in terms of y coordinate, since y increases downward)
     assert!(
         a_baseline < b_baseline,
         "Super baseline ({a_baseline}) should be above Baseline ({b_baseline})"
@@ -543,7 +530,7 @@ fn vertical_align_mixed_runs_all_different() {
 }
 
 // ---------------------------------------------------------------------------
-// Tests: Inline box + text run with different vertical aligns
+// Tests: Inline box alignment_baseline variants
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -554,13 +541,7 @@ fn vertical_align_inline_box_middle() {
     let layout = build_layout_with_boxes(
         &mut env,
         "Hello",
-        vec![InlineBox {
-            id: 0,
-            index: 5,
-            width: 20.0,
-            height: box_height,
-            vertical_align: VerticalAlign::Middle,
-        }],
+        vec![make_box(0, 5, 20.0, box_height, AlignmentBaseline::Middle, BaselineShift::None)],
         None,
     );
 
@@ -568,8 +549,6 @@ fn vertical_align_inline_box_middle() {
 
     for item in first_line_items(&layout) {
         if let PositionedLayoutItem::InlineBox(ib) = item {
-            // Middle: offset = -(height * 0.5)
-            // y = baseline + offset - height = baseline - height/2 - height = baseline - 1.5*height
             let offset = -(box_height * 0.5);
             let expected_y = baseline + offset - box_height;
             assert!(
@@ -588,9 +567,9 @@ fn vertical_align_text_top_bottom_align_with_line_edges() {
     let layout = build_layout_with_valign_text(
         &mut env,
         &[
-            ("Normal", VerticalAlign::Baseline),
-            ("T", VerticalAlign::Top),
-            ("B", VerticalAlign::Bottom),
+            ("Normal", DEFAULT.0, DEFAULT.1),
+            ("T", AlignmentBaseline::Baseline, BaselineShift::Top),
+            ("B", AlignmentBaseline::Baseline, BaselineShift::Bottom),
         ],
     );
 
@@ -609,10 +588,6 @@ fn vertical_align_text_top_bottom_align_with_line_edges() {
     let top_baseline = baselines.iter().find(|(c, _)| *c == 'T').unwrap().1;
     let bottom_baseline = baselines.iter().find(|(c, _)| *c == 'B').unwrap().1;
 
-    // For same-font text, Top and Bottom should produce offsets that push the run
-    // to align with line edges. With a single font, all runs have identical metrics,
-    // so Top and Bottom should be equivalent to Baseline.
-    // Just verify they're reasonable values (within the line box).
     let line_top = metrics.baseline - metrics.ascent;
     let line_bottom = metrics.baseline + metrics.descent;
 
@@ -633,5 +608,48 @@ fn vertical_align_text_top_bottom_align_with_line_edges() {
     assert!(
         (bottom_baseline - normal_baseline).abs() < 0.5,
         "Same-font Bottom should match Baseline: {bottom_baseline} vs {normal_baseline}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Tests: Combined alignment_baseline + baseline_shift (the key CSS3 feature)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn vertical_align_combined_text_top_with_shift() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // This is the case that was impossible with the single-enum model:
+    // alignment-baseline: text-top; baseline-shift: 2px
+    let layout = build_layout_with_valign_text(
+        &mut env,
+        &[
+            ("Normal", DEFAULT.0, DEFAULT.1),
+            ("shifted", AlignmentBaseline::TextTop, BaselineShift::Length(2.0)),
+        ],
+    );
+
+    let items = first_line_items(&layout);
+    let mut baselines: Vec<(String, f32)> = Vec::new();
+
+    for item in &items {
+        if let PositionedLayoutItem::GlyphRun(gr) = item {
+            let text: String = gr.run().clusters().map(|c| c.source_char()).collect();
+            baselines.push((text, gr.baseline()));
+        }
+    }
+
+    // With same font, TextTop aligns the run top with the line top (offset = 0 for same font).
+    // Then Length(2.0) raises it by 2 additional units.
+    // So the shifted run's baseline should be 2 units higher than the TextTop-only position.
+    let normal_baseline = baselines.iter().find(|(t, _)| t.starts_with('N')).unwrap().1;
+    let shifted_baseline = baselines.iter().find(|(t, _)| t.starts_with('s')).unwrap().1;
+
+    // With same font, text-top alone = baseline, so combined = baseline - 2.0
+    let expected_diff = 2.0;
+    let actual_diff = normal_baseline - shifted_baseline;
+    assert!(
+        (actual_diff - expected_diff).abs() < 0.5,
+        "TextTop + Length(2) should raise by ~{expected_diff}: actual diff {actual_diff}"
     );
 }

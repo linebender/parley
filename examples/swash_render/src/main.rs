@@ -10,7 +10,7 @@ use image::codecs::png::PngEncoder;
 use image::{self, Pixel, Rgba, RgbaImage};
 use parley::layout::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
 use parley::style::{FontFamily, FontWeight, StyleProperty, TextStyle};
-use parley::{AlignmentOptions, FontContext, InlineBox, LayoutContext, LineHeight, VerticalAlign};
+use parley::{AlignmentOptions, AlignmentBaseline, BaselineShift, BaselineSource, FontContext, InlineBox, LayoutContext, LineHeight};
 use std::fs::File;
 use swash::FontRef;
 use swash::scale::image::Content;
@@ -97,7 +97,9 @@ fn main() {
             index: 0,
             width: 50.0,
             height: 50.0,
-            vertical_align: VerticalAlign::Baseline,
+            alignment_baseline: AlignmentBaseline::default(),
+            baseline_shift: BaselineShift::default(),
+            baseline_source: BaselineSource::default(),
         });
 
         builder.push_text(&text[40..50]);
@@ -107,7 +109,9 @@ fn main() {
             index: 50,
             width: 50.0,
             height: 30.0,
-            vertical_align: VerticalAlign::Baseline,
+            alignment_baseline: AlignmentBaseline::default(),
+            baseline_shift: BaselineShift::default(),
+            baseline_source: BaselineSource::default(),
         });
 
         builder.push_text(&text[50..141]);
@@ -157,14 +161,18 @@ fn main() {
             index: 40,
             width: 50.0,
             height: 50.0,
-            vertical_align: VerticalAlign::Baseline,
+            alignment_baseline: AlignmentBaseline::default(),
+            baseline_shift: BaselineShift::default(),
+            baseline_source: BaselineSource::default(),
         });
         builder.push_inline_box(InlineBox {
             id: 1,
             index: 50,
             width: 50.0,
             height: 30.0,
-            vertical_align: VerticalAlign::Baseline,
+            alignment_baseline: AlignmentBaseline::default(),
+            baseline_shift: BaselineShift::default(),
+            baseline_source: BaselineSource::default(),
         });
 
         // Build the builder into a Layout

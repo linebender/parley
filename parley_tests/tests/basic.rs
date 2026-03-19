@@ -7,7 +7,7 @@ use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
     Alignment, AlignmentOptions, BreakReason, ContentWidths, FontFamily, InlineBox, Layout,
-    LineHeight, PositionedLayoutItem, StyleProperty, TextStyle, VerticalAlign, WhiteSpaceCollapse,
+    LineHeight, PositionedLayoutItem, StyleProperty, TextStyle, AlignmentBaseline, BaselineShift, BaselineSource, WhiteSpaceCollapse,
 };
 use peniko::color::{AlphaColor, Srgb, palette};
 use peniko::kurbo::Size;
@@ -69,7 +69,9 @@ fn placing_inboxes() {
             index: position,
             width: 10.0,
             height: 10.0,
-            vertical_align: VerticalAlign::Baseline,
+            alignment_baseline: AlignmentBaseline::default(),
+            baseline_shift: BaselineShift::default(),
+            baseline_source: BaselineSource::default(),
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
@@ -90,7 +92,9 @@ fn only_inboxes_wrap() {
             index: 0,
             width: 10.0,
             height: 10.0,
-            vertical_align: VerticalAlign::Baseline,
+            alignment_baseline: AlignmentBaseline::default(),
+            baseline_shift: BaselineShift::default(),
+            baseline_source: BaselineSource::default(),
         });
     }
     let mut layout = builder.build(text);
@@ -112,21 +116,27 @@ fn full_width_inbox() {
             index: 1,
             width: 10.,
             height: 10.0,
-            vertical_align: VerticalAlign::Baseline,
+            alignment_baseline: AlignmentBaseline::default(),
+            baseline_shift: BaselineShift::default(),
+            baseline_source: BaselineSource::default(),
         });
         builder.push_inline_box(InlineBox {
             id: 1,
             index: 1,
             width,
             height: 10.0,
-            vertical_align: VerticalAlign::Baseline,
+            alignment_baseline: AlignmentBaseline::default(),
+            baseline_shift: BaselineShift::default(),
+            baseline_source: BaselineSource::default(),
         });
         builder.push_inline_box(InlineBox {
             id: 2,
             index: 2,
             width,
             height: 10.0,
-            vertical_align: VerticalAlign::Baseline,
+            alignment_baseline: AlignmentBaseline::default(),
+            baseline_shift: BaselineShift::default(),
+            baseline_source: BaselineSource::default(),
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(100.));
@@ -145,7 +155,9 @@ fn inbox_separated_by_whitespace() {
         index: 0,
         width: 10.,
         height: 10.0,
-        vertical_align: VerticalAlign::Baseline,
+        alignment_baseline: AlignmentBaseline::default(),
+        baseline_shift: BaselineShift::default(),
+        baseline_source: BaselineSource::default(),
     });
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
@@ -153,7 +165,9 @@ fn inbox_separated_by_whitespace() {
         index: 1,
         width: 10.0,
         height: 10.0,
-        vertical_align: VerticalAlign::Baseline,
+        alignment_baseline: AlignmentBaseline::default(),
+        baseline_shift: BaselineShift::default(),
+        baseline_source: BaselineSource::default(),
     });
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
@@ -161,7 +175,9 @@ fn inbox_separated_by_whitespace() {
         index: 2,
         width: 10.0,
         height: 10.0,
-        vertical_align: VerticalAlign::Baseline,
+        alignment_baseline: AlignmentBaseline::default(),
+        baseline_shift: BaselineShift::default(),
+        baseline_source: BaselineSource::default(),
     });
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
@@ -169,7 +185,9 @@ fn inbox_separated_by_whitespace() {
         index: 3,
         width: 10.0,
         height: 10.0,
-        vertical_align: VerticalAlign::Baseline,
+        alignment_baseline: AlignmentBaseline::default(),
+        baseline_shift: BaselineShift::default(),
+        baseline_source: BaselineSource::default(),
     });
     let (mut layout, _text) = builder.build();
     layout.break_all_lines(Some(100.));
@@ -451,7 +469,9 @@ fn inbox_content_width() {
             index: 3,
             width: 100.0,
             height: 10.0,
-            vertical_align: VerticalAlign::Baseline,
+            alignment_baseline: AlignmentBaseline::default(),
+            baseline_shift: BaselineShift::default(),
+            baseline_source: BaselineSource::default(),
         });
         let mut layout = builder.build(text);
         let ContentWidths {
@@ -472,7 +492,9 @@ fn inbox_content_width() {
             index: 2,
             width: 10.0,
             height: 10.0,
-            vertical_align: VerticalAlign::Baseline,
+            alignment_baseline: AlignmentBaseline::default(),
+            baseline_shift: BaselineShift::default(),
+            baseline_source: BaselineSource::default(),
         });
         let mut layout = builder.build(text);
         let ContentWidths {

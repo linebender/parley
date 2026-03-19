@@ -17,7 +17,7 @@ use crate::layout::{
     LineMetrics, Run,
 };
 use crate::style::Brush;
-use crate::{OverflowWrap, TextWrapMode, VerticalAlign};
+use crate::{AlignmentBaseline, BaselineShift, OverflowWrap, TextWrapMode};
 
 use core::ops::Range;
 
@@ -749,32 +749,41 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
         }
 
-        // Pass 1: baseline-relative items
+        // Pass 1: baseline-relative items (everything except Top/Bottom shift)
         for item_idx in line.item_range.clone() {
             let is_trailing_ws = item_idx >= trailing_ws_start;
             let line_item = &mut self.lines.line_items[item_idx];
             match line_item.kind {
                 LayoutItemKind::InlineBox => {
                     let item = &self.layout.data.inline_boxes[line_item.index];
+                    let is_line_relative = matches!(
+                        item.baseline_shift,
+                        BaselineShift::Top | BaselineShift::Bottom
+                    );
 
-                    // Compute baseline_offset based on vertical_align (positive = down)
-                    let offset = match item.vertical_align {
-                        VerticalAlign::Baseline => 0.0,
-                        VerticalAlign::Sub => item.height * 0.25,
-                        VerticalAlign::Super => -(item.height * 0.4),
-                        VerticalAlign::Middle => -(item.height * 0.5),
-                        VerticalAlign::Length(v) => -v,
-                        VerticalAlign::TextTop => -(line.metrics.ascent - item.height),
-                        VerticalAlign::TextBottom => line.metrics.descent,
-                        // Top/Bottom deferred to pass 2
-                        VerticalAlign::Top | VerticalAlign::Bottom => 0.0,
+                    // Compute alignment offset from alignment_baseline
+                    let align_offset = match item.alignment_baseline {
+                        AlignmentBaseline::Baseline => 0.0,
+                        AlignmentBaseline::TextTop => -(line.metrics.ascent - item.height),
+                        AlignmentBaseline::TextBottom => line.metrics.descent,
+                        AlignmentBaseline::Middle => -(item.height * 0.5),
                     };
+
+                    // Compute shift offset from baseline_shift
+                    let shift_offset = match item.baseline_shift {
+                        BaselineShift::None => 0.0,
+                        BaselineShift::Sub => item.height * 0.25,
+                        BaselineShift::Super => -(item.height * 0.4),
+                        BaselineShift::Length(v) => -v,
+                        // Top/Bottom deferred to pass 2
+                        BaselineShift::Top | BaselineShift::Bottom => 0.0,
+                    };
+
+                    let offset = align_offset + shift_offset;
                     line_item.baseline_offset = offset;
 
-                    // Contribute to line metrics considering the offset.
-                    // Inline boxes sit with bottom at baseline by default,
-                    // so effective_ascent = height - offset, effective_descent = offset
-                    if !matches!(item.vertical_align, VerticalAlign::Top | VerticalAlign::Bottom) {
+                    // Contribute to line metrics (skip Top/Bottom — they're resolved in pass 2)
+                    if !is_line_relative {
                         let effective_ascent = (item.height - offset).max(0.0);
                         let effective_descent = offset.max(0.0);
                         line.metrics.ascent = line.metrics.ascent.max(effective_ascent);
@@ -784,28 +793,43 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     have_metrics = true;
                 }
                 LayoutItemKind::TextRun => {
-                    // Get the vertical_align for this run from its style
-                    let vertical_align = get_run_vertical_align(line_item, &self.layout.data);
+                    let (alignment_baseline, baseline_shift) =
+                        get_run_alignment(line_item, &self.layout.data);
                     let run = &self.layout.data.runs[line_item.index];
+                    let is_line_relative = matches!(
+                        baseline_shift,
+                        BaselineShift::Top | BaselineShift::Bottom
+                    );
 
-                    // Compute baseline_offset (positive = down)
-                    let offset = match vertical_align {
-                        VerticalAlign::Baseline => 0.0,
-                        VerticalAlign::Sub => run.metrics.descent,
-                        VerticalAlign::Super => -(run.metrics.ascent * 0.4),
-                        VerticalAlign::Middle => {
+                    // Compute alignment offset from alignment_baseline
+                    let align_offset = match alignment_baseline {
+                        AlignmentBaseline::Baseline => 0.0,
+                        AlignmentBaseline::TextTop => {
+                            -(line.metrics.ascent - run.metrics.ascent)
+                        }
+                        AlignmentBaseline::TextBottom => {
+                            line.metrics.descent - run.metrics.descent
+                        }
+                        AlignmentBaseline::Middle => {
                             let x_height = run
                                 .metrics
                                 .x_height
                                 .unwrap_or(run.metrics.ascent * 0.5);
                             -(x_height * 0.5)
                         }
-                        VerticalAlign::Length(v) => -v,
-                        VerticalAlign::TextTop => -(line.metrics.ascent - run.metrics.ascent),
-                        VerticalAlign::TextBottom => line.metrics.descent - run.metrics.descent,
-                        // Deferred to pass 2
-                        VerticalAlign::Top | VerticalAlign::Bottom => 0.0,
                     };
+
+                    // Compute shift offset from baseline_shift
+                    let shift_offset = match baseline_shift {
+                        BaselineShift::None => 0.0,
+                        BaselineShift::Sub => run.metrics.descent,
+                        BaselineShift::Super => -(run.metrics.ascent * 0.4),
+                        BaselineShift::Length(v) => -v,
+                        // Deferred to pass 2
+                        BaselineShift::Top | BaselineShift::Bottom => 0.0,
+                    };
+
+                    let offset = align_offset + shift_offset;
                     line_item.baseline_offset = offset;
 
                     // Skip trailing whitespace for metrics contribution
@@ -813,8 +837,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         continue;
                     }
 
-                    // Contribute to line metrics considering the offset
-                    if !matches!(vertical_align, VerticalAlign::Top | VerticalAlign::Bottom) {
+                    // Contribute to line metrics (skip Top/Bottom)
+                    if !is_line_relative {
                         let effective_ascent = (run.metrics.ascent - offset).max(0.0);
                         let effective_descent = (run.metrics.descent + offset).max(0.0);
                         line.metrics.ascent = line.metrics.ascent.max(effective_ascent);
@@ -832,26 +856,26 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             match line_item.kind {
                 LayoutItemKind::InlineBox => {
                     let item = &self.layout.data.inline_boxes[line_item.index];
-                    match item.vertical_align {
-                        VerticalAlign::Top => {
-                            // Align top of box with top of line
+                    match item.baseline_shift {
+                        BaselineShift::Top => {
                             line_item.baseline_offset = -(line.metrics.ascent - item.height);
                         }
-                        VerticalAlign::Bottom => {
-                            // Align bottom of box with bottom of line
+                        BaselineShift::Bottom => {
                             line_item.baseline_offset = line.metrics.descent;
                         }
                         _ => {}
                     }
                 }
                 LayoutItemKind::TextRun => {
-                    let vertical_align = get_run_vertical_align(line_item, &self.layout.data);
+                    let (_alignment_baseline, baseline_shift) =
+                        get_run_alignment(line_item, &self.layout.data);
                     let run = &self.layout.data.runs[line_item.index];
-                    match vertical_align {
-                        VerticalAlign::Top => {
-                            line_item.baseline_offset = -(line.metrics.ascent - run.metrics.ascent);
+                    match baseline_shift {
+                        BaselineShift::Top => {
+                            line_item.baseline_offset =
+                                -(line.metrics.ascent - run.metrics.ascent);
                         }
-                        VerticalAlign::Bottom => {
+                        BaselineShift::Bottom => {
                             line_item.baseline_offset =
                                 line.metrics.descent - run.metrics.descent;
                         }
@@ -1231,16 +1255,18 @@ fn try_commit_line<B: Brush>(
     true
 }
 
-/// Get the `VerticalAlign` for a text run's `LineItemData` by looking up its first cluster's style.
-fn get_run_vertical_align<B: Brush>(
+/// Get the alignment baseline and baseline shift for a text run's `LineItemData`
+/// by looking up its first cluster's style.
+fn get_run_alignment<B: Brush>(
     line_item: &LineItemData,
     data: &LayoutData<B>,
-) -> VerticalAlign {
+) -> (AlignmentBaseline, BaselineShift) {
     if line_item.cluster_range.is_empty() {
-        return VerticalAlign::Baseline;
+        return (AlignmentBaseline::Baseline, BaselineShift::None);
     }
     let cluster = &data.clusters[line_item.cluster_range.start];
-    data.styles[cluster.style_index as usize].vertical_align
+    let style = &data.styles[cluster.style_index as usize];
+    (style.alignment_baseline, style.baseline_shift)
 }
 
 /// Reorder items within line according to the bidi levels of the items
