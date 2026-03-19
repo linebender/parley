@@ -994,38 +994,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 max_inline_box_below.max(strut_descent + strut_half_leading);
         }
 
-        // Pass 2: Top/Bottom items — position them relative to the finalized line box
-        for item_idx in line.item_range.clone() {
-            let line_item = &mut self.lines.line_items[item_idx];
-            match line_item.kind {
-                LayoutItemKind::InlineBox => {
-                    let item = &self.layout.data.inline_boxes[line_item.index];
-                    match item.baseline_shift {
-                        BaselineShift::Top => {
-                            line_item.baseline_offset = -(line.metrics.ascent - item.height);
-                        }
-                        BaselineShift::Bottom => {
-                            line_item.baseline_offset = line.metrics.descent;
-                        }
-                        _ => {}
-                    }
-                }
-                LayoutItemKind::TextRun => {
-                    let (_alignment_baseline, baseline_shift) =
-                        get_run_alignment(line_item, &self.layout.data);
-                    let run = &self.layout.data.runs[line_item.index];
-                    match baseline_shift {
-                        BaselineShift::Top => {
-                            line_item.baseline_offset = -(line.metrics.ascent - run.metrics.ascent);
-                        }
-                        BaselineShift::Bottom => {
-                            line_item.baseline_offset = line.metrics.descent - run.metrics.descent;
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
+        // Pass 2 is deferred until after leading computation (see below).
 
         // Reorder the items within the line (if required). Reordering is required if the line contains
         // a mix of bidi levels (a mix of LTR and RTL text)
@@ -1161,6 +1130,49 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // which in turn clamps the selection box minimum height to ascent + descent.
         line.metrics.min_coord = line.metrics.baseline - ascent - leading_above.max(0.);
         line.metrics.max_coord = line.metrics.baseline + descent + leading_below.max(0.);
+
+        // Pass 2: Top/Bottom items — position relative to finalized line box.
+        // CSS2.1: "top" aligns box top with line box top; "bottom" aligns box
+        // bottom with line box bottom. The line box extends from
+        // (baseline - ascent - leading_above) to (baseline + descent + leading_below),
+        // so offsets must account for leading distribution.
+        for item_idx in line.item_range.clone() {
+            let line_item = &mut self.lines.line_items[item_idx];
+            match line_item.kind {
+                LayoutItemKind::InlineBox => {
+                    let item = &self.layout.data.inline_boxes[line_item.index];
+                    match item.baseline_shift {
+                        BaselineShift::Top => {
+                            // y_pos = baseline + offset - height = line_box_top
+                            // => offset = height - ascent - leading_above
+                            line_item.baseline_offset = item.height - ascent - leading_above;
+                        }
+                        BaselineShift::Bottom => {
+                            // y_pos + height = baseline + descent + leading_below
+                            // => offset = descent + leading_below
+                            line_item.baseline_offset = descent + leading_below;
+                        }
+                        _ => {}
+                    }
+                }
+                LayoutItemKind::TextRun => {
+                    let (_alignment_baseline, baseline_shift) =
+                        get_run_alignment(line_item, &self.layout.data);
+                    let run = &self.layout.data.runs[line_item.index];
+                    match baseline_shift {
+                        BaselineShift::Top => {
+                            line_item.baseline_offset =
+                                run.metrics.ascent - ascent - leading_above;
+                        }
+                        BaselineShift::Bottom => {
+                            line_item.baseline_offset =
+                                descent + leading_below - run.metrics.descent;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
 
         self.state.committed_y += line.metrics.line_height as f64;
     }
