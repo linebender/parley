@@ -545,15 +545,30 @@ fn vertical_align_inline_box_middle() {
         None,
     );
 
-    let baseline = layout.lines().next().unwrap().metrics().baseline;
+    let line = layout.lines().next().unwrap();
+    let baseline = line.metrics().baseline;
+
+    // Get x-height from the first text run on the line
+    let x_height = line
+        .runs()
+        .next()
+        .map(|r| {
+            r.metrics()
+                .x_height
+                .unwrap_or(r.metrics().ascent * 0.5)
+        })
+        .unwrap_or(0.0);
 
     for item in first_line_items(&layout) {
         if let PositionedLayoutItem::InlineBox(ib) = item {
-            let offset = -(box_height * 0.5);
+            // CSS middle: center the box at baseline - x_height/2
+            // offset = (height - x_height) / 2
+            // y = baseline + offset - height
+            let offset = (box_height - x_height) / 2.0;
             let expected_y = baseline + offset - box_height;
             assert!(
                 (ib.y - expected_y).abs() < 0.5,
-                "Middle box y should be {expected_y}, got {}",
+                "Middle box y should be {expected_y}, got {} (x_height={x_height})",
                 ib.y
             );
         }

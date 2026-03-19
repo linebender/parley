@@ -711,6 +711,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // Items at or after this index are trailing whitespace and don't contribute to metrics.
         let mut trailing_ws_start = line.item_range.end;
 
+        // Collect the line's x-height from text runs for use in inline box Middle alignment.
+        // We take the first available x_height, falling back to ascent * 0.5.
+        let mut line_x_height: Option<f32> = None;
+
         // Pass 0: pre-compute per-item properties and find trailing whitespace boundary
         for item_idx in line.item_range.clone() {
             let line_item = &mut self.lines.line_items[item_idx];
@@ -730,9 +734,20 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         .iter()
                         .map(|c| c.advance)
                         .sum();
+
+                    // Collect x-height from the first text run that has one
+                    if line_x_height.is_none() {
+                        let run = &self.layout.data.runs[line_item.index];
+                        line_x_height = Some(
+                            run.metrics.x_height.unwrap_or(run.metrics.ascent * 0.5),
+                        );
+                    }
                 }
             }
         }
+
+        // Fall back to 0 if there are no text runs on the line (e.g. boxes-only line)
+        let line_x_height = line_x_height.unwrap_or(0.0);
 
         // Walk backwards to find trailing whitespace boundary
         for item_idx in line.item_range.clone().rev() {
@@ -761,12 +776,22 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         BaselineShift::Top | BaselineShift::Bottom
                     );
 
-                    // Compute alignment offset from alignment_baseline
+                    // Compute alignment offset from alignment_baseline.
+                    //
+                    // For inline boxes, y = baseline + offset - height, so:
+                    //   box bottom = baseline + offset
+                    //   box center = baseline + offset - height/2
+                    //   box top    = baseline + offset - height
                     let align_offset = match item.alignment_baseline {
                         AlignmentBaseline::Baseline => 0.0,
                         AlignmentBaseline::TextTop => -(line.metrics.ascent - item.height),
                         AlignmentBaseline::TextBottom => line.metrics.descent,
-                        AlignmentBaseline::Middle => -(item.height * 0.5),
+                        // CSS middle: center the box at baseline + x_height/2.
+                        // We need: baseline + offset - height/2 = baseline - x_height/2
+                        // So: offset = (height - x_height) / 2
+                        AlignmentBaseline::Middle => {
+                            (item.height - line_x_height) / 2.0
+                        }
                     };
 
                     // Compute shift offset from baseline_shift
