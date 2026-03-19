@@ -114,6 +114,7 @@ fn build_layout<A: Into<Option<f32>>>(
         alignment_baseline: AlignmentBaseline::default(),
         baseline_shift: BaselineShift::default(),
         baseline_source: BaselineSource::default(),
+        first_baseline: None,
     });
     builder.push_inline_box(InlineBox {
         id: 1,
@@ -123,6 +124,7 @@ fn build_layout<A: Into<Option<f32>>>(
         alignment_baseline: AlignmentBaseline::default(),
         baseline_shift: BaselineShift::default(),
         baseline_source: BaselineSource::default(),
+        first_baseline: None,
     });
 
     let mut layout = builder.build(TEXT);

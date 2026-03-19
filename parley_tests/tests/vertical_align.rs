@@ -90,6 +90,7 @@ fn make_box(
         alignment_baseline,
         baseline_shift,
         baseline_source: BaselineSource::default(),
+        first_baseline: None,
     }
 }
 

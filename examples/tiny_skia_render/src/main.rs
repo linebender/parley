@@ -94,6 +94,7 @@ fn main() {
         alignment_baseline: AlignmentBaseline::default(),
         baseline_shift: BaselineShift::default(),
         baseline_source: BaselineSource::default(),
+        first_baseline: None,
     });
 
     // Build the builder into a Layout
