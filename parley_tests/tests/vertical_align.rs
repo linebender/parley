@@ -548,14 +548,15 @@ fn vertical_align_inline_box_middle() {
     let line = layout.lines().next().unwrap();
     let baseline = line.metrics().baseline;
 
-    // Get x-height from the first text run on the line
+    // Get x-height from the first text run on the line.
+    // CSS spec fallback: font_size * 0.5
     let x_height = line
         .runs()
         .next()
         .map(|r| {
             r.metrics()
                 .x_height
-                .unwrap_or(r.metrics().ascent * 0.5)
+                .unwrap_or(r.font_size() * 0.5)
         })
         .unwrap_or(0.0);
 

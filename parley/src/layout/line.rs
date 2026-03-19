@@ -93,6 +93,17 @@ impl<'a, B: Brush> Line<'a, B> {
             })
     }
 
+    /// Returns the baseline offset for the item at the given line-relative index.
+    fn baseline_offset(&self, item_index: usize) -> f32 {
+        let abs_idx = self.data.item_range.start + item_index;
+        self.layout
+            .data
+            .line_items
+            .get(abs_idx)
+            .map(|li| li.baseline_offset)
+            .unwrap_or(0.0)
+    }
+
     /// Returns an iterator over the glyph runs for the line.
     pub fn items(&self) -> impl Iterator<Item = PositionedLayoutItem<'a, B>> + 'a + Clone {
         GlyphRunIter {
@@ -252,17 +263,7 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
             match item {
                 LineItem::InlineBox(inline_box) => {
                     let x = self.offset + self.line.data.metrics.offset;
-
-                    // Get baseline_offset from the corresponding LineItemData
-                    let abs_item_idx = self.line.data.item_range.start + self.item_index;
-                    let baseline_offset = self
-                        .line
-                        .layout
-                        .data
-                        .line_items
-                        .get(abs_item_idx)
-                        .map(|li| li.baseline_offset)
-                        .unwrap_or(0.0);
+                    let baseline_offset = self.line.baseline_offset(self.item_index);
 
                     self.item_index += 1;
                     self.glyph_start = 0;
@@ -290,17 +291,7 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                             advance += glyph.advance;
                         }
                         let style = run.layout.data.styles.get(style_index)?;
-
-                        // Get baseline_offset from the corresponding LineItemData
-                        let abs_item_idx = self.line.data.item_range.start + self.item_index;
-                        let baseline_offset = self
-                            .line
-                            .layout
-                            .data
-                            .line_items
-                            .get(abs_item_idx)
-                            .map(|li| li.baseline_offset)
-                            .unwrap_or(0.0);
+                        let baseline_offset = self.line.baseline_offset(self.item_index);
 
                         let glyph_start = self.glyph_start;
                         self.glyph_start += glyph_count;

@@ -22,4 +22,10 @@ pub struct InlineBox {
     pub baseline_shift: BaselineShift,
     /// Which baseline set to use (CSS `baseline-source`).
     pub baseline_source: BaselineSource,
+    // TODO: Add `first_baseline: Option<f32>` field. When `Some(baseline)`, the
+    // inline box should align using this as its baseline (distance from box top
+    // to its internal text baseline). When `None`, falls back to aligning by the
+    // bottom of the box (current behavior). In Blitz, this would be sourced from
+    // Taffy's layout output.
+    // See: https://github.com/linebender/parley/issues/291
 }

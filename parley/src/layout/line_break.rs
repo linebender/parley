@@ -712,8 +712,15 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         let mut trailing_ws_start = line.item_range.end;
 
         // Collect the line's x-height from text runs for use in inline box Middle alignment.
-        // We take the first available x_height, falling back to ascent * 0.5.
+        // CSS spec fallback for x-height is font_size * 0.5:
+        // https://www.w3.org/TR/css-inline-3/#baseline-synthesis-fonts
         let mut line_x_height: Option<f32> = None;
+
+        // Pre-compute the "dominant baseline" ascent/descent from baseline-aligned text runs.
+        // This is needed for TextTop/TextBottom alignment, which must reference the final
+        // line metrics from unshifted runs rather than the still-accumulating metrics.
+        let mut dominant_ascent = 0.0_f32;
+        let mut dominant_descent = 0.0_f32;
 
         // Pass 0: pre-compute per-item properties and find trailing whitespace boundary
         for item_idx in line.item_range.clone() {
@@ -735,12 +742,20 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         .map(|c| c.advance)
                         .sum();
 
+                    let run = &self.layout.data.runs[line_item.index];
+
                     // Collect x-height from the first text run that has one
                     if line_x_height.is_none() {
-                        let run = &self.layout.data.runs[line_item.index];
                         line_x_height = Some(
-                            run.metrics.x_height.unwrap_or(run.metrics.ascent * 0.5),
+                            run.metrics.x_height.unwrap_or(run.font_size * 0.5),
                         );
+                    }
+
+                    // Accumulate dominant baseline metrics from baseline-aligned runs
+                    let (ab, bs) = get_run_alignment(line_item, &self.layout.data);
+                    if ab == AlignmentBaseline::Baseline && bs == BaselineShift::None {
+                        dominant_ascent = dominant_ascent.max(run.metrics.ascent);
+                        dominant_descent = dominant_descent.max(run.metrics.descent);
                     }
                 }
             }
@@ -764,7 +779,16 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
         }
 
-        // Pass 1: baseline-relative items (everything except Top/Bottom shift)
+        // Pass 1: baseline-relative items (everything except Top/Bottom shift).
+        //
+        // Note on inline box metrics contribution: inline boxes position as
+        // y = baseline + offset - height, so box top = offset - height and
+        // box bottom = offset (relative to baseline). The effective ascent/descent
+        // formulas differ from text runs because boxes have a single height rather
+        // than separate ascent/descent, but the offset direction is consistent.
+        // TODO: When `first_baseline` is added to InlineBox, boxes will have
+        // separate "ascent" (first_baseline) and "descent" (height - first_baseline)
+        // portions, and these formulas will need updating.
         for item_idx in line.item_range.clone() {
             let is_trailing_ws = item_idx >= trailing_ws_start;
             let line_item = &mut self.lines.line_items[item_idx];
@@ -782,11 +806,20 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     //   box bottom = baseline + offset
                     //   box center = baseline + offset - height/2
                     //   box top    = baseline + offset - height
+                    //
+                    // TODO: Add `first_baseline: Option<f32>` to InlineBox. When Some,
+                    // the box should align using that as its baseline (distance from box
+                    // top to internal text baseline). When None, fall back to aligning
+                    // by the bottom of the box (current behavior).
+                    // See: https://github.com/linebender/parley/issues/291
                     let align_offset = match item.alignment_baseline {
                         AlignmentBaseline::Baseline => 0.0,
-                        AlignmentBaseline::TextTop => -(line.metrics.ascent - item.height),
-                        AlignmentBaseline::TextBottom => line.metrics.descent,
-                        // CSS middle: center the box at baseline + x_height/2.
+                        // Use dominant_ascent/dominant_descent (pre-computed from
+                        // baseline-aligned runs) rather than the still-accumulating
+                        // line.metrics values.
+                        AlignmentBaseline::TextTop => -(dominant_ascent - item.height),
+                        AlignmentBaseline::TextBottom => dominant_descent,
+                        // CSS middle: center the box at baseline - x_height/2.
                         // We need: baseline + offset - height/2 = baseline - x_height/2
                         // So: offset = (height - x_height) / 2
                         AlignmentBaseline::Middle => {
@@ -794,7 +827,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         }
                     };
 
-                    // Compute shift offset from baseline_shift
+                    // Compute shift offset from baseline_shift.
+                    // TODO: Sub/Super offsets for inline boxes should ideally be derived
+                    // from the box's content font metrics or the line's dominant font
+                    // metrics (from the font's BASE/OS2 table), rather than using
+                    // hardcoded ratios of the box height.
+                    // See: https://github.com/linebender/parley/pull/579#discussion
                     let shift_offset = match item.baseline_shift {
                         BaselineShift::None => 0.0,
                         BaselineShift::Sub => item.height * 0.25,
@@ -826,25 +864,40 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         BaselineShift::Top | BaselineShift::Bottom
                     );
 
-                    // Compute alignment offset from alignment_baseline
+                    // Compute alignment offset from alignment_baseline.
+                    // TextTop/TextBottom use pre-computed dominant baseline metrics
+                    // rather than the still-accumulating line.metrics values.
                     let align_offset = match alignment_baseline {
                         AlignmentBaseline::Baseline => 0.0,
                         AlignmentBaseline::TextTop => {
-                            -(line.metrics.ascent - run.metrics.ascent)
+                            -(dominant_ascent - run.metrics.ascent)
                         }
                         AlignmentBaseline::TextBottom => {
-                            line.metrics.descent - run.metrics.descent
+                            dominant_descent - run.metrics.descent
                         }
                         AlignmentBaseline::Middle => {
+                            // CSS spec fallback: font_size * 0.5
+                            // https://www.w3.org/TR/css-inline-3/#baseline-synthesis-fonts
                             let x_height = run
                                 .metrics
                                 .x_height
-                                .unwrap_or(run.metrics.ascent * 0.5);
+                                .unwrap_or(run.font_size * 0.5);
                             -(x_height * 0.5)
                         }
                     };
 
-                    // Compute shift offset from baseline_shift
+                    // Compute shift offset from baseline_shift.
+                    // TODO: Sub/Super offsets should ideally use font-specific values
+                    // from the font's BASE or OS/2 table (e.g. subscript_y_offset,
+                    // superscript_y_offset). This requires plumbing those metrics
+                    // through RunMetrics.
+                    // See: https://github.com/linebender/parley/pull/579#discussion
+                    //
+                    // TODO: In the general case, baseline shifts accumulate through
+                    // the style tree. For example, a superscript within a superscript
+                    // should shift by the cumulative amount. This would require the
+                    // style resolution layer to propagate cumulative offsets.
+                    // See: https://github.com/linebender/parley/issues/291
                     let shift_offset = match baseline_shift {
                         BaselineShift::None => 0.0,
                         BaselineShift::Sub => run.metrics.descent,
