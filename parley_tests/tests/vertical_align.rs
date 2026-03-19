@@ -824,3 +824,202 @@ fn vertical_align_sub_super_use_font_metrics() {
         "Sub offset should be significant: {}", sub - normal
     );
 }
+
+// ---------------------------------------------------------------------------
+// Tests: Line box height expansion for shifted inline boxes
+// ---------------------------------------------------------------------------
+
+#[test]
+fn vertical_align_inline_box_shift_expands_line_height() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Baseline: unshifted inline-block
+    let layout_normal = build_layout_with_boxes(
+        &mut env,
+        "Hello",
+        vec![make_box(
+            0, 5, 20.0, 20.0,
+            AlignmentBaseline::Baseline,
+            BaselineShift::None,
+        )],
+        None,
+    );
+    let height_normal = layout_normal.height();
+
+    // Shifted: raise the box by 20px — it should push the line box taller
+    let layout_shifted = build_layout_with_boxes(
+        &mut env,
+        "Hello",
+        vec![make_box(
+            0, 5, 20.0, 20.0,
+            AlignmentBaseline::Baseline,
+            BaselineShift::Length(20.0),
+        )],
+        None,
+    );
+    let height_shifted = layout_shifted.height();
+
+    assert!(
+        height_shifted > height_normal,
+        "Shifting an inline box upward should expand layout height: shifted={height_shifted}, normal={height_normal}"
+    );
+
+    // The expansion should be approximately the shift amount
+    let expansion = height_shifted - height_normal;
+    assert!(
+        expansion > 15.0,
+        "Expected ~20px expansion from Length(20) shift, got {expansion}"
+    );
+}
+
+#[test]
+fn vertical_align_inline_box_downward_shift_expands_descent() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let layout_normal = build_layout_with_boxes(
+        &mut env,
+        "Hello",
+        vec![make_box(
+            0, 5, 20.0, 20.0,
+            AlignmentBaseline::Baseline,
+            BaselineShift::None,
+        )],
+        None,
+    );
+    let metrics_normal = *layout_normal.lines().next().unwrap().metrics();
+
+    // Shift the box downward — should expand descent
+    let layout_shifted = build_layout_with_boxes(
+        &mut env,
+        "Hello",
+        vec![make_box(
+            0, 5, 20.0, 20.0,
+            AlignmentBaseline::Baseline,
+            BaselineShift::Length(-15.0),
+        )],
+        None,
+    );
+    let metrics_shifted = *layout_shifted.lines().next().unwrap().metrics();
+
+    assert!(
+        metrics_shifted.descent > metrics_normal.descent,
+        "Downward shift should expand descent: shifted={}, normal={}",
+        metrics_shifted.descent,
+        metrics_normal.descent
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Tests: Line box height expansion for shifted text runs (CSS inline box model)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn vertical_align_text_shift_expands_layout_height() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let layout_normal = build_layout_with_valign_text(
+        &mut env,
+        &[("Hello world", DEFAULT.0, DEFAULT.1)],
+    );
+    let height_normal = layout_normal.height();
+
+    // Large upward shift should expand the line box beyond nominal line_height
+    let layout_shifted = build_layout_with_valign_text(
+        &mut env,
+        &[
+            ("Hello ", DEFAULT.0, DEFAULT.1),
+            ("UP", AlignmentBaseline::Baseline, BaselineShift::Length(30.0)),
+        ],
+    );
+    let height_shifted = layout_shifted.height();
+
+    assert!(
+        height_shifted > height_normal,
+        "Large text shift should expand layout height: shifted={height_shifted}, normal={height_normal}"
+    );
+}
+
+#[test]
+fn vertical_align_text_shift_line_height_is_minimum() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // With no shift, line_height should equal the nominal line-height
+    let layout_normal = build_layout_with_valign_text(
+        &mut env,
+        &[("Hello", DEFAULT.0, DEFAULT.1)],
+    );
+    let line_height_normal = layout_normal.lines().next().unwrap().metrics().line_height;
+
+    // With a shift, the line_height metric should be >= nominal
+    let layout_shifted = build_layout_with_valign_text(
+        &mut env,
+        &[
+            ("Hello ", DEFAULT.0, DEFAULT.1),
+            ("UP", AlignmentBaseline::Baseline, BaselineShift::Length(40.0)),
+        ],
+    );
+    let line_height_shifted = layout_shifted.lines().next().unwrap().metrics().line_height;
+
+    assert!(
+        line_height_shifted >= line_height_normal,
+        "CSS spec: line-height is a minimum — shifted line_height ({line_height_shifted}) should be >= nominal ({line_height_normal})"
+    );
+    assert!(
+        line_height_shifted > line_height_normal + 10.0,
+        "Length(40) shift should expand line_height significantly: shifted={line_height_shifted}, normal={line_height_normal}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Tests: Unshifted content does not over-expand
+// ---------------------------------------------------------------------------
+
+#[test]
+fn vertical_align_no_shift_line_height_matches_nominal() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // With no shifts, layout height should equal nominal line_height (within tolerance)
+    let layout = build_layout_with_valign_text(
+        &mut env,
+        &[("Hello world", DEFAULT.0, DEFAULT.1)],
+    );
+
+    let line_height = layout.lines().next().unwrap().metrics().line_height;
+    let layout_height = layout.height();
+
+    // Single line: layout height should equal line_height
+    assert!(
+        (layout_height - line_height).abs() < 0.01,
+        "Single-line layout height ({layout_height}) should match line_height ({line_height})"
+    );
+}
+
+#[test]
+fn vertical_align_inline_box_no_shift_preserves_height() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // A small unshifted inline box should not expand the line beyond what text already requires
+    let layout_text_only = build_layout_with_valign_text(
+        &mut env,
+        &[("Hello world", DEFAULT.0, DEFAULT.1)],
+    );
+    let height_text_only = layout_text_only.height();
+
+    let layout_with_box = build_layout_with_boxes(
+        &mut env,
+        "Hello",
+        vec![make_box(
+            0, 5, 20.0, 5.0, // Small box, shorter than text
+            AlignmentBaseline::Baseline,
+            BaselineShift::None,
+        )],
+        None,
+    );
+    let height_with_box = layout_with_box.height();
+
+    // A 5px tall box at baseline shouldn't expand the line if text is already taller
+    assert!(
+        (height_with_box - height_text_only).abs() < 2.0,
+        "Small unshifted box should not significantly expand height: with_box={height_with_box}, text_only={height_text_only}"
+    );
+}

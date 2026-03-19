@@ -688,12 +688,21 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.offset = 0.;
         line.text_range.start = usize::MAX;
 
+        // Track the max inline box extent above/below the baseline for the
+        // CSS line box height calculation. For text runs, the CSS inline box
+        // height = line-height, split as (ascent + half_leading) above the baseline
+        // and (descent + half_leading) below. When vertical-align shifts a run, the
+        // shifted inline box can push the line box extent beyond the nominal
+        // line_height. We track this to expand the line box only for shifts, NOT
+        // for intentionally small line-heights (where content overflows the inline box).
+        let mut max_inline_box_above: f32 = f32::NEG_INFINITY;
+        let mut max_inline_box_below: f32 = f32::NEG_INFINITY;
+        // Track inline-block (InlineBox) extent separately. Unlike text runs
+        // (which use half-leading and only expand for shifts), inline-block
+        // boxes directly contribute ascent/descent that may exceed line_height.
+        let mut max_ibox_extent: f32 = 0.0;
+
         // Apply CSS strut: line_height is at least the root style's line_height
-        #[cfg(feature = "std")]
-        std::eprintln!(
-            "[strut] line_height_in={line_height:.1} strut_asc={:.1} strut_desc={:.1} strut_lh={:.1}",
-            self.layout.data.strut_ascent, self.layout.data.strut_descent, self.layout.data.strut_line_height
-        );
         line.metrics.line_height = line_height.max(self.layout.data.strut_line_height);
 
         if line.item_range.is_empty() {
@@ -752,9 +761,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                     // Collect x-height from the first text run that has one
                     if line_x_height.is_none() {
-                        line_x_height = Some(
-                            run.metrics.x_height.unwrap_or(run.font_size * 0.5),
-                        );
+                        line_x_height = Some(run.metrics.x_height.unwrap_or(run.font_size * 0.5));
                     }
 
                     // Accumulate dominant baseline metrics from baseline-aligned runs
@@ -839,9 +846,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         AlignmentBaseline::TextBottom => dominant_descent,
                         // CSS middle: center the box at baseline - x_height/2.
                         // offset = (height - x_height) / 2
-                        AlignmentBaseline::Middle => {
-                            (item.height - line_x_height) / 2.0
-                        }
+                        AlignmentBaseline::Middle => (item.height - line_x_height) / 2.0,
                     };
 
                     // Compute shift offset from baseline_shift.
@@ -861,22 +866,29 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     line_item.baseline_offset = offset;
 
                     // Contribute to line metrics (skip Top/Bottom — they're resolved in pass 2).
-                    // The box spans from (offset - height) to (offset) relative to the
-                    // line baseline, so:
-                    //   space above baseline = max(0, -(offset - height)) = max(0, height - offset)
-                    //   space below baseline = max(0, offset)
+                    // The box spans from (baseline - ascent) to (baseline + descent)
+                    // where:
+                    //   ascent  = max(0, height - offset)  (space above baseline)
+                    //   descent = max(0, offset)            (space below baseline)
                     //
-                    // When first_baseline is set and extends beyond the box (e.g. an
-                    // inline-block with explicit height < its internal line baseline),
-                    // the box's contribution to line metrics is clamped to its actual
-                    // dimensions. The baseline alignment still uses the true offset, but
-                    // the overflow beyond the box doesn't force the parent line to expand.
+                    // When a box is shifted (e.g. vertical-align: 50%), ascent can exceed
+                    // item.height — the line box must expand to accommodate it.
+                    //
+                    // However, when there's NO shift and the excess comes solely from
+                    // first_baseline extending beyond the box (e.g. a 4px wrapper inheriting
+                    // a 56px line-height), we clamp to box dimensions for browser compat.
                     if !is_line_relative {
-                        let effective_ascent =
-                            (item.height - offset).max(0.0).min(item.height);
-                        let effective_descent = offset.max(0.0).min(item.height);
+                        let raw_ascent = (item.height - offset).max(0.0);
+                        let raw_descent = offset.max(0.0);
+                        let (effective_ascent, effective_descent) = if shift_offset == 0.0 {
+                            (raw_ascent.min(item.height), raw_descent.min(item.height))
+                        } else {
+                            (raw_ascent, raw_descent)
+                        };
                         line.metrics.ascent = line.metrics.ascent.max(effective_ascent);
                         line.metrics.descent = line.metrics.descent.max(effective_descent);
+                        max_ibox_extent =
+                            max_ibox_extent.max(effective_ascent + effective_descent);
                     }
 
                     have_metrics = true;
@@ -885,29 +897,20 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let (alignment_baseline, baseline_shift) =
                         get_run_alignment(line_item, &self.layout.data);
                     let run = &self.layout.data.runs[line_item.index];
-                    let is_line_relative = matches!(
-                        baseline_shift,
-                        BaselineShift::Top | BaselineShift::Bottom
-                    );
+                    let is_line_relative =
+                        matches!(baseline_shift, BaselineShift::Top | BaselineShift::Bottom);
 
                     // Compute alignment offset from alignment_baseline.
                     // TextTop/TextBottom use pre-computed dominant baseline metrics
                     // rather than the still-accumulating line.metrics values.
                     let align_offset = match alignment_baseline {
                         AlignmentBaseline::Baseline => 0.0,
-                        AlignmentBaseline::TextTop => {
-                            -(dominant_ascent - run.metrics.ascent)
-                        }
-                        AlignmentBaseline::TextBottom => {
-                            dominant_descent - run.metrics.descent
-                        }
+                        AlignmentBaseline::TextTop => -(dominant_ascent - run.metrics.ascent),
+                        AlignmentBaseline::TextBottom => dominant_descent - run.metrics.descent,
                         AlignmentBaseline::Middle => {
                             // CSS spec fallback: font_size * 0.5
                             // https://www.w3.org/TR/css-inline-3/#baseline-synthesis-fonts
-                            let x_height = run
-                                .metrics
-                                .x_height
-                                .unwrap_or(run.font_size * 0.5);
+                            let x_height = run.metrics.x_height.unwrap_or(run.font_size * 0.5);
                             -(x_height * 0.5)
                         }
                     };
@@ -923,10 +926,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // See: https://github.com/linebender/parley/issues/291
                     let shift_offset = match baseline_shift {
                         BaselineShift::None => 0.0,
-                        BaselineShift::Sub => run
-                            .metrics
-                            .subscript_offset
-                            .unwrap_or(run.metrics.descent),
+                        BaselineShift::Sub => {
+                            run.metrics.subscript_offset.unwrap_or(run.metrics.descent)
+                        }
                         BaselineShift::Super => -run
                             .metrics
                             .superscript_offset
@@ -950,6 +952,21 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let effective_descent = (run.metrics.descent + offset).max(0.0);
                         line.metrics.ascent = line.metrics.ascent.max(effective_ascent);
                         line.metrics.descent = line.metrics.descent.max(effective_descent);
+
+                        // CSS2.1 §10.8: the inline box height = line-height, distributed
+                        // as half-leading above ascent and below descent. The line box
+                        // height is the union of all inline boxes, which can exceed
+                        // nominal line_height when runs are shifted or when different
+                        // fonts have different ascent/descent ratios.
+                        {
+                            let half_leading = (line_height
+                                - (run.metrics.ascent + run.metrics.descent))
+                                * 0.5;
+                            let box_above = run.metrics.ascent + half_leading - offset;
+                            let box_below = run.metrics.descent + half_leading + offset;
+                            max_inline_box_above = max_inline_box_above.max(box_above);
+                            max_inline_box_below = max_inline_box_below.max(box_below);
+                        }
                     }
 
                     have_metrics = true;
@@ -962,10 +979,19 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // using the root element's font and line-height.
         let strut_ascent = self.layout.data.strut_ascent;
         let strut_descent = self.layout.data.strut_descent;
+        let strut_line_height = self.layout.data.strut_line_height;
         if strut_ascent > 0.0 || strut_descent > 0.0 {
             line.metrics.ascent = line.metrics.ascent.max(strut_ascent);
             line.metrics.descent = line.metrics.descent.max(strut_descent);
             have_metrics = true;
+
+            // Strut's inline box contribution (unshifted, so offset = 0)
+            let strut_half_leading =
+                (strut_line_height - (strut_ascent + strut_descent)) * 0.5;
+            max_inline_box_above =
+                max_inline_box_above.max(strut_ascent + strut_half_leading);
+            max_inline_box_below =
+                max_inline_box_below.max(strut_descent + strut_half_leading);
         }
 
         // Pass 2: Top/Bottom items — position them relative to the finalized line box
@@ -990,12 +1016,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let run = &self.layout.data.runs[line_item.index];
                     match baseline_shift {
                         BaselineShift::Top => {
-                            line_item.baseline_offset =
-                                -(line.metrics.ascent - run.metrics.ascent);
+                            line_item.baseline_offset = -(line.metrics.ascent - run.metrics.ascent);
                         }
                         BaselineShift::Bottom => {
-                            line_item.baseline_offset =
-                                line.metrics.descent - run.metrics.descent;
+                            line_item.baseline_offset = line.metrics.descent - run.metrics.descent;
                         }
                         _ => {}
                     }
@@ -1081,8 +1105,22 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
         }
 
-        line.metrics.leading =
-            line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
+        // CSS2.1 §10.8: "The line box height is the distance between the uppermost
+        // box top and the lowermost box bottom." §10.8.1: "line-height specifies the
+        // *minimal* height of line boxes." When vertical-align shifts inline boxes
+        // beyond the nominal line_height, expand the line box to contain them.
+        //
+        // Two sources of expansion:
+        // 1. Text run inline boxes (half-leading + shift): for a single unshifted run
+        //    the extent equals exactly line_height (no spurious expansion).
+        // 2. Inline-block boxes: their extent can exceed line_height when shifted.
+        //    (We do NOT use total ascent+descent because text runs with small
+        //    line-heights intentionally have ascent+descent > line_height.)
+        if max_inline_box_above > f32::NEG_INFINITY {
+            let inline_box_extent = max_inline_box_above + max_inline_box_below;
+            line.metrics.line_height = line.metrics.line_height.max(inline_box_extent);
+        }
+        line.metrics.line_height = line.metrics.line_height.max(max_ibox_extent);
 
         // Whether metrics should be quantized to pixel boundaries
         let quantize = self.layout.data.quantize;
@@ -1095,6 +1133,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         } else {
             (line.metrics.ascent, line.metrics.descent)
         };
+
+        line.metrics.leading =
+            line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
 
         let (leading_above, leading_below) = if quantize {
             // Calculate leading using the rounded ascent and descent.
