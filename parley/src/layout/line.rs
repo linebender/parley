@@ -268,9 +268,16 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                     self.item_index += 1;
                     self.glyph_start = 0;
                     self.offset += inline_box.width;
+                    let y = self.line.data.metrics.baseline + baseline_offset - inline_box.height;
+                    #[cfg(feature = "std")]
+                    std::eprintln!(
+                        "[pos ibox] id={} x={:.1} y={:.1} w={:.1} h={:.1} baseline={:.1} offset={:.1}",
+                        inline_box.id, x, y, inline_box.width, inline_box.height,
+                        self.line.data.metrics.baseline, baseline_offset
+                    );
                     return Some(PositionedLayoutItem::InlineBox(PositionedInlineBox {
                         x,
-                        y: self.line.data.metrics.baseline + baseline_offset - inline_box.height,
+                        y,
                         width: inline_box.width,
                         height: inline_box.height,
                         id: inline_box.id,

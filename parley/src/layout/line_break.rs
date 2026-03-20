@@ -697,9 +697,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // for intentionally small line-heights (where content overflows the inline box).
         let mut max_inline_box_above: f32 = f32::NEG_INFINITY;
         let mut max_inline_box_below: f32 = f32::NEG_INFINITY;
-        // Track inline-block (InlineBox) extent separately. Unlike text runs
-        // (which use half-leading and only expand for shifts), inline-block
-        // boxes directly contribute ascent/descent that may exceed line_height.
+        // Track max individual inline-block extent (ascent + descent per box).
         let mut max_ibox_extent: f32 = 0.0;
 
         // Apply CSS strut: line_height is at least the root style's line_height
@@ -865,6 +863,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let offset = align_offset + shift_offset;
                     line_item.baseline_offset = offset;
 
+                    #[cfg(feature = "std")]
+                    std::eprintln!(
+                        "[pass1 ibox] id={} h={:.1} first_baseline={:?} align={:?} shift={:?} align_off={:.1} shift_off={:.1} offset={:.1} is_line_rel={}",
+                        item.id, item.height, item.first_baseline,
+                        item.alignment_baseline, item.baseline_shift,
+                        align_offset, shift_offset, offset, is_line_relative
+                    );
+
                     // Contribute to line metrics (skip Top/Bottom — they're resolved in pass 2).
                     // The box spans from (baseline - ascent) to (baseline + descent)
                     // where:
@@ -889,6 +895,23 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         line.metrics.descent = line.metrics.descent.max(effective_descent);
                         max_ibox_extent =
                             max_ibox_extent.max(effective_ascent + effective_descent);
+                        // Inline-blocks contribute to the unified above/below tracking
+                        // so their extent combines with text descent (and vice versa)
+                        // when computing line box height. This handles cases like
+                        // overflow:hidden boxes (all above baseline) + text descent.
+                        max_inline_box_above =
+                            max_inline_box_above.max(effective_ascent);
+                        max_inline_box_below =
+                            max_inline_box_below.max(effective_descent);
+
+                        #[cfg(feature = "std")]
+                        std::eprintln!(
+                            "[pass1 ibox metrics] id={} raw_asc={:.1} raw_desc={:.1} eff_asc={:.1} eff_desc={:.1} clamped={} line_asc={:.1} line_desc={:.1}",
+                            item.id, raw_ascent, raw_descent,
+                            effective_ascent, effective_descent,
+                            shift_offset == 0.0,
+                            line.metrics.ascent, line.metrics.descent
+                        );
                     }
 
                     have_metrics = true;
@@ -958,8 +981,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // height is the union of all inline boxes, which can exceed
                         // nominal line_height when runs are shifted or when different
                         // fonts have different ascent/descent ratios.
+                        //
+                        // Use the run's own CSS line-height (not the line-wide
+                        // running_line_height which includes inline box heights).
                         {
-                            let half_leading = (line_height
+                            let half_leading = (run.metrics.line_height
                                 - (run.metrics.ascent + run.metrics.descent))
                                 * 0.5;
                             let box_above = run.metrics.ascent + half_leading - offset;
@@ -1079,12 +1105,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // *minimal* height of line boxes." When vertical-align shifts inline boxes
         // beyond the nominal line_height, expand the line box to contain them.
         //
-        // Two sources of expansion:
-        // 1. Text run inline boxes (half-leading + shift): for a single unshifted run
-        //    the extent equals exactly line_height (no spurious expansion).
-        // 2. Inline-block boxes: their extent can exceed line_height when shifted.
-        //    (We do NOT use total ascent+descent because text runs with small
-        //    line-heights intentionally have ascent+descent > line_height.)
+        // max_inline_box_above/below now unifies BOTH text run inline boxes (with
+        // half-leading) and inline-block boxes (raw ascent/descent). This correctly
+        // computes the line box as the union of all inline-level boxes:
+        //   - Text runs with small line-heights: half-leading shrinks the inline box,
+        //     so text-only extent ≤ line_height (no spurious expansion).
+        //   - Inline-blocks: contribute effective_ascent/descent directly. When an
+        //     overflow:hidden box puts all height above baseline and text descent
+        //     exists below, the combined extent correctly exceeds any single item.
         if max_inline_box_above > f32::NEG_INFINITY {
             let inline_box_extent = max_inline_box_above + max_inline_box_below;
             line.metrics.line_height = line.metrics.line_height.max(inline_box_extent);
@@ -1130,6 +1158,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // which in turn clamps the selection box minimum height to ascent + descent.
         line.metrics.min_coord = line.metrics.baseline - ascent - leading_above.max(0.);
         line.metrics.max_coord = line.metrics.baseline + descent + leading_below.max(0.);
+
+        #[cfg(feature = "std")]
+        std::eprintln!(
+            "[line] ascent={:.1} descent={:.1} line_height={:.1} leading={:.1} leading_above={:.1} leading_below={:.1} baseline={:.1} min={:.1} max={:.1}",
+            ascent, descent, line.metrics.line_height, line.metrics.leading,
+            leading_above, leading_below, line.metrics.baseline,
+            line.metrics.min_coord, line.metrics.max_coord
+        );
 
         // Pass 2: Top/Bottom items — position relative to finalized line box.
         // CSS2.1: "top" aligns box top with line box top; "bottom" aligns box
