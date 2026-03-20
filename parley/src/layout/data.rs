@@ -421,7 +421,7 @@ impl<B: Brush> LayoutData<B> {
                 index
             });
 
-        let (metrics, subscript_offset, superscript_offset) = {
+        let (metrics, subscript_offset, superscript_offset, os2_win_line_height) = {
             let font = &self.fonts[font_index];
             let font_ref = skrifa::FontRef::from_index(font.data.as_ref(), font.index).unwrap();
             let m = skrifa::metrics::Metrics::new(
@@ -434,7 +434,14 @@ impl<B: Brush> LayoutData<B> {
             let os2 = font_ref.os2().ok();
             let sub_off = os2.as_ref().map(|t| t.y_subscript_y_offset() as f32 * scale);
             let sup_off = os2.as_ref().map(|t| t.y_superscript_y_offset() as f32 * scale);
-            (m, sub_off, sup_off)
+            // OS/2 Win metrics (usWinAscent + usWinDescent) are often larger than
+            // sTypo/hhea metrics and closer to what browsers use for line-height: normal.
+            let os2_win_lh = os2.as_ref().map(|t| {
+                let win_ascent = t.us_win_ascent() as f32 * scale;
+                let win_descent = t.us_win_descent() as f32 * scale;
+                win_ascent + win_descent
+            });
+            (m, sub_off, sup_off, os2_win_lh)
         };
         let units_per_em = metrics.units_per_em as f32;
 
@@ -460,7 +467,12 @@ impl<B: Brush> LayoutData<B> {
                 LineHeight::Absolute(value) => value,
                 LineHeight::FontSizeRelative(value) => value * font_size,
                 LineHeight::MetricsRelative(value) => {
-                    (metrics.ascent - metrics.descent + metrics.leading) * value
+                    // Prefer OS/2 Win metrics (usWinAscent + usWinDescent) when
+                    // available — they're closer to what browsers use for
+                    // line-height: normal. Fall back to skrifa's default metrics.
+                    let base = os2_win_line_height
+                        .unwrap_or(metrics.ascent - metrics.descent + metrics.leading);
+                    base * value
                 }
             };
 
