@@ -863,13 +863,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let offset = align_offset + shift_offset;
                     line_item.baseline_offset = offset;
 
-                    #[cfg(feature = "std")]
-                    std::eprintln!(
-                        "[pass1 ibox] id={} h={:.1} first_baseline={:?} align={:?} shift={:?} align_off={:.1} shift_off={:.1} offset={:.1} is_line_rel={}",
-                        item.id, item.height, item.first_baseline,
-                        item.alignment_baseline, item.baseline_shift,
-                        align_offset, shift_offset, offset, is_line_relative
-                    );
+                    // #[cfg(feature = "std")]
+                    // std::eprintln!(
+                    //     "[pass1 ibox] id={} h={:.1} first_baseline={:?} align={:?} shift={:?} align_off={:.1} shift_off={:.1} offset={:.1} is_line_rel={}",
+                    //     item.id, item.height, item.first_baseline,
+                    //     item.alignment_baseline, item.baseline_shift,
+                    //     align_offset, shift_offset, offset, is_line_relative
+                    // );
 
                     // Contribute to line metrics (skip Top/Bottom — they're resolved in pass 2).
                     // The box spans from (baseline - ascent) to (baseline + descent)
@@ -893,25 +893,26 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         };
                         line.metrics.ascent = line.metrics.ascent.max(effective_ascent);
                         line.metrics.descent = line.metrics.descent.max(effective_descent);
-                        max_ibox_extent =
-                            max_ibox_extent.max(effective_ascent + effective_descent);
+                        max_ibox_extent = max_ibox_extent.max(effective_ascent + effective_descent);
                         // Inline-blocks contribute to the unified above/below tracking
                         // so their extent combines with text descent (and vice versa)
                         // when computing line box height. This handles cases like
                         // overflow:hidden boxes (all above baseline) + text descent.
-                        max_inline_box_above =
-                            max_inline_box_above.max(effective_ascent);
-                        max_inline_box_below =
-                            max_inline_box_below.max(effective_descent);
+                        max_inline_box_above = max_inline_box_above.max(effective_ascent);
+                        max_inline_box_below = max_inline_box_below.max(effective_descent);
 
-                        #[cfg(feature = "std")]
-                        std::eprintln!(
-                            "[pass1 ibox metrics] id={} raw_asc={:.1} raw_desc={:.1} eff_asc={:.1} eff_desc={:.1} clamped={} line_asc={:.1} line_desc={:.1}",
-                            item.id, raw_ascent, raw_descent,
-                            effective_ascent, effective_descent,
-                            shift_offset == 0.0,
-                            line.metrics.ascent, line.metrics.descent
-                        );
+                        // #[cfg(feature = "std")]
+                        // std::eprintln!(
+                        //     "[pass1 ibox metrics] id={} raw_asc={:.1} raw_desc={:.1} eff_asc={:.1} eff_desc={:.1} clamped={} line_asc={:.1} line_desc={:.1}",
+                        //     item.id,
+                        //     raw_ascent,
+                        //     raw_descent,
+                        //     effective_ascent,
+                        //     effective_descent,
+                        //     shift_offset == 0.0,
+                        //     line.metrics.ascent,
+                        //     line.metrics.descent
+                        // );
                     }
 
                     have_metrics = true;
@@ -1012,12 +1013,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             have_metrics = true;
 
             // Strut's inline box contribution (unshifted, so offset = 0)
-            let strut_half_leading =
-                (strut_line_height - (strut_ascent + strut_descent)) * 0.5;
-            max_inline_box_above =
-                max_inline_box_above.max(strut_ascent + strut_half_leading);
-            max_inline_box_below =
-                max_inline_box_below.max(strut_descent + strut_half_leading);
+            let strut_half_leading = (strut_line_height - (strut_ascent + strut_descent)) * 0.5;
+            max_inline_box_above = max_inline_box_above.max(strut_ascent + strut_half_leading);
+            max_inline_box_below = max_inline_box_below.max(strut_descent + strut_half_leading);
         }
 
         // Pass 2 is deferred until after leading computation (see below).
@@ -1159,13 +1157,19 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.min_coord = line.metrics.baseline - ascent - leading_above.max(0.);
         line.metrics.max_coord = line.metrics.baseline + descent + leading_below.max(0.);
 
-        #[cfg(feature = "std")]
-        std::eprintln!(
-            "[line] ascent={:.1} descent={:.1} line_height={:.1} leading={:.1} leading_above={:.1} leading_below={:.1} baseline={:.1} min={:.1} max={:.1}",
-            ascent, descent, line.metrics.line_height, line.metrics.leading,
-            leading_above, leading_below, line.metrics.baseline,
-            line.metrics.min_coord, line.metrics.max_coord
-        );
+        // #[cfg(feature = "std")]
+        // std::eprintln!(
+        //     "[line] ascent={:.1} descent={:.1} line_height={:.1} leading={:.1} leading_above={:.1} leading_below={:.1} baseline={:.1} min={:.1} max={:.1}",
+        //     ascent,
+        //     descent,
+        //     line.metrics.line_height,
+        //     line.metrics.leading,
+        //     leading_above,
+        //     leading_below,
+        //     line.metrics.baseline,
+        //     line.metrics.min_coord,
+        //     line.metrics.max_coord
+        // );
 
         // Pass 2: Top/Bottom items — position relative to finalized line box.
         // CSS2.1: "top" aligns box top with line box top; "bottom" aligns box
@@ -1197,8 +1201,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let run = &self.layout.data.runs[line_item.index];
                     match baseline_shift {
                         BaselineShift::Top => {
-                            line_item.baseline_offset =
-                                run.metrics.ascent - ascent - leading_above;
+                            line_item.baseline_offset = run.metrics.ascent - ascent - leading_above;
                         }
                         BaselineShift::Bottom => {
                             line_item.baseline_offset =
