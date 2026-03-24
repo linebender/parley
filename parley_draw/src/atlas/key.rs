@@ -15,11 +15,23 @@ use skrifa::instance::NormalizedCoord;
 use smallvec::SmallVec;
 use vello_common::color::{AlphaColor, Srgb};
 
-/// Number of horizontal subpixel quantization buckets (valid range: 1–255).
+/// Number of horizontal subpixel quantization buckets (valid range: 1–253).
 ///
 /// Higher values improve rendering quality at the cost of more atlas entries
 /// per glyph. Common values: 1 (disabled), 2, 4 (default), 8.
 pub(crate) const SUBPIXEL_BUCKETS: u8 = 4;
+
+/// Sentinel `subpixel_x` for COLR glyph cache entries.
+///
+/// `quantize_subpixel` returns values in `0..SUBPIXEL_BUCKETS`, so values
+/// above that range can never appear in an outline key. Using distinct
+/// sentinels for COLR and bitmap entries prevents cache collisions between
+/// glyph types that would otherwise produce identical keys (same font, glyph
+/// id, size, and color).
+pub(crate) const SUBPIXEL_COLR: u8 = SUBPIXEL_BUCKETS;
+
+/// Sentinel `subpixel_x` for bitmap glyph cache entries. See [`SUBPIXEL_COLR`].
+pub(crate) const SUBPIXEL_BITMAP: u8 = SUBPIXEL_BUCKETS + 1;
 
 /// Unique identifier for a cached glyph bitmap.
 ///
@@ -44,7 +56,8 @@ pub struct GlyphCacheKey {
     pub size_bits: u32,
     /// Whether hinting was applied.
     pub hinted: bool,
-    /// Horizontal subpixel position (0 to SUBPIXEL_BUCKETS-1).
+    /// Horizontal subpixel position (0 to SUBPIXEL_BUCKETS-1 for outlines),
+    /// or a sentinel (`SUBPIXEL_COLR` / `SUBPIXEL_BITMAP`) for non-outline glyphs.
     pub subpixel_x: u8,
     /// Context color for COLR glyphs. Only used for rendering, not for Hash/Eq.
     pub context_color: AlphaColor<Srgb>,
@@ -186,6 +199,46 @@ mod tests {
         let key1 = GlyphCacheKey::new(1, 0, 42, 16.0, true, 0.3, BLACK, packed, &[]);
         let key2 = GlyphCacheKey::new(1, 0, 42, 16.0, true, 0.3, BLACK, packed, &[]);
         assert_eq!(key1, key2);
+    }
+
+    #[test]
+    fn test_outline_colr_bitmap_keys_never_collide() {
+        let packed = pack_color(BLACK);
+        let outline_key = GlyphCacheKey::new(1, 0, 42, 16.0, false, 0.0, BLACK, packed, &[]);
+        let colr_key = GlyphCacheKey {
+            font_id: 1,
+            font_index: 0,
+            glyph_id: 42,
+            size_bits: 16.0_f32.to_bits(),
+            hinted: false,
+            subpixel_x: SUBPIXEL_COLR,
+            context_color: BLACK,
+            context_color_packed: packed,
+            var_coords: SmallVec::new(),
+        };
+        let bitmap_key = GlyphCacheKey {
+            font_id: 1,
+            font_index: 0,
+            glyph_id: 42,
+            size_bits: 16.0_f32.to_bits(),
+            hinted: false,
+            subpixel_x: SUBPIXEL_BITMAP,
+            context_color: BLACK,
+            context_color_packed: packed,
+            var_coords: SmallVec::new(),
+        };
+        assert_ne!(outline_key, colr_key);
+        assert_ne!(outline_key, bitmap_key);
+        assert_ne!(colr_key, bitmap_key);
+    }
+
+    #[test]
+    fn test_sentinels_unreachable_by_quantize() {
+        for i in 0..=255_u8 {
+            let frac = i as f32 / 255.0;
+            let bucket = quantize_subpixel(frac);
+            assert!(bucket < SUBPIXEL_BUCKETS, "bucket {bucket} for frac {frac}");
+        }
     }
 
     #[test]
