@@ -14,6 +14,8 @@ use crate::atlas::AtlasSlot;
 use crate::atlas::GlyphCacheKey;
 use crate::atlas::key::{SUBPIXEL_BITMAP, SUBPIXEL_COLR, pack_color};
 use crate::atlas::{GlyphCache, ImageCache};
+use crate::color::PremulRgba8;
+use crate::color::palette::css::BLACK;
 use crate::colr::convert_bounding_box;
 use crate::kurbo::Point;
 use crate::kurbo::Rect;
@@ -39,8 +41,6 @@ use skrifa::raw::TableProvider;
 use skrifa::{FontRef, OutlineGlyphCollection};
 use skrifa::{GlyphId, MetadataProvider};
 use smallvec::SmallVec;
-use vello_common::color::PremulRgba8;
-use vello_common::color::palette::css::BLACK;
 
 /// Pre-packed `BLACK` color as a `u32` for use in `GlyphCacheKey`.
 const BLACK_PACKED: u32 = PremulRgba8 {

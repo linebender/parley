@@ -2861,6 +2861,7 @@ dependencies = [
  "foldhash 0.2.0",
  "hashbrown 0.16.1",
  "log",
+ "peniko",
  "png 0.17.16",
  "skrifa 0.40.0",
  "smallvec",
