@@ -349,7 +349,6 @@ impl<'a, 'b, Glyphs: Iterator<Item = Glyph> + Clone, C: GlyphCache>
 
                 // COLR glyphs are never hinted and have no sub-pixel offset;
                 // context_color is part of the key because it affects painted layers.
-                // SUBPIXEL_COLR prevents collisions with outline keys (see key.rs).
                 let cache_key = cache_enabled.then(|| GlyphCacheKey {
                     font_id,
                     font_index,
@@ -427,7 +426,6 @@ impl<'a, 'b, Glyphs: Iterator<Item = Glyph> + Clone, C: GlyphCache>
 
                 // Bitmaps are not hinted and have no sub-pixel offset or
                 // context color; variation coords are irrelevant for fixed strikes.
-                // SUBPIXEL_BITMAP prevents collisions with outline/COLR keys (see key.rs).
                 let cache_key = cache_enabled.then(|| GlyphCacheKey {
                     font_id,
                     font_index,
