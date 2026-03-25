@@ -20,7 +20,7 @@ vello_hybrid = { workspace = true, default-features = true }
 vello_common = { workspace = true, default-features = false, features = ["std", "png"] }
 skrifa = { workspace = true }
 pollster = "0.4"
-wgpu = "27"
+wgpu = "28"
 bytemuck = { workspace = true }
 png = "0.17"
 
