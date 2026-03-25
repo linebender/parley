@@ -33,7 +33,8 @@ use png as _;
 #[cfg(feature = "std")]
 extern crate std;
 
-use vello_common::{color, kurbo, peniko, pixmap::Pixmap};
+use peniko::{self, color, kurbo};
+use vello_common::pixmap::Pixmap;
 
 pub mod atlas;
 mod colr;

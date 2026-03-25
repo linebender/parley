@@ -8,12 +8,12 @@
 //! COLR context color, and variable-font coordinates. Two keys that compare
 //! equal produce identical bitmaps and can safely share a single atlas entry.
 
+use crate::color::{AlphaColor, Srgb};
 use core::hash::{Hash, Hasher};
 #[cfg(not(feature = "std"))]
 use core_maths::CoreFloat as _;
 use skrifa::instance::NormalizedCoord;
 use smallvec::SmallVec;
-use vello_common::color::{AlphaColor, Srgb};
 
 /// Number of horizontal subpixel quantization buckets (valid range: 1–253).
 ///
@@ -165,7 +165,7 @@ pub fn subpixel_offset(quantized: u8) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use vello_common::color::palette::css::BLACK;
+    use crate::color::palette::css::BLACK;
 
     use super::*;
 
