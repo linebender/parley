@@ -25,6 +25,9 @@ use fontique::{self, Query, QueryFamily, QueryFont};
 
 mod cache;
 pub(crate) mod data;
+mod push_run;
+
+pub(crate) use push_run::ShapeSink;
 
 pub(crate) struct ShapeContext {
     shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::ShaperData>,
@@ -456,14 +459,15 @@ fn shape_item<'a, B: Brush>(
             &item_infos[segment_char_start..(segment_char_start + segment_char_count)];
 
         // Push harfrust-shaped run for the entire segment
-        layout.data.push_run(
+        push_run::push_run(
+            &mut layout.data,
             FontData::new(font.font.blob.clone(), font.font.index),
             item.size,
             font.attrs,
             font.font.synthesis,
             &glyph_buffer,
             item.level,
-            item.style_index,
+            &styles[item.style_index as usize],
             item.word_spacing,
             item.letter_spacing,
             segment_text,

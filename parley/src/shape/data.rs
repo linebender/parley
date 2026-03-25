@@ -126,7 +126,7 @@ pub(crate) struct ClusterInfo {
     source_char: char,
 }
 
-const fn to_whitespace(c: char) -> Whitespace {
+pub(super) const fn to_whitespace(c: char) -> Whitespace {
     const LINE_SEPARATOR: char = '\u{2028}';
     const PARAGRAPH_SEPARATOR: char = '\u{2029}';
 
