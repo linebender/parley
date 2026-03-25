@@ -7,7 +7,6 @@
 mod accessibility;
 mod alignment;
 mod cluster;
-mod glyph;
 mod line;
 mod line_break;
 mod run;
@@ -26,15 +25,14 @@ pub use accessibility::LayoutAccessibility;
 pub use alignment::{Alignment, AlignmentOptions};
 pub use cluster::{Affinity, Cluster, ClusterPath, ClusterSide};
 pub use data::BreakReason;
-pub use glyph::Glyph;
 pub use layout::Layout;
 pub use line::{GlyphRun, Line, LineMetrics, PositionedInlineBox, PositionedLayoutItem};
 pub use line_break::{
     BoxBreakData, BreakLines, BreakerState, LineBreakData, MaxHeightBreakData, YieldData,
 };
-pub use run::{Run, RunMetrics};
+pub use run::Run;
 
-pub(crate) use data::{LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData};
+pub(crate) use data::{LayoutData, LineData, LineItemData};
 pub(crate) use line::LineItem;
 
 // TODO - Deprecation not yet active to ease internal code migration.

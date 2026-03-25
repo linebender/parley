@@ -11,11 +11,8 @@ use core_maths::CoreFloat;
 
 use crate::analysis::Boundary;
 use crate::analysis::cluster::Whitespace;
-use crate::data::ClusterData;
-use crate::layout::{
-    BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
-    LineMetrics, Run,
-};
+use crate::layout::{BreakReason, Layout, LayoutData, LineData, LineItemData, LineMetrics, Run};
+use crate::shape::data::{ClusterData, LayoutItem, LayoutItemKind};
 use crate::style::Brush;
 use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
 

@@ -8,9 +8,11 @@
 
 use image::codecs::png::PngEncoder;
 use image::{self, Pixel, Rgba, RgbaImage};
-use parley::layout::{Alignment, Glyph, GlyphRun, Layout, PositionedLayoutItem};
+use parley::layout::{Alignment, GlyphRun, Layout, PositionedLayoutItem};
 use parley::style::{FontFamily, FontWeight, StyleProperty, TextStyle};
-use parley::{AlignmentOptions, FontContext, InlineBox, InlineBoxKind, LayoutContext, LineHeight};
+use parley::{
+    AlignmentOptions, FontContext, Glyph, InlineBox, InlineBoxKind, LayoutContext, LineHeight,
+};
 use std::fs::File;
 use swash::FontRef;
 use swash::scale::image::Content;

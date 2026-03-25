@@ -138,6 +138,8 @@ pub use inline_box::{InlineBox, InlineBoxKind};
 #[doc(inline)]
 pub use layout::Layout;
 
+pub use crate::shape::data::{Glyph, RunMetrics};
+
 pub use editing::*;
 pub use layout::*;
 pub use style::*;

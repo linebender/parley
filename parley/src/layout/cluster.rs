@@ -4,11 +4,10 @@
 use crate::analysis::cluster::Whitespace;
 use crate::layout::Style;
 use crate::layout::data::BreakReason;
-use crate::layout::data::ClusterData;
-use crate::layout::glyph::Glyph;
 use crate::layout::layout::Layout;
 use crate::layout::line::{Line, LineItem};
 use crate::layout::run::Run;
+use crate::shape::data::{ClusterData, ClusterInfo, Glyph};
 use crate::style::Brush;
 use core::ops::Range;
 
@@ -428,7 +427,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
         Some(offset)
     }
 
-    pub(crate) fn info(&self) -> &super::data::ClusterInfo {
+    pub(crate) fn info(&self) -> &ClusterInfo {
         &self.data.info
     }
 

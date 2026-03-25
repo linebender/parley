@@ -24,6 +24,7 @@ use icu_properties::props::Script;
 use fontique::{self, Query, QueryFamily, QueryFont};
 
 mod cache;
+pub(crate) mod data;
 
 pub(crate) struct ShapeContext {
     shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::ShaperData>,
