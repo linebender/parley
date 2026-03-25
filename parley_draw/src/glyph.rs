@@ -12,7 +12,7 @@ only break in edge cases, and some of them are also only related to conversions 
 use crate::Pixmap;
 use crate::atlas::AtlasSlot;
 use crate::atlas::GlyphCacheKey;
-use crate::atlas::key::pack_color;
+use crate::atlas::key::{SUBPIXEL_BITMAP, SUBPIXEL_COLR, pack_color};
 use crate::atlas::{GlyphCache, ImageCache};
 use crate::colr::convert_bounding_box;
 use crate::kurbo::Point;
@@ -355,7 +355,7 @@ impl<'a, 'b, Glyphs: Iterator<Item = Glyph> + Clone, C: GlyphCache>
                     glyph_id: glyph.id,
                     size_bits: hinted_size.to_bits(),
                     hinted: false,
-                    subpixel_x: 0,
+                    subpixel_x: SUBPIXEL_COLR,
                     context_color,
                     context_color_packed,
                     var_coords: SmallVec::from_slice(normalized_coords),
@@ -432,7 +432,7 @@ impl<'a, 'b, Glyphs: Iterator<Item = Glyph> + Clone, C: GlyphCache>
                     glyph_id: glyph.id,
                     size_bits: bitmap_ppem.to_bits(),
                     hinted: false,
-                    subpixel_x: 0,
+                    subpixel_x: SUBPIXEL_BITMAP,
                     context_color: BLACK,
                     context_color_packed: BLACK_PACKED,
                     var_coords: SmallVec::new(),
