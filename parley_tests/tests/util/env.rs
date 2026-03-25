@@ -4,6 +4,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs::File;
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -234,7 +235,7 @@ impl TestEnv {
             return Err(format!("Cannot find snapshot {}", snapshot_path.display()));
         }
         let snapshot_file = File::open(snapshot_path).unwrap();
-        let snapshot_img = Pixmap::from_png(snapshot_file).unwrap();
+        let snapshot_img = Pixmap::from_png(BufReader::new(snapshot_file)).unwrap();
         if snapshot_img.width() != current_img.width()
             || snapshot_img.height() != current_img.height()
         {
