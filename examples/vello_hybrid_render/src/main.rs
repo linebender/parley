@@ -9,8 +9,8 @@ use std::path::Path;
 use std::time::Instant;
 
 use parley::{GlyphRun, Layout, PositionedLayoutItem};
-use parley_draw::renderers::vello_renderer::replay_atlas_commands;
-use parley_draw::{
+use glifo::renderers::vello_renderer::replay_atlas_commands;
+use glifo::{
     GLYPH_PADDING, GlyphCache, GlyphCacheConfig, GlyphRunBuilder, GpuGlyphCaches, PendingClearRect,
 };
 use parley_examples_common::{
@@ -136,7 +136,7 @@ fn render_frame(
                             .build(
                                 glyph_run
                                     .positioned_glyphs()
-                                    .map(|glyph| parley_draw::Glyph {
+                                    .map(|glyph| glifo::Glyph {
                                         id: glyph.id,
                                         x: glyph.x,
                                         y: glyph.y,

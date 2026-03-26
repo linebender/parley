@@ -10,7 +10,7 @@ use parley::{
     Alignment, AlignmentOptions, FontFamily, FontStyle, FontWeight, Layout, PositionedLayoutItem,
     RangedBuilder, StyleProperty,
 };
-use parley_draw::{AtlasConfig, CpuGlyphCaches, GlyphCache, GlyphRunBuilder, ImageCache};
+use glifo::{AtlasConfig, CpuGlyphCaches, GlyphCache, GlyphRunBuilder, ImageCache};
 use std::cell::RefCell;
 use std::hint::black_box;
 use tango_bench::{Benchmark, benchmark_fn};
@@ -407,7 +407,7 @@ fn render_layout_glyphs(
                     .build(
                         glyph_run
                             .positioned_glyphs()
-                            .map(|glyph| parley_draw::Glyph {
+                            .map(|glyph| glifo::Glyph {
                                 id: glyph.id,
                                 x: glyph.x,
                                 y: glyph.y,

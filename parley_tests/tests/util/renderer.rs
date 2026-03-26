@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 
 use parley::{BoundingBox, GlyphRun, Layout, PositionedLayoutItem};
-use parley_draw::{AtlasConfig, CpuGlyphCaches, GlyphRunBuilder, ImageCache};
+use glifo::{AtlasConfig, CpuGlyphCaches, GlyphRunBuilder, ImageCache};
 use peniko::{
     Color,
     kurbo::{self, Affine, BezPath, Rect, Stroke},
@@ -405,7 +405,7 @@ fn render_glyph_run_impl(
     let mut run_renderer = builder.build(
         glyph_run
             .positioned_glyphs()
-            .map(|glyph| parley_draw::Glyph {
+            .map(|glyph| glifo::Glyph {
                 id: glyph.id,
                 x: glyph.x + x_offset,
                 y: glyph.y + y_offset,
