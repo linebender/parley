@@ -26,6 +26,7 @@ mod basic;
 mod cursor;
 mod draw;
 mod editor;
+mod exclusions;
 mod floats;
 mod issues;
 mod line_break;
