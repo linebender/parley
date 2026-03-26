@@ -23,6 +23,7 @@ members = [
 
 [workspace.package]
 edition = "2021"
+version = "0.8.0"
 # Keep in sync with RUST_MIN_VER in .github/workflows/ci.yml, with the relevant README.md files
 # and with the MSRV in the `Unreleased` section of CHANGELOG.md.
 rust-version = "1.88"
@@ -32,8 +33,7 @@ repository = "https://github.com/linebender/parley"
 [workspace.dependencies]
 accesskit = "0.24.0"
 bytemuck = { version = "1.25.0", default-features = false }
-fontique = { version = "0.7.0", default-features = false, path = "fontique" }
-parlance = { version = "0.1.0", default-features = false, path = "parlance" }
+fontique = { version = "0.8.0", default-features = false, path = "fontique" }
 harfrust = { version = "0.5.2", default-features = false }
 foldhash = { version = "0.2.0", default-features = false }
 hashbrown = { version = "0.16.1", default-features = false, features = [
@@ -46,8 +46,9 @@ icu_properties = { version = "2.1.2", default-features = false }
 icu_segmenter = { version = "2.1.2", default-features = false }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
 packtab = { version = "1.8.0" }
-parley = { version = "0.7.0", default-features = false, path = "parley" }
-parley_data = { path = "parley_data", default-features = false }
+parlance = { version = "0.1.0", default-features = false, path = "parlance" }
+parley = { version = "0.8.0", default-features = false, path = "parley" }
+parley_data = { version = "0.8.0", path = "parley_data", default-features = false }
 parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
 parley_draw = { default-features = false, path = "parley_draw" }
