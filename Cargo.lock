@@ -1386,7 +1386,7 @@ dependencies = [
 [[package]]
 name = "glifo"
 version = "0.0.0"
-source = "git+https://github.com/linebender/vello.git?rev=78504ab5#78504ab5482d48f9d33d0345f7a1add2e01d1188"
+source = "git+https://github.com/linebender/vello.git?rev=9b070fd#9b070fdde833035f3e74c74739ae2382c465a5d9"
 dependencies = [
  "bytemuck",
  "foldhash 0.1.5",
@@ -4069,7 +4069,7 @@ dependencies = [
 [[package]]
 name = "vello_api"
 version = "0.0.7"
-source = "git+https://github.com/linebender/vello.git?rev=78504ab5#78504ab5482d48f9d33d0345f7a1add2e01d1188"
+source = "git+https://github.com/linebender/vello.git?rev=9b070fd#9b070fdde833035f3e74c74739ae2382c465a5d9"
 dependencies = [
  "bytemuck",
  "peniko",
@@ -4078,7 +4078,7 @@ dependencies = [
 [[package]]
 name = "vello_common"
 version = "0.0.7"
-source = "git+https://github.com/linebender/vello.git?rev=78504ab5#78504ab5482d48f9d33d0345f7a1add2e01d1188"
+source = "git+https://github.com/linebender/vello.git?rev=9b070fd#9b070fdde833035f3e74c74739ae2382c465a5d9"
 dependencies = [
  "bytemuck",
  "fearless_simd",
@@ -4095,7 +4095,7 @@ dependencies = [
 [[package]]
 name = "vello_cpu"
 version = "0.0.7"
-source = "git+https://github.com/linebender/vello.git?rev=78504ab5#78504ab5482d48f9d33d0345f7a1add2e01d1188"
+source = "git+https://github.com/linebender/vello.git?rev=9b070fd#9b070fdde833035f3e74c74739ae2382c465a5d9"
 dependencies = [
  "bytemuck",
  "hashbrown 0.16.1",
@@ -4149,7 +4149,7 @@ dependencies = [
 [[package]]
 name = "vello_hybrid"
 version = "0.0.7"
-source = "git+https://github.com/linebender/vello.git?rev=78504ab5#78504ab5482d48f9d33d0345f7a1add2e01d1188"
+source = "git+https://github.com/linebender/vello.git?rev=9b070fd#9b070fdde833035f3e74c74739ae2382c465a5d9"
 dependencies = [
  "bytemuck",
  "hashbrown 0.16.1",
@@ -4194,7 +4194,7 @@ dependencies = [
 [[package]]
 name = "vello_sparse_shaders"
 version = "0.0.7"
-source = "git+https://github.com/linebender/vello.git?rev=78504ab5#78504ab5482d48f9d33d0345f7a1add2e01d1188"
+source = "git+https://github.com/linebender/vello.git?rev=9b070fd#9b070fdde833035f3e74c74739ae2382c465a5d9"
 
 [[package]]
 name = "version_check"

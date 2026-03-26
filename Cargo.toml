@@ -48,7 +48,7 @@ parley = { version = "0.7.0", default-features = false, path = "parley" }
 parley_data = { path = "parley_data", default-features = false }
 parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
-glifo = { git = "https://github.com/linebender/vello", rev = "78504ab5", default-features = false }
+glifo = { git = "https://github.com/linebender/vello", rev = "9b070fd", default-features = false }
 peniko = { version = "0.6.0", default-features = false }
 read-fonts = { version = "0.37.0", default-features = false }
 skrifa = { version = "0.40.0", default-features = false }
@@ -108,9 +108,9 @@ clippy.wildcard_dependencies = "warn"
 # END LINEBENDER LINT SET
 
 [patch.crates-io]
-vello_common = { git = "https://github.com/linebender/vello.git", rev = "78504ab5" }
-vello_cpu = { git = "https://github.com/linebender/vello.git", rev = "78504ab5" }
-vello_hybrid = { git = "https://github.com/linebender/vello.git", rev = "78504ab5" }
+vello_common = { git = "https://github.com/linebender/vello.git", rev = "9b070fd" }
+vello_cpu = { git = "https://github.com/linebender/vello.git", rev = "9b070fd" }
+vello_hybrid = { git = "https://github.com/linebender/vello.git", rev = "9b070fd" }
 
 
 [profile.profiling]
