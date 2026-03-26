@@ -73,7 +73,7 @@ impl FontWeight {
     /// This parser is case-sensitive and does not clamp the numeric range.
     ///
     /// ```
-    /// use text_primitives::FontWeight;
+    /// use parlance::FontWeight;
     ///
     /// assert_eq!(FontWeight::parse_css("normal"), Some(FontWeight::NORMAL));
     /// assert_eq!(FontWeight::parse_css("bold"), Some(FontWeight::BOLD));
@@ -218,7 +218,7 @@ impl FontWidth {
     /// This parser is case-sensitive.
     ///
     /// ```
-    /// use text_primitives::FontWidth;
+    /// use parlance::FontWidth;
     ///
     /// assert_eq!(
     ///     FontWidth::parse_css("semi-condensed"),
@@ -330,7 +330,7 @@ impl FontStyle {
     /// This parser is case-sensitive.
     ///
     /// ```
-    /// use text_primitives::FontStyle;
+    /// use parlance::FontStyle;
     ///
     /// assert_eq!(FontStyle::parse_css("normal"), Some(FontStyle::Normal));
     /// assert_eq!(FontStyle::parse_css("italic"), Some(FontStyle::Italic));

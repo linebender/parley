@@ -56,8 +56,6 @@ mod source_cache;
 
 pub use linebender_resource_handle::Blob;
 pub use script::ScriptExt;
-pub use text_primitives::Language;
-pub use text_primitives::Script;
 
 pub use attributes::Attributes;
 pub use charmap::{Charmap, CharmapIndex};
@@ -66,8 +64,8 @@ pub use fallback::FallbackKey;
 pub use family::{FamilyId, FamilyInfo};
 pub use font::{AxisInfo, FontInfo, FontInfoOverride, Synthesis};
 pub use impl_fontconfig::FromFontconfig;
+pub use parlance::{FontStyle, FontWeight, FontWidth, GenericFamily, Language, Script};
 pub use source::{SourceId, SourceInfo, SourceKind};
-pub use text_primitives::{FontStyle, FontWeight, FontWidth, GenericFamily};
 
 #[cfg(all(feature = "system", target_vendor = "apple"))]
 use objc2 as _;

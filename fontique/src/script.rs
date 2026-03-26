@@ -3,7 +3,7 @@
 
 //! Support for working with Unicode scripts.
 
-use text_primitives::Script;
+use parlance::Script;
 
 pub trait ScriptExt {
     /// Returns a mapping of scripts to sample text.

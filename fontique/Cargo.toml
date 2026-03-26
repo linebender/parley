@@ -17,9 +17,9 @@ workspace = true
 
 [features]
 default = ["system"]
-std = ["read-fonts/std", "dep:memmap2", "text_primitives/std"]
+std = ["read-fonts/std", "dep:memmap2", "parlance/std"]
 libm = ["read-fonts/libm"]
-bytemuck = ["text_primitives/bytemuck"]
+bytemuck = ["parlance/bytemuck"]
 # Enables support for system font backends
 system = [
     "std",
@@ -44,7 +44,7 @@ linebender_resource_handle = { workspace = true }
 smallvec = "1.15.1"
 memmap2 = { version = "0.9.10", optional = true }
 hashbrown = { workspace = true }
-text_primitives = { path = "../text_primitives", default-features = false }
+parlance = { workspace = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.62.2", features = ["Win32_Graphics_DirectWrite"], optional = true }
