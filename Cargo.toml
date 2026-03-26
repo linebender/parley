@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "attributed_text",
     "fontique",
+    "parlance",
     "parley",
     "parley_bench",
     "parley_core",
@@ -11,7 +12,6 @@ members = [
     "parley_dev",
     "parley_draw",
     "parley_tests",
-    "text_primitives",
     "examples/common",
     "examples/swash_render",
     "examples/tiny_skia_render",
@@ -33,6 +33,7 @@ repository = "https://github.com/linebender/parley"
 accesskit = "0.24.0"
 bytemuck = { version = "1.25.0", default-features = false }
 fontique = { version = "0.7.0", default-features = false, path = "fontique" }
+parlance = { version = "0.1.0", default-features = false, path = "parlance" }
 harfrust = { version = "0.5.2", default-features = false }
 foldhash = { version = "0.2.0", default-features = false }
 hashbrown = { version = "0.16.1", default-features = false, features = [

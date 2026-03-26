@@ -46,7 +46,7 @@ impl Language {
     /// this type to model them.
     ///
     /// ```
-    /// use text_primitives::Language;
+    /// use parlance::Language;
     ///
     /// let (lang, rest) = Language::parse_prefix("tr-Latin-TR").unwrap();
     /// assert_eq!(lang.as_str(), "tr");

@@ -1194,10 +1194,10 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-core-text",
  "objc2-foundation 0.3.2",
+ "parlance",
  "read-fonts 0.37.0",
  "roxmltree",
  "smallvec",
- "text_primitives",
  "windows 0.62.2",
  "windows-core 0.62.2",
  "yeslogic-fontconfig-sys",
@@ -2829,6 +2829,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "parlance"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+]
+
+[[package]]
 name = "parley"
 version = "0.7.0"
 dependencies = [
@@ -2842,11 +2849,11 @@ dependencies = [
  "icu_segmenter",
  "linebender_resource_handle",
  "oxipng",
+ "parlance",
  "parley_data",
  "parley_dev",
  "peniko",
  "skrifa 0.40.0",
- "text_primitives",
  "tiny-skia",
 ]
 
@@ -3843,13 +3850,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "text_primitives"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
 ]
 
 [[package]]

@@ -96,8 +96,8 @@ impl<'a> FontFamilyName<'a> {
     /// ```
     /// # extern crate alloc;
     /// use alloc::borrow::Cow;
-    /// use text_primitives::FontFamilyName::{self, *};
-    /// use text_primitives::GenericFamily::*;
+    /// use parlance::FontFamilyName::{self, *};
+    /// use parlance::GenericFamily::*;
     ///
     /// assert_eq!(FontFamilyName::parse("Palatino Linotype"), Some(Named(Cow::Borrowed("Palatino Linotype"))));
     /// assert_eq!(FontFamilyName::parse("monospace"), Some(Generic(Monospace)));
@@ -119,9 +119,9 @@ impl<'a> FontFamilyName<'a> {
     /// # extern crate alloc;
     /// use alloc::borrow::Cow;
     /// use alloc::vec::Vec;
-    /// use text_primitives::FontFamilyName::{self, *};
-    /// use text_primitives::ParseFontFamilyError;
-    /// use text_primitives::GenericFamily::*;
+    /// use parlance::FontFamilyName::{self, *};
+    /// use parlance::ParseFontFamilyError;
+    /// use parlance::GenericFamily::*;
     ///
     /// let source = "Arial, 'Times New Roman', serif";
     ///

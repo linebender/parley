@@ -53,7 +53,7 @@ impl GenericFamily {
     /// Parses a generic family from a CSS generic family name.
     ///
     /// ```
-    /// use text_primitives::GenericFamily;
+    /// use parlance::GenericFamily;
     ///
     /// assert_eq!(
     ///     GenericFamily::parse("sans-serif"),

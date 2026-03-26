@@ -15,7 +15,7 @@
 //! ## Example
 //!
 //! ```
-//! use text_primitives::{Language, Tag};
+//! use parlance::{Language, Tag};
 //!
 //! let tag = Tag::parse("wght").unwrap();
 //! assert_eq!(tag.to_bytes(), *b"wght");
