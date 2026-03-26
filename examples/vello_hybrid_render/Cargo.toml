@@ -9,11 +9,7 @@ publish = false
 
 [dependencies]
 parley = { workspace = true, default-features = true }
-glifo = { workspace = true, default-features = false, features = [
-    "std",
-    "png",
-    "vello_hybrid",
-] }
+glifo = { workspace = true, default-features = false, features = ["std", "png", "vello_hybrid"] }
 parley_examples_common = { path = "../common" }
 peniko = { workspace = true }
 vello_hybrid = { workspace = true, default-features = true }

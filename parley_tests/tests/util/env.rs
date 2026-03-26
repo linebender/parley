@@ -8,6 +8,7 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use super::renderer::{ColorBrush, RenderingConfig, render_layout, render_layout_with_clusters};
 use fontique::{Blob, Collection, CollectionOptions, SourceCache};
 use parley::{
     BoundingBox, FontContext, FontFamily, FontFamilyName, Layout, LayoutContext, LineHeight,
@@ -15,7 +16,6 @@ use parley::{
 };
 use peniko::{Color, kurbo::Size};
 use vello_cpu::Pixmap;
-use super::renderer::{ColorBrush, RenderingConfig, render_layout, render_layout_with_clusters};
 
 fn current_imgs_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("current")
