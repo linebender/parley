@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::analysis::Boundary;
-use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty, WordBreak};
+use crate::{FontContext, ParleyCoreContext, StyleProperty, StyleRunBuilder, TextStyle, WordBreak};
 use alloc::{vec, vec::Vec};
+use core::ops::RangeBounds;
 use fontique::FontWeight;
 use icu_properties::props::{GraphemeClusterBreak, Script};
 
 #[derive(Default)]
 struct TestContext {
-    pub layout_context: LayoutContext,
+    pub layout_context: ParleyCoreContext,
     pub font_context: FontContext,
 }
 
@@ -87,14 +88,28 @@ impl TestContext {
     }
 }
 
+struct TestBuilder<'a>(&'a mut StyleRunBuilder<'a, [u8; 4]>);
+
+impl TestBuilder<'_> {
+    fn push(&mut self, prop: StyleProperty<'_, [u8; 4]>, range: impl RangeBounds<usize>) {
+        let style = TextStyle::default();
+
+        // TODO: implement
+        style.apply(prop);
+
+        let style_index = self.0.push_style(style);
+        self.0.push_style_run(style_index, range)
+    }
+}
+
 fn verify_analysis(
     text: &str,
-    configure_builder: impl for<'a> FnOnce(&mut RangedBuilder<'a, [u8; 4]>),
+    configure_builder: impl for<'a> FnOnce(&mut TestBuilder<'a>),
 ) -> TestContext {
     let mut test_context = TestContext::default();
 
     {
-        let mut builder = test_context.layout_context.ranged_builder(
+        let mut builder = test_context.layout_context.style_run_builder(
             &mut test_context.font_context,
             text,
             1.,
@@ -102,8 +117,9 @@ fn verify_analysis(
         );
 
         // Apply test-specific configuration
-        configure_builder(&mut builder);
+        configure_builder(&mut TestBuilder(&mut builder));
 
+        // TODO: ShapedText
         _ = builder.build(text);
     }
 

@@ -1,16 +1,16 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::analysis::Boundary;
-use crate::inline_box::InlineBox;
+use super::{Decoration, IndentOptions};
+use crate::FontData;
 use crate::layout::{ContentWidths, LineMetrics, Style};
-use crate::resolve::{ResolvedDecoration, ResolvedStyle};
-use crate::shape::ShapeSink;
-use crate::shape::data::{ClusterData, Glyph, LayoutItem, LayoutItemKind, RunData};
 use crate::style::Brush;
 use crate::util::nearly_zero;
-use crate::{Decoration, FontData, IndentOptions, InlineBoxKind, OverflowWrap, TextWrapMode};
 use core::ops::Range;
+use parley_core::{
+    Boundary, ClusterData, Glyph, InlineBox, InlineBoxKind, LayoutItem, LayoutItemKind,
+    OverflowWrap, ResolvedDecoration, ResolvedStyle, RunData, ShapeSink, TextWrapMode,
+};
 
 use alloc::vec::Vec;
 

@@ -1,15 +1,14 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::analysis::cluster::Whitespace;
 use crate::layout::Style;
 use crate::layout::data::BreakReason;
 use crate::layout::layout::Layout;
 use crate::layout::line::{Line, LineItem};
 use crate::layout::run::Run;
-use crate::shape::data::{ClusterData, ClusterInfo, Glyph};
 use crate::style::Brush;
 use core::ops::Range;
+use parley_core::{ClusterData, ClusterInfo, Glyph, Whitespace};
 
 /// Atomic unit of text.
 #[derive(Copy, Clone)]

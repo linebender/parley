@@ -74,7 +74,7 @@ pub enum Whitespace {
 
 impl Whitespace {
     /// Returns true for space or no break space.
-    pub(crate) fn is_space_or_nbsp(self) -> bool {
+    pub fn is_space_or_nbsp(self) -> bool {
         matches!(self, Self::Space | Self::NoBreakSpace)
     }
 }

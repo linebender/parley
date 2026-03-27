@@ -2856,13 +2856,10 @@ dependencies = [
  "fontique",
  "harfrust",
  "hashbrown 0.16.1",
- "icu_normalizer",
- "icu_properties",
- "icu_segmenter",
  "linebender_resource_handle",
  "oxipng",
  "parlance",
- "parley_data",
+ "parley_core",
  "parley_dev",
  "peniko",
  "skrifa 0.40.0",
@@ -2883,7 +2880,20 @@ dependencies = [
 
 [[package]]
 name = "parley_core"
-version = "0.0.0"
+version = "0.8.0"
+dependencies = [
+ "core_maths",
+ "fontique",
+ "harfrust",
+ "hashbrown 0.16.1",
+ "icu_normalizer",
+ "icu_properties",
+ "icu_segmenter",
+ "linebender_resource_handle",
+ "parlance",
+ "parley_data",
+ "skrifa 0.40.0",
+]
 
 [[package]]
 name = "parley_data"

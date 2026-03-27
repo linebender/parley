@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::BoundingBox;
-#[cfg(feature = "accesskit")]
-use crate::analysis::cluster::Whitespace;
 use crate::layout::{Affinity, BreakReason, Cluster, ClusterSide, Layout, Line};
 #[cfg(feature = "accesskit")]
 use crate::layout::{ClusterPath, LayoutAccessibility};
 use crate::style::Brush;
 #[cfg(feature = "accesskit")]
 use accesskit::TextPosition;
+#[cfg(feature = "accesskit")]
+use parley_core::Whitespace;
 
 /// Defines a position with a text layout.
 #[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]

@@ -108,21 +108,13 @@ extern crate std;
 
 pub use fontique;
 
-mod analysis;
-mod bidi;
 mod builder;
 mod context;
-mod inline_box;
-mod lru_cache;
 mod resolve;
-mod shape;
 mod util;
 
 pub mod editing;
 pub mod layout;
-pub mod style;
-
-pub use analysis::{Boundary, cluster::Whitespace};
 
 #[cfg(test)]
 mod tests;
@@ -130,20 +122,15 @@ mod tests;
 pub use linebender_resource_handle::FontData;
 pub use util::BoundingBox;
 
-pub use builder::{RangedBuilder, StyleRunBuilder, TreeBuilder};
+pub use builder::{RangedBuilder, TreeBuilder};
 pub use context::LayoutContext;
 pub use fontique::FontContext;
-pub use inline_box::{InlineBox, InlineBoxKind};
 #[doc(inline)]
 pub use layout::Layout;
 
-pub use resolve::{Resolved, ResolvedDecoration, ResolvedProperty, ResolvedStyle};
-pub use shape::ShapeSink;
-pub use shape::data::*;
-
 pub use editing::*;
 pub use layout::*;
-pub use style::*;
+pub use parley_core::*;
 
 #[deprecated(
     note = "Old name for this type, use `parley::FontData` instead.",

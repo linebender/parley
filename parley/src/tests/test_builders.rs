@@ -123,7 +123,8 @@ fn build_layout_with_style_runs(
 ) -> Layout<ColorBrush> {
     let mut rb = lcx.style_run_builder(fcx, opts.text, opts.scale, opts.quantize);
     with_builder(&mut rb);
-    let mut layout = rb.build(opts.text);
+    let mut layout = Layout::new();
+    rb.build_into(&mut layout.data, opts.text);
     layout.break_all_lines(opts.max_advance);
     layout
 }

@@ -18,27 +18,24 @@ workspace = true
 
 [features]
 default = ["system"]
-std = ["fontique/std", "harfrust/std", "peniko/std", "skrifa/std", "parlance/std"]
-libm = ["fontique/libm", "peniko/libm", "skrifa/libm", "dep:core_maths"]
+std = ["fontique/std", "harfrust/std", "peniko/std", "skrifa/std", "parley_core/std"]
+libm = ["fontique/libm", "peniko/libm", "skrifa/libm", "dep:core_maths", "parley_core/libm"]
 # Enables support for system font backends
 system = ["std", "fontique/system"]
-accesskit = ["dep:accesskit"]
+accesskit = ["dep:accesskit", "dep:skrifa", "dep:hashbrown"]
 
 [dependencies]
-skrifa = { workspace = true }
+skrifa = { workspace = true, optional = true }
 linebender_resource_handle = { workspace = true }
 fontique = { workspace = true }
-parlance = { workspace = true }
+parley_core = { workspace = true }
 core_maths = { version = "0.1.1", optional = true }
-parley_data = { workspace = true, features = ["baked"] }
 accesskit = { workspace = true, optional = true }
-hashbrown = { workspace = true }
+hashbrown = { workspace = true, optional = true }
 harfrust = { workspace = true }
-icu_normalizer = { workspace = true, features = ["compiled_data"] }
-icu_properties = { workspace = true, features = ["compiled_data"] }
-icu_segmenter = { workspace = true, features = ["compiled_data"] }
 
 [dev-dependencies]
+parlance = { workspace = true }
 parley_dev = { workspace = true }
 peniko = { workspace = true }
 tiny-skia = "0.11.4"

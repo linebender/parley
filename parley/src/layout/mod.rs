@@ -42,7 +42,7 @@ pub use crate::editing::{Cursor, Selection};
 // TODO - Move the following to `style` module and submodules.
 
 use crate::style::Brush;
-use crate::{LineHeight, OverflowWrap, TextWrapMode};
+use parley_core::{LineHeight, OverflowWrap, TextWrapMode};
 
 #[allow(clippy::partial_pub_fields)]
 /// Style properties.

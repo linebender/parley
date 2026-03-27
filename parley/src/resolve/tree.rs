@@ -6,7 +6,9 @@ use alloc::{string::String, vec::Vec};
 
 use crate::style::WhiteSpaceCollapse;
 
-use super::{Brush, ResolvedProperty, ResolvedStyle, StyleRun};
+use super::{Brush, ResolvedProperty, ResolvedStyle};
+
+use parley_core::{ParleyCoreContext, StyleRun};
 
 #[derive(Debug, Clone)]
 struct StyleTreeNode<B: Brush> {
@@ -201,21 +203,15 @@ impl<B: Brush> TreeStyleBuilder<B> {
     }
 
     /// Computes style table + style runs and returns the final text buffer.
-    pub(crate) fn finish(
-        &mut self,
-        style_table: &mut Vec<ResolvedStyle<B>>,
-        style_runs: &mut Vec<StyleRun>,
-    ) -> String {
+    pub(crate) fn finish(&mut self, core_ctx: &mut ParleyCoreContext<B>) -> String {
         while self.tree[self.current_span].parent.is_some() {
             self.pop_style_span();
         }
 
         self.push_uncommitted_text(true);
 
-        style_table.clear();
-        style_runs.clear();
-        style_table.extend_from_slice(&self.style_table);
-        style_runs.extend_from_slice(&self.style_runs);
+        core_ctx.set_style_table(self.style_table.drain(..));
+        core_ctx.set_style_runs(self.style_runs.drain(..));
 
         core::mem::take(&mut self.text)
     }

@@ -3,78 +3,50 @@
 
 //! Context for layout.
 
-use alloc::{vec, vec::Vec};
-
 use super::FontContext;
-use super::builder::{RangedBuilder, StyleRunBuilder};
+use super::builder::RangedBuilder;
+use super::resolve::RangedStyleBuilder;
 use super::resolve::tree::TreeStyleBuilder;
-use super::resolve::{RangedStyleBuilder, ResolveContext, ResolvedStyle, StyleRun};
 use super::style::{Brush, TextStyle};
-
-use crate::StyleProperty;
-use crate::analysis::{AnalysisDataSources, CharInfo};
-use crate::bidi::BidiResolver;
-use crate::builder::TreeBuilder;
-use crate::inline_box::InlineBox;
-use crate::resolve::ResolvedProperty;
-use crate::shape::{ShapeContext, ShapeSink};
+use crate::{StyleProperty, TreeBuilder};
+use parley_core::{ParleyCoreContext, ResolvedProperty, ResolvedStyle, ShapeSink, StyleRunBuilder};
 
 /// Shared scratch space used when constructing text layouts.
 ///
 /// This type is designed to be a global resource with only one per-application (or per-thread).
 pub struct LayoutContext<B: Brush = [u8; 4]> {
-    pub(crate) rcx: ResolveContext,
-    pub(crate) style_table: Vec<ResolvedStyle<B>>,
-    pub(crate) style_runs: Vec<StyleRun>,
-    pub(crate) inline_boxes: Vec<InlineBox>,
-    pub(crate) bidi: BidiResolver,
+    pub(crate) core_ctx: ParleyCoreContext<B>,
 
     // Reusable style builders (to amortise allocations)
     pub(crate) ranged_style_builder: RangedStyleBuilder<B>,
     pub(crate) tree_style_builder: TreeStyleBuilder<B>,
-
-    // u16: style index for character
-    pub(crate) info: Vec<(CharInfo, u16)>,
-    pub(crate) scx: ShapeContext,
-
-    // Unicode analysis data sources (provided by icu)
-    pub(crate) analysis_data_sources: AnalysisDataSources,
 }
 
 impl<B: Brush> LayoutContext<B> {
     pub fn new() -> Self {
         Self {
-            rcx: ResolveContext::default(),
-            style_table: vec![],
-            style_runs: vec![],
-            inline_boxes: vec![],
-            bidi: BidiResolver::new(),
+            core_ctx: ParleyCoreContext::new(),
             ranged_style_builder: RangedStyleBuilder::default(),
             tree_style_builder: TreeStyleBuilder::default(),
-            info: vec![],
-            analysis_data_sources: AnalysisDataSources::new(),
-            scx: ShapeContext::default(),
         }
     }
 
-    fn resolve_style_set(
+    pub fn resolve_style_set(
         &mut self,
         font_ctx: &mut FontContext,
         scale: f32,
         raw_style: &TextStyle<'_, '_, B>,
     ) -> ResolvedStyle<B> {
-        self.rcx
-            .resolve_entire_style_set(font_ctx, raw_style, scale)
+        self.core_ctx.resolve_style_set(font_ctx, scale, raw_style)
     }
 
-    #[allow(dead_code)]
-    fn resolve_style_property(
+    pub fn resolve_style_property(
         &mut self,
         fcx: &mut FontContext,
         scale: f32,
         property: &StyleProperty<'_, B>,
     ) -> ResolvedProperty<B> {
-        self.rcx.resolve_property(fcx, property, scale)
+        self.core_ctx.resolve_style_property(fcx, scale, property)
     }
 
     /// Create a ranged style layout builder.
@@ -134,18 +106,7 @@ impl<B: Brush> LayoutContext<B> {
         scale: f32,
         quantize: bool,
     ) -> StyleRunBuilder<'a, B> {
-        self.begin();
-
-        fcx.source_cache.prune(128, false);
-
-        StyleRunBuilder {
-            scale,
-            quantize,
-            len: text.len(),
-            lcx: self,
-            fcx,
-            cursor: 0,
-        }
+        self.core_ctx.style_run_builder(fcx, text, scale, quantize)
     }
 
     /// Create a tree style layout builder.
@@ -197,71 +158,11 @@ impl<B: Brush> LayoutContext<B> {
         text: &str,
         fcx: &mut FontContext,
     ) {
-        if text.is_empty() && self.style_runs.is_empty() {
-            self.style_table.push(ResolvedStyle::default());
-            self.style_runs.push(StyleRun {
-                style_index: 0,
-                range: 0..0,
-            });
-        }
-        assert!(
-            !self.style_runs.is_empty(),
-            "at least one style run is required"
-        );
-
-        crate::analysis::analyze_text(self, text);
-
-        sink.clear();
-        sink.set_scale(scale);
-        sink.set_quantize(quantize);
-        sink.set_base_level(self.bidi.base_level());
-        sink.set_text_len(text.len());
-
-        let mut char_index = 0;
-        for style_run in &self.style_runs {
-            for _ in text[style_run.range.clone()].chars() {
-                self.info[char_index].1 = style_run.style_index;
-                char_index += 1;
-            }
-        }
-
-        // Copy the visual styles into the layout
-        sink.push_styles(&self.style_table);
-
-        // Sort the inline boxes as subsequent code assumes that they are in text index order.
-        // Note: It's important that this is a stable sort to allow users to control the order of contiguous inline boxes
-        self.inline_boxes.sort_by_key(|b| b.index);
-
-        {
-            let query = fcx.collection.query(&mut fcx.source_cache);
-            super::shape::shape_text(
-                &self.rcx,
-                query,
-                &self.style_table,
-                &self.inline_boxes,
-                &self.info,
-                self.bidi.levels(),
-                &mut self.scx,
-                text,
-                sink,
-                &self.analysis_data_sources,
-            );
-        }
-
-        // Move inline boxes into the layout
-        let boxes = core::mem::take(&mut self.inline_boxes);
-        self.inline_boxes = sink.set_inline_boxes(boxes);
-
-        sink.finish();
+        self.core_ctx.build_into(sink, scale, quantize, text, fcx);
     }
 
     fn begin(&mut self) {
-        self.rcx.clear();
-        self.style_table.clear();
-        self.style_runs.clear();
-        self.inline_boxes.clear();
-        self.info.clear();
-        self.bidi.clear();
+        self.core_ctx.begin();
     }
 }
 

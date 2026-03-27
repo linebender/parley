@@ -4,8 +4,10 @@
 //! Range based style application.
 
 use alloc::vec;
+use alloc::vec::Vec;
+use parley_core::{ParleyCoreContext, StyleRun};
 
-use super::{Brush, RangedProperty, RangedStyle, ResolvedProperty, ResolvedStyle, StyleRun, Vec};
+use super::{Brush, RangedProperty, RangedStyle, ResolvedProperty, ResolvedStyle};
 use core::ops::{Bound, Range, RangeBounds};
 
 /// Builder for constructing an ordered sequence of non-overlapping ranged
@@ -71,13 +73,7 @@ impl<B: Brush> RangedStyleBuilder<B> {
     }
 
     /// Computes style table + style runs for the ranged properties.
-    pub(crate) fn finish(
-        &mut self,
-        style_table: &mut Vec<ResolvedStyle<B>>,
-        style_runs: &mut Vec<StyleRun>,
-    ) {
-        style_table.clear();
-        style_runs.clear();
+    pub(crate) fn finish(&mut self, core_ctx: &mut ParleyCoreContext<B>) {
         if self.len == usize::MAX {
             self.properties.clear();
             self.scratch_styles.clear();
@@ -153,15 +149,16 @@ impl<B: Brush> RangedStyleBuilder<B> {
         }
         styles.truncate(styles.len() - merged_count);
 
-        style_table.reserve(styles.len());
-        style_runs.reserve(styles.len());
-        for (style_index, style) in styles.drain(..).enumerate() {
-            style_table.push(style.style);
-            style_runs.push(StyleRun {
-                style_index: style_index as u16,
-                range: style.range,
-            });
-        }
+        core_ctx.set_style_runs(
+            styles
+                .iter()
+                .enumerate()
+                .map(|(style_index, style)| StyleRun {
+                    style_index: style_index as u16,
+                    range: style.range.clone(),
+                }),
+        );
+        core_ctx.set_style_table(styles.drain(..).map(|style| style.style));
 
         self.properties.clear();
         self.root_style = ResolvedStyle::default();

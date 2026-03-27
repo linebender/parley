@@ -13,17 +13,28 @@ use linebender_resource_handle::FontData;
 use super::data::{ClusterData, ClusterInfo, LayoutItem, LayoutItemKind, RunData, to_whitespace};
 
 pub trait ShapeSink<B: Brush> {
+    /// Clear data from a previous shaping run ready to accept new data
     fn clear(&mut self);
+    /// This method is called when Parley Core has finished pushed data into the sink, and can be
+    /// used as a hook to post-process that data. Parley's `Layout` type uses this to implement 
+    /// the `word-spacing` and `letter-spacing` properties.
     fn finish(&mut self);
 
+    // Setters for simple variables
     fn set_scale(&mut self, scale: f32);
     fn set_quantize(&mut self, quantize: bool);
     fn set_base_level(&mut self, level: u8);
     fn set_text_len(&mut self, len: usize);
 
-    fn push_styles(&mut self, styles: &[ResolvedStyle<B>]);
-    fn set_inline_boxes(&mut self, boxes: Vec<InlineBox>) -> Vec<InlineBox>;
+    // Push methods for styles and inline boxes. These two need some API design work. They are different
+    // the other `push` methods below for allocation efficiency reasons, but this could probably be done better.
 
+    /// Set the entire list of inline boxes. TODO: make a "push" method?
+    fn set_inline_boxes(&mut self, boxes: Vec<InlineBox>) -> Vec<InlineBox>;
+    /// Push an entire list of `ResolvedStyle<B>` into the list of resolved styles
+    fn push_styles(&mut self, styles: &[ResolvedStyle<B>]);
+
+    // Push methods. The layout should store these data types.
     fn push_coords(&mut self, coords: &[harfrust::NormalizedCoord]) -> (usize, usize);
     fn push_font(&mut self, font: &FontData) -> usize;
     fn push_cluster(&mut self, cluster: ClusterData);
@@ -32,10 +43,13 @@ pub trait ShapeSink<B: Brush> {
     fn push_item(&mut self, item: LayoutItem);
     fn push_inline_box_item(&mut self, index: usize);
 
+    /// Getters methods. Returns how many of the data type that sink currently has stored
     fn cluster_count(&self) -> usize;
     fn glyph_count(&self) -> usize;
     fn run_count(&self) -> usize;
 
+    /// The clusters should be stored in a `Vec` or similar ordered list type. This method
+    /// should reverse the order of a subslice of that list specified by `range`.
     fn reverse_cluster_range(&mut self, range: Range<usize>);
 }
 

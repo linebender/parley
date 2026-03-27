@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use crate::resolve::StyleRun;
-use crate::{Brush, LayoutContext, WordBreak};
+use crate::{Brush, ParleyCoreContext, WordBreak};
 
 use icu_normalizer::properties::{
     CanonicalComposition, CanonicalCompositionBorrowed, CanonicalDecomposition,
@@ -214,11 +214,11 @@ pub enum Boundary {
     Mandatory = 3,
 }
 
-pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str) {
+pub(crate) fn analyze_text<B: Brush>(lcx: &mut ParleyCoreContext<B>, mut text: &str) {
     struct WordBreakSegmentIter<'a, I: Iterator, B: Brush> {
         text: &'a str,
         style_runs: I,
-        lcx: &'a LayoutContext<B>,
+        lcx: &'a ParleyCoreContext<B>,
         char_indices: core::str::CharIndices<'a>,
         current_char: (usize, char),
         building_range_start: usize,
@@ -234,7 +234,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
         fn new(
             text: &'a str,
             style_runs: I,
-            lcx: &'a LayoutContext<B>,
+            lcx: &'a ParleyCoreContext<B>,
             first_style_run: &StyleRun,
         ) -> Self {
             let mut char_indices = text.char_indices();

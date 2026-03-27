@@ -9,12 +9,11 @@ use alloc::vec::Vec;
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 
-use crate::analysis::Boundary;
-use crate::analysis::cluster::Whitespace;
+use parley_core::{Boundary, ClusterData, LayoutItem, LayoutItemKind, Whitespace};
+
 use crate::layout::{BreakReason, Layout, LayoutData, LineData, LineItemData, LineMetrics, Run};
-use crate::shape::data::{ClusterData, LayoutItem, LayoutItemKind};
 use crate::style::Brush;
-use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
+use parley_core::{InlineBoxKind, OverflowWrap, TextWrapMode};
 
 use core::ops::Range;
 

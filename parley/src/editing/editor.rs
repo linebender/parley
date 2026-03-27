@@ -15,7 +15,8 @@ use core::{
 use crate::editing::{Cursor, Selection};
 use crate::layout::{Affinity, Alignment, AlignmentOptions, Layout};
 use crate::style::Brush;
-use crate::{BoundingBox, FontContext, LayoutContext, StyleProperty, StyleSet};
+use crate::{BoundingBox, FontContext, LayoutContext};
+use parley_core::{StyleProperty, StyleSet};
 
 #[cfg(feature = "accesskit")]
 use crate::layout::LayoutAccessibility;
@@ -779,7 +780,7 @@ where
         next_node_id: impl FnMut() -> NodeId,
         x_offset: f64,
         y_offset: f64,
-        set_brush_properties: impl Fn(&mut Node, &crate::Style<T>),
+        set_brush_properties: impl Fn(&mut Node, &crate::layout::Style<T>),
     ) -> Option<()> {
         self.refresh_layout();
         self.editor.accessibility_unchecked(
@@ -1091,7 +1092,7 @@ where
         next_node_id: impl FnMut() -> NodeId,
         x_offset: f64,
         y_offset: f64,
-        set_brush_properties: impl Fn(&mut Node, &crate::Style<T>),
+        set_brush_properties: impl Fn(&mut Node, &crate::layout::Style<T>),
     ) -> Option<()> {
         if self.layout_dirty {
             return None;
@@ -1259,7 +1260,7 @@ where
         next_node_id: impl FnMut() -> NodeId,
         x_offset: f64,
         y_offset: f64,
-        set_brush_properties: impl Fn(&mut Node, &crate::Style<T>),
+        set_brush_properties: impl Fn(&mut Node, &crate::layout::Style<T>),
     ) {
         self.layout_access.build_nodes(
             &self.buffer,

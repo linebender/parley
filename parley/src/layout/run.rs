@@ -5,10 +5,10 @@ use crate::FontData;
 use crate::layout::cluster::{Cluster, ClusterPath};
 use crate::layout::data::LineItemData;
 use crate::layout::layout::Layout;
-use crate::shape::data::{RunData, RunMetrics};
 use crate::style::Brush;
 use core::ops::Range;
 use fontique::Synthesis;
+use parley_core::{RunData, RunMetrics};
 
 /// Sequence of clusters with a single font and style.
 #[derive(Copy, Clone)]

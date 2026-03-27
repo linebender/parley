@@ -8,7 +8,7 @@ use crate::layout::data::LayoutData;
 use crate::style::Brush;
 use core::cmp::Ordering;
 
-use crate::IndentOptions;
+use super::IndentOptions;
 use crate::layout::{
     ContentWidths, Style, alignment::Alignment, alignment::AlignmentOptions, line::Line,
     line_break::BreakLines,

@@ -13,8 +13,9 @@ use skrifa::{
     raw::{TableProvider, types::NameId},
 };
 
+use super::{Alignment, ClusterPath, Layout, LineMetrics, Run, Style};
+use crate::FontStyle;
 use crate::style::Brush;
-use crate::{Alignment, ClusterPath, FontStyle, Layout, LineMetrics, Run, Style};
 
 fn link_spans(prev_id: NodeId, prev: &mut Node, next_id: NodeId, next: &mut Node) {
     prev.set_next_on_line(next_id);
