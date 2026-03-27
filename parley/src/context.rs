@@ -15,7 +15,9 @@ use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::bidi::BidiResolver;
 use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
+use crate::resolve::ResolvedProperty;
 use crate::shape::ShapeContext;
+use crate::{Layout, StyleProperty};
 
 /// Shared scratch space used when constructing text layouts.
 ///
@@ -63,6 +65,16 @@ impl<B: Brush> LayoutContext<B> {
     ) -> ResolvedStyle<B> {
         self.rcx
             .resolve_entire_style_set(font_ctx, raw_style, scale)
+    }
+
+    #[allow(dead_code)]
+    fn resolve_style_property(
+        &mut self,
+        fcx: &mut FontContext,
+        scale: f32,
+        property: &StyleProperty<'_, B>,
+    ) -> ResolvedProperty<B> {
+        self.rcx.resolve_property(fcx, property, scale)
     }
 
     /// Create a ranged style layout builder.
@@ -175,6 +187,75 @@ impl<B: Brush> LayoutContext<B> {
             lcx: self,
             fcx,
         }
+    }
+
+    pub fn build_into_layout(
+        &mut self,
+        layout: &mut Layout<B>,
+        scale: f32,
+        quantize: bool,
+        text: &str,
+        fcx: &mut FontContext,
+    ) {
+        if text.is_empty() && self.style_runs.is_empty() {
+            self.style_table.push(ResolvedStyle::default());
+            self.style_runs.push(StyleRun {
+                style_index: 0,
+                range: 0..0,
+            });
+        }
+        assert!(
+            !self.style_runs.is_empty(),
+            "at least one style run is required"
+        );
+
+        crate::analysis::analyze_text(self, text);
+
+        layout.data.clear();
+        layout.data.scale = scale;
+        layout.data.quantize = quantize;
+        layout.data.base_level = self.bidi.base_level();
+        layout.data.text_len = text.len();
+
+        let mut char_index = 0;
+        for style_run in &self.style_runs {
+            for _ in text[style_run.range.clone()].chars() {
+                self.info[char_index].1 = style_run.style_index;
+                char_index += 1;
+            }
+        }
+
+        // Copy the visual styles into the layout
+        layout
+            .data
+            .styles
+            .extend(self.style_table.iter().map(|s| s.as_layout_style()));
+
+        // Sort the inline boxes as subsequent code assumes that they are in text index order.
+        // Note: It's important that this is a stable sort to allow users to control the order of contiguous inline boxes
+        self.inline_boxes.sort_by_key(|b| b.index);
+
+        {
+            let query = fcx.collection.query(&mut fcx.source_cache);
+            super::shape::shape_text(
+                &self.rcx,
+                query,
+                &self.style_table,
+                &self.inline_boxes,
+                &self.info,
+                self.bidi.levels(),
+                &mut self.scx,
+                text,
+                layout,
+                &self.analysis_data_sources,
+            );
+        }
+
+        // Move inline boxes into the layout
+        layout.data.inline_boxes.clear();
+        core::mem::swap(&mut layout.data.inline_boxes, &mut self.inline_boxes);
+
+        layout.data.finish();
     }
 
     fn begin(&mut self) {

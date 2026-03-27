@@ -14,7 +14,7 @@ use core::ops::{Bound, Range, RangeBounds};
 
 use crate::InlineBoxKind;
 use crate::inline_box::InlineBox;
-use crate::resolve::{ResolvedStyle, StyleRun, tree::ItemKind};
+use crate::resolve::{StyleRun, tree::ItemKind};
 
 /// Builder for constructing a text layout with ranged attributes.
 #[must_use]
@@ -57,14 +57,8 @@ impl<B: Brush> RangedBuilder<'_, B> {
             .finish(&mut self.lcx.style_table, &mut self.lcx.style_runs);
 
         // Call generic layout builder method
-        build_into_layout(
-            layout,
-            self.scale,
-            self.quantize,
-            text.as_ref(),
-            self.lcx,
-            self.fcx,
-        );
+        self.lcx
+            .build_into_layout(layout, self.scale, self.quantize, text.as_ref(), self.fcx);
     }
 
     pub fn build(self, text: impl AsRef<str>) -> Layout<B> {
@@ -147,14 +141,8 @@ impl<B: Brush> StyleRunBuilder<'_, B> {
             self.cursor == self.len,
             "StyleRunBuilder requires runs that cover the full text"
         );
-        build_into_layout(
-            layout,
-            self.scale,
-            self.quantize,
-            text.as_ref(),
-            self.lcx,
-            self.fcx,
-        );
+        self.lcx
+            .build_into_layout(layout, self.scale, self.quantize, text.as_ref(), self.fcx);
     }
 
     pub fn build(self, text: impl AsRef<str>) -> Layout<B> {
@@ -233,7 +221,8 @@ impl<B: Brush> TreeBuilder<'_, B> {
             .finish(&mut self.lcx.style_table, &mut self.lcx.style_runs);
 
         // Call generic layout builder method
-        build_into_layout(layout, self.scale, self.quantize, &text, self.lcx, self.fcx);
+        self.lcx
+            .build_into_layout(layout, self.scale, self.quantize, &text, self.fcx);
 
         text
     }
@@ -244,75 +233,6 @@ impl<B: Brush> TreeBuilder<'_, B> {
         let text = self.build_into(&mut layout);
         (layout, text)
     }
-}
-
-fn build_into_layout<B: Brush>(
-    layout: &mut Layout<B>,
-    scale: f32,
-    quantize: bool,
-    text: &str,
-    lcx: &mut LayoutContext<B>,
-    fcx: &mut FontContext,
-) {
-    if text.is_empty() && lcx.style_runs.is_empty() {
-        lcx.style_table.push(ResolvedStyle::default());
-        lcx.style_runs.push(StyleRun {
-            style_index: 0,
-            range: 0..0,
-        });
-    }
-    assert!(
-        !lcx.style_runs.is_empty(),
-        "at least one style run is required"
-    );
-
-    crate::analysis::analyze_text(lcx, text);
-
-    layout.data.clear();
-    layout.data.scale = scale;
-    layout.data.quantize = quantize;
-    layout.data.base_level = lcx.bidi.base_level();
-    layout.data.text_len = text.len();
-
-    let mut char_index = 0;
-    for style_run in &lcx.style_runs {
-        for _ in text[style_run.range.clone()].chars() {
-            lcx.info[char_index].1 = style_run.style_index;
-            char_index += 1;
-        }
-    }
-
-    // Copy the visual styles into the layout
-    layout
-        .data
-        .styles
-        .extend(lcx.style_table.iter().map(|s| s.as_layout_style()));
-
-    // Sort the inline boxes as subsequent code assumes that they are in text index order.
-    // Note: It's important that this is a stable sort to allow users to control the order of contiguous inline boxes
-    lcx.inline_boxes.sort_by_key(|b| b.index);
-
-    {
-        let query = fcx.collection.query(&mut fcx.source_cache);
-        super::shape::shape_text(
-            &lcx.rcx,
-            query,
-            &lcx.style_table,
-            &lcx.inline_boxes,
-            &lcx.info,
-            lcx.bidi.levels(),
-            &mut lcx.scx,
-            text,
-            layout,
-            &lcx.analysis_data_sources,
-        );
-    }
-
-    // Move inline boxes into the layout
-    layout.data.inline_boxes.clear();
-    core::mem::swap(&mut layout.data.inline_boxes, &mut lcx.inline_boxes);
-
-    layout.data.finish();
 }
 
 fn resolve_range(range: impl RangeBounds<usize>, len: usize) -> Range<usize> {
