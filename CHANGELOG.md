@@ -8,9 +8,6 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 # Changelog
 
-The latest published Parley release is [0.8.0](#080---2026-03-27) which was released on 2026-03-27.
-You can find its changes [documented below](#080---2026-03-27).
-
 ## [Unreleased]
 
 This release has an [MSRV] of 1.88.
@@ -18,14 +15,6 @@ This release has an [MSRV] of 1.88.
 ## [0.8.0] - 2026-03-27
 
 This release has an [MSRV] of 1.88.
-
-### Parlance
-
-A new `parlance` crate has been added.
-This is lightweight type-only crate that contains type representing text-related concepts such as `FontWeight`, `FontFamily`, `Script`, `Language`, etc.
-This crate is developed as part of the Parley project and is used in the `parley` and `fontique` crates but is intended to be widely useful to any Rust project working with text.
-
-Added in ([#500][], [#501][], [#502][] by [@waywardmonkeys][])
 
 ### Added
 
@@ -53,7 +42,7 @@ Added in ([#500][], [#501][], [#502][] by [@waywardmonkeys][])
 - Cursor rectangle calculation for last line. ([#547][] by [@areopagitics][])
 - Treat Line Separator and Paragraph Separator as mandatory break. ([#549][] by [@xorgy][])
 - Justification space count for non-space line breaks. ([#565][] by [@devunt][])
-- Font fallback by computing `map_len` in `fill_cluster_in_place`. [#566][] by [@devunt][])
+- Font fallback by computing `map_len` in `fill_cluster_in_place`. ([#566][] by [@devunt][])
 
 #### Fontique
 
@@ -542,9 +531,6 @@ This release has an [MSRV][] of 1.70.
 [#467]: https://github.com/linebender/parley/pull/467
 [#468]: https://github.com/linebender/parley/pull/468
 [#486]: https://github.com/linebender/parley/pull/486
-[#500]: https://github.com/linebender/parley/pull/500
-[#501]: https://github.com/linebender/parley/pull/501
-[#502]: https://github.com/linebender/parley/pull/502
 [#510]: https://github.com/linebender/parley/pull/510
 [#512]: https://github.com/linebender/parley/pull/512
 [#516]: https://github.com/linebender/parley/pull/516
