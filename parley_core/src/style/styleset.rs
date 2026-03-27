@@ -9,9 +9,8 @@ type StyleProperty<Brush> = crate::StyleProperty<'static, Brush>;
 /// A long-lived collection of [`StyleProperties`](super::StyleProperty), containing at
 /// most one of each property.
 ///
-/// This is used by [`PlainEditor`](crate::editing::PlainEditor) to provide a reasonably ergonomic
+/// This is used by the `PlainEditor` in Parley to provide a reasonably ergonomic
 /// mutable API for styles applied to all text managed by it.
-/// This can be accessed using [`PlainEditor::edit_styles`](crate::editing::PlainEditor::edit_styles).
 ///
 /// These styles do not have a corresponding range, and are generally unsuited for rich text.
 #[derive(Clone, Debug)]

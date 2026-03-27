@@ -71,7 +71,7 @@ impl<B: Brush> ParleyCoreContext<B> {
 
     /// Create a builder for constructing a layout from indexed style runs.
     ///
-    /// Unlike [`Self::ranged_builder`], this builder expects callers to provide:
+    /// This builder expects callers to provide:
     /// - a style table of fully specified [`TextStyle`] values (via [`StyleRunBuilder::push_style`])
     /// - a complete sequence of **contiguous**, **non-overlapping** spans that cover
     ///   `0..text.len()` and reference style indices (via [`StyleRunBuilder::push_style_run`])
