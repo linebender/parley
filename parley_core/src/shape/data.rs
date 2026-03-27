@@ -3,8 +3,146 @@
 
 //! Shaped data
 
-use crate::analysis::{Boundary, cluster::Whitespace};
+use crate::{
+    Brush, InlineBox, ResolvedStyle,
+    analysis::{Boundary, cluster::Whitespace},
+};
+use alloc::vec::Vec;
 use core::ops::Range;
+use linebender_resource_handle::FontData;
+
+use super::ShapeSink;
+
+#[derive(Debug, Clone, Default)]
+pub struct ShapedText<B: Brush> {
+    pub base_level: u8,
+    pub text_len: usize,
+
+    // Input (/ output of style resolution)
+    pub styles: Vec<ResolvedStyle<B>>,
+    pub inline_boxes: Vec<InlineBox>,
+
+    // Output of shaping
+    pub runs: Vec<RunData>,
+    pub items: Vec<LayoutItem>,
+    pub clusters: Vec<ClusterData>,
+    pub glyphs: Vec<Glyph>,
+    pub fonts: Vec<FontData>,
+    pub coords: Vec<i16>,
+}
+
+impl<B: Brush> ShapedText<B> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl<B: Brush> ShapeSink<B> for ShapedText<B> {
+    fn set_scale(&mut self, _scale: f32) {
+        // Do nothing
+    }
+
+    fn set_quantize(&mut self, _quantize: bool) {
+        // Do nothing
+    }
+
+    fn set_base_level(&mut self, level: u8) {
+        self.base_level = level;
+    }
+
+    fn set_text_len(&mut self, len: usize) {
+        self.text_len = len;
+    }
+
+    fn push_coords(&mut self, coords: &[harfrust::NormalizedCoord]) -> (usize, usize) {
+        let coords_start = self.coords.len();
+        self.coords.extend(coords.iter().map(|c| c.to_bits()));
+        let coords_end = self.coords.len();
+        (coords_start, coords_end)
+    }
+
+    fn push_font(&mut self, font: &FontData) -> usize {
+        self.fonts
+            .iter()
+            .position(|f| f == font)
+            .unwrap_or_else(|| {
+                let index = self.fonts.len();
+                self.fonts.push(font.clone());
+                index
+            })
+    }
+
+    fn push_cluster(&mut self, cluster: ClusterData) {
+        self.clusters.push(cluster);
+    }
+
+    fn push_glyph(&mut self, glyph: Glyph) {
+        self.glyphs.push(glyph);
+    }
+
+    fn push_run(&mut self, run: RunData) {
+        self.runs.push(run);
+    }
+
+    fn push_item(&mut self, item: LayoutItem) {
+        self.items.push(item);
+    }
+
+    fn push_inline_box_item(&mut self, index: usize) {
+        // Give the box the same bidi level as the preceding text run
+        // (or else default to 0 if there is not yet a text run)
+        let bidi_level = self.runs.last().map(|r| r.bidi_level).unwrap_or(0);
+
+        self.items.push(LayoutItem {
+            kind: LayoutItemKind::InlineBox,
+            index,
+            bidi_level,
+        });
+    }
+
+    fn set_inline_boxes(&mut self, boxes: Vec<InlineBox>) -> Vec<InlineBox> {
+        let mut old_box_allocation = core::mem::replace(&mut self.inline_boxes, boxes);
+        old_box_allocation.clear();
+        old_box_allocation
+    }
+
+    fn push_styles(&mut self, styles: &[ResolvedStyle<B>]) {
+        self.styles.extend(styles.iter().cloned());
+    }
+
+    fn glyph_count(&self) -> usize {
+        self.glyphs.len()
+    }
+
+    fn cluster_count(&self) -> usize {
+        self.clusters.len()
+    }
+
+    fn run_count(&self) -> usize {
+        self.runs.len()
+    }
+
+    fn reverse_cluster_range(&mut self, range: Range<usize>) {
+        self.clusters[range].reverse();
+    }
+
+    fn clear(&mut self) {
+        self.base_level = 0;
+        self.text_len = 0;
+        self.fonts.clear();
+        self.coords.clear();
+        self.styles.clear();
+        self.inline_boxes.clear();
+        self.runs.clear();
+        self.items.clear();
+        self.clusters.clear();
+        self.glyphs.clear();
+    }
+
+    fn finish(&mut self) {
+        // Do nothing
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LayoutItemKind {

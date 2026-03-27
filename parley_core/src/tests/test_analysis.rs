@@ -2,17 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::analysis::Boundary;
-use crate::{FontContext, ParleyCoreContext, StyleProperty, StyleRunBuilder, TextStyle, WordBreak};
+use crate::{
+    FontContext, ParleyCoreContext, ShapedText, StyleProperty, StyleRunBuilder, TextStyle,
+    WordBreak,
+};
 use alloc::{vec, vec::Vec};
 use core::ops::RangeBounds;
 use fontique::FontWeight;
 use icu_properties::props::{GraphemeClusterBreak, Script};
+use parlance::TextWrapMode;
 
 #[derive(Default)]
 struct TestContext {
     pub layout_context: ParleyCoreContext,
     pub font_context: FontContext,
 }
+
+/// A style that is set to it's default value and therefore has effect. This is needed to satisfy the
+/// StyleRunBuilder's assertions that all ranges are covered by a style.
+const DUMMY_STYLE: StyleProperty<'static, [u8; 4]> =
+    StyleProperty::TextWrapMode(TextWrapMode::Wrap);
 
 impl TestContext {
     fn expect_boundary_list(self, expected: Vec<Boundary>) -> Self {
@@ -88,10 +97,14 @@ impl TestContext {
     }
 }
 
-struct TestBuilder<'a>(&'a mut StyleRunBuilder<'a, [u8; 4]>);
+struct TestBuilder<'a>(StyleRunBuilder<'a, [u8; 4]>);
 
 impl TestBuilder<'_> {
-    fn push<'a: 'static>(&mut self, prop: StyleProperty<'a, [u8; 4]>, range: impl RangeBounds<usize>) {
+    fn push<'a: 'static>(
+        &mut self,
+        prop: StyleProperty<'a, [u8; 4]>,
+        range: impl RangeBounds<usize>,
+    ) {
         let mut style = TextStyle::default();
         style.apply(prop);
 
@@ -102,12 +115,12 @@ impl TestBuilder<'_> {
 
 fn verify_analysis(
     text: &str,
-    configure_builder: impl for<'a> FnOnce(&mut TestBuilder<'a>),
+    configure_builder: impl for<'a> FnOnce(&mut TestBuilder<'a>, usize),
 ) -> TestContext {
     let mut test_context = TestContext::default();
 
     {
-        let mut builder = test_context.layout_context.style_run_builder(
+        let builder = test_context.layout_context.style_run_builder(
             &mut test_context.font_context,
             text,
             1.,
@@ -115,10 +128,15 @@ fn verify_analysis(
         );
 
         // Apply test-specific configuration
-        configure_builder(&mut TestBuilder(&mut builder));
+        let builder = {
+            let mut test_builder = TestBuilder(builder);
+            configure_builder(&mut test_builder, text.len());
+            test_builder.0
+        };
 
         // TODO: ShapedText
-        _ = builder.build(text);
+        let mut shaped_text = ShapedText::new();
+        _ = builder.build_into(&mut shaped_text, text);
     }
 
     test_context
@@ -126,7 +144,7 @@ fn verify_analysis(
 
 #[test]
 fn test_latin_mixed_keep_all_last() {
-    verify_analysis("AB", |builder| {
+    verify_analysis("AB", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 0..1);
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 1..2);
     })
@@ -144,81 +162,87 @@ fn test_latin_mixed_keep_all_last() {
 
 #[test]
 fn test_mandatory_break_in_text() {
-    verify_analysis("ABC DEF\nG", |_| {})
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Mandatory,
-        ])
-        .expect_bidi_embed_level_list(vec![])
-        .expect_script_list(vec![
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Common,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Common,
-            Script::Latin,
-        ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::LF,
-            GraphemeClusterBreak::Other,
-        ])
-        .expect_is_control_list(vec![
-            false, false, false, false, false, false, false, true, false,
-        ])
-        .expect_contributes_to_shaping_list(vec![
-            true, true, true, true, true, true, true, false, true,
-        ])
-        .expect_force_normalize_list(vec![
-            false, false, false, false, false, false, false, false, false,
-        ]);
+    verify_analysis("ABC DEF\nG", |builder, len| {
+        builder.push(DUMMY_STYLE, 0..len);
+    })
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Mandatory,
+    ])
+    .expect_bidi_embed_level_list(vec![])
+    .expect_script_list(vec![
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Common,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Common,
+        Script::Latin,
+    ])
+    .expect_grapheme_cluster_break_list(vec![
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::LF,
+        GraphemeClusterBreak::Other,
+    ])
+    .expect_is_control_list(vec![
+        false, false, false, false, false, false, false, true, false,
+    ])
+    .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true, true, false, true])
+    .expect_force_normalize_list(vec![
+        false, false, false, false, false, false, false, false, false,
+    ]);
 }
 
 #[test]
 fn test_line_separator_is_hard_break() {
-    verify_analysis("A\u{2028}B", |_| {})
-        .expect_boundary_list(vec![Boundary::Word, Boundary::Word, Boundary::Mandatory])
-        .expect_contributes_to_shaping_list(vec![true, false, true]);
+    verify_analysis("A\u{2028}B", |builder, len| {
+        builder.push(DUMMY_STYLE, 0..len);
+    })
+    .expect_boundary_list(vec![Boundary::Word, Boundary::Word, Boundary::Mandatory])
+    .expect_contributes_to_shaping_list(vec![true, false, true]);
 }
 
 #[test]
 fn test_paragraph_separator_is_hard_break() {
-    verify_analysis("A\u{2029}B", |_| {})
-        .expect_boundary_list(vec![Boundary::Word, Boundary::Word, Boundary::Mandatory])
-        .expect_contributes_to_shaping_list(vec![true, false, true]);
+    verify_analysis("A\u{2029}B", |builder, len| {
+        builder.push(DUMMY_STYLE, 0..len);
+    })
+    .expect_boundary_list(vec![Boundary::Word, Boundary::Word, Boundary::Mandatory])
+    .expect_contributes_to_shaping_list(vec![true, false, true]);
 }
 
 #[test]
 fn test_blank() {
-    verify_analysis("", |_| {})
-        .expect_boundary_list(vec![Boundary::Word])
-        .expect_bidi_embed_level_list(vec![])
-        .expect_script_list(vec![Script::Common])
-        .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::Other])
-        .expect_is_control_list(vec![false])
-        .expect_contributes_to_shaping_list(vec![true])
-        .expect_force_normalize_list(vec![false]);
+    verify_analysis("", |builder, len| {
+        builder.push(DUMMY_STYLE, 0..len);
+    })
+    .expect_boundary_list(vec![Boundary::Word])
+    .expect_bidi_embed_level_list(vec![])
+    .expect_script_list(vec![Script::Common])
+    .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::Other])
+    .expect_is_control_list(vec![false])
+    .expect_contributes_to_shaping_list(vec![true])
+    .expect_force_normalize_list(vec![false]);
 }
 
 #[test]
 fn test_latin_mixed_keep_all_first() {
-    verify_analysis("AB", |builder| {
+    verify_analysis("AB", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..1);
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..2);
     })
@@ -227,7 +251,7 @@ fn test_latin_mixed_keep_all_first() {
 
 #[test]
 fn test_mixed_break_four_segments() {
-    verify_analysis("ABCD 123", |builder| {
+    verify_analysis("ABCD 123", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 0..1);
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 1..2);
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 2..4);
@@ -247,7 +271,7 @@ fn test_mixed_break_four_segments() {
 
 #[test]
 fn test_alternate_twice_within_word_normal_break_normal() {
-    verify_analysis("ABC", |builder| {
+    verify_analysis("ABC", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 0..1);
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 1..2);
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 2..3);
@@ -257,7 +281,7 @@ fn test_alternate_twice_within_word_normal_break_normal() {
 
 #[test]
 fn test_alternate_twice_within_word_break_normal_break() {
-    verify_analysis("ABC", |builder| {
+    verify_analysis("ABC", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..1);
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..2);
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 2..3);
@@ -267,7 +291,7 @@ fn test_alternate_twice_within_word_break_normal_break() {
 
 #[test]
 fn test_latin_trailing_space_mixed() {
-    verify_analysis("AB ", |builder| {
+    verify_analysis("AB ", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..1);
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..3);
     })
@@ -278,7 +302,7 @@ fn test_latin_trailing_space_mixed() {
 
 #[test]
 fn test_latin_leading_space_mixed() {
-    verify_analysis(" AB", |builder| {
+    verify_analysis(" AB", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..1);
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..3);
     })
@@ -289,7 +313,7 @@ fn test_latin_leading_space_mixed() {
 
 #[test]
 fn test_latin_mixed_break_all_last() {
-    verify_analysis("AB", |builder| {
+    verify_analysis("AB", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 0..1);
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 1..2);
     })
@@ -298,7 +322,7 @@ fn test_latin_mixed_break_all_last() {
 
 #[test]
 fn test_latin_mixed_break_all_first() {
-    verify_analysis("AB", |builder| {
+    verify_analysis("AB", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..1);
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..2);
     })
@@ -307,47 +331,51 @@ fn test_latin_mixed_break_all_first() {
 
 #[test]
 fn test_all_whitespace() {
-    verify_analysis("   ", |_| {})
-        .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::None])
-        .expect_bidi_embed_level_list(vec![])
-        .expect_script_list(vec![Script::Common, Script::Common, Script::Common]);
+    verify_analysis("   ", |builder, len| {
+        builder.push(DUMMY_STYLE, 0..len);
+    })
+    .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::None])
+    .expect_bidi_embed_level_list(vec![])
+    .expect_script_list(vec![Script::Common, Script::Common, Script::Common]);
 }
 
 #[test]
 fn test_multi_char_grapheme() {
-    verify_analysis("A e\u{301} B", |_| {})
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-        ])
-        .expect_script_list(vec![
-            Script::Latin,
-            Script::Common,
-            Script::Latin,
-            Script::Inherited,
-            Script::Common,
-            Script::Latin,
-        ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Extend,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-        ])
-        .expect_is_control_list(vec![false, false, false, false, false, false])
-        .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
-        .expect_force_normalize_list(vec![false, false, false, true, false, false]);
+    verify_analysis("A e\u{301} B", |builder, len| {
+        builder.push(DUMMY_STYLE, 0..len);
+    })
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+    ])
+    .expect_script_list(vec![
+        Script::Latin,
+        Script::Common,
+        Script::Latin,
+        Script::Inherited,
+        Script::Common,
+        Script::Latin,
+    ])
+    .expect_grapheme_cluster_break_list(vec![
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Extend,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+    ])
+    .expect_is_control_list(vec![false, false, false, false, false, false])
+    .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
+    .expect_force_normalize_list(vec![false, false, false, true, false, false]);
 }
 
 #[test]
 fn test_mixed_break_frequent_alternation() {
-    verify_analysis("ABCD 123", |builder| {
+    verify_analysis("ABCD 123", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 0..1);
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 1..2);
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 2..3);
@@ -381,7 +409,7 @@ fn test_mixed_break_frequent_alternation() {
 
 #[test]
 fn test_mixed_style() {
-    verify_analysis("A  B  C D", |builder| {
+    verify_analysis("A  B  C D", |builder, _| {
         builder.push(StyleProperty::FontWeight(FontWeight::new(400.0)), 0..3);
         builder.push(StyleProperty::FontWeight(FontWeight::new(700.0)), 3..9);
     })
@@ -411,39 +439,41 @@ fn test_mixed_style() {
 
 #[test]
 fn test_mixed_ltr_rtl() {
-    verify_analysis("Hello مرحبا", |_| {})
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-        ])
-        .expect_bidi_embed_level_list(vec![0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
-        .expect_script_list(vec![
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Common,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-        ]);
+    verify_analysis("Hello مرحبا", |builder, len| {
+        builder.push(DUMMY_STYLE, 0..len);
+    })
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+    ])
+    .expect_bidi_embed_level_list(vec![0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
+    .expect_script_list(vec![
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Common,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+    ]);
 }
 
 #[test]
 fn test_multi_byte_chars_alternating_break_all() {
-    verify_analysis("€你€你AA", |builder| {
+    verify_analysis("€你€你AA", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..3);
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 3..6);
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 6..9);
@@ -471,7 +501,7 @@ fn test_multi_byte_chars_alternating_break_all() {
 
 #[test]
 fn test_multi_byte_chars_varying_utf8_lengths_whitespace_separated() {
-    verify_analysis("ß € 𝓗 你 ą", |builder| {
+    verify_analysis("ß € 𝓗 你 ą", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..3);
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 3..7);
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 7..12);
@@ -504,7 +534,7 @@ fn test_multi_byte_chars_varying_utf8_lengths_whitespace_separated() {
 
 #[test]
 fn test_multi_byte_chars_varying_utf8_lengths() {
-    verify_analysis("ß€𝓗你ą", |builder| {
+    verify_analysis("ß€𝓗你ą", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..2);
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 2..5);
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 5..9);
@@ -529,71 +559,73 @@ fn test_multi_byte_chars_varying_utf8_lengths() {
 
 #[test]
 fn test_mixed_ltr_rtl_nested_embedding() {
-    verify_analysis("In Hebrew: שנת 2024 היא...", |_| {})
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::Word,
-        ])
-        .expect_bidi_embed_level_list(vec![
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0,
-        ])
-        .expect_script_list(vec![
-            Script::Latin,
-            Script::Latin,
-            Script::Common,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Common,
-            Script::Common,
-            Script::Hebrew,
-            Script::Hebrew,
-            Script::Hebrew,
-            Script::Common,
-            Script::Common,
-            Script::Common,
-            Script::Common,
-            Script::Common,
-            Script::Common,
-            Script::Hebrew,
-            Script::Hebrew,
-            Script::Hebrew,
-            Script::Common,
-            Script::Common,
-            Script::Common,
-        ]);
+    verify_analysis("In Hebrew: שנת 2024 היא...", |builder, len| {
+        builder.push(DUMMY_STYLE, 0..len);
+    })
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Word,
+    ])
+    .expect_bidi_embed_level_list(vec![
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0,
+    ])
+    .expect_script_list(vec![
+        Script::Latin,
+        Script::Latin,
+        Script::Common,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Common,
+        Script::Common,
+        Script::Hebrew,
+        Script::Hebrew,
+        Script::Hebrew,
+        Script::Common,
+        Script::Common,
+        Script::Common,
+        Script::Common,
+        Script::Common,
+        Script::Common,
+        Script::Hebrew,
+        Script::Hebrew,
+        Script::Hebrew,
+        Script::Common,
+        Script::Common,
+        Script::Common,
+    ]);
 }
 
 #[test]
 fn test_mixed_break_simple() {
-    verify_analysis("ABCD 123", |builder| {
+    verify_analysis("ABCD 123", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 0..1);
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 1..8);
     })
@@ -621,7 +653,7 @@ fn test_mixed_break_simple() {
 
 #[test]
 fn test_multi_char_grapheme_mixed_break_all() {
-    verify_analysis("A e\u{301} B", |builder| {
+    verify_analysis("A e\u{301} B", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..1);
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..2);
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 2..5);
@@ -660,7 +692,7 @@ fn test_multi_char_grapheme_mixed_break_all() {
 
 #[test]
 fn test_multi_byte_chars_alternating_keep_all() {
-    verify_analysis("€你€你AA", |builder| {
+    verify_analysis("€你€你AA", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..3);
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 3..6);
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 6..9);
@@ -688,124 +720,129 @@ fn test_multi_byte_chars_alternating_keep_all() {
 
 #[test]
 fn test_mixed_ltr_rtl_multiple_segments() {
-    verify_analysis("Hello مرحبا World عالم Test اختبار", |_| {})
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-        ])
-        .expect_bidi_embed_level_list(vec![
-            0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1,
-            1, 1, 1, 1, 1,
-        ])
-        .expect_script_list(vec![
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Common,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Common,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Common,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Common,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Common,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-        ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-        ]);
+    verify_analysis(
+        "Hello مرحبا World عالم Test اختبار",
+        |builder, len| {
+            builder.push(DUMMY_STYLE, 0..len);
+        },
+    )
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+    ])
+    .expect_bidi_embed_level_list(vec![
+        0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1,
+        1, 1, 1, 1,
+    ])
+    .expect_script_list(vec![
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Common,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Common,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Common,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Common,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Common,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+    ])
+    .expect_grapheme_cluster_break_list(vec![
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+    ]);
 }
 
 #[test]
 fn test_multi_char_grapheme_mixed_break_and_keep_all() {
-    verify_analysis("A e\u{301} B", |builder| {
+    verify_analysis("A e\u{301} B", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..1);
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 1..2);
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 2..5);
@@ -844,7 +881,7 @@ fn test_multi_char_grapheme_mixed_break_and_keep_all() {
 
 #[test]
 fn test_multi_char_grapheme_mixed_keep_all() {
-    verify_analysis("A e\u{301} B", |builder| {
+    verify_analysis("A e\u{301} B", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..1);
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..2);
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 2..5);
@@ -883,160 +920,167 @@ fn test_multi_char_grapheme_mixed_keep_all() {
 
 #[test]
 fn test_multi_paragraph_bidi() {
-    verify_analysis("Hello مرحبا \nTest اختبار", |_| {})
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::Mandatory,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Line,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-        ])
-        .expect_bidi_embed_level_list(vec![
-            0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
-        ])
-        .expect_script_list(vec![
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Common,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Common,
-            Script::Common,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Latin,
-            Script::Common,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-        ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::LF,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-        ])
-        .expect_is_control_list(vec![
-            false, false, false, false, false, false, false, false, false, false, false, false,
-            true, false, false, false, false, false, false, false, false, false, false, false,
-        ])
-        .expect_contributes_to_shaping_list(vec![
-            true, true, true, true, true, true, true, true, true, true, true, true, false, true,
-            true, true, true, true, true, true, true, true, true, true,
-        ]);
+    verify_analysis("Hello مرحبا \nTest اختبار", |builder, len| {
+        builder.push(DUMMY_STYLE, 0..len);
+    })
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Mandatory,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+    ])
+    .expect_bidi_embed_level_list(vec![
+        0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
+    ])
+    .expect_script_list(vec![
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Common,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Common,
+        Script::Common,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Latin,
+        Script::Common,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+    ])
+    .expect_grapheme_cluster_break_list(vec![
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::LF,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+    ])
+    .expect_is_control_list(vec![
+        false, false, false, false, false, false, false, false, false, false, false, false, true,
+        false, false, false, false, false, false, false, false, false, false, false,
+    ])
+    .expect_contributes_to_shaping_list(vec![
+        true, true, true, true, true, true, true, true, true, true, true, true, false, true, true,
+        true, true, true, true, true, true, true, true, true,
+    ]);
 }
 
 #[test]
 fn test_single_char() {
-    verify_analysis("A", |_| {}).expect_boundary_list(vec![Boundary::Word]);
+    verify_analysis("A", |builder, len| {
+        builder.push(DUMMY_STYLE, 0..len);
+    })
+    .expect_boundary_list(vec![Boundary::Word]);
 }
 
 #[test]
 fn test_rtl_paragraph_with_non_authoritative_logical_first_char_two_paragraphs() {
-    verify_analysis("حدا\u{64b} \nحدا\u{64b} ", |_| {})
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::Mandatory,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-        ])
-        .expect_bidi_embed_level_list(vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
-        .expect_script_list(vec![
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Inherited,
-            Script::Common,
-            Script::Common,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Inherited,
-            Script::Common,
-        ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Extend,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::LF,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Extend,
-            GraphemeClusterBreak::Other,
-        ])
-        .expect_is_control_list(vec![
-            false, false, false, false, false, true, false, false, false, false, false,
-        ])
-        .expect_contributes_to_shaping_list(vec![
-            true, true, true, true, true, false, true, true, true, true, true,
-        ])
-        .expect_force_normalize_list(vec![
-            false, false, false, true, false, false, false, false, false, true, false,
-        ]);
+    verify_analysis("حدا\u{64b} \nحدا\u{64b} ", |builder, len| {
+        builder.push(DUMMY_STYLE, 0..len);
+    })
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Mandatory,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+    ])
+    .expect_bidi_embed_level_list(vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+    .expect_script_list(vec![
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Inherited,
+        Script::Common,
+        Script::Common,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Inherited,
+        Script::Common,
+    ])
+    .expect_grapheme_cluster_break_list(vec![
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Extend,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::LF,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Extend,
+        GraphemeClusterBreak::Other,
+    ])
+    .expect_is_control_list(vec![
+        false, false, false, false, false, true, false, false, false, false, false,
+    ])
+    .expect_contributes_to_shaping_list(vec![
+        true, true, true, true, true, false, true, true, true, true, true,
+    ])
+    .expect_force_normalize_list(vec![
+        false, false, false, true, false, false, false, false, false, true, false,
+    ]);
 }
 
 #[test]
 fn test_three_chars() {
-    verify_analysis("ABC", |builder| {
+    verify_analysis("ABC", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 0..3);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::None]);
@@ -1044,7 +1088,7 @@ fn test_three_chars() {
 
 #[test]
 fn test_single_char_multi_byte() {
-    verify_analysis("€", |builder| {
+    verify_analysis("€", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..3);
     })
     .expect_boundary_list(vec![Boundary::Word])
@@ -1055,58 +1099,61 @@ fn test_single_char_multi_byte() {
 
 #[test]
 fn test_rtl_paragraph_with_non_authoritative_logical_first_character() {
-    verify_analysis("حدا\u{64b} ", |_| {})
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::None,
-            Boundary::None,
-            Boundary::None,
-            Boundary::Word,
-        ])
-        .expect_bidi_embed_level_list(vec![1, 1, 1, 1, 1])
-        .expect_script_list(vec![
-            Script::Arabic,
-            Script::Arabic,
-            Script::Arabic,
-            Script::Inherited,
-            Script::Common,
-        ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Extend,
-            GraphemeClusterBreak::Other,
-        ])
-        .expect_is_control_list(vec![false, false, false, false, false])
-        .expect_contributes_to_shaping_list(vec![true, true, true, true, true])
-        .expect_force_normalize_list(vec![false, false, false, true, false]);
+    verify_analysis("حدا\u{64b} ", |builder, len| {
+        builder.push(DUMMY_STYLE, 0..len);
+    })
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::None,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+    ])
+    .expect_bidi_embed_level_list(vec![1, 1, 1, 1, 1])
+    .expect_script_list(vec![
+        Script::Arabic,
+        Script::Arabic,
+        Script::Arabic,
+        Script::Inherited,
+        Script::Common,
+    ])
+    .expect_grapheme_cluster_break_list(vec![
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Other,
+        GraphemeClusterBreak::Extend,
+        GraphemeClusterBreak::Other,
+    ])
+    .expect_is_control_list(vec![false, false, false, false, false])
+    .expect_contributes_to_shaping_list(vec![true, true, true, true, true])
+    .expect_force_normalize_list(vec![false, false, false, true, false]);
 }
 
 #[test]
 fn test_two_newlines() {
-    verify_analysis("\n\n", |_| {})
-        .expect_boundary_list(vec![Boundary::Word, Boundary::Mandatory])
-        .expect_bidi_embed_level_list(vec![])
-        .expect_script_list(vec![Script::Common, Script::Common])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::LF,
-            GraphemeClusterBreak::LF,
-        ]);
+    verify_analysis("\n\n", |builder, len| {
+        builder.push(DUMMY_STYLE, 0..len);
+    })
+    .expect_boundary_list(vec![Boundary::Word, Boundary::Mandatory])
+    .expect_bidi_embed_level_list(vec![])
+    .expect_script_list(vec![Script::Common, Script::Common])
+    .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::LF, GraphemeClusterBreak::LF]);
 }
 
 #[test]
 fn test_newline() {
-    verify_analysis("\n", |_| {})
-        .expect_boundary_list(vec![Boundary::Word])
-        .expect_bidi_embed_level_list(vec![])
-        .expect_script_list(vec![Script::Common])
-        .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::LF]);
+    verify_analysis("\n", |builder, len| {
+        builder.push(DUMMY_STYLE, 0..len);
+    })
+    .expect_boundary_list(vec![Boundary::Word])
+    .expect_bidi_embed_level_list(vec![])
+    .expect_script_list(vec![Script::Common])
+    .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::LF]);
 }
 
 #[test]
 fn test_two_chars_keep_all() {
-    verify_analysis("AB", |builder| {
+    verify_analysis("AB", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..2);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None])
@@ -1116,34 +1163,36 @@ fn test_two_chars_keep_all() {
 
 #[test]
 fn test_whitespace_contiguous_interspersed_in_latin() {
-    verify_analysis("A  B  C D", |_| {})
-        .expect_boundary_list(vec![
-            Boundary::Word,
-            Boundary::Word,
-            Boundary::None,
-            Boundary::Line,
-            Boundary::Word,
-            Boundary::None,
-            Boundary::Line,
-            Boundary::Word,
-            Boundary::Line,
-        ])
-        .expect_script_list(vec![
-            Script::Latin,
-            Script::Common,
-            Script::Common,
-            Script::Latin,
-            Script::Common,
-            Script::Common,
-            Script::Latin,
-            Script::Common,
-            Script::Latin,
-        ]);
+    verify_analysis("A  B  C D", |builder, len| {
+        builder.push(DUMMY_STYLE, 0..len);
+    })
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::None,
+        Boundary::Line,
+        Boundary::Word,
+        Boundary::None,
+        Boundary::Line,
+        Boundary::Word,
+        Boundary::Line,
+    ])
+    .expect_script_list(vec![
+        Script::Latin,
+        Script::Common,
+        Script::Common,
+        Script::Latin,
+        Script::Common,
+        Script::Common,
+        Script::Latin,
+        Script::Common,
+        Script::Latin,
+    ]);
 }
 
 #[test]
 fn test_whitespace_contiguous_interspersed_in_latin_mixed() {
-    verify_analysis("A  B  C D", |builder| {
+    verify_analysis("A  B  C D", |builder, _| {
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..3);
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 3..9);
     })

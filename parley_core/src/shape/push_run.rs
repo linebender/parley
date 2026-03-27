@@ -16,7 +16,7 @@ pub trait ShapeSink<B: Brush> {
     /// Clear data from a previous shaping run ready to accept new data
     fn clear(&mut self);
     /// This method is called when Parley Core has finished pushed data into the sink, and can be
-    /// used as a hook to post-process that data. Parley's `Layout` type uses this to implement 
+    /// used as a hook to post-process that data. Parley's `Layout` type uses this to implement
     /// the `word-spacing` and `letter-spacing` properties.
     fn finish(&mut self);
 
