@@ -21,7 +21,9 @@ This release has an [MSRV] of 1.88.
 
 ### Parlance
 
-A new `parlance` crate has been added. This is lightweight type-only crate that contains type representing text-related concepts such as `FontWeight`, `FontFamily`, `Script`, `Language`, etc. This crate is developed as part of the Parley project and is used in the `parley` and `fontique` crates but is intended to be widely useful to any Rust project working with text.
+A new `parlance` crate has been added.
+This is lightweight type-only crate that contains type representing text-related concepts such as `FontWeight`, `FontFamily`, `Script`, `Language`, etc.
+This crate is developed as part of the Parley project and is used in the `parley` and `fontique` crates but is intended to be widely useful to any Rust project working with text.
 
 Added in ([#500][], [#501][], [#502][] by [@waywardmonkeys][])
 
@@ -29,47 +31,47 @@ Added in ([#500][], [#501][], [#502][] by [@waywardmonkeys][])
 
 #### Parley
 
-- Implemented CSS `text-indent` support ([#551][] by [@devunt][])
-- Add `break_line_with_next` method which implements a new line-breaking algorithm based on the number of characters rather than the width of the text ([#575][],  by [@taj-p][])
+- CSS `text-indent` support. ([#551][] by [@devunt][])
+- `break_line_with_next` method which implements a new line-breaking algorithm based on the number of characters rather than the width of the text. ([#575][] by [@taj-p][])
 - `Layout::lines` now returns an iterator that also implements `ExactSizeIterator` and `DoubleEndedIterator`. ([#554][], [#560][] by [@xStrom])
-- `BoundingBox`  now implements `Debug` ([#486][] by [@taj-p][])
-- Added a lower-level `StyleRunBuilder` to go along with the existing `RangedBuilder` and `TreeBuilder`. `StyleRunBuilder` accept non-overlapping ranges of styles. ([#516][] by [@waywardmonkeys][])
-- Added x-height, cap-height to RunMetrics ([#523][] by [@elbaro][])
-- Implement all possible AccessKit text properties ([#563][] by [@mwcampbell][])
-- PlainEditor: add getters `scale`, `font_size`, and `default_style` ([#571][] by [@zeophlite][])
+- `BoundingBox` now implements `Debug`. ([#486][] by [@taj-p][])
+- Lower-level `StyleRunBuilder` to go along with the existing `RangedBuilder` and `TreeBuilder`. `StyleRunBuilder` accept non-overlapping ranges of styles. ([#516][] by [@waywardmonkeys][])
+- X-height, cap-height to RunMetrics. ([#523][] by [@elbaro][])
+- All possible AccessKit text properties. ([#563][] by [@mwcampbell][])
+- PlainEditor getters `scale`, `font_size`, and `default_style`. ([#571][] by [@zeophlite][])
 
 #### Fontique
 
-- Add `load_system_fonts` and `load_fonts_from_paths` methods ([#540][] by [@nicoburns][])
-- Add method to convert non-shared `Collection`/`SourceCache` to shared variants ([#541][] by [@nicoburns][])
+- `load_system_fonts` and `load_fonts_from_paths` methods. ([#540][] by [@nicoburns][])
+- Method to convert non-shared `Collection`/`SourceCache` to shared variants. ([#541][] by [@nicoburns][])
 
 ### Fixed
 
 #### Parley
 
-- Fix max-content width being reset to 0 by mandatory line breaks. ([#531][] by [@nicoburns][])
-- Fix cursor rectangle calculation for last line ([#547][] by [@areopagitics][])
+- Max-content width being reset to 0 by mandatory line breaks. ([#531][] by [@nicoburns][])
+- Cursor rectangle calculation for last line. ([#547][] by [@areopagitics][])
 - Treat Line Separator and Paragraph Separator as mandatory break. ([#549][] by [@xorgy][])
-- Fix justification space count for non-space line breaks ([#565][] by [@devunt][])
-- Fix font fallback by computing map_len in fill_cluster_in_place [#566][] by [@devunt][])
+- Justification space count for non-space line breaks. ([#565][] by [@devunt][])
+- Font fallback by computing `map_len` in `fill_cluster_in_place`. [#566][] by [@devunt][])
 
 #### Fontique
 
-- Clear fallback_families cache on attribute change ([#562][] by [@dqii][])
-- Fix font family name override being ignored during registration ([#564][] by [@devunt][])
-- Reset fallback cache when fallback families are modified ([#567][] by [@devunt][])
-- Fix panic on Windows 7 ([#589][] by [@guiguiprim][])
-
+- Clear fallback_families cache on attribute change. ([#562][] by [@dqii][])
+- Fix font family name override being ignored during registration. ([#564][] by [@devunt][])
+- Reset fallback cache when fallback families are modified. ([#567][] by [@devunt][])
+- Panic on Windows 7. ([#589][] by [@guiguiprim][])
 
 ### Changed
 
 #### Parley
 
-- AccessKit has been updated to v0.24 ([#532][] by [@nicoburns][])
-- Fontations has updated: harfrust (0.5), skrifa (0.40), read-fonts (0.37) ([#510][] by [@waywardmonkeys][])
-- Parley now uses `icu4x` rather than `swash` for text analysis ([#436][] by [@conor-93[] and [@taj-p][])
+- AccessKit has been updated to v0.24. ([#532][] by [@nicoburns][])
+- Fontations has updated: harfrust (0.5), skrifa (0.40), read-fonts (0.37). ([#510][] by [@waywardmonkeys][])
+- Parley now uses `icu4x` rather than `swash` for text analysis. ([#436][] by [@conor-93][] and [@taj-p][])
 
-- `TextStyle` now uses separate lifetimes for family vs settings. This lets callers keep a long-lived font-family value while borrowing per-run settings without forcing both to share a single lifetime. ([#519][] by [@waywardmonkeys][])
+- `TextStyle` now uses separate lifetimes for family vs settings.
+  This lets callers keep a long-lived font-family value while borrowing per-run settings without forcing both to share a single lifetime. ([#519][] by [@waywardmonkeys][])
 - Breaking change: `Glyph::y` is now in Y-down coordinate space instead of Y-up coordinate space. ([#528][] by [@valadaptive][])
 
   **This does not change the API surface, but *will* change the behavior of existing code!** If you're iterating over non-positioned glyphs using the `GlyphRun::glyphs` method and positioning each glyph yourself, with code like:
@@ -96,15 +98,15 @@ Added in ([#500][], [#501][], [#502][] by [@waywardmonkeys][])
 
 #### Fontique
 
-- The `windows` crate was updated to 0.62 ([#518][] by [@nicoburns][])
-- On macOS: Enumerate system fonts via CoreText ([#536][] by [@raiscui][], [#568][] by [@grebmeg][])
-
+- The `windows` crate was updated to 0.62. ([#518][] by [@nicoburns][])
+- On macOS: Enumerate system fonts via CoreText. ([#536][] by [@raiscui][], [#568][] by [@grebmeg][])
 
 ### Removed
 
 #### Fontique
 
-- Fontique no longer has conversions between it's script type and that of `icu4x` and `unicode_properties`. If you need these then you will now need to [implement the conversions yourself (see linked PR for removed implementation) ([#512][] by [@waywardmonkeys][]).
+- Fontique no longer has conversions between it's script type and that of `icu4x` and `unicode_properties`.
+  If you need these then you will now need to implement the conversions yourself (see linked PR for removed implementation). ([#512][] by [@waywardmonkeys][])
 
 ## [0.7.0] - 2025-11-24
 
@@ -422,7 +424,7 @@ This release has an [MSRV][] of 1.70.
 [@dhardy]: https://github.com/dhardy
 [@DJMcNab]: https://github.com/DJMcNab
 [@dolsup]: https://github.com/dolsup
-[@dqii]: https://github.com/
+[@dqii]: https://github.com/dqii
 [@elbaro]: https://github.com/elbaro
 [@guiguiprim]: https://github.com/guiguiprim
 [@grebmeg]: https://github.com/grebmeg
