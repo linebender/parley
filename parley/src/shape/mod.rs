@@ -11,19 +11,20 @@ use core::ops::RangeInclusive;
 use super::layout::Layout;
 use super::resolve::{ResolveContext, Resolved, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
+use crate::FontData;
 use crate::analysis::cluster::{Char, CharCluster, Status};
 use crate::analysis::{AnalysisDataSources, CharInfo};
-use crate::convert::script_to_harfrust;
 use crate::inline_box::InlineBox;
 use crate::lru_cache::LruCache;
 use crate::util::nearly_eq;
-use crate::{FontData, convert};
+use convert::script_to_harfrust;
 use fontique::Language;
 use icu_properties::props::Script;
 
 use fontique::{self, Query, QueryFamily, QueryFont};
 
 mod cache;
+mod convert;
 pub(crate) mod data;
 mod push_run;
 

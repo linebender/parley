@@ -112,7 +112,6 @@ mod analysis;
 mod bidi;
 mod builder;
 mod context;
-mod convert;
 mod inline_box;
 mod lru_cache;
 mod resolve;
