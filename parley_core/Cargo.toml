@@ -17,7 +17,7 @@ all-features = true
 [features]
 default = ["system"]
 std = ["fontique/std", "harfrust/std", "skrifa/std", "parlance/std"]
-libm = ["fontique/libm", "skrifa/libm", "dep:core_maths"]
+libm = ["fontique/libm", "skrifa/libm"]
 # Enables support for system font backends
 system = ["std", "fontique/system"]
 
@@ -26,7 +26,6 @@ skrifa = { workspace = true }
 linebender_resource_handle = { workspace = true }
 fontique = { workspace = true }
 parlance = { workspace = true }
-core_maths = { version = "0.1.1", optional = true }
 parley_data = { workspace = true, features = ["baked"] }
 hashbrown = { workspace = true }
 harfrust = { workspace = true }

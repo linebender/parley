@@ -2882,7 +2882,6 @@ dependencies = [
 name = "parley_core"
 version = "0.8.0"
 dependencies = [
- "core_maths",
  "fontique",
  "harfrust",
  "hashbrown 0.16.1",
