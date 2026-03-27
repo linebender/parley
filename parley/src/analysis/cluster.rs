@@ -59,7 +59,7 @@ pub(crate) type GlyphId = u16;
 /// Whitespace content of a cluster.
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
 #[repr(u8)]
-pub(crate) enum Whitespace {
+pub enum Whitespace {
     /// Not a space.
     None = 0,
     /// Standard space.

@@ -17,7 +17,7 @@ use super::style::{
 use crate::FontContext;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
-use crate::{LineHeight, OverflowWrap, layout};
+use crate::{LineHeight, OverflowWrap};
 use crate::{TextWrapMode, WordBreak};
 use core::borrow::Borrow;
 use core::ops::Range;
@@ -46,7 +46,7 @@ struct RangedProperty<B: Brush> {
 
 /// Handle for a managed property.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub(crate) struct Resolved<T> {
+pub struct Resolved<T> {
     index: usize,
     _phantom: core::marker::PhantomData<T>,
 }
@@ -340,7 +340,7 @@ impl ResolveContext {
 
 /// Style property with resolved resources.
 #[derive(Clone, PartialEq)]
-pub(crate) enum ResolvedProperty<B: Brush> {
+pub enum ResolvedProperty<B: Brush> {
     /// `font-family`.
     FontFamily(Resolved<FamilyId>),
     /// Font size.
@@ -391,46 +391,46 @@ pub(crate) enum ResolvedProperty<B: Brush> {
 
 /// Flattened group of style properties.
 #[derive(Clone, PartialEq, Debug, Default)]
-pub(crate) struct ResolvedStyle<B: Brush> {
+pub struct ResolvedStyle<B: Brush> {
     /// `font-family`.
-    pub(crate) font_family: Resolved<FamilyId>,
+    pub font_family: Resolved<FamilyId>,
     /// Font size.
-    pub(crate) font_size: f32,
+    pub font_size: f32,
     /// Font width.
-    pub(crate) font_width: FontWidth,
+    pub font_width: FontWidth,
     /// Font style.
-    pub(crate) font_style: FontStyle,
+    pub font_style: FontStyle,
     /// Font weight.
-    pub(crate) font_weight: FontWeight,
+    pub font_weight: FontWeight,
     /// Font variation settings.
-    pub(crate) font_variations: Resolved<FontVariation>,
+    pub font_variations: Resolved<FontVariation>,
     /// Font feature settings.
-    pub(crate) font_features: Resolved<FontFeature>,
+    pub font_features: Resolved<FontFeature>,
     /// Locale.
-    pub(crate) locale: Option<Language>,
+    pub locale: Option<Language>,
     /// Brush for rendering text.
-    pub(crate) brush: B,
+    pub brush: B,
     /// Underline decoration.
-    pub(crate) underline: ResolvedDecoration<B>,
+    pub underline: ResolvedDecoration<B>,
     /// Strikethrough decoration.
-    pub(crate) strikethrough: ResolvedDecoration<B>,
+    pub strikethrough: ResolvedDecoration<B>,
     /// Line height.
-    pub(crate) line_height: LineHeight,
+    pub line_height: LineHeight,
     /// Extra spacing between words.
-    pub(crate) word_spacing: f32,
+    pub word_spacing: f32,
     /// Extra spacing between letters.
-    pub(crate) letter_spacing: f32,
+    pub letter_spacing: f32,
     /// Control over where words can wrap.
-    pub(crate) word_break: WordBreak,
+    pub word_break: WordBreak,
     /// Control over "emergency" line-breaking.
-    pub(crate) overflow_wrap: OverflowWrap,
+    pub overflow_wrap: OverflowWrap,
     /// Control over non-"emergency" line-breaking.
-    pub(crate) text_wrap_mode: TextWrapMode,
+    pub text_wrap_mode: TextWrapMode,
 }
 
 impl<B: Brush> ResolvedStyle<B> {
     /// Applies the specified property to this style.
-    pub(crate) fn apply(&mut self, property: ResolvedProperty<B>) {
+    pub fn apply(&mut self, property: ResolvedProperty<B>) {
         use ResolvedProperty::*;
         match property {
             FontFamily(value) => self.font_family = value,
@@ -459,7 +459,7 @@ impl<B: Brush> ResolvedStyle<B> {
         }
     }
 
-    pub(crate) fn check(&self, property: &ResolvedProperty<B>) -> bool {
+    pub fn check(&self, property: &ResolvedProperty<B>) -> bool {
         use ResolvedProperty::*;
         match property {
             FontFamily(value) => self.font_family == *value,
@@ -487,45 +487,17 @@ impl<B: Brush> ResolvedStyle<B> {
             TextWrapMode(value) => self.text_wrap_mode == *value,
         }
     }
-
-    pub(crate) fn as_layout_style(&self) -> layout::Style<B> {
-        layout::Style {
-            brush: self.brush.clone(),
-            underline: self.underline.as_layout_decoration(&self.brush),
-            strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
-            line_height: self.line_height,
-            overflow_wrap: self.overflow_wrap,
-            text_wrap_mode: self.text_wrap_mode,
-            #[cfg(feature = "accesskit")]
-            locale: self.locale,
-        }
-    }
 }
 
 /// Underline or strikethrough decoration.
 #[derive(Clone, PartialEq, Default, Debug)]
-pub(crate) struct ResolvedDecoration<B: Brush> {
+pub struct ResolvedDecoration<B: Brush> {
     /// True if the decoration is enabled.
-    pub(crate) enabled: bool,
+    pub enabled: bool,
     /// Offset of the decoration from the baseline.
-    pub(crate) offset: Option<f32>,
+    pub offset: Option<f32>,
     /// Thickness of the decoration stroke.
-    pub(crate) size: Option<f32>,
+    pub size: Option<f32>,
     /// Brush for the decoration.
-    pub(crate) brush: Option<B>,
-}
-
-impl<B: Brush> ResolvedDecoration<B> {
-    /// Convert into a layout Decoration (filtering out disabled decorations)
-    pub(crate) fn as_layout_decoration(&self, default_brush: &B) -> Option<layout::Decoration<B>> {
-        if self.enabled {
-            Some(layout::Decoration {
-                brush: self.brush.clone().unwrap_or_else(|| default_brush.clone()),
-                offset: self.offset,
-                size: self.size,
-            })
-        } else {
-            None
-        }
-    }
+    pub brush: Option<B>,
 }

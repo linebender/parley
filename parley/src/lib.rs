@@ -122,6 +122,8 @@ pub mod editing;
 pub mod layout;
 pub mod style;
 
+pub use analysis::{Boundary, cluster::Whitespace};
+
 #[cfg(test)]
 mod tests;
 
@@ -135,7 +137,9 @@ pub use inline_box::{InlineBox, InlineBoxKind};
 #[doc(inline)]
 pub use layout::Layout;
 
-pub use crate::shape::data::{Glyph, RunMetrics};
+pub use resolve::{Resolved, ResolvedDecoration, ResolvedProperty, ResolvedStyle};
+pub use shape::ShapeSink;
+pub use shape::data::*;
 
 pub use editing::*;
 pub use layout::*;

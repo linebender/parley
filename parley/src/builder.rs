@@ -57,8 +57,13 @@ impl<B: Brush> RangedBuilder<'_, B> {
             .finish(&mut self.lcx.style_table, &mut self.lcx.style_runs);
 
         // Call generic layout builder method
-        self.lcx
-            .build_into_layout(layout, self.scale, self.quantize, text.as_ref(), self.fcx);
+        self.lcx.build_into(
+            &mut layout.data,
+            self.scale,
+            self.quantize,
+            text.as_ref(),
+            self.fcx,
+        );
     }
 
     pub fn build(self, text: impl AsRef<str>) -> Layout<B> {
@@ -141,8 +146,13 @@ impl<B: Brush> StyleRunBuilder<'_, B> {
             self.cursor == self.len,
             "StyleRunBuilder requires runs that cover the full text"
         );
-        self.lcx
-            .build_into_layout(layout, self.scale, self.quantize, text.as_ref(), self.fcx);
+        self.lcx.build_into(
+            &mut layout.data,
+            self.scale,
+            self.quantize,
+            text.as_ref(),
+            self.fcx,
+        );
     }
 
     pub fn build(self, text: impl AsRef<str>) -> Layout<B> {
@@ -222,7 +232,7 @@ impl<B: Brush> TreeBuilder<'_, B> {
 
         // Call generic layout builder method
         self.lcx
-            .build_into_layout(layout, self.scale, self.quantize, &text, self.fcx);
+            .build_into(&mut layout.data, self.scale, self.quantize, &text, self.fcx);
 
         text
     }

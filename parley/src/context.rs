@@ -11,13 +11,13 @@ use super::resolve::tree::TreeStyleBuilder;
 use super::resolve::{RangedStyleBuilder, ResolveContext, ResolvedStyle, StyleRun};
 use super::style::{Brush, TextStyle};
 
+use crate::StyleProperty;
 use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::bidi::BidiResolver;
 use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
 use crate::resolve::ResolvedProperty;
-use crate::shape::ShapeContext;
-use crate::{Layout, StyleProperty};
+use crate::shape::{ShapeContext, ShapeSink};
 
 /// Shared scratch space used when constructing text layouts.
 ///
@@ -189,9 +189,9 @@ impl<B: Brush> LayoutContext<B> {
         }
     }
 
-    pub fn build_into_layout(
+    pub fn build_into(
         &mut self,
-        layout: &mut Layout<B>,
+        sink: &mut impl ShapeSink<B>,
         scale: f32,
         quantize: bool,
         text: &str,
@@ -211,11 +211,11 @@ impl<B: Brush> LayoutContext<B> {
 
         crate::analysis::analyze_text(self, text);
 
-        layout.data.clear();
-        layout.data.scale = scale;
-        layout.data.quantize = quantize;
-        layout.data.base_level = self.bidi.base_level();
-        layout.data.text_len = text.len();
+        sink.clear();
+        sink.set_scale(scale);
+        sink.set_quantize(quantize);
+        sink.set_base_level(self.bidi.base_level());
+        sink.set_text_len(text.len());
 
         let mut char_index = 0;
         for style_run in &self.style_runs {
@@ -226,10 +226,7 @@ impl<B: Brush> LayoutContext<B> {
         }
 
         // Copy the visual styles into the layout
-        layout
-            .data
-            .styles
-            .extend(self.style_table.iter().map(|s| s.as_layout_style()));
+        sink.push_styles(&self.style_table);
 
         // Sort the inline boxes as subsequent code assumes that they are in text index order.
         // Note: It's important that this is a stable sort to allow users to control the order of contiguous inline boxes
@@ -246,16 +243,16 @@ impl<B: Brush> LayoutContext<B> {
                 self.bidi.levels(),
                 &mut self.scx,
                 text,
-                layout,
+                sink,
                 &self.analysis_data_sources,
             );
         }
 
         // Move inline boxes into the layout
-        layout.data.inline_boxes.clear();
-        core::mem::swap(&mut layout.data.inline_boxes, &mut self.inline_boxes);
+        let boxes = core::mem::take(&mut self.inline_boxes);
+        self.inline_boxes = sink.set_inline_boxes(boxes);
 
-        layout.data.finish();
+        sink.finish();
     }
 
     fn begin(&mut self) {

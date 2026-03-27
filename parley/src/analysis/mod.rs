@@ -203,7 +203,7 @@ impl CharInfo {
 /// Boundary type of a character or cluster.
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
 #[repr(u8)]
-pub(crate) enum Boundary {
+pub enum Boundary {
     /// Not a boundary.
     None = 0,
     /// Start of a word.

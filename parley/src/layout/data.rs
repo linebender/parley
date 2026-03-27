@@ -4,11 +4,12 @@
 use crate::analysis::Boundary;
 use crate::inline_box::InlineBox;
 use crate::layout::{ContentWidths, LineMetrics, Style};
+use crate::resolve::{ResolvedDecoration, ResolvedStyle};
 use crate::shape::ShapeSink;
 use crate::shape::data::{ClusterData, Glyph, LayoutItem, LayoutItemKind, RunData};
 use crate::style::Brush;
 use crate::util::nearly_zero;
-use crate::{FontData, IndentOptions, InlineBoxKind, OverflowWrap, TextWrapMode};
+use crate::{Decoration, FontData, IndentOptions, InlineBoxKind, OverflowWrap, TextWrapMode};
 use core::ops::Range;
 
 use alloc::vec::Vec;
@@ -157,7 +158,23 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) indent_options: IndentOptions,
 }
 
-impl<B: Brush> ShapeSink for LayoutData<B> {
+impl<B: Brush> ShapeSink<B> for LayoutData<B> {
+    fn set_scale(&mut self, scale: f32) {
+        self.scale = scale;
+    }
+
+    fn set_quantize(&mut self, quantize: bool) {
+        self.quantize = quantize;
+    }
+
+    fn set_base_level(&mut self, level: u8) {
+        self.base_level = level;
+    }
+
+    fn set_text_len(&mut self, len: usize) {
+        self.text_len = len;
+    }
+
     fn push_coords(&mut self, coords: &[harfrust::NormalizedCoord]) -> (usize, usize) {
         let coords_start = self.coords.len();
         self.coords.extend(coords.iter().map(|c| c.to_bits()));
@@ -192,6 +209,55 @@ impl<B: Brush> ShapeSink for LayoutData<B> {
         self.items.push(item);
     }
 
+    fn push_inline_box_item(&mut self, index: usize) {
+        // Give the box the same bidi level as the preceding text run
+        // (or else default to 0 if there is not yet a text run)
+        let bidi_level = self.runs.last().map(|r| r.bidi_level).unwrap_or(0);
+
+        self.items.push(LayoutItem {
+            kind: LayoutItemKind::InlineBox,
+            index,
+            bidi_level,
+        });
+    }
+
+    fn set_inline_boxes(&mut self, boxes: Vec<InlineBox>) -> Vec<InlineBox> {
+        let mut old_box_allocation = core::mem::replace(&mut self.inline_boxes, boxes);
+        old_box_allocation.clear();
+        old_box_allocation
+    }
+
+    fn push_styles(&mut self, styles: &[ResolvedStyle<B>]) {
+        self.styles.extend(styles.iter().map(|style| Style {
+            brush: style.brush.clone(),
+            underline: convert_decoration(&style.underline, &style.brush),
+            strikethrough: convert_decoration(&style.strikethrough, &style.brush),
+            line_height: style.line_height,
+            overflow_wrap: style.overflow_wrap,
+            text_wrap_mode: style.text_wrap_mode,
+            #[cfg(feature = "accesskit")]
+            locale: style.locale,
+        }));
+
+        fn convert_decoration<B: Brush>(
+            decoration: &ResolvedDecoration<B>,
+            default_brush: &B,
+        ) -> Option<Decoration<B>> {
+            if decoration.enabled {
+                Some(Decoration {
+                    brush: decoration
+                        .brush
+                        .clone()
+                        .unwrap_or_else(|| default_brush.clone()),
+                    offset: decoration.offset,
+                    size: decoration.size,
+                })
+            } else {
+                None
+            }
+        }
+    }
+
     fn glyph_count(&self) -> usize {
         self.glyphs.len()
     }
@@ -206,6 +272,30 @@ impl<B: Brush> ShapeSink for LayoutData<B> {
 
     fn reverse_cluster_range(&mut self, range: Range<usize>) {
         self.clusters[range].reverse();
+    }
+
+    fn clear(&mut self) {
+        self.scale = 1.;
+        self.quantize = true;
+        self.base_level = 0;
+        self.text_len = 0;
+        self.width = 0.;
+        self.full_width = 0.;
+        self.height = 0.;
+        self.fonts.clear();
+        self.coords.clear();
+        self.styles.clear();
+        self.inline_boxes.clear();
+        self.runs.clear();
+        self.items.clear();
+        self.clusters.clear();
+        self.glyphs.clear();
+        self.lines.clear();
+        self.line_items.clear();
+    }
+
+    fn finish(&mut self) {
+        self.apply_word_and_letter_spacing();
     }
 }
 
@@ -240,40 +330,7 @@ impl<B: Brush> Default for LayoutData<B> {
 }
 
 impl<B: Brush> LayoutData<B> {
-    pub(crate) fn clear(&mut self) {
-        self.scale = 1.;
-        self.quantize = true;
-        self.base_level = 0;
-        self.text_len = 0;
-        self.width = 0.;
-        self.full_width = 0.;
-        self.height = 0.;
-        self.fonts.clear();
-        self.coords.clear();
-        self.styles.clear();
-        self.inline_boxes.clear();
-        self.runs.clear();
-        self.items.clear();
-        self.clusters.clear();
-        self.glyphs.clear();
-        self.lines.clear();
-        self.line_items.clear();
-    }
-
-    /// Push an inline box to the list of items
-    pub(crate) fn push_inline_box(&mut self, index: usize) {
-        // Give the box the same bidi level as the preceding text run
-        // (or else default to 0 if there is not yet a text run)
-        let bidi_level = self.runs.last().map(|r| r.bidi_level).unwrap_or(0);
-
-        self.items.push(LayoutItem {
-            kind: LayoutItemKind::InlineBox,
-            index,
-            bidi_level,
-        });
-    }
-
-    pub(crate) fn finish(&mut self) {
+    pub(crate) fn apply_word_and_letter_spacing(&mut self) {
         for run in &self.runs {
             let word = run.word_spacing;
             let letter = run.letter_spacing;

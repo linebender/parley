@@ -2,22 +2,35 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::{
-    Brush, Glyph, LineHeight, RunMetrics,
+    Brush, Glyph, InlineBox, LineHeight, RunMetrics,
     analysis::{CharInfo, cluster::Whitespace},
     resolve::ResolvedStyle,
 };
+use alloc::vec::Vec;
 use core::ops::Range;
 use linebender_resource_handle::FontData;
 
 use super::data::{ClusterData, ClusterInfo, LayoutItem, LayoutItemKind, RunData, to_whitespace};
 
-pub(crate) trait ShapeSink {
+pub trait ShapeSink<B: Brush> {
+    fn clear(&mut self);
+    fn finish(&mut self);
+
+    fn set_scale(&mut self, scale: f32);
+    fn set_quantize(&mut self, quantize: bool);
+    fn set_base_level(&mut self, level: u8);
+    fn set_text_len(&mut self, len: usize);
+
+    fn push_styles(&mut self, styles: &[ResolvedStyle<B>]);
+    fn set_inline_boxes(&mut self, boxes: Vec<InlineBox>) -> Vec<InlineBox>;
+
     fn push_coords(&mut self, coords: &[harfrust::NormalizedCoord]) -> (usize, usize);
     fn push_font(&mut self, font: &FontData) -> usize;
     fn push_cluster(&mut self, cluster: ClusterData);
     fn push_glyph(&mut self, glyph: Glyph);
     fn push_run(&mut self, run: RunData);
     fn push_item(&mut self, item: LayoutItem);
+    fn push_inline_box_item(&mut self, index: usize);
 
     fn cluster_count(&self) -> usize;
     fn glyph_count(&self) -> usize;
@@ -28,7 +41,7 @@ pub(crate) trait ShapeSink {
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn push_run<B: Brush>(
-    sink: &mut impl ShapeSink,
+    sink: &mut impl ShapeSink<B>,
     font: FontData,
     font_size: f32,
     font_attrs: fontique::Attributes,
@@ -173,8 +186,8 @@ pub(crate) fn push_run<B: Brush>(
 /// * `char_infos` - Character information from text analysis, indexed by cluster ID.
 /// * `char_indices_iter` - Iterator over (`byte_offset`, `char`) pairs from the source text.
 ///   Should be in logical order (forward for LTR, reverse for RTL).
-fn process_clusters<I: Iterator<Item = (usize, char)>>(
-    sink: &mut impl ShapeSink,
+fn process_clusters<I: Iterator<Item = (usize, char)>, B: Brush>(
+    sink: &mut impl ShapeSink<B>,
     direction: Direction,
     scale_factor: f32,
     glyph_infos: &[harfrust::GlyphInfo],
@@ -440,8 +453,8 @@ impl From<&ClusterType> for u16 {
     }
 }
 
-fn push_cluster(
-    sink: &mut impl ShapeSink,
+fn push_cluster<B: Brush>(
+    sink: &mut impl ShapeSink<B>,
     char_info: (CharInfo, u16),
     cluster_start_char: (usize, char),
     glyph_offset: u32,
