@@ -50,7 +50,10 @@ impl<B: Brush> RangedBuilder<'_, B> {
 
     pub fn build_into(self, layout: &mut Layout<B>, text: impl AsRef<str>) {
         // Apply RangedStyleBuilder styles directly to style-table/style-run state.
-        self.lcx.ranged_style_builder.finish(&mut self.lcx.core_ctx);
+        self.lcx.ranged_style_builder.finish(
+            &mut self.lcx.core_ctx.style_table,
+            &mut self.lcx.core_ctx.style_runs,
+        );
 
         // Call generic layout builder method
         self.lcx.build_into(
@@ -131,7 +134,10 @@ impl<B: Brush> TreeBuilder<'_, B> {
     #[inline]
     pub fn build_into(self, layout: &mut Layout<B>) -> String {
         // Apply TreeStyleBuilder styles to LayoutContext.
-        let text = self.lcx.tree_style_builder.finish(&mut self.lcx.core_ctx);
+        let text = self.lcx.tree_style_builder.finish(
+            &mut self.lcx.core_ctx.style_table,
+            &mut self.lcx.core_ctx.style_runs,
+        );
 
         // Call generic layout builder method
         self.lcx

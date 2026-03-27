@@ -5,7 +5,7 @@
 
 use alloc::vec;
 use alloc::vec::Vec;
-use parley_core::{ParleyCoreContext, StyleRun};
+use parley_core::StyleRun;
 
 use super::{Brush, RangedProperty, RangedStyle, ResolvedProperty, ResolvedStyle};
 use core::ops::{Bound, Range, RangeBounds};
@@ -73,7 +73,13 @@ impl<B: Brush> RangedStyleBuilder<B> {
     }
 
     /// Computes style table + style runs for the ranged properties.
-    pub(crate) fn finish(&mut self, core_ctx: &mut ParleyCoreContext<B>) {
+    pub(crate) fn finish(
+        &mut self,
+        style_table: &mut Vec<ResolvedStyle<B>>,
+        style_runs: &mut Vec<StyleRun>,
+    ) {
+        style_table.clear();
+        style_runs.clear();
         if self.len == usize::MAX {
             self.properties.clear();
             self.scratch_styles.clear();
@@ -149,16 +155,15 @@ impl<B: Brush> RangedStyleBuilder<B> {
         }
         styles.truncate(styles.len() - merged_count);
 
-        core_ctx.set_style_runs(
-            styles
-                .iter()
-                .enumerate()
-                .map(|(style_index, style)| StyleRun {
-                    style_index: style_index as u16,
-                    range: style.range.clone(),
-                }),
-        );
-        core_ctx.set_style_table(styles.drain(..).map(|style| style.style));
+        style_table.reserve(styles.len());
+        style_runs.reserve(styles.len());
+        for (style_index, style) in styles.drain(..).enumerate() {
+            style_table.push(style.style);
+            style_runs.push(StyleRun {
+                style_index: style_index as u16,
+                range: style.range,
+            });
+        }
 
         self.properties.clear();
         self.root_style = ResolvedStyle::default();

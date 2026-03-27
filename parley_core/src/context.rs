@@ -22,9 +22,10 @@ use crate::shape::{ShapeContext, ShapeSink};
 /// This type is designed to be a global resource with only one per-application (or per-thread).
 pub struct ParleyCoreContext<B: Brush = [u8; 4]> {
     pub(crate) rcx: ResolveContext,
-    pub(crate) style_table: Vec<ResolvedStyle<B>>,
-    pub(crate) style_runs: Vec<StyleRun>,
-    pub(crate) inline_boxes: Vec<InlineBox>,
+    pub style_table: Vec<ResolvedStyle<B>>,
+    pub style_runs: Vec<StyleRun>,
+    pub inline_boxes: Vec<InlineBox>,
+
     pub(crate) bidi: BidiResolver,
 
     // u16: style index for character
