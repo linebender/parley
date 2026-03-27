@@ -12,7 +12,7 @@ use alloc::borrow::Cow;
 pub use brush::*;
 pub use font::{
     FontFamily, FontFamilyName, FontFeature, FontFeatures, FontStyle, FontVariation,
-    FontVariations, FontWeight, FontWidth, GenericFamily,
+    FontVariations, FontWeight, FontWidth, GenericFamily, Tag,
 };
 pub use fontique::Language;
 pub use parlance::{OverflowWrap, TextWrapMode, WordBreak};

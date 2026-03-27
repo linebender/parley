@@ -111,7 +111,7 @@ fn style_font_style_values() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use parley::setting::Tag;
+    use parley::Tag;
     use parley::style::{FontFamily, FontVariation, FontVariations};
 
     // Using Roboto Flex with slnt axis for italic/oblique effects

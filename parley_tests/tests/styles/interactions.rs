@@ -11,8 +11,8 @@ use std::borrow::Cow;
 use crate::test_name;
 use crate::util::{TestEnv, samples};
 use parley::AlignmentOptions;
+use parley::Tag;
 use parley::layout::Alignment;
-use parley::setting::Tag;
 use parley::style::{
     FontFeature, FontFeatures, FontVariation, FontVariations, LineHeight, StyleProperty,
 };
@@ -227,7 +227,7 @@ fn interaction_weight_style_width() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use parley::setting::Tag;
+    use parley::Tag;
     use parley::style::FontFamily;
     use parley::{FontWeight, FontWidth};
 

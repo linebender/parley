@@ -122,7 +122,6 @@ mod util;
 
 pub mod editing;
 pub mod layout;
-pub mod setting;
 pub mod style;
 
 #[cfg(test)]

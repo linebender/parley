@@ -3,9 +3,8 @@
 
 use alloc::borrow::Cow;
 
-pub use crate::setting::{FontFeature, FontVariation};
 pub use fontique::{FontStyle, FontWeight, FontWidth, GenericFamily};
-pub use parlance::{FontFamily, FontFamilyName};
+pub use parlance::{FontFamily, FontFamilyName, FontFeature, FontVariation, Tag};
 
 /// Font variation settings that can be supplied as a raw source string or a parsed slice.
 #[derive(Clone, PartialEq, Debug)]

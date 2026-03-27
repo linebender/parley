@@ -8,8 +8,8 @@ use std::borrow::Cow;
 use crate::test_name;
 use crate::util::{TestEnv, samples};
 use parley::AlignmentOptions;
+use parley::Tag;
 use parley::layout::Alignment;
-use parley::setting::Tag;
 use parley::style::{FontFeature, FontFeatures, FontVariation, FontVariations, StyleProperty};
 
 // ============================================================================
