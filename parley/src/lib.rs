@@ -113,7 +113,6 @@ mod bidi;
 mod builder;
 mod context;
 mod convert;
-mod font;
 mod inline_box;
 mod lru_cache;
 mod resolve;
@@ -132,7 +131,7 @@ pub use util::BoundingBox;
 
 pub use builder::{RangedBuilder, StyleRunBuilder, TreeBuilder};
 pub use context::LayoutContext;
-pub use font::FontContext;
+pub use fontique::FontContext;
 pub use inline_box::{InlineBox, InlineBoxKind};
 #[doc(inline)]
 pub use layout::Layout;

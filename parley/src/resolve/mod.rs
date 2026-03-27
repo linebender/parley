@@ -14,7 +14,7 @@ use super::style::{
     Brush, FontFamily, FontFamilyName, FontFeature, FontFeatures, FontStyle, FontVariation,
     FontVariations, FontWeight, FontWidth, StyleProperty,
 };
-use crate::font::FontContext;
+use crate::FontContext;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
 use crate::{LineHeight, OverflowWrap, layout};
