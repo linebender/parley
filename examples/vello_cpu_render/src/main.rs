@@ -8,12 +8,12 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
-use parley::{GlyphRun, Layout, PositionedLayoutItem};
-use parley_draw::renderers::vello_renderer::replay_atlas_commands;
-use parley_draw::{
+use glifo::renderers::vello_renderer::replay_atlas_commands;
+use glifo::{
     AtlasConfig, CpuGlyphCaches, GlyphCache, GlyphCacheConfig, GlyphRunBuilder, ImageCache,
     PendingClearRect,
 };
+use parley::{GlyphRun, Layout, PositionedLayoutItem};
 use parley_examples_common::{
     ColorBrush, ExampleConfig, FrameKind, FrameStats, frame_sequence, output_dir, prepare_layouts,
 };
@@ -112,13 +112,11 @@ fn render_frame(
                             .normalized_coords(run.normalized_coords())
                             .atlas_cache(config.use_atlas_cache)
                             .build(
-                                glyph_run
-                                    .positioned_glyphs()
-                                    .map(|glyph| parley_draw::Glyph {
-                                        id: glyph.id,
-                                        x: glyph.x,
-                                        y: glyph.y,
-                                    }),
+                                glyph_run.positioned_glyphs().map(|glyph| glifo::Glyph {
+                                    id: glyph.id,
+                                    x: glyph.x,
+                                    y: glyph.y,
+                                }),
                                 glyph_caches,
                                 image_cache,
                             );

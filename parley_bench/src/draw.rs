@@ -3,13 +3,13 @@
 
 //! # Draw Benchmarks
 //!
-//! Benchmarks for text rendering using `parley_draw` with `vello_cpu`.
+//! Benchmarks for text rendering using `glifo` with `vello_cpu`.
 
 use crate::{ColorBrush, FONT_FAMILY_LIST, with_contexts};
+use glifo::{AtlasConfig, CpuGlyphCaches, Glyph, GlyphRunBuilder, ImageCache};
 use parley::{
     Alignment, AlignmentOptions, FontFamily, Layout, PositionedLayoutItem, StyleProperty,
 };
-use parley_draw::{AtlasConfig, CpuGlyphCaches, Glyph, GlyphRunBuilder, ImageCache};
 use std::hint::black_box;
 use tango_bench::{Benchmark, benchmark_fn};
 use vello_cpu::{RenderContext, kurbo};

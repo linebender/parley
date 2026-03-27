@@ -10,7 +10,6 @@ members = [
     "parley_data",
     "parley_data_gen",
     "parley_dev",
-    "parley_draw",
     "parley_tests",
     "examples/common",
     "examples/swash_render",
@@ -51,15 +50,15 @@ parley = { version = "0.8.0", default-features = false, path = "parley" }
 parley_data = { version = "0.8.0", path = "parley_data", default-features = false }
 parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
-parley_draw = { default-features = false, path = "parley_draw" }
+glifo = { git = "https://github.com/linebender/vello", rev = "5796226", default-features = false }
 peniko = { version = "0.6.0", default-features = false }
 read-fonts = { version = "0.37.0", default-features = false }
 skrifa = { version = "0.40.0", default-features = false }
 smallvec = "1.15.1"
 swash = { version = "0.2.6", default-features = false }
-vello_common = { version = "0.0.6", default-features = false }
-vello_cpu = { version = "0.0.6", default-features = false, features = ["u8_pipeline"] }
-vello_hybrid = { version = "0.0.6", default-features = false }
+vello_common = { version = "0.0.7", default-features = false }
+vello_cpu = { version = "0.0.7", default-features = false, features = ["u8_pipeline"] }
+vello_hybrid = { version = "0.0.7", default-features = false }
 
 [workspace.lints]
 rust.unsafe_code = "deny"
@@ -111,9 +110,9 @@ clippy.wildcard_dependencies = "warn"
 # END LINEBENDER LINT SET
 
 [patch.crates-io]
-vello_common = { git = "https://github.com/linebender/vello.git", rev = "190f5a2b77ca2433f7ec5781b2855a7b4625b8f4" }
-vello_cpu = { git = "https://github.com/linebender/vello.git", rev = "190f5a2b77ca2433f7ec5781b2855a7b4625b8f4" }
-vello_hybrid = { git = "https://github.com/linebender/vello.git", rev = "190f5a2b77ca2433f7ec5781b2855a7b4625b8f4" }
+vello_common = { git = "https://github.com/linebender/vello.git", rev = "5796226" }
+vello_cpu = { git = "https://github.com/linebender/vello.git", rev = "5796226" }
+vello_hybrid = { git = "https://github.com/linebender/vello.git", rev = "5796226" }
 
 [profile.profiling]
 inherits = "release"

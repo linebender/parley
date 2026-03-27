@@ -1,7 +1,7 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Tests for glyph and decoration drawing via `parley_draw`.
+//! Tests for glyph and decoration drawing via `glifo`.
 //!
 //! These tests focus on the interaction between transforms, hinting, and
 //! decoration rendering (especially ink-skipping underlines).

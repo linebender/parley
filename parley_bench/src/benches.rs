@@ -6,11 +6,11 @@
 //! This module provides benchmarks for text layout and rendering.
 
 use crate::{ColorBrush, FONT_FAMILY_LIST, get_samples, with_contexts};
+use glifo::{AtlasConfig, CpuGlyphCaches, GlyphCache, GlyphRunBuilder, ImageCache};
 use parley::{
     Alignment, AlignmentOptions, FontFamily, FontStyle, FontWeight, Layout, PositionedLayoutItem,
     RangedBuilder, StyleProperty,
 };
-use parley_draw::{AtlasConfig, CpuGlyphCaches, GlyphCache, GlyphRunBuilder, ImageCache};
 use std::cell::RefCell;
 use std::hint::black_box;
 use tango_bench::{Benchmark, benchmark_fn};
@@ -405,13 +405,11 @@ fn render_layout_glyphs(
                     .normalized_coords(run.normalized_coords())
                     .atlas_cache(use_cache)
                     .build(
-                        glyph_run
-                            .positioned_glyphs()
-                            .map(|glyph| parley_draw::Glyph {
-                                id: glyph.id,
-                                x: glyph.x,
-                                y: glyph.y,
-                            }),
+                        glyph_run.positioned_glyphs().map(|glyph| glifo::Glyph {
+                            id: glyph.id,
+                            x: glyph.x,
+                            y: glyph.y,
+                        }),
                         glyph_caches,
                         image_cache,
                     )
