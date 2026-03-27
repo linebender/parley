@@ -19,7 +19,7 @@ struct TestContext {
 }
 
 /// A style that is set to it's default value and therefore has effect. This is needed to satisfy the
-/// StyleRunBuilder's assertions that all ranges are covered by a style.
+/// `StyleRunBuilder`s assertions that all ranges are covered by a style.
 const DUMMY_STYLE: StyleProperty<'static, [u8; 4]> =
     StyleProperty::TextWrapMode(TextWrapMode::Wrap);
 
@@ -109,7 +109,7 @@ impl TestBuilder<'_> {
         style.apply(prop);
 
         let style_index = self.0.push_style(style);
-        self.0.push_style_run(style_index, range)
+        self.0.push_style_run(style_index, range);
     }
 }
 
@@ -136,7 +136,7 @@ fn verify_analysis(
 
         // TODO: ShapedText
         let mut shaped_text = ShapedText::new();
-        _ = builder.build_into(&mut shaped_text, text);
+        builder.build_into(&mut shaped_text, text);
     }
 
     test_context
