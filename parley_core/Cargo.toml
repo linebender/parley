@@ -1,6 +1,6 @@
 [package]
 name = "parley_core"
-version = "0.0.0"
+version = "0.8.0"
 description = "Parley Core provides low level APIs for implementing text layout."
 keywords = ["text", "layout"]
 categories = ["gui", "graphics"]
@@ -15,8 +15,23 @@ publish = false
 all-features = true
 
 [features]
-default = ["std"]
-std = []
+default = ["system"]
+std = ["fontique/std", "harfrust/std", "skrifa/std", "parlance/std"]
+libm = ["fontique/libm", "skrifa/libm"]
+# Enables support for system font backends
+system = ["std", "fontique/system"]
+
+[dependencies]
+skrifa = { workspace = true }
+linebender_resource_handle = { workspace = true }
+fontique = { workspace = true }
+parlance = { workspace = true }
+parley_data = { workspace = true, features = ["baked"] }
+hashbrown = { workspace = true }
+harfrust = { workspace = true }
+icu_normalizer = { workspace = true, features = ["compiled_data"] }
+icu_properties = { workspace = true, features = ["compiled_data"] }
+icu_segmenter = { workspace = true, features = ["compiled_data"] }
 
 [lints]
 workspace = true

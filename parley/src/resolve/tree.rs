@@ -6,7 +6,9 @@ use alloc::{string::String, vec::Vec};
 
 use crate::style::WhiteSpaceCollapse;
 
-use super::{Brush, ResolvedProperty, ResolvedStyle, StyleRun};
+use super::{Brush, ResolvedProperty, ResolvedStyle};
+
+use parley_core::StyleRun;
 
 #[derive(Debug, Clone)]
 struct StyleTreeNode<B: Brush> {

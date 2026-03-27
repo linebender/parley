@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::BoundingBox;
-#[cfg(feature = "accesskit")]
-use crate::analysis::cluster::Whitespace;
 use crate::layout::{Affinity, BreakReason, Cluster, ClusterSide, Layout, Line};
 #[cfg(feature = "accesskit")]
 use crate::layout::{ClusterPath, LayoutAccessibility};
 use crate::style::Brush;
 #[cfg(feature = "accesskit")]
 use accesskit::TextPosition;
+#[cfg(feature = "accesskit")]
+use parley_core::Whitespace;
 
 /// Defines a position with a text layout.
 #[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
@@ -445,9 +445,9 @@ fn cursor_rect<B: Brush>(cluster: &Cluster<'_, B>, at_end: bool, size: f32) -> B
     let metrics = line.metrics();
     BoundingBox::new(
         line_x as f64,
-        metrics.min_coord as f64,
+        metrics.block_min_coord as f64,
         (line_x + size) as f64,
-        metrics.max_coord as f64,
+        metrics.block_max_coord as f64,
     )
 }
 
@@ -456,9 +456,9 @@ fn last_line_cursor_rect<B: Brush>(layout: &Layout<B>, size: f32) -> BoundingBox
         let metrics = line.metrics();
         BoundingBox::new(
             metrics.offset as f64,
-            metrics.min_coord as f64,
+            metrics.block_min_coord as f64,
             (metrics.offset + size) as f64,
-            metrics.max_coord as f64,
+            metrics.block_max_coord as f64,
         )
     } else {
         BoundingBox::default()

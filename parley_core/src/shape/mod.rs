@@ -8,22 +8,26 @@ use alloc::vec::Vec;
 use core::mem;
 use core::ops::RangeInclusive;
 
-use super::layout::Layout;
 use super::resolve::{ResolveContext, Resolved, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
+use crate::FontData;
 use crate::analysis::cluster::{Char, CharCluster, Status};
 use crate::analysis::{AnalysisDataSources, CharInfo};
-use crate::convert::script_to_harfrust;
 use crate::inline_box::InlineBox;
 use crate::lru_cache::LruCache;
 use crate::util::nearly_eq;
-use crate::{FontData, convert};
+use convert::script_to_harfrust;
 use fontique::Language;
 use icu_properties::props::Script;
 
 use fontique::{self, Query, QueryFamily, QueryFont};
 
 mod cache;
+mod convert;
+pub(crate) mod data;
+mod push_run;
+
+pub use push_run::ShapeSink;
 
 pub(crate) struct ShapeContext {
     shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::ShaperData>,
@@ -70,7 +74,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     levels: &[u8],
     scx: &mut ShapeContext,
     mut text: &str,
-    layout: &mut Layout<B>,
+    sink: &mut impl ShapeSink<B>,
     analysis_data_sources: &AnalysisDataSources,
 ) {
     // If we have both empty text and no inline boxes, shape with a fake space
@@ -83,7 +87,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         // Process any remaining inline boxes whose index is greater than the length of the text
         for box_idx in 0..inline_boxes.len() {
             // Push the box to the list of items
-            layout.data.push_inline_box(box_idx);
+            sink.push_inline_box_item(box_idx);
         }
         return;
     }
@@ -172,7 +176,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 &text_range,
                 &char_range,
                 infos,
-                layout,
+                sink,
                 analysis_data_sources,
             );
             item.size = style.font_size;
@@ -189,7 +193,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
         if let Some(deferred_boxes) = deferred_boxes {
             for box_idx in deferred_boxes {
-                layout.data.push_inline_box(box_idx);
+                sink.push_inline_box_item(box_idx);
             }
         }
 
@@ -208,17 +212,17 @@ pub(crate) fn shape_text<'a, B: Brush>(
             &text_range,
             &char_range,
             infos,
-            layout,
+            sink,
             analysis_data_sources,
         );
     }
 
     // Process any remaining inline boxes whose index is greater than the length of the text
     if let Some((box_idx, _inline_box)) = current_box {
-        layout.data.push_inline_box(box_idx);
+        sink.push_inline_box_item(box_idx);
     }
     for (box_idx, _inline_box) in inline_box_iter {
-        layout.data.push_inline_box(box_idx);
+        sink.push_inline_box_item(box_idx);
     }
 }
 
@@ -280,7 +284,7 @@ fn shape_item<'a, B: Brush>(
     text_range: &core::ops::Range<usize>,
     char_range: &core::ops::Range<usize>,
     infos: &[(CharInfo, u16)],
-    layout: &mut Layout<B>,
+    sink: &mut impl ShapeSink<B>,
     analysis_data_sources: &AnalysisDataSources,
 ) {
     let item_text = &text[text_range.clone()];
@@ -455,14 +459,15 @@ fn shape_item<'a, B: Brush>(
             &item_infos[segment_char_start..(segment_char_start + segment_char_count)];
 
         // Push harfrust-shaped run for the entire segment
-        layout.data.push_run(
+        push_run::push_run(
+            sink,
             FontData::new(font.font.blob.clone(), font.font.index),
             item.size,
             font.attrs,
             font.font.synthesis,
             &glyph_buffer,
             item.level,
-            item.style_index,
+            &styles[item.style_index as usize],
             item.word_spacing,
             item.letter_spacing,
             segment_text,

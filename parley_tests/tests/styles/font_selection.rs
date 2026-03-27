@@ -17,7 +17,7 @@ fn build_with_font_size(env: &mut TestEnv, text: &str, size: f32) -> Layout<Colo
     builder.push_default(StyleProperty::FontSize(size));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
     layout
 }
 
@@ -66,7 +66,7 @@ fn style_font_weight_values() {
         builder.push_default(StyleProperty::FontWeight(weight));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name(name).check_layout_snapshot(&layout);
     }
@@ -96,7 +96,7 @@ fn style_font_width_values() {
         builder.push_default(StyleProperty::FontWidth(width));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name(name).check_layout_snapshot(&layout);
     }
@@ -111,7 +111,7 @@ fn style_font_style_values() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use parley::setting::Tag;
+    use parley::Tag;
     use parley::style::{FontFamily, FontVariation, FontVariations};
 
     // Using Roboto Flex with slnt axis for italic/oblique effects
@@ -128,7 +128,7 @@ fn style_font_style_values() {
         builder.push_default(StyleProperty::FontVariations(variations));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(None, Alignment::Start, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name(name).check_layout_snapshot(&layout);
     }
@@ -150,7 +150,7 @@ fn style_font_family_named() {
     builder.push_default(StyleProperty::FontFamily(FontFamily::named("Roboto")));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.with_name("roboto").check_layout_snapshot(&layout);
 }

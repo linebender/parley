@@ -48,6 +48,7 @@ packtab = { version = "1.8.0" }
 parlance = { version = "0.1.0", default-features = false, path = "parlance" }
 parley = { version = "0.8.0", default-features = false, path = "parley" }
 parley_data = { version = "0.8.0", path = "parley_data", default-features = false }
+parley_core = { version = "0.8.0", path = "parley_core", default-features = false }
 parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
 glifo = { git = "https://github.com/linebender/vello", rev = "5796226", default-features = false }

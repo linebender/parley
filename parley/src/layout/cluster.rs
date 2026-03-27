@@ -1,16 +1,14 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::analysis::cluster::Whitespace;
 use crate::layout::Style;
 use crate::layout::data::BreakReason;
-use crate::layout::data::ClusterData;
-use crate::layout::glyph::Glyph;
 use crate::layout::layout::Layout;
 use crate::layout::line::{Line, LineItem};
 use crate::layout::run::Run;
 use crate::style::Brush;
 use core::ops::Range;
+use parley_core::{ClusterData, ClusterInfo, Glyph, Whitespace};
 
 /// Atomic unit of text.
 #[derive(Copy, Clone)]
@@ -79,7 +77,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
         let mut path = ClusterPath::default();
         if let Some((line_index, line)) = layout.line_for_offset(y) {
             path.line_index = line_index as u32;
-            let mut offset = line.metrics().offset;
+            let mut offset = line.metrics().offset + line.metrics().inline_min_coord;
             let last_run_index = line.len().saturating_sub(1);
             for item in line.items_nonpositioned() {
                 match item {
@@ -428,7 +426,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
         Some(offset)
     }
 
-    pub(crate) fn info(&self) -> &super::data::ClusterInfo {
+    pub(crate) fn info(&self) -> &ClusterInfo {
         &self.data.info
     }
 
@@ -563,8 +561,7 @@ mod tests {
 
     fn cluster_from_position_with_alignment(alignment: Alignment) {
         let mut layout = create_unaligned_layout();
-        let width = layout.full_width();
-        layout.align(Some(width + 100.), alignment, AlignmentOptions::default());
+        layout.align(alignment, AlignmentOptions::default());
         assert_eq!(
             layout.len(),
             1,

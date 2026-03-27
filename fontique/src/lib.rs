@@ -66,10 +66,26 @@ pub use font::{AxisInfo, FontInfo, FontInfoOverride, Synthesis};
 pub use impl_fontconfig::FromFontconfig;
 pub use parlance::{FontStyle, FontWeight, FontWidth, GenericFamily, Language, Script};
 pub use source::{SourceId, SourceInfo, SourceKind};
+pub use source_cache::{SourceCache, SourceCacheOptions};
+
+/// A font database/cache (wrapper around a Fontique [`Collection`] and [`SourceCache`]).
+///
+/// This type is designed to be a global resource with only one per-application (or per-thread).
+#[derive(Default, Clone)]
+pub struct FontContext {
+    pub collection: Collection,
+    pub source_cache: SourceCache,
+}
+
+impl FontContext {
+    /// Create a new `FontContext`, discovering system fonts if available.
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
 
 #[cfg(all(feature = "system", target_vendor = "apple"))]
 use objc2 as _;
-pub use source_cache::{SourceCache, SourceCacheOptions};
 
 #[cfg(not(target_has_atomic = "64"))]
 use core::sync::atomic::AtomicU32 as AtomicCounter;

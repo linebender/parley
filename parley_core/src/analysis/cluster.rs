@@ -59,7 +59,7 @@ pub(crate) type GlyphId = u16;
 /// Whitespace content of a cluster.
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
 #[repr(u8)]
-pub(crate) enum Whitespace {
+pub enum Whitespace {
     /// Not a space.
     None = 0,
     /// Standard space.
@@ -74,7 +74,7 @@ pub(crate) enum Whitespace {
 
 impl Whitespace {
     /// Returns true for space or no break space.
-    pub(crate) fn is_space_or_nbsp(self) -> bool {
+    pub fn is_space_or_nbsp(self) -> bool {
         matches!(self, Self::Space | Self::NoBreakSpace)
     }
 }
