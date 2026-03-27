@@ -96,7 +96,7 @@ mod doctests {
     ///
     /// ```compile_fail,E0080
     /// use bytemuck::Contiguous;
-    /// use text_primitives::GenericFamily;
+    /// use parlance::GenericFamily;
     /// const {
     ///     let value = GenericFamily::MAX_VALUE + 1;
     ///     // Safety: In a const context, therefore if this makes an invalid GenericFamily, that will be detected.

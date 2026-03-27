@@ -5,7 +5,7 @@
 
 use core::fmt;
 
-use text_primitives::{FontStyle, FontWeight, FontWidth};
+use parlance::{FontStyle, FontWeight, FontWidth};
 
 /// Primary attributes for font matching: [`FontWidth`], [`FontStyle`] and [`FontWeight`].
 ///

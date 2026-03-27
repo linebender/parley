@@ -1,6 +1,6 @@
 [package]
 name = "fontique"
-version = "0.7.0" # Keep in sync with workspace dependency specification
+version.workspace = true
 description = "Font enumeration and fallback."
 keywords = ["font", "text"]
 categories = ["gui", "os"]
@@ -17,9 +17,9 @@ workspace = true
 
 [features]
 default = ["system"]
-std = ["read-fonts/std", "dep:memmap2", "text_primitives/std"]
+std = ["read-fonts/std", "dep:memmap2", "parlance/std"]
 libm = ["read-fonts/libm"]
-bytemuck = ["text_primitives/bytemuck"]
+bytemuck = ["parlance/bytemuck"]
 # Enables support for system font backends
 system = [
     "std",
@@ -42,9 +42,9 @@ fontconfig-dlopen = ["yeslogic-fontconfig-sys?/dlopen"]
 read-fonts = { workspace = true }
 linebender_resource_handle = { workspace = true }
 smallvec = "1.15.1"
-memmap2 = { version = "0.9.9", optional = true }
+memmap2 = { version = "0.9.10", optional = true }
 hashbrown = { workspace = true }
-text_primitives = { path = "../text_primitives", default-features = false }
+parlance = { workspace = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.62.2", features = ["Win32_Graphics_DirectWrite"], optional = true }
@@ -52,7 +52,7 @@ windows-core = { version = "0.62.2", optional = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
 # FIX: Enable relax-sign-encoding to prevent the bug described in this issue: https://github.com/madsmtm/objc2/issues/566
-objc2 = { version = "0.6.3", optional = true, features = ["std", "relax-sign-encoding"] }
+objc2 = { version = "0.6.4", optional = true, features = ["std", "relax-sign-encoding"] }
 # NOTE: When updating objc2-foundation, objc2-core-foundation, or objc2-core-text make sure to use the version of objc2
 # that they reference to prevent crate duplication.
 objc2-foundation = { version = "0.3.2", optional = true, default-features = false, features = [

@@ -9,11 +9,11 @@ publish = false
 
 [dependencies]
 vello = "0.8.0"
-anyhow = "1.0.100"
+anyhow = "1.0.102"
 pollster = "0.4.0"
 ui-events-winit = "0.3"
 ui-events = "0.3"
-winit = "0.30.12"
+winit = "0.30.13"
 parley = { workspace = true, default-features = true, features = ["accesskit"] }
 peniko = { workspace = true }
 accesskit = { workspace = true }
@@ -23,10 +23,10 @@ accesskit_winit = "0.32.2"
 workspace = true
 
 [target.'cfg(target_os = "android")'.dependencies]
-winit = { version = "0.30.12", features = ["android-native-activity"] }
+winit = { version = "0.30.13", features = ["android-native-activity"] }
 
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
-clipboard-rs = "0.3.1"
+clipboard-rs = "0.3.3"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-time = "1.1.0"

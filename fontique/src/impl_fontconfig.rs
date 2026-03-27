@@ -10,7 +10,7 @@ use crate::{FontStyle, FontWeight, FontWidth};
 
 /// Conversion from Fontconfig numeric values.
 ///
-/// This is intentionally kept in `fontique` (rather than `text_primitives`) because it is a
+/// This is intentionally kept in `fontique` (rather than `parlance`) because it is a
 /// Fontconfig-specific mapping.
 ///
 /// The numeric values used by these conversions are based on the `fonts.conf` documentation:

@@ -6,8 +6,8 @@
 use std::{borrow::Cow, path::PathBuf, sync::Arc};
 
 use fontique::{Collection, CollectionOptions, FontStyle, FontWeight, FontWidth, SourceCache};
+use parlance::FontFamilyName;
 use peniko::{Blob, color::palette};
-use text_primitives::FontFamilyName;
 
 use super::utils::{ColorBrush, asserts::assert_eq_layout_data};
 use crate::{

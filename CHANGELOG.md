@@ -8,10 +8,11 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 # Changelog
 
-The latest published Parley release is [0.7.0](#060---2025-11-24) which was released on 2025-11-24.
-You can find its changes [documented below](#060---2025-11-24).
-
 ## [Unreleased]
+
+This release has an [MSRV] of 1.88.
+
+## [0.8.0] - 2026-03-27
 
 This release has an [MSRV] of 1.88.
 
@@ -19,13 +20,47 @@ This release has an [MSRV] of 1.88.
 
 #### Parley
 
+- CSS `text-indent` support. ([#551][] by [@devunt][])
+- `break_line_with_next` method which implements a new line-breaking algorithm based on the number of characters rather than the width of the text. ([#575][] by [@taj-p][])
 - `Layout::lines` now returns an iterator that also implements `ExactSizeIterator` and `DoubleEndedIterator`. ([#554][], [#560][] by [@xStrom])
+- `BoundingBox` now implements `Debug`. ([#486][] by [@taj-p][])
+- Lower-level `StyleRunBuilder` to go along with the existing `RangedBuilder` and `TreeBuilder`. `StyleRunBuilder` accept non-overlapping ranges of styles. ([#516][] by [@waywardmonkeys][])
+- X-height, cap-height to RunMetrics. ([#523][] by [@elbaro][])
+- All possible AccessKit text properties. ([#563][] by [@mwcampbell][])
+- PlainEditor getters `scale`, `font_size`, and `default_style`. ([#571][] by [@zeophlite][])
+
+#### Fontique
+
+- `load_system_fonts` and `load_fonts_from_paths` methods. ([#540][] by [@nicoburns][])
+- Method to convert non-shared `Collection`/`SourceCache` to shared variants. ([#541][] by [@nicoburns][])
+
+### Fixed
+
+#### Parley
+
+- Max-content width being reset to 0 by mandatory line breaks. ([#531][] by [@nicoburns][])
+- Cursor rectangle calculation for last line. ([#547][] by [@areopagitics][])
+- Treat Line Separator and Paragraph Separator as mandatory break. ([#549][] by [@xorgy][])
+- Justification space count for non-space line breaks. ([#565][] by [@devunt][])
+- Font fallback by computing `map_len` in `fill_cluster_in_place`. ([#566][] by [@devunt][])
+
+#### Fontique
+
+- Clear fallback_families cache on attribute change. ([#562][] by [@dqii][])
+- Fix font family name override being ignored during registration. ([#564][] by [@devunt][])
+- Reset fallback cache when fallback families are modified. ([#567][] by [@devunt][])
+- Panic on Windows 7. ([#589][] by [@guiguiprim][])
 
 ### Changed
 
 #### Parley
 
-- AccessKit has been updated to v0.23 ([#532][] by [@valadaptive][])
+- AccessKit has been updated to v0.24. ([#532][] by [@nicoburns][])
+- Fontations has updated: harfrust (0.5), skrifa (0.40), read-fonts (0.37). ([#510][] by [@waywardmonkeys][])
+- Parley now uses `icu4x` rather than `swash` for text analysis. ([#436][] by [@conor-93][] and [@taj-p][])
+
+- `TextStyle` now uses separate lifetimes for family vs settings.
+  This lets callers keep a long-lived font-family value while borrowing per-run settings without forcing both to share a single lifetime. ([#519][] by [@waywardmonkeys][])
 - Breaking change: `Glyph::y` is now in Y-down coordinate space instead of Y-up coordinate space. ([#528][] by [@valadaptive][])
 
   **This does not change the API surface, but *will* change the behavior of existing code!** If you're iterating over non-positioned glyphs using the `GlyphRun::glyphs` method and positioning each glyph yourself, with code like:
@@ -50,7 +85,17 @@ This release has an [MSRV] of 1.88.
 
   If you instead use the `GlyphRun::positioned_glyphs` method, your code will not need to change.
 
+#### Fontique
 
+- The `windows` crate was updated to 0.62. ([#518][] by [@nicoburns][])
+- On macOS: Enumerate system fonts via CoreText. ([#536][] by [@raiscui][], [#568][] by [@grebmeg][])
+
+### Removed
+
+#### Fontique
+
+- Fontique no longer has conversions between it's script type and that of `icu4x` and `unicode_properties`.
+  If you need these then you will now need to implement the conversions yourself (see linked PR for removed implementation). ([#512][] by [@waywardmonkeys][])
 
 ## [0.7.0] - 2025-11-24
 
@@ -361,16 +406,24 @@ This release has an [MSRV][] of 1.70.
 
 [MSRV]: README.md#minimum-supported-rust-version-msrv
 
+[@areopagitics]: https://github.com/areopagitics
+[@conor-93]: https://github.com/conor-93
+[@devunt]: https://github.com/devunt
 [@dfrg]: https://github.com/dfrg
 [@dhardy]: https://github.com/dhardy
 [@DJMcNab]: https://github.com/DJMcNab
 [@dolsup]: https://github.com/dolsup
+[@dqii]: https://github.com/dqii
+[@elbaro]: https://github.com/elbaro
+[@guiguiprim]: https://github.com/guiguiprim
+[@grebmeg]: https://github.com/grebmeg
 [@kekelp]: https://github.com/kekelp
 [@mwcampbell]: https://github.com/mwcampbell
 [@nicoburns]: https://github.com/nicoburns
 [@NoahR02]: https://github.com/NoahR02
 [@ogoffart]: https://github.com/ogoffart
 [@PoignardAzur]: https://github.com/@PoignardAzur
+[@raiscui]: https://github.com/raiscui
 [@richardhozak]: https://github.com/richardhozak
 [@spirali]: https://github.com/spirali
 [@taj-p]: https://github.com/taj-p
@@ -380,6 +433,7 @@ This release has an [MSRV][] of 1.70.
 [@wfdewith]: https://github.com/wfdewith
 [@xorgy]: https://github.com/xorgy
 [@xStrom]: https://github.com/xStrom
+[@zeophlite]: https://github.com/zeophlite
 
 [#54]: https://github.com/linebender/parley/pull/54
 [#55]: https://github.com/linebender/parley/pull/55
@@ -467,6 +521,7 @@ This release has an [MSRV][] of 1.70.
 [#413]: https://github.com/linebender/parley/pull/413
 [#414]: https://github.com/linebender/parley/pull/414
 [#418]: https://github.com/linebender/parley/pull/418
+[#436]: https://github.com/linebender/parley/pull/436
 [#440]: https://github.com/linebender/parley/pull/440
 [#444]: https://github.com/linebender/parley/pull/444
 [#447]: https://github.com/linebender/parley/pull/447
@@ -475,12 +530,36 @@ This release has an [MSRV][] of 1.70.
 [#451]: https://github.com/linebender/parley/pull/451
 [#467]: https://github.com/linebender/parley/pull/467
 [#468]: https://github.com/linebender/parley/pull/468
+[#486]: https://github.com/linebender/parley/pull/486
+[#510]: https://github.com/linebender/parley/pull/510
+[#512]: https://github.com/linebender/parley/pull/512
+[#516]: https://github.com/linebender/parley/pull/516
+[#518]: https://github.com/linebender/parley/pull/518
+[#519]: https://github.com/linebender/parley/pull/519
+[#523]: https://github.com/linebender/parley/pull/523
 [#528]: https://github.com/linebender/parley/pull/528
+[#531]: https://github.com/linebender/parley/pull/531
 [#532]: https://github.com/linebender/parley/pull/532
+[#540]: https://github.com/linebender/parley/pull/540
+[#541]: https://github.com/linebender/parley/pull/541
+[#547]: https://github.com/linebender/parley/pull/547
+[#549]: https://github.com/linebender/parley/pull/549
+[#551]: https://github.com/linebender/parley/pull/551
 [#554]: https://github.com/linebender/parley/pull/554
 [#560]: https://github.com/linebender/parley/pull/560
+[#562]: https://github.com/linebender/parley/pull/562
+[#563]: https://github.com/linebender/parley/pull/563
+[#564]: https://github.com/linebender/parley/pull/564
+[#565]: https://github.com/linebender/parley/pull/565
+[#566]: https://github.com/linebender/parley/pull/566
+[#567]: https://github.com/linebender/parley/pull/567
+[#568]: https://github.com/linebender/parley/pull/568
+[#575]: https://github.com/linebender/parley/pull/575
+[#578]: https://github.com/linebender/parley/pull/578
+[#589]: https://github.com/linebender/parley/pull/589
 
-[Unreleased]: https://github.com/linebender/parley/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/linebender/parley/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/linebender/parley/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/linebender/parley/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/linebender/parley/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/linebender/parley/compare/v0.4.0...v0.5.0

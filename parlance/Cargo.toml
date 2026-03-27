@@ -1,15 +1,13 @@
 [package]
-name = "text_primitives"
+name = "parlance"
 version = "0.1.0"
 description = "Fundamental text property types"
 keywords = ["text", "style", "css"]
-categories = ["graphics", "text"]
+categories = ["graphics"]
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-
-publish = false
 
 [package.metadata.docs.rs]
 all-features = true
