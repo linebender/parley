@@ -1185,7 +1185,7 @@ dependencies = [
 
 [[package]]
 name = "fontique"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "hashbrown 0.16.1",
  "linebender_resource_handle",
@@ -2837,7 +2837,7 @@ dependencies = [
 
 [[package]]
 name = "parley"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "accesskit",
  "core_maths",
@@ -2875,7 +2875,7 @@ version = "0.0.0"
 
 [[package]]
 name = "parley_data"
-version = "0.0.0"
+version = "0.8.0"
 dependencies = [
  "icu_properties",
 ]
