@@ -91,10 +91,8 @@ impl TestContext {
 struct TestBuilder<'a>(&'a mut StyleRunBuilder<'a, [u8; 4]>);
 
 impl TestBuilder<'_> {
-    fn push(&mut self, prop: StyleProperty<'_, [u8; 4]>, range: impl RangeBounds<usize>) {
-        let style = TextStyle::default();
-
-        // TODO: implement
+    fn push<'a: 'static>(&mut self, prop: StyleProperty<'a, [u8; 4]>, range: impl RangeBounds<usize>) {
+        let mut style = TextStyle::default();
         style.apply(prop);
 
         let style_index = self.0.push_style(style);

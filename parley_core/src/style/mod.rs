@@ -170,6 +170,50 @@ pub struct TextStyle<'family, 'settings, B: Brush> {
     pub text_wrap_mode: TextWrapMode,
 }
 
+impl<'a, B: Brush> TextStyle<'a, 'a, B> {
+    pub fn apply(&mut self, property: StyleProperty<'a, B>) {
+        match property {
+            StyleProperty::FontFamily(font_family) => self.font_family = font_family,
+            StyleProperty::FontSize(font_size) => self.font_size = font_size,
+            StyleProperty::FontWidth(font_width) => self.font_width = font_width,
+            StyleProperty::FontStyle(font_style) => self.font_style = font_style,
+            StyleProperty::FontWeight(font_weight) => self.font_weight = font_weight,
+            StyleProperty::FontVariations(font_variations) => {
+                self.font_variations = font_variations;
+            }
+            StyleProperty::FontFeatures(font_features) => self.font_features = font_features,
+            StyleProperty::Locale(locale) => self.locale = locale,
+            StyleProperty::Brush(brush) => self.brush = brush,
+            StyleProperty::Underline(has_underline) => self.has_underline = has_underline,
+            StyleProperty::UnderlineOffset(underline_offset) => {
+                self.underline_offset = underline_offset;
+            }
+            StyleProperty::UnderlineSize(underline_size) => self.underline_size = underline_size,
+            StyleProperty::UnderlineBrush(underline_brush) => {
+                self.underline_brush = underline_brush;
+            }
+            StyleProperty::Strikethrough(has_strikethrough) => {
+                self.has_strikethrough = has_strikethrough;
+            }
+            StyleProperty::StrikethroughOffset(strikethrough_offset) => {
+                self.strikethrough_offset = strikethrough_offset;
+            }
+            StyleProperty::StrikethroughSize(strikethrough_size) => {
+                self.strikethrough_size = strikethrough_size;
+            }
+            StyleProperty::StrikethroughBrush(strikethrough_brush) => {
+                self.strikethrough_brush = strikethrough_brush;
+            }
+            StyleProperty::LineHeight(line_height) => self.line_height = line_height,
+            StyleProperty::WordSpacing(word_spacing) => self.word_spacing = word_spacing,
+            StyleProperty::LetterSpacing(letter_spacing) => self.letter_spacing = letter_spacing,
+            StyleProperty::WordBreak(word_break) => self.word_break = word_break,
+            StyleProperty::OverflowWrap(overflow_wrap) => self.overflow_wrap = overflow_wrap,
+            StyleProperty::TextWrapMode(text_wrap_mode) => self.text_wrap_mode = text_wrap_mode,
+        }
+    }
+}
+
 impl<B: Brush> Default for TextStyle<'static, 'static, B> {
     fn default() -> Self {
         TextStyle {
