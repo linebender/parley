@@ -185,6 +185,12 @@ where
     }
 }
 
+impl From<Script> for FallbackKey {
+    fn from(value: Script) -> Self {
+        Self::new(value, None)
+    }
+}
+
 #[derive(Clone, Default, Debug)]
 struct PerScript {
     default: Option<FamilyList>,

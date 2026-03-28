@@ -12,6 +12,12 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 This release has an [MSRV] of 1.88.
 
+### Added
+
+#### Fontique
+
+- `FallbackKey` now implements `From<Script>` for convenience. ([#594][] by [@xStrom][])
+
 ## [0.8.0] - 2026-03-27
 
 This release has an [MSRV] of 1.88.
@@ -557,6 +563,7 @@ This release has an [MSRV][] of 1.70.
 [#575]: https://github.com/linebender/parley/pull/575
 [#578]: https://github.com/linebender/parley/pull/578
 [#589]: https://github.com/linebender/parley/pull/589
+[#594]: https://github.com/linebender/parley/pull/594
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.8.0...HEAD
 [0.8.0]: https://github.com/linebender/parley/compare/v0.7.0...v0.8.0
