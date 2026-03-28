@@ -241,3 +241,51 @@ impl<B: Brush> From<LineHeight> for StyleProperty<'_, B> {
         StyleProperty::LineHeight(value)
     }
 }
+
+impl<'a, B: Brush> StyleProperty<'a, B> {
+    /// Maps the brush in a `StyleProperty<B>` to a `StyleProperty<C>` by applying the function `f`
+    /// if the property contains a brush.
+    ///
+    /// # Examples
+    ///
+    /// Convert a `StyleProperty<Color>` to a `StyleProperty<[u8; 4]>`.
+    ///
+    /// ```
+    /// # use parley::style::{StyleProperty};
+    /// # #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+    /// # struct Color { components: [u8; 4] }
+    /// let color = Color { components: [0, 0, 0, 255] };
+    /// let brush = StyleProperty::Brush(color);
+    ///
+    /// let brush: StyleProperty<[u8; 4]> = brush.map_brush(|c| c.components);
+    /// assert_eq!(brush, StyleProperty::Brush([0, 0, 0, 255]));
+    /// ```
+    pub fn map_brush<C: Brush>(self, f: impl FnOnce(B) -> C) -> StyleProperty<'a, C> {
+        match self {
+            StyleProperty::Brush(v) => StyleProperty::Brush(f(v)),
+            StyleProperty::UnderlineBrush(v) => StyleProperty::UnderlineBrush(v.map(f)),
+            StyleProperty::StrikethroughBrush(v) => StyleProperty::StrikethroughBrush(v.map(f)),
+
+            StyleProperty::FontFamily(v) => StyleProperty::FontFamily(v),
+            StyleProperty::FontSize(v) => StyleProperty::FontSize(v),
+            StyleProperty::FontWidth(v) => StyleProperty::FontWidth(v),
+            StyleProperty::FontStyle(v) => StyleProperty::FontStyle(v),
+            StyleProperty::FontWeight(v) => StyleProperty::FontWeight(v),
+            StyleProperty::FontVariations(v) => StyleProperty::FontVariations(v),
+            StyleProperty::FontFeatures(v) => StyleProperty::FontFeatures(v),
+            StyleProperty::Locale(v) => StyleProperty::Locale(v),
+            StyleProperty::Underline(v) => StyleProperty::Underline(v),
+            StyleProperty::UnderlineOffset(v) => StyleProperty::UnderlineOffset(v),
+            StyleProperty::UnderlineSize(v) => StyleProperty::UnderlineSize(v),
+            StyleProperty::Strikethrough(v) => StyleProperty::Strikethrough(v),
+            StyleProperty::StrikethroughOffset(v) => StyleProperty::StrikethroughOffset(v),
+            StyleProperty::StrikethroughSize(v) => StyleProperty::StrikethroughSize(v),
+            StyleProperty::LineHeight(v) => StyleProperty::LineHeight(v),
+            StyleProperty::WordSpacing(v) => StyleProperty::WordSpacing(v),
+            StyleProperty::LetterSpacing(v) => StyleProperty::LetterSpacing(v),
+            StyleProperty::WordBreak(v) => StyleProperty::WordBreak(v),
+            StyleProperty::OverflowWrap(v) => StyleProperty::OverflowWrap(v),
+            StyleProperty::TextWrapMode(v) => StyleProperty::TextWrapMode(v),
+        }
+    }
+}
