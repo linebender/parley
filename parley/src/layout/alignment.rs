@@ -60,7 +60,6 @@ impl Default for AlignmentOptions {
 /// Prior to re-line-breaking or re-aligning, [`unjustify`] has to be called.
 pub(crate) fn align<B: Brush>(
     layout: &mut LayoutData<B>,
-    alignment_width: Option<f32>,
     alignment: Alignment,
     options: AlignmentOptions,
 ) {
@@ -68,7 +67,6 @@ pub(crate) fn align<B: Brush>(
     {
         layout.alignment = Some(alignment);
     }
-    layout.alignment_width = alignment_width.unwrap_or(layout.width);
     layout.is_aligned_justified = alignment == Alignment::Justify;
 
     align_impl::<_, false>(layout, alignment, options);
@@ -116,8 +114,9 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
         }
 
         // Compute free space.
-        let free_space = layout.alignment_width - indent - line.metrics.advance
-            + line.metrics.trailing_whitespace;
+        let line_width = line.metrics.inline_max_coord - line.metrics.inline_min_coord;
+        let free_space =
+            line_width - indent - line.metrics.advance + line.metrics.trailing_whitespace;
 
         if !options.align_when_overflowing && free_space <= 0.0 {
             if is_rtl {
