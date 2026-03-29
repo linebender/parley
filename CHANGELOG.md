@@ -18,6 +18,20 @@ This release has an [MSRV] of 1.88.
 
 - `FallbackKey` now implements `From<Script>` for convenience. ([#594][] by [@xStrom][])
 
+#### Parley
+
+- `PlainEditorDriver` now exposes UTF-8 document-range editing helpers for host-side text input and composition handling, plus delete-to-edge helpers for semantic edit-command integration.
+- `PlainEditorDriver::commit_composition` to explicitly commit an active composition.
+- `SplitString::to_utf8_range` and `TextIndexEncoding` to convert encoded offsets over visible editor text without allocating.
+
+### Changed
+
+#### Parley
+
+- Breaking change: removed legacy `PlainEditorDriver` composition mutation methods `set_compose`, `set_compose_byte_range`, `clear_compose`, and `finish_compose` in favor of the document-space editing API.
+- Breaking change: `PlainEditor::raw_compose` has been replaced by `PlainEditor::composition`, which exposes composing text and its document offset instead of raw-buffer byte ranges.
+- Breaking change: `PlainEditor::ime_cursor_area` has been renamed to `PlainEditor::text_input_area`.
+
 ## [0.8.0] - 2026-03-27
 
 This release has an [MSRV] of 1.88.

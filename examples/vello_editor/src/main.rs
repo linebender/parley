@@ -105,8 +105,8 @@ struct SimpleVelloApp<'s> {
     /// The last generation of the editor layout that we drew.
     last_drawn_generation: text::Generation,
 
-    /// The IME cursor area we last sent to the platform.
-    last_sent_ime_cursor_area: parley::BoundingBox,
+    /// The text input area we last sent to the platform.
+    last_sent_text_input_area: parley::BoundingBox,
 
     /// The event loop proxy required by the AccessKit winit adapter.
     event_loop_proxy: EventLoopProxy<accesskit_winit::Event>,
@@ -251,6 +251,9 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
                     WindowEventTranslation::Pointer(p) => {
                         self.editor.handle_pointer_event(&p);
                     }
+                    WindowEventTranslation::Text(t) => {
+                        self.editor.handle_text_input_event(&t);
+                    }
                 }
             } else {
                 self.editor.handle_event(event.clone());
@@ -259,9 +262,9 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
 
         if self.last_drawn_generation != self.editor.generation() {
             render_state.window.request_redraw();
-            let area = self.editor.editor().ime_cursor_area();
-            if self.last_sent_ime_cursor_area != area {
-                self.last_sent_ime_cursor_area = area;
+            let area = self.editor.editor().text_input_area();
+            if self.last_sent_text_input_area != area {
+                self.last_sent_text_input_area = area;
                 // Note: on X11 `set_ime_cursor_area` may cause the exclusion area to be obscured
                 // until https://github.com/rust-windowing/winit/pull/3966 is in the Winit release
                 // used by this example.
@@ -414,7 +417,7 @@ fn main() -> Result<()> {
         scene: Scene::new(),
         editor: text::Editor::new(text::LOREM),
         last_drawn_generation: text::Generation::default(),
-        last_sent_ime_cursor_area: parley::BoundingBox::new(f64::NAN, f64::NAN, f64::NAN, f64::NAN),
+        last_sent_text_input_area: parley::BoundingBox::new(f64::NAN, f64::NAN, f64::NAN, f64::NAN),
         event_loop_proxy: event_loop.create_proxy(),
         event_reducer: WindowEventReducer::default(),
     };
