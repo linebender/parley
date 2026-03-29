@@ -6,6 +6,7 @@ use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
 use crate::style::Brush;
 use crate::util::nearly_zero;
 use crate::{FontData, IndentOptions, LineHeight, OverflowWrap, TextWrapMode};
+use skrifa::raw::TableProvider;
 use core::ops::Range;
 
 use alloc::vec::Vec;
@@ -189,6 +190,9 @@ pub(crate) struct LineItemData {
     /// Advance (size in direction of text flow) for the run.
     pub(crate) advance: f32,
 
+    /// Offset from the line baseline for vertical alignment (positive = down).
+    pub(crate) baseline_offset: f32,
+
     // Fields that only apply to text runs (Ignored for boxes)
     // TODO: factor this out?
     /// True if the run is composed entirely of whitespace.
@@ -302,6 +306,17 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) indent_amount: f32,
     /// Options controlling text-indent behavior (each-line, hanging).
     pub(crate) indent_options: IndentOptions,
+
+    // CSS strut metrics (CSS2.1 §10.8.1): the root style's font metrics
+    // that establish minimum line box height for every line.
+    /// Strut font ascent (from root style's font).
+    pub(crate) strut_ascent: f32,
+    /// Strut font descent (from root style's font).
+    pub(crate) strut_descent: f32,
+    /// Strut line height (from root style's line-height).
+    pub(crate) strut_line_height: f32,
+    /// Strut x-height (from root style's font, for vertical-align: middle).
+    pub(crate) strut_x_height: f32,
 }
 
 impl<B: Brush> Default for LayoutData<B> {
@@ -330,6 +345,10 @@ impl<B: Brush> Default for LayoutData<B> {
             alignment_width: 0.0,
             indent_amount: 0.0,
             indent_options: IndentOptions::default(),
+            strut_ascent: 0.0,
+            strut_descent: 0.0,
+            strut_line_height: 0.0,
+            strut_x_height: 0.0,
         }
     }
 }
@@ -353,6 +372,10 @@ impl<B: Brush> LayoutData<B> {
         self.glyphs.clear();
         self.lines.clear();
         self.line_items.clear();
+        self.strut_ascent = 0.0;
+        self.strut_descent = 0.0;
+        self.strut_line_height = 0.0;
+        self.strut_x_height = 0.0;
     }
 
     /// Push an inline box to the list of items
@@ -398,10 +421,27 @@ impl<B: Brush> LayoutData<B> {
                 index
             });
 
-        let metrics = {
+        let (metrics, subscript_offset, superscript_offset, os2_win_line_height) = {
             let font = &self.fonts[font_index];
             let font_ref = skrifa::FontRef::from_index(font.data.as_ref(), font.index).unwrap();
-            skrifa::metrics::Metrics::new(&font_ref, skrifa::prelude::Size::new(font_size), coords)
+            let m = skrifa::metrics::Metrics::new(
+                &font_ref,
+                skrifa::prelude::Size::new(font_size),
+                coords,
+            );
+            let scale = font_size / m.units_per_em as f32;
+            // Read subscript/superscript offsets from the OS/2 table
+            let os2 = font_ref.os2().ok();
+            let sub_off = os2.as_ref().map(|t| t.y_subscript_y_offset() as f32 * scale);
+            let sup_off = os2.as_ref().map(|t| t.y_superscript_y_offset() as f32 * scale);
+            // OS/2 Win metrics (usWinAscent + usWinDescent) are often larger than
+            // sTypo/hhea metrics and closer to what browsers use for line-height: normal.
+            let os2_win_lh = os2.as_ref().map(|t| {
+                let win_ascent = t.us_win_ascent() as f32 * scale;
+                let win_descent = t.us_win_descent() as f32 * scale;
+                win_ascent + win_descent
+            });
+            (m, sub_off, sup_off, os2_win_lh)
         };
         let units_per_em = metrics.units_per_em as f32;
 
@@ -427,7 +467,12 @@ impl<B: Brush> LayoutData<B> {
                 LineHeight::Absolute(value) => value,
                 LineHeight::FontSizeRelative(value) => value * font_size,
                 LineHeight::MetricsRelative(value) => {
-                    (metrics.ascent - metrics.descent + metrics.leading) * value
+                    // Prefer OS/2 Win metrics (usWinAscent + usWinDescent) when
+                    // available — they're closer to what browsers use for
+                    // line-height: normal. Fall back to skrifa's default metrics.
+                    let base = os2_win_line_height
+                        .unwrap_or(metrics.ascent - metrics.descent + metrics.leading);
+                    base * value
                 }
             };
 
@@ -442,6 +487,8 @@ impl<B: Brush> LayoutData<B> {
                 line_height,
                 x_height: metrics.x_height,
                 cap_height: metrics.cap_height,
+                subscript_offset,
+                superscript_offset,
             }
         };
 

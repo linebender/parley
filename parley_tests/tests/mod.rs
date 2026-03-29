@@ -31,6 +31,7 @@ mod line_break;
 mod lines;
 mod styles;
 mod text_indent;
+mod vertical_align;
 mod wrap;
 #[macro_use]
 mod util;

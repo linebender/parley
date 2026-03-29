@@ -111,6 +111,24 @@ impl<B: Brush> Layout<B> {
             })
     }
 
+    /// Sets the CSS strut metrics for the layout (CSS2.1 §10.8.1).
+    ///
+    /// The strut is an imaginary zero-width inline box on each line with the root
+    /// element's font metrics and line-height. It establishes the minimum line box
+    /// height, ensuring that lines containing only inline boxes (e.g. icons) still
+    /// get the height dictated by the parent's font.
+    ///
+    /// All values should be in physical pixels (i.e. already scaled by the device
+    /// pixel ratio).
+    ///
+    /// This must be called before [`Layout::break_all_lines`] or [`Layout::break_lines`].
+    pub fn set_strut(&mut self, ascent: f32, descent: f32, line_height: f32, x_height: f32) {
+        self.data.strut_ascent = ascent;
+        self.data.strut_descent = descent;
+        self.data.strut_line_height = line_height;
+        self.data.strut_x_height = x_height;
+    }
+
     /// Sets the text-indent for the layout.
     ///
     /// The indent is applied as a margin on the start edge of indented lines, reducing the

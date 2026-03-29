@@ -242,4 +242,10 @@ pub struct RunMetrics {
     pub x_height: Option<f32>,
     /// Distance from the baseline to the top of capital letters.
     pub cap_height: Option<f32>,
+    /// Vertical offset for subscript positioning, from the font's OS/2 table.
+    /// Positive value indicates downward shift from the baseline.
+    pub subscript_offset: Option<f32>,
+    /// Vertical offset for superscript positioning, from the font's OS/2 table.
+    /// Positive value indicates upward shift from the baseline.
+    pub superscript_offset: Option<f32>,
 }
