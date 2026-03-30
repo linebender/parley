@@ -29,6 +29,7 @@ mod editor;
 mod issues;
 mod line_break;
 mod lines;
+mod split_string;
 mod styles;
 mod text_indent;
 mod wrap;
