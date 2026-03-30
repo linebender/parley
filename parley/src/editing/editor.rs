@@ -319,7 +319,11 @@ where
         }
     }
 
-    /// Delete the selection or to the start of the physical line.
+    /// Delete the current selection, or delete backward to the start of the
+    /// current physical line when the selection is collapsed.
+    ///
+    /// This corresponds to semantic editing commands such as AppKit's
+    /// `deleteToBeginningOfLine:`.
     pub fn delete_to_line_start(&mut self) {
         self.refresh_layout();
         if self.editor.selection.is_collapsed() {
@@ -335,7 +339,11 @@ where
         }
     }
 
-    /// Delete the selection or to the end of the physical line.
+    /// Delete the current selection, or delete forward to the end of the
+    /// current physical line when the selection is collapsed.
+    ///
+    /// This corresponds to semantic editing commands such as AppKit's
+    /// `deleteToEndOfLine:`.
     pub fn delete_to_line_end(&mut self) {
         self.refresh_layout();
         if self.editor.selection.is_collapsed() {
@@ -351,7 +359,8 @@ where
         }
     }
 
-    /// Delete the selection or to the beginning of the document.
+    /// Delete the current selection, or delete backward to the beginning of
+    /// the document when the selection is collapsed.
     pub fn delete_to_text_start(&mut self) {
         if self.editor.selection.is_collapsed() {
             let end = self.editor.selection.focus().index();
@@ -362,7 +371,8 @@ where
         }
     }
 
-    /// Delete the selection or to the end of the document.
+    /// Delete the current selection, or delete forward to the end of the
+    /// document when the selection is collapsed.
     pub fn delete_to_text_end(&mut self) {
         if self.editor.selection.is_collapsed() {
             let start = self.editor.selection.focus().index();
@@ -375,19 +385,27 @@ where
     }
 
     /// Insert a newline at the current selection.
+    ///
+    /// This is useful for hosts that surface newline insertion as a semantic
+    /// editing action rather than ordinary text input.
     pub fn insert_newline(&mut self) {
         self.insert_or_replace_selection("\n");
     }
 
     /// Insert a horizontal tab at the current selection.
+    ///
+    /// This is useful for hosts that surface tab insertion as a semantic
+    /// editing action rather than ordinary text input.
     pub fn insert_tab(&mut self) {
         self.insert_or_replace_selection("\t");
     }
 
     /// Set the document selection using UTF-8 byte offsets over [`PlainEditor::text`].
     ///
-    /// Returns `false` if the provided range is reversed, out of bounds, or
-    /// does not land on character boundaries in the document text.
+    /// Returns `false` and leaves the editor unchanged if the provided range is
+    /// reversed, out of bounds, or does not land on UTF-8 scalar-value
+    /// boundaries in the document text. This does not promise grapheme-cluster
+    /// aware selection behavior.
     pub fn set_document_selection(&mut self, range: Range<usize>) -> bool {
         let Some(range) = self.editor.document_range_to_raw_range(range) else {
             return false;
@@ -403,8 +421,12 @@ where
 
     /// Set the composing region using UTF-8 byte offsets over [`PlainEditor::text`].
     ///
-    /// Returns `false` if the provided range is reversed, out of bounds, or
-    /// does not land on character boundaries in the document text.
+    /// Any existing composition, whether hidden preedit or a visible composing
+    /// region, is replaced by this new visible composing region.
+    ///
+    /// Returns `false` and leaves the editor unchanged if the provided range is
+    /// reversed, out of bounds, or does not land on UTF-8 scalar-value
+    /// boundaries in the document text.
     pub fn set_composing_region(&mut self, range: Range<usize>) -> bool {
         let Some(range) = self.editor.document_range_to_raw_range(range) else {
             return false;
@@ -424,7 +446,8 @@ where
     /// [`PlainEditor::text`]. The `selection_in_inserted_text` range is
     /// expressed in UTF-8 byte offsets over `text`.
     ///
-    /// Returns `false` if either range is invalid.
+    /// Returns `false` and leaves the editor unchanged if either range is
+    /// invalid.
     pub fn insert_or_replace(
         &mut self,
         text: &str,
@@ -473,9 +496,14 @@ where
     /// [`PlainEditor::text`]. The `selection_in_composition` range is
     /// expressed in UTF-8 byte offsets over `text`.
     ///
+    /// If `replacement` is provided, that document range is replaced. Otherwise
+    /// the current composition range is replaced if one exists; if not, the
+    /// current selection is replaced.
+    ///
     /// If `text` is empty, this clears any active composition.
     ///
-    /// Returns `false` if either range is invalid.
+    /// Returns `false` and leaves the editor unchanged if either range is
+    /// invalid.
     pub fn update_composition(
         &mut self,
         text: &str,
@@ -525,9 +553,11 @@ where
     /// document selection.
     ///
     /// The counts are measured in the space returned by [`PlainEditor::text`].
+    /// If the current selection is non-collapsed, it is included in the deleted
+    /// range.
     ///
-    /// Returns `false` if the current selection cannot be represented in that
-    /// document space.
+    /// Returns `false` and leaves the editor unchanged if the current selection
+    /// cannot be represented in that document space.
     pub fn delete_surrounding(&mut self, before: usize, after: usize) -> bool {
         if before == 0 && after == 0 {
             return true;
@@ -1485,6 +1515,8 @@ where
         }
         if let Some(compose) = &self.compose {
             if compose.range.is_empty() {
+                // A collapsed composition still affects editor state, but there
+                // is no visible composing span to underline in the layout.
                 self.layout = builder.build(&self.buffer);
                 self.layout.break_all_lines(self.width);
                 self.layout

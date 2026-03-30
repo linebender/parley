@@ -20,17 +20,17 @@ This release has an [MSRV] of 1.88.
 
 #### Parley
 
-- `PlainEditorDriver` now exposes UTF-8 document-range editing helpers for host-side text input and composition handling, plus delete-to-edge helpers for semantic edit-command integration.
-- `PlainEditorDriver::commit_composition` to explicitly commit an active composition.
-- `SplitString::to_utf8_range` and `TextIndexEncoding` to convert encoded offsets over visible editor text without allocating.
+- `PlainEditorDriver` now exposes UTF-8 document-range editing helpers for host-side text input and composition handling, plus delete-to-edge helpers for semantic edit-command integration. ([#595][] by [@waywardmonkeys][])
+- `PlainEditorDriver::commit_composition` to explicitly commit an active composition. ([#595][] by [@waywardmonkeys][])
+- `SplitString::to_utf8_range` and `TextIndexEncoding` to convert encoded offsets over visible editor text without allocating. ([#595][] by [@waywardmonkeys][])
 
 ### Changed
 
 #### Parley
 
-- Breaking change: removed legacy `PlainEditorDriver` composition mutation methods `set_compose`, `set_compose_byte_range`, `clear_compose`, and `finish_compose` in favor of the document-space editing API.
-- Breaking change: `PlainEditor::raw_compose` has been replaced by `PlainEditor::composition`, which exposes composing text and its document offset instead of raw-buffer byte ranges.
-- Breaking change: `PlainEditor::ime_cursor_area` has been renamed to `PlainEditor::text_input_area`.
+- Breaking change: removed legacy `PlainEditorDriver` composition mutation methods `set_compose`, `set_compose_byte_range`, `clear_compose`, and `finish_compose` in favor of the document-space editing API. ([#595][] by [@waywardmonkeys][])
+- Breaking change: `PlainEditor::raw_compose` has been replaced by `PlainEditor::composition`, which exposes composing text and its document offset instead of raw-buffer byte ranges. ([#595][] by [@waywardmonkeys][])
+- Breaking change: `PlainEditor::ime_cursor_area` has been renamed to `PlainEditor::text_input_area`. ([#595][] by [@waywardmonkeys][])
 
 ## [0.8.0] - 2026-03-27
 
@@ -578,6 +578,7 @@ This release has an [MSRV][] of 1.70.
 [#578]: https://github.com/linebender/parley/pull/578
 [#589]: https://github.com/linebender/parley/pull/589
 [#594]: https://github.com/linebender/parley/pull/594
+[#595]: https://github.com/linebender/parley/pull/595
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.8.0...HEAD
 [0.8.0]: https://github.com/linebender/parley/compare/v0.7.0...v0.8.0

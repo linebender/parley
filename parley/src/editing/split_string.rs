@@ -1,4 +1,4 @@
-// Copyright 2026 the Parley Authors
+// Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use core::{fmt::Display, ops::Range};
@@ -18,7 +18,7 @@ pub enum TextIndexEncoding {
     Utf8Bytes,
     /// Offsets are UTF-16 code-unit indices.
     Utf16CodeUnits,
-    /// Offsets are Unicode scalar-value counts.
+    /// Offsets are Unicode scalar-value counts (`char`s in Rust terms).
     UnicodeCodePoints,
 }
 
@@ -126,6 +126,8 @@ fn split_utf16_offset_to_utf8_byte_offset(
     for segment in text {
         for ch in segment.chars() {
             if utf16_count == target {
+                // The requested UTF-16 boundary can fall exactly at a split
+                // seam, before the next segment contributes any code units.
                 return Some(byte_offset);
             }
             utf16_count = utf16_count.checked_add(ch.len_utf16())?;
