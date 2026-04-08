@@ -13,7 +13,11 @@ use super::{
 use alloc::string::String;
 use alloc::vec;
 use hashbrown::HashMap;
-use read_fonts::{FileRef, FontRef, TableProvider as _, tables::name, types::NameId};
+use read_fonts::{
+    FileRef, FontRef, TableProvider as _,
+    tables::name,
+    types::{NameId, Tag},
+};
 use smallvec::SmallVec;
 #[cfg(feature = "std")]
 use {super::source::SourcePathMap, std::path::Path};
@@ -197,6 +201,10 @@ fn scan_font<'a>(
     index: u32,
     f: &mut impl FnMut(&ScannedFont<'a>),
 ) -> Option<()> {
+    // We can't currently render hvgl fonts so reject them
+    if font.table_data(Tag::new(b"hvgl")).is_some() {
+        return None;
+    }
     let name_table = font.name().ok()?;
     f(&ScannedFont {
         font,
