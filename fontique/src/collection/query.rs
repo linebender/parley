@@ -102,7 +102,7 @@ impl<'a> Query<'a> {
                     .map(CachedFamily::new),
             );
             // HACK: always add a Han font to the fallback list to capture
-            // puncutation in the common script
+            // punctuation in the common script
             // See <https://github.com/linebender/parley/issues/597>
             self.state.fallback_families.extend(
                 self.collection
