@@ -140,11 +140,17 @@ impl<B: Brush> Layout<B> {
             .break_remaining(max_advance.unwrap_or(f32::MAX));
     }
 
-    /// Apply alignment to the layout relative to the specified container width or full layout
-    /// width.
+    /// Apply alignment to the layout.
     ///
     /// You must perform line breaking prior to aligning, through [`Layout::break_lines`] or
     /// [`Layout::break_all_lines`].
+    ///
+    /// If a finite `max_advance` is supplied to `Layout::break_all_lines` then that width will be applied
+    /// relative to that width. Otherwise alignment will be applied relative to the width of the
+    /// longest line as computed by line breaking.
+    ///
+    /// If line-specific `offset` and `max_advance` are set using the advanced methods on the `BreakLines`
+    /// struct then each lines line will be aligned individually within it's line box.
     pub fn align(&mut self, alignment: Alignment, options: AlignmentOptions) {
         unjustify(&mut self.data);
         align(&mut self.data, alignment, options);
