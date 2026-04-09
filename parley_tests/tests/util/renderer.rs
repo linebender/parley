@@ -87,7 +87,13 @@ pub(crate) fn draw_layout(
     let base_width = config
         .size
         .map(|size| size.width as f32)
-        .unwrap_or(layout.available_width())
+        .unwrap_or_else(|| {
+            if layout.layout_max_advance() >= f32::MAX {
+                layout.full_width()
+            } else {
+                layout.layout_max_advance()
+            }
+        })
         .ceil() as u16;
     let base_height = config
         .size
@@ -209,7 +215,7 @@ pub(crate) fn draw_layout_with_clusters(
     let width = config
         .size
         .map(|size| size.width as f32)
-        .unwrap_or(layout.available_width())
+        .unwrap_or(layout.layout_max_advance())
         .ceil() as u16;
     let base_height = layout.height();
     let num_lines = layout.len();

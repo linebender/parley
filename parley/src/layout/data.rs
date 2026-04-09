@@ -265,29 +265,41 @@ pub(crate) struct LayoutItem {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct LayoutData<B: Brush> {
+    // General settings (directly from the "builder")
+    /// The display scale factor
     pub(crate) scale: f32,
+    /// Whether metrics should be quantized to pixel boundaries
     pub(crate) quantize: bool,
+    /// The BiDi base level
     pub(crate) base_level: u8,
+    /// The length of the text in the layout
     pub(crate) text_len: usize,
-    pub(crate) width: f32,
-    pub(crate) full_width: f32,
-    pub(crate) height: f32,
-    pub(crate) fonts: Vec<FontData>,
-    pub(crate) coords: Vec<i16>,
 
-    // Input (/ output of style resolution)
+    // Output of style resolution (input to line breaking)
     pub(crate) styles: Vec<Style<B>>,
     pub(crate) inline_boxes: Vec<InlineBox>,
 
-    // Output of shaping
+    // Output of shaping (input to line breaking)
+    pub(crate) fonts: Vec<FontData>,
+    pub(crate) coords: Vec<i16>,
     pub(crate) runs: Vec<RunData>,
     pub(crate) items: Vec<LayoutItem>,
     pub(crate) clusters: Vec<ClusterData>,
     pub(crate) glyphs: Vec<Glyph>,
 
     // Output of line breaking
+    /// The lines in the
     pub(crate) lines: Vec<LineData>,
+    /// Items within each line
     pub(crate) line_items: Vec<LineItemData>,
+    /// The width constraint that was used to line break the layout
+    pub(crate) layout_max_advance: f32,
+    /// The computed width of the layout excluding trailing whitespace
+    pub(crate) width: f32,
+    /// The computed width of the layout including trailing whitespace
+    pub(crate) full_width: f32,
+    /// The computed height of the layout
+    pub(crate) height: f32,
 
     // Output of alignment
     #[cfg(feature = "accesskit")]
@@ -296,8 +308,6 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) alignment: Option<super::Alignment>,
     /// Whether the layout is aligned with [`crate::Alignment::Justify`].
     pub(crate) is_aligned_justified: bool,
-    /// The width the layout was aligned to.
-    pub(crate) alignment_width: f32,
     /// The text-indent amount in layout units.
     pub(crate) indent_amount: f32,
     /// Options controlling text-indent behavior (each-line, hanging).
@@ -327,7 +337,7 @@ impl<B: Brush> Default for LayoutData<B> {
             #[cfg(feature = "accesskit")]
             alignment: None,
             is_aligned_justified: false,
-            alignment_width: 0.0,
+            layout_max_advance: 0.0,
             indent_amount: 0.0,
             indent_options: IndentOptions::default(),
         }

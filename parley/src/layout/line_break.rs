@@ -1067,14 +1067,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.block_min_coord = line.metrics.baseline - ascent - leading_above.max(0.);
         line.metrics.block_max_coord = line.metrics.baseline + descent + leading_below.max(0.);
 
-        let max_advance = if self.state.line_max_advance < f32::MAX {
-            self.state.line_max_advance
-        } else {
-            line.metrics.advance - line.metrics.trailing_whitespace
-        };
+        // let max_advance = if self.state.line_max_advance < f32::MAX {
+        //     self.state.line_max_advance
+        // } else {
+        //     line.metrics.advance - line.metrics.trailing_whitespace
+        // };
 
         line.metrics.inline_min_coord = self.state.line_x;
-        line.metrics.inline_max_coord = self.state.line_x + max_advance;
+        line.metrics.inline_max_coord = self.state.line_x + self.state.line_max_advance;
     }
 }
 
@@ -1082,26 +1082,25 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
     fn drop(&mut self) {
         // Compute the overall width and height of the entire layout
         // The "width" excludes trailing whitespace. The "full_width" includes it.
-        let mut width = 0_f32;
-        let mut full_width = 0_f32;
+        let mut layout_width = 0_f32;
+        let mut layout_full_width = 0_f32;
         let mut height = 0_f64; // f32 causes test failures due to accumulated error
-        for line in &self.lines.lines {
+        for line in &mut self.lines.lines {
             let indent_extra = line.indent.max(0.0);
-            width =
-                width.max(line.metrics.advance + indent_extra - line.metrics.trailing_whitespace);
-            full_width = full_width.max(line.metrics.advance + indent_extra);
+            let line_max = line.metrics.inline_min_coord + line.metrics.advance + indent_extra;
+            layout_full_width = layout_full_width.max(line_max);
+            layout_width = layout_width.max(line_max - line.metrics.trailing_whitespace);
             height += line.metrics.line_height as f64;
         }
 
         // If laying out with infinite width constraint, then set all lines' "max_width"
         // to the measured width of the longest line.
         if self.state.layout_max_advance >= f32::MAX {
-            self.layout.data.alignment_width = full_width;
             for line in &mut self.lines.lines {
-                line.metrics.inline_max_coord = line.metrics.inline_min_coord + width;
+                if line.metrics.inline_max_coord >= f32::MAX {
+                    line.metrics.inline_max_coord = layout_width;
+                }
             }
-        } else {
-            self.layout.data.alignment_width = self.state.layout_max_advance;
         }
 
         // Don't include the last line's line_height in the layout's height if the last line is empty
@@ -1112,9 +1111,10 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
         }
 
         // Save the computed widths/height to the layout
-        self.layout.data.width = width;
-        self.layout.data.full_width = full_width;
+        self.layout.data.width = layout_width;
+        self.layout.data.full_width = layout_full_width;
         self.layout.data.height = height as f32;
+        self.layout.data.layout_max_advance = self.state.layout_max_advance;
 
         // for (i, line) in self.lines.lines.iter().enumerate() {
         //     println!("LINE {i} (h:{})", line.metrics.line_height);

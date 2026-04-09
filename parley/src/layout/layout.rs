@@ -36,18 +36,17 @@ impl<B: Brush> Layout<B> {
         &self.data.styles
     }
 
-    /// Returns available width of the layout.
-    pub fn available_width(&self) -> f32 {
-        self.data.alignment_width
+    /// The `max_advance` that was used to line break the `Layout`
+    pub fn layout_max_advance(&self) -> f32 {
+        self.data.layout_max_advance
     }
 
-    /// Returns the width of the layout.
+    /// Returns the computed width of the layout excluding the width of trailing whitespace.
     pub fn width(&self) -> f32 {
         self.data.width
     }
 
-    /// Returns the width of the layout, including the width of any trailing
-    /// whitespace.
+    /// Returns the computed width of the layout including the width of trailing whitespace.
     pub fn full_width(&self) -> f32 {
         self.data.full_width
     }
