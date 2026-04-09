@@ -702,6 +702,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 LayoutItemKind::InlineBox => {
                     let inline_box = &self.layout.data.inline_boxes[item.index];
 
+                    if inline_box.kind != InlineBoxKind::InFlow {
+                        self.state.item_idx += 1;
+                        self.state.append_inline_box_to_line(self.state.line.x, 0.0);
+                        continue;
+                    }
+
                     // Check if adding this box would exceed the limit
                     if char_count >= max_chars && max_chars != 0 {
                         // Break before this box
