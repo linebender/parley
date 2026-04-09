@@ -20,6 +20,7 @@ use objc2_core_text::{
 use objc2_foundation::{
     NSSearchPathDirectory, NSSearchPathDomainMask, NSSearchPathForDirectoriesInDomains,
 };
+use parlance::Script;
 use std::path::{Path, PathBuf};
 
 const DEFAULT_GENERIC_FAMILIES: &[(GenericFamily, &[&str])] = &[
@@ -65,11 +66,24 @@ impl SystemFonts {
     }
 
     pub(crate) fn fallback(&mut self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
+        const HANI: Script = Script::from_bytes(*b"Hani");
+        const HANT: Script = Script::from_bytes(*b"Hant");
+        const HANS: Script = Script::from_bytes(*b"Hans");
         let key = key.into();
-        let sample = key.script().sample()?;
-        let font = create_fallback_font_for_text(sample, key.locale_str(), false)?;
+        let script = key.script();
+        let font = create_fallback_font_for_text(script.sample()?, key.locale_str(), false)?;
         let family_name = unsafe { font.family_name() };
-        self.name_map.get(&family_name.to_string()).map(|n| n.id())
+        if let Some(family) = self.name_map.get(&family_name.to_string()) {
+            return Some(family.id());
+        }
+        // HACK: if we don't have a usable PingFangUI due to our inability
+        // to render hvgl outlines then try another font
+        let name = match script {
+            HANI | HANS => "Heiti SC",
+            HANT => "Heiti TC",
+            _ => return None,
+        };
+        self.name_map.get(name).map(|family| family.id())
     }
 }
 

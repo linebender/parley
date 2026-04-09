@@ -8,6 +8,7 @@ use crate::{Charmap, CharmapIndex};
 use super::super::{Collection, SourceCache};
 
 use alloc::vec::Vec;
+use parlance::Script;
 
 use super::{
     super::{Attributes, Blob, FallbackKey, FamilyId, FamilyInfo, GenericFamily, Synthesis},
@@ -98,6 +99,14 @@ impl<'a> Query<'a> {
             self.state.fallback_families.extend(
                 self.collection
                     .fallback_families(key)
+                    .map(CachedFamily::new),
+            );
+            // HACK: always add a Han font to the fallback list to capture
+            // punctuation in the common script
+            // See <https://github.com/linebender/parley/issues/597>
+            self.state.fallback_families.extend(
+                self.collection
+                    .fallback_families(FallbackKey::new(Script::from_bytes(*b"Hani"), None))
                     .map(CachedFamily::new),
             );
             self.fallbacks = Some(key);
