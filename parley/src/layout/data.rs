@@ -270,7 +270,7 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) scale: f32,
     /// Whether metrics should be quantized to pixel boundaries
     pub(crate) quantize: bool,
-    /// The BiDi base level
+    /// The `BiDi` base level
     pub(crate) base_level: u8,
     /// The length of the text in the layout
     pub(crate) text_len: usize,

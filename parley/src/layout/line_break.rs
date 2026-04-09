@@ -207,9 +207,9 @@ impl BreakerState {
         self.layout_max_advance = advance;
     }
 
-    /// Get the max-height of the current line
+    /// Get the max-advance of the current line
     #[inline(always)]
-    pub fn line_max_advance(&mut self) -> f32 {
+    pub fn line_max_advance(&self) -> f32 {
         self.line_max_advance
     }
     /// Set the max-advance of the current line
