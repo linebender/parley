@@ -4,7 +4,9 @@
 mod cursor;
 mod editor;
 mod selection;
+mod split_string;
 
 pub use self::cursor::*;
 pub use self::editor::*;
 pub use self::selection::*;
+pub use self::split_string::*;

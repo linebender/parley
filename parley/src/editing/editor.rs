@@ -4,15 +4,9 @@
 //! A simple plain text editor and related types.
 
 use alloc::{borrow::ToOwned, string::String, vec::Vec};
-use core::{
-    cmp::PartialEq,
-    default::Default,
-    fmt::{Debug, Display},
-    num::NonZeroUsize,
-    ops::Range,
-};
+use core::{cmp::PartialEq, default::Default, fmt::Debug, num::NonZeroUsize, ops::Range};
 
-use crate::editing::{Cursor, Selection};
+use crate::editing::{Cursor, Selection, SplitString};
 use crate::layout::{Affinity, Alignment, AlignmentOptions, Layout};
 use crate::style::Brush;
 use crate::{BoundingBox, FontContext, LayoutContext, StyleProperty, StyleSet};
@@ -39,48 +33,30 @@ impl Generation {
     }
 }
 
-/// A string which is potentially discontiguous in memory.
+/// Active in-progress composition text.
 ///
-/// This is returned by [`PlainEditor::text`], as the IME preedit
-/// area needs to be efficiently excluded from its return value.
-#[derive(Debug, Clone, Copy)]
-pub struct SplitString<'source>([&'source str; 2]);
-
-impl<'source> SplitString<'source> {
-    /// Get the characters of this string.
-    pub fn chars(self) -> impl Iterator<Item = char> + 'source {
-        self.into_iter().flat_map(str::chars)
-    }
+/// This text may either be transient preedit text excluded from
+/// [`PlainEditor::text`] or an existing document range that is currently marked
+/// as composing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Composition<'source> {
+    /// The composing text.
+    pub text: &'source str,
+    /// The UTF-8 byte offset in [`PlainEditor::text`] where the composition is
+    /// currently located.
+    pub document_offset: usize,
 }
 
-impl PartialEq<&'_ str> for SplitString<'_> {
-    fn eq(&self, other: &&'_ str) -> bool {
-        let [a, b] = self.0;
-        let mid = a.len();
-        match other.split_at_checked(mid) {
-            Some((a_1, b_1)) => a_1 == a && b_1 == b,
-            None => false,
-        }
-    }
-}
-// We intentionally choose not to:
-// impl PartialEq<Self> for SplitString<'_> {}
-// for simplicity, as the impl wouldn't be useful and is non-trivial
-
-impl Display for SplitString<'_> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let [a, b] = self.0;
-        write!(f, "{a}{b}")
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CompositionKind {
+    HiddenPreedit,
+    VisibleRegion,
 }
 
-/// Iterate through the source strings.
-impl<'source> IntoIterator for SplitString<'source> {
-    type Item = &'source str;
-    type IntoIter = <[&'source str; 2] as IntoIterator>::IntoIter;
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ActiveComposition {
+    range: Range<usize>,
+    kind: CompositionKind,
 }
 
 /// Basic plain text editor with a single style applied to the entire text.
@@ -99,9 +75,9 @@ where
     #[cfg(feature = "accesskit")]
     layout_access: LayoutAccessibility,
     selection: Selection,
-    /// Byte offsets of IME composing preedit text in the text buffer.
+    /// Byte offsets of active composition text in the text buffer.
     /// `None` if the IME is not currently composing.
-    compose: Option<Range<usize>>,
+    compose: Option<ActiveComposition>,
     /// Whether the cursor should be shown. The IME can request to hide the cursor.
     show_cursor: bool,
     width: Option<f32>,
@@ -343,88 +319,310 @@ where
         }
     }
 
-    // --- MARK: IME ---
-    /// Set the IME preedit composing text.
+    /// Delete the current selection, or delete backward to the start of the
+    /// current physical line when the selection is collapsed.
     ///
-    /// This starts composing. Composing is reset by calling [`clear_compose`](Self::clear_compose).
-    /// Alternatively, the preedit text can be committed by calling [`finish_compose`](Self::finish_compose).
-    ///
-    /// The selection and preedit region can be manipulated independently while composing
-    /// is active.
-    ///
-    /// The preedit text replaces the current selection if this call starts composing.
-    ///
-    /// The selection is updated based on `cursor`, which contains the byte offsets relative to the
-    /// start of the preedit text. If `cursor` is `None`, the selection and caret are hidden.
-    pub fn set_compose(&mut self, text: &str, cursor: Option<(usize, usize)>) {
-        debug_assert!(!text.is_empty());
-        debug_assert!(cursor.map(|cursor| cursor.1 <= text.len()).unwrap_or(true));
-
-        let start = if let Some(preedit_range) = &self.editor.compose {
+    /// This corresponds to semantic editing commands such as AppKit's
+    /// `deleteToBeginningOfLine:`.
+    pub fn delete_to_line_start(&mut self) {
+        self.refresh_layout();
+        if self.editor.selection.is_collapsed() {
+            let range = self
+                .editor
+                .selection
+                .line_start(&self.editor.layout, true)
+                .text_range();
             self.editor
-                .buffer
-                .replace_range(preedit_range.clone(), text);
-            preedit_range.start
+                .replace_range_with_selection(self.font_cx, self.layout_cx, range, "");
         } else {
-            if self.editor.selection.is_collapsed() {
-                self.editor
-                    .buffer
-                    .insert_str(self.editor.selection.text_range().start, text);
-            } else {
-                self.editor
-                    .buffer
-                    .replace_range(self.editor.selection.text_range(), text);
-            }
-            self.editor.selection.text_range().start
+            self.delete_selection();
+        }
+    }
+
+    /// Delete the current selection, or delete forward to the end of the
+    /// current physical line when the selection is collapsed.
+    ///
+    /// This corresponds to semantic editing commands such as AppKit's
+    /// `deleteToEndOfLine:`.
+    pub fn delete_to_line_end(&mut self) {
+        self.refresh_layout();
+        if self.editor.selection.is_collapsed() {
+            let range = self
+                .editor
+                .selection
+                .line_end(&self.editor.layout, true)
+                .text_range();
+            self.editor
+                .replace_range_with_selection(self.font_cx, self.layout_cx, range, "");
+        } else {
+            self.delete_selection();
+        }
+    }
+
+    /// Delete the current selection, or delete backward to the beginning of
+    /// the document when the selection is collapsed.
+    pub fn delete_to_text_start(&mut self) {
+        if self.editor.selection.is_collapsed() {
+            let end = self.editor.selection.focus().index();
+            self.editor
+                .replace_range_with_selection(self.font_cx, self.layout_cx, 0..end, "");
+        } else {
+            self.delete_selection();
+        }
+    }
+
+    /// Delete the current selection, or delete forward to the end of the
+    /// document when the selection is collapsed.
+    pub fn delete_to_text_end(&mut self) {
+        if self.editor.selection.is_collapsed() {
+            let start = self.editor.selection.focus().index();
+            let end = self.editor.buffer.len();
+            self.editor
+                .replace_range_with_selection(self.font_cx, self.layout_cx, start..end, "");
+        } else {
+            self.delete_selection();
+        }
+    }
+
+    /// Insert a newline at the current selection.
+    ///
+    /// This is useful for hosts that surface newline insertion as a semantic
+    /// editing action rather than ordinary text input.
+    pub fn insert_newline(&mut self) {
+        self.insert_or_replace_selection("\n");
+    }
+
+    /// Insert a horizontal tab at the current selection.
+    ///
+    /// This is useful for hosts that surface tab insertion as a semantic
+    /// editing action rather than ordinary text input.
+    pub fn insert_tab(&mut self) {
+        self.insert_or_replace_selection("\t");
+    }
+
+    /// Set the document selection using UTF-8 byte offsets over [`PlainEditor::text`].
+    ///
+    /// Returns `false` and leaves the editor unchanged if the provided range is
+    /// reversed, out of bounds, or does not land on UTF-8 scalar-value
+    /// boundaries in the document text. This does not promise grapheme-cluster
+    /// aware selection behavior.
+    pub fn set_document_selection(&mut self, range: Range<usize>) -> bool {
+        let Some(range) = self.editor.document_range_to_raw_range(range) else {
+            return false;
         };
-        self.editor.compose = Some(start..start + text.len());
-        self.editor.show_cursor = cursor.is_some();
+        self.refresh_layout();
+        self.editor.show_cursor = true;
+        self.editor.set_selection(Selection::new(
+            self.editor.cursor_at(range.start),
+            self.editor.cursor_at(range.end),
+        ));
+        true
+    }
+
+    /// Set the composing region using UTF-8 byte offsets over [`PlainEditor::text`].
+    ///
+    /// Any existing composition, whether hidden preedit or a visible composing
+    /// region, is replaced by this new visible composing region.
+    ///
+    /// Returns `false` and leaves the editor unchanged if the provided range is
+    /// reversed, out of bounds, or does not land on UTF-8 scalar-value
+    /// boundaries in the document text.
+    pub fn set_composing_region(&mut self, range: Range<usize>) -> bool {
+        let Some(range) = self.editor.document_range_to_raw_range(range) else {
+            return false;
+        };
+        self.editor.compose = Some(ActiveComposition {
+            range,
+            kind: CompositionKind::VisibleRegion,
+        });
+        self.update_layout();
+        true
+    }
+
+    /// Insert text, optionally replacing a document range, and optionally set a
+    /// selection within the inserted text.
+    ///
+    /// The `replacement` range is expressed in UTF-8 byte offsets over
+    /// [`PlainEditor::text`]. The `selection_in_inserted_text` range is
+    /// expressed in UTF-8 byte offsets over `text`.
+    ///
+    /// Returns `false` and leaves the editor unchanged if either range is
+    /// invalid.
+    pub fn insert_or_replace(
+        &mut self,
+        text: &str,
+        replacement: Option<Range<usize>>,
+        selection_in_inserted_text: Option<Range<usize>>,
+    ) -> bool {
+        let selection_in_inserted_text = match selection_in_inserted_text {
+            Some(range) => {
+                let Some(range) = validate_text_range(text, range) else {
+                    return false;
+                };
+                Some(range)
+            }
+            None => None,
+        };
+        let replacement = match replacement {
+            Some(range) => {
+                let Some(range) = self.editor.document_range_to_raw_range(range) else {
+                    return false;
+                };
+                range
+            }
+            None => self.editor.selection.text_range(),
+        };
+        self.editor.replace_range_with_selection(
+            self.font_cx,
+            self.layout_cx,
+            replacement.clone(),
+            text,
+        );
+        self.editor.show_cursor = true;
+        if let Some(selection) = selection_in_inserted_text {
+            let start = replacement.start + selection.start;
+            let end = replacement.start + selection.end;
+            self.editor.set_selection(Selection::new(
+                self.editor.cursor_at(start),
+                self.editor.cursor_at(end),
+            ));
+        }
+        true
+    }
+
+    /// Apply a composition update atomically.
+    ///
+    /// The `replacement` range is expressed in UTF-8 byte offsets over
+    /// [`PlainEditor::text`]. The `selection_in_composition` range is
+    /// expressed in UTF-8 byte offsets over `text`.
+    ///
+    /// If `replacement` is provided, that document range is replaced. Otherwise
+    /// the current composition range is replaced if one exists; if not, the
+    /// current selection is replaced.
+    ///
+    /// If `text` is empty, this clears any active composition.
+    ///
+    /// Returns `false` and leaves the editor unchanged if either range is
+    /// invalid.
+    pub fn update_composition(
+        &mut self,
+        text: &str,
+        replacement: Option<Range<usize>>,
+        selection_in_composition: Option<Range<usize>>,
+    ) -> bool {
+        if text.is_empty() {
+            return self.clear_composition();
+        }
+        let selection_in_composition = match selection_in_composition {
+            Some(range) => {
+                let Some(range) = validate_text_range(text, range) else {
+                    return false;
+                };
+                Some(range)
+            }
+            None => None,
+        };
+        let replacement = if let Some(range) = replacement {
+            let Some(range) = self.editor.document_range_to_raw_range(range) else {
+                return false;
+            };
+            range
+        } else if let Some(compose) = self.editor.compose.as_ref() {
+            compose.range.clone()
+        } else {
+            self.editor.selection.text_range()
+        };
+        let start = replacement.start;
+        self.editor.buffer.replace_range(replacement, text);
+        self.editor.compose = Some(ActiveComposition {
+            range: start..start + text.len(),
+            kind: CompositionKind::HiddenPreedit,
+        });
+        self.editor.show_cursor = selection_in_composition.is_some();
         self.update_layout();
 
-        // Select the location indicated by the IME. If `cursor` is none, collapse the selection to
-        // a caret at the start of the preedit text. As `self.editor.show_cursor` is `false`, it
-        // won't show up.
-        let cursor = cursor.unwrap_or((0, 0));
+        let selection = selection_in_composition.unwrap_or(0..0);
         self.editor.set_selection(Selection::new(
-            self.editor.cursor_at(start + cursor.0),
-            self.editor.cursor_at(start + cursor.1),
+            self.editor.cursor_at(start + selection.start),
+            self.editor.cursor_at(start + selection.end),
         ));
+        true
     }
 
-    /// Set the preedit range to a range of byte indices.
-    /// This leaves the selection and cursor unchanged.
+    /// Delete the requested number of UTF-8 bytes surrounding the current
+    /// document selection.
     ///
-    /// No-op if either index is not a char boundary.
-    pub fn set_compose_byte_range(&mut self, start: usize, end: usize) {
-        if self.editor.buffer.is_char_boundary(start) && self.editor.buffer.is_char_boundary(end) {
-            self.editor.compose = Some(start..end);
-            self.update_layout();
+    /// The counts are measured in the space returned by [`PlainEditor::text`].
+    /// If the current selection is non-collapsed, it is included in the deleted
+    /// range.
+    ///
+    /// Returns `false` and leaves the editor unchanged if the current selection
+    /// cannot be represented in that document space.
+    pub fn delete_surrounding(&mut self, before: usize, after: usize) -> bool {
+        if before == 0 && after == 0 {
+            return true;
         }
+        let Some(selection) = self.editor.document_selection_range() else {
+            return false;
+        };
+        let start = selection.start.saturating_sub(before);
+        let end = selection
+            .end
+            .saturating_add(after)
+            .min(self.editor.visible_text_len());
+        let Some(range) = self.editor.document_range_to_raw_range(start..end) else {
+            return false;
+        };
+        self.editor.buffer.replace_range(range.clone(), "");
+        self.editor.update_compose_for_replaced_range(range, 0);
+        self.editor.show_cursor = true;
+        self.update_layout();
+        let Some(caret) = self.editor.document_byte_to_raw_byte(start) else {
+            return false;
+        };
+        self.editor.set_selection(
+            Cursor::from_byte_index(&self.editor.layout, caret, Affinity::Downstream).into(),
+        );
+        true
     }
 
-    /// Stop IME composing.
+    /// Clear the active composition, if any.
     ///
-    /// This removes the IME preedit text, shows the cursor if it was hidden,
-    /// and moves the cursor to the start of the former preedit region.
-    pub fn clear_compose(&mut self) {
-        if let Some(preedit_range) = self.editor.compose.take() {
-            self.editor.buffer.replace_range(preedit_range.clone(), "");
-            self.editor.show_cursor = true;
-            self.update_layout();
-
-            self.editor
-                .set_selection(self.editor.cursor_at(preedit_range.start).into());
+    /// Hidden preedit text is removed from the buffer. Visible composing
+    /// regions over committed document text are preserved and simply lose the
+    /// composing mark.
+    ///
+    /// Returns `true` if a composition was active.
+    pub fn clear_composition(&mut self) -> bool {
+        let Some(compose) = self.editor.compose.take() else {
+            return false;
+        };
+        self.editor.show_cursor = true;
+        match compose.kind {
+            CompositionKind::HiddenPreedit => {
+                self.editor.buffer.replace_range(compose.range.clone(), "");
+                self.update_layout();
+                self.editor
+                    .set_selection(self.editor.cursor_at(compose.range.start).into());
+            }
+            CompositionKind::VisibleRegion => {
+                self.update_layout();
+            }
         }
+        true
     }
 
-    /// Commit the IME preedit text, if any.
+    /// Commit the active composition, if any, leaving the composed text in the
+    /// buffer and making it part of [`PlainEditor::text`].
     ///
-    /// This doesn't change the selection, but shows the cursor if
-    /// it was hidden.
-    pub fn finish_compose(&mut self) {
+    /// Returns `true` if a composition was active.
+    pub fn commit_composition(&mut self) -> bool {
         if self.editor.compose.take().is_some() {
             self.editor.show_cursor = true;
             self.update_layout();
+            true
+        } else {
+            false
         }
     }
 
@@ -832,22 +1030,34 @@ where
 
     /// Borrow the current selection. The indices returned by functions
     /// such as [`Selection::text_range`] refer to the raw text buffer,
-    /// including the IME preedit region, which can be accessed via
+    /// including any active hidden composition text, which can be accessed via
     /// [`PlainEditor::raw_text`].
     pub fn raw_selection(&self) -> &Selection {
         &self.selection
     }
 
-    /// Borrow the current IME preedit range, if any. These indices refer
-    /// to the raw text buffer, which can be accessed via [`PlainEditor::raw_text`].
-    pub fn raw_compose(&self) -> &Option<Range<usize>> {
-        &self.compose
+    /// Borrow the current active composition, if any.
+    ///
+    /// The composing text is exposed here together with its UTF-8 byte offset
+    /// in [`PlainEditor::text`], regardless of whether the composition is
+    /// transient hidden preedit text or a visible composing region over
+    /// existing document text.
+    pub fn composition(&self) -> Option<Composition<'_>> {
+        let compose = self.compose.as_ref()?;
+        Some(Composition {
+            text: &self.buffer[compose.range.clone()],
+            document_offset: self.raw_byte_to_document_byte(compose.range.start)?,
+        })
     }
 
     /// If the current selection is not collapsed, returns the text content of
     /// that selection.
+    ///
+    /// Returns `None` while hidden preedit composition text is active, as the
+    /// raw selection indices cannot be exposed as a stable contiguous document
+    /// slice in that state.
     pub fn selected_text(&self) -> Option<&str> {
-        if self.is_composing() {
+        if self.hidden_composition_range().is_some() {
             return None;
         }
         if !self.selection.is_collapsed() {
@@ -884,14 +1094,15 @@ where
 
     /// Get a rectangle bounding the text the user is currently editing.
     ///
-    /// This is useful for suggesting an exclusion area to the platform for, e.g., IME candidate
-    /// box placement. This bounds the area of the preedit text if present, otherwise it bounds the
-    /// selection on the focused line.
-    pub fn ime_cursor_area(&self) -> BoundingBox {
-        let (area, focus) = if let Some(preedit_range) = &self.compose {
+    /// This is useful for suggesting an exclusion area to the platform text
+    /// input system for candidate box placement. This bounds the area of the
+    /// active composition if present, otherwise it bounds the selection on the
+    /// focused line.
+    pub fn text_input_area(&self) -> BoundingBox {
+        let (area, focus) = if let Some(compose) = &self.compose {
             let selection = Selection::new(
-                self.cursor_at(preedit_range.start),
-                self.cursor_at(preedit_range.end),
+                self.cursor_at(compose.range.start),
+                self.cursor_at(compose.range.end),
             );
 
             // Bound the entire preedit text.
@@ -939,10 +1150,11 @@ where
 
     /// Borrow the text content of the buffer.
     ///
-    /// The return value is a `SplitString` because it
-    /// excludes the IME preedit region.
+    /// The return value is a `SplitString` because transient IME preedit text
+    /// is excluded. Visible composing regions over existing document text
+    /// remain part of the returned text.
     pub fn text(&self) -> SplitString<'_> {
-        if let Some(preedit_range) = &self.compose {
+        if let Some(preedit_range) = self.hidden_composition_range() {
             SplitString([
                 &self.buffer[..preedit_range.start],
                 &self.buffer[preedit_range.end..],
@@ -955,9 +1167,9 @@ where
     /// Borrow the text content of the buffer, including the IME preedit
     /// region if any.
     ///
-    /// Application authors should generally prefer [`text`](Self::text). That method excludes the
-    /// IME preedit contents, which are not meaningful for applications to access; the
-    /// in-progress IME content is not itself what the user intends to write.
+    /// Application authors should generally prefer [`text`](Self::text). That
+    /// method excludes transient IME preedit contents, which are not
+    /// meaningful for applications to access as committed document text.
     pub fn raw_text(&self) -> &str {
         &self.buffer
     }
@@ -1130,33 +1342,97 @@ where
         }
     }
 
-    fn update_compose_for_replaced_range(&mut self, old_range: Range<usize>, new_len: usize) {
-        if new_len == old_range.len() {
-            return;
+    fn visible_text_len(&self) -> usize {
+        self.buffer.len() - self.hidden_composition_range().map_or(0, Range::len)
+    }
+
+    fn document_byte_to_raw_byte(&self, index: usize) -> Option<usize> {
+        if let Some(compose) = self.hidden_composition_range() {
+            if index < compose.start {
+                self.buffer.is_char_boundary(index).then_some(index)
+            } else {
+                let suffix_index = index - compose.start;
+                let suffix = &self.buffer[compose.end..];
+                (suffix_index <= suffix.len() && suffix.is_char_boundary(suffix_index))
+                    .then_some(compose.end + suffix_index)
+            }
+        } else {
+            (index <= self.buffer.len() && self.buffer.is_char_boundary(index)).then_some(index)
         }
+    }
+
+    fn document_range_end_to_raw_byte(&self, index: usize) -> Option<usize> {
+        if let Some(compose) = self.hidden_composition_range() {
+            if index <= compose.start {
+                self.buffer.is_char_boundary(index).then_some(index)
+            } else {
+                let suffix_index = index - compose.start;
+                let suffix = &self.buffer[compose.end..];
+                (suffix_index <= suffix.len() && suffix.is_char_boundary(suffix_index))
+                    .then_some(compose.end + suffix_index)
+            }
+        } else {
+            (index <= self.buffer.len() && self.buffer.is_char_boundary(index)).then_some(index)
+        }
+    }
+
+    fn raw_byte_to_document_byte(&self, index: usize) -> Option<usize> {
+        if !(index <= self.buffer.len() && self.buffer.is_char_boundary(index)) {
+            return None;
+        }
+        if let Some(compose) = self.hidden_composition_range() {
+            if index <= compose.start {
+                Some(index)
+            } else if index >= compose.end {
+                Some(index - compose.len())
+            } else {
+                Some(compose.start)
+            }
+        } else {
+            Some(index)
+        }
+    }
+
+    fn document_range_to_raw_range(&self, range: Range<usize>) -> Option<Range<usize>> {
+        if range.start > range.end || range.end > self.visible_text_len() {
+            return None;
+        }
+        if range.start == range.end {
+            let raw = self.document_byte_to_raw_byte(range.start)?;
+            Some(raw..raw)
+        } else {
+            Some(
+                self.document_byte_to_raw_byte(range.start)?
+                    ..self.document_range_end_to_raw_byte(range.end)?,
+            )
+        }
+    }
+
+    fn document_selection_range(&self) -> Option<Range<usize>> {
+        let range = self.selection.text_range();
+        Some(
+            self.raw_byte_to_document_byte(range.start)?
+                ..self.raw_byte_to_document_byte(range.end)?,
+        )
+    }
+
+    fn update_compose_for_replaced_range(&mut self, old_range: Range<usize>, new_len: usize) {
         let Some(compose) = &mut self.compose else {
             return;
         };
-        if compose.end <= old_range.start {
-            return;
+        let new_start = transformed_range_start(compose.range.start, &old_range, new_len);
+        let new_end = transformed_range_end(compose.range.end, &old_range, new_len);
+        compose.range = new_start..new_end;
+        if compose.kind == CompositionKind::HiddenPreedit && compose.range.is_empty() {
+            self.compose = None;
         }
-        if compose.start >= old_range.end {
-            if new_len > old_range.len() {
-                let diff = new_len - old_range.len();
-                *compose = compose.start + diff..compose.end + diff;
-            } else {
-                let diff = old_range.len() - new_len;
-                *compose = compose.start - diff..compose.end - diff;
-            }
-            return;
-        }
-        if new_len < old_range.len() {
-            if compose.start >= (old_range.start + new_len) {
-                self.compose = None;
-                return;
-            }
-            compose.end = compose.end.min(old_range.start + new_len);
-        }
+    }
+
+    fn hidden_composition_range(&self) -> Option<&Range<usize>> {
+        self.compose
+            .as_ref()
+            .filter(|compose| compose.kind == CompositionKind::HiddenPreedit)
+            .map(|compose| &compose.range)
     }
 
     fn replace_selection(
@@ -1165,13 +1441,18 @@ where
         layout_cx: &mut LayoutContext<T>,
         s: &str,
     ) {
-        let range = self.selection.text_range();
+        self.replace_range_with_selection(font_cx, layout_cx, self.selection.text_range(), s);
+    }
+
+    fn replace_range_with_selection(
+        &mut self,
+        font_cx: &mut FontContext,
+        layout_cx: &mut LayoutContext<T>,
+        range: Range<usize>,
+        s: &str,
+    ) {
         let start = range.start;
-        if self.selection.is_collapsed() {
-            self.buffer.insert_str(start, s);
-        } else {
-            self.buffer.replace_range(range.clone(), s);
-        }
+        self.buffer.replace_range(range.clone(), s);
         self.update_compose_for_replaced_range(range, s.len());
 
         self.update_layout(font_cx, layout_cx);
@@ -1232,8 +1513,20 @@ where
         for prop in self.default_style.inner().values() {
             builder.push_default(prop.to_owned());
         }
-        if let Some(preedit_range) = &self.compose {
-            builder.push(StyleProperty::Underline(true), preedit_range.clone());
+        if let Some(compose) = &self.compose {
+            if compose.range.is_empty() {
+                // A collapsed composition still affects editor state, but there
+                // is no visible composing span to underline in the layout.
+                self.layout = builder.build(&self.buffer);
+                self.layout.break_all_lines(self.width);
+                self.layout
+                    .align(self.width, self.alignment, AlignmentOptions::default());
+                self.selection = self.selection.refresh(&self.layout);
+                self.layout_dirty = false;
+                self.generation.nudge();
+                return;
+            }
+            builder.push(StyleProperty::Underline(true), compose.range.clone());
         }
         self.layout = builder.build(&self.buffer);
         self.layout.break_all_lines(self.width);
@@ -1282,5 +1575,33 @@ where
             node.clear_text_selection();
         }
         node.add_action(accesskit::Action::SetTextSelection);
+    }
+}
+
+fn validate_text_range(text: &str, range: Range<usize>) -> Option<Range<usize>> {
+    (range.start <= range.end && text.get(range.clone()).is_some()).then_some(range)
+}
+
+fn transformed_range_start(index: usize, replaced: &Range<usize>, inserted_len: usize) -> usize {
+    if index < replaced.start {
+        index
+    } else if index < replaced.end {
+        replaced.start
+    } else if inserted_len >= replaced.len() {
+        index + inserted_len - replaced.len()
+    } else {
+        index - (replaced.len() - inserted_len)
+    }
+}
+
+fn transformed_range_end(index: usize, replaced: &Range<usize>, inserted_len: usize) -> usize {
+    if index <= replaced.start {
+        index
+    } else if index <= replaced.end {
+        replaced.start + inserted_len
+    } else if inserted_len >= replaced.len() {
+        index + inserted_len - replaced.len()
+    } else {
+        index - (replaced.len() - inserted_len)
     }
 }

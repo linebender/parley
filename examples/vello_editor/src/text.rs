@@ -8,14 +8,16 @@ use web_time::Instant;
 
 use accesskit::{Node, TextDecoration, TextDecorationStyle, TreeUpdate};
 use core::default::Default;
-use parley::editing::SplitString;
+use parley::editing::{SplitString, TextIndexEncoding};
 use parley::layout::{PositionedLayoutItem, Style};
 use parley::{GenericFamily, StyleProperty};
+use std::ops::Range;
 use std::time::Duration;
 use ui_events::pointer::PointerButton;
 use ui_events::{
     keyboard::{Key, KeyboardEvent, NamedKey},
     pointer::{PointerButtonEvent, PointerEvent, PointerInfo, PointerState, PointerType},
+    text::{TextInputAction, TextInputEvent, TextRange, TextRangeEncoding, TextTargetRange},
 };
 use vello::{
     Scene,
@@ -23,7 +25,7 @@ use vello::{
     peniko::color::{AlphaColor, Srgb, palette},
     peniko::{Brush, Fill},
 };
-use winit::event::{Ime, WindowEvent};
+use winit::event::WindowEvent;
 
 pub use parley::editing::Generation;
 use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorDriver};
@@ -334,26 +336,72 @@ impl Editor {
         }
     }
 
-    pub fn handle_event(&mut self, event: WindowEvent) {
+    /// Handle normalized text input events surfaced by `ui-events-winit`.
+    ///
+    /// On the current `winit` backend this example mostly exercises the
+    /// preedit/commit IME path. Richer platform-originated text events such as
+    /// selection updates, composing-region updates, or non-UTF-8 surrounding
+    /// deletes are still handled here for parity with Parley's host-facing API,
+    /// but they are not expected to originate from `winit` today.
+    pub fn handle_text_input_event(&mut self, event: &TextInputEvent) {
+        self.cursor_reset();
         match event {
-            WindowEvent::Resized(size) => {
-                self.editor
-                    .set_width(Some(size.width as f32 - 2_f32 * INSET));
+            TextInputEvent::Insert(insert) => {
+                let replacement = self.document_range_to_byte_range(insert.replacement_range);
+                let mut drv = self.driver();
+                let applied = drv.insert_or_replace(&insert.text, replacement, None);
+                debug_assert!(applied, "invalid insert range from text input event");
             }
-            WindowEvent::Ime(Ime::Disabled) => {
-                self.driver().clear_compose();
-            }
-            WindowEvent::Ime(Ime::Commit(text)) => {
-                self.driver().insert_or_replace_selection(&text);
-            }
-            WindowEvent::Ime(Ime::Preedit(text, cursor)) => {
-                if text.is_empty() {
-                    self.driver().clear_compose();
-                } else {
-                    self.driver().set_compose(&text, cursor);
+            TextInputEvent::DeleteBackward => self.driver().backdelete(),
+            TextInputEvent::DeleteForward => self.driver().delete(),
+            TextInputEvent::DeleteSurrounding(delete)
+                if delete.encoding == TextRangeEncoding::Utf8Bytes =>
+            {
+                let before = usize::try_from(delete.before_length).ok();
+                let after = usize::try_from(delete.after_length).ok();
+                if let (Some(before), Some(after)) = (before, after) {
+                    let applied = self.driver().delete_surrounding(before, after);
+                    debug_assert!(
+                        applied,
+                        "invalid surrounding delete range from text input event",
+                    );
                 }
             }
-            _ => {}
+            TextInputEvent::SetSelection(range) => {
+                if let Some(range) = self.document_range_to_byte_range(Some(*range)) {
+                    let applied = self.driver().set_document_selection(range);
+                    debug_assert!(applied, "invalid document selection from text input event");
+                }
+            }
+            TextInputEvent::SetComposingRegion(range) => {
+                if let Some(range) = self.document_range_to_byte_range(Some(*range)) {
+                    let applied = self.driver().set_composing_region(range);
+                    debug_assert!(applied, "invalid composing region from text input event");
+                }
+            }
+            TextInputEvent::CompositionUpdate(state) => {
+                let replacement = self.document_range_to_byte_range(state.replacement_range);
+                let mut drv = self.driver();
+                let applied = drv.update_composition(
+                    &state.text,
+                    replacement,
+                    Self::text_range_to_byte_range(state.selection),
+                );
+                debug_assert!(applied, "invalid composition update from text input event");
+            }
+            TextInputEvent::CompositionEnd => {
+                let _ = self.driver().clear_composition();
+            }
+            TextInputEvent::Action(TextInputAction::Newline) => self.driver().insert_newline(),
+            TextInputEvent::Action(_) => {}
+            TextInputEvent::DeleteSurrounding(_) => {}
+        }
+    }
+
+    pub fn handle_event(&mut self, event: WindowEvent) {
+        if let WindowEvent::Resized(size) = event {
+            self.editor
+                .set_width(Some(size.width as f32 - 2_f32 * INSET));
         }
     }
 
@@ -368,6 +416,28 @@ impl Editor {
     /// Return the current `Generation` of the layout.
     pub fn generation(&self) -> Generation {
         self.editor.generation()
+    }
+
+    fn document_range_to_byte_range(&self, range: Option<TextTargetRange>) -> Option<Range<usize>> {
+        range.and_then(|range| {
+            self.text().to_utf8_range(
+                range.range.start,
+                range.range.end,
+                match range.encoding {
+                    TextRangeEncoding::Utf8Bytes => TextIndexEncoding::Utf8Bytes,
+                    TextRangeEncoding::Utf16CodeUnits => TextIndexEncoding::Utf16CodeUnits,
+                    TextRangeEncoding::UnicodeCodePoints => TextIndexEncoding::UnicodeCodePoints,
+                },
+            )
+        })
+    }
+
+    fn text_range_to_byte_range(range: Option<TextRange>) -> Option<Range<usize>> {
+        range.and_then(|range| {
+            let start = usize::try_from(range.start).ok()?;
+            let end = usize::try_from(range.end).ok()?;
+            Some(start..end)
+        })
     }
 
     /// Draw into scene.

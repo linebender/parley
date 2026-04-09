@@ -11,8 +11,10 @@ publish = false
 vello = "0.8.0"
 anyhow = "1.0.102"
 pollster = "0.4.0"
-ui-events-winit = "0.3"
-ui-events = "0.3"
+ui-events = { git = "https://github.com/endoli/ui-events.git", rev = "5e840f0e39b412573aaec8debadd4be81c17d823", package = "ui-events", default-features = false, features = [
+    "kurbo",
+] }
+ui-events-winit = { git = "https://github.com/endoli/ui-events.git", rev = "5e840f0e39b412573aaec8debadd4be81c17d823", package = "ui-events-winit", default-features = false }
 winit = "0.30.13"
 parley = { workspace = true, default-features = true, features = ["accesskit"] }
 peniko = { workspace = true }
