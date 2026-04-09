@@ -64,6 +64,7 @@ struct PrevBoundaryState {
 }
 
 /// Reason that the line breaker has yielded control flow
+#[derive(Clone, Debug)]
 pub enum YieldData {
     /// Control flow was yielded because a line break was encountered
     LineBreak(LineBreakData),
@@ -74,6 +75,7 @@ pub enum YieldData {
     InlineBoxBreak(BoxBreakData),
 }
 
+#[derive(Clone, Debug)]
 pub struct LineBreakData {
     pub reason: BreakReason,
     pub advance: f32,
@@ -82,11 +84,13 @@ pub struct LineBreakData {
     pub line_y_end: f64,
 }
 
+#[derive(Clone, Debug)]
 pub struct MaxHeightBreakData {
     pub advance: f32,
     pub line_height: f32,
 }
 
+#[derive(Clone, Debug)]
 pub struct BoxBreakData {
     /// The user-supplied ID for the inline box
     pub inline_box_id: u64,
