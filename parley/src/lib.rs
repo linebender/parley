@@ -26,8 +26,8 @@
 //!
 //! ```rust
 //! use parley::{
-//!    Alignment, AlignmentOptions, FontContext, FontWeight, InlineBox, Layout, LayoutContext,
-//!    LineHeight, PositionedLayoutItem, StyleProperty,
+//!    Alignment, AlignmentOptions, FontContext, FontWeight, InlineBox, InlineBoxKind, Layout,
+//!    LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty,
 //! };
 //!
 //! // Create a FontContext (font database) and LayoutContext (scratch space).
@@ -47,7 +47,7 @@
 //! builder.push(StyleProperty::FontWeight(FontWeight::new(600.0)), 0..4);
 //!
 //! // Add a box to be laid out inline with the text
-//! builder.push_inline_box(InlineBox { id: 0, index: 5, width: 50.0, height: 50.0 });
+//! builder.push_inline_box(InlineBox { id: 0, kind: InlineBoxKind::InFlow, index: 5, width: 50.0, height: 50.0 });
 //!
 //! // Build the builder into a Layout
 //! let mut layout: Layout<()> = builder.build(&TEXT);
@@ -55,7 +55,7 @@
 //! // Run line-breaking and alignment on the Layout
 //! const MAX_WIDTH : Option<f32> = Some(100.0);
 //! layout.break_all_lines(MAX_WIDTH);
-//! layout.align(MAX_WIDTH, Alignment::Start, AlignmentOptions::default());
+//! layout.align(Alignment::Start, AlignmentOptions::default());
 //!
 //! // Inspect computed layout (see examples for more details)
 //! let width = layout.width();
@@ -108,22 +108,13 @@ extern crate std;
 
 pub use fontique;
 
-mod analysis;
-mod bidi;
 mod builder;
 mod context;
-mod convert;
-mod font;
-mod inline_box;
-mod lru_cache;
 mod resolve;
-mod shape;
 mod util;
 
 pub mod editing;
 pub mod layout;
-pub mod setting;
-pub mod style;
 
 #[cfg(test)]
 mod tests;
@@ -131,16 +122,15 @@ mod tests;
 pub use linebender_resource_handle::FontData;
 pub use util::BoundingBox;
 
-pub use builder::{RangedBuilder, StyleRunBuilder, TreeBuilder};
+pub use builder::{RangedBuilder, TreeBuilder};
 pub use context::LayoutContext;
-pub use font::FontContext;
-pub use inline_box::InlineBox;
+pub use fontique::FontContext;
 #[doc(inline)]
 pub use layout::Layout;
 
 pub use editing::*;
 pub use layout::*;
-pub use style::*;
+pub use parley_core::*;
 
 #[deprecated(
     note = "Old name for this type, use `parley::FontData` instead.",

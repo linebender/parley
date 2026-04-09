@@ -4,8 +4,10 @@
 //! Range based style application.
 
 use alloc::vec;
+use alloc::vec::Vec;
+use parley_core::StyleRun;
 
-use super::{Brush, RangedProperty, RangedStyle, ResolvedProperty, ResolvedStyle, StyleRun, Vec};
+use super::{Brush, RangedProperty, RangedStyle, ResolvedProperty, ResolvedStyle};
 use core::ops::{Bound, Range, RangeBounds};
 
 /// Builder for constructing an ordered sequence of non-overlapping ranged

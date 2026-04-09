@@ -3,11 +3,12 @@
 
 use crate::FontData;
 use crate::layout::cluster::{Cluster, ClusterPath};
-use crate::layout::data::{LineItemData, RunData};
+use crate::layout::data::LineItemData;
 use crate::layout::layout::Layout;
 use crate::style::Brush;
 use core::ops::Range;
 use fontique::Synthesis;
+use parley_core::{RunData, RunMetrics};
 
 /// Sequence of clusters with a single font and style.
 #[derive(Copy, Clone)]
@@ -217,29 +218,4 @@ impl<'a, B: Brush> Iterator for Clusters<'a, B> {
             data: self.run.layout.data.clusters.get(index)?,
         })
     }
-}
-
-/// Metrics information for a run.
-#[derive(Copy, Clone, Default, Debug, PartialEq)]
-pub struct RunMetrics {
-    /// Typographic ascent.
-    pub ascent: f32,
-    /// Typographic descent.
-    pub descent: f32,
-    /// Typographic leading.
-    pub leading: f32,
-    /// Offset of the top of underline decoration from the baseline.
-    pub underline_offset: f32,
-    /// Thickness of the underline decoration.
-    pub underline_size: f32,
-    /// Offset of the top of strikethrough decoration from the baseline.
-    pub strikethrough_offset: f32,
-    /// Thickness of the strikethrough decoration.
-    pub strikethrough_size: f32,
-    /// The line height
-    pub line_height: f32,
-    /// Distance from the baseline to the top of short lowercase letters.
-    pub x_height: Option<f32>,
-    /// Distance from the baseline to the top of capital letters.
-    pub cap_height: Option<f32>,
 }

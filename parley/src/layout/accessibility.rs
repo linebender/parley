@@ -13,8 +13,9 @@ use skrifa::{
     raw::{TableProvider, types::NameId},
 };
 
+use super::{Alignment, ClusterPath, Layout, LineMetrics, Run, Style};
+use crate::FontStyle;
 use crate::style::Brush;
-use crate::{Alignment, ClusterPath, FontStyle, Layout, LineMetrics, Run, Style};
 
 fn link_spans(prev_id: NodeId, prev: &mut Node, next_id: NodeId, next: &mut Node) {
     prev.set_next_on_line(next_id);
@@ -37,9 +38,9 @@ fn finish_span(
 ) {
     node.set_bounds(accesskit::Rect {
         x0: x_offset + (run_offset + span_offset) as f64,
-        y0: y_offset + metrics.min_coord as f64,
+        y0: y_offset + metrics.block_min_coord as f64,
         x1: x_offset + (run_offset + span_offset + span_advance) as f64,
-        y1: y_offset + metrics.max_coord as f64,
+        y1: y_offset + metrics.block_max_coord as f64,
     });
     node.set_value(span_text);
     node.set_character_lengths(character_lengths);
