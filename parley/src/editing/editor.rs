@@ -39,7 +39,7 @@ impl Generation {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy)]
 struct LineVerticalSnapshot {
     baseline: f32,
     min_coord: f32,
@@ -1193,8 +1193,6 @@ where
         saved: LineVerticalSnapshot,
     ) -> bool {
         (current.baseline - saved.baseline).abs() > 0.01
-            || (current.min_coord - saved.min_coord).abs() > 0.01
-            || (current.max_coord - saved.max_coord).abs() > 0.01
             || (current.line_height - saved.line_height).abs() > 0.01
     }
 
@@ -1306,10 +1304,10 @@ where
     }
     /// Update the layout.
     fn update_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
-        // Save all current line snapshots before rebuilding. This enables baseline
-        // stabilization: when font fallback changes line metrics (e.g., typing English
-        // after Chinese on the same line), we restore the previous line's vertical
-        // metrics to prevent visual jitter.
+        // Save snapshots of current line vertical metrics before rebuilding.
+        // Used for baseline stabilization: when font fallback changes line
+        // metrics mid-composition, we restore previous metrics to prevent
+        // visual jitter.
         let saved_snapshots: Vec<LineVerticalSnapshot> = (0..self.layout.data.lines.len())
             .map(|i| self.line_vertical_snapshot(i))
             .collect();
@@ -1327,28 +1325,29 @@ where
         self.layout
             .align(self.width, self.alignment, AlignmentOptions::default());
 
-        // Apply stabilization: match lines by index. For each line where the new
-        // layout produces different vertical metrics, restore the saved snapshot
-        // and accumulate the line-height delta to shift subsequent lines.
-        let mut cumulative_y_delta = 0.0_f32;
-        for line_idx in 0..self.layout.data.lines.len() {
-            self.shift_line_vertically(line_idx, cumulative_y_delta);
+        // Restore previous line positions where only font metrics changed.
+        if !saved_snapshots.is_empty() {
+            let mut cumulative_y_delta = 0.0_f32;
+            for line_idx in 0..self.layout.data.lines.len() {
+                self.shift_line_vertically(line_idx, cumulative_y_delta);
 
-            if let Some(&saved) = saved_snapshots.get(line_idx) {
-                let current = self.line_vertical_snapshot(line_idx);
-                if Self::needs_vertical_stabilization(current, saved) {
-                    let current_line_height = self.layout.data.lines[line_idx].metrics.line_height;
-                    self.apply_vertical_snapshot(line_idx, saved);
-                    let height_delta = saved.line_height - current_line_height;
-                    if height_delta.abs() > 0.01 {
-                        cumulative_y_delta += height_delta;
+                if let Some(&saved) = saved_snapshots.get(line_idx) {
+                    let current = self.line_vertical_snapshot(line_idx);
+                    if Self::needs_vertical_stabilization(current, saved) {
+                        let current_line_height =
+                            self.layout.data.lines[line_idx].metrics.line_height;
+                        self.apply_vertical_snapshot(line_idx, saved);
+                        let height_delta = saved.line_height - current_line_height;
+                        if height_delta.abs() > 0.01 {
+                            cumulative_y_delta += height_delta;
+                        }
                     }
                 }
             }
-        }
 
-        if cumulative_y_delta.abs() > 0.01 {
-            self.layout.data.height += cumulative_y_delta;
+            if cumulative_y_delta.abs() > 0.01 {
+                self.layout.data.height += cumulative_y_delta;
+            }
         }
 
         self.selection = self.selection.refresh(&self.layout);
