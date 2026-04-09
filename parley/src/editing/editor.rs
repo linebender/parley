@@ -29,7 +29,7 @@ use accesskit::{Node, NodeId, TreeUpdate};
 // so wrapping is fine. This could only fail if exactly
 // `u32::MAX` generations happen between drawing
 // operations. This is implausible and so can be ignored.
-#[derive(PartialEq, Eq, Default, Clone, Copy, Debug)]
+#[derive(PartialEq, Eq, Default, Clone, Copy)]
 pub struct Generation(u32);
 
 impl Generation {
@@ -1330,7 +1330,7 @@ where
         // Apply stabilization: match lines by index. For each line where the new
         // layout produces different vertical metrics, restore the saved snapshot
         // and accumulate the line-height delta to shift subsequent lines.
-        let mut cumulative_y_delta = 0.0f32;
+        let mut cumulative_y_delta = 0.0_f32;
         for line_idx in 0..self.layout.data.lines.len() {
             self.shift_line_vertically(line_idx, cumulative_y_delta);
 
