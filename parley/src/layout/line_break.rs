@@ -291,7 +291,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         self.state.lines = self.lines.lines.len();
         self.state.line.x = 0.;
         self.state.line.running_line_height = 0.;
-        self.state.prev_boundary = None; // Added by Nico
+        self.state.prev_boundary = None;
         self.state.emergency_boundary = None;
 
         self.finish_line(self.lines.lines.len() - 1, line_height);
