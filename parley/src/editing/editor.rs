@@ -29,7 +29,7 @@ use accesskit::{Node, NodeId, TreeUpdate};
 // so wrapping is fine. This could only fail if exactly
 // `u32::MAX` generations happen between drawing
 // operations. This is implausible and so can be ignored.
-#[derive(PartialEq, Eq, Default, Clone, Copy)]
+#[derive(PartialEq, Eq, Default, Clone, Copy, Debug)]
 pub struct Generation(u32);
 
 impl Generation {
@@ -37,6 +37,14 @@ impl Generation {
     pub(crate) fn nudge(&mut self) {
         self.0 = self.0.wrapping_add(1);
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct LineVerticalSnapshot {
+    baseline: f32,
+    min_coord: f32,
+    max_coord: f32,
+    line_height: f32,
 }
 
 /// A string which is potentially discontiguous in memory.
@@ -425,6 +433,37 @@ where
         if self.editor.compose.take().is_some() {
             self.editor.show_cursor = true;
             self.update_layout();
+        }
+    }
+
+    /// Handle an IME commit while potentially still composing.
+    ///
+    /// On some platforms (e.g. Windows), `Ime::Commit` arrives while the preedit
+    /// is still in the buffer (before `Ime::Preedit("")` clears it). This method
+    /// atomically replaces the preedit text with the committed text, avoiding
+    /// an intermediate "doubled text" state that causes visual jitter.
+    ///
+    /// If not currently composing, falls back to [`insert_or_replace_selection`](Self::insert_or_replace_selection).
+    pub fn commit_compose(&mut self, text: &str) {
+        if let Some(preedit_range) = self.editor.compose.take() {
+            // Atomically replace preedit with committed text
+            self.editor
+                .buffer
+                .replace_range(preedit_range.clone(), text);
+            self.editor.show_cursor = true;
+            self.update_layout();
+
+            let new_index = preedit_range.start + text.len();
+            let affinity = if text.ends_with(['\n', '\r', '\u{2028}', '\u{2029}']) {
+                Affinity::Downstream
+            } else {
+                Affinity::Upstream
+            };
+            self.editor.set_selection(
+                Cursor::from_byte_index(&self.editor.layout, new_index, affinity).into(),
+            );
+        } else {
+            self.insert_or_replace_selection(text);
         }
     }
 
@@ -976,6 +1015,7 @@ where
         self.buffer.push_str(is);
         self.layout_dirty = true;
         self.compose = None;
+        self.layout = Layout::default();
     }
 
     /// Set the width of the layout.
@@ -1119,6 +1159,45 @@ where
     }
 
     // --- MARK: Internal Helpers ---
+    fn line_vertical_snapshot(&self, line_idx: usize) -> LineVerticalSnapshot {
+        let metrics = &self.layout.data.lines[line_idx].metrics;
+        LineVerticalSnapshot {
+            baseline: metrics.baseline,
+            min_coord: metrics.min_coord,
+            max_coord: metrics.max_coord,
+            line_height: metrics.line_height,
+        }
+    }
+
+    fn shift_line_vertically(&mut self, line_idx: usize, delta: f32) {
+        if delta.abs() <= 0.01 {
+            return;
+        }
+        let line = &mut self.layout.data.lines[line_idx];
+        line.metrics.baseline += delta;
+        line.metrics.min_coord += delta;
+        line.metrics.max_coord += delta;
+    }
+
+    fn apply_vertical_snapshot(&mut self, line_idx: usize, saved: LineVerticalSnapshot) {
+        let line = &mut self.layout.data.lines[line_idx];
+        line.metrics.baseline = saved.baseline;
+        line.metrics.min_coord = saved.min_coord;
+        line.metrics.max_coord = saved.max_coord;
+        line.metrics.line_height = saved.line_height;
+        line.metrics.leading = saved.line_height - (line.metrics.ascent + line.metrics.descent);
+    }
+
+    fn needs_vertical_stabilization(
+        current: LineVerticalSnapshot,
+        saved: LineVerticalSnapshot,
+    ) -> bool {
+        (current.baseline - saved.baseline).abs() > 0.01
+            || (current.min_coord - saved.min_coord).abs() > 0.01
+            || (current.max_coord - saved.max_coord).abs() > 0.01
+            || (current.line_height - saved.line_height).abs() > 0.01
+    }
+
     /// Make a cursor at a given byte index.
     fn cursor_at(&self, index: usize) -> Cursor {
         // TODO: Do we need to be non-dirty?
@@ -1227,6 +1306,14 @@ where
     }
     /// Update the layout.
     fn update_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
+        // Save all current line snapshots before rebuilding. This enables baseline
+        // stabilization: when font fallback changes line metrics (e.g., typing English
+        // after Chinese on the same line), we restore the previous line's vertical
+        // metrics to prevent visual jitter.
+        let saved_snapshots: Vec<LineVerticalSnapshot> = (0..self.layout.data.lines.len())
+            .map(|i| self.line_vertical_snapshot(i))
+            .collect();
+
         let mut builder =
             layout_cx.ranged_builder(font_cx, &self.buffer, self.scale, self.quantize);
         for prop in self.default_style.inner().values() {
@@ -1239,6 +1326,31 @@ where
         self.layout.break_all_lines(self.width);
         self.layout
             .align(self.width, self.alignment, AlignmentOptions::default());
+
+        // Apply stabilization: match lines by index. For each line where the new
+        // layout produces different vertical metrics, restore the saved snapshot
+        // and accumulate the line-height delta to shift subsequent lines.
+        let mut cumulative_y_delta = 0.0f32;
+        for line_idx in 0..self.layout.data.lines.len() {
+            self.shift_line_vertically(line_idx, cumulative_y_delta);
+
+            if let Some(&saved) = saved_snapshots.get(line_idx) {
+                let current = self.line_vertical_snapshot(line_idx);
+                if Self::needs_vertical_stabilization(current, saved) {
+                    let current_line_height = self.layout.data.lines[line_idx].metrics.line_height;
+                    self.apply_vertical_snapshot(line_idx, saved);
+                    let height_delta = saved.line_height - current_line_height;
+                    if height_delta.abs() > 0.01 {
+                        cumulative_y_delta += height_delta;
+                    }
+                }
+            }
+        }
+
+        if cumulative_y_delta.abs() > 0.01 {
+            self.layout.data.height += cumulative_y_delta;
+        }
+
         self.selection = self.selection.refresh(&self.layout);
         self.layout_dirty = false;
         self.generation.nudge();
