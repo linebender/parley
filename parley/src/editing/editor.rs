@@ -22,6 +22,10 @@ use crate::layout::LayoutAccessibility;
 #[cfg(feature = "accesskit")]
 use accesskit::{Node, NodeId, TreeUpdate};
 
+/// Threshold for considering a vertical metric change as significant.
+/// Changes smaller than this are ignored to avoid unnecessary stabilization.
+const STABILIZATION_THRESHOLD: f32 = 0.01;
+
 /// Opaque representation of a generation.
 ///
 /// Obtained from [`PlainEditor::generation`].
@@ -120,6 +124,9 @@ where
     // alignment_dirty: bool,
     alignment: Alignment,
     generation: Generation,
+    /// Scratch space for per-line baseline snapshots, reused across layout
+    /// updates to avoid repeated allocation.
+    baseline_snapshots: Vec<f32>,
 }
 
 impl<T> PlainEditor<T>
@@ -147,6 +154,7 @@ where
             // will choose to use that as their initial value, but will probably need
             // to redraw if they haven't already.
             generation: Generation(1),
+            baseline_snapshots: Vec::default(),
         }
     }
 }
@@ -425,6 +433,36 @@ where
         if self.editor.compose.take().is_some() {
             self.editor.show_cursor = true;
             self.update_layout();
+        }
+    }
+
+    /// Handle an IME commit while potentially still composing.
+    ///
+    /// On some platforms (e.g. Windows), `Ime::Commit` arrives while the preedit
+    /// is still in the buffer (before `Ime::Preedit("")` clears it). This method
+    /// atomically replaces the preedit text with the committed text, avoiding
+    /// an intermediate "doubled text" state that causes visual jitter.
+    ///
+    /// If not currently composing, falls back to [`insert_or_replace_selection`](Self::insert_or_replace_selection).
+    pub fn commit_compose(&mut self, text: &str) {
+        if let Some(preedit_range) = self.editor.compose.take() {
+            self.editor
+                .buffer
+                .replace_range(preedit_range.clone(), text);
+            self.editor.show_cursor = true;
+            self.update_layout();
+
+            let new_index = preedit_range.start + text.len();
+            let affinity = if text.ends_with(['\n', '\r', '\u{2028}', '\u{2029}']) {
+                Affinity::Downstream
+            } else {
+                Affinity::Upstream
+            };
+            self.editor.set_selection(
+                Cursor::from_byte_index(&self.editor.layout, new_index, affinity).into(),
+            );
+        } else {
+            self.insert_or_replace_selection(text);
         }
     }
 
@@ -1227,6 +1265,21 @@ where
     }
     /// Update the layout.
     fn update_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
+        // Snapshot per-line baselines before rebuild so we can compute
+        // per-glyph vertical offsets afterwards. This prevents baseline jitter
+        // caused by font fallback changing line metrics (e.g., mixing CJK and
+        // Latin scripts on the same line).
+        // We reuse the scratch `baseline_snapshots` field to avoid reallocating
+        // on every layout update. `take` moves the Vec out (leaving an empty
+        // Vec behind) so the borrow checker is satisfied while we call
+        // `&mut self` methods during stabilization.
+        let num_old_lines = self.layout.data.lines.len();
+        self.baseline_snapshots.clear();
+        for line in &self.layout.data.lines {
+            self.baseline_snapshots.push(line.metrics.baseline);
+        }
+        let saved_baselines = core::mem::take(&mut self.baseline_snapshots);
+
         let mut builder =
             layout_cx.ranged_builder(font_cx, &self.buffer, self.scale, self.quantize);
         for prop in self.default_style.inner().values() {
@@ -1239,6 +1292,100 @@ where
         self.layout.break_all_lines(self.width);
         self.layout
             .align(self.width, self.alignment, AlignmentOptions::default());
+
+        // Apply glyph-level vertical offsets to stabilize character positions.
+        //
+        // When font fallback changes line metrics, the baseline shifts and all
+        // characters jump. We counteract this by computing the per-line baseline
+        // delta and applying it directly to glyph y-coordinates in the layout
+        // data. This is a character-level correction: each glyph's stored
+        // y-offset is adjusted so that positioned_glyphs() renders it at the
+        // pre-fallback position.
+        //
+        // Performance: for long documents, we first do a lightweight O(lines)
+        // scan to check if any baselines actually shifted. If nothing changed,
+        // we skip the glyph traversal entirely. The snapshot itself is reused
+        // across updates (scratch Vec preserves capacity).
+        let num_lines = self.layout.data.lines.len();
+        if num_old_lines > 0 && num_lines > 0 {
+            let mut cum_height_delta: f32 = 0.0;
+            let mut any_stabilized = false;
+
+            for line_idx in 0..num_lines {
+                // Apply accumulated height delta from previous lines so this
+                // line's baseline reflects the corrected y-position.
+                if cum_height_delta.abs() > STABILIZATION_THRESHOLD {
+                    let line = &mut self.layout.data.lines[line_idx];
+                    line.metrics.baseline += cum_height_delta;
+                    line.metrics.min_coord += cum_height_delta;
+                    line.metrics.max_coord += cum_height_delta;
+                }
+
+                if let Some(&old_baseline) = saved_baselines.get(line_idx) {
+                    let new_baseline = self.layout.data.lines[line_idx].metrics.baseline;
+                    let delta = old_baseline - new_baseline;
+
+                    if delta.abs() > STABILIZATION_THRESHOLD {
+                        any_stabilized = true;
+                        // Apply the offset to each glyph's y-coordinate in this line.
+                        // We traverse: line → line_items → runs → clusters → glyphs.
+                        let line = &self.layout.data.lines[line_idx];
+                        let item_range = line.item_range.clone();
+
+                        for item in &self.layout.data.line_items[item_range] {
+                            if item.kind != crate::layout::data::LayoutItemKind::TextRun {
+                                continue;
+                            }
+                            let run = &self.layout.data.runs[item.index];
+                            let glyph_base = run.glyph_start;
+                            for ci in run.cluster_range.clone() {
+                                let cluster = &self.layout.data.clusters[ci];
+                                if cluster.glyph_len != 0xFF {
+                                    let start = glyph_base + cluster.glyph_offset as usize;
+                                    let end = start + cluster.glyph_len as usize;
+                                    for glyph in &mut self.layout.data.glyphs[start..end] {
+                                        glyph.y += delta;
+                                    }
+                                }
+                                // Inline glyphs (0xFF) have y=0 and are positioned
+                                // purely by baseline. We adjust baseline below.
+                            }
+                        }
+
+                        // Adjust line position for inline glyphs and cursor/selection.
+                        let line = &mut self.layout.data.lines[line_idx];
+                        line.metrics.baseline += delta;
+                        line.metrics.min_coord += delta;
+                        line.metrics.max_coord += delta;
+                    }
+                }
+
+                // Track cumulative height change for positioning subsequent lines.
+                if saved_baselines.get(line_idx).is_some() && line_idx + 1 < num_lines {
+                    let current_height = self.layout.data.lines[line_idx].metrics.line_height;
+                    let old_height = if line_idx + 1 < saved_baselines.len() {
+                        saved_baselines[line_idx + 1] - saved_baselines[line_idx]
+                    } else {
+                        current_height
+                    };
+                    cum_height_delta += old_height - current_height;
+                }
+            }
+
+            if cum_height_delta.abs() > STABILIZATION_THRESHOLD {
+                self.layout.data.height += cum_height_delta;
+            }
+
+            // Nudge generation if we applied any stabilization, so the
+            // consumer redraws even if the selection didn't change.
+            if any_stabilized {
+                self.generation.nudge();
+            }
+        }
+
+        // Return the scratch space, preserving its capacity for the next update.
+        self.baseline_snapshots = saved_baselines;
+
         self.selection = self.selection.refresh(&self.layout);
         self.layout_dirty = false;
         self.generation.nudge();
