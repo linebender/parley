@@ -1273,6 +1273,7 @@ where
         // on every layout update. `take` moves the Vec out (leaving an empty
         // Vec behind) so the borrow checker is satisfied while we call
         // `&mut self` methods during stabilization.
+        let num_old_lines = self.layout.data.lines.len();
         self.baseline_snapshots.clear();
         for line in &self.layout.data.lines {
             self.baseline_snapshots.push(line.metrics.baseline);
@@ -1300,9 +1301,15 @@ where
         // data. This is a character-level correction: each glyph's stored
         // y-offset is adjusted so that positioned_glyphs() renders it at the
         // pre-fallback position.
-        if !saved_baselines.is_empty() {
+        //
+        // Performance: for long documents, we first do a lightweight O(lines)
+        // scan to check if any baselines actually shifted. If nothing changed,
+        // we skip the glyph traversal entirely. The snapshot itself is reused
+        // across updates (scratch Vec preserves capacity).
+        let num_lines = self.layout.data.lines.len();
+        if num_old_lines > 0 && num_lines > 0 {
             let mut cum_height_delta: f32 = 0.0;
-            let num_lines = self.layout.data.lines.len();
+            let mut any_stabilized = false;
 
             for line_idx in 0..num_lines {
                 // Apply accumulated height delta from previous lines so this
@@ -1319,6 +1326,7 @@ where
                     let delta = old_baseline - new_baseline;
 
                     if delta.abs() > STABILIZATION_THRESHOLD {
+                        any_stabilized = true;
                         // Apply the offset to each glyph's y-coordinate in this line.
                         // We traverse: line → line_items → runs → clusters → glyphs.
                         let line = &self.layout.data.lines[line_idx];
@@ -1366,6 +1374,12 @@ where
 
             if cum_height_delta.abs() > STABILIZATION_THRESHOLD {
                 self.layout.data.height += cum_height_delta;
+            }
+
+            // Nudge generation if we applied any stabilization, so the
+            // consumer redraws even if the selection didn't change.
+            if any_stabilized {
+                self.generation.nudge();
             }
         }
 
