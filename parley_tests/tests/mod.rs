@@ -31,6 +31,7 @@ mod floats;
 mod issues;
 mod line_break;
 mod lines;
+mod out_of_flow_boxes;
 mod styles;
 mod text_indent;
 mod wrap;

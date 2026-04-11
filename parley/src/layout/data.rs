@@ -603,8 +603,8 @@ impl<B: Brush> LayoutData<B> {
                 }
                 LayoutItemKind::InlineBox => {
                     let ibox = &self.inline_boxes[item.index];
-                    running_max_width += ibox.width;
                     if ibox.kind == InlineBoxKind::InFlow {
+                        running_max_width += ibox.width;
                         if text_wrap_mode == TextWrapMode::Wrap {
                             let trailing_whitespace = whitespace_advance(prev_cluster);
                             min_width = min_width.max(running_min_width - trailing_whitespace);
