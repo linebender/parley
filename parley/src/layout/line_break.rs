@@ -66,40 +66,73 @@ struct PrevBoundaryState {
 /// Reason that the line breaker has yielded control flow
 #[derive(Clone, Debug)]
 pub enum YieldData {
-    /// Control flow was yielded because a line break was encountered
+    /// Control flow was yielded because a line break occurred.
+    /// The `reason` field of the [`LineBreakData`] contains a specific reason about what caused a
+    /// line break at this location.
     LineBreak(LineBreakData),
     /// Control flow was yielded because content on the line caused the line to exceed the max height
+    ///
+    /// The caller is responsible for finding a new location for the line with a greater available height
+    /// adjusting the line geometry to the new position and resuming iteration.
+    ///
+    /// Note: that by default no max height is set (and one is not required for laying out text into
+    /// rectangular regions), so you will only encounter this if you explicitly set a max height
+    /// using `BreakLine::set_line_max_height`.
     MaxHeightExceeded(MaxHeightBreakData),
-    /// Control flow was yielded because an inline box with kind `InlineBoxKind::CustomOutOfFlow`
+    /// Control flow was yielded because an inline box with kind [`InlineBoxKind::CustomOutOfFlow`]
     /// was encountered.
+    ///
+    /// Parley does not position these boxes itself. The caller is responsible for
+    /// placing the box (e.g. via a caller-owned algorithm), adjusting the line geometry through
+    /// [`BreakerState`], and then resuming iteration.
     InlineBoxBreak(BoxBreakData),
 }
 
 #[derive(Clone, Debug)]
+/// Information about a line break
 pub struct LineBreakData {
+    /// The reason for the line break (see [`BreakReason`] for details)
     pub reason: BreakReason,
+    /// The computed advance (width) of the line
     pub advance: f32,
+    /// The computed height of the line
     pub line_height: f32,
+    /// The position of the top of the line
     pub line_y_start: f64,
+    /// The position of the bottom of the line
     pub line_y_end: f64,
 }
 
 #[derive(Clone, Debug)]
+/// Information about a "max height break" (where control flow has been yielded due to the
+/// line's configured max height being exceeded by content by laid out into the line).
 pub struct MaxHeightBreakData {
+    /// The current advance of the in-progress line
     pub advance: f32,
+    /// The current line height of the in-progress line
     pub line_height: f32,
 }
 
 #[derive(Clone, Debug)]
+/// Information about a "box break" (where control flow has been yielded due to an inline box
+/// with kind [`InlineBoxKind::CustomOutOfFlow`] being encountered during layout.
 pub struct BoxBreakData {
     /// The user-supplied ID for the inline box
     pub inline_box_id: u64,
-    // The index of the inline box within `Layout::inline_boxes()`
+    /// The index of the inline box within `Layout::inline_boxes()`
     pub inline_box_index: usize,
+    /// The current advance of the line (up to but *not* including the `CustomOutOfFlow` box)
     pub advance: f32,
 }
 
 #[derive(Clone)]
+/// The mutable state of the line breaker.
+///
+/// This is exposed so that callers using [`BreakLines`] directly can inspect and
+/// adjust line geometry between calls to [`BreakLines::break_next`].
+///
+/// A `BreakerState` can be cloned and later passed to [`BreakLines::revert_to`]
+/// to retry layout from a saved checkpoint.
 pub struct BreakerState {
     /// The number of items that have been processed (used to revert state)
     items: usize,
@@ -126,8 +159,13 @@ pub struct BreakerState {
     /// The max height available to the current line.
     line_max_height: f32,
 
+    /// The state of the current line
     line: LineState,
+
+    // Saved breaker states for reverting to a previously encountered line-breaking opportunity
+    /// Saved breaker state for the last non-emergency line-breaking opportunity
     prev_boundary: Option<PrevBoundaryState>,
+    /// Saved breaker state for the last emergency line-breaking opportunity
     emergency_boundary: Option<PrevBoundaryState>,
 }
 
@@ -202,7 +240,7 @@ impl BreakerState {
 
     /// Get the max-advance of the entire layout
     #[inline(always)]
-    pub fn layout_max_advance(&mut self) -> f32 {
+    pub fn layout_max_advance(&self) -> f32 {
         self.layout_max_advance
     }
     /// Set the max-advance of the entire layout
@@ -374,6 +412,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     /// Computes the next line in the paragraph. Returns the advance and size
     /// (width and height for horizontal layouts) of the line.
     fn break_next_line_or_box(&mut self) -> Option<YieldData> {
+        assert!(self.state.line_max_advance <= self.state.layout_max_advance);
+
         // Maintain iterator state
         if self.done {
             return None;
@@ -742,7 +782,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             if break_reason == BreakReason::None {
                                 self.done = true;
                             }
-                            self.start_new_line(BreakReason::None);
+                            self.start_new_line(break_reason);
                             return Some(());
                         }
                     }
