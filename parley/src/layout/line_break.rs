@@ -412,7 +412,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     /// Computes the next line in the paragraph. Returns the advance and size
     /// (width and height for horizontal layouts) of the line.
     fn break_next_line_or_box(&mut self) -> Option<YieldData> {
-        assert!(self.state.line_max_advance <= self.state.layout_max_advance);
+        assert!(
+            self.state.layout_max_advance == f32::INFINITY
+                || self.state.line_max_advance - self.state.layout_max_advance < 1.0
+        );
 
         // Maintain iterator state
         if self.done {
