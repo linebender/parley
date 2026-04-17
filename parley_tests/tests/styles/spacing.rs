@@ -19,7 +19,7 @@ fn build_with_line_height(
     builder.push_default(StyleProperty::LineHeight(line_height));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
     layout
 }
 
@@ -29,7 +29,7 @@ fn build_with_letter_spacing(env: &mut TestEnv, text: &str, spacing: f32) -> Lay
     builder.push_default(StyleProperty::LetterSpacing(spacing));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
     layout
 }
 
@@ -39,7 +39,7 @@ fn build_with_word_spacing(env: &mut TestEnv, text: &str, spacing: f32) -> Layou
     builder.push_default(StyleProperty::WordSpacing(spacing));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(None, Alignment::Start, AlignmentOptions::default());
+    layout.align(Alignment::Start, AlignmentOptions::default());
     layout
 }
 

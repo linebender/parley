@@ -8,7 +8,6 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use super::renderer::{ColorBrush, RenderingConfig, render_layout, render_layout_with_clusters};
 use fontique::{Blob, Collection, CollectionOptions, SourceCache};
 use parley::{
     BoundingBox, FontContext, FontFamily, FontFamilyName, Layout, LayoutContext, LineHeight,
@@ -16,6 +15,10 @@ use parley::{
 };
 use peniko::{Color, kurbo::Size};
 use vello_cpu::Pixmap;
+
+use super::renderer::{
+    ColorBrush, RenderingConfig, draw_layout, draw_layout_with_clusters, render_to_pixmap,
+};
 
 fn current_imgs_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("current")
@@ -290,8 +293,8 @@ impl TestEnv {
         cursor_rect: Option<BoundingBox>,
         selection_rects: &[(BoundingBox, usize)],
     ) {
-        let current_img =
-            render_layout(&self.rendering_config, layout, cursor_rect, selection_rects);
+        let renderer = draw_layout(&self.rendering_config, layout, cursor_rect, selection_rects);
+        let current_img = render_to_pixmap(renderer);
         self.check_image(&current_img);
     }
 
@@ -314,12 +317,12 @@ impl TestEnv {
             });
         }
 
-        let current_img =
-            render_layout_with_clusters(&self.rendering_config, layout, &char_layouts);
+        let renderer = draw_layout_with_clusters(&self.rendering_config, layout, &char_layouts);
+        let current_img = render_to_pixmap(renderer);
         self.check_image(&current_img);
     }
 
-    fn check_image(&mut self, img: &Pixmap) {
+    pub(crate) fn check_image(&mut self, img: &Pixmap) {
         let test_case_name = std::mem::take(&mut self.next_test_case_name);
         let image_name = self.image_name(&test_case_name);
 

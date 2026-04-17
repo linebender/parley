@@ -1238,7 +1238,7 @@ where
         self.layout = builder.build(&self.buffer);
         self.layout.break_all_lines(self.width);
         self.layout
-            .align(self.width, self.alignment, AlignmentOptions::default());
+            .align(self.alignment, AlignmentOptions::default());
         self.selection = self.selection.refresh(&self.layout);
         self.layout_dirty = false;
         self.generation.nudge();

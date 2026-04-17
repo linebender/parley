@@ -14,7 +14,7 @@ use std::time::Instant;
 use parley::fontique::Blob;
 use parley::{
     Alignment, AlignmentOptions, FontContext, FontFamily, FontWeight, GenericFamily, InlineBox,
-    Layout, LayoutContext, LineHeight, StyleProperty,
+    InlineBoxKind, Layout, LayoutContext, LineHeight, StyleProperty,
 };
 use peniko::Color;
 
@@ -149,11 +149,7 @@ pub fn build_simple_layout(
 
     let mut layout = builder.build(&config.text);
     layout.break_all_lines(config.max_advance);
-    layout.align(
-        config.max_advance,
-        Alignment::Start,
-        AlignmentOptions::default(),
-    );
+    layout.align(Alignment::Start, AlignmentOptions::default());
 
     let width = layout.width().ceil() as u16;
     let height = layout.height().ceil() as u16;
@@ -206,6 +202,7 @@ pub fn build_rich_layout(
     builder.push(FontFamily::named("Noto Color Emoji"), party_emoji_range);
     builder.push_inline_box(InlineBox {
         id: 0,
+        kind: InlineBoxKind::InFlow,
         index: 40,
         width: 50.0,
         height: 50.0,
@@ -213,11 +210,7 @@ pub fn build_rich_layout(
 
     let mut layout = builder.build(&config.text);
     layout.break_all_lines(config.max_advance);
-    layout.align(
-        config.max_advance,
-        Alignment::Start,
-        AlignmentOptions::default(),
-    );
+    layout.align(Alignment::Start, AlignmentOptions::default());
 
     let width = layout.width().ceil() as u16;
     let height = layout.height().ceil() as u16;
