@@ -34,8 +34,7 @@ accesskit = "0.24.0"
 bytemuck = { version = "1.25.0", default-features = false }
 fontique = { version = "0.8.0", default-features = false, path = "fontique" }
 harfrust = { version = "0.5.2", default-features = false }
-foldhash = { version = "0.2.0", default-features = false }
-hashbrown = { version = "0.16.1", default-features = false, features = [
+hashbrown = { version = "0.17.0", default-features = false, features = [
     "default-hasher",
     "raw-entry",
 ] }
