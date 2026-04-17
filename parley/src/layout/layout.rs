@@ -150,7 +150,7 @@ impl<B: Brush> Layout<B> {
     /// longest line as computed by line breaking.
     ///
     /// If line-specific `offset` and `max_advance` are set using the advanced methods on the `BreakLines`
-    /// struct then each lines line will be aligned individually within it's line box.
+    /// struct then each line will be aligned individually within its line box.
     pub fn align(&mut self, alignment: Alignment, options: AlignmentOptions) {
         unjustify(&mut self.data);
         align(&mut self.data, alignment, options);
