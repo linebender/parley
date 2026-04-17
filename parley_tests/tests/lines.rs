@@ -10,7 +10,7 @@ use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
 use parley::{
     Affinity, Alignment, AlignmentOptions, BoundingBox, Brush, Cursor, InlineBox, Layout,
-    LineHeight, Selection, StyleProperty,
+    LineHeight, Selection, StyleProperty, AlignmentBaseline, BaselineShift, BaselineSource,
 };
 use peniko::kurbo::Size;
 
@@ -111,12 +111,20 @@ fn build_layout<A: Into<Option<f32>>>(
         index: 40,
         width: 50.0,
         height: 5.0,
+        alignment_baseline: AlignmentBaseline::default(),
+        baseline_shift: BaselineShift::default(),
+        baseline_source: BaselineSource::default(),
+        first_baseline: None,
     });
     builder.push_inline_box(InlineBox {
         id: 1,
         index: 51,
         width: 50.0,
         height: 3.0,
+        alignment_baseline: AlignmentBaseline::default(),
+        baseline_shift: BaselineShift::default(),
+        baseline_source: BaselineSource::default(),
+        first_baseline: None,
     });
 
     let mut layout = builder.build(TEXT);

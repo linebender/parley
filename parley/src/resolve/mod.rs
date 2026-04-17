@@ -17,7 +17,7 @@ use super::style::{
 use crate::font::FontContext;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
-use crate::{LineHeight, OverflowWrap, layout};
+use crate::{AlignmentBaseline, BaselineShift, BaselineSource, LineHeight, OverflowWrap, layout};
 use crate::{TextWrapMode, WordBreak};
 use core::borrow::Borrow;
 use core::ops::Range;
@@ -166,6 +166,9 @@ impl ResolveContext {
             StyleProperty::WordBreak(value) => WordBreak(*value),
             StyleProperty::OverflowWrap(value) => OverflowWrap(*value),
             StyleProperty::TextWrapMode(value) => TextWrapMode(*value),
+            StyleProperty::AlignmentBaseline(value) => AlignmentBaseline(*value),
+            StyleProperty::BaselineShift(value) => BaselineShift(value.scale(scale)),
+            StyleProperty::BaselineSource(value) => BaselineSource(*value),
         }
     }
 
@@ -203,6 +206,9 @@ impl ResolveContext {
             word_break: raw_style.word_break,
             overflow_wrap: raw_style.overflow_wrap,
             text_wrap_mode: raw_style.text_wrap_mode,
+            alignment_baseline: raw_style.alignment_baseline,
+            baseline_shift: raw_style.baseline_shift.scale(scale),
+            baseline_source: raw_style.baseline_source,
         }
     }
 
@@ -387,6 +393,12 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     OverflowWrap(OverflowWrap),
     /// Control over non-"emergency" line-breaking.
     TextWrapMode(TextWrapMode),
+    /// Alignment baseline of inline elements.
+    AlignmentBaseline(AlignmentBaseline),
+    /// Baseline shift of inline elements.
+    BaselineShift(BaselineShift),
+    /// Baseline source of inline elements.
+    BaselineSource(BaselineSource),
 }
 
 /// Flattened group of style properties.
@@ -426,6 +438,12 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     pub(crate) overflow_wrap: OverflowWrap,
     /// Control over non-"emergency" line-breaking.
     pub(crate) text_wrap_mode: TextWrapMode,
+    /// Alignment baseline of inline elements.
+    pub(crate) alignment_baseline: AlignmentBaseline,
+    /// Baseline shift of inline elements.
+    pub(crate) baseline_shift: BaselineShift,
+    /// Baseline source of inline elements.
+    pub(crate) baseline_source: BaselineSource,
 }
 
 impl<B: Brush> ResolvedStyle<B> {
@@ -456,6 +474,9 @@ impl<B: Brush> ResolvedStyle<B> {
             WordBreak(value) => self.word_break = value,
             OverflowWrap(value) => self.overflow_wrap = value,
             TextWrapMode(value) => self.text_wrap_mode = value,
+            AlignmentBaseline(value) => self.alignment_baseline = value,
+            BaselineShift(value) => self.baseline_shift = value,
+            BaselineSource(value) => self.baseline_source = value,
         }
     }
 
@@ -485,6 +506,9 @@ impl<B: Brush> ResolvedStyle<B> {
             WordBreak(value) => self.word_break == *value,
             OverflowWrap(value) => self.overflow_wrap == *value,
             TextWrapMode(value) => self.text_wrap_mode == *value,
+            AlignmentBaseline(value) => self.alignment_baseline == *value,
+            BaselineShift(value) => self.baseline_shift.nearly_eq(*value),
+            BaselineSource(value) => self.baseline_source == *value,
         }
     }
 
@@ -496,6 +520,9 @@ impl<B: Brush> ResolvedStyle<B> {
             line_height: self.line_height,
             overflow_wrap: self.overflow_wrap,
             text_wrap_mode: self.text_wrap_mode,
+            alignment_baseline: self.alignment_baseline,
+            baseline_shift: self.baseline_shift,
+            baseline_source: self.baseline_source,
             #[cfg(feature = "accesskit")]
             locale: self.locale,
         }
