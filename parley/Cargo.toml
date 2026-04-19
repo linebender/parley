@@ -41,7 +41,6 @@ icu_segmenter = { workspace = true, features = ["compiled_data"] }
 [dev-dependencies]
 parley_dev = { workspace = true }
 peniko = { workspace = true }
-tiny-skia = "0.11.4"
 
 # We special-case android targets because oxipng doesn't build in Android CI.
 [target.'cfg(not(target_os = "android"))'.dev-dependencies]
