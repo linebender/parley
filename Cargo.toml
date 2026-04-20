@@ -33,7 +33,7 @@ repository = "https://github.com/linebender/parley"
 accesskit = "0.24.0"
 bytemuck = { version = "1.25.0", default-features = false }
 fontique = { version = "0.8.0", default-features = false, path = "fontique" }
-harfrust = { version = "0.5.2", default-features = false }
+harfrust = { version = "0.6.0", default-features = false }
 hashbrown = { version = "0.17.0", default-features = false, features = [
     "default-hasher",
     "raw-entry",
@@ -51,8 +51,8 @@ parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
 glifo = { git = "https://github.com/linebender/vello", rev = "5796226", default-features = false }
 peniko = { version = "0.6.0", default-features = false }
-read-fonts = { version = "0.37.0", default-features = false }
-skrifa = { version = "0.40.0", default-features = false }
+read-fonts = { version = "0.39.0", default-features = false }
+skrifa = { version = "0.42.0", default-features = false }
 smallvec = "1.15.1"
 swash = { version = "0.2.6", default-features = false }
 vello_common = { version = "0.0.7", default-features = false }
