@@ -11,7 +11,7 @@ mod system;
 #[path = "coretext.rs"]
 mod system;
 
-#[cfg(all(feature = "system", target_os = "linux"))]
+#[cfg(all(feature = "system", any(target_os = "linux", target_os = "freebsd")))]
 #[path = "fontconfig.rs"]
 mod system;
 
@@ -40,6 +40,7 @@ pub(crate) use system::SystemFonts;
     not(any(
         target_os = "windows",
         target_os = "linux",
+        target_os = "freebsd",
         target_os = "android",
         target_vendor = "apple"
     ))
