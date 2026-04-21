@@ -12,11 +12,39 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 This release has an [MSRV] of 1.88.
 
+## [0.9.0] - 2026-04-21
+
+This release has an [MSRV] of 1.88.
+
 ### Added
+
+#### Parley
+
+- Enable floats and other advanced layouts ([#421][] by [@nicoburns][])
+
+  This does not affect users who are using the high-level `break_all_lines()` function to perform line breaking. However, it brings a number of additional advanced capabilities to users who are calling the `break_lines()` function to use the  `BreakLines` struct directly:
+
+  - Inline boxes now have an additional `InlineBoxKind` field. `InFlow` behaves like inline boxes in previous versions of Parley. `OutOfFlow` gets positioned like an `InFlow` box, but does not take up space (like `position:absolute` in CSS), and `CustomOutOfFlow` can be used in conjunction with the low-level `.break_lines()` API to implement floated boxes (like CSS `float`) which  position depends on the state of line breaking 
+  - Each line can have it's x/y/width/height set individually, and text will lay out into that box (the width for each line must be less than or equal to the width of the overall layout). This enables text to be laid out around "excluded regions", by setting a line box that avoids those regions. The logic for computing the positions of each line is left to the user.
 
 #### Fontique
 
 - `FallbackKey` now implements `From<Script>` for convenience. ([#594][] by [@xStrom][])
+
+### Changed
+
+- Upgrade hashbrown to 0.17 ([#506][] by [@waywardmonkeys][])
+- Upgrade to read-fonts to 0.39, skrifa 0.42, harfrust 0.6 ([#600][] by [@nicoburns][])
+
+### Fixed
+
+#### Parley
+
+- Fix going to start of text when moving up on single line ([#609][] by [@jordanhalase][])
+
+#### Fontique
+
+- Fix CJK text on macOS when PingFangUI contains hvgl outlines ([#598][] by [@dfrg][])
 
 ## [0.8.0] - 2026-03-27
 
@@ -423,6 +451,7 @@ This release has an [MSRV][] of 1.70.
 [@elbaro]: https://github.com/elbaro
 [@guiguiprim]: https://github.com/guiguiprim
 [@grebmeg]: https://github.com/grebmeg
+[@jordanhalase]: https://github.com/jordanhalase
 [@kekelp]: https://github.com/kekelp
 [@mwcampbell]: https://github.com/mwcampbell
 [@nicoburns]: https://github.com/nicoburns
@@ -527,6 +556,7 @@ This release has an [MSRV][] of 1.70.
 [#413]: https://github.com/linebender/parley/pull/413
 [#414]: https://github.com/linebender/parley/pull/414
 [#418]: https://github.com/linebender/parley/pull/418
+[#421]: https://github.com/linebender/parley/pull/421
 [#436]: https://github.com/linebender/parley/pull/436
 [#440]: https://github.com/linebender/parley/pull/440
 [#444]: https://github.com/linebender/parley/pull/444
@@ -537,6 +567,7 @@ This release has an [MSRV][] of 1.70.
 [#467]: https://github.com/linebender/parley/pull/467
 [#468]: https://github.com/linebender/parley/pull/468
 [#486]: https://github.com/linebender/parley/pull/486
+[#506]: https://github.com/linebender/parley/pull/506
 [#510]: https://github.com/linebender/parley/pull/510
 [#512]: https://github.com/linebender/parley/pull/512
 [#516]: https://github.com/linebender/parley/pull/516
@@ -564,6 +595,10 @@ This release has an [MSRV][] of 1.70.
 [#578]: https://github.com/linebender/parley/pull/578
 [#589]: https://github.com/linebender/parley/pull/589
 [#594]: https://github.com/linebender/parley/pull/594
+[#598]: https://github.com/linebender/parley/pull/598
+[#600]: https://github.com/linebender/parley/pull/600
+[#605]: https://github.com/linebender/parley/pull/605
+[#609]: https://github.com/linebender/parley/pull/609
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.8.0...HEAD
 [0.8.0]: https://github.com/linebender/parley/compare/v0.7.0...v0.8.0

@@ -22,7 +22,7 @@ members = [
 
 [workspace.package]
 edition = "2021"
-version = "0.8.0"
+version = "0.9.0"
 # Keep in sync with RUST_MIN_VER in .github/workflows/ci.yml, with the relevant README.md files
 # and with the MSRV in the `Unreleased` section of CHANGELOG.md.
 rust-version = "1.88"
@@ -32,7 +32,7 @@ repository = "https://github.com/linebender/parley"
 [workspace.dependencies]
 accesskit = "0.24.0"
 bytemuck = { version = "1.25.0", default-features = false }
-fontique = { version = "0.8.0", default-features = false, path = "fontique" }
+fontique = { version = "0.9.0", default-features = false, path = "fontique" }
 harfrust = { version = "0.6.0", default-features = false }
 hashbrown = { version = "0.17.0", default-features = false, features = [
     "default-hasher",
@@ -45,8 +45,8 @@ icu_segmenter = { version = "2.1.2", default-features = false }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
 packtab = { version = "1.8.0" }
 parlance = { version = "0.1.0", default-features = false, path = "parlance" }
-parley = { version = "0.8.0", default-features = false, path = "parley" }
-parley_data = { version = "0.8.0", path = "parley_data", default-features = false }
+parley = { version = "0.9.0", default-features = false, path = "parley" }
+parley_data = { version = "0.9.0", path = "parley_data", default-features = false }
 parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
 glifo = { git = "https://github.com/linebender/vello", rev = "5796226", default-features = false }
