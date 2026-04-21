@@ -22,9 +22,11 @@ This release has an [MSRV] of 1.88.
 
 - Enable floats and other advanced layouts ([#421][] by [@nicoburns][])
 
-  This does not affect users who are using the high-level `break_all_lines()` function to perform line breaking. However, it brings a number of additional advanced capabilities to users who are calling the `break_lines()` function to use the  `BreakLines` struct directly:
+  This comes with a few changes to the API. Additionally, it brings a number of additional advanced capabilities to users who are calling the `break_lines()` function to use the  `BreakLines` struct directly:
 
-  - Inline boxes now have an additional `InlineBoxKind` field. `InFlow` behaves like inline boxes in previous versions of Parley. `OutOfFlow` gets positioned like an `InFlow` box, but does not take up space (like `position:absolute` in CSS), and `CustomOutOfFlow` can be used in conjunction with the low-level `.break_lines()` API to implement floated boxes (like CSS `float`) which  position depends on the state of line breaking 
+  - The `Layout::align` method no longer accepts a `width` parameter. Text will now automatically be aligned relative to the `max_advance` passed to `break_all_lines()`, unless that is `Infinite` (or `f32::MAX` which we treat as infinite) in which case it will be aligned relative to the width of the longest line in the layout. Additionally, if a line is given a (non-infinite) line-specific `line_max_advance` using the advanced `BreakLines` API, then it will aligned relative to that width instead.
+  - The `min_coord` and `max_coord` fields of `LineMetrics` which record the start and end position of the line in the block/y axis are renamed to `block_min_coord` and `inline_min_coord`, and there are new `inline_min_coord` and `inline_max_coord` which record the start and end position of the line in the x/inline axis.
+  - Inline boxes now have an additional `InlineBoxKind` field. `InFlow` behaves like inline boxes in previous versions of Parley. `OutOfFlow` gets positioned like an `InFlow` box, but does not take up space (like `position:absolute` in CSS), and `CustomOutOfFlow` can be used in conjunction with the low-level `.break_lines()` API to implement floated boxes (like CSS `float`) which  position depends on the state of line breaking.
   - Each line can have it's x/y/width/height set individually, and text will lay out into that box (the width for each line must be less than or equal to the width of the overall layout). This enables text to be laid out around "excluded regions", by setting a line box that avoids those regions. The logic for computing the positions of each line is left to the user.
 
 #### Fontique
