@@ -274,7 +274,7 @@ impl Selection {
             .map(|(ix, _)| ix)
             .unwrap_or(line_limit);
         let new_line_index = line_index.saturating_add_signed(delta);
-        if delta < 0 && line_index.checked_add_signed(delta).is_none() && line_limit > 0 {
+        if delta < 0 && line_index.checked_add_signed(delta).is_none() {
             return self
                 .move_to_line(layout, 0, extend)
                 .line_start(layout, extend);
