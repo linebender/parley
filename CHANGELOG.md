@@ -20,14 +20,21 @@ This release has an [MSRV] of 1.88.
 
 #### Parley
 
-- Enable floats and other advanced layouts ([#421][] by [@nicoburns][])
+- Floating boxes and other advanced layouts. ([#421][] by [@nicoburns][])
 
-  This comes with a few changes to the API. Additionally, it brings a number of additional advanced capabilities to users who are calling the `break_lines()` function to use the  `BreakLines` struct directly:
+  This comes with a few changes to the API.
+  Additionally, it brings a number of additional advanced capabilities to users who are calling the `break_lines()` function to use the  `BreakLines` struct directly:
 
-  - The `Layout::align` method no longer accepts a `width` parameter. Text will now automatically be aligned relative to the `max_advance` passed to `break_all_lines()`, unless that is `Infinite` (or `f32::MAX` which we treat as infinite) in which case it will be aligned relative to the width of the longest line in the layout. Additionally, if a line is given a (non-infinite) line-specific `line_max_advance` using the advanced `BreakLines` API, then it will aligned relative to that width instead.
+  - The `Layout::align` method no longer accepts a `width` parameter.
+    Text will now automatically be aligned relative to the `max_advance` passed to `break_all_lines()`, unless that is `Infinite` (or `f32::MAX` which we treat as infinite) in which case it will be aligned relative to the width of the longest line in the layout.
+    Additionally, if a line is given a (non-infinite) line-specific `line_max_advance` using the advanced `BreakLines` API, then it will aligned relative to that width instead.
   - The `min_coord` and `max_coord` fields of `LineMetrics` which record the start and end position of the line in the block/y axis are renamed to `block_min_coord` and `inline_min_coord`, and there are new `inline_min_coord` and `inline_max_coord` which record the start and end position of the line in the x/inline axis.
-  - Inline boxes now have an additional `InlineBoxKind` field. `InFlow` behaves like inline boxes in previous versions of Parley. `OutOfFlow` gets positioned like an `InFlow` box, but does not take up space (like `position:absolute` in CSS), and `CustomOutOfFlow` can be used in conjunction with the low-level `.break_lines()` API to implement floated boxes (like CSS `float`) which  position depends on the state of line breaking.
-  - Each line can have it's x/y/width/height set individually, and text will lay out into that box (the width for each line must be less than or equal to the width of the overall layout). This enables text to be laid out around "excluded regions", by setting a line box that avoids those regions. The logic for computing the positions of each line is left to the user.
+  - Inline boxes now have an additional `InlineBoxKind` field.
+    `InFlow` behaves like inline boxes in previous versions of Parley.
+    `OutOfFlow` gets positioned like an `InFlow` box, but does not take up space (like `position:absolute` in CSS), and `CustomOutOfFlow` can be used in conjunction with the low-level `.break_lines()` API to implement floated boxes (like CSS `float`) which  position depends on the state of line breaking.
+  - Each line can have it's x/y/width/height set individually, and text will lay out into that box (the width for each line must be less than or equal to the width of the overall layout).
+    This enables text to be laid out around "excluded regions", by setting a line box that avoids those regions.
+    The logic for computing the positions of each line is left to the user.
 
 #### Fontique
 
@@ -35,18 +42,18 @@ This release has an [MSRV] of 1.88.
 
 ### Changed
 
-- Upgrade hashbrown to 0.17 ([#506][] by [@waywardmonkeys][])
-- Upgrade to read-fonts to 0.39, skrifa 0.42, harfrust 0.6 ([#600][] by [@nicoburns][])
+- Updated to `hashbrown` 0.17. ([#506][] by [@waywardmonkeys][])
+- Updated to `read-fonts` 0.39, `skrifa` 0.42, and `harfrust` 0.6. ([#600][] by [@nicoburns][])
 
 ### Fixed
 
 #### Parley
 
-- Fix going to start of text when moving up on single line ([#609][] by [@jordanhalase][])
+- Going to the start of text when moving up on a single line. ([#609][] by [@jordanhalase][])
 
 #### Fontique
 
-- Fix CJK text on macOS when PingFangUI contains hvgl outlines ([#598][] by [@dfrg][])
+- CJK text on macOS when PingFangUI contains hvgl outlines. ([#598][] by [@dfrg][])
 
 ## [0.8.0] - 2026-03-27
 
@@ -602,7 +609,8 @@ This release has an [MSRV][] of 1.70.
 [#605]: https://github.com/linebender/parley/pull/605
 [#609]: https://github.com/linebender/parley/pull/609
 
-[Unreleased]: https://github.com/linebender/parley/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/linebender/parley/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/linebender/parley/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/linebender/parley/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/linebender/parley/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/linebender/parley/compare/v0.5.0...v0.6.0
