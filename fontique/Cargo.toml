@@ -72,7 +72,7 @@ objc2-core-text = { version = "0.3.2", optional = true, default-features = false
     "CTFontCollection",
 ] }
 
-[target.'cfg(target_os = "linux")'.dependencies]
+[target.'cfg(any(target_os = "linux", target_os="freebsd"))'.dependencies]
 yeslogic-fontconfig-sys = { version = "6.0.0", optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
