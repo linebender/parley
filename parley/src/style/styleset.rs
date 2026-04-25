@@ -73,4 +73,11 @@ impl<Brush: crate::Brush> StyleSet<Brush> {
     pub fn inner(&self) -> &HashMap<Discriminant<StyleProperty<Brush>>, StyleProperty<Brush>> {
         &self.0
     }
+
+    /// Clear all styles.
+    ///
+    /// All styles return to their default values.
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
 }
