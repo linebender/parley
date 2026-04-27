@@ -15,7 +15,7 @@ use crate::layout::{
 };
 
 /// Text layout.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Layout<B: Brush> {
     pub(crate) data: LayoutData<B>,
 }
