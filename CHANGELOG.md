@@ -594,6 +594,7 @@ This release has an [MSRV][] of 1.70.
 [#528]: https://github.com/linebender/parley/pull/528
 [#531]: https://github.com/linebender/parley/pull/531
 [#532]: https://github.com/linebender/parley/pull/532
+[#536]: https://github.com/linebender/parley/pull/536
 [#540]: https://github.com/linebender/parley/pull/540
 [#541]: https://github.com/linebender/parley/pull/541
 [#547]: https://github.com/linebender/parley/pull/547
@@ -608,13 +609,12 @@ This release has an [MSRV][] of 1.70.
 [#566]: https://github.com/linebender/parley/pull/566
 [#567]: https://github.com/linebender/parley/pull/567
 [#568]: https://github.com/linebender/parley/pull/568
+[#571]: https://github.com/linebender/parley/pull/571
 [#575]: https://github.com/linebender/parley/pull/575
-[#578]: https://github.com/linebender/parley/pull/578
 [#589]: https://github.com/linebender/parley/pull/589
 [#594]: https://github.com/linebender/parley/pull/594
 [#598]: https://github.com/linebender/parley/pull/598
 [#600]: https://github.com/linebender/parley/pull/600
-[#605]: https://github.com/linebender/parley/pull/605
 [#609]: https://github.com/linebender/parley/pull/609
 [#615]: https://github.com/linebender/parley/pull/615
 
