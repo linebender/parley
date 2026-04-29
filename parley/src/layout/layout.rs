@@ -17,10 +17,8 @@ use crate::layout::{
 
 /// Text layout.
 ///
-/// The [`Debug`] implementation prints a compact summary by default
-/// (text length, dimensions, and counts of lines, runs, and styles) which is
-/// intended for one-off developer logging. Use the alternate form (`{:#?}`)
-/// to get the full pretty-printed dump of the underlying data.
+/// The [`Debug`] implementation prints a compact summary by default.
+/// The alternate form (`{:#?}`) formats the full underlying data.
 ///
 /// [`Debug`]: core::fmt::Debug
 #[derive(Clone)]
