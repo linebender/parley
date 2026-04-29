@@ -12,6 +12,13 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 This release has an [MSRV] of 1.88.
 
+### Added
+
+#### Parley
+
+- `PlainEditor`, `Layout`, `LayoutAccessibility`, and `Generation` now implement `Debug`. ([#615][] by [@NandishwarSingh][])
+  Note: The `Layout` implementation provides a compact summary by default; the alternate form (`{:#?}`) formats the full underlying data.
+
 ## [0.9.0] - 2026-04-21
 
 This release has an [MSRV] of 1.88.
@@ -463,6 +470,7 @@ This release has an [MSRV][] of 1.70.
 [@jordanhalase]: https://github.com/jordanhalase
 [@kekelp]: https://github.com/kekelp
 [@mwcampbell]: https://github.com/mwcampbell
+[@NandishwarSingh]: https://github.com/NandishwarSingh
 [@nicoburns]: https://github.com/nicoburns
 [@NoahR02]: https://github.com/NoahR02
 [@ogoffart]: https://github.com/ogoffart
@@ -608,6 +616,7 @@ This release has an [MSRV][] of 1.70.
 [#600]: https://github.com/linebender/parley/pull/600
 [#605]: https://github.com/linebender/parley/pull/605
 [#609]: https://github.com/linebender/parley/pull/609
+[#615]: https://github.com/linebender/parley/pull/615
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.9.0...HEAD
 [0.9.0]: https://github.com/linebender/parley/compare/v0.8.0...v0.9.0

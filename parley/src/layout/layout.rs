@@ -7,6 +7,7 @@ use crate::layout::alignment::unjustify;
 use crate::layout::data::LayoutData;
 use crate::style::Brush;
 use core::cmp::Ordering;
+use core::fmt;
 
 use crate::IndentOptions;
 use crate::layout::{
@@ -15,9 +16,31 @@ use crate::layout::{
 };
 
 /// Text layout.
+///
+/// The [`Debug`] implementation prints a compact summary by default.
+/// The alternate form (`{:#?}`) formats the full underlying data.
+///
+/// [`Debug`]: core::fmt::Debug
 #[derive(Clone)]
 pub struct Layout<B: Brush> {
     pub(crate) data: LayoutData<B>,
+}
+
+impl<B: Brush> fmt::Debug for Layout<B> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if f.alternate() {
+            f.debug_struct("Layout").field("data", &self.data).finish()
+        } else {
+            f.debug_struct("Layout")
+                .field("text_len", &self.data.text_len)
+                .field("width", &self.data.width)
+                .field("height", &self.data.height)
+                .field("lines", &self.data.lines.len())
+                .field("runs", &self.data.runs.len())
+                .field("styles", &self.data.styles.len())
+                .finish_non_exhaustive()
+        }
+    }
 }
 
 impl<B: Brush> Layout<B> {
