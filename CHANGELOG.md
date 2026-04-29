@@ -16,7 +16,7 @@ This release has an [MSRV] of 1.88.
 
 #### Parley
 
-- `PlainEditor`, `Layout`, `LayoutAccessibility`, and `Generation` now implement `Debug`. ([#615][] by [@NandishwarSingh][])
+- `PlainEditor`, `Layout`, `LayoutAccessibility`, and `Generation` now implement `Debug`. The `Layout` implementation prints a compact summary by default; the alternate form (`{:#?}`) prints the full underlying data. ([#615][] by [@NandishwarSingh][])
 
 ## [0.9.0] - 2026-04-21
 
