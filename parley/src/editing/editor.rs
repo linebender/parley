@@ -267,7 +267,7 @@ where
         if self.editor.selection.is_collapsed() {
             let focus = self.editor.selection.focus();
             let start = focus.index();
-            let end = focus.next_logical_word(&self.editor.layout).index();
+            let end = focus.next_visual_word(&self.editor.layout).index();
             if self.editor.buffer.get(start..end).is_some() {
                 self.editor.buffer.replace_range(start..end, "");
                 self.editor.update_compose_for_replaced_range(start..end, 0);
@@ -328,7 +328,7 @@ where
         if self.editor.selection.is_collapsed() {
             let focus = self.editor.selection.focus();
             let end = focus.index();
-            let start = focus.previous_logical_word(&self.editor.layout).index();
+            let start = focus.previous_visual_word(&self.editor.layout).index();
             if self.editor.buffer.get(start..end).is_some() {
                 self.editor.buffer.replace_range(start..end, "");
                 self.editor.update_compose_for_replaced_range(start..end, 0);
