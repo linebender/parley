@@ -380,6 +380,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     ///
     /// This method changes a line's reported [`inline_max_coord`](LineMetrics::inline_max_coord), so
     /// if you use this method and read that value, you should be cautious.
+    // This escape hatch has not been carefully evaluated for unexpected consequences.
+    // It's current motivation is cases where Parley gives different line breaking results
+    // than blink, for reasons which haven't been fully understood.
+    #[doc(hidden)]
     pub fn set_prior_line_width(&mut self, advance: f32) {
         if let Some(line) = self.lines.lines.last_mut() {
             line.metrics.inline_max_coord = line.metrics.inline_min_coord + advance;
