@@ -247,8 +247,11 @@ fn fill_cluster_in_place(
         is_emoji_or_pictograph |= info.is_emoji_or_pictograph();
         *code_unit_offset_in_string += ch.len_utf8();
 
-        // If the color emoji with non printing variation selector, ignores the variation selector.
-        //
+        // TODO: Explore ignoring other modifiers in determining `contributes_to_shaping`:
+        //  regional indicators, subdivision flag tag sequences, skin tone modifiers
+        //  See also: https://github.com/google/emoji-segmenter
+
+        // If the color emoji has a non-printing variation selector, ignore the variation selector.
         // Its presentation depends on the platform and font.
         //
         // e.g.
