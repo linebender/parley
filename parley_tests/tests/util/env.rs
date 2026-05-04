@@ -155,6 +155,11 @@ impl TestEnv {
         }
     }
 
+    #[cfg(all(target_os = "macos", feature = "system"))]
+    pub(crate) fn font_context(&mut self) -> &mut FontContext {
+        &mut self.font_cx
+    }
+
     pub(crate) fn rendering_config(&mut self) -> &mut RenderingConfig {
         &mut self.rendering_config
     }

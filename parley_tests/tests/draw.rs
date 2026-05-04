@@ -172,3 +172,34 @@ fn draw_colr_emoji() {
         layout
     });
 }
+
+/// Test COLR emoji with non printing variation selector 16 rendering across different hinting,
+/// per-glyph transform, and scale configurations.
+#[cfg(all(target_os = "macos", feature = "system"))]
+#[test]
+fn draw_colr_emoji_with_non_printing_variation_selector_16() {
+    let mut env = TestEnv::new(test_name!(), None);
+    env.set_tolerance(5.0);
+
+    let collection = &mut env.font_context().collection;
+    collection.load_system_fonts();
+
+    let text = "\u{270c}\u{fe0f}\u{2705}\u{270c}\u{fe0f}";
+
+    test_with_configs(&mut env, |env| {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::FontSize(24.0));
+        builder.push_default(StyleProperty::FontFamily(FontFamily::named(
+            "Apple Color Emoji",
+        )));
+        builder.push(
+            StyleProperty::FontFamily(FontFamily::named("Noto Color Emoji")),
+            0..9,
+        );
+
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(Alignment::Start, AlignmentOptions::default());
+        layout
+    });
+}
