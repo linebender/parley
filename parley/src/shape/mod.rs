@@ -262,8 +262,7 @@ fn fill_cluster_in_place(
         let is_emoji_with_non_printing_variation_selector =
             is_emoji_or_pictograph && info.is_variation_selector();
 
-        let contributes_to_shaping =
-            info.contributes_to_shaping() && !is_emoji_with_non_printing_variation_selector;
+        let contributes_to_shaping = info.contributes_to_shaping();
         if contributes_to_shaping {
             map_len += 1;
         }
@@ -274,6 +273,7 @@ fn fill_cluster_in_place(
             glyph_id: 0,
             style_index: *style_index,
             is_control_character: info.is_control(),
+            is_emoji_with_non_printing_variation_selector,
         });
     }
 
