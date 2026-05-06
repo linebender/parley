@@ -85,6 +85,28 @@ impl TestContext {
         assert_eq!(actual, expected, "Force normalize list mismatch");
         self
     }
+
+    fn expect_is_emoji_or_pictograph_list(self, expected: Vec<bool>) -> Self {
+        let actual: Vec<_> = self
+            .layout_context
+            .info
+            .iter()
+            .map(|(info, _)| info.is_emoji_or_pictograph())
+            .collect();
+        assert_eq!(actual, expected, "Is emoji or pictograph list mismatch");
+        self
+    }
+
+    fn expect_is_variation_selector_list(self, expected: Vec<bool>) -> Self {
+        let actual: Vec<_> = self
+            .layout_context
+            .info
+            .iter()
+            .map(|(info, _)| info.is_variation_selector())
+            .collect();
+        assert_eq!(actual, expected, "Is variation selector list mismatch");
+        self
+    }
 }
 
 fn verify_analysis(
@@ -1155,4 +1177,11 @@ fn test_whitespace_contiguous_interspersed_in_latin_mixed() {
         Script::Common,
         Script::Latin,
     ]);
+}
+
+#[test]
+fn test_color_emoji_with_non_printing_variation_selector() {
+    verify_analysis("\u{270c}\u{fe0f}", |_| {})
+        .expect_is_emoji_or_pictograph_list(vec![true, false])
+        .expect_is_variation_selector_list(vec![false, true]);
 }

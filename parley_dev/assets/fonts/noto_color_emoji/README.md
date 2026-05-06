@@ -7,7 +7,8 @@ Included emoji are:
 - ✅ Check Mark - \u{2705}/`:white_check_mark:`
 - 👀 Eyes - \u{1f440}/`:eyes:`
 - 🎉 Party Popper - \u{1f389}/`:party_popper:`
-- 🤠 Face with Cowboy Hat - \u{1f920}/`cowboy_hat_face`
+- 🤠 Face with Cowboy Hat - \u{1f920}/`:cowboy_hat_face:`
+- ✌️ Victory hand - \u{270c}\u{fe0f}/`:victory_hand:`
 
 These are in the COLR format in `NotoColorEmoji-Subset` and in the CBTF format in `NotoColorEmoji-CBTF-Subset`.
 This covers all ways that Emoji are commonly packaged, and both are supported by Vello.

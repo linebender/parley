@@ -247,7 +247,23 @@ fn fill_cluster_in_place(
         is_emoji_or_pictograph |= info.is_emoji_or_pictograph();
         *code_unit_offset_in_string += ch.len_utf8();
 
-        let contributes_to_shaping = info.contributes_to_shaping();
+        // TODO: Explore ignoring other modifiers in determining `contributes_to_shaping`:
+        //  regional indicators, subdivision flag tag sequences, skin tone modifiers
+        //  See also: https://github.com/google/emoji-segmenter
+
+        // If the color emoji has a non-printing variation selector, ignore the variation selector.
+        // Its presentation depends on the platform and font.
+        //
+        // e.g.
+        //  - `U+270C + U+FE0F`: `✌`, force basic presentation
+        //  - `U+270C + U+FE0F`: `✌️`, force emoji presentation
+        //
+        // <https://www.unicode.org/reports/tr37/>
+        let is_emoji_with_non_printing_variation_selector =
+            is_emoji_or_pictograph && info.is_variation_selector();
+
+        let contributes_to_shaping =
+            info.contributes_to_shaping() && !is_emoji_with_non_printing_variation_selector;
         if contributes_to_shaping {
             map_len += 1;
         }
