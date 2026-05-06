@@ -255,12 +255,11 @@ fn fill_cluster_in_place(
         // Its presentation depends on the platform and font.
         //
         // e.g.
-        //  - `U+270C + U+FE0F`: `✌`, force basic presentation
-        //  - `U+270C + U+FE0F`: `✌️`, force emoji presentation
+        //  - VS-15: `U+270C + U+FE0F` - `✌`, render as text.
+        //  - VS-16: `U+270C + U+FE0F` - `✌️`, render as emoji.
         //
         // <https://www.unicode.org/reports/tr37/>
-        let is_emoji_with_non_printing_variation_selector =
-            is_emoji_or_pictograph && info.is_variation_selector();
+        let is_emoji_presentation = is_emoji_or_pictograph && info.is_variation_selector();
 
         let contributes_to_shaping = info.contributes_to_shaping();
         if contributes_to_shaping {
@@ -273,7 +272,7 @@ fn fill_cluster_in_place(
             glyph_id: 0,
             style_index: *style_index,
             is_control_character: info.is_control(),
-            is_emoji_with_non_printing_variation_selector,
+            is_emoji_presentation,
         });
     }
 
