@@ -173,13 +173,14 @@ fn draw_colr_emoji() {
     });
 }
 
-/// Test COLR emoji with non printing variation selector 16 rendering across different hinting,
-/// per-glyph transform, and scale configurations.
+/// Test COLR emoji rendering across different hinting, per-glyph transform, and scale configurations.
+///
+/// The COLR emoji with presentation style(VS-16).
 ///
 /// The default color emoji is different for each system, so only macOS was added for testing.
 #[cfg(all(target_os = "macos", feature = "system"))]
 #[test]
-fn draw_colr_emoji_with_non_printing_variation_selector_16() {
+fn draw_colr_emoji_with_presentation_style() {
     let mut env = TestEnv::new(test_name!(), None);
     env.set_tolerance(5.0);
 
@@ -207,15 +208,15 @@ fn draw_colr_emoji_with_non_printing_variation_selector_16() {
     });
 }
 
-/// Test COLR emoji with non printing variation selector 16 rendering across different hinting,
-/// per-glyph transform, and scale configurations.
+/// Test COLR emoji rendering across different hinting, per-glyph transform, and scale configurations.
 ///
-/// Should fall back to the system default color emoji.
+/// The COLR emoji with presentation style(VS-16) without setting the default font,
+/// and should fallback to the system default color emoji.
 ///
 /// The default color emoji is different for each system, so only macOS was added for testing.
 #[cfg(all(target_os = "macos", feature = "system"))]
 #[test]
-fn draw_colr_emoji_with_non_printing_variation_selector_16_without_default_font() {
+fn draw_colr_emoji_with_presentation_style_without_setting_default_font() {
     let mut env = TestEnv::new(test_name!(), None);
     env.set_tolerance(5.0);
 
