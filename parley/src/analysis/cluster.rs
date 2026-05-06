@@ -353,7 +353,7 @@ impl<'a> Mapper<'a> {
         }
         let mut mapped = 0;
         for (c, g) in self.chars.iter().zip(glyphs.iter_mut()) {
-            // If the color emoji has a non-printing variation selector, ignore the variation selector.
+            // If the color emoji has a presentation style, ignore the variation selector.
             if c.is_emoji_presentation {
                 break;
             }

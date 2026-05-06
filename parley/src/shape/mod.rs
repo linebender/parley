@@ -251,8 +251,7 @@ fn fill_cluster_in_place(
         //  regional indicators, subdivision flag tag sequences, skin tone modifiers
         //  See also: https://github.com/google/emoji-segmenter
 
-        // If the color emoji has a non-printing variation selector, ignore the variation selector.
-        // Its presentation depends on the platform and font.
+        // If the color emoji has a presentation style, ignore the variation selector.
         //
         // e.g.
         //  - VS-15: `U+270C + U+FE0F` - `✌`, render as text.
