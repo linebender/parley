@@ -60,6 +60,8 @@ pub struct Char {
     /// Indexes into the list of styles for the containing text run, to find the style applicable
     /// to this character.
     pub style_index: u16,
+    /// Whether the emoji with non-printing variation selector
+    pub is_emoji_with_non_printing_variation_selector: bool,
 }
 
 /// Whitespace content of a cluster.
@@ -325,6 +327,7 @@ impl CharCluster {
                 contributes_to_shaping,
                 style_index,
                 is_control_character: info.is_control(),
+                is_emoji_with_non_printing_variation_selector,
             });
         }
 
@@ -421,6 +424,11 @@ impl<'a> Mapper<'a> {
         }
         let mut mapped = 0;
         for c in self.chars.iter() {
+            // If the color emoji has a non-printing variation selector, ignore the variation selector.
+            if c.is_emoji_with_non_printing_variation_selector {
+                break;
+            }
+
             if !c.contributes_to_shaping {
                 if !self.has_contributing {
                     mapped += 1;
