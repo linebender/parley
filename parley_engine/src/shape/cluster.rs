@@ -61,8 +61,8 @@ pub struct Char {
     /// Indexes into the list of styles for the containing text run, to find the style applicable
     /// to this character.
     pub style_index: u16,
-    /// Whether the emoji with non-printing variation selector
-    pub is_emoji_with_non_printing_variation_selector: bool,
+    /// Whether the emoji presentation
+    pub is_emoji_presentation: bool,
 }
 
 /// Whitespace content of a cluster.
@@ -371,11 +371,9 @@ impl CharCluster {
             // variation sequences and
             // <https://www.unicode.org/versions/Unicode17.0.0/core-spec/chapter-23/#G19053> for
             // variation selectors more generally.
-            let is_emoji_with_non_printing_variation_selector =
-                is_emoji_or_pictograph && info.is_variation_selector();
+            let is_emoji_presentation = is_emoji_or_pictograph && info.is_variation_selector();
 
-            let contributes_to_shaping =
-                info.contributes_to_shaping() && !is_emoji_with_non_printing_variation_selector;
+            let contributes_to_shaping = info.contributes_to_shaping() && !is_emoji_presentation;
             if contributes_to_shaping {
                 map_len = map_len.saturating_add(1);
             }
@@ -385,7 +383,7 @@ impl CharCluster {
                 contributes_to_shaping,
                 style_index,
                 is_control_character: info.is_control(),
-                is_emoji_with_non_printing_variation_selector,
+                is_emoji_presentation,
             });
         }
 
