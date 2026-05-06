@@ -61,6 +61,8 @@ pub struct Char {
     /// Indexes into the list of styles for the containing text run, to find the style applicable
     /// to this character.
     pub style_index: u16,
+    /// Whether the emoji with non-printing variation selector
+    pub is_emoji_with_non_printing_variation_selector: bool,
 }
 
 /// Whitespace content of a cluster.
@@ -383,6 +385,7 @@ impl CharCluster {
                 contributes_to_shaping,
                 style_index,
                 is_control_character: info.is_control(),
+                is_emoji_with_non_printing_variation_selector,
             });
         }
 
