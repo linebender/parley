@@ -251,12 +251,12 @@ fn fill_cluster_in_place(
         //  regional indicators, subdivision flag tag sequences, skin tone modifiers
         //  See also: https://github.com/google/emoji-segmenter
 
-        // If the color emoji has a presentation style, ignore the variation selector.
+        // Unicode color emoji has two variants:
         //
-        // e.g.
-        //  - VS-15: `U+270C + U+FE0F` - `✌`, render as text.
-        //  - VS-16: `U+270C + U+FE0F` - `✌️`, render as emoji.
+        // * Emoji presentation(VS16): `U+270C + U+FE0F` - `✌️`
+        // * Text presentation(VS15): `U+270C + U+FE0E` - `✌`
         //
+        // <https://www.unicode.org/reports/tr51/>
         // <https://www.unicode.org/reports/tr37/>
         let is_emoji_presentation = is_emoji_or_pictograph && info.is_variation_selector();
 
