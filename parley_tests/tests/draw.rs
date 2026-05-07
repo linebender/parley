@@ -210,7 +210,7 @@ fn draw_colr_emoji_with_presentation_style() {
 
 /// Test COLR emoji rendering across different hinting, per-glyph transform, and scale configurations.
 ///
-/// The COLR emoji with presentation style(VS16) without setting the default font,
+/// The COLR emoji with presentation style without setting the default font,
 /// and should fallback to the system default color emoji font.
 ///
 /// The default color emoji is different for each system, so only macOS was added for testing.
@@ -223,7 +223,7 @@ fn draw_colr_emoji_with_presentation_style_without_setting_default_font() {
     let collection = &mut env.font_context().collection;
     collection.load_system_fonts();
 
-    let text = "\u{270c}\u{fe0f}\u{2705}\u{270c}\u{fe0f}";
+    let text = "\u{270c}\u{fe0f}\u{2705}\u{270c}\u{fe0e}";
 
     test_with_configs(&mut env, |env| {
         let mut builder = env.ranged_builder(text);
