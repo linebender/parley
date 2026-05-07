@@ -258,7 +258,7 @@ fn fill_cluster_in_place(
         //
         // <https://www.unicode.org/reports/tr51/>
         // <https://www.unicode.org/reports/tr37/>
-        let is_emoji_presentation = is_emoji_or_pictograph && info.is_variation_selector();
+        let is_emoji_presentation_style = is_emoji_or_pictograph && info.is_variation_selector();
 
         let contributes_to_shaping = info.contributes_to_shaping();
         if contributes_to_shaping {
@@ -271,7 +271,7 @@ fn fill_cluster_in_place(
             glyph_id: 0,
             style_index: *style_index,
             is_control_character: info.is_control(),
-            is_emoji_presentation,
+            is_emoji_presentation_style,
         });
     }
 
