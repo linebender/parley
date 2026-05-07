@@ -353,22 +353,23 @@ impl<'a> Mapper<'a> {
         }
         let mut mapped = 0;
         for (c, g) in self.chars.iter().zip(glyphs.iter_mut()) {
+            *g = f(c.ch);
+
             // If the color emoji has a presentation style, ignore the variation selector.
             if c.is_emoji_presentation_selector {
-                break;
+                mapped += 1;
+                continue;
             }
 
-            if !c.contributes_to_shaping {
-                *g = f(c.ch);
-                if self.map_len == 1 {
+            if c.contributes_to_shaping {
+                if *g != 0 {
                     mapped += 1;
                 }
-            } else {
-                let gid = f(c.ch);
-                *g = gid;
-                if gid != 0 {
-                    mapped += 1;
-                }
+                continue;
+            }
+
+            if self.map_len == 1 {
+                mapped += 1;
             }
         }
         let ratio = mapped as f32 / self.map_len as f32;
