@@ -175,7 +175,7 @@ fn draw_colr_emoji() {
 
 /// Test COLR emoji rendering across different hinting, per-glyph transform, and scale configurations.
 ///
-/// The COLR emoji with presentation style(VS-16).
+/// The COLR emoji with presentation style(VS16).
 ///
 /// The default color emoji is different for each system, so only macOS was added for testing.
 #[cfg(all(target_os = "macos", feature = "system"))]
@@ -210,8 +210,8 @@ fn draw_colr_emoji_with_presentation_style() {
 
 /// Test COLR emoji rendering across different hinting, per-glyph transform, and scale configurations.
 ///
-/// The COLR emoji with presentation style(VS-16) without setting the default font,
-/// and should fallback to the system default color emoji.
+/// The COLR emoji with presentation style(VS16) without setting the default font,
+/// and should fallback to the system default color emoji font.
 ///
 /// The default color emoji is different for each system, so only macOS was added for testing.
 #[cfg(all(target_os = "macos", feature = "system"))]
