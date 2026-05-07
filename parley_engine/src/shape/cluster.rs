@@ -426,7 +426,8 @@ impl<'a> Mapper<'a> {
         for c in self.chars.iter() {
             // If the color emoji has a presentation style, ignore the variation selector.
             if c.is_emoji_presentation_selector {
-                break;
+                mapped += 1;
+                continue;
             }
 
             if !c.contributes_to_shaping {
@@ -437,6 +438,10 @@ impl<'a> Mapper<'a> {
                 if covers(c.ch) {
                     mapped += 1;
                 }
+            }
+
+            if self.map_len == 1 {
+                mapped += 1;
             }
         }
         mapped as f32 / self.map_len as f32
