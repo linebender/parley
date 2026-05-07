@@ -251,14 +251,14 @@ fn fill_cluster_in_place(
         //  regional indicators, subdivision flag tag sequences, skin tone modifiers
         //  See also: https://github.com/google/emoji-segmenter
 
-        // Unicode color emoji has two variants:
+        // Unicode color emoji has two presentation styles:
         //
         // * Emoji presentation(VS16): `U+270C + U+FE0F` - `✌️`
         // * Text presentation(VS15): `U+270C + U+FE0E` - `✌`
         //
         // <https://www.unicode.org/reports/tr51/>
         // <https://www.unicode.org/reports/tr37/>
-        let is_emoji_presentation_style = is_emoji_or_pictograph && info.is_variation_selector();
+        let is_emoji_presentation_selector = is_emoji_or_pictograph && info.is_variation_selector();
 
         let contributes_to_shaping = info.contributes_to_shaping();
         if contributes_to_shaping {
@@ -271,7 +271,7 @@ fn fill_cluster_in_place(
             glyph_id: 0,
             style_index: *style_index,
             is_control_character: info.is_control(),
-            is_emoji_presentation_style,
+            is_emoji_presentation_selector,
         });
     }
 

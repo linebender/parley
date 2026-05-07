@@ -52,8 +52,8 @@ pub(crate) struct Char {
     /// Indexes into the list of styles for the containing text run, to find the style applicable
     /// to this character.
     pub style_index: u16,
-    /// Whether the emoji presentation style
-    pub is_emoji_presentation_style: bool,
+    /// Whether the emoji presentation selector
+    pub is_emoji_presentation_selector: bool,
 }
 
 pub(crate) type GlyphId = u16;
@@ -354,7 +354,7 @@ impl<'a> Mapper<'a> {
         let mut mapped = 0;
         for (c, g) in self.chars.iter().zip(glyphs.iter_mut()) {
             // If the color emoji has a presentation style, ignore the variation selector.
-            if c.is_emoji_presentation_style {
+            if c.is_emoji_presentation_selector {
                 break;
             }
 
