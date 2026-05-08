@@ -234,9 +234,29 @@ impl AttributeSegmentsWorkspace {
 /// let mut segments = workspace.segments(&text);
 ///
 /// while let Some(range) = segments.next() {
-///     let active_attrs: Vec<_> = segments.active_spans().iter().collect();
+///     let active_attrs = segments.active_spans();
 ///     for chunk in text.chunks(range) {
 ///         // Use `chunk.text()` with `active_attrs` for this segment.
+///         assert!(!chunk.text().is_empty());
+///     }
+///     assert!(active_attrs.len() <= 1);
+/// }
+/// ```
+///
+/// Or use [`AttributeSegments::next_segment`] to receive the range and active spans together:
+///
+/// ```
+/// use attributed_text::{AttributeSegmentsWorkspace, AttributedText, TextRange};
+///
+/// let mut text = AttributedText::new("aé日z");
+/// text.apply_attribute(TextRange::new(text.text(), 1..6).unwrap(), "emphasis");
+///
+/// let mut workspace = AttributeSegmentsWorkspace::new();
+/// let mut segments = workspace.segments(&text);
+///
+/// while let Some(segment) = segments.next_segment() {
+///     let active_attrs = segment.active_spans();
+///     for chunk in text.chunks(segment.range()) {
 ///         assert!(!chunk.text().is_empty());
 ///     }
 ///     assert!(active_attrs.len() <= 1);
@@ -284,6 +304,45 @@ impl<'w, 'a, T: Debug + TextStorage, Attr: Debug> AttributeSegments<'w, 'a, T, A
     pub fn active_spans(&self) -> ActiveSpans<'_, 'a, T, Attr> {
         ActiveSpans {
             active_ids: &self.workspace.active,
+            attributed: self.attributed,
+        }
+    }
+
+    /// Returns the next segment as a combined range and active-span view.
+    ///
+    /// This is a convenience wrapper around [`Iterator::next`] and [`Self::active_spans`].
+    /// The returned segment borrows this iterator, so it must be dropped before requesting
+    /// another segment.
+    pub fn next_segment(&mut self) -> Option<AttributeSegment<'_, 'a, T, Attr>> {
+        let range = self.next()?;
+        Some(AttributeSegment {
+            range,
+            active_ids: &self.workspace.active,
+            attributed: self.attributed,
+        })
+    }
+}
+
+/// A range yielded by [`AttributeSegments`] with its active attribute spans.
+#[derive(Clone, Debug)]
+pub struct AttributeSegment<'s, 'a, T: Debug + TextStorage, Attr: Debug> {
+    range: TextRange,
+    active_ids: &'s [u32],
+    attributed: &'a AttributedText<T, Attr>,
+}
+
+impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> AttributeSegment<'s, 'a, T, Attr> {
+    /// Returns the segment range.
+    #[must_use]
+    pub const fn range(&self) -> TextRange {
+        self.range
+    }
+
+    /// Returns the spans active over this segment.
+    #[must_use]
+    pub const fn active_spans(&self) -> ActiveSpans<'s, 'a, T, Attr> {
+        ActiveSpans {
+            active_ids: self.active_ids,
             attributed: self.attributed,
         }
     }
@@ -638,6 +697,29 @@ mod tests {
             assert_eq!(iter.next().map(|(_, c)| c), Some(&Color::Red));
             assert_eq!(iter.len(), 0);
         }
+    }
+
+    #[test]
+    fn next_segment_returns_range_and_active_spans_together() {
+        let mut at = AttributedText::new("abcd");
+        at.apply_attribute(TextRange::new(at.text(), 1..3).unwrap(), Color::Red);
+        let mut workspace = AttributeSegmentsWorkspace::new();
+        let mut segments = workspace.segments(&at);
+
+        let segment = segments.next_segment().unwrap();
+        assert_eq!(segment.range(), TextRange::new_unchecked(0, 1));
+        assert!(segment.active_spans().is_empty());
+
+        let segment = segments.next_segment().unwrap();
+        assert_eq!(segment.range(), TextRange::new_unchecked(1, 3));
+        let active: Vec<_> = segment.active_spans().iter().map(|(_, c)| c).collect();
+        assert_eq!(active, vec![&Color::Red]);
+
+        let segment = segments.next_segment().unwrap();
+        assert_eq!(segment.range(), TextRange::new_unchecked(3, 4));
+        assert!(segment.active_spans().is_empty());
+
+        assert!(segments.next_segment().is_none());
     }
 
     #[test]
