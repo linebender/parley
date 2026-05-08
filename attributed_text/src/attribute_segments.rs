@@ -8,7 +8,6 @@
 
 use alloc::vec::Vec;
 use core::fmt::Debug;
-use core::ops::Range;
 
 use crate::AttributedText;
 use crate::TextRange;
@@ -37,8 +36,8 @@ fn build_segment_state<T: Debug + TextStorage, Attr: Debug>(
     workspace.boundaries.push(0);
     workspace.boundaries.push(len_u32);
     for (range, _) in attributed.attributes_iter() {
-        let start_u32 = u32::try_from(range.start).expect("range start should fit in u32");
-        let end_u32 = u32::try_from(range.end).expect("range end should fit in u32");
+        let start_u32 = u32::try_from(range.start()).expect("range start should fit in u32");
+        let end_u32 = u32::try_from(range.end()).expect("range end should fit in u32");
         workspace.boundaries.push(start_u32);
         workspace.boundaries.push(end_u32);
     }
@@ -55,11 +54,11 @@ fn build_segment_state<T: Debug + TextStorage, Attr: Debug>(
     workspace.span_build.reserve(attr_count);
 
     for (attr_index, (range, _)) in attributed.attributes_iter().enumerate() {
-        if range.start == range.end {
+        if range.is_empty() {
             continue;
         }
-        let start_u32 = u32::try_from(range.start).expect("range start should fit in u32");
-        let end_u32 = u32::try_from(range.end).expect("range end should fit in u32");
+        let start_u32 = u32::try_from(range.start()).expect("range start should fit in u32");
+        let end_u32 = u32::try_from(range.end()).expect("range end should fit in u32");
         let start_boundary = workspace
             .boundaries
             .binary_search(&start_u32)
@@ -199,20 +198,21 @@ impl AttributeSegmentsWorkspace {
 /// let mut segments = workspace.segments(&text);
 ///
 /// assert_eq!(segments.next().map(TextRange::as_range), Some(0..1));
-/// let colors: Vec<_> = segments
-///     .active_spans()
+/// let active_spans = segments.active_spans();
+/// let mut active = active_spans
 ///     .iter()
-///     .map(|(_, c)| c)
-///     .collect();
-/// assert_eq!(colors, vec![&Color::Red]);
+///     .map(|(range, color)| (range.as_range(), color));
+/// assert_eq!(active.next(), Some((0..2, &Color::Red)));
+/// assert_eq!(active.next(), None);
 ///
 /// assert_eq!(segments.next().map(TextRange::as_range), Some(1..2));
-/// let colors: Vec<_> = segments
-///     .active_spans()
+/// let active_spans = segments.active_spans();
+/// let mut active = active_spans
 ///     .iter()
-///     .map(|(_, c)| c)
-///     .collect();
-/// assert_eq!(colors, vec![&Color::Red, &Color::Blue]);
+///     .map(|(range, color)| (range.as_range(), color));
+/// assert_eq!(active.next(), Some((0..2, &Color::Red)));
+/// assert_eq!(active.next(), Some((1..5, &Color::Blue)));
+/// assert_eq!(active.next(), None);
 ///
 /// let active = segments.active_spans();
 /// let mut count = 0;
@@ -220,6 +220,27 @@ impl AttributeSegmentsWorkspace {
 ///     count += 1;
 /// }
 /// assert_eq!(count, 2);
+/// ```
+///
+/// Read the text covered by each segment through [`AttributedText::chunks`]:
+///
+/// ```
+/// use attributed_text::{AttributeSegmentsWorkspace, AttributedText, TextRange};
+///
+/// let mut text = AttributedText::new("aé日z");
+/// text.apply_attribute(TextRange::new(text.text(), 1..6).unwrap(), "emphasis");
+///
+/// let mut workspace = AttributeSegmentsWorkspace::new();
+/// let mut segments = workspace.segments(&text);
+///
+/// while let Some(range) = segments.next() {
+///     let active_attrs: Vec<_> = segments.active_spans().iter().collect();
+///     for chunk in text.chunks(range) {
+///         // Use `chunk.text()` with `active_attrs` for this segment.
+///         assert!(!chunk.text().is_empty());
+///     }
+///     assert!(active_attrs.len() <= 1);
+/// }
 /// ```
 ///
 /// # Implementation notes
@@ -327,7 +348,7 @@ pub struct ActiveSpansIter<'s, 'a, T: Debug + TextStorage, Attr: Debug> {
 }
 
 impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> Iterator for ActiveSpansIter<'s, 'a, T, Attr> {
-    type Item = (&'a Range<usize>, &'a Attr);
+    type Item = (TextRange, &'a Attr);
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.ids.size_hint()
@@ -361,7 +382,7 @@ impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> DoubleEndedIterator
 impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> ActiveSpans<'s, 'a, T, Attr> {
     /// Iterate over the active spans in application order (ascending span id).
     ///
-    /// Each item is `(&Range<usize>, &Attr)`.
+    /// Each item is `(TextRange, &Attr)`.
     pub fn iter(&self) -> ActiveSpansIter<'_, 'a, T, Attr> {
         ActiveSpansIter {
             ids: self.active_ids.iter(),
@@ -383,7 +404,7 @@ impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> ActiveSpans<'s, 'a, T, Attr> {
 impl<'active, 's, 'a, T: Debug + TextStorage, Attr: Debug> IntoIterator
     for &'active ActiveSpans<'s, 'a, T, Attr>
 {
-    type Item = (&'a Range<usize>, &'a Attr);
+    type Item = (TextRange, &'a Attr);
     type IntoIter = ActiveSpansIter<'active, 'a, T, Attr>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -396,6 +417,7 @@ mod tests {
     use super::*;
     use alloc::vec;
     use alloc::vec::Vec;
+    use core::ops::Range;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum Color {

@@ -92,6 +92,20 @@ impl TextRange {
         self.start == self.end
     }
 
+    /// Returns `true` if `index` is contained in this range.
+    #[must_use]
+    #[inline]
+    pub const fn contains(self, index: usize) -> bool {
+        self.start <= index && index < self.end
+    }
+
+    /// Returns `true` if this range and `other` overlap.
+    #[must_use]
+    #[inline]
+    pub const fn overlaps(self, other: Self) -> bool {
+        self.start < other.end && self.end > other.start
+    }
+
     /// Returns this range as a `Range<usize>`.
     #[must_use]
     #[inline]
