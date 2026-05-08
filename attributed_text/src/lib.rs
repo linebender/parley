@@ -32,4 +32,4 @@ pub use crate::attribute_segments::{
 pub use crate::attributed_text::AttributedText;
 pub use crate::error::{BoundaryInfo, Endpoint, Error, ErrorKind};
 pub use crate::text_range::TextRange;
-pub use crate::text_storage::TextStorage;
+pub use crate::text_storage::{TextChunk, TextStorage};

@@ -6,7 +6,7 @@ use core::fmt::Debug;
 use core::ops::Range;
 
 use crate::text_range::validate_range;
-use crate::{Error, TextRange, TextStorage};
+use crate::{Error, TextChunk, TextRange, TextStorage};
 
 /// A block of text with attributes applied to ranges within the text.
 #[derive(Debug)]
@@ -50,11 +50,15 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
     }
 
     /// Borrow the underlying text as `&str` when the storage is contiguous.
-    pub fn as_str(&self) -> &str
-    where
-        T: AsRef<str>,
-    {
-        self.text.as_ref()
+    pub fn as_str(&self) -> Option<&str> {
+        self.text.as_str()
+    }
+
+    /// Iterates over borrowed text chunks covering `range`.
+    ///
+    /// The provided range must have been validated against this text.
+    pub fn chunks(&self, range: TextRange) -> impl Iterator<Item = TextChunk<'_>> {
+        self.text.chunks(range)
     }
 
     /// Apply an `attribute` to a validated [`TextRange`] within the text.
@@ -147,6 +151,7 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
 #[cfg(test)]
 mod tests {
     use crate::{AttributedText, Endpoint, ErrorKind, TextRange};
+    use alloc::vec;
     use alloc::vec::Vec;
 
     #[derive(Debug, PartialEq)]
@@ -258,6 +263,23 @@ mod tests {
         let range = TextRange::new(at.text(), 1..3).unwrap();
         at.apply_attribute(range, TestAttribute::Keep);
         assert_eq!(at.attributes_len(), 1);
+    }
+
+    #[test]
+    fn as_str_returns_contiguous_text() {
+        let at = AttributedText::<&str, ()>::new("Hello!");
+        assert_eq!(at.as_str(), Some("Hello!"));
+    }
+
+    #[test]
+    fn chunks_iterates_underlying_text() {
+        let at = AttributedText::<&str, ()>::new("aé日z");
+        let range = TextRange::new(at.text(), 1..6).unwrap();
+        let chunks: Vec<_> = at
+            .chunks(range)
+            .map(|chunk| (chunk.range().as_range(), chunk.text()))
+            .collect();
+        assert_eq!(chunks, vec![(1..6, "é日")]);
     }
 
     #[test]

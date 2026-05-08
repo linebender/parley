@@ -76,7 +76,7 @@ impl Error {
         }
     }
 
-    pub(crate) fn not_on_char_boundary<T: TextStorage>(
+    pub(crate) fn not_on_char_boundary<T: TextStorage + ?Sized>(
         text: &T,
         start: usize,
         end: usize,
@@ -182,7 +182,7 @@ pub struct BoundaryInfo {
     pub char_end: usize,
 }
 
-fn enclosing_char_span<T: TextStorage>(text: &T, index: usize) -> Option<(usize, usize)> {
+fn enclosing_char_span<T: TextStorage + ?Sized>(text: &T, index: usize) -> Option<(usize, usize)> {
     let len = text.len();
     if index > len {
         return None;
