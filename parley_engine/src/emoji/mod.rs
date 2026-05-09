@@ -196,7 +196,7 @@ pub const fn scan_emoji_presetation(
     //
     // text_emoji_run_with_vs
     let is_text_emoji_presentation_sequence =
-        is_any_emoji && len >= 2 && EmojiSegmentationCategory::Vs15.eq(categories[1]);
+        is_any_emoji && len >= 2 && categories[1].eq(EmojiSegmentationCategory::Vs15);
     if is_text_emoji_presentation_sequence && len == 2 || is_text_emoji_keycap_sequence(categories)
     {
         return ScannedEmojiPresentation {
@@ -222,7 +222,7 @@ pub const fn scan_emoji_presetation(
 
     let is_emoji_combining_enclosing_circle_backslash_sequence = is_any_emoji
         && len == 2
-        && EmojiSegmentationCategory::CombiningEnclosingCircleBackslash.eq(categories[1]);
+        && categories[1].eq(EmojiSegmentationCategory::CombiningEnclosingCircleBackslash);
     if is_emoji_combining_enclosing_circle_backslash_sequence {
         return ScannedEmojiPresentation {
             is_emoji: true,
@@ -247,7 +247,7 @@ pub const fn scan_emoji_presetation(
 
     // emoji_run_with_vs
     let is_emoji_presentation_sequence =
-        is_any_emoji && len >= 2 && EmojiSegmentationCategory::Vs16.eq(categories[1]);
+        is_any_emoji && len >= 2 && categories[1].eq(EmojiSegmentationCategory::Vs16);
     if (is_emoji_presentation_sequence && len == 2) || is_emoji_keycap_sequence(categories) {
         return ScannedEmojiPresentation {
             is_emoji: true,
@@ -257,7 +257,7 @@ pub const fn scan_emoji_presetation(
 
     let is_emoji_modifier_sequence = is_emoji_modifier_base
         && len >= 2
-        && EmojiSegmentationCategory::EmojiModifier.eq(categories[1]);
+        && categories[1].eq(EmojiSegmentationCategory::EmojiModifier);
     if is_emoji_modifier_sequence && len == 2 {
         return ScannedEmojiPresentation {
             is_emoji: true,
@@ -292,14 +292,14 @@ pub const fn scan_emoji_presetation(
 
         if cursor + 1 < len {
             let is_emoji_presentation_sequence =
-                is_any_emoji && EmojiSegmentationCategory::Vs16.eq(categories[cursor + 1]);
+                is_any_emoji && categories[cursor + 1].eq(EmojiSegmentationCategory::Vs16);
             if is_emoji_presentation_sequence {
                 cursor += 2;
                 continue;
             }
 
             let is_emoji_modifier_sequence = is_emoji_modifier_base
-                && EmojiSegmentationCategory::EmojiModifier.eq(categories[cursor + 1]);
+                && categories[cursor + 1].eq(EmojiSegmentationCategory::EmojiModifier);
             if is_emoji_modifier_sequence {
                 cursor += 2;
                 continue;
@@ -352,35 +352,35 @@ const fn emoji_matches(category: EmojiSegmentationCategory) -> (bool, bool, bool
 #[inline(always)]
 const fn is_text_emoji_keycap_sequence(categories: &[EmojiSegmentationCategory]) -> bool {
     categories.len() == 3
-        && EmojiSegmentationCategory::KeycapBase.eq(categories[0])
-        && EmojiSegmentationCategory::Vs15.eq(categories[1])
-        && EmojiSegmentationCategory::CombiningEnclosingKeycap.eq(categories[2])
+        && categories[0].eq(EmojiSegmentationCategory::KeycapBase)
+        && categories[1].eq(EmojiSegmentationCategory::Vs15)
+        && categories[2].eq(EmojiSegmentationCategory::CombiningEnclosingKeycap)
 }
 
 #[inline(always)]
 const fn is_emoji_keycap_sequence(categories: &[EmojiSegmentationCategory]) -> bool {
     categories.len() == 3
-        && EmojiSegmentationCategory::KeycapBase.eq(categories[0])
-        && EmojiSegmentationCategory::Vs16.eq(categories[1])
-        && EmojiSegmentationCategory::CombiningEnclosingKeycap.eq(categories[2])
+        && categories[0].eq(EmojiSegmentationCategory::KeycapBase)
+        && categories[1].eq(EmojiSegmentationCategory::Vs16)
+        && categories[2].eq(EmojiSegmentationCategory::CombiningEnclosingKeycap)
 }
 
 #[inline(always)]
 const fn is_emoji_flag_sequence(categories: &[EmojiSegmentationCategory]) -> bool {
     categories.len() == 2
-        && EmojiSegmentationCategory::RegionalIndicator.eq(categories[0])
-        && EmojiSegmentationCategory::RegionalIndicator.eq(categories[1])
+        && categories[0].eq(EmojiSegmentationCategory::RegionalIndicator)
+        && categories[1].eq(EmojiSegmentationCategory::RegionalIndicator)
 }
 
 #[inline(always)]
 const fn is_emoji_tag_sequence(categories: &[EmojiSegmentationCategory]) -> bool {
     let is_tag_sequence = categories.len() >= 2
-        && EmojiSegmentationCategory::TagBase.eq(categories[0])
-        && EmojiSegmentationCategory::TagTerm.eq(categories[categories.len() - 1]);
+        && categories[0].eq(EmojiSegmentationCategory::TagBase)
+        && categories[categories.len() - 1].eq(EmojiSegmentationCategory::TagTerm);
 
     let mut i = 1;
     while i < categories.len() - 1 {
-        if !EmojiSegmentationCategory::TagSequence.eq(categories[i]) {
+        if !categories[i].eq(EmojiSegmentationCategory::TagSequence) {
             return false;
         }
         i += 1;
@@ -392,6 +392,6 @@ const fn is_emoji_tag_sequence(categories: &[EmojiSegmentationCategory]) -> bool
 #[inline(always)]
 const fn is_unqualified_keycap_sequence(categories: &[EmojiSegmentationCategory]) -> bool {
     categories.len() == 2
-        && EmojiSegmentationCategory::KeycapBase.eq(categories[0])
-        && EmojiSegmentationCategory::CombiningEnclosingKeycap.eq(categories[1])
+        && categories[0].eq(EmojiSegmentationCategory::KeycapBase)
+        && categories[1].eq(EmojiSegmentationCategory::CombiningEnclosingKeycap)
 }
