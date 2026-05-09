@@ -285,7 +285,7 @@ pub(crate) const fn scan_emoji_presentation(
     //
     // emoji_zwj_element = emoji_presentation_sequence | emoji_modifier_sequence | any_emoji
     // emoji_zwj_element (zwj emoji_zwj_element)+
-    while cursor < len && EmojiSegmentationCategory::Zwj.eq(categories[cursor]) {
+    while cursor < len && categories[cursor].eq(EmojiSegmentationCategory::Zwj) {
         cursor += 1;
 
         let (is_any_emoji, is_emoji_modifier_base, _) = emoji_matches(categories[cursor]);
