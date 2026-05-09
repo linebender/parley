@@ -103,7 +103,6 @@ impl CharCluster {
     #[inline]
     pub(crate) fn clear(&mut self) {
         self.chars.clear();
-        self.is_emoji = false;
         self.map_len = 0;
         self.start = 0;
         self.end = 0;
