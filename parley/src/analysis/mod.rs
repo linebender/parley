@@ -13,9 +13,13 @@ use icu_normalizer::properties::{
     CanonicalComposition, CanonicalCompositionBorrowed, CanonicalDecomposition,
     CanonicalDecompositionBorrowed,
 };
-use icu_properties::props::{BidiMirroringGlyph, GeneralCategory, GraphemeClusterBreak, Script};
+use icu_properties::props::{
+    BidiMirroringGlyph, EmojiComponent, EmojiModifier, EmojiModifierBase, EmojiPresentation,
+    GeneralCategory, GraphemeClusterBreak, Script,
+};
 use icu_properties::{
-    CodePointMapData, CodePointMapDataBorrowed, PropertyNamesShort, PropertyNamesShortBorrowed,
+    CodePointMapData, CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed,
+    PropertyNamesShort, PropertyNamesShortBorrowed,
 };
 use icu_segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakInvariantOptions};
 use icu_segmenter::{
@@ -91,6 +95,26 @@ impl AnalysisDataSources {
     #[inline(always)]
     fn brackets(&self) -> CodePointMapDataBorrowed<'_, BidiMirroringGlyph> {
         const { CodePointMapData::new() }
+    }
+
+    #[inline(always)]
+    pub(crate) fn emoji_modifier(&self) -> CodePointSetDataBorrowed<'_> {
+        const { CodePointSetData::new::<EmojiModifier>() }
+    }
+
+    #[inline(always)]
+    pub(crate) fn emoji_modifier_base(&self) -> CodePointSetDataBorrowed<'_> {
+        const { CodePointSetData::new::<EmojiModifierBase>() }
+    }
+
+    #[inline(always)]
+    pub(crate) fn emoji_component(&self) -> CodePointSetDataBorrowed<'_> {
+        const { CodePointSetData::new::<EmojiComponent>() }
+    }
+
+    #[inline(always)]
+    pub(crate) fn emoji_presentation(&self) -> CodePointSetDataBorrowed<'_> {
+        const { CodePointSetData::new::<EmojiPresentation>() }
     }
 }
 

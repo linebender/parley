@@ -4,7 +4,7 @@
 use alloc::vec::Vec;
 use icu_normalizer::properties::Decomposed;
 
-use crate::analysis::AnalysisDataSources;
+use crate::{analysis::AnalysisDataSources, emoji::ScannedEmojiPresetation};
 
 /// The maximum number of characters in a single cluster.
 const MAX_CLUSTER_SIZE: usize = 32;
@@ -12,11 +12,11 @@ const MAX_CLUSTER_SIZE: usize = 32;
 #[derive(Debug, Default)]
 pub(crate) struct CharCluster {
     pub chars: Vec<Char>,
-    pub is_emoji: bool,
     pub map_len: u8,
     pub start: u32,
     pub end: u32,
     pub force_normalize: bool,
+    pub scanned_emoji_presetation: ScannedEmojiPresetation,
     comp: Form,
     decomp: Form,
     form: FormKind,
@@ -95,7 +95,6 @@ pub(crate) enum Status {
 impl CharCluster {
     pub(crate) fn clear(&mut self) {
         self.chars.clear();
-        self.is_emoji = false;
         self.map_len = 0;
         self.start = 0;
         self.end = 0;
@@ -104,6 +103,7 @@ impl CharCluster {
         self.decomp.clear();
         self.form = FormKind::Original;
         self.best_ratio = 0.;
+        self.scanned_emoji_presetation.clear();
     }
 
     #[inline(always)]

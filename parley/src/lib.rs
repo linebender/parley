@@ -113,6 +113,7 @@ mod bidi;
 mod builder;
 mod context;
 mod convert;
+mod emoji;
 mod font;
 mod inline_box;
 mod lru_cache;

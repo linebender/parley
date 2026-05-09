@@ -1180,7 +1180,7 @@ fn test_whitespace_contiguous_interspersed_in_latin_mixed() {
 }
 
 #[test]
-fn test_color_emoji_with_non_printing_variation_selector() {
+fn test_color_emoji_with_presentation() {
     verify_analysis("\u{270c}\u{fe0f}", |_| {})
         .expect_is_emoji_or_pictograph_list(vec![true, false])
         .expect_is_variation_selector_list(vec![false, true]);

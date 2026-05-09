@@ -14,6 +14,7 @@ use super::style::{Brush, FontFeature, FontVariation};
 use crate::analysis::cluster::{Char, CharCluster, Status};
 use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::convert::script_to_harfrust;
+use crate::emoji::{EmojiFlags, EmojiSegmentationCategory, scan_emoji_presetation};
 use crate::inline_box::InlineBox;
 use crate::lru_cache::LruCache;
 use crate::util::nearly_eq;
@@ -229,36 +230,57 @@ fn fill_cluster_in_place(
     item_infos_iter: &mut core::slice::Iter<'_, (CharInfo, u16)>,
     code_unit_offset_in_string: &mut usize,
     char_cluster: &mut CharCluster,
+    analysis_data_sources: &AnalysisDataSources,
 ) {
     // Reset cluster but keep allocation
     char_cluster.clear();
 
     let mut force_normalize = false;
-    let mut is_emoji_or_pictograph = false;
     let mut map_len: u8 = 0;
     let start = *code_unit_offset_in_string as u32;
 
+    let mut is_emoji = false;
+    let mut emoji_segmentations = Vec::with_capacity(segment_text.char_indices().count());
+
     for ((_, ch), (info, style_index)) in segment_text.char_indices().zip(item_infos_iter.by_ref())
     {
+        *code_unit_offset_in_string += ch.len_utf8();
         force_normalize |= info.force_normalize();
+
         // TODO - make emoji detection more complete, as per (except using composite Trie tables as
         //  much as possible:
         //  https://github.com/conor-93/parley/blob/4637d826732a1a82bbb3c904c7f47a16a21cceec/parley/src/shape/mod.rs#L221-L269
-        is_emoji_or_pictograph |= info.is_emoji_or_pictograph();
-        *code_unit_offset_in_string += ch.len_utf8();
 
         // TODO: Explore ignoring other modifiers in determining `contributes_to_shaping`:
         //  regional indicators, subdivision flag tag sequences, skin tone modifiers
         //  See also: https://github.com/google/emoji-segmenter
 
-        // Unicode color emoji has two presentation styles:
-        //
-        // * Emoji presentation(VS16): `U+270C + U+FE0F` - `✌️`
-        // * Text presentation(VS15): `U+270C + U+FE0E` - `✌`
-        //
-        // <https://www.unicode.org/reports/tr51/>
-        // <https://www.unicode.org/reports/tr37/>
-        let is_emoji_presentation_selector = is_emoji_or_pictograph && info.is_variation_selector();
+        is_emoji |= info.is_emoji_or_pictograph();
+
+        let mut is_emoji_presentation_selector = false;
+
+        if is_emoji {
+            let emoji_modifier = analysis_data_sources.emoji_modifier();
+            let emoji_modifier_base = analysis_data_sources.emoji_modifier_base();
+            let emoji_component = analysis_data_sources.emoji_component();
+            let emoji_presentation = analysis_data_sources.emoji_presentation();
+
+            let category = EmojiSegmentationCategory::from_codepoint(
+                ch as u32,
+                EmojiFlags::new().with_emoji(is_emoji).with_extra(
+                    emoji_modifier.contains(ch),
+                    emoji_modifier_base.contains(ch),
+                    emoji_presentation.contains(ch),
+                    emoji_component.contains(ch),
+                    info.is_region_indicator(),
+                ),
+            );
+
+            is_emoji_presentation_selector = EmojiSegmentationCategory::Vs16.eq(&category)
+                || EmojiSegmentationCategory::Vs15.eq(&category);
+
+            emoji_segmentations.push(category);
+        }
 
         let contributes_to_shaping = info.contributes_to_shaping();
         if contributes_to_shaping {
@@ -277,11 +299,14 @@ fn fill_cluster_in_place(
 
     // Finalize cluster metadata
     let end = *code_unit_offset_in_string as u32;
-    char_cluster.is_emoji = is_emoji_or_pictograph;
     char_cluster.map_len = map_len;
     char_cluster.start = start;
     char_cluster.end = end;
     char_cluster.force_normalize = force_normalize;
+
+    if is_emoji {
+        char_cluster.scanned_emoji_presetation = scan_emoji_presetation(&emoji_segmentations);
+    }
 }
 
 fn shape_item<'a, B: Brush>(
@@ -323,6 +348,7 @@ fn shape_item<'a, B: Brush>(
         &mut item_infos_iter,
         &mut code_unit_offset_in_string,
         char_cluster,
+        analysis_data_sources,
     );
 
     let mut current_font = font_selector.select_font(char_cluster, analysis_data_sources);
@@ -343,6 +369,7 @@ fn shape_item<'a, B: Brush>(
                 &mut item_infos_iter,
                 &mut code_unit_offset_in_string,
                 char_cluster,
+                analysis_data_sources,
             );
 
             if let Some(next_font) = font_selector.select_font(char_cluster, analysis_data_sources)
@@ -568,7 +595,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         analysis_data_sources: &AnalysisDataSources,
     ) -> Option<SelectedFont> {
         let style_index = cluster.style_index();
-        let is_emoji = cluster.is_emoji;
+        let is_emoji = cluster.scanned_emoji_presetation.is_emoji();
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize];
@@ -577,6 +604,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             let fonts = self.rcx.stack(style.font_family).unwrap_or(&[]);
             let fonts = fonts.iter().copied().map(QueryFamily::Id);
             if is_emoji {
+                std::dbg!(is_emoji);
                 use core::iter::once;
                 let emoji_family = QueryFamily::Generic(fontique::GenericFamily::Emoji);
                 self.query.set_families(fonts.chain(once(emoji_family)));
