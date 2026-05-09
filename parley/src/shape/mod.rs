@@ -14,7 +14,7 @@ use super::style::{Brush, FontFeature, FontVariation};
 use crate::analysis::cluster::{Char, CharCluster, Status};
 use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::convert::script_to_harfrust;
-use crate::emoji::{EmojiFlags, EmojiSegmentationCategory, scan_emoji_presetation};
+use crate::emoji::{EmojiFlags, EmojiSegmentationCategory, scan_emoji_presentation};
 use crate::inline_box::InlineBox;
 use crate::lru_cache::LruCache;
 use crate::util::nearly_eq;
@@ -305,7 +305,7 @@ fn fill_cluster_in_place(
     char_cluster.force_normalize = force_normalize;
 
     if is_emoji {
-        char_cluster.scanned_emoji_presetation = scan_emoji_presetation(&emoji_segmentations);
+        char_cluster.scanned_emoji_presentation = scan_emoji_presentation(&emoji_segmentations);
     }
 }
 
@@ -595,7 +595,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         analysis_data_sources: &AnalysisDataSources,
     ) -> Option<SelectedFont> {
         let style_index = cluster.style_index();
-        let is_emoji = cluster.scanned_emoji_presetation.is_emoji();
+        let is_emoji = cluster.scanned_emoji_presentation.is_emoji();
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize];

@@ -161,12 +161,12 @@ impl EmojiSegmentationCategory {
 }
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
-pub(crate) struct ScannedEmojiPresetation {
+pub(crate) struct ScannedEmojiPresentation {
     pub is_emoji: bool,
     pub has_vs: bool,
 }
 
-impl ScannedEmojiPresetation {
+impl ScannedEmojiPresentation {
     pub(crate) fn is_emoji(&self) -> bool {
         self.is_emoji
     }
@@ -177,13 +177,13 @@ impl ScannedEmojiPresetation {
     }
 }
 
-pub(crate) const fn scan_emoji_presetation(
+pub(crate) const fn scan_emoji_presentation(
     categories: &[EmojiSegmentationCategory],
-) -> ScannedEmojiPresetation {
+) -> ScannedEmojiPresentation {
     let len = categories.len();
 
     if len == 0 {
-        return ScannedEmojiPresetation {
+        return ScannedEmojiPresentation {
             is_emoji: false,
             has_vs: false,
         };
@@ -199,7 +199,7 @@ pub(crate) const fn scan_emoji_presetation(
         is_any_emoji && len >= 2 && EmojiSegmentationCategory::Vs15.eq(categories[1]);
     if is_text_emoji_presentation_sequence && len == 2 || is_text_emoji_keycap_sequence(categories)
     {
-        return ScannedEmojiPresetation {
+        return ScannedEmojiPresentation {
             is_emoji: false,
             has_vs: true,
         };
@@ -207,14 +207,14 @@ pub(crate) const fn scan_emoji_presetation(
 
     // emoji_run
     if is_emoji_presentation && len == 1 {
-        return ScannedEmojiPresetation {
+        return ScannedEmojiPresentation {
             is_emoji: true,
             has_vs: false,
         };
     }
 
     if is_unqualified_keycap_sequence(categories) {
-        return ScannedEmojiPresetation {
+        return ScannedEmojiPresentation {
             is_emoji: true,
             has_vs: false,
         };
@@ -224,14 +224,14 @@ pub(crate) const fn scan_emoji_presetation(
         && len == 2
         && EmojiSegmentationCategory::CombiningEnclosingCircleBackslash.eq(categories[1]);
     if is_emoji_combining_enclosing_circle_backslash_sequence {
-        return ScannedEmojiPresetation {
+        return ScannedEmojiPresentation {
             is_emoji: true,
             has_vs: false,
         };
     }
 
     if is_emoji_flag_sequence(categories) {
-        return ScannedEmojiPresetation {
+        return ScannedEmojiPresentation {
             is_emoji: true,
             has_vs: false,
         };
@@ -239,7 +239,7 @@ pub(crate) const fn scan_emoji_presetation(
 
     // TAG_BASE TAG_SEQUENCE+ TAG_TERM;
     if is_emoji_tag_sequence(categories) {
-        return ScannedEmojiPresetation {
+        return ScannedEmojiPresentation {
             is_emoji: true,
             has_vs: false,
         };
@@ -249,7 +249,7 @@ pub(crate) const fn scan_emoji_presetation(
     let is_emoji_presentation_sequence =
         is_any_emoji && len >= 2 && EmojiSegmentationCategory::Vs16.eq(categories[1]);
     if (is_emoji_presentation_sequence && len == 2) || is_emoji_keycap_sequence(categories) {
-        return ScannedEmojiPresetation {
+        return ScannedEmojiPresentation {
             is_emoji: true,
             has_vs: true,
         };
@@ -259,7 +259,7 @@ pub(crate) const fn scan_emoji_presetation(
         && len >= 2
         && EmojiSegmentationCategory::EmojiModifier.eq(categories[1]);
     if is_emoji_modifier_sequence && len == 2 {
-        return ScannedEmojiPresetation {
+        return ScannedEmojiPresentation {
             is_emoji: true,
             has_vs: false,
         };
@@ -275,7 +275,7 @@ pub(crate) const fn scan_emoji_presetation(
 
     // fast path
     if cursor == len {
-        return ScannedEmojiPresetation {
+        return ScannedEmojiPresentation {
             is_emoji: false,
             has_vs: is_text_emoji_presentation_sequence,
         };
@@ -312,7 +312,7 @@ pub(crate) const fn scan_emoji_presetation(
         }
     }
 
-    ScannedEmojiPresetation {
+    ScannedEmojiPresentation {
         is_emoji: cursor == len || is_emoji_presentation_sequence || is_emoji_modifier_sequence,
         has_vs: false,
     }
