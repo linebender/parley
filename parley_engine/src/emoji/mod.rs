@@ -1,7 +1,7 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! The Core algorithm is based on [Emoji Segmenter]'s Ragel grammar.
+//! The implementation is based on [Emoji Segmenter]'s Ragel grammar.
 //!
 //! Follow the [UTS51](Unicode Technical Standard #51).
 //!
