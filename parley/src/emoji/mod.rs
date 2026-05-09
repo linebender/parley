@@ -56,33 +56,33 @@ impl EmojiFlags {
     }
 
     #[inline(always)]
-    pub(crate) const fn is_emoji(&self) -> bool {
+    pub(crate) const fn is_emoji(self) -> bool {
         self.0 & Self::EMOJI_MASK != 0
     }
 
     #[inline(always)]
-    pub(crate) const fn is_emoji_modifier(&self) -> bool {
+    pub(crate) const fn is_emoji_modifier(self) -> bool {
         self.0 & Self::EMOJI_MODIFIER_MASK != 0
     }
 
     #[inline(always)]
-    pub(crate) const fn is_emoji_modifier_base(&self) -> bool {
+    pub(crate) const fn is_emoji_modifier_base(self) -> bool {
         self.0 & Self::EMOJI_MODIFIER_BASE_MASK != 0
     }
 
     #[inline(always)]
-    pub(crate) const fn is_emoji_presentation(&self) -> bool {
+    pub(crate) const fn is_emoji_presentation(self) -> bool {
         self.0 & Self::EMOJI_PRESENTATION_MASK != 0
     }
 
     #[allow(unused)]
     #[inline(always)]
-    pub(crate) const fn is_emoji_component(&self) -> bool {
+    pub(crate) const fn is_emoji_component(self) -> bool {
         self.0 & Self::EMOJI_COMPONENT_MASK != 0
     }
 
     #[inline(always)]
-    pub(crate) const fn is_regional_indicator(&self) -> bool {
+    pub(crate) const fn is_regional_indicator(self) -> bool {
         self.0 & Self::REGIONAL_INDICATOR_MASK != 0
     }
 }
@@ -167,7 +167,7 @@ pub(crate) struct ScannedEmojiPresentation {
 }
 
 impl ScannedEmojiPresentation {
-    pub(crate) fn is_emoji(&self) -> bool {
+    pub(crate) fn is_emoji(self) -> bool {
         self.is_emoji
     }
 
