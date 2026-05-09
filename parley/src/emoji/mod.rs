@@ -6,7 +6,7 @@
 //! Follow the [UTS51](Unicode Technical Standard #51).
 //!
 //! [Emoji Segmenter]: <https://github.com/google/emoji-segmenter>
-//! [TR51]: <https://www.unicode.org/reports/tr51/>
+//! [UTS51]: <https://www.unicode.org/reports/tr51/>
 
 #[derive(Clone, Copy, Default, Debug)]
 pub(crate) struct EmojiFlags(u32);
