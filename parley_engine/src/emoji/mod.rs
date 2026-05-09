@@ -321,14 +321,14 @@ pub const fn scan_emoji_presetation(
 /// Extracts the emoji category flags from the given category.
 ///
 /// `is_any_emoji`:
-///     EmojiTextPresentation | EmojiEmojiPresentation | KeycapBase |
-///     EmojiModifierBaseText | EmojiModifierBaseEmoji | TagBase | Emoji
+///     `EmojiTextPresentation` | `EmojiEmojiPresentation` | `KeycapBase` |
+///     `EmojiModifierBaseText` | `EmojiModifierBaseEmoji` | `TagBase` | `Emoji`
 ///
-/// `is_emoji_modifier_base`: EmojiModifierBaseText | EmojiModifierBaseEmoji
+/// `is_emoji_modifier_base`: `EmojiModifierBaseText` | `EmojiModifierBaseEmoji`
 ///
 /// `is_emoji_presentation`:
-///     EmojiEmojiPresentation | TagBase | EmojiModifierBaseEmoji |
-///     EmojiModifier | RegionalIndicator
+///     `EmojiEmojiPresentation` | `TagBase` | `EmojiModifierBaseEmoji` |
+///     `EmojiModifier` | `RegionalIndicator`
 ///
 /// Returns `(is_any_emoji, is_emoji_modifier_base, is_emoji_presentation)`
 #[inline(always)]
