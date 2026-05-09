@@ -604,7 +604,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             let fonts = self.rcx.stack(style.font_family).unwrap_or(&[]);
             let fonts = fonts.iter().copied().map(QueryFamily::Id);
             if is_emoji {
-                std::dbg!(is_emoji);
                 use core::iter::once;
                 let emoji_family = QueryFamily::Generic(fontique::GenericFamily::Emoji);
                 self.query.set_families(fonts.chain(once(emoji_family)));
