@@ -173,12 +173,12 @@ pub struct ScannedEmojiPresentation {
 
 impl ScannedEmojiPresentation {
     /// Returns true if the scanned sequence is an emoji presentation.
-    pub(crate) fn is_emoji(self) -> bool {
+    pub(crate) const fn is_emoji(self) -> bool {
         self.is_emoji
     }
 
     /// Clears the emoji presentation state.
-    pub(crate) fn clear(&mut self) {
+    pub(crate) const fn clear(&mut self) {
         self.is_emoji = false;
         self.has_vs = false;
     }
