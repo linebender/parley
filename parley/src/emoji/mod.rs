@@ -126,7 +126,7 @@ impl EmojiSegmentationCategory {
             0xFE0E => Self::Vs15,
             0xFE0F => Self::Vs16,
             0x1F3F4 => Self::TagBase,
-            0xE0030..=0xE0039 | 0xE0061..0xE007A => Self::TagSequence,
+            0xE0030..=0xE0039 | 0xE0061..=0xE007A => Self::TagSequence,
             0xE007F => Self::TagTerm,
             _ => {
                 if flags.is_emoji_modifier_base() {
@@ -206,7 +206,8 @@ pub(crate) const fn scan_emoji_presentation(
     // text_emoji_run_with_vs
     let is_text_emoji_presentation_sequence =
         is_any_emoji && len >= 2 && categories[1].eq(EmojiSegmentationCategory::Vs15);
-    if is_text_emoji_presentation_sequence && len == 2 || is_text_emoji_keycap_sequence(categories)
+    if (is_text_emoji_presentation_sequence && len == 2)
+        || is_text_emoji_keycap_sequence(categories)
     {
         return ScannedEmojiPresentation {
             is_emoji: false,
