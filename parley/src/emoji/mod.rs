@@ -113,6 +113,8 @@ pub(crate) enum EmojiSegmentationCategory {
 
 impl EmojiSegmentationCategory {
     /// Returns the category of the given codepoint and flags.
+    ///
+    /// <https://unicode.org/reports/tr51/#Definitions>
     #[inline]
     pub(crate) const fn from_codepoint(cp: u32, flags: EmojiFlags) -> Self {
         match cp {
@@ -163,7 +165,7 @@ impl EmojiSegmentationCategory {
     }
 }
 
-/// Used to control the presentation style of the emoji.
+/// Used to control the presentation style of an emoji.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
 pub(crate) struct ScannedEmojiPresentation {
     pub is_emoji: bool,
@@ -303,14 +305,14 @@ pub(crate) const fn scan_emoji_presentation(
 /// Extracts the emoji category flags from the given category.
 ///
 /// - `is_any_emoji`:
-///     `EmojiTextPresentation` | `EmojiEmojiPresentation` | `KeycapBase` |
-///     `EmojiModifierBaseText` | `EmojiModifierBaseEmoji` | `TagBase` | `Emoji`
+///   `EmojiTextPresentation` | `EmojiEmojiPresentation` | `KeycapBase` |
+///   `EmojiModifierBaseText` | `EmojiModifierBaseEmoji` | `TagBase` | `Emoji`
 ///
 /// - `is_emoji_modifier_base`: `EmojiModifierBaseText` | `EmojiModifierBaseEmoji`
 ///
 /// - `is_emoji_presentation`:
-///     `EmojiEmojiPresentation` | `TagBase` | `EmojiModifierBaseEmoji` |
-///     `EmojiModifier` | `RegionalIndicator`
+///   `EmojiEmojiPresentation` | `TagBase` | `EmojiModifierBaseEmoji` |
+///   `EmojiModifier` | `RegionalIndicator`
 ///
 /// Returns a tuple: `(is_any_emoji, is_emoji_modifier_base, is_emoji_presentation)`.
 ///
