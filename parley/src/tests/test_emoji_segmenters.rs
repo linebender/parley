@@ -3,7 +3,7 @@
 
 //! Tests extracted from the [emoji segmenter].
 //!
-//! [emoji segmenter]: <https://github.com/unicode-org/emoji-segmenter>
+//! [emoji segmenter]: <https://github.com/google/emoji-segmenter>
 
 use core::char;
 use std::vec::Vec;
