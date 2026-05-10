@@ -1,14 +1,15 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! The implementation is based on [Emoji Segmenter]'s Ragel grammar.
+//! This implementation is based on [Emoji Segmenter]'s Ragel grammar (Apache-2.0).
 //!
-//! Follow the [UTS51](Unicode Technical Standard #51).
+//! And follow the [UTS51](Unicode Technical Standard #51).
 //!
 //! [Emoji Segmenter]: <https://github.com/google/emoji-segmenter>
 //! [UTS51]: <https://www.unicode.org/reports/tr51/>
 
-#[derive(Clone, Copy, Default, Debug)]
+/// Flags are used to identify [`EmojiSegmentationCategory`].
+#[derive(Clone, Copy, Default)]
 pub(crate) struct EmojiFlags(u32);
 
 impl EmojiFlags {
@@ -27,18 +28,18 @@ impl EmojiFlags {
     const EMOJI_COMPONENT_MASK: u32 = 1 << Self::EMOJI_COMPONENT_SHIFT;
     const REGIONAL_INDICATOR_MASK: u32 = 1 << Self::REGIONAL_INDICATOR_SHIFT;
 
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn new() -> Self {
         Self(0)
     }
 
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn with_emoji(mut self, is_emoji: bool) -> Self {
         self.0 |= (is_emoji as u32) << Self::EMOJI_SHIFT;
         self
     }
 
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn with_extra(
         mut self,
         is_emoji_modifier: bool,
@@ -55,40 +56,41 @@ impl EmojiFlags {
         self
     }
 
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn is_emoji(self) -> bool {
         self.0 & Self::EMOJI_MASK != 0
     }
 
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn is_emoji_modifier(self) -> bool {
         self.0 & Self::EMOJI_MODIFIER_MASK != 0
     }
 
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn is_emoji_modifier_base(self) -> bool {
         self.0 & Self::EMOJI_MODIFIER_BASE_MASK != 0
     }
 
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn is_emoji_presentation(self) -> bool {
         self.0 & Self::EMOJI_PRESENTATION_MASK != 0
     }
 
     #[allow(unused)]
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn is_emoji_component(self) -> bool {
         self.0 & Self::EMOJI_COMPONENT_MASK != 0
     }
 
-    #[inline(always)]
+    #[inline]
     pub(crate) const fn is_regional_indicator(self) -> bool {
         self.0 & Self::REGIONAL_INDICATOR_MASK != 0
     }
 }
 
+/// Represents the category of an emoji segmentation.
 #[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum EmojiSegmentationCategory {
     Emoji = 0,
     EmojiTextPresentation,
@@ -110,11 +112,12 @@ pub(crate) enum EmojiSegmentationCategory {
 }
 
 impl EmojiSegmentationCategory {
-    #[inline(always)]
+    /// Returns the category of the given codepoint and flags.
+    #[inline]
     pub(crate) const fn from_codepoint(cp: u32, flags: EmojiFlags) -> Self {
         match cp {
             // '0'..'9', '#', '*'
-            0x30..=0x39 | 0x23 | 0x2a => Self::KeycapBase,
+            0x30..=0x39 | 0x23 | 0x2A => Self::KeycapBase,
             0x200D => Self::Zwj,
             0x20E0 => Self::CombiningEnclosingCircleBackslash,
             0x20E3 => Self::CombiningEnclosingKeycap,
@@ -160,6 +163,7 @@ impl EmojiSegmentationCategory {
     }
 }
 
+/// Used to control the presentation style of the emoji.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
 pub(crate) struct ScannedEmojiPresentation {
     pub is_emoji: bool,
@@ -167,16 +171,21 @@ pub(crate) struct ScannedEmojiPresentation {
 }
 
 impl ScannedEmojiPresentation {
+    /// Returns true if the scanned sequence is an emoji presentation.
     pub(crate) fn is_emoji(self) -> bool {
         self.is_emoji
     }
 
+    /// Clears the emoji presentation state.
     pub(crate) fn clear(&mut self) {
         self.is_emoji = false;
         self.has_vs = false;
     }
 }
 
+/// Scan the given categories for an emoji presentation sequence.
+///
+/// Returns a [`ScannedEmojiPresentation`] indicating whether the sequence is an emoji presentation.
 pub(crate) const fn scan_emoji_presentation(
     categories: &[EmojiSegmentationCategory],
 ) -> ScannedEmojiPresentation {
@@ -192,8 +201,6 @@ pub(crate) const fn scan_emoji_presentation(
     let (is_any_emoji, is_emoji_modifier_base, is_emoji_presentation) =
         emoji_matches(categories[0]);
 
-    // In order to give the the VS15 sequences higher priority than detecting
-    //
     // text_emoji_run_with_vs
     let is_text_emoji_presentation_sequence =
         is_any_emoji && len >= 2 && categories[1].eq(EmojiSegmentationCategory::Vs15);
@@ -207,13 +214,6 @@ pub(crate) const fn scan_emoji_presentation(
 
     // emoji_run
     if is_emoji_presentation && len == 1 {
-        return ScannedEmojiPresentation {
-            is_emoji: true,
-            has_vs: false,
-        };
-    }
-
-    if is_unqualified_keycap_sequence(categories) {
         return ScannedEmojiPresentation {
             is_emoji: true,
             has_vs: false,
@@ -237,7 +237,6 @@ pub(crate) const fn scan_emoji_presentation(
         };
     }
 
-    // TAG_BASE TAG_SEQUENCE+ TAG_TERM;
     if is_emoji_tag_sequence(categories) {
         return ScannedEmojiPresentation {
             is_emoji: true,
@@ -265,7 +264,7 @@ pub(crate) const fn scan_emoji_presentation(
         };
     }
 
-    let mut cursor = if is_emoji_presentation_sequence || is_emoji_modifier_sequence {
+    let cursor = if is_emoji_presentation_sequence || is_emoji_modifier_sequence {
         2
     } else if is_any_emoji {
         1
@@ -281,16 +280,121 @@ pub(crate) const fn scan_emoji_presentation(
         };
     }
 
-    // zwj sequences
-    //
-    // emoji_zwj_element = emoji_presentation_sequence | emoji_modifier_sequence | any_emoji
-    // emoji_zwj_element (zwj emoji_zwj_element)+
-    while cursor < len && categories[cursor].eq(EmojiSegmentationCategory::Zwj) {
+    if is_emoji_zwj_sequence(categories, cursor) {
+        return ScannedEmojiPresentation {
+            is_emoji: true,
+            has_vs: false,
+        };
+    }
+
+    if is_unqualified_keycap_sequence(categories) {
+        return ScannedEmojiPresentation {
+            is_emoji: true,
+            has_vs: false,
+        };
+    }
+
+    ScannedEmojiPresentation {
+        is_emoji: is_emoji_presentation_sequence || is_emoji_modifier_sequence,
+        has_vs: false,
+    }
+}
+
+/// Extracts the emoji category flags from the given category.
+///
+/// ```
+/// - `is_any_emoji`:
+///     `EmojiTextPresentation` | `EmojiEmojiPresentation` | `KeycapBase` |
+///     `EmojiModifierBaseText` | `EmojiModifierBaseEmoji` | `TagBase` | `Emoji`
+///
+/// - `is_emoji_modifier_base`: `EmojiModifierBaseText` | `EmojiModifierBaseEmoji`
+///
+/// - `is_emoji_presentation`:
+///     `EmojiEmojiPresentation` | `TagBase` | `EmojiModifierBaseEmoji` |
+///     `EmojiModifier` | `RegionalIndicator`
+/// ```
+///
+/// Returns a tuple: `(is_any_emoji, is_emoji_modifier_base, is_emoji_presentation)`.
+///
+/// <https://unicode.org/reports/tr51/#Definitions>
+#[inline]
+const fn emoji_matches(category: EmojiSegmentationCategory) -> (bool, bool, bool) {
+    use EmojiSegmentationCategory::*;
+    match category {
+        EmojiTextPresentation | KeycapBase | Emoji => (true, false, false),
+        EmojiEmojiPresentation | TagBase => (true, false, true),
+        EmojiModifierBaseText => (true, true, false),
+        EmojiModifierBaseEmoji => (true, true, true),
+        EmojiModifier | RegionalIndicator => (false, false, true),
+        _ => (false, false, false),
+    }
+}
+
+/// Text emoji keycap sequence.
+///
+/// This is a special case of text emoji presentation sequence.
+#[inline]
+const fn is_text_emoji_keycap_sequence(categories: &[EmojiSegmentationCategory]) -> bool {
+    categories.len() == 3
+        && categories[0].eq(EmojiSegmentationCategory::KeycapBase)
+        && categories[1].eq(EmojiSegmentationCategory::Vs15)
+        && categories[2].eq(EmojiSegmentationCategory::CombiningEnclosingKeycap)
+}
+
+/// Emoji flag sequence.
+///
+/// <https://unicode.org/reports/tr51/#def_emoji_flag_sequence>
+#[inline]
+const fn is_emoji_flag_sequence(categories: &[EmojiSegmentationCategory]) -> bool {
+    categories.len() == 2
+        && categories[0].eq(EmojiSegmentationCategory::RegionalIndicator)
+        && categories[1].eq(EmojiSegmentationCategory::RegionalIndicator)
+}
+
+/// Emoji tag sequence (ETS).
+///
+/// <https://unicode.org/reports/tr51/#def_emoji_tag_sequence>
+#[inline]
+const fn is_emoji_tag_sequence(categories: &[EmojiSegmentationCategory]) -> bool {
+    let is_tag_sequence = categories.len() >= 2
+        && categories[0].eq(EmojiSegmentationCategory::TagBase)
+        && categories[categories.len() - 1].eq(EmojiSegmentationCategory::TagTerm);
+
+    let mut i = 1;
+    while i < categories.len() - 1 {
+        if !categories[i].eq(EmojiSegmentationCategory::TagSequence) {
+            return false;
+        }
+        i += 1;
+    }
+
+    is_tag_sequence
+}
+
+/// Emoji keycap sequence.
+///
+/// <https://unicode.org/reports/tr51/#def_emoji_keycap_sequence>
+#[inline]
+const fn is_emoji_keycap_sequence(categories: &[EmojiSegmentationCategory]) -> bool {
+    categories.len() == 3
+        && categories[0].eq(EmojiSegmentationCategory::KeycapBase)
+        && categories[1].eq(EmojiSegmentationCategory::Vs16)
+        && categories[2].eq(EmojiSegmentationCategory::CombiningEnclosingKeycap)
+}
+
+/// Emoji ZWJ sequence.
+///
+/// <https://unicode.org/reports/tr51/#def_emoji_zwj_sequence>
+const fn is_emoji_zwj_sequence(
+    categories: &[EmojiSegmentationCategory],
+    mut cursor: usize,
+) -> bool {
+    while cursor + 1 < categories.len() && categories[cursor].eq(EmojiSegmentationCategory::Zwj) {
         cursor += 1;
 
         let (is_any_emoji, is_emoji_modifier_base, _) = emoji_matches(categories[cursor]);
 
-        if cursor + 1 < len {
+        if cursor + 1 < categories.len() {
             let is_emoji_presentation_sequence =
                 is_any_emoji && categories[cursor + 1].eq(EmojiSegmentationCategory::Vs16);
             if is_emoji_presentation_sequence {
@@ -308,88 +412,13 @@ pub(crate) const fn scan_emoji_presentation(
 
         if is_any_emoji {
             cursor += 1;
-            continue;
         }
     }
 
-    ScannedEmojiPresentation {
-        is_emoji: cursor == len || is_emoji_presentation_sequence || is_emoji_modifier_sequence,
-        has_vs: false,
-    }
+    cursor == categories.len()
 }
 
-/// Extracts the emoji category flags from the given category.
-///
-/// `is_any_emoji`:
-///     `EmojiTextPresentation` | `EmojiEmojiPresentation` | `KeycapBase` |
-///     `EmojiModifierBaseText` | `EmojiModifierBaseEmoji` | `TagBase` | `Emoji`
-///
-/// `is_emoji_modifier_base`: `EmojiModifierBaseText` | `EmojiModifierBaseEmoji`
-///
-/// `is_emoji_presentation`:
-///     `EmojiEmojiPresentation` | `TagBase` | `EmojiModifierBaseEmoji` |
-///     `EmojiModifier` | `RegionalIndicator`
-///
-/// Returns `(is_any_emoji, is_emoji_modifier_base, is_emoji_presentation)`
-#[inline(always)]
-const fn emoji_matches(category: EmojiSegmentationCategory) -> (bool, bool, bool) {
-    use EmojiSegmentationCategory::*;
-
-    match category {
-        EmojiTextPresentation | KeycapBase | Emoji => (true, false, false),
-
-        EmojiEmojiPresentation | TagBase => (true, false, true),
-
-        EmojiModifierBaseText => (true, true, false),
-        EmojiModifierBaseEmoji => (true, true, true),
-
-        EmojiModifier | RegionalIndicator => (false, false, true),
-
-        _ => (false, false, false),
-    }
-}
-
-#[inline(always)]
-const fn is_text_emoji_keycap_sequence(categories: &[EmojiSegmentationCategory]) -> bool {
-    categories.len() == 3
-        && categories[0].eq(EmojiSegmentationCategory::KeycapBase)
-        && categories[1].eq(EmojiSegmentationCategory::Vs15)
-        && categories[2].eq(EmojiSegmentationCategory::CombiningEnclosingKeycap)
-}
-
-#[inline(always)]
-const fn is_emoji_keycap_sequence(categories: &[EmojiSegmentationCategory]) -> bool {
-    categories.len() == 3
-        && categories[0].eq(EmojiSegmentationCategory::KeycapBase)
-        && categories[1].eq(EmojiSegmentationCategory::Vs16)
-        && categories[2].eq(EmojiSegmentationCategory::CombiningEnclosingKeycap)
-}
-
-#[inline(always)]
-const fn is_emoji_flag_sequence(categories: &[EmojiSegmentationCategory]) -> bool {
-    categories.len() == 2
-        && categories[0].eq(EmojiSegmentationCategory::RegionalIndicator)
-        && categories[1].eq(EmojiSegmentationCategory::RegionalIndicator)
-}
-
-#[inline(always)]
-const fn is_emoji_tag_sequence(categories: &[EmojiSegmentationCategory]) -> bool {
-    let is_tag_sequence = categories.len() >= 2
-        && categories[0].eq(EmojiSegmentationCategory::TagBase)
-        && categories[categories.len() - 1].eq(EmojiSegmentationCategory::TagTerm);
-
-    let mut i = 1;
-    while i < categories.len() - 1 {
-        if !categories[i].eq(EmojiSegmentationCategory::TagSequence) {
-            return false;
-        }
-        i += 1;
-    }
-
-    is_tag_sequence
-}
-
-#[inline(always)]
+#[inline]
 const fn is_unqualified_keycap_sequence(categories: &[EmojiSegmentationCategory]) -> bool {
     categories.len() == 2
         && categories[0].eq(EmojiSegmentationCategory::KeycapBase)

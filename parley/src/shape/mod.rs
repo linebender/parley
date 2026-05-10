@@ -276,8 +276,8 @@ fn fill_cluster_in_place(
                 ),
             );
 
-            is_emoji_presentation_selector = EmojiSegmentationCategory::Vs16.eq(&category)
-                || EmojiSegmentationCategory::Vs15.eq(&category);
+            is_emoji_presentation_selector = category.eq(&EmojiSegmentationCategory::Vs16)
+                || category.eq(&EmojiSegmentationCategory::Vs15);
 
             emoji_segmentations.push(category);
         }
