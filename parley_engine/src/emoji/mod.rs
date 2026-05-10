@@ -359,6 +359,10 @@ const fn is_emoji_tag_sequence(categories: &[EmojiSegmentationCategory]) -> bool
         && categories[0].eq(EmojiSegmentationCategory::TagBase)
         && categories[categories.len() - 1].eq(EmojiSegmentationCategory::TagTerm);
 
+    if !is_tag_sequence {
+        return false;
+    }
+
     let mut i = 1;
     while i < categories.len() - 1 {
         if !categories[i].eq(EmojiSegmentationCategory::TagSequence) {
