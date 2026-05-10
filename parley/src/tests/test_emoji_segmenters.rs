@@ -1,6 +1,10 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+//! Tests extracted from the [emoji segmenter].
+//!
+//! [emoji segmenter]: <https://github.com/unicode-org/emoji-segmenter>
+
 use core::char;
 use std::vec::Vec;
 

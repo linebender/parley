@@ -1,11 +1,11 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! This implementation is based on [Emoji Segmenter]'s Ragel grammar (Apache-2.0).
+//! This implementation is based on [emoji segmenter]'s Ragel grammar (Apache-2.0).
 //!
 //! And follow the [UTS51](Unicode Technical Standard #51).
 //!
-//! [Emoji Segmenter]: <https://github.com/google/emoji-segmenter>
+//! [emoji segmenter]: <https://github.com/google/emoji-segmenter>
 //! [UTS51]: <https://www.unicode.org/reports/tr51/>
 
 /// Flags are used to identify [`EmojiSegmentationCategory`].
@@ -302,7 +302,6 @@ pub(crate) const fn scan_emoji_presentation(
 
 /// Extracts the emoji category flags from the given category.
 ///
-/// ```
 /// - `is_any_emoji`:
 ///     `EmojiTextPresentation` | `EmojiEmojiPresentation` | `KeycapBase` |
 ///     `EmojiModifierBaseText` | `EmojiModifierBaseEmoji` | `TagBase` | `Emoji`
@@ -312,7 +311,6 @@ pub(crate) const fn scan_emoji_presentation(
 /// - `is_emoji_presentation`:
 ///     `EmojiEmojiPresentation` | `TagBase` | `EmojiModifierBaseEmoji` |
 ///     `EmojiModifier` | `RegionalIndicator`
-/// ```
 ///
 /// Returns a tuple: `(is_any_emoji, is_emoji_modifier_base, is_emoji_presentation)`.
 ///
