@@ -14,7 +14,7 @@ use super::style::{Brush, FontFeature, FontVariation};
 use crate::analysis::cluster::{Char, CharCluster, Status};
 use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::convert::script_to_harfrust;
-use crate::emoji::{EmojiFlags, EmojiSegmentationCategory, scan_emoji_presentation};
+use crate::emoji::{EmojiDFA, EmojiFlags, EmojiSegmentationCategory};
 use crate::inline_box::InlineBox;
 use crate::lru_cache::LruCache;
 use crate::util::nearly_eq;
@@ -240,7 +240,7 @@ fn fill_cluster_in_place(
     let start = *code_unit_offset_in_string as u32;
 
     let mut is_emoji = false;
-    let mut emoji_segmentations = Vec::with_capacity(segment_text.char_indices().count());
+    let mut emoji_dfa = EmojiDFA::new();
 
     for ((_, ch), (info, style_index)) in segment_text.char_indices().zip(item_infos_iter.by_ref())
     {
@@ -276,10 +276,10 @@ fn fill_cluster_in_place(
                 ),
             );
 
-            is_emoji_presentation_selector = category.eq(&EmojiSegmentationCategory::Vs16)
-                || category.eq(&EmojiSegmentationCategory::Vs15);
+            is_emoji_presentation_selector = category.eq(EmojiSegmentationCategory::Vs16)
+                || category.eq(EmojiSegmentationCategory::Vs15);
 
-            emoji_segmentations.push(category);
+            emoji_dfa.step_record(category);
         }
 
         let contributes_to_shaping = info.contributes_to_shaping();
@@ -305,7 +305,7 @@ fn fill_cluster_in_place(
     char_cluster.force_normalize = force_normalize;
 
     if is_emoji {
-        char_cluster.scanned_emoji_presentation = scan_emoji_presentation(&emoji_segmentations);
+        char_cluster.emoji_presentation_style = emoji_dfa.presentation_style();
     }
 }
 
@@ -595,7 +595,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         analysis_data_sources: &AnalysisDataSources,
     ) -> Option<SelectedFont> {
         let style_index = cluster.style_index();
-        let is_emoji = cluster.scanned_emoji_presentation.is_emoji();
+        let is_emoji = cluster.emoji_presentation_style.is_emoji();
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize];
