@@ -1,6 +1,7 @@
-use crate::emoji::types::EmojiSequence;
+// Copyright 2026 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::types::{EmojiPresentationStyle, EmojiSegmentationCategory, EmojiState};
+use super::types::{EmojiPresentationStyle, EmojiSegmentationCategory, EmojiSequence, EmojiState};
 
 /// The transition table for Emoji DFA.
 ///
