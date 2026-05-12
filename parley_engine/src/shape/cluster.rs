@@ -7,7 +7,7 @@
 use alloc::vec::Vec;
 use icu_normalizer::properties::Decomposed;
 
-use crate::{CharInfo, analysis::AnalysisDataSources};
+use crate::{CharInfo, analysis::AnalysisDataSources, emoji::EmojiPresentationStyle};
 
 #[derive(Debug, Default)]
 pub struct CharCluster {
@@ -17,6 +17,7 @@ pub struct CharCluster {
     start: u32,
     end: u32,
     force_normalize: bool,
+    emoji_presentation_style: EmojiPresentationStyle,
     comp: Form,
     decomp: Form,
     best_ratio: f32,
@@ -110,6 +111,7 @@ impl CharCluster {
         self.comp.clear();
         self.decomp.clear();
         self.best_ratio = 0.;
+        self.emoji_presentation_style = EmojiPresentationStyle::Default;
     }
 
     #[inline(always)]
