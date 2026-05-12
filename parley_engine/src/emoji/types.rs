@@ -103,14 +103,17 @@ pub(crate) enum EmojiState {
 }
 
 impl EmojiState {
+    #[inline]
     pub(crate) const fn as_usize(self) -> usize {
         self as usize
     }
 
+    #[inline]
     pub(crate) const fn as_u8(self) -> u8 {
         self as u8
     }
 
+    #[inline]
     pub(crate) const fn eq(self, other: Self) -> bool {
         self.as_u8() == other.as_u8()
     }
@@ -203,14 +206,17 @@ impl EmojiSegmentationCategory {
         }
     }
 
+    #[inline]
     pub(crate) const fn as_usize(self) -> usize {
         self as usize
     }
 
+    #[inline]
     pub(crate) const fn as_u8(self) -> u8 {
         self as u8
     }
 
+    #[inline]
     pub(crate) const fn eq(self, other: Self) -> bool {
         self.as_u8() == other.as_u8()
     }
@@ -244,10 +250,12 @@ pub(crate) enum EmojiSequence {
 }
 
 impl EmojiSequence {
+    #[inline]
     pub(crate) const fn as_u8(self) -> u8 {
         self as u8
     }
 
+    #[inline]
     pub(crate) const fn eq(self, other: Self) -> bool {
         self.as_u8() == other.as_u8()
     }
@@ -263,14 +271,17 @@ pub enum EmojiPresentationStyle {
 }
 
 impl EmojiPresentationStyle {
+    #[inline]
     pub(crate) const fn is_emoji(self) -> bool {
         self.eq(Self::Emoji)
     }
 
+    #[inline]
     pub(crate) const fn as_u8(self) -> u8 {
         self as u8
     }
 
+    #[inline]
     pub(crate) const fn eq(self, other: Self) -> bool {
         self.as_u8() == other.as_u8()
     }
