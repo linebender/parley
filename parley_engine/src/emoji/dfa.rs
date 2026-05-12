@@ -160,18 +160,18 @@ impl EmojiDFA {
     }
 
     #[inline]
-    pub(crate) const fn is_rejected(&self) -> bool {
+    pub(crate) const fn is_rejected(self) -> bool {
         self.state.eq(EmojiState::Reject)
     }
 
     #[inline]
-    pub(crate) const fn is_started(&self) -> bool {
+    pub(crate) const fn is_started(self) -> bool {
         self.state.eq(EmojiState::Start)
     }
 
     #[allow(unused)]
     #[inline]
-    pub(crate) const fn is_accepting(&self) -> bool {
+    pub(crate) const fn is_accepting(self) -> bool {
         const START: u8 = EmojiState::Terminal.as_u8();
         const END: u8 = EmojiState::Ri.as_u8();
 
@@ -181,17 +181,17 @@ impl EmojiDFA {
     }
 
     #[inline]
-    pub(crate) const fn contains_state(&self, state: EmojiState) -> bool {
+    pub(crate) const fn contains_state(self, state: EmojiState) -> bool {
         self.recorded[0] & (1 << state.as_u8()) != 0
     }
 
     #[inline]
-    pub(crate) const fn contains_category(&self, category: EmojiSegmentationCategory) -> bool {
+    pub(crate) const fn contains_category(self, category: EmojiSegmentationCategory) -> bool {
         self.recorded[1] & (1 << category.as_u8()) != 0
     }
 
     #[inline]
-    pub(crate) const fn sequence(&self) -> EmojiSequence {
+    pub(crate) const fn sequence(self) -> EmojiSequence {
         if self.contains_category(EmojiSegmentationCategory::Zwj) {
             return EmojiSequence::Zwj;
         }
