@@ -136,16 +136,18 @@ impl EmojiDFA {
         recorded: [0, 0],
     };
 
+    #[inline]
     pub(crate) const fn new() -> Self {
         Self::DEFAULT
     }
 
+    #[inline]
     pub(crate) const fn step(&mut self, category: EmojiSegmentationCategory) {
         self.state = DFA_TRANS[self.state.as_usize()][category.as_usize()];
     }
 
-    // pub(crate) const fn step_record(&mut self, category: EmojiSegmentationCategory) {
-    pub(crate) fn step_record(&mut self, category: EmojiSegmentationCategory) {
+    #[inline]
+    pub(crate) const fn step_record(&mut self, category: EmojiSegmentationCategory) {
         self.step(category);
 
         if self.is_rejected() || self.is_started() {
@@ -156,15 +158,18 @@ impl EmojiDFA {
         self.recorded[1] |= 1 << category.as_u8();
     }
 
+    #[inline]
     pub(crate) const fn is_rejected(&self) -> bool {
         self.state.eq(EmojiState::Reject)
     }
 
+    #[inline]
     pub(crate) const fn is_started(&self) -> bool {
         self.state.eq(EmojiState::Start)
     }
 
     #[allow(unused)]
+    #[inline]
     pub(crate) const fn is_accepting(&self) -> bool {
         const START: u8 = EmojiState::Terminal.as_u8();
         const END: u8 = EmojiState::Ri.as_u8();
@@ -174,14 +179,17 @@ impl EmojiDFA {
         START <= cur && cur <= END
     }
 
+    #[inline]
     pub(crate) const fn contains_state(&self, state: EmojiState) -> bool {
         self.recorded[0] & (1 << state.as_u8()) != 0
     }
 
+    #[inline]
     pub(crate) const fn contains_category(&self, category: EmojiSegmentationCategory) -> bool {
         self.recorded[1] & (1 << category.as_u8()) != 0
     }
 
+    #[inline]
     pub(crate) const fn sequence(&self) -> EmojiSequence {
         if self.contains_category(EmojiSegmentationCategory::Zwj) {
             return EmojiSequence::Zwj;
@@ -221,6 +229,7 @@ impl EmojiDFA {
         EmojiSequence::Basic
     }
 
+    #[inline]
     pub(crate) const fn presentation_style(&self) -> EmojiPresentationStyle {
         if self.contains_category(EmojiSegmentationCategory::Vs15) {
             return EmojiPresentationStyle::Text;
