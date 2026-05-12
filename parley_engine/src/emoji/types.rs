@@ -1,3 +1,6 @@
+// Copyright 2026 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 /// Flags are used to identify [`EmojiSegmentationCategory`].
 #[derive(Clone, Copy, Default)]
 pub struct EmojiFlags(u32);
