@@ -96,7 +96,7 @@ pub(crate) enum EmojiState {
     OptionalZwj,
     KeycapVs,
     TagBase,
-    /// RegionalIndicator
+    /// `RegionalIndicator`
     Ri,
 
     TagSpec,
@@ -148,7 +148,7 @@ pub enum EmojiSegmentationCategory {
     EmojiModifierBaseText,
     EmojiModifierBaseEmoji,
     EmojiModifier,
-    /// RegionalIndicator
+    /// `RegionalIndicator`
     Ri,
     KeycapBase,
     KeycapTerm,
