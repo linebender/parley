@@ -12,35 +12,42 @@ static DFA_TRANS: [[EmojiState; 16]; 15] = {
 
     let mut t = [[State::Reject; 16]; 15];
 
+    // Add a state transition to the DFA transition table.
+    macro_rules! add {
+        ($state:expr, $category:expr, $next_state:expr) => {
+            t[$state.as_usize()][$category.as_usize()] = $next_state
+        };
+    }
+
     {
-        t[State::Start.as_usize()][Category::None.as_usize()] = State::Start;
-        t[State::Start.as_usize()][Category::KeycapTerm.as_usize()] = State::Start;
-        t[State::Start.as_usize()][Category::Zwj.as_usize()] = State::Start;
-        t[State::Start.as_usize()][Category::Vs15.as_usize()] = State::Start;
-        t[State::Start.as_usize()][Category::Vs16.as_usize()] = State::Start;
-        t[State::Start.as_usize()][Category::TagSpec.as_usize()] = State::Start;
-        t[State::Start.as_usize()][Category::TagTerm.as_usize()] = State::Start;
+        add!(State::Start, Category::None, State::Start);
+        add!(State::Start, Category::KeycapTerm, State::Start);
+        add!(State::Start, Category::Zwj, State::Start);
+        add!(State::Start, Category::Vs15, State::Start);
+        add!(State::Start, Category::Vs16, State::Start);
+        add!(State::Start, Category::TagSpec, State::Start);
+        add!(State::Start, Category::TagTerm, State::Start);
     }
 
     // Text and Emoji presentation sequences
     {
-        t[State::Start.as_usize()][Category::Emoji.as_usize()] = State::Emoji;
+        add!(State::Start, Category::Emoji, State::Emoji);
 
-        t[State::Start.as_usize()][Category::EmojiTextPresentation.as_usize()] = State::Emoji;
-        t[State::Start.as_usize()][Category::EmojiEmojiPresentation.as_usize()] = State::Emoji;
+        add!(State::Start, Category::EmojiTextPresentation, State::Emoji);
+        add!(State::Start, Category::EmojiEmojiPresentation, State::Emoji);
 
         // Text presentation sequence
         //
         // <https://unicode.org/reports/tr51/#def_text_presentation_sequence>
-        t[State::Emoji.as_usize()][Category::Vs15.as_usize()] = State::Terminal;
+        add!(State::Emoji, Category::Vs15, State::Terminal);
 
         // Emoji presentation sequence
         //
         // <https://unicode.org/reports/tr51/#def_emoji_presentation_sequence>
-        t[State::Emoji.as_usize()][Category::Vs16.as_usize()] = State::OptionalZwj;
+        add!(State::Emoji, Category::Vs16, State::OptionalZwj);
 
         // ZWJ
-        t[State::Emoji.as_usize()][Category::Zwj.as_usize()] = State::Zwj;
+        add!(State::Emoji, Category::Zwj, State::Zwj);
     }
 
     // Emoji modifier sequence
@@ -48,77 +55,104 @@ static DFA_TRANS: [[EmojiState; 16]; 15] = {
     // <https://unicode.org/reports/tr51/#def_emoji_modifier_sequence>
     {
         // text
-        t[State::Start.as_usize()][Category::EmojiModifierBaseText.as_usize()] =
-            State::EmojiModifierBaseText;
+        add!(
+            State::Start,
+            Category::EmojiModifierBaseText,
+            State::EmojiModifierBaseText
+        );
 
-        t[State::EmojiModifierBaseText.as_usize()][Category::Vs15.as_usize()] = State::Terminal;
-        t[State::EmojiModifierBaseText.as_usize()][Category::Vs16.as_usize()] = State::Terminal;
-        t[State::EmojiModifierBaseText.as_usize()][Category::EmojiModifier.as_usize()] =
-            State::OptionalZwj;
+        add!(
+            State::EmojiModifierBaseText,
+            Category::Vs15,
+            State::Terminal
+        );
+        add!(
+            State::EmojiModifierBaseText,
+            Category::Vs16,
+            State::Terminal
+        );
+        add!(
+            State::EmojiModifierBaseText,
+            Category::EmojiModifier,
+            State::OptionalZwj
+        );
 
         // emoji
-        t[State::Start.as_usize()][Category::EmojiModifierBaseEmoji.as_usize()] =
-            State::EmojiModifierBaseEmoji;
+        add!(
+            State::Start,
+            Category::EmojiModifierBaseEmoji,
+            State::EmojiModifierBaseEmoji
+        );
 
-        t[State::EmojiModifierBaseEmoji.as_usize()][Category::Vs16.as_usize()] = State::OptionalZwj;
-        t[State::EmojiModifierBaseEmoji.as_usize()][Category::Zwj.as_usize()] = State::Zwj;
-        t[State::EmojiModifierBaseEmoji.as_usize()][Category::EmojiModifier.as_usize()] =
-            State::OptionalZwj;
+        add!(
+            State::EmojiModifierBaseEmoji,
+            Category::Vs16,
+            State::OptionalZwj
+        );
+        add!(State::EmojiModifierBaseEmoji, Category::Zwj, State::Zwj);
+        add!(
+            State::EmojiModifierBaseEmoji,
+            Category::EmojiModifier,
+            State::OptionalZwj
+        );
 
         // other
-        t[State::Start.as_usize()][Category::EmojiModifier.as_usize()] = State::Terminal;
+        add!(State::Start, Category::EmojiModifier, State::Terminal);
     }
 
     // Emoji flag sequence -- A sequence of two Regional Indicator characters.
     //
     // <https://unicode.org/reports/tr51/#def_emoji_flag_sequence>
     {
-        t[State::Start.as_usize()][Category::Ri.as_usize()] = State::Ri;
+        add!(State::Start, Category::Ri, State::Ri);
 
-        t[State::Ri.as_usize()][Category::Ri.as_usize()] = State::Terminal;
+        add!(State::Ri, Category::Ri, State::Terminal);
     }
 
     // Emoji tag sequence (ETS).
     //
     // <https://unicode.org/reports/tr51/#def_emoji_tag_sequence>
     {
-        t[State::Start.as_usize()][Category::TagBase.as_usize()] = State::TagBase;
+        add!(State::Start, Category::TagBase, State::TagBase);
 
-        t[State::TagBase.as_usize()][Category::Vs15.as_usize()] = State::Terminal;
-        t[State::TagBase.as_usize()][Category::Vs16.as_usize()] = State::OptionalZwj;
-        t[State::TagBase.as_usize()][Category::TagSpec.as_usize()] = State::TagSpec;
-        t[State::TagBase.as_usize()][Category::TagTerm.as_usize()] = State::TagEmpty; // without any `TagSpec`
-        t[State::TagBase.as_usize()][Category::Zwj.as_usize()] = State::Zwj;
+        add!(State::TagBase, Category::Vs15, State::Terminal);
+        add!(State::TagBase, Category::Vs16, State::OptionalZwj);
+        add!(State::TagBase, Category::TagSpec, State::TagSpec);
+        add!(State::TagBase, Category::TagTerm, State::TagEmpty); // without any `TagSpec`
+        add!(State::TagBase, Category::Zwj, State::Zwj);
 
         // (seq)+
-        t[State::TagSpec.as_usize()][Category::TagSpec.as_usize()] = State::TagSpec;
-        t[State::TagSpec.as_usize()][Category::TagTerm.as_usize()] = State::Terminal;
+        add!(State::TagSpec, Category::TagSpec, State::TagSpec);
+        add!(State::TagSpec, Category::TagTerm, State::Terminal);
     }
 
     // Emoji keycap sequence.
     //
     // <https://unicode.org/reports/tr51/#def_emoji_keycap_sequence>
     {
-        t[State::Start.as_usize()][Category::KeycapBase.as_usize()] = State::KeycapBase;
+        add!(State::Start, Category::KeycapBase, State::KeycapBase);
 
-        t[State::KeycapBase.as_usize()][Category::KeycapTerm.as_usize()] = State::Terminal;
-        t[State::KeycapBase.as_usize()][Category::Vs15.as_usize()] = State::KeycapVs;
-        t[State::KeycapBase.as_usize()][Category::Vs16.as_usize()] = State::KeycapVs;
+        add!(State::KeycapBase, Category::KeycapTerm, State::Terminal);
+        add!(State::KeycapBase, Category::Vs15, State::KeycapVs);
+        add!(State::KeycapBase, Category::Vs16, State::KeycapVs);
 
-        t[State::KeycapVs.as_usize()][Category::KeycapTerm.as_usize()] = State::Terminal;
+        add!(State::KeycapVs, Category::KeycapTerm, State::Terminal);
     }
 
     // Emoji ZWJ sequence.
     //
     // <https://unicode.org/reports/tr51/#def_emoji_zwj_sequence>
     {
-        t[State::OptionalZwj.as_usize()][Category::Zwj.as_usize()] = State::Zwj;
+        add!(State::OptionalZwj, Category::Zwj, State::Zwj);
 
         // (zwj emoji_zwj_element)+
-        t[State::Zwj.as_usize()][Category::Emoji.as_usize()] = State::Emoji;
-        t[State::Zwj.as_usize()][Category::EmojiEmojiPresentation.as_usize()] = State::Emoji;
-        t[State::Zwj.as_usize()][Category::EmojiModifierBaseEmoji.as_usize()] =
-            State::EmojiModifierBaseEmoji;
+        add!(State::Zwj, Category::Emoji, State::Emoji);
+        add!(State::Zwj, Category::EmojiEmojiPresentation, State::Emoji);
+        add!(
+            State::Zwj,
+            Category::EmojiModifierBaseEmoji,
+            State::EmojiModifierBaseEmoji
+        );
     }
 
     t
