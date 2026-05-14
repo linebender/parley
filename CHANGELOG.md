@@ -16,6 +16,7 @@ This release has an [MSRV] of 1.88.
 
 #### Parley
 
+- `complex-scripts` Cargo feature to enable dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar). When disabled, the lightweight segmenter is used (no change in default behavior).
 - `PlainEditor`, `Layout`, `LayoutAccessibility`, and `Generation` now implement `Debug`. ([#615][] by [@NandishwarSingh][])
   Note: The `Layout` implementation provides a compact summary by default; the alternate form (`{:#?}`) formats the full underlying data.
 
