@@ -262,16 +262,15 @@ fn fill_cluster_in_place(
         if is_emoji {
             let emoji_modifier = analysis_data_sources.emoji_modifier();
             let emoji_modifier_base = analysis_data_sources.emoji_modifier_base();
-            let emoji_component = analysis_data_sources.emoji_component();
             let emoji_presentation = analysis_data_sources.emoji_presentation();
 
             let category = EmojiSegmentationCategory::from_codepoint(
                 ch as u32,
-                EmojiFlags::new().with_emoji(is_emoji).with_extra(
+                EmojiFlags::new(
+                    is_emoji,
+                    emoji_presentation.contains(ch),
                     emoji_modifier.contains(ch),
                     emoji_modifier_base.contains(ch),
-                    emoji_presentation.contains(ch),
-                    emoji_component.contains(ch),
                     info.is_region_indicator(),
                 ),
             );

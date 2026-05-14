@@ -6,35 +6,24 @@ use super::types::{EmojiPresentationStyle, EmojiSegmentationCategory, EmojiSeque
 /// The transition table for Emoji DFA.
 ///
 /// <https://unicode.org/reports/tr51/#Definitions>
-static DFA_TRANS: [[EmojiState; 16]; 15] = {
+static DFA_TRANS: [[u8; 13]; 14] = {
     use EmojiSegmentationCategory as Category;
     use EmojiState as State;
 
-    let mut t = [[State::Reject; 16]; 15];
+    let mut t = [[0; 13]; 14];
 
-    // Add a state transition to the DFA transition table.
+    /// Add a state transition to the DFA transition table.
     macro_rules! add {
         ($state:expr, $category:expr, $next_state:expr) => {
-            t[$state.as_usize()][$category.as_usize()] = $next_state
+            t[$state.as_usize()][$category.as_usize()] = $next_state.as_u8()
         };
-    }
-
-    {
-        add!(State::Start, Category::None, State::Start);
-        add!(State::Start, Category::KeycapTerm, State::Start);
-        add!(State::Start, Category::Zwj, State::Start);
-        add!(State::Start, Category::Vs15, State::Start);
-        add!(State::Start, Category::Vs16, State::Start);
-        add!(State::Start, Category::TagSpec, State::Start);
-        add!(State::Start, Category::TagTerm, State::Start);
     }
 
     // Text and Emoji presentation sequences
     {
         add!(State::Start, Category::Emoji, State::Emoji);
 
-        add!(State::Start, Category::EmojiTextPresentation, State::Emoji);
-        add!(State::Start, Category::EmojiEmojiPresentation, State::Emoji);
+        add!(State::Start, Category::EmojiPresentation, State::Emoji);
 
         // Text presentation sequence
         //
@@ -54,44 +43,16 @@ static DFA_TRANS: [[EmojiState; 16]; 15] = {
     //
     // <https://unicode.org/reports/tr51/#def_emoji_modifier_sequence>
     {
-        // text
         add!(
             State::Start,
-            Category::EmojiModifierBaseText,
-            State::EmojiModifierBaseText
+            Category::EmojiModifierBase,
+            State::EmojiModifierBase
         );
 
+        add!(State::EmojiModifierBase, Category::Vs16, State::OptionalZwj);
+        add!(State::EmojiModifierBase, Category::Zwj, State::Zwj);
         add!(
-            State::EmojiModifierBaseText,
-            Category::Vs15,
-            State::Terminal
-        );
-        add!(
-            State::EmojiModifierBaseText,
-            Category::Vs16,
-            State::Terminal
-        );
-        add!(
-            State::EmojiModifierBaseText,
-            Category::EmojiModifier,
-            State::OptionalZwj
-        );
-
-        // emoji
-        add!(
-            State::Start,
-            Category::EmojiModifierBaseEmoji,
-            State::EmojiModifierBaseEmoji
-        );
-
-        add!(
-            State::EmojiModifierBaseEmoji,
-            Category::Vs16,
-            State::OptionalZwj
-        );
-        add!(State::EmojiModifierBaseEmoji, Category::Zwj, State::Zwj);
-        add!(
-            State::EmojiModifierBaseEmoji,
+            State::EmojiModifierBase,
             Category::EmojiModifier,
             State::OptionalZwj
         );
@@ -118,12 +79,12 @@ static DFA_TRANS: [[EmojiState; 16]; 15] = {
         add!(State::TagBase, Category::Vs15, State::Terminal);
         add!(State::TagBase, Category::Vs16, State::OptionalZwj);
         add!(State::TagBase, Category::TagSpec, State::TagSpec);
-        add!(State::TagBase, Category::TagTerm, State::TagEmpty); // without any `TagSpec`
+        add!(State::TagBase, Category::TagEnd, State::TagEmpty); // without any `TagSpec`
         add!(State::TagBase, Category::Zwj, State::Zwj);
 
         // (seq)+
         add!(State::TagSpec, Category::TagSpec, State::TagSpec);
-        add!(State::TagSpec, Category::TagTerm, State::Terminal);
+        add!(State::TagSpec, Category::TagEnd, State::Terminal);
     }
 
     // Emoji keycap sequence.
@@ -132,11 +93,11 @@ static DFA_TRANS: [[EmojiState; 16]; 15] = {
     {
         add!(State::Start, Category::KeycapBase, State::KeycapBase);
 
-        add!(State::KeycapBase, Category::KeycapTerm, State::Terminal);
+        add!(State::KeycapBase, Category::KeycapEnd, State::Terminal);
         add!(State::KeycapBase, Category::Vs15, State::KeycapVs);
         add!(State::KeycapBase, Category::Vs16, State::KeycapVs);
 
-        add!(State::KeycapVs, Category::KeycapTerm, State::Terminal);
+        add!(State::KeycapVs, Category::KeycapEnd, State::Terminal);
     }
 
     // Emoji ZWJ sequence.
@@ -147,11 +108,11 @@ static DFA_TRANS: [[EmojiState; 16]; 15] = {
 
         // (zwj emoji_zwj_element)+
         add!(State::Zwj, Category::Emoji, State::Emoji);
-        add!(State::Zwj, Category::EmojiEmojiPresentation, State::Emoji);
+        add!(State::Zwj, Category::EmojiPresentation, State::Emoji);
         add!(
             State::Zwj,
-            Category::EmojiModifierBaseEmoji,
-            State::EmojiModifierBaseEmoji
+            Category::EmojiModifierBase,
+            State::EmojiModifierBase
         );
     }
 
@@ -161,14 +122,14 @@ static DFA_TRANS: [[EmojiState; 16]; 15] = {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct EmojiDFA {
     state: EmojiState,
-    // [state, category]
-    recorded: [u16; 2],
+    // (state, category)
+    recorded: (u16, u16),
 }
 
 impl EmojiDFA {
     const DEFAULT: Self = Self {
         state: EmojiState::Start,
-        recorded: [0, 0],
+        recorded: (0, 0),
     };
 
     #[inline]
@@ -178,7 +139,7 @@ impl EmojiDFA {
 
     #[inline]
     pub(crate) const fn step(&mut self, category: EmojiSegmentationCategory) {
-        self.state = DFA_TRANS[self.state.as_usize()][category.as_usize()];
+        self.state = EmojiState::from_u8(DFA_TRANS[self.state.as_usize()][category.as_usize()]);
     }
 
     #[inline]
@@ -189,8 +150,8 @@ impl EmojiDFA {
             return;
         }
 
-        self.recorded[0] |= 1 << self.state.as_u8();
-        self.recorded[1] |= 1 << category.as_u8();
+        self.recorded.0 |= 1 << self.state.as_u8();
+        self.recorded.1 |= 1 << category.as_u8();
     }
 
     #[inline]
@@ -216,12 +177,12 @@ impl EmojiDFA {
 
     #[inline]
     pub(crate) const fn contains_state(self, state: EmojiState) -> bool {
-        self.recorded[0] & (1 << state.as_u8()) != 0
+        self.recorded.0 & (1 << state.as_u8()) != 0
     }
 
     #[inline]
     pub(crate) const fn contains_category(self, category: EmojiSegmentationCategory) -> bool {
-        self.recorded[1] & (1 << category.as_u8()) != 0
+        self.recorded.1 & (1 << category.as_u8()) != 0
     }
 
     #[inline]
@@ -241,8 +202,7 @@ impl EmojiDFA {
             return EmojiSequence::Flag;
         }
 
-        if (self.contains_category(EmojiSegmentationCategory::EmojiModifierBaseEmoji)
-            || self.contains_category(EmojiSegmentationCategory::EmojiModifierBaseText))
+        if self.contains_category(EmojiSegmentationCategory::EmojiModifierBase)
             && self.contains_category(EmojiSegmentationCategory::EmojiModifier)
         {
             return EmojiSequence::Modifier;
@@ -250,12 +210,12 @@ impl EmojiDFA {
 
         if self.contains_category(EmojiSegmentationCategory::KeycapBase)
             && self.contains_category(EmojiSegmentationCategory::Vs16)
-            && self.contains_category(EmojiSegmentationCategory::KeycapTerm)
+            && self.contains_category(EmojiSegmentationCategory::KeycapEnd)
         {
             return EmojiSequence::Keycap;
         }
 
-        if self.contains_category(EmojiSegmentationCategory::KeycapTerm)
+        if self.contains_category(EmojiSegmentationCategory::KeycapEnd)
             && self.contains_category(EmojiSegmentationCategory::Vs16)
         {
             return EmojiSequence::Keycap;
@@ -273,10 +233,7 @@ impl EmojiDFA {
             return EmojiPresentationStyle::Emoji;
         }
 
-        if self.contains_category(EmojiSegmentationCategory::EmojiTextPresentation) {
-            return EmojiPresentationStyle::Text;
-        }
-        if self.contains_category(EmojiSegmentationCategory::EmojiEmojiPresentation) {
+        if self.contains_category(EmojiSegmentationCategory::EmojiPresentation) {
             return EmojiPresentationStyle::Emoji;
         }
 
@@ -284,8 +241,13 @@ impl EmojiDFA {
             return EmojiPresentationStyle::Emoji;
         }
 
-        // single emoji character
-        if self.contains_category(EmojiSegmentationCategory::EmojiModifierBaseText) {
+        // single emoji modifier; e.g. 🏻
+        if self.contains_category(EmojiSegmentationCategory::EmojiModifier) {
+            return EmojiPresentationStyle::Emoji;
+        }
+
+        // single emoji modifier base; e.g ☝
+        if self.contains_category(EmojiSegmentationCategory::EmojiModifierBase) {
             return EmojiPresentationStyle::Text;
         }
 

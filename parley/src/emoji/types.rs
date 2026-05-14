@@ -7,51 +7,41 @@ pub(crate) struct EmojiFlags(u32);
 
 impl EmojiFlags {
     const EMOJI_SHIFT: u32 = 0;
-    const EMOJI_MODIFIER_SHIFT: u32 = 1;
-    const EMOJI_MODIFIER_BASE_SHIFT: u32 = 2;
-    const EMOJI_PRESENTATION_SHIFT: u32 = 3;
-    const EMOJI_COMPONENT_SHIFT: u32 = 4;
-    const REGIONAL_INDICATOR_SHIFT: u32 = 5;
+    const EMOJI_PRESENTATION_SHIFT: u32 = 1;
+    const EMOJI_MODIFIER_SHIFT: u32 = 2;
+    const EMOJI_MODIFIER_BASE_SHIFT: u32 = 3;
+    const REGIONAL_INDICATOR_SHIFT: u32 = 4;
 
     const EMOJI_MASK: u32 = 1 << Self::EMOJI_SHIFT;
+    const EMOJI_PRESENTATION_MASK: u32 = 1 << Self::EMOJI_PRESENTATION_SHIFT;
     const EMOJI_MODIFIER_MASK: u32 = 1 << Self::EMOJI_MODIFIER_SHIFT;
     const EMOJI_MODIFIER_BASE_MASK: u32 = 1 << Self::EMOJI_MODIFIER_BASE_SHIFT;
-    const EMOJI_PRESENTATION_MASK: u32 = 1 << Self::EMOJI_PRESENTATION_SHIFT;
-    #[allow(unused)]
-    const EMOJI_COMPONENT_MASK: u32 = 1 << Self::EMOJI_COMPONENT_SHIFT;
     const REGIONAL_INDICATOR_MASK: u32 = 1 << Self::REGIONAL_INDICATOR_SHIFT;
 
     #[inline]
-    pub(crate) const fn new() -> Self {
-        Self(0)
-    }
-
-    #[inline]
-    pub(crate) const fn with_emoji(mut self, is_emoji: bool) -> Self {
-        self.0 |= (is_emoji as u32) << Self::EMOJI_SHIFT;
-        self
-    }
-
-    #[inline]
-    pub(crate) const fn with_extra(
-        mut self,
+    pub(crate) const fn new(
+        is_emoji: bool,
+        is_emoji_presentation: bool,
         is_emoji_modifier: bool,
         is_emoji_modifier_base: bool,
-        is_emoji_presentation: bool,
-        is_emoji_component: bool,
         is_regional_indicator: bool,
     ) -> Self {
-        self.0 |= (is_emoji_modifier as u32) << Self::EMOJI_MODIFIER_SHIFT;
-        self.0 |= (is_emoji_modifier_base as u32) << Self::EMOJI_MODIFIER_BASE_SHIFT;
-        self.0 |= (is_emoji_presentation as u32) << Self::EMOJI_PRESENTATION_SHIFT;
-        self.0 |= (is_emoji_component as u32) << Self::EMOJI_COMPONENT_SHIFT;
-        self.0 |= (is_regional_indicator as u32) << Self::REGIONAL_INDICATOR_SHIFT;
-        self
+        let flags = (is_emoji as u32) << Self::EMOJI_SHIFT
+            | (is_emoji_presentation as u32) << Self::EMOJI_PRESENTATION_SHIFT
+            | (is_emoji_modifier as u32) << Self::EMOJI_MODIFIER_SHIFT
+            | (is_emoji_modifier_base as u32) << Self::EMOJI_MODIFIER_BASE_SHIFT
+            | (is_regional_indicator as u32) << Self::REGIONAL_INDICATOR_SHIFT;
+        Self(flags)
     }
 
     #[inline]
     pub(crate) const fn is_emoji(self) -> bool {
         self.0 & Self::EMOJI_MASK != 0
+    }
+
+    #[inline]
+    pub(crate) const fn is_emoji_presentation(self) -> bool {
+        self.0 & Self::EMOJI_PRESENTATION_MASK != 0
     }
 
     #[inline]
@@ -62,17 +52,6 @@ impl EmojiFlags {
     #[inline]
     pub(crate) const fn is_emoji_modifier_base(self) -> bool {
         self.0 & Self::EMOJI_MODIFIER_BASE_MASK != 0
-    }
-
-    #[inline]
-    pub(crate) const fn is_emoji_presentation(self) -> bool {
-        self.0 & Self::EMOJI_PRESENTATION_MASK != 0
-    }
-
-    #[allow(unused)]
-    #[inline]
-    pub(crate) const fn is_emoji_component(self) -> bool {
-        self.0 & Self::EMOJI_COMPONENT_MASK != 0
     }
 
     #[inline]
@@ -89,10 +68,7 @@ pub(crate) enum EmojiState {
 
     Terminal,
     Emoji,
-    #[allow(unused)]
-    EmojiModifier,
-    EmojiModifierBaseText,
-    EmojiModifierBaseEmoji,
+    EmojiModifierBase,
     OptionalZwj,
     KeycapVs,
     TagBase,
@@ -106,6 +82,25 @@ pub(crate) enum EmojiState {
 }
 
 impl EmojiState {
+    #[inline]
+    pub(crate) const fn from_u8(value: u8) -> Self {
+        match value {
+            1 => Self::Start,
+            2 => Self::Terminal,
+            3 => Self::Emoji,
+            4 => Self::EmojiModifierBase,
+            5 => Self::OptionalZwj,
+            6 => Self::KeycapVs,
+            7 => Self::TagBase,
+            8 => Self::Ri,
+            9 => Self::TagSpec,
+            10 => Self::TagEmpty,
+            11 => Self::KeycapBase,
+            12 => Self::Zwj,
+            _ => Self::Reject,
+        }
+    }
+
     #[inline]
     pub(crate) const fn as_usize(self) -> usize {
         self as usize
@@ -143,21 +138,19 @@ impl<T> core::ops::IndexMut<EmojiState> for [T] {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum EmojiSegmentationCategory {
     Emoji = 0,
-    EmojiTextPresentation,
-    EmojiEmojiPresentation,
-    EmojiModifierBaseText,
-    EmojiModifierBaseEmoji,
+    EmojiPresentation,
     EmojiModifier,
-    /// `RegionalIndicator`
-    Ri,
+    EmojiModifierBase,
     KeycapBase,
-    KeycapTerm,
-    Zwj,
-    Vs15,
-    Vs16,
+    KeycapEnd,
     TagBase,
     TagSpec,
-    TagTerm,
+    TagEnd,
+    /// `RegionalIndicator`
+    Ri,
+    Vs15,
+    Vs16,
+    Zwj,
     None,
 }
 
@@ -171,36 +164,30 @@ impl EmojiSegmentationCategory {
             // '0'..'9', '#', '*'
             0x30..=0x39 | 0x23 | 0x2A => Self::KeycapBase,
             0x200D => Self::Zwj,
-            0x20E3 => Self::KeycapTerm,
+            0x20E3 => Self::KeycapEnd,
             0xFE0E => Self::Vs15,
             0xFE0F => Self::Vs16,
             0x1F3F4 => Self::TagBase,
             0xE0030..=0xE0039 | 0xE0061..=0xE007A => Self::TagSpec,
-            0xE007F => Self::TagTerm,
+            0xE007F => Self::TagEnd,
             _ => {
+                if flags.is_regional_indicator() {
+                    return Self::Ri;
+                }
+
                 if flags.is_emoji_modifier_base() {
-                    if flags.is_emoji_presentation() {
-                        return Self::EmojiModifierBaseEmoji;
-                    }
-                    return Self::EmojiModifierBaseText;
+                    return Self::EmojiModifierBase;
                 }
 
                 if flags.is_emoji_modifier() {
                     return Self::EmojiModifier;
                 }
 
-                if flags.is_regional_indicator() {
-                    return Self::Ri;
-                }
-
                 if flags.is_emoji_presentation() {
-                    return Self::EmojiEmojiPresentation;
+                    return Self::EmojiPresentation;
                 }
 
                 if flags.is_emoji() {
-                    if !flags.is_emoji_presentation() {
-                        return Self::EmojiTextPresentation;
-                    }
                     return Self::Emoji;
                 }
 

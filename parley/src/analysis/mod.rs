@@ -14,8 +14,8 @@ use icu_normalizer::properties::{
     CanonicalDecompositionBorrowed,
 };
 use icu_properties::props::{
-    BidiMirroringGlyph, EmojiComponent, EmojiModifier, EmojiModifierBase, EmojiPresentation,
-    GeneralCategory, GraphemeClusterBreak, Script,
+    BidiMirroringGlyph, EmojiModifier, EmojiModifierBase, EmojiPresentation, GeneralCategory,
+    GraphemeClusterBreak, Script,
 };
 use icu_properties::{
     CodePointMapData, CodePointMapDataBorrowed, CodePointSetData, CodePointSetDataBorrowed,
@@ -105,11 +105,6 @@ impl AnalysisDataSources {
     #[inline(always)]
     pub(crate) fn emoji_modifier_base(&self) -> CodePointSetDataBorrowed<'_> {
         const { CodePointSetData::new::<EmojiModifierBase>() }
-    }
-
-    #[inline(always)]
-    pub(crate) fn emoji_component(&self) -> CodePointSetDataBorrowed<'_> {
-        const { CodePointSetData::new::<EmojiComponent>() }
     }
 
     #[inline(always)]
