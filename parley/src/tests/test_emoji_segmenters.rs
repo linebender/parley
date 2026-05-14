@@ -21,10 +21,9 @@ struct TestEntity<'a> {
 
 fn assert_emoji_segmenters_produce_same_result(entity: TestEntity<'_>) {
     let analysis = AnalysisDataSources::new();
+    let emoji_presentation = analysis.emoji_presentation();
     let emoji_modifier = analysis.emoji_modifier();
     let emoji_modifier_base = analysis.emoji_modifier_base();
-    let emoji_component = analysis.emoji_component();
-    let emoji_presentation = analysis.emoji_presentation();
 
     let mut emoji_dfa = EmojiDFA::new();
 
@@ -36,17 +35,16 @@ fn assert_emoji_segmenters_produce_same_result(entity: TestEntity<'_>) {
             let props = analysis.properties(char::from_u32(cp).unwrap());
 
             let is_emoji = props.is_emoji_or_pictograph();
+            let is_emoji_presentation = emoji_presentation.contains32(cp);
             let is_emoji_modifier = emoji_modifier.contains32(cp);
             let is_emoji_modifier_base = emoji_modifier_base.contains32(cp);
-            let is_emoji_presentation = emoji_presentation.contains32(cp);
-            let is_emoji_component = emoji_component.contains32(cp);
             let is_regional_indicator = props.is_region_indicator();
 
-            let emoji_flags = EmojiFlags::new().with_emoji(is_emoji).with_extra(
+            let emoji_flags = EmojiFlags::new(
+                is_emoji,
+                is_emoji_presentation,
                 is_emoji_modifier,
                 is_emoji_modifier_base,
-                is_emoji_presentation,
-                is_emoji_component,
                 is_regional_indicator,
             );
 
@@ -69,7 +67,7 @@ fn emoji_presentation_default() {
         sequence: &[
             0x1F600, // GRINNING FACE
         ],
-        categories: &[EmojiSegmentationCategory::EmojiEmojiPresentation],
+        categories: &[EmojiSegmentationCategory::EmojiPresentation],
         style: EmojiPresentationStyle::Emoji,
     });
 }
@@ -81,8 +79,8 @@ fn text_presentation_default() {
         sequence: &[
             0x00A9, // COPYRIGHT SIGN
         ],
-        categories: &[EmojiSegmentationCategory::EmojiTextPresentation],
-        style: EmojiPresentationStyle::Text,
+        categories: &[EmojiSegmentationCategory::Emoji],
+        style: EmojiPresentationStyle::Default,
     });
 }
 
@@ -138,7 +136,7 @@ fn unqualified_keycap() {
         ],
         categories: &[
             EmojiSegmentationCategory::KeycapBase,
-            EmojiSegmentationCategory::KeycapTerm,
+            EmojiSegmentationCategory::KeycapEnd,
         ],
         style: EmojiPresentationStyle::Default,
     });
@@ -156,7 +154,7 @@ fn keycap_vs15_term() {
         categories: &[
             EmojiSegmentationCategory::KeycapBase,
             EmojiSegmentationCategory::Vs15,
-            EmojiSegmentationCategory::KeycapTerm,
+            EmojiSegmentationCategory::KeycapEnd,
         ],
         style: EmojiPresentationStyle::Text,
     });
@@ -174,7 +172,7 @@ fn qualified_keycap() {
         categories: &[
             EmojiSegmentationCategory::KeycapBase,
             EmojiSegmentationCategory::Vs16,
-            EmojiSegmentationCategory::KeycapTerm,
+            EmojiSegmentationCategory::KeycapEnd,
         ],
         style: EmojiPresentationStyle::Emoji,
     });
@@ -188,7 +186,7 @@ fn lone_emoji_modifier() {
             0x1F3FB, // EMOJI MODIFIER FITZPATRICK TYPE-1-2
         ],
         categories: &[EmojiSegmentationCategory::EmojiModifier],
-        style: EmojiPresentationStyle::Default,
+        style: EmojiPresentationStyle::Emoji,
     });
 }
 
@@ -199,7 +197,7 @@ fn bare_modifier_base_text_default() {
         sequence: &[
             0x261D, // WHITE UP POINTING INDEX
         ],
-        categories: &[EmojiSegmentationCategory::EmojiModifierBaseText],
+        categories: &[EmojiSegmentationCategory::EmojiModifierBase],
         style: EmojiPresentationStyle::Text,
     });
 }
@@ -213,7 +211,7 @@ fn modifier_base_text_default_vs16() {
             0xFE0F, // VARIATION SELECTOR-16
         ],
         categories: &[
-            EmojiSegmentationCategory::EmojiModifierBaseText,
+            EmojiSegmentationCategory::EmojiModifierBase,
             EmojiSegmentationCategory::Vs16,
         ],
         style: EmojiPresentationStyle::Emoji,
@@ -229,7 +227,7 @@ fn modifier_base_text_default_skin_tone() {
             0x1F3FB, // EMOJI MODIFIER FITZPATRICK TYPE-1-2
         ],
         categories: &[
-            EmojiSegmentationCategory::EmojiModifierBaseText,
+            EmojiSegmentationCategory::EmojiModifierBase,
             EmojiSegmentationCategory::EmojiModifier,
         ],
         style: EmojiPresentationStyle::Emoji,
@@ -245,7 +243,7 @@ fn modifier_base_emoji_default_skin_tone() {
             0x1F3FB, // EMOJI MODIFIER FITZPATRICK TYPE-1-2
         ],
         categories: &[
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
             EmojiSegmentationCategory::EmojiModifier,
         ],
         style: EmojiPresentationStyle::Emoji,
@@ -309,7 +307,7 @@ fn text_default_emoji_vs15() {
             0xFE0E, // VARIATION SELECTOR-15
         ],
         categories: &[
-            EmojiSegmentationCategory::EmojiTextPresentation,
+            EmojiSegmentationCategory::Emoji,
             EmojiSegmentationCategory::Vs15,
         ],
         style: EmojiPresentationStyle::Text,
@@ -325,7 +323,7 @@ fn text_default_emoji_vs16() {
             0xFE0F, // VARIATION SELECTOR-16
         ],
         categories: &[
-            EmojiSegmentationCategory::EmojiTextPresentation,
+            EmojiSegmentationCategory::Emoji,
             EmojiSegmentationCategory::Vs16,
         ],
         style: EmojiPresentationStyle::Emoji,
@@ -341,7 +339,7 @@ fn emoji_default_emoji_vs15() {
             0xFE0E,  // VARIATION SELECTOR-15
         ],
         categories: &[
-            EmojiSegmentationCategory::EmojiEmojiPresentation,
+            EmojiSegmentationCategory::EmojiPresentation,
             EmojiSegmentationCategory::Vs15,
         ],
         style: EmojiPresentationStyle::Text,
@@ -357,7 +355,7 @@ fn emoji_default_emoji_vs16() {
             0xFE0F,  // VARIATION SELECTOR-16
         ],
         categories: &[
-            EmojiSegmentationCategory::EmojiEmojiPresentation,
+            EmojiSegmentationCategory::EmojiPresentation,
             EmojiSegmentationCategory::Vs16,
         ],
         style: EmojiPresentationStyle::Emoji,
@@ -376,11 +374,11 @@ fn zwj_family() {
             0x1F467, // GIRL
         ],
         categories: &[
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
             EmojiSegmentationCategory::Zwj,
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
             EmojiSegmentationCategory::Zwj,
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
         ],
         style: EmojiPresentationStyle::Emoji,
     });
@@ -400,13 +398,13 @@ fn long_zwj_family() {
             0x1F466, // BOY
         ],
         categories: &[
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
             EmojiSegmentationCategory::Zwj,
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
             EmojiSegmentationCategory::Zwj,
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
             EmojiSegmentationCategory::Zwj,
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
         ],
         style: EmojiPresentationStyle::Emoji,
     });
@@ -424,11 +422,11 @@ fn zwj_couple() {
             0x1F468, // MAN
         ],
         categories: &[
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
             EmojiSegmentationCategory::Zwj,
-            EmojiSegmentationCategory::EmojiTextPresentation,
+            EmojiSegmentationCategory::Emoji,
             EmojiSegmentationCategory::Zwj,
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
         ],
         style: EmojiPresentationStyle::Emoji,
     });
@@ -445,10 +443,10 @@ fn zwj_with_vs16_element() {
             0x1F469, // WOMAN
         ],
         categories: &[
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
             EmojiSegmentationCategory::Vs16,
             EmojiSegmentationCategory::Zwj,
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
         ],
         style: EmojiPresentationStyle::Emoji,
     });
@@ -466,10 +464,10 @@ fn zwj_with_vs16_on_both_elements() {
             0xFE0F,  // VARIATION SELECTOR-16
         ],
         categories: &[
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
             EmojiSegmentationCategory::Vs16,
             EmojiSegmentationCategory::Zwj,
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
             EmojiSegmentationCategory::Vs16,
         ],
         style: EmojiPresentationStyle::Emoji,
@@ -487,10 +485,10 @@ fn zwj_after_modifier_sequence() {
             0x1F4BB, // PERSONAL COMPUTER
         ],
         categories: &[
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
             EmojiSegmentationCategory::EmojiModifier,
             EmojiSegmentationCategory::Zwj,
-            EmojiSegmentationCategory::EmojiEmojiPresentation,
+            EmojiSegmentationCategory::EmojiPresentation,
         ],
         style: EmojiPresentationStyle::Emoji,
     });
@@ -507,10 +505,10 @@ fn zwj_technologist_with_skin_tone() {
             0x1F4BB, // PERSONAL COMPUTER
         ],
         categories: &[
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
             EmojiSegmentationCategory::EmojiModifier,
             EmojiSegmentationCategory::Zwj,
-            EmojiSegmentationCategory::EmojiEmojiPresentation,
+            EmojiSegmentationCategory::EmojiPresentation,
         ],
         style: EmojiPresentationStyle::Emoji,
     });
@@ -527,10 +525,10 @@ fn vs16_enables_zwj_continuation() {
             0x1F469, // WOMAN
         ],
         categories: &[
-            EmojiSegmentationCategory::EmojiTextPresentation,
+            EmojiSegmentationCategory::Emoji,
             EmojiSegmentationCategory::Vs16,
             EmojiSegmentationCategory::Zwj,
-            EmojiSegmentationCategory::EmojiModifierBaseEmoji,
+            EmojiSegmentationCategory::EmojiModifierBase,
         ],
         style: EmojiPresentationStyle::Emoji,
     });
@@ -556,7 +554,7 @@ fn tag_sequence_england() {
             EmojiSegmentationCategory::TagSpec,
             EmojiSegmentationCategory::TagSpec,
             EmojiSegmentationCategory::TagSpec,
-            EmojiSegmentationCategory::TagTerm,
+            EmojiSegmentationCategory::TagEnd,
         ],
         style: EmojiPresentationStyle::Emoji,
     });
@@ -574,7 +572,7 @@ fn tag_base_as_zwj_element() {
         categories: &[
             EmojiSegmentationCategory::TagBase,
             EmojiSegmentationCategory::Zwj,
-            EmojiSegmentationCategory::EmojiEmojiPresentation,
+            EmojiSegmentationCategory::EmojiPresentation,
         ],
         style: EmojiPresentationStyle::Emoji,
     });
@@ -594,7 +592,7 @@ fn tag_base_vs16_as_zwj() {
             EmojiSegmentationCategory::TagBase,
             EmojiSegmentationCategory::Vs16,
             EmojiSegmentationCategory::Zwj,
-            EmojiSegmentationCategory::EmojiEmojiPresentation,
+            EmojiSegmentationCategory::EmojiPresentation,
         ],
         style: EmojiPresentationStyle::Emoji,
     });
