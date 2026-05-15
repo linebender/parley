@@ -6,13 +6,13 @@ use super::types::{EmojiPresentationStyle, EmojiSegmentationCategory, EmojiSeque
 /// The transition table for Emoji DFA.
 ///
 /// <https://unicode.org/reports/tr51/#Definitions>
-static DFA_TRANS: [[u8; 13]; 14] = {
+static DFA_TRANS: [[u8; 13]; 13] = {
     use EmojiSegmentationCategory as Category;
     use EmojiState as State;
 
-    let mut t = [[0; 13]; 14];
+    let mut t = [[0; 13]; 13];
 
-    /// Add a state transition to the DFA transition table.
+    /// Adds a state transition to the DFA transition table.
     macro_rules! add {
         ($state:expr, $category:expr, $next_state:expr) => {
             t[$state.as_usize()][$category.as_usize()] = $next_state.as_u8()
