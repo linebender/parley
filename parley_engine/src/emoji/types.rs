@@ -1,64 +1,7 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-/// Flags are used to identify [`EmojiSegmentationCategory`].
-#[derive(Clone, Copy, Default)]
-pub struct EmojiFlags(u32);
-
-impl EmojiFlags {
-    const EMOJI_SHIFT: u32 = 0;
-    const EMOJI_PRESENTATION_SHIFT: u32 = 1;
-    const EMOJI_MODIFIER_SHIFT: u32 = 2;
-    const EMOJI_MODIFIER_BASE_SHIFT: u32 = 3;
-    const REGIONAL_INDICATOR_SHIFT: u32 = 4;
-
-    const EMOJI_MASK: u32 = 1 << Self::EMOJI_SHIFT;
-    const EMOJI_PRESENTATION_MASK: u32 = 1 << Self::EMOJI_PRESENTATION_SHIFT;
-    const EMOJI_MODIFIER_MASK: u32 = 1 << Self::EMOJI_MODIFIER_SHIFT;
-    const EMOJI_MODIFIER_BASE_MASK: u32 = 1 << Self::EMOJI_MODIFIER_BASE_SHIFT;
-    const REGIONAL_INDICATOR_MASK: u32 = 1 << Self::REGIONAL_INDICATOR_SHIFT;
-
-    #[inline]
-    pub const fn new(
-        is_emoji: bool,
-        is_emoji_presentation: bool,
-        is_emoji_modifier: bool,
-        is_emoji_modifier_base: bool,
-        is_regional_indicator: bool,
-    ) -> Self {
-        let flags = (is_emoji as u32) << Self::EMOJI_SHIFT
-            | (is_emoji_presentation as u32) << Self::EMOJI_PRESENTATION_SHIFT
-            | (is_emoji_modifier as u32) << Self::EMOJI_MODIFIER_SHIFT
-            | (is_emoji_modifier_base as u32) << Self::EMOJI_MODIFIER_BASE_SHIFT
-            | (is_regional_indicator as u32) << Self::REGIONAL_INDICATOR_SHIFT;
-        Self(flags)
-    }
-
-    #[inline]
-    pub(crate) const fn is_emoji(self) -> bool {
-        self.0 & Self::EMOJI_MASK != 0
-    }
-
-    #[inline]
-    pub(crate) const fn is_emoji_presentation(self) -> bool {
-        self.0 & Self::EMOJI_PRESENTATION_MASK != 0
-    }
-
-    #[inline]
-    pub(crate) const fn is_emoji_modifier(self) -> bool {
-        self.0 & Self::EMOJI_MODIFIER_MASK != 0
-    }
-
-    #[inline]
-    pub(crate) const fn is_emoji_modifier_base(self) -> bool {
-        self.0 & Self::EMOJI_MODIFIER_BASE_MASK != 0
-    }
-
-    #[inline]
-    pub(crate) const fn is_regional_indicator(self) -> bool {
-        self.0 & Self::REGIONAL_INDICATOR_MASK != 0
-    }
-}
+use parley_data::emoji::EmojiProperties;
 
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -159,7 +102,7 @@ impl EmojiSegmentationCategory {
     ///
     /// <https://unicode.org/reports/tr51/#Definitions>
     #[inline]
-    pub fn from_codepoint(cp: u32, flags: EmojiFlags) -> Self {
+    pub fn from_codepoint(cp: u32, properties: EmojiProperties) -> Self {
         match cp {
             // '0'..'9', '#', '*'
             0x30..=0x39 | 0x23 | 0x2A => Self::KeycapBase,
@@ -171,23 +114,23 @@ impl EmojiSegmentationCategory {
             0xE0030..=0xE0039 | 0xE0061..=0xE007A => Self::TagSpec,
             0xE007F => Self::TagEnd,
             _ => {
-                if flags.is_regional_indicator() {
+                if properties.is_regional_indicator() {
                     return Self::Ri;
                 }
 
-                if flags.is_emoji_modifier_base() {
+                if properties.is_emoji_modifier_base() {
                     return Self::EmojiModifierBase;
                 }
 
-                if flags.is_emoji_modifier() {
+                if properties.is_emoji_modifier() {
                     return Self::EmojiModifier;
                 }
 
-                if flags.is_emoji_presentation() {
+                if properties.is_emoji_presentation() {
                     return Self::EmojiPresentation;
                 }
 
-                if flags.is_emoji() {
+                if properties.is_emoji() {
                     return Self::Emoji;
                 }
 

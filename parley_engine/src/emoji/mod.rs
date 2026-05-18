@@ -12,4 +12,4 @@ mod dfa;
 mod types;
 
 pub use dfa::EmojiDFA;
-pub use types::{EmojiFlags, EmojiPresentationStyle, EmojiSegmentationCategory};
+pub use types::{EmojiPresentationStyle, EmojiSegmentationCategory};
