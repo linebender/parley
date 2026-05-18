@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 /// Emoji character properties relevant for text analysis.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct EmojiProperties(u32);
 
 impl EmojiProperties {
@@ -21,6 +21,9 @@ impl EmojiProperties {
     const EMOJI_MODIFIER_MASK: u32 = 1 << Self::EMOJI_MODIFIER_SHIFT;
     const EMOJI_MODIFIER_BASE_MASK: u32 = 1 << Self::EMOJI_MODIFIER_BASE_SHIFT;
     const REGIONAL_INDICATOR_MASK: u32 = 1 << Self::REGIONAL_INDICATOR_SHIFT;
+
+    /// All zeroes.
+    pub const ZERO: Self = Self(0);
 
     #[cfg(feature = "baked")]
     #[inline]

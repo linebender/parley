@@ -230,7 +230,6 @@ fn fill_cluster_in_place(
     item_infos_iter: &mut core::slice::Iter<'_, (CharInfo, u16)>,
     code_unit_offset_in_string: &mut usize,
     char_cluster: &mut CharCluster,
-    analysis_data_sources: &AnalysisDataSources,
 ) {
     // Reset cluster but keep allocation
     char_cluster.clear();
@@ -260,9 +259,8 @@ fn fill_cluster_in_place(
         let mut is_emoji_presentation_selector = false;
 
         if is_emoji {
-            let emoji_properties = analysis_data_sources.emoji_properties(ch);
-
-            let category = EmojiSegmentationCategory::from_codepoint(ch as u32, emoji_properties);
+            let category =
+                EmojiSegmentationCategory::from_codepoint(ch as u32, info.emoji_properties);
 
             is_emoji_presentation_selector = category.eq(EmojiSegmentationCategory::Vs16)
                 || category.eq(EmojiSegmentationCategory::Vs15);
@@ -336,7 +334,6 @@ fn shape_item<'a, B: Brush>(
         &mut item_infos_iter,
         &mut code_unit_offset_in_string,
         char_cluster,
-        analysis_data_sources,
     );
 
     let mut current_font = font_selector.select_font(char_cluster, analysis_data_sources);
@@ -357,7 +354,6 @@ fn shape_item<'a, B: Brush>(
                 &mut item_infos_iter,
                 &mut code_unit_offset_in_string,
                 char_cluster,
-                analysis_data_sources,
             );
 
             if let Some(next_font) = font_selector.select_font(char_cluster, analysis_data_sources)
