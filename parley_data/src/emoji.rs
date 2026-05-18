@@ -15,6 +15,8 @@ impl EmojiProperties {
     const REGIONAL_INDICATOR_SHIFT: u32 = 6;
 
     const EMOJI_MASK: u32 = 1 << Self::EMOJI_SHIFT;
+    const EXTENDED_PICTOGRAPHIC_MASK: u32 = 1 << Self::EXTENDED_PICTOGRAPHIC_SHIFT;
+    const EMOJI_COMPONENT_MASK: u32 = 1 << Self::EMOJI_COMPONENT_SHIFT;
     const EMOJI_PRESENTATION_MASK: u32 = 1 << Self::EMOJI_PRESENTATION_SHIFT;
     const EMOJI_MODIFIER_MASK: u32 = 1 << Self::EMOJI_MODIFIER_SHIFT;
     const EMOJI_MODIFIER_BASE_MASK: u32 = 1 << Self::EMOJI_MODIFIER_BASE_SHIFT;
@@ -58,13 +60,13 @@ impl EmojiProperties {
     /// Returns whether the character is an extended pictographic.
     #[inline]
     pub const fn is_extended_pictographic(self) -> bool {
-        self.0 & Self::EXTENDED_PICTOGRAPHIC_SHIFT != 0
+        self.0 & Self::EXTENDED_PICTOGRAPHIC_MASK != 0
     }
 
     /// Returns whether the character is an emoji component.
     #[inline]
     pub const fn is_emoji_component(self) -> bool {
-        self.0 & Self::EMOJI_COMPONENT_SHIFT != 0
+        self.0 & Self::EMOJI_COMPONENT_MASK != 0
     }
 
     /// Returns whether the character is an emoji presentation.
