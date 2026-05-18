@@ -12,6 +12,9 @@ use icu_properties::props::{BidiClass, GeneralCategory, GraphemeClusterBreak, Sc
 #[cfg(feature = "baked")]
 pub mod generated;
 
+/// Emoji character properties relevant for text analysis.
+pub mod emoji;
+
 /// Unicode character properties relevant for text analysis.
 #[derive(Copy, Clone, Debug)]
 pub struct Properties(u32);
