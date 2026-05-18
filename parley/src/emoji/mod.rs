@@ -12,4 +12,4 @@ mod dfa;
 mod types;
 
 pub(crate) use dfa::EmojiDFA;
-pub(crate) use types::{EmojiFlags, EmojiPresentationStyle, EmojiSegmentationCategory};
+pub(crate) use types::{EmojiPresentationStyle, EmojiSegmentationCategory};

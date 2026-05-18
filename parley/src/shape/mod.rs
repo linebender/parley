@@ -14,7 +14,7 @@ use super::style::{Brush, FontFeature, FontVariation};
 use crate::analysis::cluster::{Char, CharCluster, Status};
 use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::convert::script_to_harfrust;
-use crate::emoji::{EmojiDFA, EmojiFlags, EmojiSegmentationCategory};
+use crate::emoji::{EmojiDFA, EmojiSegmentationCategory};
 use crate::inline_box::InlineBox;
 use crate::lru_cache::LruCache;
 use crate::util::nearly_eq;
@@ -260,20 +260,9 @@ fn fill_cluster_in_place(
         let mut is_emoji_presentation_selector = false;
 
         if is_emoji {
-            let emoji_modifier = analysis_data_sources.emoji_modifier();
-            let emoji_modifier_base = analysis_data_sources.emoji_modifier_base();
-            let emoji_presentation = analysis_data_sources.emoji_presentation();
+            let emoji_properties = analysis_data_sources.emoji_properties(ch);
 
-            let category = EmojiSegmentationCategory::from_codepoint(
-                ch as u32,
-                EmojiFlags::new(
-                    is_emoji,
-                    emoji_presentation.contains(ch),
-                    emoji_modifier.contains(ch),
-                    emoji_modifier_base.contains(ch),
-                    info.is_region_indicator(),
-                ),
-            );
+            let category = EmojiSegmentationCategory::from_codepoint(ch as u32, emoji_properties);
 
             is_emoji_presentation_selector = category.eq(EmojiSegmentationCategory::Vs16)
                 || category.eq(EmojiSegmentationCategory::Vs15);

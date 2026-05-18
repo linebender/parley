@@ -10,7 +10,7 @@ use core::char;
 
 use crate::{
     analysis::AnalysisDataSources,
-    emoji::{EmojiDFA, EmojiFlags, EmojiPresentationStyle, EmojiSegmentationCategory},
+    emoji::{EmojiDFA, EmojiPresentationStyle, EmojiSegmentationCategory},
 };
 
 struct TestEntity<'a> {
@@ -21,9 +21,6 @@ struct TestEntity<'a> {
 
 fn assert_emoji_segmenters_produce_same_result(entity: TestEntity<'_>) {
     let analysis = AnalysisDataSources::new();
-    let emoji_presentation = analysis.emoji_presentation();
-    let emoji_modifier = analysis.emoji_modifier();
-    let emoji_modifier_base = analysis.emoji_modifier_base();
 
     let mut emoji_dfa = EmojiDFA::new();
 
@@ -32,23 +29,10 @@ fn assert_emoji_segmenters_produce_same_result(entity: TestEntity<'_>) {
         .iter()
         .copied()
         .map(|cp| {
-            let props = analysis.properties(char::from_u32(cp).unwrap());
+            let ch = char::from_u32(cp).unwrap();
+            let emoji_properties = analysis.emoji_properties(ch);
 
-            let is_emoji = props.is_emoji_or_pictograph();
-            let is_emoji_presentation = emoji_presentation.contains32(cp);
-            let is_emoji_modifier = emoji_modifier.contains32(cp);
-            let is_emoji_modifier_base = emoji_modifier_base.contains32(cp);
-            let is_regional_indicator = props.is_region_indicator();
-
-            let emoji_flags = EmojiFlags::new(
-                is_emoji,
-                is_emoji_presentation,
-                is_emoji_modifier,
-                is_emoji_modifier_base,
-                is_regional_indicator,
-            );
-
-            let category = EmojiSegmentationCategory::from_codepoint(cp, emoji_flags);
+            let category = EmojiSegmentationCategory::from_codepoint(cp, emoji_properties);
 
             emoji_dfa.step_record(category);
 
