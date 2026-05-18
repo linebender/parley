@@ -1,8 +1,6 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::generated;
-
 /// Emoji character properties relevant for text analysis.
 #[derive(Clone, Copy, Debug)]
 pub struct EmojiProperties(u32);
@@ -26,7 +24,7 @@ impl EmojiProperties {
     #[inline]
     /// Returns the properties for a given character.
     pub const fn get(ch: char) -> Self {
-        Self(generated::emoji_composite_get(ch as u32))
+        Self(crate::generated::emoji_composite_get(ch as u32))
     }
 
     /// Creates a new [`EmojiProperties`] from the given properties
