@@ -12,8 +12,11 @@ use icu_properties::{
     },
 };
 use parley_data::{Properties, emoji::EmojiProperties};
-use std::fmt::Write as _;
-use std::io::{BufWriter, Write};
+use std::{collections::BTreeMap, fmt::Write as _};
+use std::{
+    io::{BufWriter, Write},
+    ops::Range,
+};
 
 const COPYRIGHT_HEADER: &str =
     "// Copyright 2025 the Parley Authors\n// SPDX-License-Identifier: Apache-2.0 OR MIT\n";
@@ -115,43 +118,63 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
 }
 
 fn generate_emojis(emojis: &[(u32, u32)]) -> String {
-    let emoji_count = emojis.len();
-    let mut emoji_bits = Vec::with_capacity(emoji_count);
-    let mut emoji_matches = Vec::with_capacity(emoji_count);
+    let mut emoji_map = BTreeMap::<u32, Vec<u32>>::new();
 
-    let mut prev = 0;
-    for (i, (c, b)) in emojis.iter().enumerate() {
-        emoji_bits.push(b);
-
-        if c - prev != 1 {
-            emoji_matches.push((i, c..c));
-        } else if let Some(last) = emoji_matches.last_mut() {
-            last.1.end = c;
-        }
-
-        prev = *c;
+    for (c, b) in emojis.iter().copied() {
+        emoji_map
+            .entry(b)
+            .and_modify(|e| e.push(c))
+            .or_insert_with(|| vec![c]);
     }
 
+    let emoji_count = emoji_map.len();
+    let mut emoji_bits = Vec::with_capacity(emoji_count);
     let mut code_emoji_matches = String::new();
 
-    for (i, r) in emoji_matches {
-        let start = *r.start;
-        let end = *r.end;
-        let is_single = end == start;
-        if is_single {
-            code_emoji_matches.push_str(&format!("{start:#X} => {i},"));
-        } else {
-            code_emoji_matches
-                .push_str(&format!("{start:#X}..={end:#X} => cp - {start:#X} + {i},"));
+    for (b, mut a) in emoji_map {
+        a.sort();
+
+        let mut v = Vec::<Range<u32>>::new();
+
+        for c in a {
+            if let Some(last) = v.last_mut() {
+                if c - last.end == 1 {
+                    last.end = c;
+                    continue;
+                }
+            }
+            v.push(c..c);
         }
+
+        let i = emoji_bits.len();
+
+        let mut s = String::new();
+
+        for r in v {
+            let start = r.start;
+            let end = r.end;
+            let is_single = end == start;
+
+            if is_single {
+                s.push_str(&format!("{start:#X}"));
+            } else {
+                s.push_str(&format!("{start:#X}..={end:#X}"));
+            }
+            s.push('|');
+        }
+
+        s.pop();
+        s.push_str(&format!(" => {i},"));
+
+        emoji_bits.push(b);
+        code_emoji_matches.push_str(&s);
     }
 
     let mut code_extra = String::new();
 
     code_extra.push_str(&format!(
         "
-#[allow(dead_code, non_upper_case_globals, clippy::allow_attributes_without_reason)]
-static emoji_composite_u8: [u8; {emoji_count}] = {emoji_bits:#?};
+static EMOJI_COMPOSITE_U8: [u8; {emoji_count}] = {emoji_bits:#?};
 
 #[allow(missing_docs, reason = \"generated code\")]
 #[inline]
@@ -161,7 +184,7 @@ pub const fn emoji_composite_get(cp: u32) -> u32 {{
         _ => return 0,
     }};
 
-    emoji_composite_u8[idx as usize] as u32
+    EMOJI_COMPOSITE_U8[idx as usize] as u32
 }}
 "
     ));
