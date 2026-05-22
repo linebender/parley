@@ -281,7 +281,7 @@ impl ResolveContext {
         if self.tmp_variations.is_empty() {
             return Resolved::default();
         }
-        self.tmp_variations.sort_by(|a, b| a.tag.cmp(&b.tag));
+        self.tmp_variations.sort_by_key(|a| a.tag);
         let resolved = self.variations.insert(&self.tmp_variations);
         self.tmp_variations.clear();
         resolved
@@ -306,7 +306,7 @@ impl ResolveContext {
         if self.tmp_features.is_empty() {
             return Resolved::default();
         }
-        self.tmp_features.sort_by(|a, b| a.tag.cmp(&b.tag));
+        self.tmp_features.sort_by_key(|a| a.tag);
         let resolved = self.features.insert(&self.tmp_features);
         self.tmp_features.clear();
         resolved
