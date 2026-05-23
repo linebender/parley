@@ -384,6 +384,60 @@ fn builders_style_runs_match_ranged() {
     assert_eq_layout_data(&ranged.data, &runs.data, "style_runs_match_ranged");
 }
 
+/// Test that `StyleRunBuilder` handles a first run whose style table index is not zero.
+#[test]
+fn style_runs_first_run_can_use_nonzero_style_index() {
+    let text = "Builders often wear hard hats.";
+    let scale = 2.;
+    let quantize = false;
+    let max_advance = Some(50.);
+    let root_style = create_root_style();
+    let mut modified_style = root_style.clone();
+    modified_style.font_size = 40.;
+
+    let mut fcx = create_font_context();
+    let mut lcx_a: LayoutContext<ColorBrush> = LayoutContext::new();
+    let mut lcx_b: LayoutContext<ColorBrush> = LayoutContext::new();
+
+    let ropts = RangedOptions {
+        scale,
+        quantize,
+        max_advance,
+        text,
+    };
+
+    let ranged = build_layout_with_ranged(&mut fcx, &mut lcx_a, &ropts, |rb| {
+        set_root_style(rb);
+        rb.push(
+            StyleProperty::FontSize(modified_style.font_size),
+            0..text.len(),
+        );
+    });
+
+    let runs = build_layout_with_style_runs(&mut fcx, &mut lcx_b, &ropts, |rb| {
+        let family: FontFamily<'static> = root_style.font_family.clone().into_owned();
+        let root_run: TextStyle<'static, 'static, ColorBrush> = TextStyle {
+            font_family: family.clone(),
+            ..root_style.clone()
+        };
+
+        let modified_run: TextStyle<'static, 'static, ColorBrush> = TextStyle {
+            font_family: family,
+            ..modified_style.clone()
+        };
+
+        let _root_index = rb.push_style(root_run);
+        let modified_index = rb.push_style(modified_run);
+        rb.push_style_run(modified_index, 0..text.len());
+    });
+
+    assert_eq_layout_data(
+        &ranged.data,
+        &runs.data,
+        "style_runs_first_run_can_use_nonzero_style_index",
+    );
+}
+
 /// Test that all the builders behave the same when given the same root style.
 #[test]
 fn builders_root_only() {

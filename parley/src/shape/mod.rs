@@ -89,9 +89,10 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 
     // Setup mutable state for iteration
-    let mut style = &styles[0];
+    let initial_style_index = infos.first().map_or(0, |(_, style_index)| *style_index);
+    let mut style = &styles[initial_style_index as usize];
     let mut item = Item {
-        style_index: 0,
+        style_index: initial_style_index,
         size: style.font_size,
         level: levels.first().copied().unwrap_or(0),
         script: infos
