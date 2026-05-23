@@ -19,6 +19,12 @@ This release has an [MSRV] of 1.88.
 - `PlainEditor`, `Layout`, `LayoutAccessibility`, and `Generation` now implement `Debug`. ([#615][] by [@NandishwarSingh][])
   Note: The `Layout` implementation provides a compact summary by default; the alternate form (`{:#?}`) formats the full underlying data.
 
+### Fixed
+
+#### Parley
+
+- `StyleRunBuilder` now handles a first style run that references a non-zero style table index. ([#626][] by [@waywardmonkeys][])
+
 ## [0.9.0] - 2026-04-21
 
 This release has an [MSRV] of 1.88.
@@ -617,6 +623,7 @@ This release has an [MSRV][] of 1.70.
 [#600]: https://github.com/linebender/parley/pull/600
 [#609]: https://github.com/linebender/parley/pull/609
 [#615]: https://github.com/linebender/parley/pull/615
+[#626]: https://github.com/linebender/parley/pull/626
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.9.0...HEAD
 [0.9.0]: https://github.com/linebender/parley/compare/v0.8.0...v0.9.0
