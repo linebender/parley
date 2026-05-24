@@ -43,32 +43,33 @@ impl AnalysisDataSources {
 
     #[inline(always)]
     fn word_segmenter(&self) -> WordSegmenterBorrowed<'static> {
-        const { WordSegmenter::new_for_non_complex_scripts(WordBreakInvariantOptions::default()) }
+        #[cfg(feature = "complex-scripts")]
+        {
+            WordSegmenter::new_dictionary(WordBreakInvariantOptions::default())
+        }
+        #[cfg(not(feature = "complex-scripts"))]
+        {
+            const { WordSegmenter::new_for_non_complex_scripts(WordBreakInvariantOptions::default()) }
+        }
     }
 
     #[inline(always)]
     fn line_segmenter(&self, word_break_strength: WordBreak) -> LineSegmenterBorrowed<'static> {
         match word_break_strength {
             WordBreak::Normal => {
-                const {
-                    let mut opt = LineBreakOptions::default();
-                    opt.word_option = Some(LineBreakWordOption::Normal);
-                    LineSegmenter::new_for_non_complex_scripts(opt)
-                }
+                let mut opt = LineBreakOptions::default();
+                opt.word_option = Some(LineBreakWordOption::Normal);
+                line_segmenter_impl(opt)
             }
             WordBreak::BreakAll => {
-                const {
-                    let mut opt = LineBreakOptions::default();
-                    opt.word_option = Some(LineBreakWordOption::BreakAll);
-                    LineSegmenter::new_for_non_complex_scripts(opt)
-                }
+                let mut opt = LineBreakOptions::default();
+                opt.word_option = Some(LineBreakWordOption::BreakAll);
+                line_segmenter_impl(opt)
             }
             WordBreak::KeepAll => {
-                const {
-                    let mut opt = LineBreakOptions::default();
-                    opt.word_option = Some(LineBreakWordOption::KeepAll);
-                    LineSegmenter::new_for_non_complex_scripts(opt)
-                }
+                let mut opt = LineBreakOptions::default();
+                opt.word_option = Some(LineBreakWordOption::KeepAll);
+                line_segmenter_impl(opt)
             }
         }
     }
@@ -92,6 +93,18 @@ impl AnalysisDataSources {
     fn brackets(&self) -> CodePointMapDataBorrowed<'_, BidiMirroringGlyph> {
         const { CodePointMapData::new() }
     }
+}
+
+#[cfg(feature = "complex-scripts")]
+#[inline(always)]
+fn line_segmenter_impl(opt: LineBreakOptions<'_>) -> LineSegmenterBorrowed<'static> {
+    LineSegmenter::new_dictionary(opt)
+}
+
+#[cfg(not(feature = "complex-scripts"))]
+#[inline(always)]
+fn line_segmenter_impl(opt: LineBreakOptions<'_>) -> LineSegmenterBorrowed<'static> {
+    LineSegmenter::new_for_non_complex_scripts(opt)
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

@@ -23,6 +23,9 @@ libm = ["fontique/libm", "peniko/libm", "skrifa/libm", "dep:core_maths"]
 # Enables support for system font backends
 system = ["std", "fontique/system"]
 accesskit = ["dep:accesskit"]
+# Enables dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
+# When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
+complex-scripts = []
 
 [dependencies]
 skrifa = { workspace = true }
