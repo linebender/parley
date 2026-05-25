@@ -1151,53 +1151,6 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
     }
 }
 
-// fn cluster_range_is_valid(
-//     mut cluster_range: Range<usize>,
-//     state_cluster_range: Range<usize>,
-//     is_first: bool,
-//     is_last: bool,
-//     is_empty: bool,
-// ) -> bool {
-//     // Compute cluster range
-//     if is_first {
-//         cluster_range.start = state_cluster_range.start;
-//     }
-//     if is_last {
-//         cluster_range.end = state_cluster_range.end;
-//     }
-
-//     // Return true if cluster is valid. Else false.
-//     cluster_range.start < cluster_range.end
-//         || (cluster_range.start == cluster_range.end && is_empty)
-// }
-
-// fn should_commit_line<B: Brush>(
-//     layout: &LayoutData<B>,
-//     state: &mut LineState,
-//     is_last: bool,
-// ) -> bool {
-//     // Compute end cluster
-//     state.clusters.end = state.clusters.end.min(layout.clusters.len());
-//     if state.runs.end == 0 && is_last {
-//         state.runs.end = 1;
-//     }
-
-//     let last_run = state.runs.len() - 1;
-//     let is_empty = layout.text_len == 0;
-
-//     // Iterate over runs. Checking if any have a valid cluster range.
-//     let runs = &layout.runs[state.runs.clone()];
-//     runs.iter().enumerate().any(|(i, run_data)| {
-//         cluster_range_is_valid(
-//             run_data.cluster_range.clone(),
-//             state.clusters.clone(),
-//             i == 0,
-//             i == last_run,
-//             is_empty,
-//         )
-//     })
-// }
-
 fn commit_line<B: Brush>(
     layout: &Layout<B>,
     lines: &mut LineLayout,
@@ -1219,15 +1172,6 @@ fn commit_line<B: Brush>(
     let is_text_run = |item: &LayoutItem| item.kind == LayoutItemKind::TextRun;
     let first_run_pos = items_to_commit.iter().position(is_text_run).unwrap_or(0);
     let last_run_pos = items_to_commit.iter().rposition(is_text_run).unwrap_or(0);
-
-    // // Return if line contains no runs
-    // let (Some(first_run_pos), Some(last_run_pos)) = (first_run_pos, last_run_pos) else {
-    //     return false;
-    // };
-
-    //let runs = &layout.runs[state.runs.clone()];
-    // let start_run_idx = items_to_commit[first_run_pos].index;
-    // let end_run_idx = items_to_commit[last_run_pos].index;
 
     // Iterate over the items to commit
     // println!("\nCOMMIT LINE");
@@ -1307,13 +1251,6 @@ fn commit_line<B: Brush>(
     }
     // let end_run_idx = lines.line_items.last().map(|item| item.index).unwrap_or(0);
     let end_item_idx = lines.line_items.len();
-
-    // Return false and don't commit line if there were no items to process
-    // FIXME: support lines with only inlines boxes
-    // if start_item_idx == end_item_idx {
-    //     // } || first_run_pos == last_run_pos {
-    //     return false;
-    // }
 
     // Exclude the trailing space from justification space count.
     // Only subtract if the line actually ends with a space — with
