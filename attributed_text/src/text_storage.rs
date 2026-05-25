@@ -70,6 +70,8 @@ pub trait TextStorage {
     /// Returns this storage as a contiguous string slice when available.
     ///
     /// Rope-like and sparse storage implementations should return `None`.
+    ///
+    /// For non-contiguous storage or selecting a text range, see [`TextStorage::chunks`].
     fn as_str(&self) -> Option<&str> {
         None
     }
@@ -82,11 +84,14 @@ pub trait TextStorage {
         TextRange::new(self, range)
     }
 
-    /// Iterates over borrowed chunks covering `range`.
+    /// Iterates over contiguous, non-empty chunks of text covering `range`.
     ///
     /// The provided range must have been validated against this storage. Implementations should
     /// yield chunks in order, without gaps or overlaps, and should yield no chunks for an empty
     /// range.
+    ///
+    /// For contiguous storage implementations, you can use [`TextStorage::as_str`] to get the
+    /// entire underlying string slice.
     fn chunks(&self, range: TextRange) -> impl Iterator<Item = TextChunk<'_>>;
 }
 
@@ -219,44 +224,17 @@ mod tests {
         }
 
         fn chunks(&self, range: TextRange) -> impl Iterator<Item = TextChunk<'_>> {
-            ChunkedTextChunks {
-                chunks: self.chunks.iter(),
-                chunk_start: 0,
-                range,
-            }
-        }
-    }
-
-    #[derive(Clone, Debug)]
-    struct ChunkedTextChunks<'a> {
-        chunks: core::slice::Iter<'a, &'static str>,
-        chunk_start: usize,
-        range: TextRange,
-    }
-
-    impl<'a> Iterator for ChunkedTextChunks<'a> {
-        type Item = TextChunk<'a>;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            for chunk in self.chunks.by_ref() {
-                let chunk = *chunk;
-                let chunk_start = self.chunk_start;
-                let chunk_end = chunk_start + chunk.len();
-                self.chunk_start = chunk_end;
-
-                let start = self.range.start().max(chunk_start);
-                let end = self.range.end().min(chunk_end);
-                if start < end {
-                    let local_start = start - chunk_start;
-                    let local_end = end - chunk_start;
-                    return Some(TextChunk::new(
-                        TextRange::new_unchecked(start, end),
-                        &chunk[local_start..local_end],
-                    ));
-                }
-            }
-
-            None
+            let mut chunk_start = 0;
+            self.chunks.iter().filter_map(move |&chunk| {
+                let offset = chunk_start;
+                let start = range.start().max(chunk_start);
+                chunk_start += chunk.len();
+                let end = range.end().min(chunk_start);
+                (start < end).then(|| {
+                    let text = &chunk[start - offset..end - offset];
+                    TextChunk::new(TextRange::new_unchecked(start, end), text)
+                })
+            })
         }
     }
 
