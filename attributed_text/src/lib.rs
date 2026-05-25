@@ -27,9 +27,9 @@ mod text_range;
 mod text_storage;
 
 pub use crate::attribute_segments::{
-    ActiveSpans, ActiveSpansIter, AttributeSegments, AttributeSegmentsWorkspace,
+    ActiveSpans, ActiveSpansIter, AttributeSegment, AttributeSegments, AttributeSegmentsWorkspace,
 };
 pub use crate::attributed_text::AttributedText;
 pub use crate::error::{BoundaryInfo, Endpoint, Error, ErrorKind};
 pub use crate::text_range::TextRange;
-pub use crate::text_storage::TextStorage;
+pub use crate::text_storage::{TextChunk, TextStorage};

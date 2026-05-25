@@ -8,9 +8,9 @@
 
 use alloc::vec::Vec;
 use core::fmt::Debug;
-use core::ops::Range;
 
 use crate::AttributedText;
+use crate::TextRange;
 use crate::TextStorage;
 
 fn build_segment_state<T: Debug + TextStorage, Attr: Debug>(
@@ -36,8 +36,8 @@ fn build_segment_state<T: Debug + TextStorage, Attr: Debug>(
     workspace.boundaries.push(0);
     workspace.boundaries.push(len_u32);
     for (range, _) in attributed.attributes_iter() {
-        let start_u32 = u32::try_from(range.start).expect("range start should fit in u32");
-        let end_u32 = u32::try_from(range.end).expect("range end should fit in u32");
+        let start_u32 = u32::try_from(range.start()).expect("range start should fit in u32");
+        let end_u32 = u32::try_from(range.end()).expect("range end should fit in u32");
         workspace.boundaries.push(start_u32);
         workspace.boundaries.push(end_u32);
     }
@@ -54,11 +54,11 @@ fn build_segment_state<T: Debug + TextStorage, Attr: Debug>(
     workspace.span_build.reserve(attr_count);
 
     for (attr_index, (range, _)) in attributed.attributes_iter().enumerate() {
-        if range.start == range.end {
+        if range.is_empty() {
             continue;
         }
-        let start_u32 = u32::try_from(range.start).expect("range start should fit in u32");
-        let end_u32 = u32::try_from(range.end).expect("range end should fit in u32");
+        let start_u32 = u32::try_from(range.start()).expect("range start should fit in u32");
+        let end_u32 = u32::try_from(range.end()).expect("range end should fit in u32");
         let start_boundary = workspace
             .boundaries
             .binary_search(&start_u32)
@@ -176,7 +176,7 @@ impl AttributeSegmentsWorkspace {
 
 /// Iterator over contiguous attribute segments produced from an [`AttributedText`].
 ///
-/// Each yielded item is a non-empty, non-overlapping byte range. The active spans for the
+/// Each yielded item is a non-empty, non-overlapping [`TextRange`]. The active spans for the
 /// yielded range are exposed through [`AttributeSegments::active_spans`].
 ///
 /// # Examples
@@ -197,21 +197,22 @@ impl AttributeSegmentsWorkspace {
 /// let mut workspace = AttributeSegmentsWorkspace::new();
 /// let mut segments = workspace.segments(&text);
 ///
-/// assert_eq!(segments.next(), Some(0..1));
-/// let colors: Vec<_> = segments
-///     .active_spans()
+/// assert_eq!(segments.next().map(TextRange::as_range), Some(0..1));
+/// let active_spans = segments.active_spans();
+/// let mut active = active_spans
 ///     .iter()
-///     .map(|(_, c)| c)
-///     .collect();
-/// assert_eq!(colors, vec![&Color::Red]);
+///     .map(|(range, color)| (range.as_range(), color));
+/// assert_eq!(active.next(), Some((0..2, &Color::Red)));
+/// assert_eq!(active.next(), None);
 ///
-/// assert_eq!(segments.next(), Some(1..2));
-/// let colors: Vec<_> = segments
-///     .active_spans()
+/// assert_eq!(segments.next().map(TextRange::as_range), Some(1..2));
+/// let active_spans = segments.active_spans();
+/// let mut active = active_spans
 ///     .iter()
-///     .map(|(_, c)| c)
-///     .collect();
-/// assert_eq!(colors, vec![&Color::Red, &Color::Blue]);
+///     .map(|(range, color)| (range.as_range(), color));
+/// assert_eq!(active.next(), Some((0..2, &Color::Red)));
+/// assert_eq!(active.next(), Some((1..5, &Color::Blue)));
+/// assert_eq!(active.next(), None);
 ///
 /// let active = segments.active_spans();
 /// let mut count = 0;
@@ -219,6 +220,47 @@ impl AttributeSegmentsWorkspace {
 ///     count += 1;
 /// }
 /// assert_eq!(count, 2);
+/// ```
+///
+/// Read the text covered by each segment through [`AttributedText::chunks`]:
+///
+/// ```
+/// use attributed_text::{AttributeSegmentsWorkspace, AttributedText, TextRange};
+///
+/// let mut text = AttributedText::new("aé日z");
+/// text.apply_attribute(TextRange::new(text.text(), 1..6).unwrap(), "emphasis");
+///
+/// let mut workspace = AttributeSegmentsWorkspace::new();
+/// let mut segments = workspace.segments(&text);
+///
+/// while let Some(range) = segments.next() {
+///     let active_attrs = segments.active_spans();
+///     for chunk in text.chunks(range) {
+///         // Use `chunk.text()` with `active_attrs` for this segment.
+///         assert!(!chunk.text().is_empty());
+///     }
+///     assert!(active_attrs.len() <= 1);
+/// }
+/// ```
+///
+/// Or use [`AttributeSegments::next_segment`] to receive the range and active spans together:
+///
+/// ```
+/// use attributed_text::{AttributeSegmentsWorkspace, AttributedText, TextRange};
+///
+/// let mut text = AttributedText::new("aé日z");
+/// text.apply_attribute(TextRange::new(text.text(), 1..6).unwrap(), "emphasis");
+///
+/// let mut workspace = AttributeSegmentsWorkspace::new();
+/// let mut segments = workspace.segments(&text);
+///
+/// while let Some(segment) = segments.next_segment() {
+///     let active_attrs = segment.active_spans();
+///     for chunk in text.chunks(segment.range()) {
+///         assert!(!chunk.text().is_empty());
+///     }
+///     assert!(active_attrs.len() <= 1);
+/// }
 /// ```
 ///
 /// # Implementation notes
@@ -265,10 +307,49 @@ impl<'w, 'a, T: Debug + TextStorage, Attr: Debug> AttributeSegments<'w, 'a, T, A
             attributed: self.attributed,
         }
     }
+
+    /// Returns the next segment as a combined range and active-span view.
+    ///
+    /// This is a convenience wrapper around [`Iterator::next`] and [`Self::active_spans`].
+    /// The returned segment borrows this iterator, so it must be dropped before requesting
+    /// another segment.
+    pub fn next_segment(&mut self) -> Option<AttributeSegment<'_, 'a, T, Attr>> {
+        let range = self.next()?;
+        Some(AttributeSegment {
+            range,
+            active_ids: &self.workspace.active,
+            attributed: self.attributed,
+        })
+    }
+}
+
+/// A range yielded by [`AttributeSegments`] with its active attribute spans.
+#[derive(Clone, Debug)]
+pub struct AttributeSegment<'s, 'a, T: Debug + TextStorage, Attr: Debug> {
+    range: TextRange,
+    active_ids: &'s [u32],
+    attributed: &'a AttributedText<T, Attr>,
+}
+
+impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> AttributeSegment<'s, 'a, T, Attr> {
+    /// Returns the segment range.
+    #[must_use]
+    pub const fn range(&self) -> TextRange {
+        self.range
+    }
+
+    /// Returns the spans active over this segment.
+    #[must_use]
+    pub const fn active_spans(&self) -> ActiveSpans<'s, 'a, T, Attr> {
+        ActiveSpans {
+            active_ids: self.active_ids,
+            attributed: self.attributed,
+        }
+    }
 }
 
 impl<T: Debug + TextStorage, Attr: Debug> Iterator for AttributeSegments<'_, '_, T, Attr> {
-    type Item = Range<usize>;
+    type Item = TextRange;
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         // Remaining segments are remaining adjacent boundary pairs: [i, i + 1).
@@ -288,7 +369,7 @@ impl<T: Debug + TextStorage, Attr: Debug> Iterator for AttributeSegments<'_, '_,
             self.index += 1;
             debug_assert!(start < end, "boundaries are sorted + deduped");
 
-            return Some(start..end);
+            return Some(TextRange::new_unchecked(start, end));
         }
         self.workspace.active.clear();
         None
@@ -326,7 +407,11 @@ pub struct ActiveSpansIter<'s, 'a, T: Debug + TextStorage, Attr: Debug> {
 }
 
 impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> Iterator for ActiveSpansIter<'s, 'a, T, Attr> {
-    type Item = (&'a Range<usize>, &'a Attr);
+    type Item = (TextRange, &'a Attr);
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.ids.size_hint()
+    }
 
     fn next(&mut self) -> Option<Self::Item> {
         let &attr_index = self.ids.next()?;
@@ -356,7 +441,7 @@ impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> DoubleEndedIterator
 impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> ActiveSpans<'s, 'a, T, Attr> {
     /// Iterate over the active spans in application order (ascending span id).
     ///
-    /// Each item is `(&Range<usize>, &Attr)`.
+    /// Each item is `(TextRange, &Attr)`.
     pub fn iter(&self) -> ActiveSpansIter<'_, 'a, T, Attr> {
         ActiveSpansIter {
             ids: self.active_ids.iter(),
@@ -378,7 +463,7 @@ impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> ActiveSpans<'s, 'a, T, Attr> {
 impl<'active, 's, 'a, T: Debug + TextStorage, Attr: Debug> IntoIterator
     for &'active ActiveSpans<'s, 'a, T, Attr>
 {
-    type Item = (&'a Range<usize>, &'a Attr);
+    type Item = (TextRange, &'a Attr);
     type IntoIter = ActiveSpansIter<'active, 'a, T, Attr>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -389,15 +474,19 @@ impl<'active, 's, 'a, T: Debug + TextStorage, Attr: Debug> IntoIterator
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TextRange;
     use alloc::vec;
     use alloc::vec::Vec;
+    use core::ops::Range;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum Color {
         Red,
         Blue,
         Green,
+    }
+
+    fn r(range: Range<usize>) -> Option<TextRange> {
+        Some(TextRange::new_unchecked(range.start, range.end))
     }
 
     #[test]
@@ -413,7 +502,7 @@ mod tests {
         let at = AttributedText::<&str, Color>::new("hello");
         let mut workspace = AttributeSegmentsWorkspace::new();
         let mut segments = workspace.segments(&at);
-        assert_eq!(segments.next(), Some(0..5));
+        assert_eq!(segments.next(), r(0..5));
         assert!(segments.active_spans().is_empty());
         assert_eq!(segments.next(), None);
     }
@@ -426,11 +515,11 @@ mod tests {
         let mut segments = workspace.segments(&at);
 
         assert_eq!(segments.size_hint(), (3, Some(3)));
-        assert_eq!(segments.next(), Some(0..1));
+        assert_eq!(segments.next(), r(0..1));
         assert_eq!(segments.size_hint(), (2, Some(2)));
-        assert_eq!(segments.next(), Some(1..3));
+        assert_eq!(segments.next(), r(1..3));
         assert_eq!(segments.size_hint(), (1, Some(1)));
-        assert_eq!(segments.next(), Some(3..5));
+        assert_eq!(segments.next(), r(3..5));
         assert_eq!(segments.size_hint(), (0, Some(0)));
         assert_eq!(segments.next(), None);
     }
@@ -441,7 +530,7 @@ mod tests {
         at.apply_attribute(TextRange::new(at.text(), 0..5).unwrap(), Color::Red);
         let mut workspace = AttributeSegmentsWorkspace::new();
         let mut segments = workspace.segments(&at);
-        assert_eq!(segments.next(), Some(0..5));
+        assert_eq!(segments.next(), r(0..5));
         let active: Vec<_> = segments.active_spans().iter().collect();
         assert_eq!(active.len(), 1);
         assert_eq!(active[0].1, &Color::Red);
@@ -454,11 +543,11 @@ mod tests {
         at.apply_attribute(TextRange::new(at.text(), 1..3).unwrap(), Color::Red);
         let mut workspace = AttributeSegmentsWorkspace::new();
         let mut segments = workspace.segments(&at);
-        assert_eq!(segments.next(), Some(0..1));
+        assert_eq!(segments.next(), r(0..1));
         assert!(segments.active_spans().is_empty());
-        assert_eq!(segments.next(), Some(1..3));
+        assert_eq!(segments.next(), r(1..3));
         assert_eq!(segments.active_spans().len(), 1);
-        assert_eq!(segments.next(), Some(3..5));
+        assert_eq!(segments.next(), r(3..5));
         assert!(segments.active_spans().is_empty());
         assert_eq!(segments.next(), None);
     }
@@ -470,22 +559,22 @@ mod tests {
         at.apply_attribute(TextRange::new(at.text(), 2..5).unwrap(), Color::Blue);
         let mut workspace = AttributeSegmentsWorkspace::new();
         let mut segments = workspace.segments(&at);
-        assert_eq!(segments.next(), Some(0..1));
+        assert_eq!(segments.next(), r(0..1));
         assert!(segments.active_spans().is_empty());
 
-        assert_eq!(segments.next(), Some(1..2));
+        assert_eq!(segments.next(), r(1..2));
         let a: Vec<_> = segments.active_spans().iter().map(|(_, c)| c).collect();
         assert_eq!(a, vec![&Color::Red]);
 
-        assert_eq!(segments.next(), Some(2..4));
+        assert_eq!(segments.next(), r(2..4));
         let a: Vec<_> = segments.active_spans().iter().map(|(_, c)| c).collect();
         assert_eq!(a, vec![&Color::Red, &Color::Blue]);
 
-        assert_eq!(segments.next(), Some(4..5));
+        assert_eq!(segments.next(), r(4..5));
         let a: Vec<_> = segments.active_spans().iter().map(|(_, c)| c).collect();
         assert_eq!(a, vec![&Color::Blue]);
 
-        assert_eq!(segments.next(), Some(5..6));
+        assert_eq!(segments.next(), r(5..6));
         assert!(segments.active_spans().is_empty());
         assert_eq!(segments.next(), None);
     }
@@ -498,7 +587,7 @@ mod tests {
         at.apply_attribute(TextRange::new(at.text(), 0..6).unwrap(), Color::Green);
         let mut workspace = AttributeSegmentsWorkspace::new();
         let mut segments = workspace.segments(&at);
-        assert_eq!(segments.next(), Some(0..6));
+        assert_eq!(segments.next(), r(0..6));
 
         let forward: Vec<_> = segments.active_spans().iter().map(|(_, c)| c).collect();
         assert_eq!(forward, vec![&Color::Red, &Color::Blue, &Color::Green]);
@@ -519,9 +608,9 @@ mod tests {
         at.apply_attribute(TextRange::new(at.text(), 2..2).unwrap(), Color::Red);
         let mut workspace = AttributeSegmentsWorkspace::new();
         let mut segments = workspace.segments(&at);
-        assert_eq!(segments.next(), Some(0..2));
+        assert_eq!(segments.next(), r(0..2));
         assert!(segments.active_spans().is_empty());
-        assert_eq!(segments.next(), Some(2..5));
+        assert_eq!(segments.next(), r(2..5));
         assert!(segments.active_spans().is_empty());
         assert_eq!(segments.next(), None);
     }
@@ -533,10 +622,10 @@ mod tests {
         at.apply_attribute(TextRange::new(at.text(), 3..6).unwrap(), Color::Blue);
         let mut workspace = AttributeSegmentsWorkspace::new();
         let mut segments = workspace.segments(&at);
-        assert_eq!(segments.next(), Some(0..3));
+        assert_eq!(segments.next(), r(0..3));
         let a: Vec<_> = segments.active_spans().iter().map(|(_, c)| c).collect();
         assert_eq!(a, vec![&Color::Red]);
-        assert_eq!(segments.next(), Some(3..6));
+        assert_eq!(segments.next(), r(3..6));
         let a: Vec<_> = segments.active_spans().iter().map(|(_, c)| c).collect();
         assert_eq!(a, vec![&Color::Blue]);
         assert_eq!(segments.next(), None);
@@ -549,7 +638,7 @@ mod tests {
         let mut workspace = AttributeSegmentsWorkspace::new();
         let mut segments = workspace.segments(&at);
 
-        assert_eq!(segments.next(), Some(0..3));
+        assert_eq!(segments.next(), r(0..3));
         assert_eq!(segments.active_spans().len(), 1);
         assert_eq!(segments.next(), None);
         assert!(segments.active_spans().is_empty());
@@ -563,19 +652,74 @@ mod tests {
         let mut workspace = AttributeSegmentsWorkspace::new();
         let mut segments = workspace.segments(&at);
 
-        assert_eq!(segments.next(), Some(0..1));
+        assert_eq!(segments.next(), r(0..1));
         let first: Vec<_> = (&segments.active_spans())
             .into_iter()
             .map(|(_, c)| c)
             .collect();
         assert_eq!(first, vec![&Color::Red]);
 
-        assert_eq!(segments.next(), Some(1..3));
+        assert_eq!(segments.next(), r(1..3));
         let overlap: Vec<_> = (&segments.active_spans())
             .into_iter()
             .map(|(_, c)| c)
             .collect();
         assert_eq!(overlap, vec![&Color::Red, &Color::Blue]);
+    }
+
+    #[test]
+    fn active_spans_iter_reports_exact_len() {
+        let mut at = AttributedText::new("abcd");
+        at.apply_attribute(TextRange::new(at.text(), 0..4).unwrap(), Color::Red);
+        at.apply_attribute(TextRange::new(at.text(), 1..3).unwrap(), Color::Blue);
+        let mut workspace = AttributeSegmentsWorkspace::new();
+        let mut segments = workspace.segments(&at);
+
+        assert_eq!(segments.next(), r(0..1));
+        {
+            let active = segments.active_spans();
+            let mut iter = active.iter();
+            assert_eq!(iter.size_hint(), (1, Some(1)));
+            assert_eq!(iter.len(), 1);
+            assert_eq!(iter.next().map(|(_, c)| c), Some(&Color::Red));
+            assert_eq!(iter.size_hint(), (0, Some(0)));
+            assert_eq!(iter.len(), 0);
+        }
+
+        assert_eq!(segments.next(), r(1..3));
+        {
+            let active = segments.active_spans();
+            let mut iter = active.iter();
+            assert_eq!(iter.size_hint(), (2, Some(2)));
+            assert_eq!(iter.len(), 2);
+            assert_eq!(iter.next_back().map(|(_, c)| c), Some(&Color::Blue));
+            assert_eq!(iter.len(), 1);
+            assert_eq!(iter.next().map(|(_, c)| c), Some(&Color::Red));
+            assert_eq!(iter.len(), 0);
+        }
+    }
+
+    #[test]
+    fn next_segment_returns_range_and_active_spans_together() {
+        let mut at = AttributedText::new("abcd");
+        at.apply_attribute(TextRange::new(at.text(), 1..3).unwrap(), Color::Red);
+        let mut workspace = AttributeSegmentsWorkspace::new();
+        let mut segments = workspace.segments(&at);
+
+        let segment = segments.next_segment().unwrap();
+        assert_eq!(segment.range(), TextRange::new_unchecked(0, 1));
+        assert!(segment.active_spans().is_empty());
+
+        let segment = segments.next_segment().unwrap();
+        assert_eq!(segment.range(), TextRange::new_unchecked(1, 3));
+        let active: Vec<_> = segment.active_spans().iter().map(|(_, c)| c).collect();
+        assert_eq!(active, vec![&Color::Red]);
+
+        let segment = segments.next_segment().unwrap();
+        assert_eq!(segment.range(), TextRange::new_unchecked(3, 4));
+        assert!(segment.active_spans().is_empty());
+
+        assert!(segments.next_segment().is_none());
     }
 
     #[test]
@@ -586,10 +730,10 @@ mod tests {
         a.apply_attribute(TextRange::new(a.text(), 0..1).unwrap(), Color::Red);
         {
             let mut segments = workspace.segments(&a);
-            assert_eq!(segments.next(), Some(0..1));
+            assert_eq!(segments.next(), r(0..1));
             let first: Vec<_> = segments.active_spans().iter().map(|(_, c)| c).collect();
             assert_eq!(first, vec![&Color::Red]);
-            assert_eq!(segments.next(), Some(1..3));
+            assert_eq!(segments.next(), r(1..3));
             assert!(segments.active_spans().is_empty());
             assert_eq!(segments.next(), None);
         }
@@ -598,9 +742,9 @@ mod tests {
         b.apply_attribute(TextRange::new(b.text(), 1..4).unwrap(), Color::Blue);
         {
             let mut segments = workspace.segments(&b);
-            assert_eq!(segments.next(), Some(0..1));
+            assert_eq!(segments.next(), r(0..1));
             assert!(segments.active_spans().is_empty());
-            assert_eq!(segments.next(), Some(1..4));
+            assert_eq!(segments.next(), r(1..4));
             let second: Vec<_> = segments.active_spans().iter().map(|(_, c)| c).collect();
             assert_eq!(second, vec![&Color::Blue]);
             assert_eq!(segments.next(), None);

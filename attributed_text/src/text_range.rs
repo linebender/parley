@@ -47,7 +47,7 @@ pub struct TextRange {
 impl TextRange {
     /// Returns a validated `TextRange` for the provided text.
     #[inline]
-    pub fn new<T: TextStorage>(text: &T, range: Range<usize>) -> Result<Self, Error> {
+    pub fn new<T: TextStorage + ?Sized>(text: &T, range: Range<usize>) -> Result<Self, Error> {
         validate_range(text, &range)?;
         Ok(Self {
             start: range.start,
@@ -78,6 +78,34 @@ impl TextRange {
         self.end
     }
 
+    /// Returns the length of this range in bytes.
+    #[must_use]
+    #[inline]
+    pub const fn len(self) -> usize {
+        self.end - self.start
+    }
+
+    /// Returns `true` if this range contains no bytes.
+    #[must_use]
+    #[inline]
+    pub const fn is_empty(self) -> bool {
+        self.start == self.end
+    }
+
+    /// Returns `true` if `index` is contained in this range.
+    #[must_use]
+    #[inline]
+    pub const fn contains(self, index: usize) -> bool {
+        self.start <= index && index < self.end
+    }
+
+    /// Returns `true` if this range and `other` overlap.
+    #[must_use]
+    #[inline]
+    pub const fn overlaps(self, other: Self) -> bool {
+        self.start < other.end && self.end > other.start
+    }
+
     /// Returns this range as a `Range<usize>`.
     #[must_use]
     #[inline]
@@ -94,7 +122,10 @@ impl From<TextRange> for Range<usize> {
 }
 
 #[inline]
-pub(crate) fn validate_range<T: TextStorage>(text: &T, range: &Range<usize>) -> Result<(), Error> {
+pub(crate) fn validate_range<T: TextStorage + ?Sized>(
+    text: &T,
+    range: &Range<usize>,
+) -> Result<(), Error> {
     let text_len = text.len();
     if range.start > range.end {
         return Err(Error::invalid_range(range.start, range.end, text_len));

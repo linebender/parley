@@ -6,13 +6,13 @@ use core::fmt::Debug;
 use core::ops::Range;
 
 use crate::text_range::validate_range;
-use crate::{Error, TextRange, TextStorage};
+use crate::{Error, TextChunk, TextRange, TextStorage};
 
 /// A block of text with attributes applied to ranges within the text.
 #[derive(Debug)]
 pub struct AttributedText<T: Debug + TextStorage, Attr: Debug> {
     text: T,
-    attributes: Vec<(Range<usize>, Attr)>,
+    attributes: Vec<(TextRange, Attr)>,
 }
 
 impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
@@ -50,17 +50,21 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
     }
 
     /// Borrow the underlying text as `&str` when the storage is contiguous.
-    pub fn as_str(&self) -> &str
-    where
-        T: AsRef<str>,
-    {
-        self.text.as_ref()
+    pub fn as_str(&self) -> Option<&str> {
+        self.text.as_str()
+    }
+
+    /// Iterates over borrowed text chunks covering `range`.
+    ///
+    /// The provided range must have been validated against this text.
+    pub fn chunks(&self, range: TextRange) -> impl Iterator<Item = TextChunk<'_>> {
+        self.text.chunks(range)
     }
 
     /// Apply an `attribute` to a validated [`TextRange`] within the text.
     #[inline]
     pub fn apply_attribute(&mut self, range: TextRange, attribute: Attr) {
-        self.attributes.push((range.into(), attribute));
+        self.attributes.push((range, attribute));
     }
 
     /// Apply an `attribute` to a byte range within the text.
@@ -73,7 +77,8 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
         attribute: Attr,
     ) -> Result<(), Error> {
         validate_range(&self.text, &range)?;
-        self.attributes.push((range, attribute));
+        self.attributes
+            .push((TextRange::new_unchecked(range.start, range.end), attribute));
         Ok(())
     }
 
@@ -81,8 +86,8 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
     ///
     /// Attributes are yielded in the order they were applied.
     #[inline]
-    pub fn attributes_iter(&self) -> impl ExactSizeIterator<Item = (&Range<usize>, &Attr)> {
-        self.attributes.iter().map(|(range, attr)| (range, attr))
+    pub fn attributes_iter(&self) -> impl ExactSizeIterator<Item = (TextRange, &Attr)> {
+        self.attributes.iter().map(|(range, attr)| (*range, attr))
     }
 
     /// Get an iterator over the attributes (and their ranges) that apply at the given `index`.
@@ -91,10 +96,10 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
     /// attributes, it just reports everything.
     ///
     /// This performs a full scan of all attributes on each call (`O(n)` in applied span count).
-    pub fn attributes_at(&self, index: usize) -> impl Iterator<Item = (&Range<usize>, &Attr)> {
+    pub fn attributes_at(&self, index: usize) -> impl Iterator<Item = (TextRange, &Attr)> {
         self.attributes.iter().filter_map(move |(attr_span, attr)| {
-            if attr_span.contains(&index) {
-                Some((attr_span, attr))
+            if attr_span.contains(index) {
+                Some((*attr_span, attr))
             } else {
                 None
             }
@@ -114,11 +119,11 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
     /// the exact covered subranges).
     pub fn attributes_for_range(
         &self,
-        range: Range<usize>,
-    ) -> impl Iterator<Item = (&Range<usize>, &Attr)> {
+        range: TextRange,
+    ) -> impl Iterator<Item = (TextRange, &Attr)> {
         self.attributes.iter().filter_map(move |(attr_span, attr)| {
-            if (attr_span.start < range.end) && (attr_span.end > range.start) {
-                Some((attr_span, attr))
+            if attr_span.overlaps(range) {
+                Some((*attr_span, attr))
             } else {
                 None
             }
@@ -132,10 +137,10 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
 
     /// Returns the `(range, attribute)` pair at the given insertion-order span index.
     #[inline]
-    pub(crate) fn attribute_at_idx(&self, index: usize) -> Option<(&Range<usize>, &Attr)> {
+    pub(crate) fn attribute_at_idx(&self, index: usize) -> Option<(TextRange, &Attr)> {
         self.attributes
             .get(index)
-            .map(|(range, attr)| (range, attr))
+            .map(|(range, attr)| (*range, attr))
     }
 
     /// Remove all applied attribute spans.
@@ -147,12 +152,17 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
 #[cfg(test)]
 mod tests {
     use crate::{AttributedText, Endpoint, ErrorKind, TextRange};
+    use alloc::vec;
     use alloc::vec::Vec;
 
     #[derive(Debug, PartialEq)]
     enum TestAttribute {
         Keep,
         Remove,
+    }
+
+    fn r(range: core::ops::Range<usize>) -> TextRange {
+        TextRange::new_unchecked(range.start, range.end)
     }
 
     #[test]
@@ -175,13 +185,13 @@ mod tests {
         // Index 2 is in both spans; returns ranges and attrs in application order.
         let at_2: Vec<_> = at.attributes_at(2).collect();
         assert_eq!(at_2.len(), 2);
-        assert_eq!(at_2[0], (&(1..3), &TestAttribute::Keep));
-        assert_eq!(at_2[1], (&(2..5), &TestAttribute::Remove));
+        assert_eq!(at_2[0], (r(1..3), &TestAttribute::Keep));
+        assert_eq!(at_2[1], (r(2..5), &TestAttribute::Remove));
 
         // Index 4 is only in the second span.
         let at_4: Vec<_> = at.attributes_at(4).collect();
         assert_eq!(at_4.len(), 1);
-        assert_eq!(at_4[0], (&(2..5), &TestAttribute::Remove));
+        assert_eq!(at_4[0], (r(2..5), &TestAttribute::Remove));
     }
 
     #[test]
@@ -199,19 +209,25 @@ mod tests {
         );
 
         // Range overlapping only the first span.
-        let r: Vec<_> = at.attributes_for_range(0..2).collect();
-        assert_eq!(r.len(), 1);
-        assert_eq!(r[0], (&(1..3), &TestAttribute::Keep));
+        let attrs: Vec<_> = at
+            .attributes_for_range(TextRange::new(at.text(), 0..2).unwrap())
+            .collect();
+        assert_eq!(attrs.len(), 1);
+        assert_eq!(attrs[0], (r(1..3), &TestAttribute::Keep));
 
         // Range overlapping both spans.
-        let r: Vec<_> = at.attributes_for_range(2..5).collect();
-        assert_eq!(r.len(), 2);
-        assert_eq!(r[0], (&(1..3), &TestAttribute::Keep));
-        assert_eq!(r[1], (&(4..6), &TestAttribute::Remove));
+        let attrs: Vec<_> = at
+            .attributes_for_range(TextRange::new(at.text(), 2..5).unwrap())
+            .collect();
+        assert_eq!(attrs.len(), 2);
+        assert_eq!(attrs[0], (r(1..3), &TestAttribute::Keep));
+        assert_eq!(attrs[1], (r(4..6), &TestAttribute::Remove));
 
         // Range between the two spans, overlapping neither.
-        let r: Vec<_> = at.attributes_for_range(3..4).collect();
-        assert!(r.is_empty());
+        let attrs: Vec<_> = at
+            .attributes_for_range(TextRange::new(at.text(), 3..4).unwrap())
+            .collect();
+        assert!(attrs.is_empty());
     }
 
     #[test]
@@ -258,6 +274,23 @@ mod tests {
         let range = TextRange::new(at.text(), 1..3).unwrap();
         at.apply_attribute(range, TestAttribute::Keep);
         assert_eq!(at.attributes_len(), 1);
+    }
+
+    #[test]
+    fn as_str_returns_contiguous_text() {
+        let at = AttributedText::<&str, ()>::new("Hello!");
+        assert_eq!(at.as_str(), Some("Hello!"));
+    }
+
+    #[test]
+    fn chunks_iterates_underlying_text() {
+        let at = AttributedText::<&str, ()>::new("aé日z");
+        let range = TextRange::new(at.text(), 1..6).unwrap();
+        let chunks: Vec<_> = at
+            .chunks(range)
+            .map(|chunk| (chunk.range().as_range(), chunk.text()))
+            .collect();
+        assert_eq!(chunks, vec![(1..6, "é日")]);
     }
 
     #[test]
