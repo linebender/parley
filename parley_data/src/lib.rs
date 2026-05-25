@@ -6,7 +6,9 @@
 
 #![no_std]
 
-use icu_properties::props::{BidiClass, GeneralCategory, GraphemeClusterBreak, Script};
+use icu_properties::props::{
+    BidiClass, GeneralCategory, GraphemeClusterBreak, Script, VerticalOrientation,
+};
 
 /// Baked data (`PackTab` tables).
 #[cfg(feature = "baked")]
@@ -25,6 +27,7 @@ impl Properties {
     const IS_VARIATION_SELECTOR_BITS: u32 = 1;
     const IS_REGION_INDICATOR_BITS: u32 = 1;
     const IS_MANDATORY_LINE_BREAK_BITS: u32 = 1;
+    const VO_BITS: u32 = 2;
 
     const SCRIPT_SHIFT: u32 = 0;
     const GC_SHIFT: u32 = Self::SCRIPT_SHIFT + Self::SCRIPT_BITS;
@@ -37,6 +40,7 @@ impl Properties {
         Self::IS_VARIATION_SELECTOR_SHIFT + Self::IS_VARIATION_SELECTOR_BITS;
     const IS_MANDATORY_LINE_BREAK_SHIFT: u32 =
         Self::IS_REGION_INDICATOR_SHIFT + Self::IS_REGION_INDICATOR_BITS;
+    const VO_SHIFT: u32 = Self::IS_MANDATORY_LINE_BREAK_SHIFT + Self::IS_MANDATORY_LINE_BREAK_BITS;
 
     #[cfg(feature = "baked")]
     #[inline(always)]
@@ -55,11 +59,13 @@ impl Properties {
         is_variation_selector: bool,
         is_region_indicator: bool,
         is_mandatory_linebreak: bool,
+        vo: VerticalOrientation,
     ) -> Self {
         let s = script.to_icu4c_value() as u32;
         let gc = gc as u32;
         let gcb = gcb.to_icu4c_value() as u32;
         let bidi = bidi.to_icu4c_value() as u32;
+        let vo = vo.to_icu4c_value() as u32;
 
         Self(
             (s << Self::SCRIPT_SHIFT)
@@ -69,7 +75,8 @@ impl Properties {
                 | ((is_emoji_or_pictographic as u32) << Self::IS_EMOJI_OR_PICTOGRAPH_SHIFT)
                 | ((is_variation_selector as u32) << Self::IS_VARIATION_SELECTOR_SHIFT)
                 | ((is_region_indicator as u32) << Self::IS_REGION_INDICATOR_SHIFT)
-                | ((is_mandatory_linebreak as u32) << Self::IS_MANDATORY_LINE_BREAK_SHIFT),
+                | ((is_mandatory_linebreak as u32) << Self::IS_MANDATORY_LINE_BREAK_SHIFT)
+                | (vo << Self::VO_SHIFT),
         )
     }
 
@@ -153,6 +160,16 @@ impl Properties {
             Self::IS_MANDATORY_LINE_BREAK_BITS,
         ) != 0
     }
+
+    /// Returns the vertical orientation (UTR #50) for the character.
+    #[inline(always)]
+    pub fn vertical_orientation(&self) -> VerticalOrientation {
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "vertical orientation data only occupies VO_BITS bits"
+        )]
+        VerticalOrientation::from_icu4c_value(self.bits(Self::VO_SHIFT, Self::VO_BITS) as u8)
+    }
 }
 
 impl From<Properties> for u32 {
@@ -166,7 +183,7 @@ mod tests {
     use super::Properties;
     use icu_properties::props::{
         BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak,
-        RegionalIndicator, Script, VariationSelector,
+        RegionalIndicator, Script, VariationSelector, VerticalOrientation,
     };
     use icu_properties::{CodePointMapData, CodePointSetData};
 
@@ -187,6 +204,7 @@ mod tests {
                     | LineBreak::LineFeed
                     | LineBreak::NextLine
             ),
+            CodePointMapData::<VerticalOrientation>::new().get32(cp),
         )
     }
 

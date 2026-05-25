@@ -3,14 +3,18 @@
 
 use crate::analysis::Boundary;
 use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty, WordBreak};
+use alloc::string::{String, ToString};
 use alloc::{vec, vec::Vec};
 use fontique::FontWeight;
+use icu_properties::PropertyNamesShort;
 use icu_properties::props::{GraphemeClusterBreak, Script};
+use parley_data::Properties;
 
 #[derive(Default)]
 struct TestContext {
     pub layout_context: LayoutContext,
     pub font_context: FontContext,
+    pub text: String,
 }
 
 impl TestContext {
@@ -19,24 +23,29 @@ impl TestContext {
             .layout_context
             .info
             .iter()
-            .map(|(info, _)| info.boundary)
+            .map(|(info, _)| info.boundary())
             .collect();
         assert_eq!(actual, expected, "Boundary list mismatch");
         self
     }
 
     fn expect_bidi_embed_level_list(self, expected: Vec<u8>) -> Self {
-        let actual = self.layout_context.bidi.levels();
+        let actual = self.layout_context.analysis.bidi_levels();
         assert_eq!(actual, expected, "Bidi embed level list mismatch");
         self
     }
 
     fn expect_script_list(self, expected: Vec<Script>) -> Self {
+        let names = PropertyNamesShort::<Script>::new();
+        let expected: Vec<fontique::Script> = expected
+            .iter()
+            .map(|&script| fontique::Script::parse(names.get(script).unwrap_or("Zzzz")).unwrap())
+            .collect();
         let actual: Vec<_> = self
             .layout_context
             .info
             .iter()
-            .map(|(info, _)| info.script)
+            .map(|(info, _)| info.script())
             .collect();
         assert_eq!(actual, expected, "Script list mismatch");
         self
@@ -44,10 +53,9 @@ impl TestContext {
 
     fn expect_grapheme_cluster_break_list(self, expected: Vec<GraphemeClusterBreak>) -> Self {
         let actual: Vec<_> = self
-            .layout_context
-            .info
-            .iter()
-            .map(|(info, _)| info.grapheme_cluster_break)
+            .text
+            .chars()
+            .map(|ch| Properties::get(ch).grapheme_cluster_break())
             .collect();
         assert_eq!(actual, expected, "Grapheme cluster break list mismatch");
         self
@@ -113,7 +121,15 @@ fn verify_analysis(
     text: &str,
     configure_builder: impl for<'a> FnOnce(&mut RangedBuilder<'a, [u8; 4]>),
 ) -> TestContext {
-    let mut test_context = TestContext::default();
+    // Analyze empty input as a single space.
+    let mut test_context = TestContext {
+        text: if text.is_empty() {
+            " ".to_string()
+        } else {
+            text.to_string()
+        },
+        ..Default::default()
+    };
 
     {
         let mut builder = test_context.layout_context.ranged_builder(

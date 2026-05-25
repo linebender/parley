@@ -19,10 +19,14 @@ system = ["parley/system"]
 
 [dependencies]
 parley = { workspace = true, features = ["std"] }
+parley_core = { workspace = true, features = ["std"] }
+parlance = { workspace = true, features = ["std"] }
 parley_dev = { workspace = true }
 glifo = { workspace = true, features = ["std", "vello_cpu", "png"] }
 peniko = { workspace = true, features = ["std"] }
-vello_cpu = { workspace = true, features = ["std", "png"] }
+# The `text` feature provides vello_cpu's own glyph-run API, which the parley_core
+# renderer uses to rasterize a `ShapedText` directly (parley layouts go via glifo).
+vello_cpu = { workspace = true, features = ["std", "png", "text"] }
 fontique = { workspace = true, features = ["std"] }
 taffy = { version = "0.10", default-features = false, features = ["std", "float_layout"] }
 

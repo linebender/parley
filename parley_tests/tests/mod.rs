@@ -23,6 +23,7 @@
 #![allow(clippy::cast_possible_truncation, reason = "not critical for testing")]
 
 mod basic;
+mod core_shaping;
 mod cursor;
 mod draw;
 mod editor;

@@ -10,7 +10,6 @@ use alloc::vec::Vec;
 use core_maths::CoreFloat;
 
 use crate::analysis::Boundary;
-use crate::analysis::cluster::Whitespace;
 use crate::data::ClusterData;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
@@ -18,6 +17,7 @@ use crate::layout::{
 };
 use crate::style::Brush;
 use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
+use parley_core::Whitespace;
 
 use core::ops::Range;
 

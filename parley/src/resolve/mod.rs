@@ -60,12 +60,6 @@ impl<T> Default for Resolved<T> {
     }
 }
 
-impl<T> Resolved<T> {
-    pub(crate) fn id(&self) -> usize {
-        self.index
-    }
-}
-
 #[derive(Clone)]
 struct Cache<T> {
     /// Items in the cache. May contain sequences.

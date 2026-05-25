@@ -1,87 +1,52 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+//! Per-grapheme font selection.
+//!
+//! These are graphemes as in UAX #29's "extended grapheme clusters", i.e., multiple characters can
+//! be a single unit. For example, "é" written as "e" + U+0301 is a grapheme.
+//!
+//! For each grapheme we ask the [`fontique::Query`] for candidate fonts and pick the one that
+//! covers the cluster, keeping the best partial match as a fallback. Coverage is probed against
+//! the font's `cmap`, trying canonical NFC/NFD forms of combining sequences so a font carrying
+//! only the precomposed (or only the decomposed) form still counts as covering. The chosen *font*
+//! is what matters here; actual glyph selection happens later when `harfrust` shapes the font run.
+
 use alloc::vec::Vec;
+
+use fontique::{Charmap, QueryFont};
 use icu_normalizer::properties::Decomposed;
 
-use crate::analysis::AnalysisDataSources;
+use crate::analysis::{AnalysisDataSources, CharInfo};
 
-/// The maximum number of characters in a single cluster.
-const MAX_CLUSTER_SIZE: usize = 32;
+/// Nominal glyph identifier (0 is `.notdef` / unmapped).
+type GlyphId = u32;
 
+/// One character of a [`CharCluster`].
+#[derive(Copy, Clone, Debug, Default)]
+struct Char {
+    /// The character.
+    ch: char,
+    /// Whether the character is a control character.
+    is_control_character: bool,
+    /// True if the character should be considered when mapping glyphs.
+    contributes_to_shaping: bool,
+}
+
+/// A grapheme cluster being probed for font coverage.
 #[derive(Debug, Default)]
-pub(crate) struct CharCluster {
-    pub chars: Vec<Char>,
-    pub is_emoji: bool,
-    pub map_len: u8,
-    pub start: u32,
-    pub end: u32,
-    pub force_normalize: bool,
+pub(super) struct CharCluster {
+    chars: Vec<Char>,
+    map_len: u8,
+    force_normalize: bool,
     comp: Form,
     decomp: Form,
-    form: FormKind,
     best_ratio: f32,
-}
-
-impl CharCluster {
-    pub(crate) fn range(&self) -> SourceRange {
-        SourceRange {
-            start: self.start,
-            end: self.end,
-        }
-    }
-}
-
-/// Source range of a cluster in code units.
-#[derive(Copy, Clone)]
-pub(crate) struct SourceRange {
-    pub start: u32,
-    pub end: u32,
-}
-
-#[derive(Copy, Clone, Debug, Default)]
-pub(crate) struct Char {
-    /// The character.
-    pub ch: char,
-    /// Whether the character
-    pub is_control_character: bool,
-    /// True if the character should be considered when mapping glyphs.
-    pub contributes_to_shaping: bool,
-    /// Nominal glyph identifier.
-    pub glyph_id: GlyphId,
-    /// Indexes into the list of styles for the containing text run, to find the style applicable
-    /// to this character.
-    pub style_index: u16,
-}
-
-pub(crate) type GlyphId = u16;
-
-/// Whitespace content of a cluster.
-#[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
-#[repr(u8)]
-pub(crate) enum Whitespace {
-    /// Not a space.
-    None = 0,
-    /// Standard space.
-    Space = 1,
-    /// Non-breaking space (U+00A0).
-    NoBreakSpace = 2,
-    /// Horizontal tab.
-    Tab = 3,
-    /// Newline (CR, LF, CRLF, LS, or PS).
-    Newline = 4,
-}
-
-impl Whitespace {
-    /// Returns true for space or no break space.
-    pub(crate) fn is_space_or_nbsp(self) -> bool {
-        matches!(self, Self::Space | Self::NoBreakSpace)
-    }
 }
 
 /// Iterative status of mapping a character cluster to nominal glyph identifiers.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub(crate) enum Status {
+enum Status {
     /// Mapping should be skipped.
     Discard,
     /// The best mapping so far.
@@ -91,28 +56,43 @@ pub(crate) enum Status {
 }
 
 impl CharCluster {
-    pub(crate) fn clear(&mut self) {
+    /// Resets the cluster, then fills it from `grapheme_text` and `run_char_infos`, advancing
+    /// `char_cursor` by the number of characters in `grapheme_text`.
+    pub(super) fn fill(
+        &mut self,
+        grapheme_text: &str,
+        char_cursor: &mut usize,
+        run_char_infos: &[CharInfo],
+    ) {
+        self.clear();
+        for ch in grapheme_text.chars() {
+            let info = run_char_infos[*char_cursor];
+            *char_cursor += 1;
+            self.force_normalize |= info.force_normalize();
+            let contributes_to_shaping = info.contributes_to_shaping();
+            if contributes_to_shaping {
+                self.map_len += 1;
+            }
+            self.chars.push(Char {
+                ch,
+                is_control_character: info.is_control(),
+                contributes_to_shaping,
+            });
+        }
+    }
+
+    fn clear(&mut self) {
         self.chars.clear();
-        self.is_emoji = false;
         self.map_len = 0;
-        self.start = 0;
-        self.end = 0;
         self.force_normalize = false;
         self.comp.clear();
         self.decomp.clear();
-        self.form = FormKind::Original;
         self.best_ratio = 0.;
     }
 
     #[inline(always)]
     fn len(&self) -> usize {
         self.chars.len()
-    }
-
-    /// Returns the primary style index for the cluster.
-    #[inline(always)]
-    pub(crate) fn style_index(&self) -> u16 {
-        self.chars[0].style_index
     }
 
     #[inline(always)]
@@ -195,7 +175,9 @@ impl CharCluster {
         }
     }
 
-    pub(crate) fn map(
+    /// Probes a font's coverage, where `f(ch)` reports the font's nominal glyph for `ch` (0 for
+    /// `.notdef`/unmapped). Updates the running best ratio and returns how this font compares.
+    fn map(
         &mut self,
         f: impl Fn(char) -> GlyphId,
         analysis_data_sources: &AnalysisDataSources,
@@ -204,45 +186,40 @@ impl CharCluster {
         if len == 0 {
             return Status::Complete;
         }
-        let mut glyph_ids = [0_u16; MAX_CLUSTER_SIZE];
         let prev_ratio = self.best_ratio;
         let mut ratio;
         if self.force_normalize && self.composed(analysis_data_sources).is_some() {
-            ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
+            ratio = self.comp.map(&f);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
-                self.form = FormKind::NFC;
                 if ratio >= 1. {
                     return Status::Complete;
                 }
             }
         }
         ratio = Mapper {
-            chars: &mut self.chars[..len],
+            chars: &self.chars[..len],
             map_len: self.map_len.max(1),
         }
-        .map(&f, &mut glyph_ids, self.best_ratio);
+        .map(&f);
         if ratio > self.best_ratio {
             self.best_ratio = ratio;
-            self.form = FormKind::Original;
             if ratio >= 1. {
                 return Status::Complete;
             }
         }
         if self.decomposed(analysis_data_sources).is_some() {
-            ratio = self.decomp.map(&f, &mut glyph_ids, self.best_ratio);
+            ratio = self.decomp.map(&f);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
-                self.form = FormKind::NFD;
                 if ratio >= 1. {
                     return Status::Complete;
                 }
             }
             if !self.force_normalize && self.composed(analysis_data_sources).is_some() {
-                ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
+                ratio = self.comp.map(&f);
                 if ratio > self.best_ratio {
                     self.best_ratio = ratio;
-                    self.form = FormKind::NFC;
                     if ratio >= 1. {
                         return Status::Complete;
                     }
@@ -257,15 +234,6 @@ impl CharCluster {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-#[allow(clippy::upper_case_acronyms)]
-enum FormKind {
-    #[default]
-    Original,
-    NFD,
-    NFC,
-}
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum FormState {
     None,
@@ -274,7 +242,7 @@ enum FormState {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Form {
+struct Form {
     chars: [Char; 2],
     len: u8,
     map_len: u8,
@@ -320,56 +288,75 @@ impl Form {
     }
 
     #[inline(always)]
-    fn map(
-        &mut self,
-        f: &impl Fn(char) -> u16,
-        glyphs: &mut [u16; MAX_CLUSTER_SIZE],
-        best_ratio: f32,
-    ) -> f32 {
+    fn map(&self, f: &impl Fn(char) -> GlyphId) -> f32 {
         Mapper {
-            chars: &mut self.chars[..self.len as usize],
+            chars: &self.chars[..self.len as usize],
             map_len: self.map_len,
         }
-        .map(f, glyphs, best_ratio)
+        .map(f)
     }
 }
 
 struct Mapper<'a> {
-    chars: &'a mut [Char],
+    chars: &'a [Char],
     map_len: u8,
 }
 
-impl<'a> Mapper<'a> {
-    fn map(
-        &mut self,
-        f: &impl Fn(char) -> u16,
-        glyphs: &mut [u16; MAX_CLUSTER_SIZE],
-        best_ratio: f32,
-    ) -> f32 {
+impl Mapper<'_> {
+    fn map(&self, f: &impl Fn(char) -> GlyphId) -> f32 {
         if self.map_len == 0 {
             return 1.;
         }
         let mut mapped = 0;
-        for (c, g) in self.chars.iter().zip(glyphs.iter_mut()) {
+        for c in self.chars.iter() {
             if !c.contributes_to_shaping {
-                *g = f(c.ch);
                 if self.map_len == 1 {
                     mapped += 1;
                 }
-            } else {
-                let gid = f(c.ch);
-                *g = gid;
-                if gid != 0 {
-                    mapped += 1;
+            } else if f(c.ch) != 0 {
+                mapped += 1;
+            }
+        }
+        mapped as f32 / self.map_len as f32
+    }
+}
+
+/// Selects the font that best covers `cluster` from the query's candidates.
+///
+/// `charmaps` is a cache of each candidate's character map, filled on first probe.
+///
+/// Returns the first fully-covering font, or the best partial match, or the first candidate if
+/// none cover anything (so an unmappable cluster still gets a font and renders as `.notdef`).
+pub(super) fn select_font<'c>(
+    candidates: &'c [QueryFont],
+    charmaps: &mut [Option<Charmap<'c>>],
+    cluster: &mut CharCluster,
+    analysis_data_sources: &AnalysisDataSources,
+) -> Option<usize> {
+    let mut selected = None;
+    for index in 0..candidates.len() {
+        if charmaps[index].is_none() {
+            charmaps[index] = candidates[index].charmap();
+        }
+        // A font without a usable `cmap` covers nothing.
+        let Some(charmap) = &charmaps[index] else {
+            continue;
+        };
+        match cluster.map(|ch| charmap.map(ch).unwrap_or(0), analysis_data_sources) {
+            Status::Complete => return Some(index),
+            Status::Keep => selected = Some(index),
+            Status::Discard => {
+                if selected.is_none() {
+                    selected = Some(index);
                 }
             }
         }
-        let ratio = mapped as f32 / self.map_len as f32;
-        if ratio > best_ratio {
-            for (ch, glyph) in self.chars.iter_mut().zip(glyphs) {
-                ch.glyph_id = *glyph;
-            }
-        }
-        ratio
     }
+    selected
+}
+
+/// Two [`QueryFont`]s shape identically when they come from the same family entry with the same
+/// synthesis, so font runs need not be split between them.
+pub(super) fn same_font(a: &QueryFont, b: &QueryFont) -> bool {
+    a.family == b.family && a.synthesis == b.synthesis
 }
