@@ -1,0 +1,29 @@
+[package]
+name = "styled_text_parley"
+version = "0.1.0"
+description = "Parley adapter for styled_text style runs"
+keywords = ["text", "layout", "style"]
+categories = ["graphics", "text"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+publish = false
+
+[package.metadata.docs.rs]
+all-features = true
+default-target = "x86_64-unknown-linux-gnu"
+targets = []
+
+[features]
+default = ["std"]
+libm = ["parley/libm"]
+std = ["parley/std", "styled_text/std"]
+
+[dependencies]
+parley = { workspace = true }
+styled_text = { path = "../styled_text", default-features = false }
+
+[lints]
+workspace = true
