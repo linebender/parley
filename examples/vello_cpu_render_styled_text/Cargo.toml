@@ -1,0 +1,24 @@
+[package]
+name = "vello_cpu_render_styled_text"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+glifo = { workspace = true, default-features = false, features = ["std", "png", "vello_cpu"] }
+parley = { workspace = true, default-features = true }
+parley_examples_common = { path = "../common" }
+peniko = { workspace = true }
+styled_text = { path = "../../styled_text" }
+styled_text_parley = { path = "../../styled_text_parley" }
+vello_cpu = { workspace = true, default-features = false, features = ["std", "png"] }
+
+[features]
+default = ["png"]
+png = []
+
+[lints]
+workspace = true

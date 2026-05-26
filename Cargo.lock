@@ -3763,6 +3763,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
+name = "styled_text"
+version = "0.1.0"
+dependencies = [
+ "attributed_text",
+]
+
+[[package]]
+name = "styled_text_parley"
+version = "0.1.0"
+dependencies = [
+ "parley",
+ "styled_text",
+]
+
+[[package]]
 name = "supports-color"
 version = "3.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4253,6 +4268,19 @@ dependencies = [
  "parley_examples_common",
  "peniko",
  "skrifa 0.42.0",
+ "vello_cpu",
+]
+
+[[package]]
+name = "vello_cpu_render_styled_text"
+version = "0.1.0"
+dependencies = [
+ "glifo",
+ "parley",
+ "parley_examples_common",
+ "peniko",
+ "styled_text",
+ "styled_text_parley",
  "vello_cpu",
 ]
 
