@@ -24,6 +24,17 @@ impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
         }
     }
 
+    /// Create an `AttributedText` from text and unchecked attribute spans.
+    ///
+    /// Attributes are retained in the order provided. This constructor does
+    /// not validate spans in release builds. Callers are responsible for
+    /// ensuring each [`TextRange`] is valid for `text`. Prefer
+    /// [`Self::apply_attribute_bytes`] or [`TextRange::new`] unless the spans
+    /// have already been checked against this exact text storage.
+    pub fn from_attributes_unchecked(text: T, attributes: Vec<(TextRange, Attr)>) -> Self {
+        Self { text, attributes }
+    }
+
     /// Borrow the underlying text storage.
     pub fn text(&self) -> &T {
         &self.text
@@ -192,6 +203,26 @@ mod tests {
         let at_4: Vec<_> = at.attributes_at(4).collect();
         assert_eq!(at_4.len(), 1);
         assert_eq!(at_4[0], (r(2..5), &TestAttribute::Remove));
+    }
+
+    #[test]
+    fn from_attributes_unchecked_retains_attribute_order() {
+        let at = AttributedText::from_attributes_unchecked(
+            "Hello!",
+            vec![
+                (TextRange::new_unchecked(1, 3), TestAttribute::Keep),
+                (TextRange::new_unchecked(2, 5), TestAttribute::Remove),
+            ],
+        );
+
+        let attrs = at.attributes_at(2).collect::<Vec<_>>();
+        assert_eq!(
+            attrs,
+            vec![
+                (TextRange::new_unchecked(1, 3), &TestAttribute::Keep),
+                (TextRange::new_unchecked(2, 5), &TestAttribute::Remove),
+            ]
+        );
     }
 
     #[test]

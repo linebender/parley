@@ -13,17 +13,19 @@ use crate::AttributedText;
 use crate::TextRange;
 use crate::TextStorage;
 
-fn build_segment_state<T: Debug + TextStorage, Attr: Debug>(
-    attributed: &AttributedText<T, Attr>,
+fn build_segment_state_from_ranges<I>(
+    len: usize,
+    attr_count: usize,
+    ranges: I,
     workspace: &mut AttributeSegmentsWorkspace,
-) {
-    let len = attributed.len();
+) where
+    I: IntoIterator<Item = (usize, TextRange)>,
+{
     debug_assert!(
         len <= u32::MAX as usize,
         "attributed_text currently supports texts up to u32::MAX bytes (got {len})"
     );
     let len_u32 = u32::try_from(len).expect("validated by debug_assert above");
-    let attr_count = attributed.attributes_len();
     debug_assert!(
         attr_count <= u32::MAX as usize,
         "attributed_text currently supports up to u32::MAX span attributes (got {attr_count})"
@@ -35,11 +37,26 @@ fn build_segment_state<T: Debug + TextStorage, Attr: Debug>(
         .reserve(2 + attr_count.saturating_mul(2));
     workspace.boundaries.push(0);
     workspace.boundaries.push(len_u32);
-    for (range, _) in attributed.attributes_iter() {
+    workspace.span_build.clear();
+    workspace.span_build.reserve(attr_count);
+
+    for (attr_index, range) in ranges {
+        debug_assert!(
+            range.end() <= len,
+            "attribute range end {} exceeds text length {len}",
+            range.end()
+        );
         let start_u32 = u32::try_from(range.start()).expect("range start should fit in u32");
         let end_u32 = u32::try_from(range.end()).expect("range end should fit in u32");
         workspace.boundaries.push(start_u32);
         workspace.boundaries.push(end_u32);
+        if !range.is_empty() {
+            workspace.span_build.push((
+                u32::try_from(attr_index).expect("attribute index overflow"),
+                start_u32,
+                end_u32,
+            ));
+        }
     }
     workspace.boundaries.sort_unstable();
     workspace.boundaries.dedup();
@@ -50,32 +67,23 @@ fn build_segment_state<T: Debug + TextStorage, Attr: Debug>(
     workspace.start_counts.resize(boundary_count, 0);
     workspace.end_counts.clear();
     workspace.end_counts.resize(boundary_count, 0);
-    workspace.span_build.clear();
-    workspace.span_build.reserve(attr_count);
 
-    for (attr_index, (range, _)) in attributed.attributes_iter().enumerate() {
-        if range.is_empty() {
-            continue;
-        }
-        let start_u32 = u32::try_from(range.start()).expect("range start should fit in u32");
-        let end_u32 = u32::try_from(range.end()).expect("range end should fit in u32");
+    for (_attr_index, start_u32, end_u32) in &mut workspace.span_build {
         let start_boundary = workspace
             .boundaries
-            .binary_search(&start_u32)
+            .binary_search(start_u32)
             .expect("attribute boundary start should be in boundary list");
         let end_boundary = workspace
             .boundaries
-            .binary_search(&end_u32)
+            .binary_search(end_u32)
             .expect("attribute boundary end should be in boundary list");
-        if start_boundary == end_boundary {
-            continue;
-        }
+        debug_assert_ne!(
+            start_boundary, end_boundary,
+            "non-empty attributes should span at least one boundary interval"
+        );
 
-        workspace.span_build.push((
-            u32::try_from(attr_index).expect("attribute index overflow"),
-            u32::try_from(start_boundary).expect("start boundary index overflow"),
-            u32::try_from(end_boundary).expect("end boundary index overflow"),
-        ));
+        *start_u32 = u32::try_from(start_boundary).expect("start boundary index overflow");
+        *end_u32 = u32::try_from(end_boundary).expect("end boundary index overflow");
         workspace.start_counts[start_boundary] += 1;
         workspace.end_counts[end_boundary] += 1;
     }
@@ -137,6 +145,40 @@ fn build_segment_state<T: Debug + TextStorage, Attr: Debug>(
     }
 }
 
+fn build_segment_state<T: Debug + TextStorage, Attr: Debug>(
+    attributed: &AttributedText<T, Attr>,
+    workspace: &mut AttributeSegmentsWorkspace,
+) {
+    build_segment_state_from_ranges(
+        attributed.len(),
+        attributed.attributes_len(),
+        attributed
+            .attributes_iter()
+            .enumerate()
+            .map(|(index, (range, _attr))| (index, range)),
+        workspace,
+    );
+}
+
+fn update_active_for_boundary(workspace: &mut AttributeSegmentsWorkspace, boundary_index: usize) {
+    let end_range = workspace.end_offsets[boundary_index] as usize
+        ..workspace.end_offsets[boundary_index + 1] as usize;
+    for &id in &workspace.end_events[end_range] {
+        if let Ok(ix) = workspace.active.binary_search(&id) {
+            workspace.active.remove(ix);
+        }
+    }
+
+    let start_range = workspace.start_offsets[boundary_index] as usize
+        ..workspace.start_offsets[boundary_index + 1] as usize;
+    for &id in &workspace.start_events[start_range] {
+        match workspace.active.binary_search(&id) {
+            Ok(_) => {}
+            Err(ix) => workspace.active.insert(ix, id),
+        }
+    }
+}
+
 /// Reusable allocation workspace for attribute segmentation.
 ///
 /// Reusing a workspace amortizes setup allocations when processing many pieces of text.
@@ -171,6 +213,51 @@ impl AttributeSegmentsWorkspace {
             workspace: self,
             index: 0,
         }
+    }
+
+    /// Calls `f` for each segment produced from an unchecked attribute span slice.
+    ///
+    /// `text_len` is the length in bytes of the text that `spans` must
+    /// belong to. Spans are interpreted in slice order, which is the
+    /// application order reported through `active_span_indices`.
+    ///
+    /// This method does not validate span ranges in release builds. Callers
+    /// must only pass ranges that are valid for the text identified by
+    /// `text_len`, including UTF-8 boundary alignment and bounds within
+    /// `text_len`.
+    ///
+    /// `active_span_indices` contains zero-based indices into `spans`, sorted
+    /// in application order. The slice is only valid until `f` returns.
+    pub fn for_each_span_segment_unchecked<Attr, F>(
+        &mut self,
+        text_len: usize,
+        spans: &[(TextRange, Attr)],
+        mut f: F,
+    ) where
+        F: FnMut(TextRange, &[u32]),
+    {
+        build_segment_state_from_ranges(
+            text_len,
+            spans.len(),
+            spans
+                .iter()
+                .enumerate()
+                .map(|(index, (range, _attr))| (index, *range)),
+            self,
+        );
+
+        let mut index = 0;
+        while index + 1 < self.boundaries.len() {
+            update_active_for_boundary(self, index);
+            let start = self.boundaries[index] as usize;
+            let end = self.boundaries[index + 1] as usize;
+            index += 1;
+            debug_assert!(start < end, "boundaries are sorted + deduped");
+
+            f(TextRange::new_unchecked(start, end), &self.active);
+        }
+
+        self.active.clear();
     }
 }
 
@@ -279,22 +366,7 @@ pub struct AttributeSegments<'w, 'a, T: Debug + TextStorage, Attr: Debug> {
 
 impl<'w, 'a, T: Debug + TextStorage, Attr: Debug> AttributeSegments<'w, 'a, T, Attr> {
     fn update_active_for_boundary(&mut self, boundary_index: usize) {
-        let end_range = self.workspace.end_offsets[boundary_index] as usize
-            ..self.workspace.end_offsets[boundary_index + 1] as usize;
-        for &id in &self.workspace.end_events[end_range] {
-            if let Ok(ix) = self.workspace.active.binary_search(&id) {
-                self.workspace.active.remove(ix);
-            }
-        }
-
-        let start_range = self.workspace.start_offsets[boundary_index] as usize
-            ..self.workspace.start_offsets[boundary_index + 1] as usize;
-        for &id in &self.workspace.start_events[start_range] {
-            match self.workspace.active.binary_search(&id) {
-                Ok(_) => {}
-                Err(ix) => self.workspace.active.insert(ix, id),
-            }
-        }
+        update_active_for_boundary(self.workspace, boundary_index);
     }
 
     /// Returns the spans active for the most recently yielded segment.
@@ -505,6 +577,33 @@ mod tests {
         assert_eq!(segments.next(), r(0..5));
         assert!(segments.active_spans().is_empty());
         assert_eq!(segments.next(), None);
+    }
+
+    #[test]
+    fn unchecked_span_segments_match_attributed_text_segments() {
+        let mut at = AttributedText::new("hello");
+        at.apply_attribute(TextRange::new(at.text(), 0..2).unwrap(), Color::Red);
+        at.apply_attribute(TextRange::new(at.text(), 1..5).unwrap(), Color::Blue);
+
+        let spans = vec![
+            (TextRange::new(at.text(), 0..2).unwrap(), Color::Red),
+            (TextRange::new(at.text(), 1..5).unwrap(), Color::Blue),
+        ];
+
+        let mut workspace = AttributeSegmentsWorkspace::new();
+        let mut segments = Vec::new();
+        workspace.for_each_span_segment_unchecked(at.len(), &spans, |range, active| {
+            segments.push((range, active.to_vec()));
+        });
+
+        assert_eq!(
+            segments,
+            vec![
+                (TextRange::new_unchecked(0, 1), vec![0]),
+                (TextRange::new_unchecked(1, 2), vec![0, 1]),
+                (TextRange::new_unchecked(2, 5), vec![1]),
+            ]
+        );
     }
 
     #[test]
