@@ -4,7 +4,7 @@
 use alloc::vec::Vec;
 use icu_normalizer::properties::Decomposed;
 
-use crate::analysis::AnalysisDataSources;
+use crate::{analysis::AnalysisDataSources, emoji::EmojiPresentationStyle};
 
 /// The maximum number of characters in a single cluster.
 const MAX_CLUSTER_SIZE: usize = 32;
@@ -12,11 +12,11 @@ const MAX_CLUSTER_SIZE: usize = 32;
 #[derive(Debug, Default)]
 pub(crate) struct CharCluster {
     pub chars: Vec<Char>,
-    pub is_emoji: bool,
     pub map_len: u8,
     pub start: u32,
     pub end: u32,
     pub force_normalize: bool,
+    pub emoji_presentation_style: EmojiPresentationStyle,
     comp: Form,
     decomp: Form,
     form: FormKind,
@@ -52,6 +52,8 @@ pub(crate) struct Char {
     /// Indexes into the list of styles for the containing text run, to find the style applicable
     /// to this character.
     pub style_index: u16,
+    /// Whether the emoji presentation selector
+    pub is_emoji_presentation_selector: bool,
 }
 
 pub(crate) type GlyphId = u16;
@@ -93,7 +95,6 @@ pub(crate) enum Status {
 impl CharCluster {
     pub(crate) fn clear(&mut self) {
         self.chars.clear();
-        self.is_emoji = false;
         self.map_len = 0;
         self.start = 0;
         self.end = 0;
@@ -102,6 +103,7 @@ impl CharCluster {
         self.decomp.clear();
         self.form = FormKind::Original;
         self.best_ratio = 0.;
+        self.emoji_presentation_style = EmojiPresentationStyle::Default;
     }
 
     #[inline(always)]
@@ -351,17 +353,23 @@ impl<'a> Mapper<'a> {
         }
         let mut mapped = 0;
         for (c, g) in self.chars.iter().zip(glyphs.iter_mut()) {
-            if !c.contributes_to_shaping {
-                *g = f(c.ch);
-                if self.map_len == 1 {
+            *g = f(c.ch);
+
+            // If the color emoji has a presentation style, ignore the variation selector.
+            if c.is_emoji_presentation_selector {
+                mapped += 1;
+                continue;
+            }
+
+            if c.contributes_to_shaping {
+                if *g != 0 {
                     mapped += 1;
                 }
-            } else {
-                let gid = f(c.ch);
-                *g = gid;
-                if gid != 0 {
-                    mapped += 1;
-                }
+                continue;
+            }
+
+            if self.map_len == 1 {
+                mapped += 1;
             }
         }
         let ratio = mapped as f32 / self.map_len as f32;
