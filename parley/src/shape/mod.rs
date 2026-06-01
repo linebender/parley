@@ -15,6 +15,7 @@ use super::style::{Brush, FontFeature, FontVariation};
 use crate::analysis::cluster::{Char, CharCluster, Status};
 use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::convert::script_to_harfrust;
+use crate::emoji::{EmojiDFA, EmojiSegmentationCategory};
 use crate::inline_box::InlineBox;
 use crate::lru_cache::LruCache;
 use crate::util::nearly_eq;
@@ -236,36 +237,40 @@ fn fill_cluster_in_place(
     char_cluster.clear();
 
     let mut force_normalize = false;
-    let mut is_emoji_or_pictograph = false;
     let mut map_len: u8 = 0;
     let start = *code_unit_offset_in_string as u32;
 
+    let mut is_emoji = false;
+    let mut emoji_dfa = EmojiDFA::new();
+
     for ((_, ch), (info, style_index)) in segment_text.char_indices().zip(item_infos_iter.by_ref())
     {
+        *code_unit_offset_in_string += ch.len_utf8();
         force_normalize |= info.force_normalize();
+
         // TODO - make emoji detection more complete, as per (except using composite Trie tables as
         //  much as possible:
         //  https://github.com/conor-93/parley/blob/4637d826732a1a82bbb3c904c7f47a16a21cceec/parley/src/shape/mod.rs#L221-L269
-        is_emoji_or_pictograph |= info.is_emoji_or_pictograph();
-        *code_unit_offset_in_string += ch.len_utf8();
 
         // TODO: Explore ignoring other modifiers in determining `contributes_to_shaping`:
         //  regional indicators, subdivision flag tag sequences, skin tone modifiers
         //  See also: https://github.com/google/emoji-segmenter
 
-        // If the color emoji has a non-printing variation selector, ignore the variation selector.
-        // Its presentation depends on the platform and font.
-        //
-        // e.g.
-        //  - `U+270C + U+FE0F`: `✌`, force basic presentation
-        //  - `U+270C + U+FE0F`: `✌️`, force emoji presentation
-        //
-        // <https://www.unicode.org/reports/tr37/>
-        let is_emoji_with_non_printing_variation_selector =
-            is_emoji_or_pictograph && info.is_variation_selector();
+        is_emoji |= info.is_emoji_or_pictograph();
 
-        let contributes_to_shaping =
-            info.contributes_to_shaping() && !is_emoji_with_non_printing_variation_selector;
+        let mut is_emoji_presentation_selector = false;
+
+        if is_emoji {
+            let category =
+                EmojiSegmentationCategory::from_codepoint(ch as u32, info.emoji_properties);
+
+            is_emoji_presentation_selector = category.eq(EmojiSegmentationCategory::Vs16)
+                || category.eq(EmojiSegmentationCategory::Vs15);
+
+            emoji_dfa.step_record(category);
+        }
+
+        let contributes_to_shaping = info.contributes_to_shaping();
         if contributes_to_shaping {
             map_len += 1;
         }
@@ -276,16 +281,20 @@ fn fill_cluster_in_place(
             glyph_id: 0,
             style_index: *style_index,
             is_control_character: info.is_control(),
+            is_emoji_presentation_selector,
         });
     }
 
     // Finalize cluster metadata
     let end = *code_unit_offset_in_string as u32;
-    char_cluster.is_emoji = is_emoji_or_pictograph;
     char_cluster.map_len = map_len;
     char_cluster.start = start;
     char_cluster.end = end;
     char_cluster.force_normalize = force_normalize;
+
+    if is_emoji {
+        char_cluster.emoji_presentation_style = emoji_dfa.presentation_style();
+    }
 }
 
 fn shape_item<'a, B: Brush>(
@@ -577,7 +586,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         analysis_data_sources: &AnalysisDataSources,
     ) -> Option<SelectedFont> {
         let style_index = cluster.style_index();
-        let is_emoji = cluster.is_emoji;
+        let is_emoji = cluster.emoji_presentation_style.is_emoji();
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize];
