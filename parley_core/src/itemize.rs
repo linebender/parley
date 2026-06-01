@@ -382,7 +382,7 @@ mod tests {
         assert!(levels.iter().any(|&l| l % 2 == 0));
         assert!(levels.iter().any(|&l| l % 2 == 1));
 
-        // A language override on the first three bytes ("hel") plus a `split_before` predicate
+        // A language override on bytes 0..3 of "hello" plus a `split_before` predicate
         // that fires once inside the trailing Latin word.
         let english = Language::parse("en").unwrap();
         let language_overrides = [(0..3, english)];

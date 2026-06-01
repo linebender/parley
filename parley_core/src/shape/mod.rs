@@ -40,7 +40,7 @@ use lru_cache::LruCache;
 const SHAPE_CACHE_SIZE: usize = 16;
 
 /// Variable-font axis configuration for a font run, in either of `harfrust`'s two forms: either
-/// user-space variations (with costly noramlization, so the resulting instance is cached) or
+/// user-space variations (with costly normalization, so the resulting instance is cached) or
 /// pre-normalized coordinates (used directly).
 enum InstanceSource<'a> {
     Variations {
@@ -326,7 +326,7 @@ impl ShapeContext {
         // of the lifetime on `Charmap` that means we need to collect the fonts used in this run
         // beforehand. This is probably fine, because the fonts will usually be in fontique's
         // cache, but if there are large amounts of uncached fonts, and we don't end up actually
-        // using them, then we unnecesarily load them here.
+        // using them, then we unnecessarily load them here.
         //
         // TODO: This probably needs revisiting such that we don't need to load the fonts
         // beforehand, and ideally the cached `Charmap`s also survive over a single call to
