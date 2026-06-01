@@ -14,6 +14,8 @@ This release has an [MSRV] of 1.88.
 
 ## [0.10.0] - 2026-06-01
 
+This release has an [MSRV] of 1.88.
+
 ### Added
 
 #### Parley
