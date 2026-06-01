@@ -230,9 +230,9 @@ fn shaping_vertical_upright_bidi() {
     // left-to-right, so every run here stays upright and in logical order down the page.
     let shaped = Shape {
         // We use a different Arabic string from the "مرحبا" used elsewhere: the Noto Kufi Arabic
-        // font appears to be missing vertical mark anchors, and `harfrust` then falls back to
-        // shaping the dot in "ب" as if it's horizontally shaped. That means our usual string would
-        // render erroneously, and we don't have a good way of dealing with it here.
+        // font has no vertical metrics, and `harfrust` then falls back to shaping the dot in "ب"
+        // as if it's horizontally shaped. That means our usual string would render erroneously,
+        // and we don't have a good way of dealing with it here.
         text: "日本 ABC 123 سلام 語",
         families: &["Roboto", "Noto Sans CJK JP", "Noto Kufi Arabic"],
         writing_mode: WritingMode::Vertical(TextOrientation::Upright),
