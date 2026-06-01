@@ -12,19 +12,36 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 This release has an [MSRV] of 1.88.
 
+## [0.10.0] - 2026-06-01
+
 ### Added
 
 #### Parley
 
-- `complex-scripts` Cargo feature to enable dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar). When disabled, the lightweight segmenter is used (no change in default behavior).
+- Add `complex-scripts` Cargo feature to enable dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar). When disabled, the lightweight segmenter is used (no change in default behavior) ([#621][] by [@Linktime][])
 - `PlainEditor`, `Layout`, `LayoutAccessibility`, and `Generation` now implement `Debug`. ([#615][] by [@NandishwarSingh][])
   Note: The `Layout` implementation provides a compact summary by default; the alternate form (`{:#?}`) formats the full underlying data.
+- Add `StyleSet::clear` method ([#614][] by [@lainon1][])
+- Restore the ability to use a different alignment width than breaking width ([#618][] by [@DJMcNab][])
+
+
+#### Fontique
+
+- Fontique supports FreeBSD ([#610][] by [@fundon][])
 
 ### Fixed
 
 #### Parley
 
 - `StyleRunBuilder` now handles a first style run that references a non-zero style table index. ([#626][] by [@waywardmonkeys][])
+- Fix color emoji matching when emoji with non printing variation selector ([#617][] by [@fundon][])
+- Fix style run shaping with nonzero first style ([#626][] by [@waywardmonkeys][])
+
+### Changed
+
+#### Parley
+
+- Upgrade to harfrust 0.8 ([#632][] by [@nicoburns][])
 
 ## [0.9.0] - 2026-04-21
 
@@ -472,10 +489,13 @@ This release has an [MSRV][] of 1.70.
 [@dolsup]: https://github.com/dolsup
 [@dqii]: https://github.com/dqii
 [@elbaro]: https://github.com/elbaro
+[@fundon]: https://github.com/fundon
 [@guiguiprim]: https://github.com/guiguiprim
 [@grebmeg]: https://github.com/grebmeg
 [@jordanhalase]: https://github.com/jordanhalase
 [@kekelp]: https://github.com/kekelp
+[@lainon1]: https://github.com/lainon1
+[@Linktime]: https://github.com/Linktime
 [@mwcampbell]: https://github.com/mwcampbell
 [@NandishwarSingh]: https://github.com/NandishwarSingh
 [@nicoburns]: https://github.com/nicoburns
@@ -623,10 +643,17 @@ This release has an [MSRV][] of 1.70.
 [#598]: https://github.com/linebender/parley/pull/598
 [#600]: https://github.com/linebender/parley/pull/600
 [#609]: https://github.com/linebender/parley/pull/609
+[#610]: https://github.com/linebender/parley/pull/610
+[#614]: https://github.com/linebender/parley/pull/614
 [#615]: https://github.com/linebender/parley/pull/615
+[#617]: https://github.com/linebender/parley/pull/617
+[#618]: https://github.com/linebender/parley/pull/618
+[#621]: https://github.com/linebender/parley/pull/621
 [#626]: https://github.com/linebender/parley/pull/626
+[#632]: https://github.com/linebender/parley/pull/632
 
-[Unreleased]: https://github.com/linebender/parley/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/linebender/parley/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/linebender/parley/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/linebender/parley/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/linebender/parley/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/linebender/parley/compare/v0.6.0...v0.7.0
