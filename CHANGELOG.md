@@ -37,7 +37,6 @@ This release has an [MSRV] of 1.88.
 
 - `StyleRunBuilder` now handles a first style run that references a non-zero style table index. ([#626][] by [@waywardmonkeys][])
 - Fix color emoji matching when emoji with non printing variation selector ([#617][] by [@fundon][])
-- Fix style run shaping with nonzero first style ([#626][] by [@waywardmonkeys][])
 
 ### Changed
 
