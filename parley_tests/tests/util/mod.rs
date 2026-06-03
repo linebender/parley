@@ -4,6 +4,7 @@
 //! Utility functions and types shared across tests.
 
 mod asserts;
+mod core_render;
 mod cursor_test;
 pub(crate) mod env;
 mod renderer;

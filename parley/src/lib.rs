@@ -109,13 +109,10 @@ extern crate std;
 pub use fontique;
 
 mod analysis;
-mod bidi;
 mod builder;
 mod context;
-mod convert;
 mod font;
 mod inline_box;
-mod lru_cache;
 mod resolve;
 mod shape;
 mod util;

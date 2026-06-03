@@ -8,6 +8,7 @@ use icu_properties::{
     CodePointMapData, CodePointSetData,
     props::{
         BidiClass, Emoji, ExtendedPictographic, LineBreak, RegionalIndicator, VariationSelector,
+        VerticalOrientation,
     },
 };
 use parley_data::Properties;
@@ -50,6 +51,7 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
                         | LineBreak::LineFeed
                         | LineBreak::NextLine
                 ),
+                CodePointMapData::<VerticalOrientation>::new().get32(cp),
             );
             values.push(v.into());
         }

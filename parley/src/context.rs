@@ -11,11 +11,10 @@ use super::resolve::tree::TreeStyleBuilder;
 use super::resolve::{RangedStyleBuilder, ResolveContext, ResolvedStyle, StyleRun};
 use super::style::{Brush, TextStyle};
 
-use crate::analysis::{AnalysisDataSources, CharInfo};
-use crate::bidi::BidiResolver;
+use crate::analysis::{CharInfo, LineBreakOverrides};
 use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
-use crate::shape::ShapeContext;
+use parley_core::{Analysis, Analyzer, ShapeContext, ShapedText};
 
 /// Shared scratch space used when constructing text layouts.
 ///
@@ -25,7 +24,12 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) style_table: Vec<ResolvedStyle<B>>,
     pub(crate) style_runs: Vec<StyleRun>,
     pub(crate) inline_boxes: Vec<InlineBox>,
-    pub(crate) bidi: BidiResolver,
+
+    // Font-independent analysis (bidi, scripts, segmentation), performed by `parley_core`.
+    pub(crate) analyzer: Analyzer,
+    pub(crate) analysis: Analysis,
+    /// Reusable scratch for overrides passed to the analyzer.
+    pub(crate) line_break_overrides: LineBreakOverrides,
 
     // Reusable style builders (to amortise allocations)
     pub(crate) ranged_style_builder: RangedStyleBuilder<B>,
@@ -34,9 +38,8 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     // u16: style index for character
     pub(crate) info: Vec<(CharInfo, u16)>,
     pub(crate) scx: ShapeContext,
-
-    // Unicode analysis data sources (provided by icu)
-    pub(crate) analysis_data_sources: AnalysisDataSources,
+    /// Reusable shaped-text buffer, filled per itemized run and translated into the layout.
+    pub(crate) shaped: ShapedText,
 }
 
 impl<B: Brush> LayoutContext<B> {
@@ -46,12 +49,14 @@ impl<B: Brush> LayoutContext<B> {
             style_table: vec![],
             style_runs: vec![],
             inline_boxes: vec![],
-            bidi: BidiResolver::new(),
+            analyzer: Analyzer::new(),
+            analysis: Analysis::new(),
+            line_break_overrides: Vec::new(),
             ranged_style_builder: RangedStyleBuilder::default(),
             tree_style_builder: TreeStyleBuilder::default(),
             info: vec![],
-            analysis_data_sources: AnalysisDataSources::new(),
             scx: ShapeContext::default(),
+            shaped: ShapedText::new(),
         }
     }
 
@@ -183,7 +188,6 @@ impl<B: Brush> LayoutContext<B> {
         self.style_runs.clear();
         self.inline_boxes.clear();
         self.info.clear();
-        self.bidi.clear();
     }
 }
 

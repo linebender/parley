@@ -14,6 +14,7 @@ pub fn font_dirs() -> impl Iterator<Item = PathBuf> {
         assets_dir.join("arimo_fonts"),
         assets_dir.join("roboto_fonts"),
         assets_dir.join("noto_fonts"),
+        assets_dir.join("noto_cjk_fonts"),
         assets_dir.join("noto_color_emoji"),
     ]
     .into_iter()
@@ -24,6 +25,7 @@ pub const FONT_FAMILIES: &[&str] = &[
     "Arimo",
     "Roboto",
     "Noto Kufi Arabic",
+    "Noto Sans CJK JP",
     "Noto Color Emoji",
     "Noto Color Emoji CBTF",
 ];

@@ -7,11 +7,11 @@ use alloc::vec::Vec;
 use icu_properties::props::{BidiClass, BidiMirroringGlyph, BidiPairedBracketType};
 
 /// Type alias for a bidirectional level.
-pub(crate) type BidiLevel = u8;
+pub type BidiLevel = u8;
 
 /// Resolver for the Unicode bidirectional algorithm.
 #[derive(Clone, Default)]
-pub(crate) struct BidiResolver {
+pub struct BidiResolver {
     base_level: BidiLevel,
     levels: Vec<BidiLevel>,
     initial_types: Vec<BidiClass>,
@@ -23,9 +23,18 @@ pub(crate) struct BidiResolver {
     flags: u16,
 }
 
+impl core::fmt::Debug for BidiResolver {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("BidiResolver")
+            .field("base_level", &self.base_level)
+            .field("levels", &self.levels)
+            .finish_non_exhaustive()
+    }
+}
+
 impl BidiResolver {
     /// Creates a new resolver.
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             base_level: 0,
             levels: Vec::new(),
@@ -40,18 +49,18 @@ impl BidiResolver {
     }
 
     /// Returns the base level of the text.
-    pub(crate) fn base_level(&self) -> u8 {
+    pub fn base_level(&self) -> u8 {
         self.base_level
     }
 
     /// Returns the sequence of bidi levels corresponding to all characters in the
     /// paragraph.
-    pub(crate) fn levels(&self) -> &[BidiLevel] {
+    pub fn levels(&self) -> &[BidiLevel] {
         &self.levels
     }
 
     /// Clears the resolver state.
-    pub(crate) fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.initial_types.clear();
         self.levels.clear();
         self.types.clear();
@@ -63,7 +72,7 @@ impl BidiResolver {
 
     /// Resolves a paragraph with the specified base direction and
     /// precomputed types.
-    pub(crate) fn resolve(
+    pub fn resolve(
         &mut self,
         chars: impl Iterator<Item = (char, (BidiClass, BidiMirroringGlyph))>,
         base_level: Option<u8>,
@@ -387,7 +396,7 @@ impl BidiResolver {
         }
     }
 
-    #[allow(clippy::needless_range_loop)]
+    #[expect(clippy::needless_range_loop, reason = "Deferred")]
     fn resolve_sequence(&mut self, level: u8, sos: BidiClass, eos: BidiClass, len: usize) {
         if len == 0 {
             return;
@@ -718,7 +727,7 @@ where
 
 /// Returns whether the character needs bidirectional resolution.
 #[inline(always)]
-pub(crate) fn needs_bidi_resolution(bidi_class: BidiClass) -> bool {
+pub fn needs_bidi_resolution(bidi_class: BidiClass) -> bool {
     mask(bidi_class) & BIDI_MASK != 0
 }
 
@@ -891,4 +900,101 @@ impl BracketStack {
 
 const fn mask(t: BidiClass) -> u32 {
     1 << (t.to_icu4c_value() as u32)
+}
+
+/// Reorders a single line's elements into visual left-to-right display order from their bidi
+/// levels, applying UAX #9 rule L2.
+///
+/// See <https://www.unicode.org/reports/tr9/#L2>.
+///
+/// Analysis and shaping store everything in *logical* (source) order; turning that into visual
+/// left-to-right order is a per-line decision, because it must run after line breaking (rule L1
+/// resets levels at line edges, see <https://www.unicode.org/reports/tr9/#L1>). UAX #9 says:
+///
+/// > **L2.** From the highest level found in the text to the lowest odd level on each line,
+/// > including intermediate levels not actually present in the text, reverse any contiguous
+/// > sequence of characters that are at that level or higher.
+///
+/// `items` holds the elements of a single line in logical order, and `level` returns each element's
+/// bidi level (e.g. [`Run::bidi_level`](crate::Run::bidi_level)). The levels must already reflect
+/// any rule L1 resets the caller performs (e.g. trailing whitespace reset to the base level). The
+/// slice is reordered in place, left to right from the inline start (left, for a left-to-right base
+/// direction) to the inline end.
+///
+/// # Example
+///
+/// You can use this to reorder runs, or to generate an index array creating a visual order mapping.
+///
+/// ```
+/// use parley_core::reorder_visual;
+/// // Base left-to-right with an embedded right-to-left word ("hello WORLD!",
+/// // where WORLD is RTL). One bidi level per element, in logical order:
+/// let levels = [0u8, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0];
+/// let mut order: Vec<usize> = (0..levels.len()).collect();
+/// reorder_visual(&mut order, |&i| levels[i]);
+/// // The five RTL elements are reversed; everything else keeps its place.
+/// assert_eq!(order, [0, 1, 2, 3, 4, 5, 10, 9, 8, 7, 6, 11]);
+/// ```
+pub fn reorder_visual<T>(items: &mut [T], level: impl Fn(&T) -> u8) {
+    let mut max_level = 0;
+    let mut lowest_odd_level = u8::MAX;
+    for item in items.iter() {
+        let l = level(item);
+        max_level = max_level.max(l);
+        if l & 1 != 0 {
+            lowest_odd_level = lowest_odd_level.min(l);
+        }
+    }
+    // With no odd level (e.g. pure left-to-right) the range below is empty and
+    // nothing is reversed, leaving the elements in their original order.
+    let len = items.len();
+    for threshold in (lowest_odd_level..=max_level).rev() {
+        let mut i = 0;
+        while i < len {
+            if level(&items[i]) >= threshold {
+                // Reverse the maximal run of elements at this level or higher.
+                let mut end = i + 1;
+                while end < len && level(&items[end]) >= threshold {
+                    end += 1;
+                }
+                items[i..end].reverse();
+                i = end;
+            } else {
+                i += 1;
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::reorder_visual;
+    use alloc::vec::Vec;
+
+    #[test]
+    fn reorders_by_level() {
+        // (line levels in logical order, expected visual order).
+        let cases: &[(&[u8], &[usize])] = &[
+            // Empty line.
+            (&[], &[]),
+            // Pure left-to-right: no odd level, so nothing is reversed.
+            (&[0, 0, 0, 0], &[0, 1, 2, 3]),
+            // "hello WORLD!" (WORLD is RTL): only the level-1 span is reversed.
+            (&[0, 0, 1, 1, 1, 0], &[0, 1, 4, 3, 2, 5]),
+            // Entirely right-to-left.
+            (&[1, 1, 1], &[2, 1, 0]),
+            // Base LTR (0), an RTL word (1) wrapping an LTR number (2): the
+            // number keeps its internal order while the RTL word is reversed.
+            (&[0, 1, 1, 2, 2, 1], &[0, 5, 3, 4, 2, 1]),
+        ];
+        // Recover the visual order as a permutation by reordering an index array,
+        // reusing the buffer across cases.
+        let mut order = Vec::new();
+        for &(levels, expected) in cases {
+            order.clear();
+            order.extend(0..levels.len());
+            reorder_visual(&mut order, |&i| levels[i]);
+            assert_eq!(order.as_slice(), expected, "levels: {levels:?}");
+        }
+    }
 }

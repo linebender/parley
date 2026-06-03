@@ -271,15 +271,23 @@ fn build_into_layout<B: Brush>(
     layout.data.clear();
     layout.data.scale = scale;
     layout.data.quantize = quantize;
-    layout.data.base_level = lcx.bidi.base_level();
+    layout.data.base_level = lcx.analysis.paragraph_level();
     layout.data.text_len = text.len();
 
-    let mut char_index = 0;
+    lcx.info.clear();
+    lcx.info.reserve(lcx.analysis.char_infos().len());
+    let mut infos = lcx.analysis.char_infos().iter();
     for style_run in &lcx.style_runs {
+        let style_index = style_run.style_index;
         for _ in text[style_run.range.clone()].chars() {
-            lcx.info[char_index].1 = style_run.style_index;
-            char_index += 1;
+            let info = *infos.next().expect("char_infos covers every character");
+            lcx.info.push((info, style_index));
         }
+    }
+    if let Some(&info) = infos.next() {
+        // Empty text is analyzed as a single synthetic space (so a cursor can be sized) that no
+        // style run covers; it takes the default style at index 0.
+        lcx.info.push((info, 0));
     }
 
     // Copy the visual styles into the layout
@@ -300,19 +308,17 @@ fn build_into_layout<B: Brush>(
             &lcx.style_table,
             &lcx.inline_boxes,
             &lcx.info,
-            lcx.bidi.levels(),
+            &lcx.analysis,
             &mut lcx.scx,
+            &mut lcx.shaped,
             text,
             layout,
-            &lcx.analysis_data_sources,
         );
     }
 
     // Move inline boxes into the layout
     layout.data.inline_boxes.clear();
     core::mem::swap(&mut layout.data.inline_boxes, &mut lcx.inline_boxes);
-
-    layout.data.finish();
 }
 
 fn resolve_range(range: impl RangeBounds<usize>, len: usize) -> Range<usize> {

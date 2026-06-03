@@ -16,6 +16,9 @@ use parley::{
 use peniko::{Color, kurbo::Size};
 use vello_cpu::Pixmap;
 
+use parley_core::ShapedText;
+
+use super::core_render::render_shaped;
 use super::renderer::{
     ColorBrush, RenderingConfig, draw_layout, draw_layout_with_clusters, render_to_pixmap,
 };
@@ -290,6 +293,13 @@ impl TestEnv {
 
     pub(crate) fn check_layout_snapshot(&mut self, layout: &Layout<ColorBrush>) {
         self.render_and_check_snapshot(layout, None, &[]);
+    }
+
+    /// Renders a `parley_core` [`ShapedText`] (glyphs plus analysis-annotation
+    /// overlays) and compares it against the stored snapshot.
+    pub(crate) fn check_shaped_snapshot(&mut self, shaped: &ShapedText) {
+        let current_img = render_shaped(shaped);
+        self.check_image(&current_img);
     }
 
     pub(crate) fn render_and_check_snapshot(

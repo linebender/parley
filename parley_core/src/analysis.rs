@@ -1,28 +1,31 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-pub(crate) mod cluster;
+//! Text analysis.
+//!
+//! Analysis is performed prior to shaping and is independent of fonts, turning a `&str` into
+//! [`Analysis`].
 
 use alloc::vec::Vec;
-use core::marker::PhantomData;
-
-use crate::resolve::StyleRun;
-use crate::{Brush, LayoutContext, WordBreak};
+use core::ops::Range;
 
 use icu_normalizer::properties::{
     CanonicalComposition, CanonicalCompositionBorrowed, CanonicalDecomposition,
     CanonicalDecompositionBorrowed,
 };
-use icu_properties::props::{BidiMirroringGlyph, GeneralCategory, GraphemeClusterBreak, Script};
+use icu_properties::props::{
+    BidiMirroringGlyph, GeneralCategory, GraphemeClusterBreak, Script as IcuScript,
+};
 use icu_properties::{
     CodePointMapData, CodePointMapDataBorrowed, PropertyNamesShort, PropertyNamesShortBorrowed,
 };
 use icu_segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakInvariantOptions};
-use icu_segmenter::{
-    GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter,
-    LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed,
-};
+use icu_segmenter::{LineSegmenter, LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed};
+use parlance::{BaseDirection, Script, WordBreak};
 use parley_data::Properties;
+
+use crate::analyzer::{Analysis, AnalysisOptions, Analyzer};
+use crate::common::Boundary;
 
 pub(crate) struct AnalysisDataSources;
 
@@ -34,11 +37,6 @@ impl AnalysisDataSources {
     #[inline(always)]
     pub(crate) fn properties(&self, c: char) -> Properties {
         Properties::get(c)
-    }
-
-    #[inline(always)]
-    pub(crate) fn grapheme_segmenter(&self) -> GraphemeClusterSegmenterBorrowed<'_> {
-        const { GraphemeClusterSegmenter::new() }
     }
 
     #[inline(always)]
@@ -75,17 +73,17 @@ impl AnalysisDataSources {
     }
 
     #[inline(always)]
-    fn composing_normalizer(&self) -> CanonicalCompositionBorrowed<'_> {
+    pub(crate) fn composing_normalizer(&self) -> CanonicalCompositionBorrowed<'_> {
         const { CanonicalComposition::new() }
     }
 
     #[inline(always)]
-    fn decomposing_normalizer(&self) -> CanonicalDecompositionBorrowed<'_> {
+    pub(crate) fn decomposing_normalizer(&self) -> CanonicalDecompositionBorrowed<'_> {
         const { CanonicalDecomposition::new() }
     }
 
     #[inline(always)]
-    pub(crate) fn script_short_name(&self) -> PropertyNamesShortBorrowed<'static, Script> {
+    pub(crate) fn script_short_name(&self) -> PropertyNamesShortBorrowed<'static, IcuScript> {
         PropertyNamesShort::new()
     }
 
@@ -107,18 +105,13 @@ fn line_segmenter_impl(opt: LineBreakOptions<'_>) -> LineSegmenterBorrowed<'stat
     LineSegmenter::new_for_non_complex_scripts(opt)
 }
 
+/// Per-character analysis info.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct CharInfo {
+pub struct CharInfo {
     /// The line/word breaking boundary classification of this character.
-    pub boundary: Boundary,
+    boundary: Boundary,
     /// The Unicode script this character belongs to.
-    pub script: Script,
-    /// The grapheme cluster boundary property of this character.
-    pub grapheme_cluster_break: GraphemeClusterBreak,
-    /// The impact this character has on directionality.
-    pub bidi_class: icu_properties::props::BidiClass,
-    /// Whether or not the character is a bracket, plus mirror data if so.
-    pub bracket: BidiMirroringGlyph,
+    script: Script,
 
     flags: u8,
 }
@@ -131,15 +124,7 @@ impl CharInfo {
     const CONTRIBUTES_TO_SHAPING_SHIFT: u8 = 4;
     const FORCE_NORMALIZE_SHIFT: u8 = 5;
 
-    #[allow(
-        dead_code,
-        reason = "To be used in more complete emoji checking, in select_font"
-    )]
     const VARIATION_SELECTOR_MASK: u8 = 1 << Self::VARIATION_SELECTOR_SHIFT;
-    #[allow(
-        dead_code,
-        reason = "To be used in more complete emoji checking, in select_font"
-    )]
     const REGION_INDICATOR_MASK: u8 = 1 << Self::REGION_INDICATOR_SHIFT;
     const CONTROL_MASK: u8 = 1 << Self::CONTROL_SHIFT;
     const EMOJI_OR_PICTOGRAPH_MASK: u8 = 1 << Self::EMOJI_OR_PICTOGRAPH_SHIFT;
@@ -149,9 +134,6 @@ impl CharInfo {
     fn new(
         boundary: Boundary,
         script: Script,
-        grapheme_cluster_break: GraphemeClusterBreak,
-        bidi_class: icu_properties::props::BidiClass,
-        bracket: BidiMirroringGlyph,
         is_variation_selector: bool,
         is_region_indicator: bool,
         is_control: bool,
@@ -162,9 +144,6 @@ impl CharInfo {
         Self {
             boundary,
             script,
-            grapheme_cluster_break,
-            bidi_class,
-            bracket,
             flags: (is_variation_selector as u8) << Self::VARIATION_SELECTOR_SHIFT
                 | (is_region_indicator as u8) << Self::REGION_INDICATOR_SHIFT
                 | (is_control as u8) << Self::CONTROL_SHIFT
@@ -174,16 +153,27 @@ impl CharInfo {
         }
     }
 
-    #[allow(
-        dead_code,
-        reason = "To be used in more complete emoji checking, in select_font"
-    )]
+    /// The segmentation boundary immediately before this character.
     #[inline(always)]
-    pub(crate) fn is_variation_selector(self) -> bool {
+    pub fn boundary(self) -> Boundary {
+        self.boundary
+    }
+
+    /// The Unicode script of this character.
+    #[inline(always)]
+    pub fn script(self) -> Script {
+        self.script
+    }
+
+    /// Whether this character is a variation selector.
+    #[doc(hidden)] // Used in a Parley test, but this method may go away in the future
+    #[inline(always)]
+    pub fn is_variation_selector(self) -> bool {
         self.flags & Self::VARIATION_SELECTOR_MASK != 0
     }
 
-    #[allow(
+    /// Whether this character is a regional indicator symbol.
+    #[expect(
         dead_code,
         reason = "To be used in more complete emoji checking, in select_font"
     )]
@@ -192,85 +182,125 @@ impl CharInfo {
         self.flags & Self::REGION_INDICATOR_MASK != 0
     }
 
+    /// Whether this character is a control character.
     #[inline(always)]
-    pub(crate) fn is_control(self) -> bool {
+    pub fn is_control(self) -> bool {
         self.flags & Self::CONTROL_MASK != 0
     }
 
+    /// Whether this character is an emoji or pictograph.
     #[inline(always)]
-    pub(crate) fn is_emoji_or_pictograph(self) -> bool {
+    pub fn is_emoji_or_pictograph(self) -> bool {
         self.flags & Self::EMOJI_OR_PICTOGRAPH_MASK != 0
     }
 
+    /// Whether this character contributes glyphs to shaping (false for controls
+    /// and most format characters).
     #[inline(always)]
-    pub(crate) fn contributes_to_shaping(self) -> bool {
+    pub fn contributes_to_shaping(self) -> bool {
         self.flags & Self::CONTRIBUTES_TO_SHAPING_MASK != 0
     }
 
+    /// Whether this character should be normalized before glyph mapping during shaping.
     #[inline(always)]
-    pub(crate) fn force_normalize(self) -> bool {
+    pub fn force_normalize(self) -> bool {
         self.flags & Self::FORCE_NORMALIZE_MASK != 0
     }
 }
 
-/// Boundary type of a character or cluster.
-#[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
-#[repr(u8)]
-pub(crate) enum Boundary {
-    /// Not a boundary.
-    None = 0,
-    /// Start of a word.
-    Word = 1,
-    /// Potential line break.
-    Line = 2,
-    /// Mandatory line break.
-    Mandatory = 3,
-}
+pub(crate) fn analyze_text(
+    analyzer: &mut Analyzer,
+    text: &str,
+    options: &AnalysisOptions<'_>,
+    analysis: &mut Analysis,
+) {
+    /// Turns the sparse, sorted, non-overlapping per-range `overrides` into a contiguous sequence
+    /// of `(range, word-break)` segments covering all of `text`.
+    ///
+    /// Any region not covered by an override takes the default `WordBreak::Normal`.
+    struct DenseWordBreaks<'a> {
+        overrides: &'a [(Range<usize>, WordBreak)],
+        /// Index of the next override to emit.
+        next_override: usize,
+        /// Start of the next segment to emit.
+        cursor: usize,
+        text_len: usize,
+    }
 
-pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str) {
-    struct WordBreakSegmentIter<'a, I: Iterator, B: Brush> {
+    impl<'a> DenseWordBreaks<'a> {
+        fn new(overrides: &'a [(Range<usize>, WordBreak)], text_len: usize) -> Self {
+            Self {
+                overrides,
+                next_override: 0,
+                cursor: 0,
+                text_len,
+            }
+        }
+    }
+
+    impl Iterator for DenseWordBreaks<'_> {
+        type Item = (Range<usize>, WordBreak);
+
+        fn next(&mut self) -> Option<Self::Item> {
+            if self.cursor >= self.text_len {
+                return None;
+            }
+            match self.overrides.get(self.next_override) {
+                // A gap before the next override: fill it with the default up to its start.
+                Some((range, _)) if self.cursor < range.start => {
+                    let segment = self.cursor..range.start;
+                    self.cursor = range.start;
+                    Some((segment, WordBreak::Normal))
+                }
+                // At the next override: emit it.
+                Some((range, word_break)) => {
+                    self.cursor = range.end;
+                    self.next_override += 1;
+                    Some((range.start..range.end, *word_break))
+                }
+                // No overrides remain: fill the default to the end.
+                None => {
+                    let segment = self.cursor..self.text_len;
+                    self.cursor = self.text_len;
+                    Some((segment, WordBreak::Normal))
+                }
+            }
+        }
+    }
+
+    struct WordBreakSegmentIter<'a, I: Iterator> {
         text: &'a str,
-        style_runs: I,
-        lcx: &'a LayoutContext<B>,
+        segments: I,
         char_indices: core::str::CharIndices<'a>,
         current_char: (usize, char),
         building_range_start: usize,
         previous_word_break_style: WordBreak,
         done: bool,
-        _phantom: PhantomData<B>,
     }
 
-    impl<'a, I, B: Brush + 'a> WordBreakSegmentIter<'a, I, B>
+    impl<'a, I> WordBreakSegmentIter<'a, I>
     where
-        I: Iterator<Item = &'a StyleRun>,
+        I: Iterator<Item = (Range<usize>, WordBreak)>,
     {
-        fn new(
-            text: &'a str,
-            style_runs: I,
-            lcx: &'a LayoutContext<B>,
-            first_style_run: &StyleRun,
-        ) -> Self {
+        fn new(text: &'a str, segments: I, first_segment: (Range<usize>, WordBreak)) -> Self {
             let mut char_indices = text.char_indices();
             let current_char_len = char_indices.next().unwrap();
-            let first_style = &lcx.style_table[first_style_run.style_index as usize];
 
             Self {
                 text,
-                style_runs,
-                lcx,
+                segments,
                 char_indices,
                 current_char: current_char_len,
-                building_range_start: first_style_run.range.start,
-                previous_word_break_style: first_style.word_break,
+                building_range_start: first_segment.0.start,
+                previous_word_break_style: first_segment.1,
                 done: false,
-                _phantom: PhantomData,
             }
         }
     }
 
-    impl<'a, I, B: Brush + 'a> Iterator for WordBreakSegmentIter<'a, I, B>
+    impl<'a, I> Iterator for WordBreakSegmentIter<'a, I>
     where
-        I: Iterator<Item = &'a StyleRun>,
+        I: Iterator<Item = (Range<usize>, WordBreak)>,
     {
         type Item = (&'a str, WordBreak, bool);
 
@@ -279,11 +309,13 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
                 return None;
             }
 
-            for style_run in self.style_runs.by_ref() {
-                // Empty style ranges are disallowed.
-                assert!(style_run.range.start < style_run.range.end);
+            for (range, word_break) in self.segments.by_ref() {
+                assert!(
+                    range.start < range.end,
+                    "Empty style ranges are disallowed."
+                );
 
-                let style_start_index = style_run.range.start;
+                let style_start_index = range.start;
                 let mut prev_char_index = self.current_char;
 
                 // Find the character at the style boundary
@@ -292,8 +324,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
                     self.current_char = self.char_indices.next().unwrap();
                 }
 
-                let current_word_break_style =
-                    self.lcx.style_table[style_run.style_index as usize].word_break;
+                let current_word_break_style = word_break;
                 if self.previous_word_break_style == current_word_break_style {
                     continue;
                 }
@@ -319,20 +350,19 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
     }
 
     if text.is_empty() {
-        text = " ";
+        return;
     }
+
+    let data_sources = AnalysisDataSources::new();
 
     // Line boundaries (word break naming refers to the line boundary determination config).
     //
     // This breaks text into sequences with similar line boundary config (part of style
     // information). If this config is consistent for all text, we use a fast path through this.
-    let (first_style_run, rest_runs) = lcx
-        .style_runs
-        .split_first()
-        .expect("analyze_text requires at least one style run");
-
-    let contiguous_word_break_substrings =
-        WordBreakSegmentIter::new(text, rest_runs.iter(), lcx, first_style_run);
+    let mut segments = DenseWordBreaks::new(options.line_break_overrides, text.len());
+    // `text` is non-empty (checked above), so there is always at least one segment.
+    let first_segment = segments.next().unwrap();
+    let contiguous_word_break_substrings = WordBreakSegmentIter::new(text, segments, first_segment);
     let mut global_offset = 0;
     let mut line_boundary_positions: Vec<usize> = Vec::new();
     for (substring_index, (substring, word_break_strength, last)) in
@@ -340,8 +370,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
     {
         // Fast path for text with a single word-break option.
         if substring_index == 0 && last {
-            let mut lb_iter = lcx
-                .analysis_data_sources
+            let mut lb_iter = data_sources
                 .line_segmenter(word_break_strength)
                 .segment_str(substring);
 
@@ -363,8 +392,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
             break;
         }
 
-        let line_boundaries_iter = lcx
-            .analysis_data_sources
+        let line_boundaries_iter = data_sources
             .line_segmenter(word_break_strength)
             .segment_str(substring);
 
@@ -398,11 +426,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
     }
 
     // Collect boundary byte positions compactly
-    let mut wb_iter = lcx
-        .analysis_data_sources
-        .word_segmenter()
-        .segment_str(text)
-        .peekable();
+    let mut wb_iter = data_sources.word_segmenter().segment_str(text).peekable();
 
     // Merge boundaries - line takes precedence over word
     let mut lb_iter = line_boundary_positions.iter().peekable();
@@ -441,11 +465,14 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
         (boundary, ch)
     });
 
-    let properties = |c| lcx.analysis_data_sources.properties(c);
+    let properties = |c| data_sources.properties(c);
+    let script_names = data_sources.script_short_name();
 
     let mut needs_bidi_resolution = false;
+    analyzer.bidi_props.clear();
+    analyzer.bidi_props.reserve(text.len());
 
-    lcx.info.reserve(text.len());
+    analysis.infos.reserve(text.len());
     boundary_iter
         // Shift line break data forward one, as line boundaries corresponding with line-breaking
         // characters (like '\n') exist at an index position one higher than the respective
@@ -453,7 +480,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
         // character-indexed.
         .fold(false, |is_mandatory_linebreak, (boundary, ch)| {
             let properties = properties(ch);
-            let script = properties.script();
+            let icu_script = properties.script();
             let grapheme_cluster_break = properties.grapheme_cluster_break();
             let bidi_class = properties.bidi_class();
             let general_category = properties.general_category();
@@ -483,37 +510,40 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
 
             needs_bidi_resolution |= crate::bidi::needs_bidi_resolution(bidi_class);
             // TODO: maybe extend Properties to u64 to fit BidiMirroringGlyph
-            let bracket = lcx.analysis_data_sources.brackets().get(ch);
+            let bracket = data_sources.brackets().get(ch);
+            analyzer.bidi_props.push((bidi_class, bracket));
 
-            lcx.info.push((
-                CharInfo::new(
-                    boundary,
-                    script,
-                    grapheme_cluster_break,
-                    bidi_class,
-                    bracket,
-                    is_variation_selector,
-                    is_region_indicator,
-                    general_category == GeneralCategory::Control,
-                    is_emoji_or_pictograph,
-                    contributes_to_shaping(general_category, script),
-                    force_normalize,
-                ),
-                0, // Style index is populated later
+            let script = script_names
+                .get(icu_script)
+                .and_then(|name| Script::parse(name).ok())
+                .unwrap_or(Script::UNKNOWN);
+
+            analysis.infos.push(CharInfo::new(
+                boundary,
+                script,
+                is_variation_selector,
+                is_region_indicator,
+                general_category == GeneralCategory::Control,
+                is_emoji_or_pictograph,
+                contributes_to_shaping(general_category, icu_script),
+                force_normalize,
             ));
 
             next_mandatory_linebreak
         });
 
-    if needs_bidi_resolution {
-        lcx.bidi.resolve(
-            text.chars().zip(
-                lcx.info
-                    .iter()
-                    .map(|info| (info.0.bidi_class, info.0.bracket)),
-            ),
-            None,
+    let forced_base = match options.base_direction {
+        BaseDirection::Auto => None,
+        BaseDirection::Ltr => Some(0_u8),
+        BaseDirection::Rtl => Some(1_u8),
+    };
+    if needs_bidi_resolution || forced_base == Some(1) {
+        analyzer.bidi.resolve(
+            text.chars().zip(analyzer.bidi_props.iter().copied()),
+            forced_base,
         );
+        analysis.levels.extend_from_slice(analyzer.bidi.levels());
+        analysis.paragraph_level = analyzer.bidi.base_level();
     }
 }
 
@@ -521,7 +551,7 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
 /// - Control characters
 /// - Format characters, unless they use the "Inherited" script
 #[inline(always)]
-pub(crate) fn contributes_to_shaping(general_category: GeneralCategory, script: Script) -> bool {
+pub(crate) fn contributes_to_shaping(general_category: GeneralCategory, script: IcuScript) -> bool {
     if matches!(
         general_category,
         GeneralCategory::Control
@@ -531,5 +561,5 @@ pub(crate) fn contributes_to_shaping(general_category: GeneralCategory, script: 
         return false;
     }
 
-    !(general_category == GeneralCategory::Format && script != Script::Inherited)
+    !(general_category == GeneralCategory::Format && script != IcuScript::Inherited)
 }
