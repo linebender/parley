@@ -350,10 +350,11 @@ impl<'a> Mapper<'a> {
             return 1.;
         }
         let mut mapped = 0;
+        let has_contributing = self.chars.iter().any(|c| c.contributes_to_shaping);
         for (c, g) in self.chars.iter().zip(glyphs.iter_mut()) {
             if !c.contributes_to_shaping {
                 *g = f(c.ch);
-                if self.map_len == 1 {
+                if !has_contributing {
                     mapped += 1;
                 }
             } else {
