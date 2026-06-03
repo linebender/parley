@@ -212,7 +212,7 @@ pub(crate) fn analyze_text(
     analyzer: &mut Analyzer,
     text: &str,
     options: &AnalysisOptions<'_>,
-    out: &mut Analysis,
+    analysis: &mut Analysis,
 ) {
     /// Turns the sparse, sorted, non-overlapping per-range `overrides` into a contiguous sequence
     /// of `(range, word-break)` segments covering all of `text`.
@@ -471,7 +471,7 @@ pub(crate) fn analyze_text(
     let mut needs_bidi_resolution = false;
     let mut bidi_props: Vec<(BidiClass, BidiMirroringGlyph)> = Vec::with_capacity(text.len());
 
-    out.infos.reserve(text.len());
+    analysis.infos.reserve(text.len());
     boundary_iter
         // Shift line break data forward one, as line boundaries corresponding with line-breaking
         // characters (like '\n') exist at an index position one higher than the respective
@@ -517,7 +517,7 @@ pub(crate) fn analyze_text(
                 .and_then(|name| Script::parse(name).ok())
                 .unwrap_or(Script::UNKNOWN);
 
-            out.infos.push(CharInfo::new(
+            analysis.infos.push(CharInfo::new(
                 boundary,
                 script,
                 is_variation_selector,
@@ -540,8 +540,8 @@ pub(crate) fn analyze_text(
         analyzer
             .bidi
             .resolve(text.chars().zip(bidi_props.iter().copied()), forced_base);
-        out.levels.extend_from_slice(analyzer.bidi.levels());
-        out.paragraph_level = analyzer.bidi.base_level();
+        analysis.levels.extend_from_slice(analyzer.bidi.levels());
+        analysis.paragraph_level = analyzer.bidi.base_level();
     }
 }
 

@@ -188,7 +188,6 @@ impl<B: Brush> LayoutContext<B> {
         self.style_runs.clear();
         self.inline_boxes.clear();
         self.info.clear();
-        self.analysis.clear();
     }
 }
 

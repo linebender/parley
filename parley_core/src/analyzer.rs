@@ -29,9 +29,12 @@ impl Analyzer {
         Self::default()
     }
 
-    /// Analyze `text`, appending the result to `out`.
-    pub fn analyze(&mut self, text: &str, options: &AnalysisOptions<'_>, out: &mut Analysis) {
-        analyze_text(self, text, options, out);
+    /// Analyze `text`, writing the result into `analysis`.
+    ///
+    /// This overwrites `analysis`, reusing its allocations.
+    pub fn analyze(&mut self, text: &str, options: &AnalysisOptions<'_>, analysis: &mut Analysis) {
+        analysis.clear();
+        analyze_text(self, text, options, analysis);
     }
 }
 
@@ -75,7 +78,7 @@ impl Analysis {
     }
 
     /// Clears the result while retaining capacity.
-    pub fn clear(&mut self) {
+    fn clear(&mut self) {
         self.infos.clear();
         self.levels.clear();
         self.paragraph_level = 0;
