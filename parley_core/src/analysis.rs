@@ -14,7 +14,7 @@ use icu_normalizer::properties::{
     CanonicalDecompositionBorrowed,
 };
 use icu_properties::props::{
-    BidiClass, BidiMirroringGlyph, GeneralCategory, GraphemeClusterBreak, Script as IcuScript,
+    BidiMirroringGlyph, GeneralCategory, GraphemeClusterBreak, Script as IcuScript,
 };
 use icu_properties::{
     CodePointMapData, CodePointMapDataBorrowed, PropertyNamesShort, PropertyNamesShortBorrowed,
@@ -469,7 +469,8 @@ pub(crate) fn analyze_text(
     let script_names = data_sources.script_short_name();
 
     let mut needs_bidi_resolution = false;
-    let mut bidi_props: Vec<(BidiClass, BidiMirroringGlyph)> = Vec::with_capacity(text.len());
+    analyzer.bidi_props.clear();
+    analyzer.bidi_props.reserve(text.len());
 
     analysis.infos.reserve(text.len());
     boundary_iter
@@ -510,7 +511,7 @@ pub(crate) fn analyze_text(
             needs_bidi_resolution |= crate::bidi::needs_bidi_resolution(bidi_class);
             // TODO: maybe extend Properties to u64 to fit BidiMirroringGlyph
             let bracket = data_sources.brackets().get(ch);
-            bidi_props.push((bidi_class, bracket));
+            analyzer.bidi_props.push((bidi_class, bracket));
 
             let script = script_names
                 .get(icu_script)
@@ -537,9 +538,10 @@ pub(crate) fn analyze_text(
         BaseDirection::Rtl => Some(1_u8),
     };
     if needs_bidi_resolution || forced_base == Some(1) {
-        analyzer
-            .bidi
-            .resolve(text.chars().zip(bidi_props.iter().copied()), forced_base);
+        analyzer.bidi.resolve(
+            text.chars().zip(analyzer.bidi_props.iter().copied()),
+            forced_base,
+        );
         analysis.levels.extend_from_slice(analyzer.bidi.levels());
         analysis.paragraph_level = analyzer.bidi.base_level();
     }
