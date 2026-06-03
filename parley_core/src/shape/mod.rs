@@ -627,9 +627,9 @@ pub struct ShapeInput<'a> {
     pub language: Option<Language>,
     /// The bidi embedding level (its parity gives the inline direction).
     pub level: u8,
-    /// The run's resolved orientation, from the paragraph's [`WritingMode`](crate::WritingMode).
+    /// The run's orientation, from the paragraph's [`WritingMode`](crate::WritingMode).
     pub orientation: RunOrientation,
-    /// The requested font attributes (weight, width, style).
+    /// The requested font attributes.
     pub attributes: Attributes,
     /// Font size in pixels per em.
     pub font_size: f32,

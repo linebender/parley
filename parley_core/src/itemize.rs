@@ -64,7 +64,7 @@ impl Analysis {
             text,
             self.char_infos(),
             self.bidi_levels(),
-            options.language_overrides,
+            options.languages,
             options.writing_mode.uniform_orientation(),
             options.writing_mode.suppresses_bidi(),
             split_before,
@@ -115,8 +115,8 @@ pub struct Item {
 pub struct ItemizeOptions<'a> {
     /// Per-range explicit language.
     ///
-    /// Ranges must be sorted and non-overlapping. Gaps infer the language from the script.
-    pub language_overrides: &'a [(Range<usize>, Language)],
+    /// Ranges must be sorted and non-overlapping. Gaps leave the language unset.
+    pub languages: &'a [(Range<usize>, Language)],
     /// The paragraph's writing mode.
     pub writing_mode: WritingMode,
 }
@@ -124,7 +124,7 @@ pub struct ItemizeOptions<'a> {
 impl Default for ItemizeOptions<'_> {
     fn default() -> Self {
         Self {
-            language_overrides: &[],
+            languages: &[],
             writing_mode: WritingMode::Horizontal,
         }
     }
@@ -387,7 +387,7 @@ mod tests {
         let english = Language::parse("en").unwrap();
         let language_overrides = [(0..3, english)];
         let options = ItemizeOptions {
-            language_overrides: &language_overrides,
+            languages: &language_overrides,
             ..Default::default()
         };
         let items: Vec<Item> = analysis

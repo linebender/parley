@@ -63,8 +63,6 @@ impl Default for AnalysisOptions<'_> {
 }
 
 /// The result of [`Analyzer::analyze`].
-///
-/// Indexed by character (one [`CharInfo`] per `char` of the source text).
 #[derive(Debug, Default)]
 pub struct Analysis {
     pub(crate) infos: Vec<CharInfo>,
