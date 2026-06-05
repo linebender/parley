@@ -220,6 +220,7 @@ impl CharCluster {
         ratio = Mapper {
             chars: &mut self.chars[..len],
             map_len: self.map_len.max(1),
+            has_contributing: self.map_len > 0,
         }
         .map(&f, &mut glyph_ids, self.best_ratio);
         if ratio > self.best_ratio {
@@ -278,6 +279,7 @@ pub(crate) struct Form {
     chars: [Char; 2],
     len: u8,
     map_len: u8,
+    has_contributing: bool,
     state: FormState,
 }
 
@@ -293,6 +295,7 @@ impl Form {
             chars: [Char::default(), Char::default()],
             len: 0,
             map_len: 0,
+            has_contributing: false,
             state: FormState::None,
         }
     }
@@ -301,6 +304,7 @@ impl Form {
         self.chars = [Char::default(), Char::default()];
         self.len = 0;
         self.map_len = 0;
+        self.has_contributing = false;
         self.state = FormState::None;
     }
 
@@ -317,6 +321,7 @@ impl Form {
             .filter(|c| !c.is_control_character)
             .count() as u8)
             .max(1);
+        self.has_contributing = self.chars().iter().any(|c| c.contributes_to_shaping);
     }
 
     #[inline(always)]
@@ -329,6 +334,7 @@ impl Form {
         Mapper {
             chars: &mut self.chars[..self.len as usize],
             map_len: self.map_len,
+            has_contributing: self.has_contributing,
         }
         .map(f, glyphs, best_ratio)
     }
@@ -337,6 +343,7 @@ impl Form {
 struct Mapper<'a> {
     chars: &'a mut [Char],
     map_len: u8,
+    has_contributing: bool,
 }
 
 impl<'a> Mapper<'a> {
@@ -353,7 +360,7 @@ impl<'a> Mapper<'a> {
         for (c, g) in self.chars.iter().zip(glyphs.iter_mut()) {
             if !c.contributes_to_shaping {
                 *g = f(c.ch);
-                if self.map_len == 1 {
+                if !self.has_contributing {
                     mapped += 1;
                 }
             } else {
