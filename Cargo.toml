@@ -11,6 +11,7 @@ members = [
     "parley_data_gen",
     "parley_dev",
     "parley_tests",
+    "examples/chrome_compare",
     "examples/common",
     "examples/swash_render",
     "examples/tiny_skia_render",
