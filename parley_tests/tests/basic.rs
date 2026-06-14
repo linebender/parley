@@ -70,6 +70,7 @@ fn placing_inboxes() {
             index: position,
             width: 10.0,
             height: 10.0,
+            baseline: None,
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
@@ -91,6 +92,7 @@ fn only_inboxes_wrap() {
             index: 0,
             width: 10.0,
             height: 10.0,
+            baseline: None,
         });
     }
     let mut layout = builder.build(text);
@@ -113,6 +115,7 @@ fn full_width_inbox() {
             index: 1,
             width: 10.,
             height: 10.0,
+            baseline: None,
         });
         builder.push_inline_box(InlineBox {
             id: 1,
@@ -120,6 +123,7 @@ fn full_width_inbox() {
             index: 1,
             width,
             height: 10.0,
+            baseline: None,
         });
         builder.push_inline_box(InlineBox {
             id: 2,
@@ -127,6 +131,7 @@ fn full_width_inbox() {
             index: 2,
             width,
             height: 10.0,
+            baseline: None,
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(100.));
@@ -146,6 +151,7 @@ fn inbox_separated_by_whitespace() {
         index: 0,
         width: 10.,
         height: 10.0,
+        baseline: None,
     });
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
@@ -154,6 +160,7 @@ fn inbox_separated_by_whitespace() {
         index: 1,
         width: 10.0,
         height: 10.0,
+        baseline: None,
     });
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
@@ -162,6 +169,7 @@ fn inbox_separated_by_whitespace() {
         index: 2,
         width: 10.0,
         height: 10.0,
+        baseline: None,
     });
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
@@ -170,6 +178,7 @@ fn inbox_separated_by_whitespace() {
         index: 3,
         width: 10.0,
         height: 10.0,
+        baseline: None,
     });
     let (mut layout, _text) = builder.build();
     layout.break_all_lines(Some(100.));
@@ -452,6 +461,7 @@ fn inbox_content_width() {
             index: 3,
             width: 100.0,
             height: 10.0,
+            baseline: None,
         });
         let mut layout = builder.build(text);
         let ContentWidths {
@@ -473,6 +483,7 @@ fn inbox_content_width() {
             index: 2,
             width: 10.0,
             height: 10.0,
+            baseline: None,
         });
         let mut layout = builder.build(text);
         let ContentWidths {

@@ -58,6 +58,7 @@ fn float_simple() {
             index: fbox.text_index,
             width: 0.0,
             height: 0.0,
+            baseline: None,
         });
     }
 

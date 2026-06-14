@@ -16,6 +16,8 @@ pub struct InlineBox {
     pub width: f32,
     /// The height of the box in pixels
     pub height: f32,
+    /// The baseline of the box in pixels, relative to the top of the box
+    pub baseline: Option<f32>,
 }
 
 /// Whether a box is in-flow (takes up space in the layout) or out-of-flow (e.g. absolutely positioned)

@@ -206,6 +206,7 @@ pub fn build_rich_layout(
         index: 40,
         width: 50.0,
         height: 50.0,
+        baseline: None,
     });
 
     let mut layout = builder.build(&config.text);
