@@ -31,6 +31,9 @@ use crate::resolve::{ResolvedStyle, StyleRun, tree::ItemKind};
 /// This is typically used to force preferential line breaking decisions when it
 /// comes to ASCII punctuation like `/`, '-', etc. For example, to prevent break
 /// opportunities within "1/2".
+///
+/// A separate use case is to match the line breaking behavior of existing systems
+/// such as web browsers.
 #[cfg_attr(not(feature = "line-break-overrides"), allow(unreachable_pub))]
 pub type LineBreakOverrideFn = dyn Fn(char, char) -> Option<bool> + Send + Sync;
 
@@ -69,6 +72,9 @@ impl<B: Brush> RangedBuilder<'_, B> {
         self.lcx.inline_boxes.push(inline_box);
     }
 
+    /// Set the callback which will be called as a first provider of line breaking decisions.
+    ///
+    /// See [`LineBreakOverrideFn`] for more details.
     #[cfg(feature = "line-break-overrides")]
     pub fn set_line_break_override(&mut self, overrides: Option<Box<LineBreakOverrideFn>>) {
         self.line_break_override = overrides;
@@ -168,6 +174,9 @@ impl<B: Brush> StyleRunBuilder<'_, B> {
         self.lcx.inline_boxes.push(inline_box);
     }
 
+    /// Set the callback which will be called as a first provider of line breaking decisions.
+    ///
+    /// See [`LineBreakOverrideFn`] for more details.
     #[cfg(feature = "line-break-overrides")]
     pub fn set_line_break_override(&mut self, overrides: Option<Box<LineBreakOverrideFn>>) {
         self.line_break_override = overrides;
@@ -257,6 +266,9 @@ impl<B: Brush> TreeBuilder<'_, B> {
             .set_white_space_mode(white_space_collapse);
     }
 
+    /// Set the callback which will be called as a first provider of line breaking decisions.
+    ///
+    /// See [`LineBreakOverrideFn`] for more details.
     #[cfg(feature = "line-break-overrides")]
     pub fn set_line_break_override(&mut self, overrides: Option<Box<LineBreakOverrideFn>>) {
         self.line_break_override = overrides;

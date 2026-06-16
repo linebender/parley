@@ -415,7 +415,7 @@ pub(crate) fn analyze_text<B: Brush>(
     // Merge boundaries - line takes precedence over word
     let mut lb_iter = line_boundary_positions.iter().peekable();
     #[cfg(feature = "line-break-overrides")]
-    let (lb_override, mut prev_char) = (line_break_override, None);
+    let mut prev_char = None;
     let boundary_iter = text.char_indices().map(|(byte_pos, ch)| {
         // advance any stale word boundary positions
         while let Some(&w) = wb_iter.peek() {
@@ -452,8 +452,8 @@ pub(crate) fn analyze_text<B: Brush>(
         #[cfg(feature = "line-break-overrides")]
         // This leaves word boundaries intact. Consumers can only impact line boundaries.
         {
-            if let (Some(p), Some(o)) = (prev_char, lb_override) {
-                if let Some(forced) = o(p, ch) {
+            if let (Some(prev), Some(lb_override)) = (prev_char, line_break_override) {
+                if let Some(forced) = lb_override(prev, ch) {
                     is_line = forced;
                 }
             }
