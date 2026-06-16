@@ -108,7 +108,6 @@ impl TestContext {
         self
     }
 
-    #[cfg(feature = "line-break-overrides")]
     fn boundary_list(&self) -> Vec<Boundary> {
         self.layout_context
             .info
@@ -141,7 +140,6 @@ fn verify_analysis(
     test_context
 }
 
-#[cfg(feature = "line-break-overrides")]
 fn verify_analysis_with_override(
     text: &str,
     line_break_override: alloc::boxed::Box<crate::LineBreakOverrideFn>,
@@ -162,7 +160,6 @@ fn verify_analysis_with_override(
     test_context
 }
 
-#[cfg(feature = "line-break-overrides")]
 #[test]
 fn test_line_break_override_none_matches_default() {
     let text = "ab/cd ef";
@@ -172,7 +169,6 @@ fn test_line_break_override_none_matches_default() {
     assert_eq!(default, overridden);
 }
 
-#[cfg(feature = "line-break-overrides")]
 #[test]
 fn test_line_break_override_suppresses_break_after_slash() {
     let text = "ab/cd";
@@ -188,7 +184,6 @@ fn test_line_break_override_suppresses_break_after_slash() {
     assert!(!overridden.contains(&Boundary::Line),);
 }
 
-#[cfg(feature = "line-break-overrides")]
 #[test]
 fn test_line_break_override_does_not_suppress_mandatory_break() {
     let overridden =
@@ -201,7 +196,6 @@ fn test_line_break_override_does_not_suppress_mandatory_break() {
     );
 }
 
-#[cfg(feature = "line-break-overrides")]
 #[test]
 fn test_line_break_override_mandatory_break_takes_precedence() {
     let overridden =

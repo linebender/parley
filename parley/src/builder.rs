@@ -14,28 +14,9 @@ use alloc::string::String;
 use core::ops::{Bound, Range, RangeBounds};
 
 use crate::InlineBoxKind;
+use crate::break_overrides::LineBreakOverrideFn;
 use crate::inline_box::InlineBox;
 use crate::resolve::{ResolvedStyle, StyleRun, tree::ItemKind};
-
-/// Line break opportunity override.
-///
-/// Called for each adjacent pair of Unicode code points.
-///
-/// Returning:
-///    - `Some(true)`  : forces a line break opportunity between the pair
-///    - `Some(false)` : suppresses any opportunity
-///    - `None`        : defers to the default (ICU) behavior
-///
-/// Mandatory breaks are unaffected (e.g. `\n`).
-///
-/// This is typically used to force preferential line breaking decisions when it
-/// comes to ASCII punctuation like `/`, '-', etc. For example, to prevent break
-/// opportunities within "1/2".
-///
-/// A separate use case is to match the line breaking behavior of existing systems
-/// such as web browsers.
-#[cfg_attr(not(feature = "line-break-overrides"), allow(unreachable_pub))]
-pub type LineBreakOverrideFn = dyn Fn(char, char) -> Option<bool> + Send + Sync;
 
 /// Builder for constructing a text layout with ranged attributes.
 #[must_use]
@@ -75,7 +56,6 @@ impl<B: Brush> RangedBuilder<'_, B> {
     /// Set the callback which will be called as a first provider of line breaking decisions.
     ///
     /// See [`LineBreakOverrideFn`] for more details.
-    #[cfg(feature = "line-break-overrides")]
     pub fn set_line_break_override(&mut self, overrides: Option<Box<LineBreakOverrideFn>>) {
         self.line_break_override = overrides;
     }
@@ -177,7 +157,6 @@ impl<B: Brush> StyleRunBuilder<'_, B> {
     /// Set the callback which will be called as a first provider of line breaking decisions.
     ///
     /// See [`LineBreakOverrideFn`] for more details.
-    #[cfg(feature = "line-break-overrides")]
     pub fn set_line_break_override(&mut self, overrides: Option<Box<LineBreakOverrideFn>>) {
         self.line_break_override = overrides;
     }
@@ -269,7 +248,6 @@ impl<B: Brush> TreeBuilder<'_, B> {
     /// Set the callback which will be called as a first provider of line breaking decisions.
     ///
     /// See [`LineBreakOverrideFn`] for more details.
-    #[cfg(feature = "line-break-overrides")]
     pub fn set_line_break_override(&mut self, overrides: Option<Box<LineBreakOverrideFn>>) {
         self.line_break_override = overrides;
     }

@@ -26,8 +26,6 @@ accesskit = ["dep:accesskit"]
 # Enables dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
 # When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
 complex-scripts = []
-# Enables consumers to set line break opportunity overrides.
-line-break-overrides = []
 
 [dependencies]
 skrifa = { workspace = true }

@@ -6,7 +6,7 @@ pub(crate) mod cluster;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use crate::builder::LineBreakOverrideFn;
+use crate::break_overrides::LineBreakOverrideFn;
 use crate::resolve::StyleRun;
 use crate::{Brush, LayoutContext, WordBreak};
 
@@ -233,9 +233,6 @@ pub(crate) fn analyze_text<B: Brush>(
     mut text: &str,
     line_break_override: Option<&LineBreakOverrideFn>,
 ) {
-    #[cfg(not(feature = "line-break-overrides"))]
-    let _ = line_break_override;
-
     struct WordBreakSegmentIter<'a, I: Iterator, B: Brush> {
         text: &'a str,
         style_runs: I,
@@ -414,7 +411,6 @@ pub(crate) fn analyze_text<B: Brush>(
 
     // Merge boundaries - line takes precedence over word
     let mut lb_iter = line_boundary_positions.iter().peekable();
-    #[cfg(feature = "line-break-overrides")]
     let mut prev_char = None;
     let boundary_iter = text.char_indices().map(|(byte_pos, ch)| {
         // advance any stale word boundary positions
@@ -449,16 +445,13 @@ pub(crate) fn analyze_text<B: Brush>(
             }
         }
 
-        #[cfg(feature = "line-break-overrides")]
         // This leaves word boundaries intact. Consumers can only impact line boundaries.
-        {
-            if let (Some(prev), Some(lb_override)) = (prev_char, line_break_override) {
-                if let Some(forced) = lb_override(prev, ch) {
-                    is_line = forced;
-                }
+        if let (Some(prev), Some(lb_override)) = (prev_char, line_break_override) {
+            if let Some(forced) = lb_override(prev, ch) {
+                is_line = forced;
             }
-            prev_char = Some(ch);
         }
+        prev_char = Some(ch);
 
         let boundary = if is_line {
             Boundary::Line
