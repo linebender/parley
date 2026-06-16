@@ -188,6 +188,33 @@ fn test_line_break_override_suppresses_break_after_slash() {
     assert!(!overridden.contains(&Boundary::Line),);
 }
 
+#[cfg(feature = "line-break-overrides")]
+#[test]
+fn test_line_break_override_does_not_suppress_mandatory_break() {
+    let overridden =
+        verify_analysis_with_override("a\nb", alloc::boxed::Box::new(|_, _| Some(false)))
+            .boundary_list();
+
+    assert_eq!(
+        overridden,
+        vec![Boundary::Word, Boundary::Word, Boundary::Mandatory]
+    );
+}
+
+#[cfg(feature = "line-break-overrides")]
+#[test]
+fn test_line_break_override_mandatory_break_takes_precedence() {
+    let overridden =
+        verify_analysis_with_override("a\nb", alloc::boxed::Box::new(|_, _| Some(true)))
+            .boundary_list();
+
+    assert_eq!(
+        overridden,
+        // A mandatory break (e.g. `\n`) takes precedence over a forced line break override.
+        vec![Boundary::Word, Boundary::Line, Boundary::Mandatory]
+    );
+}
+
 #[test]
 fn test_latin_mixed_keep_all_last() {
     verify_analysis("AB", |builder| {
