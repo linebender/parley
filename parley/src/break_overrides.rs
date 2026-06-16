@@ -125,7 +125,7 @@ impl AsciiLineBreakTable {
 
     /// A table mirroring Chromium's preferred line breaking behavior.
     ///
-    /// See: https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/platform/text/character_property_data_generator.cc;l=449-495.
+    /// See: <https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/platform/text/character_property_data_generator.cc;l=449-495>
     ///
     /// ### Differences from other browsers
     ///
