@@ -107,6 +107,15 @@ impl TestContext {
         assert_eq!(actual, expected, "Is variation selector list mismatch");
         self
     }
+
+    #[cfg(feature = "line-break-overrides")]
+    fn boundary_list(&self) -> Vec<Boundary> {
+        self.layout_context
+            .info
+            .iter()
+            .map(|(info, _)| info.boundary)
+            .collect()
+    }
 }
 
 fn verify_analysis(
@@ -130,6 +139,53 @@ fn verify_analysis(
     }
 
     test_context
+}
+
+#[cfg(feature = "line-break-overrides")]
+fn verify_analysis_with_override(
+    text: &str,
+    line_break_override: alloc::boxed::Box<crate::LineBreakOverrideFn>,
+) -> TestContext {
+    let mut test_context = TestContext::default();
+
+    {
+        let mut builder = test_context.layout_context.ranged_builder(
+            &mut test_context.font_context,
+            text,
+            1.,
+            true,
+        );
+        builder.set_line_break_override(Some(line_break_override));
+        _ = builder.build(text);
+    }
+
+    test_context
+}
+
+#[cfg(feature = "line-break-overrides")]
+#[test]
+fn test_line_break_override_none_matches_default() {
+    let text = "ab/cd ef";
+    let default = verify_analysis(text, |_| {}).boundary_list();
+    let overridden =
+        verify_analysis_with_override(text, alloc::boxed::Box::new(|_, _| None)).boundary_list();
+    assert_eq!(default, overridden);
+}
+
+#[cfg(feature = "line-break-overrides")]
+#[test]
+fn test_line_break_override_suppresses_break_after_slash() {
+    let text = "ab/cd";
+    let default = verify_analysis(text, |_| {}).boundary_list();
+    assert!(default.contains(&Boundary::Line),);
+
+    let overridden = verify_analysis_with_override(
+        text,
+        alloc::boxed::Box::new(|before, _after| if before == '/' { Some(false) } else { None }),
+    )
+    .boundary_list();
+
+    assert!(!overridden.contains(&Boundary::Line),);
 }
 
 #[test]

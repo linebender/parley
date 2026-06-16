@@ -406,34 +406,17 @@ fn text_wrap_mode_updates_min_content_width() {
     );
 }
 
-/// Documents how Parley wraps a long URL.
-///
-/// Parley feeds text to the ICU4X line segmenter, so break opportunities follow UAX#14.
-/// The solidus `/` has line-break class SY ("Symbols Allowing Break After"), so there is a
-/// regular break opportunity *after* each slash. As a result, a long URL wraps at its
-/// slashes via `BreakReason::Regular` rather than falling back to an emergency/overflow break.
-///
-/// This is the ICU-correct behavior and intentionally differs from Chromium, which for legacy
-/// web-compatibility reasons suppresses breaks after ASCII punctuation like `/` and only breaks
-/// a long URL via the emergency/overflow path.
 #[test]
 fn wrap_url_breaks_after_slash() {
     let mut env = TestEnv::new(test_name!(), None);
 
     let text = "https://www.example.com/path/to/resource";
 
-    // Wide enough to fit the longest inter-slash segment ("www.example.com/") but narrow
-    // enough to force the URL to wrap several times.
-    let wrap_width = 150.0;
-
     let mut layout = env.ranged_builder(text).build(text);
-    layout.break_all_lines(Some(wrap_width));
+    layout.break_all_lines(Some(150.0));
     layout.align(Alignment::Start, AlignmentOptions::default());
 
-    assert!(
-        layout.len() > 1,
-        "Expected the URL to wrap onto multiple lines at width {wrap_width}"
-    );
+    assert!(layout.len() > 1);
 
     let last_line_index = layout.len() - 1;
     for (i, line) in layout.lines().enumerate() {
@@ -441,18 +424,40 @@ fn wrap_url_breaks_after_slash() {
             break;
         }
 
-        assert_eq!(
-            line.break_reason(),
-            BreakReason::Regular,
-            "Line {i} should end at a regular ICU break opportunity, not an emergency break"
-        );
+        assert_eq!(line.break_reason(), BreakReason::Regular,);
 
         let line_text = &text[line.text_range()];
-        assert!(
-            line_text.ends_with('/'),
-            "Line {i} ({line_text:?}) should end with a slash, demonstrating Parley breaks after `/`"
-        );
+        assert!(line_text.ends_with('/'),);
     }
+
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn wrap_url_override_no_break_after_slash() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "https://www.example.com/path/to/resource";
+
+    let wrap_width = 150.0;
+
+    let mut builder = env.ranged_builder(text);
+    builder.set_line_break_override(Some(Box::new(|before, _after| {
+        (before == '/').then_some(false)
+    })));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(wrap_width));
+    layout.align(Alignment::Start, AlignmentOptions::default());
+
+    assert_eq!(layout.len(), 1);
+
+    let line_advance = layout
+        .lines()
+        .next()
+        .expect("layout should have one line")
+        .metrics()
+        .advance;
+    assert!(line_advance > wrap_width);
 
     env.check_layout_snapshot(&layout);
 }

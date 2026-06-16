@@ -6,6 +6,7 @@ pub(crate) mod cluster;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
+use crate::builder::LineBreakOverrideFn;
 use crate::resolve::StyleRun;
 use crate::{Brush, LayoutContext, WordBreak};
 
@@ -227,7 +228,14 @@ pub(crate) enum Boundary {
     Mandatory = 3,
 }
 
-pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str) {
+pub(crate) fn analyze_text<B: Brush>(
+    lcx: &mut LayoutContext<B>,
+    mut text: &str,
+    line_break_override: Option<&LineBreakOverrideFn>,
+) {
+    #[cfg(not(feature = "line-break-overrides"))]
+    let _ = line_break_override;
+
     struct WordBreakSegmentIter<'a, I: Iterator, B: Brush> {
         text: &'a str,
         style_runs: I,
@@ -406,6 +414,8 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
 
     // Merge boundaries - line takes precedence over word
     let mut lb_iter = line_boundary_positions.iter().peekable();
+    #[cfg(feature = "line-break-overrides")]
+    let (lb_override, mut prev_char) = (line_break_override, None);
     let boundary_iter = text.char_indices().map(|(byte_pos, ch)| {
         // advance any stale word boundary positions
         while let Some(&w) = wb_iter.peek() {
@@ -424,19 +434,39 @@ pub(crate) fn analyze_text<B: Brush>(lcx: &mut LayoutContext<B>, mut text: &str)
             }
         }
 
-        let mut boundary = Boundary::None;
+        let mut is_word = false;
         if let Some(&w) = wb_iter.peek() {
             if w == byte_pos {
-                boundary = Boundary::Word;
+                is_word = true;
                 _ = wb_iter.next();
             }
         }
+        let mut is_line = false;
         if let Some(&l) = lb_iter.peek() {
             if *l == byte_pos {
-                boundary = Boundary::Line;
+                is_line = true;
                 _ = lb_iter.next();
             }
         }
+
+        #[cfg(feature = "line-break-overrides")]
+        // This leaves word boundaries intact. Consumers can only impact line boundaries.
+        {
+            if let (Some(p), Some(o)) = (prev_char, lb_override) {
+                if let Some(forced) = o(p, ch) {
+                    is_line = forced;
+                }
+            }
+            prev_char = Some(ch);
+        }
+
+        let boundary = if is_line {
+            Boundary::Line
+        } else if is_word {
+            Boundary::Word
+        } else {
+            Boundary::None
+        };
 
         (boundary, ch)
     });

@@ -9,12 +9,30 @@ use super::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
 
 use super::layout::Layout;
 
+use alloc::boxed::Box;
 use alloc::string::String;
 use core::ops::{Bound, Range, RangeBounds};
 
 use crate::InlineBoxKind;
 use crate::inline_box::InlineBox;
 use crate::resolve::{ResolvedStyle, StyleRun, tree::ItemKind};
+
+/// Line break opportunity override.
+///
+/// Called for each adjacent pair of Unicode code points.
+///
+/// Returning:
+///    - `Some(true)`  : forces a line break opportunity between the pair
+///    - `Some(false)` : suppresses any opportunity
+///    - `None`        : defers to the default (ICU) behavior
+///
+/// Mandatory breaks are unaffected (e.g. `\n`).
+///
+/// This is typically used to force preferential line breaking decisions when it
+/// comes to ASCII punctuation like `/`, '-', etc. For example, to prevent break
+/// opportunities within "1/2".
+#[cfg_attr(not(feature = "line-break-overrides"), allow(unreachable_pub))]
+pub type LineBreakOverrideFn = dyn Fn(char, char) -> Option<bool> + Send + Sync;
 
 /// Builder for constructing a text layout with ranged attributes.
 #[must_use]
@@ -23,6 +41,7 @@ pub struct RangedBuilder<'a, B: Brush> {
     pub(crate) quantize: bool,
     pub(crate) lcx: &'a mut LayoutContext<B>,
     pub(crate) fcx: &'a mut FontContext,
+    pub(crate) line_break_override: Option<Box<LineBreakOverrideFn>>,
 }
 
 impl<B: Brush> RangedBuilder<'_, B> {
@@ -50,6 +69,11 @@ impl<B: Brush> RangedBuilder<'_, B> {
         self.lcx.inline_boxes.push(inline_box);
     }
 
+    #[cfg(feature = "line-break-overrides")]
+    pub fn set_line_break_override(&mut self, overrides: Option<Box<LineBreakOverrideFn>>) {
+        self.line_break_override = overrides;
+    }
+
     pub fn build_into(self, layout: &mut Layout<B>, text: impl AsRef<str>) {
         // Apply RangedStyleBuilder styles directly to style-table/style-run state.
         self.lcx
@@ -64,6 +88,7 @@ impl<B: Brush> RangedBuilder<'_, B> {
             text.as_ref(),
             self.lcx,
             self.fcx,
+            self.line_break_override.as_deref(),
         );
     }
 
@@ -84,6 +109,7 @@ pub struct StyleRunBuilder<'a, B: Brush> {
     pub(crate) lcx: &'a mut LayoutContext<B>,
     pub(crate) fcx: &'a mut FontContext,
     pub(crate) cursor: usize,
+    pub(crate) line_break_override: Option<Box<LineBreakOverrideFn>>,
 }
 
 impl<B: Brush> StyleRunBuilder<'_, B> {
@@ -142,6 +168,11 @@ impl<B: Brush> StyleRunBuilder<'_, B> {
         self.lcx.inline_boxes.push(inline_box);
     }
 
+    #[cfg(feature = "line-break-overrides")]
+    pub fn set_line_break_override(&mut self, overrides: Option<Box<LineBreakOverrideFn>>) {
+        self.line_break_override = overrides;
+    }
+
     pub fn build_into(self, layout: &mut Layout<B>, text: impl AsRef<str>) {
         assert!(
             self.cursor == self.len,
@@ -154,6 +185,7 @@ impl<B: Brush> StyleRunBuilder<'_, B> {
             text.as_ref(),
             self.lcx,
             self.fcx,
+            self.line_break_override.as_deref(),
         );
     }
 
@@ -171,6 +203,7 @@ pub struct TreeBuilder<'a, B: Brush> {
     pub(crate) quantize: bool,
     pub(crate) lcx: &'a mut LayoutContext<B>,
     pub(crate) fcx: &'a mut FontContext,
+    pub(crate) line_break_override: Option<Box<LineBreakOverrideFn>>,
 }
 
 impl<B: Brush> TreeBuilder<'_, B> {
@@ -224,6 +257,11 @@ impl<B: Brush> TreeBuilder<'_, B> {
             .set_white_space_mode(white_space_collapse);
     }
 
+    #[cfg(feature = "line-break-overrides")]
+    pub fn set_line_break_override(&mut self, overrides: Option<Box<LineBreakOverrideFn>>) {
+        self.line_break_override = overrides;
+    }
+
     #[inline]
     pub fn build_into(self, layout: &mut Layout<B>) -> String {
         // Apply TreeStyleBuilder styles to LayoutContext.
@@ -233,7 +271,15 @@ impl<B: Brush> TreeBuilder<'_, B> {
             .finish(&mut self.lcx.style_table, &mut self.lcx.style_runs);
 
         // Call generic layout builder method
-        build_into_layout(layout, self.scale, self.quantize, &text, self.lcx, self.fcx);
+        build_into_layout(
+            layout,
+            self.scale,
+            self.quantize,
+            &text,
+            self.lcx,
+            self.fcx,
+            self.line_break_override.as_deref(),
+        );
 
         text
     }
@@ -253,6 +299,7 @@ fn build_into_layout<B: Brush>(
     text: &str,
     lcx: &mut LayoutContext<B>,
     fcx: &mut FontContext,
+    line_break_override: Option<&LineBreakOverrideFn>,
 ) {
     if text.is_empty() && lcx.style_runs.is_empty() {
         lcx.style_table.push(ResolvedStyle::default());
@@ -266,7 +313,7 @@ fn build_into_layout<B: Brush>(
         "at least one style run is required"
     );
 
-    crate::analysis::analyze_text(lcx, text);
+    crate::analysis::analyze_text(lcx, text, line_break_override);
 
     layout.data.clear();
     layout.data.scale = scale;

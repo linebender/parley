@@ -18,7 +18,7 @@ path = "tests/mod.rs"
 system = ["parley/system"]
 
 [dependencies]
-parley = { workspace = true, features = ["std"] }
+parley = { workspace = true, features = ["std", "line-break-overrides"] }
 parley_dev = { workspace = true }
 glifo = { workspace = true, features = ["std", "vello_cpu", "png"] }
 peniko = { workspace = true, features = ["std"] }

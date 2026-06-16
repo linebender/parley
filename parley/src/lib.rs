@@ -131,6 +131,8 @@ mod tests;
 pub use linebender_resource_handle::FontData;
 pub use util::BoundingBox;
 
+#[cfg(feature = "line-break-overrides")]
+pub use builder::LineBreakOverrideFn;
 pub use builder::{RangedBuilder, StyleRunBuilder, TreeBuilder};
 pub use context::LayoutContext;
 pub use font::FontContext;

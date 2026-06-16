@@ -104,6 +104,7 @@ impl<B: Brush> LayoutContext<B> {
             quantize,
             lcx: self,
             fcx,
+            line_break_override: None,
         }
     }
 
@@ -133,6 +134,7 @@ impl<B: Brush> LayoutContext<B> {
             lcx: self,
             fcx,
             cursor: 0,
+            line_break_override: None,
         }
     }
 
@@ -174,6 +176,7 @@ impl<B: Brush> LayoutContext<B> {
             quantize,
             lcx: self,
             fcx,
+            line_break_override: None,
         }
     }
 
