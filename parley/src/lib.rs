@@ -132,10 +132,7 @@ mod tests;
 pub use linebender_resource_handle::FontData;
 pub use util::BoundingBox;
 
-pub use break_overrides::{
-    AsciiLineBreakTable, CHROMIUM_LINE_BREAK_OVERRIDE, CHROMIUM_LINE_BREAK_TABLE,
-    LineBreakOverrideFn,
-};
+pub use break_overrides::{AsciiLineBreakTable, CHROMIUM_LINE_BREAK_OVERRIDE, LineBreakOverrideFn};
 pub use builder::{RangedBuilder, StyleRunBuilder, TreeBuilder};
 pub use context::LayoutContext;
 pub use font::FontContext;

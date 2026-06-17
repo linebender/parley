@@ -23,14 +23,15 @@ use core::ops::RangeInclusive;
 /// opportunities within "1/2".
 ///
 /// A separate use case is to match the line breaking behavior of existing systems
-/// such as web browsers. See [`CHROMIUM_LINE_BREAK_TABLE`] for a ready-made
-/// table that mirrors Chromium's behavior.
+/// such as web browsers. See [`CHROMIUM_LINE_BREAK_OVERRIDE`] for a ready-made
+/// override function that mirrors Chromium's behavior.
 pub type LineBreakOverrideFn = dyn Fn(char, char, char) -> Option<bool> + Send + Sync;
 
-/// A static table mirroring Chromium's preferred line breaking behavior.
-///
-/// Consider using [`CHROMIUM_LINE_BREAK_OVERRIDE`] when passing to builder
-/// methods that accept borrowed overrides.
+/// A static table mirroring Chromium's preferred line breaking behavior for `before` / `after`
+/// printable ASCII code points.
+static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable = AsciiLineBreakTable::chromium();
+
+/// A line break override function mirroring Chromium's preferred line breaking behavior.
 ///
 /// See: <https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/platform/text/character_property_data_generator.cc;l=449-495>
 ///
@@ -44,18 +45,17 @@ pub type LineBreakOverrideFn = dyn Fn(char, char, char) -> Option<bool> + Send +
 /// ## Compared to Firefox
 ///
 /// Firefox always defers to the default ICU behavior.
-pub static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable = AsciiLineBreakTable::chromium();
-
-/// A borrowable [`LineBreakOverrideFn`] for [`CHROMIUM_LINE_BREAK_TABLE`].
 pub static CHROMIUM_LINE_BREAK_OVERRIDE: &LineBreakOverrideFn =
     &(chromium_override as fn(char, char, char) -> Option<bool>);
 
 fn chromium_override(before_before: char, before: char, after: char) -> Option<bool> {
-    // See <https://github.com/chromium/chromium/blob/c6bee15e8f336c8feabf539d8bbb540c134ec20a/third_party/blink/renderer/platform/text/text_break_iterator.cc#L224-L240>
-
-    // We don't allow breaking when it looks like the minus sign if for a negative
-    // number like "Subtract -5 from X". But, we do want to break when the minus
+    // Before consulting 'before' / 'after' pair table, check for the special "-" case.
+    //
+    // Chromium doesn't allow breaking when it looks like the minus sign is for a negative
+    // number like "Subtract -5 from X". But, Chromium does allow breaking when the minus
     // sign is part of a long URL like "AAAA-2222".
+    //
+    // See <https://github.com/chromium/chromium/blob/c6bee15e8f336c8feabf539d8bbb540c134ec20a/third_party/blink/renderer/platform/text/text_break_iterator.cc#L224-L240>
     if before == '-' && after.is_ascii_digit() {
         return Some(before_before.is_ascii_alphanumeric());
     }
