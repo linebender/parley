@@ -29,14 +29,14 @@ pub type LineBreakOverrideFn = dyn Fn(char, char) -> Option<bool> + Send + Sync;
 ///
 /// See: <https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/platform/text/character_property_data_generator.cc;l=449-495>
 ///
-/// ### Differences from other browsers
+/// # Differences from other browsers
 ///
-/// #### Compared to Safari
+/// ## Compared to Safari
 ///
 /// Chromium (and this table) differs from Safari in 9 cases:
 ///  - A "-" followed by one of "!|$|)|/|:|;|?|]|}" is suppressed in Chromium, but broken in Safari.
 ///
-/// #### Compared to Firefox
+/// ## Compared to Firefox
 ///
 /// Firefox always defers to the default ICU behavior.
 pub static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable = AsciiLineBreakTable::chromium();
