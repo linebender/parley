@@ -21,13 +21,24 @@ use alloc::boxed::Box;
 /// opportunities within "1/2".
 ///
 /// A separate use case is to match the line breaking behavior of existing systems
-/// such as web browsers. See [`AsciiLineBreakTable::CHROMIUM`] for a ready-made
+/// such as web browsers. See [`CHROMIUM_LINE_BREAK_TABLE`] for a ready-made
 /// table that mirrors Chromium's behavior.
 pub type LineBreakOverrideFn = dyn Fn(char, char) -> Option<bool> + Send + Sync;
 
 /// A static table mirroring Chromium's preferred line breaking behavior.
 ///
-/// See [`AsciiLineBreakTable::chromium`] for more details.
+/// See: <https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/platform/text/character_property_data_generator.cc;l=449-495>
+///
+/// ### Differences from other browsers
+///
+/// #### Compared to Safari
+///
+/// Chromium (and this table) differs from Safari in 9 cases:
+///  - A "-" followed by one of "!|$|)|/|:|;|?|]|}" is suppressed in Chromium, but broken in Safari.
+///
+/// #### Compared to Firefox
+///
+/// Firefox always defers to the default ICU behavior.
 pub static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable = AsciiLineBreakTable::chromium();
 
 /// A line break override table for ASCII character pairs.
@@ -110,7 +121,7 @@ impl AsciiLineBreakTable {
 
     /// Convert into a [`LineBreakOverrideFn`] closure.
     ///
-    /// Prefer to use [`as_override`] for static tables.
+    /// Prefer to use [`AsciiLineBreakTable::as_override`] for static tables.
     pub fn into_override(self) -> Box<LineBreakOverrideFn> {
         Box::new(move |before, after| self.lookup(before, after))
     }
@@ -123,20 +134,7 @@ impl AsciiLineBreakTable {
         Box::new(move |before, after| self.lookup(before, after))
     }
 
-    /// A table mirroring Chromium's preferred line breaking behavior.
-    ///
-    /// See: <https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/platform/text/character_property_data_generator.cc;l=449-495>
-    ///
-    /// ### Differences from other browsers
-    ///
-    /// #### Compared to Safari
-    ///
-    /// Chromium (and this table) differs from Safari in 9 cases:
-    ///  - A "-" followed by one of "!|$|)|/|:|;|?|]|}" is suppressed in Chromium, but broken in Safari.
-    ///
-    /// #### Compared to Firefox
-    ///
-    /// Firefox always defers to the default ICU behavior.
+    /// See [`CHROMIUM_LINE_BREAK_TABLE`] for more details.
     const fn chromium() -> Self {
         // The printable ASCII range `'!'..=0x7F`.
         const ALL_LO: char = '!';
