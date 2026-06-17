@@ -27,10 +27,6 @@ use core::ops::RangeInclusive;
 /// override function that mirrors Chromium's behavior.
 pub type LineBreakOverrideFn = dyn Fn(char, char, char) -> Option<bool> + Send + Sync;
 
-/// A static table mirroring Chromium's preferred line breaking behavior for `before` / `after`
-/// printable ASCII code points.
-static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable = AsciiLineBreakTable::chromium();
-
 /// A line break override function mirroring Chromium's preferred line breaking behavior.
 ///
 /// See: <https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/platform/text/character_property_data_generator.cc;l=449-495>
@@ -61,6 +57,10 @@ fn chromium_override(before_before: char, before: char, after: char) -> Option<b
     }
     CHROMIUM_LINE_BREAK_TABLE.lookup(before, after)
 }
+
+/// A static table mirroring Chromium's preferred line breaking behavior for `before` / `after`
+/// printable ASCII code points.
+static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable = AsciiLineBreakTable::chromium();
 
 /// A line break override table for ASCII character pairs.
 ///
