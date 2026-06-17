@@ -45,8 +45,8 @@ pub static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable = AsciiLineBreakTable:
 ///
 /// See [`LineBreakOverrideFn`] for more details.
 ///
-/// The whole table is built at compile time so [`CHROMIUM_LINE_BREAK_TABLE`],
-/// for example, has no runtime cost.
+/// All table operations are `const`, which means that [`CHROMIUM_LINE_BREAK_TABLE`]
+/// needs no explicit construction step.
 ///
 /// # Example
 ///
