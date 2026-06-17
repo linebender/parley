@@ -9,7 +9,6 @@ use super::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
 
 use super::layout::Layout;
 
-use alloc::boxed::Box;
 use alloc::string::String;
 use core::ops::{Bound, Range, RangeBounds};
 
@@ -25,10 +24,10 @@ pub struct RangedBuilder<'a, B: Brush> {
     pub(crate) quantize: bool,
     pub(crate) lcx: &'a mut LayoutContext<B>,
     pub(crate) fcx: &'a mut FontContext,
-    pub(crate) line_break_override: Option<Box<LineBreakOverrideFn>>,
+    pub(crate) line_break_override: Option<&'a LineBreakOverrideFn>,
 }
 
-impl<B: Brush> RangedBuilder<'_, B> {
+impl<'b, B: Brush> RangedBuilder<'b, B> {
     pub fn push_default<'a>(&mut self, property: impl Into<StyleProperty<'a, B>>) {
         let resolved = self
             .lcx
@@ -56,7 +55,7 @@ impl<B: Brush> RangedBuilder<'_, B> {
     /// Set the callback which will be called as a first provider of line breaking decisions.
     ///
     /// See [`LineBreakOverrideFn`] for more details.
-    pub fn set_line_break_override(&mut self, overrides: Option<Box<LineBreakOverrideFn>>) {
+    pub fn set_line_break_override(&mut self, overrides: Option<&'b LineBreakOverrideFn>) {
         self.line_break_override = overrides;
     }
 
@@ -74,7 +73,7 @@ impl<B: Brush> RangedBuilder<'_, B> {
             text.as_ref(),
             self.lcx,
             self.fcx,
-            self.line_break_override.as_deref(),
+            self.line_break_override,
         );
     }
 
@@ -95,10 +94,10 @@ pub struct StyleRunBuilder<'a, B: Brush> {
     pub(crate) lcx: &'a mut LayoutContext<B>,
     pub(crate) fcx: &'a mut FontContext,
     pub(crate) cursor: usize,
-    pub(crate) line_break_override: Option<Box<LineBreakOverrideFn>>,
+    pub(crate) line_break_override: Option<&'a LineBreakOverrideFn>,
 }
 
-impl<B: Brush> StyleRunBuilder<'_, B> {
+impl<'b, B: Brush> StyleRunBuilder<'b, B> {
     /// Reserves additional capacity for styles and runs.
     ///
     /// This is an optional optimization for callers that know counts
@@ -157,7 +156,7 @@ impl<B: Brush> StyleRunBuilder<'_, B> {
     /// Set the callback which will be called as a first provider of line breaking decisions.
     ///
     /// See [`LineBreakOverrideFn`] for more details.
-    pub fn set_line_break_override(&mut self, overrides: Option<Box<LineBreakOverrideFn>>) {
+    pub fn set_line_break_override(&mut self, overrides: Option<&'b LineBreakOverrideFn>) {
         self.line_break_override = overrides;
     }
 
@@ -173,7 +172,7 @@ impl<B: Brush> StyleRunBuilder<'_, B> {
             text.as_ref(),
             self.lcx,
             self.fcx,
-            self.line_break_override.as_deref(),
+            self.line_break_override,
         );
     }
 
@@ -191,10 +190,10 @@ pub struct TreeBuilder<'a, B: Brush> {
     pub(crate) quantize: bool,
     pub(crate) lcx: &'a mut LayoutContext<B>,
     pub(crate) fcx: &'a mut FontContext,
-    pub(crate) line_break_override: Option<Box<LineBreakOverrideFn>>,
+    pub(crate) line_break_override: Option<&'a LineBreakOverrideFn>,
 }
 
-impl<B: Brush> TreeBuilder<'_, B> {
+impl<'b, B: Brush> TreeBuilder<'b, B> {
     pub fn push_style_span(&mut self, style: TextStyle<'_, '_, B>) {
         let resolved = self
             .lcx
@@ -248,7 +247,7 @@ impl<B: Brush> TreeBuilder<'_, B> {
     /// Set the callback which will be called as a first provider of line breaking decisions.
     ///
     /// See [`LineBreakOverrideFn`] for more details.
-    pub fn set_line_break_override(&mut self, overrides: Option<Box<LineBreakOverrideFn>>) {
+    pub fn set_line_break_override(&mut self, overrides: Option<&'b LineBreakOverrideFn>) {
         self.line_break_override = overrides;
     }
 
@@ -268,7 +267,7 @@ impl<B: Brush> TreeBuilder<'_, B> {
             &text,
             self.lcx,
             self.fcx,
-            self.line_break_override.as_deref(),
+            self.line_break_override,
         );
 
         text

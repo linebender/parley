@@ -3,7 +3,6 @@
 
 //! Overrides for line-break opportunities.
 
-use alloc::boxed::Box;
 use core::ops::RangeInclusive;
 
 /// Line break opportunity override.
@@ -28,6 +27,9 @@ pub type LineBreakOverrideFn = dyn Fn(char, char) -> Option<bool> + Send + Sync;
 
 /// A static table mirroring Chromium's preferred line breaking behavior.
 ///
+/// Consider using [`CHROMIUM_LINE_BREAK_OVERRIDE`] when passing to builder
+/// methods that accept borrowed overrides.
+///
 /// See: <https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/platform/text/character_property_data_generator.cc;l=449-495>
 ///
 /// # Differences from other browsers
@@ -42,6 +44,14 @@ pub type LineBreakOverrideFn = dyn Fn(char, char) -> Option<bool> + Send + Sync;
 /// Firefox always defers to the default ICU behavior.
 pub static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable = AsciiLineBreakTable::chromium();
 
+/// A borrowable [`LineBreakOverrideFn`] for [`CHROMIUM_LINE_BREAK_TABLE`].
+pub static CHROMIUM_LINE_BREAK_OVERRIDE: &LineBreakOverrideFn =
+    &(chromium_override as fn(char, char) -> Option<bool>);
+
+fn chromium_override(before: char, after: char) -> Option<bool> {
+    CHROMIUM_LINE_BREAK_TABLE.lookup(before, after)
+}
+
 /// A line break override table for ASCII character pairs.
 ///
 /// See [`LineBreakOverrideFn`] for more details.
@@ -52,13 +62,13 @@ pub static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable = AsciiLineBreakTable:
 /// # Example
 ///
 /// ```
-/// # use parley::{AsciiLineBreakTable, CHROMIUM_LINE_BREAK_TABLE, FontContext, LayoutContext};
+/// # use parley::{CHROMIUM_LINE_BREAK_OVERRIDE, FontContext, LayoutContext};
 /// # let mut font_cx = FontContext::default();
 /// # let mut layout_cx: LayoutContext<[u8; 4]> = LayoutContext::new();
 /// let text = "Hello there!";
 /// let mut builder = layout_cx.ranged_builder(&mut font_cx, text, 1.0, true);
 /// // Emulate Chromium:
-/// builder.set_line_break_override(Some(CHROMIUM_LINE_BREAK_TABLE.as_override()));
+/// builder.set_line_break_override(Some(CHROMIUM_LINE_BREAK_OVERRIDE));
 /// let layout = builder.build(text);
 /// # let _ = layout;
 /// ```
@@ -122,21 +132,6 @@ impl AsciiLineBreakTable {
             return None;
         }
         Some(self.allow[b as usize] & (1_u128 << a) != 0)
-    }
-
-    /// Convert into a [`LineBreakOverrideFn`] closure.
-    ///
-    /// Prefer to use [`AsciiLineBreakTable::as_override`] for static tables.
-    pub fn into_override(self) -> Box<LineBreakOverrideFn> {
-        Box::new(move |before, after| self.lookup(before, after))
-    }
-
-    /// Convert into a [`LineBreakOverrideFn`] closure.
-    ///
-    /// Prefer to use this for static tables, like [`CHROMIUM_LINE_BREAK_TABLE`] to avoid the ~4 kB
-    /// allocation overhead for each boxing.
-    pub fn as_override(&'static self) -> Box<LineBreakOverrideFn> {
-        Box::new(move |before, after| self.lookup(before, after))
     }
 
     /// See [`CHROMIUM_LINE_BREAK_TABLE`] for more details.
