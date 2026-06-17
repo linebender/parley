@@ -4,6 +4,7 @@
 //! Overrides for line-break opportunities.
 
 use alloc::boxed::Box;
+use core::ops::RangeInclusive;
 
 /// Line break opportunity override.
 ///
@@ -80,30 +81,34 @@ impl AsciiLineBreakTable {
 
     /// Override every pair in the cartesian product of the two inclusive ASCII
     /// ranges.
+    ///
+    /// # Panics
+    ///
+    /// All range bounds must be printable ASCII (`<= '\u{7f}'`).
     pub const fn with_pairs(
         mut self,
-        before_lo: char,
-        before_hi: char,
-        after_lo: char,
-        after_hi: char,
+        before: RangeInclusive<char>,
+        after: RangeInclusive<char>,
         allow_break: bool,
     ) -> Self {
-        let mut before = before_lo as u32;
-        while before <= before_hi as u32 {
-            let mut after = after_lo as u32;
-            while after <= after_hi as u32 {
-                if before < 128 && after < 128 {
-                    let bit = 1_u128 << after;
-                    self.overridden[before as usize] |= bit;
-                    if allow_break {
-                        self.allow[before as usize] |= bit;
-                    } else {
-                        self.allow[before as usize] &= !bit;
-                    }
+        assert!(
+            *before.end() as u32 <= 0x7f && *after.end() as u32 <= 0x7f,
+            "only printable ASCII is supported",
+        );
+        let mut before_pos = *before.start() as u32;
+        while before_pos <= *before.end() as u32 {
+            let mut after_pos = *after.start() as u32;
+            while after_pos <= *after.end() as u32 {
+                let bit = 1_u128 << after_pos;
+                self.overridden[before_pos as usize] |= bit;
+                if allow_break {
+                    self.allow[before_pos as usize] |= bit;
+                } else {
+                    self.allow[before_pos as usize] &= !bit;
                 }
-                after += 1;
+                after_pos += 1;
             }
-            before += 1;
+            before_pos += 1;
         }
         self
     }
@@ -137,44 +142,43 @@ impl AsciiLineBreakTable {
     /// See [`CHROMIUM_LINE_BREAK_TABLE`] for more details.
     const fn chromium() -> Self {
         // The printable ASCII range `'!'..=0x7F`.
-        const ALL_LO: char = '!';
-        const ALL_HI: char = '\u{7f}';
+        const ALL: RangeInclusive<char> = '!'..='\u{7f}';
 
         Self::new()
-            .with_pairs(ALL_LO, ALL_HI, ALL_LO, ALL_HI, false)
-            .with_pairs(ALL_LO, ALL_HI, '(', '(', true)
-            .with_pairs(ALL_LO, ALL_HI, '<', '<', true)
-            .with_pairs(ALL_LO, ALL_HI, '[', '[', true)
-            .with_pairs(ALL_LO, ALL_HI, '{', '{', true)
-            .with_pairs('-', '-', ALL_LO, ALL_HI, true)
-            .with_pairs('?', '?', ALL_LO, ALL_HI, true)
-            .with_pairs('-', '-', '$', '$', false)
-            .with_pairs(ALL_LO, ALL_HI, '!', '!', false)
-            .with_pairs('?', '?', '"', '"', false)
-            .with_pairs('?', '?', '\'', '\'', false)
-            .with_pairs(ALL_LO, ALL_HI, ')', ')', false)
-            .with_pairs(ALL_LO, ALL_HI, ',', ',', false)
-            .with_pairs(ALL_LO, ALL_HI, '.', '.', false)
-            .with_pairs(ALL_LO, ALL_HI, '/', '/', false)
-            .with_pairs('-', '-', '0', '9', false)
-            .with_pairs(ALL_LO, ALL_HI, ':', ':', false)
-            .with_pairs(ALL_LO, ALL_HI, ';', ';', false)
-            .with_pairs(ALL_LO, ALL_HI, '?', '?', false)
-            .with_pairs(ALL_LO, ALL_HI, ']', ']', false)
-            .with_pairs(ALL_LO, ALL_HI, '}', '}', false)
-            .with_pairs('$', '$', ALL_LO, ALL_HI, false)
-            .with_pairs('\'', '\'', ALL_LO, ALL_HI, false)
-            .with_pairs('(', '(', ALL_LO, ALL_HI, false)
-            .with_pairs('/', '/', ALL_LO, ALL_HI, false)
-            .with_pairs('0', '9', ALL_LO, ALL_HI, false)
-            .with_pairs('<', '<', ALL_LO, ALL_HI, false)
-            .with_pairs('@', '@', ALL_LO, ALL_HI, false)
-            .with_pairs('A', 'Z', ALL_LO, ALL_HI, false)
-            .with_pairs('[', '[', ALL_LO, ALL_HI, false)
-            .with_pairs('^', '`', ALL_LO, ALL_HI, false)
-            .with_pairs('a', 'z', ALL_LO, ALL_HI, false)
-            .with_pairs('{', '{', ALL_LO, ALL_HI, false)
-            .with_pairs('\u{7f}', '\u{7f}', ALL_LO, ALL_HI, false)
+            .with_pairs(ALL, ALL, false)
+            .with_pairs(ALL, '('..='(', true)
+            .with_pairs(ALL, '<'..='<', true)
+            .with_pairs(ALL, '['..='[', true)
+            .with_pairs(ALL, '{'..='{', true)
+            .with_pairs('-'..='-', ALL, true)
+            .with_pairs('?'..='?', ALL, true)
+            .with_pairs('-'..='-', '$'..='$', false)
+            .with_pairs(ALL, '!'..='!', false)
+            .with_pairs('?'..='?', '"'..='"', false)
+            .with_pairs('?'..='?', '\''..='\'', false)
+            .with_pairs(ALL, ')'..=')', false)
+            .with_pairs(ALL, ','..=',', false)
+            .with_pairs(ALL, '.'..='.', false)
+            .with_pairs(ALL, '/'..='/', false)
+            .with_pairs('-'..='-', '0'..='9', false)
+            .with_pairs(ALL, ':'..=':', false)
+            .with_pairs(ALL, ';'..=';', false)
+            .with_pairs(ALL, '?'..='?', false)
+            .with_pairs(ALL, ']'..=']', false)
+            .with_pairs(ALL, '}'..='}', false)
+            .with_pairs('$'..='$', ALL, false)
+            .with_pairs('\''..='\'', ALL, false)
+            .with_pairs('('..='(', ALL, false)
+            .with_pairs('/'..='/', ALL, false)
+            .with_pairs('0'..='9', ALL, false)
+            .with_pairs('<'..='<', ALL, false)
+            .with_pairs('@'..='@', ALL, false)
+            .with_pairs('A'..='Z', ALL, false)
+            .with_pairs('['..='[', ALL, false)
+            .with_pairs('^'..='`', ALL, false)
+            .with_pairs('a'..='z', ALL, false)
+            .with_pairs('{'..='{', ALL, false)
+            .with_pairs('\u{7f}'..='\u{7f}', ALL, false)
     }
 }
 
