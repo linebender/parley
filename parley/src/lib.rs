@@ -133,7 +133,8 @@ pub use linebender_resource_handle::FontData;
 pub use util::BoundingBox;
 
 pub use break_overrides::{
-    AsciiLineBreakTable, AsciiLineBreakTableBuilder, CHROMIUM_LINE_BREAK_TABLE, LineBreakOverrideFn,
+    AsciiLineBreakTable, AsciiLineBreakTableBuilder, CHROMIUM_LINE_BREAK_OVERRIDE,
+    CHROMIUM_LINE_BREAK_TABLE, LineBreakOverrideFn,
 };
 pub use builder::{RangedBuilder, StyleRunBuilder, TreeBuilder};
 pub use context::LayoutContext;

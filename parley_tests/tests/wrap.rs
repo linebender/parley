@@ -6,7 +6,7 @@
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
 use parley::{
-    Alignment, AlignmentOptions, BreakReason, CHROMIUM_LINE_BREAK_TABLE, OverflowWrap,
+    Alignment, AlignmentOptions, BreakReason, CHROMIUM_LINE_BREAK_OVERRIDE, OverflowWrap,
     StyleProperty, TextWrapMode, WordBreak,
 };
 use peniko::color::palette::css;
@@ -443,7 +443,7 @@ fn wrap_url_override_no_break_after_slash() {
     let wrap_width = 150.0;
 
     let mut builder = env.ranged_builder(text);
-    builder.set_line_break_override(Some(CHROMIUM_LINE_BREAK_TABLE.as_override()));
+    builder.set_line_break_override(Some(&CHROMIUM_LINE_BREAK_OVERRIDE));
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(wrap_width));
     layout.align(Alignment::Start, AlignmentOptions::default());
