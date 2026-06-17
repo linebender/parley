@@ -25,6 +25,7 @@ edition = "2021"
 version = "0.10.0"
 # Keep in sync with RUST_MIN_VER in .github/workflows/ci.yml, with the relevant README.md files
 # and with the MSRV in the `Unreleased` section of CHANGELOG.md.
+# Until MSRV is bumped to 1.96+, use `core::ops::Range*` rather than `core::range::Range*`.
 rust-version = "1.88"
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/linebender/parley"
