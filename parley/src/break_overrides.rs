@@ -66,8 +66,8 @@ fn chromium_override(before_before: char, before: char, after: char) -> Option<b
 ///
 /// See [`LineBreakOverrideFn`] for more details.
 ///
-/// All table operations are `const`, which means that [`CHROMIUM_LINE_BREAK_TABLE`]
-/// needs no explicit construction step.
+/// All table operations are `const`, which means that derived tables don't
+/// need a runtime construction step.
 ///
 /// # Example
 ///
