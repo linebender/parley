@@ -164,7 +164,7 @@ fn verify_analysis_with_override(
 fn test_line_break_override_none_matches_default() {
     let text = "ab/cd ef";
     let default = verify_analysis(text, |_| {}).boundary_list();
-    let overridden = verify_analysis_with_override(text, &|_, _| None).boundary_list();
+    let overridden = verify_analysis_with_override(text, &|_, _, _| None).boundary_list();
     assert_eq!(default, overridden);
 }
 
@@ -174,7 +174,7 @@ fn test_line_break_override_suppresses_break_after_slash() {
     let default = verify_analysis(text, |_| {}).boundary_list();
     assert!(default.contains(&Boundary::Line),);
 
-    let overridden = verify_analysis_with_override(text, &|before, _after| {
+    let overridden = verify_analysis_with_override(text, &|_before_before, before, _after| {
         if before == '/' { Some(false) } else { None }
     })
     .boundary_list();
@@ -184,7 +184,7 @@ fn test_line_break_override_suppresses_break_after_slash() {
 
 #[test]
 fn test_line_break_override_does_not_suppress_mandatory_break() {
-    let overridden = verify_analysis_with_override("a\nb", &|_, _| Some(false)).boundary_list();
+    let overridden = verify_analysis_with_override("a\nb", &|_, _, _| Some(false)).boundary_list();
 
     assert_eq!(
         overridden,
@@ -194,7 +194,7 @@ fn test_line_break_override_does_not_suppress_mandatory_break() {
 
 #[test]
 fn test_line_break_override_mandatory_break_takes_precedence() {
-    let overridden = verify_analysis_with_override("a\nb", &|_, _| Some(true)).boundary_list();
+    let overridden = verify_analysis_with_override("a\nb", &|_, _, _| Some(true)).boundary_list();
 
     assert_eq!(
         overridden,
