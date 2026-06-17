@@ -40,7 +40,7 @@ pub static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable = AsciiLineBreakTable:
 /// # Example
 ///
 /// ```
-/// # use parley::{AsciiLineBreakTable, FontContext, LayoutContext};
+/// # use parley::{AsciiLineBreakTable, CHROMIUM_LINE_BREAK_TABLE, FontContext, LayoutContext};
 /// # let mut font_cx = FontContext::default();
 /// # let mut layout_cx: LayoutContext<[u8; 4]> = LayoutContext::new();
 /// let text = "Hello there!";
