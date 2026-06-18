@@ -31,6 +31,7 @@ use crate::analyzer::Analysis;
 use crate::common::{NormalizedCoord, RunMetrics, RunOrientation};
 use crate::convert::script_to_harfrust;
 use crate::shaped_text::{ClusterData, Glyph, RunData, RunKind, ShapedText};
+use crate::util::reuse_vec;
 
 use cache::{ShapeDataKey, ShapeInstanceId, ShapeInstanceKey, ShapePlanId, ShapePlanKey};
 use lru_cache::LruCache;
@@ -57,18 +58,18 @@ pub struct ShapeContext {
     shape_data_cache: LruCache<ShapeDataKey, ShaperData>,
     shape_instance_cache: LruCache<ShapeInstanceId, ShaperInstance>,
     shape_plan_cache: LruCache<ShapePlanId, ShapePlan>,
-    /// Reused across shaping calls (taken out and put back so the allocation is retained).
-    unicode_buffer: Option<UnicodeBuffer>,
-    features: Vec<harfrust::Feature>,
-    char_cluster: select::CharCluster,
-    /// Per-run scratch for the `(range, font)` font runs from font selection, taken
-    /// out and put back so the allocation is retained across runs.
-    font_runs: Vec<(Range<usize>, QueryFont)>,
-    // Per-font-run scratch, filled by `shape_font_run`, retained for reuse.
-    char_offsets: Vec<(usize, char)>,
     clusters: Vec<ClusterData>,
     glyphs: Vec<Glyph>,
     coords: Vec<NormalizedCoord>,
+
+    /// Scratch buffers reused across shaping calls.
+    unicode_buffer: Option<UnicodeBuffer>,
+    features: Vec<harfrust::Feature>,
+    char_cluster: select::CharCluster,
+    font_runs: Vec<(Range<usize>, QueryFont)>,
+    font_candidates: Vec<QueryFont>,
+    charmaps: Vec<Option<Charmap<'static>>>,
+    char_offsets: Vec<(usize, char)>,
 }
 
 impl Default for ShapeContext {
@@ -77,14 +78,17 @@ impl Default for ShapeContext {
             shape_data_cache: LruCache::new(SHAPE_CACHE_SIZE),
             shape_instance_cache: LruCache::new(SHAPE_CACHE_SIZE),
             shape_plan_cache: LruCache::new(SHAPE_CACHE_SIZE),
+            clusters: Vec::new(),
+            glyphs: Vec::new(),
+            coords: Vec::new(),
+
             unicode_buffer: Some(UnicodeBuffer::new()),
             features: Vec::new(),
             char_cluster: select::CharCluster::default(),
             font_runs: Vec::new(),
+            font_candidates: Vec::new(),
+            charmaps: Vec::new(),
             char_offsets: Vec::new(),
-            clusters: Vec::new(),
-            glyphs: Vec::new(),
-            coords: Vec::new(),
         }
     }
 }
@@ -331,14 +335,13 @@ impl ShapeContext {
         // TODO: This probably needs revisiting such that we don't need to load the fonts
         // beforehand, and ideally the cached `Charmap`s also survive over a single call to
         // `select_font_runs`.
-        let mut candidates: Vec<QueryFont> = Vec::new();
+        self.font_candidates.clear();
         query.matches_with(|font| {
-            candidates.push(font.clone());
+            self.font_candidates.push(font.clone());
             QueryStatus::Continue
         });
-        let mut charmaps: Vec<Option<Charmap<'_>>> = core::iter::repeat_with(|| None)
-            .take(candidates.len())
-            .collect();
+        let mut charmaps: Vec<Option<Charmap<'_>>> = reuse_vec(core::mem::take(&mut self.charmaps));
+        charmaps.extend(core::iter::repeat_with(|| None).take(self.font_candidates.len()));
 
         let mut char_cursor = 0;
         let mut boundaries = GraphemeClusterSegmenter::new().segment_str(run_text);
@@ -351,12 +354,12 @@ impl ShapeContext {
             self.char_cluster
                 .fill(grapheme, &mut char_cursor, run_char_infos);
             if let Some(index) = select::select_font(
-                &candidates,
+                &self.font_candidates,
                 &mut charmaps,
                 &mut self.char_cluster,
                 &analysis_data_sources,
             ) {
-                let font = &candidates[index];
+                let font = &self.font_candidates[index];
                 match &current_font {
                     // No font yet: this is the first; it absorbs any leading
                     // graphemes that found no font at all.
@@ -374,6 +377,8 @@ impl ShapeContext {
             // A grapheme with no font is absorbed into the current font run.
             grapheme_start = grapheme_end;
         }
+        self.charmaps = reuse_vec(charmaps);
+
         if let Some(font) = current_font {
             font_runs.push((font_run_start..run_text.len(), font));
         }
