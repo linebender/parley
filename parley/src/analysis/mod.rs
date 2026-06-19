@@ -6,7 +6,7 @@ pub(crate) mod cluster;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use crate::break_overrides::LineBreakOverrideFn;
+use crate::break_overrides::{LineBreakContext, LineBreakOverrideFn};
 use crate::resolve::StyleRun;
 use crate::{Brush, LayoutContext, WordBreak};
 
@@ -448,8 +448,12 @@ pub(crate) fn analyze_text<B: Brush>(
 
         // This leaves word boundaries intact. Consumers can only impact line boundaries.
         if let (Some(prev), Some(lb_override)) = (prev_char, line_break_override) {
-            let before_before = prev_prev_char.unwrap_or('\0');
-            if let Some(forced) = lb_override(before_before, prev, ch) {
+            let forced = lb_override(LineBreakContext {
+                before_before: prev_prev_char,
+                before: prev,
+                after: ch,
+            });
+            if let Some(forced) = forced {
                 is_line = forced;
             }
         }
