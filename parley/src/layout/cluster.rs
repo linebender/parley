@@ -1,10 +1,10 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::layout::Glyph;
 use crate::layout::Style;
 use crate::layout::data::BreakReason;
 use crate::layout::data::ClusterData;
-use crate::layout::glyph::Glyph;
 use crate::layout::layout::Layout;
 use crate::layout::line::{Line, LineItem};
 use crate::layout::run::Run;
@@ -208,7 +208,6 @@ impl<'a, B: Brush> Cluster<'a, B> {
         if self.data.glyph_len == 0xFF {
             GlyphIter::Single(Some(Glyph {
                 id: self.data.glyph_offset,
-                style_index: self.data.style_index,
                 x: 0.,
                 y: 0.,
                 advance: self.data.advance,

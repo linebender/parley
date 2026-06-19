@@ -473,7 +473,6 @@ impl<B: Brush> LayoutData<B> {
                     let offset = (self.glyphs.len() - glyph_start) as u32;
                     self.glyphs.push(Glyph {
                         id: glyph.id,
-                        style_index,
                         x: glyph.x,
                         y: glyph.y,
                         advance: glyph.advance,
@@ -485,7 +484,6 @@ impl<B: Brush> LayoutData<B> {
                 for glyph in glyphs {
                     self.glyphs.push(Glyph {
                         id: glyph.id,
-                        style_index,
                         x: glyph.x,
                         y: glyph.y,
                         advance: glyph.advance,

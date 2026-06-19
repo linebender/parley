@@ -1,10 +1,10 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::layout::Glyph;
 use crate::layout::Style;
 use crate::layout::data::BreakReason;
 use crate::layout::data::{LayoutItemKind, LineData};
-use crate::layout::glyph::Glyph;
 use crate::layout::layout::Layout;
 use crate::layout::run::Run;
 use crate::style::Brush;
@@ -281,14 +281,16 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                 LineItem::Run(run) => {
                     let mut iter = run
                         .visual_clusters()
-                        .flat_map(|c| c.glyphs())
+                        .flat_map(|c| {
+                            let style_index = c.data.style_index as usize;
+                            c.glyphs().map(move |glyph| (glyph, style_index))
+                        })
                         .skip(self.glyph_start);
 
-                    if let Some(first) = iter.next() {
+                    if let Some((first, style_index)) = iter.next() {
                         let mut advance = first.advance;
-                        let style_index = first.style_index();
                         let mut glyph_count = 1;
-                        for glyph in iter.take_while(|g| g.style_index() == style_index) {
+                        for (glyph, _) in iter.take_while(|&(_, index)| index == style_index) {
                             glyph_count += 1;
                             advance += glyph.advance;
                         }

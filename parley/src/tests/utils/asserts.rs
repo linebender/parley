@@ -28,9 +28,6 @@ fn canonicalize_layout_data<B: Brush>(layout_data: &LayoutData<B>) -> LayoutData
     for cluster in &mut normalized.clusters {
         cluster.style_index = remap[cluster.style_index as usize];
     }
-    for glyph in &mut normalized.glyphs {
-        glyph.style_index = remap[glyph.style_index as usize];
-    }
     normalized.styles = canonical_styles;
     normalized
 }
