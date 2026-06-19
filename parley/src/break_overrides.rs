@@ -77,7 +77,8 @@ fn chromium_override(cx: LineBreakContext) -> Option<bool> {
 
 /// A static table mirroring Chromium's preferred line breaking behavior for `before` / `after`
 /// printable ASCII code points.
-static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable = AsciiLineBreakTable::chromium();
+static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable<5> =
+    AsciiLineBreakTableBuilder::chromium().build::<5>();
 
 /// A line break override table for ASCII character pairs.
 ///
@@ -85,6 +86,9 @@ static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable = AsciiLineBreakTable::chr
 ///
 /// All table operations are `const`, which means that derived tables don't
 /// need a runtime construction step.
+///
+/// The table is row-deduplicated. Each `before` character maps to
+/// one of `N` distinct rows, so tables can be kept tiny.
 ///
 /// # Example
 ///
@@ -100,15 +104,53 @@ static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable = AsciiLineBreakTable::chr
 /// # let _ = layout;
 /// ```
 #[derive(Clone)]
-pub struct AsciiLineBreakTable {
+pub struct AsciiLineBreakTable<const N: usize> {
+    /// Maps each `before` character (`0..128`) to a row in `rows`.
+    row_of: [u8; 128],
+    /// The distinct rows.
+    rows: [Row; N],
+}
+
+impl<const N: usize> AsciiLineBreakTable<N> {
+    /// Look up the break override for a `(before, after)` pair.
+    ///
+    /// Return semantics copied from [`LineBreakOverrideFn`].
+    pub const fn lookup(&self, before: char, after: char) -> Option<bool> {
+        let (b, a) = (before as u32, after as u32);
+        if b >= 128 || a >= 128 {
+            return None;
+        }
+        let row = &self.rows[self.row_of[b as usize] as usize];
+        if row.overridden & (1_u128 << a) == 0 {
+            return None;
+        }
+        Some(row.allow & (1_u128 << a) != 0)
+    }
+}
+
+/// A single deduplicated row of a [`AsciiLineBreakTable`].
+#[derive(Clone, Copy)]
+struct Row {
+    /// Bits set means the pair has an override.
+    overridden: u128,
+    /// Bits set means a break is allowed.
+    allow: u128,
+}
+
+/// A builder for an [`AsciiLineBreakTable`].
+///
+/// Construction is `const`. We create a dense `128 x 128` grid of overrides,
+/// then compress it into a row-deduplicated table via [`AsciiLineBreakTableBuilder::build`].
+#[derive(Clone)]
+pub struct AsciiLineBreakTableBuilder {
     /// Bit `after` set in row `before` means the pair has an explicit override.
     overridden: [u128; 128],
     /// Bit `after` set in row `before` means a break is allowed for that pair.
     allow: [u128; 128],
 }
 
-impl AsciiLineBreakTable {
-    /// A table that defers every pair to the default ICU behavior.
+impl AsciiLineBreakTableBuilder {
+    /// A builder that defers every pair to the default ICU behavior.
     pub const fn new() -> Self {
         Self {
             overridden: [0; 128],
@@ -150,15 +192,57 @@ impl AsciiLineBreakTable {
         self
     }
 
-    /// Look up the override for a `(before, after)` pair.
+    /// Compress the dense grid into a row-deduplicated [`AsciiLineBreakTable`]
+    /// with at most `N` distinct rows.
     ///
-    /// Return semantics copied from [`LineBreakOverrideFn`].
-    pub const fn lookup(&self, before: char, after: char) -> Option<bool> {
-        let (b, a) = (before as u32, after as u32);
-        if b >= 128 || a >= 128 || self.overridden[b as usize] & (1_u128 << a) == 0 {
-            return None;
+    /// # Panics
+    ///
+    /// Panics if `N` does not exactly match the number of distinct rows required.
+    pub const fn build<const N: usize>(&self) -> AsciiLineBreakTable<N> {
+        // Row 0 is reserved as the "defer everything" row.
+        let mut rows = [Row {
+            overridden: 0,
+            allow: 0,
+        }; N];
+        let mut len = 1_usize;
+        let mut row_of = [0_u8; 128];
+
+        let mut b = 0;
+        while b < 128 {
+            let (ov, al) = (self.overridden[b], self.allow[b]);
+            let mut idx = 0;
+            let mut found = usize::MAX;
+            while idx < len {
+                if rows[idx].overridden == ov && rows[idx].allow == al {
+                    found = idx;
+                    break;
+                }
+                idx += 1;
+            }
+            let r = if found != usize::MAX {
+                found
+            } else {
+                assert!(
+                    len < N,
+                    "N is too small to contain table. Repeat with a larger N."
+                );
+                rows[len] = Row {
+                    overridden: ov,
+                    allow: al,
+                };
+                len += 1;
+                len - 1
+            };
+            row_of[b] = r as u8;
+            b += 1;
         }
-        Some(self.allow[b as usize] & (1_u128 << a) != 0)
+
+        assert!(
+            len == N,
+            "N is larger than required. Repeat with a smaller N."
+        );
+
+        AsciiLineBreakTable { row_of, rows }
     }
 
     /// See [`CHROMIUM_LINE_BREAK_TABLE`] for more details.
@@ -204,7 +288,7 @@ impl AsciiLineBreakTable {
     }
 }
 
-impl Default for AsciiLineBreakTable {
+impl Default for AsciiLineBreakTableBuilder {
     fn default() -> Self {
         Self::new()
     }
@@ -212,7 +296,7 @@ impl Default for AsciiLineBreakTable {
 
 #[cfg(test)]
 mod tests {
-    use super::AsciiLineBreakTable;
+    use super::AsciiLineBreakTableBuilder;
     use super::CHROMIUM_LINE_BREAK_TABLE;
     use super::LineBreakContext;
     use super::chromium_override;
@@ -288,8 +372,29 @@ mod tests {
 
     #[test]
     fn empty_table_defers_to_icu() {
-        let t = AsciiLineBreakTable::new();
+        let t = AsciiLineBreakTableBuilder::new().build::<1>();
         assert_eq!(t.lookup('a', '/'), None);
         assert_eq!(t.lookup('a', '('), None);
+    }
+
+    #[test]
+    fn dedup_matches_dense_for_chromium() {
+        let builder = AsciiLineBreakTableBuilder::chromium();
+        for b in 0..128_u32 {
+            for a in 0..128_u32 {
+                let bit = 1_u128 << a;
+                let dense = if builder.overridden[b as usize] & bit == 0 {
+                    None
+                } else {
+                    Some(builder.allow[b as usize] & bit != 0)
+                };
+                let (before, after) = (char::from_u32(b).unwrap(), char::from_u32(a).unwrap());
+                assert_eq!(
+                    CHROMIUM_LINE_BREAK_TABLE.lookup(before, after),
+                    dense,
+                    "mismatch at (before={b:#04x}, after={a:#04x})",
+                );
+            }
+        }
     }
 }
