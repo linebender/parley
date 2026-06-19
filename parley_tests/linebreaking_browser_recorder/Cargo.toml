@@ -33,13 +33,5 @@ features = [
     "console",
 ]
 
-# wasm-bindgen generates `unsafe` glue code, which the workspace lint set denies,
-# so this crate cannot simply inherit `[lints] workspace = true`.
-[lints.rust]
-unsafe_code = "allow"
-missing_docs = "warn"
-unreachable_pub = "warn"
-
-[lints.clippy]
-todo = "warn"
-semicolon_if_nothing_returned = "warn"
+[lints]
+workspace = true

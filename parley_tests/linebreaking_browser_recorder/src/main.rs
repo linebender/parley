@@ -113,6 +113,10 @@ async fn run() -> Result<(), JsValue> {
 fn collect(case: &Case, measurer: &HtmlElement, document: &Document) -> Record {
     let text = &case.text;
     // We floor here arbitrarily; we just need some mapping from the initial width to the subpixel width.
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "Reasonable initial width values and floor means this will never truncate.."
+    )]
     let initial_width_subpixels = (f64::from(case.initial_width) * SUBPIXELS_PER_PX).floor() as i64;
 
     measurer
@@ -121,9 +125,12 @@ fn collect(case: &Case, measurer: &HtmlElement, document: &Document) -> Record {
         .unwrap();
 
     measurer.set_text_content(Some(text));
-    // To access individual character positions, we use the `Range` API, which operates directly on the `Text` node.
     let text_node = measurer.first_child().unwrap();
-    assert_eq!(text_node.node_type(), Node::TEXT_NODE);
+    assert_eq!(
+        text_node.node_type(),
+        Node::TEXT_NODE,
+        "Measurer child node must be a text node for the Range API to work as we expect."
+    );
     let range = document.create_range().unwrap();
     assert!(
         text.is_ascii(),
@@ -136,7 +143,10 @@ fn collect(case: &Case, measurer: &HtmlElement, document: &Document) -> Record {
     // The index of the first break opportunity in the line.
     let first_break = first_line_break(measurer, &range, &text_node, len, PROBE_SUBPIXELS);
 
-    debug_assert!(first_break <= break_at);
+    debug_assert!(
+        first_break <= break_at,
+        "Making text narrower can't move break to later in the text."
+    );
     let tightened_width_subpixels = if first_break == break_at {
         0
     } else {
