@@ -1,8 +1,6 @@
 [package]
 name = "parley_linebreaking_cases"
-description = "Deterministic, seed-driven line-breaking test cases shared between the browser data-collection harness and the native Parley comparison test"
-keywords = ["text", "layout"]
-categories = ["gui", "graphics"]
+description = "Seeded random line-breaking test cases"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

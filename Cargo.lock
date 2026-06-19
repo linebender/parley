@@ -2110,18 +2110,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4a5ff6bcca6c4867b1c4fd4ef63e4db7436ef363e0ad7531d1558856bae64f4"
 
 [[package]]
-name = "linebreaking_browser"
-version = "0.1.0"
-dependencies = [
- "console_error_panic_hook",
- "js-sys",
- "parley_linebreaking_cases",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
 name = "linux-raw-sys"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2962,6 +2950,18 @@ version = "0.1.0"
 dependencies = [
  "parley",
  "peniko",
+]
+
+[[package]]
+name = "parley_linebreaking_browser_recorder"
+version = "0.0.0"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "parley_linebreaking_cases",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

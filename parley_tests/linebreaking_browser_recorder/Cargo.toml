@@ -1,6 +1,5 @@
 [package]
-name = "linebreaking_browser"
-version = "0.1.0"
+name = "parley_linebreaking_browser_recorder"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true

@@ -225,7 +225,7 @@ fn chromium_quantized_font_size(font_size: f32) -> f32 {
 fn load_expectations(font_family: &str) -> Vec<Expected> {
     const HEADER: &str = "seed,width_subpixels,first_line_chars";
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("linebreaking_browser/data")
+        .join("linebreaking_browser_recorder/data")
         .join(format!("{font_family}.csv"));
     let raw = std::fs::read_to_string(&path)
         .unwrap_or_else(|err| panic!("failed to read {}: {err}", path.display()));

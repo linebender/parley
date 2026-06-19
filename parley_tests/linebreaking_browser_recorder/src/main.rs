@@ -13,12 +13,19 @@
 //! ```sh
 //! rustup target add wasm32-unknown-unknown
 //! cargo install --locked trunk
-//! trunk serve --open   # run from this crate's directory
+//! # If needed:
+//! cd parley_tests/linebreaking_browser_recorder
+//! trunk serve
 //! ```
+//!
+//! Trunk runs the driver in the working directory, so must be run in this
+//! package's directory.
+//! You can then open the application in Chrome (or another Chromium based browser)
+//! to get the current data.
 //!
 //! The data is persisted manually, by copying it into the relevant files, using the relevant
 //! `Copy <font> Data` buttons. These should go into the appropriately named files in
-//! `parley_tests/linebreaking_browser/data`
+//! `parley_tests/linebreaking_browser_recorder/data`
 
 use js_sys::Uint8Array;
 use parley_linebreaking_cases::{Case, FONTS, PROBE_SUBPIXELS, SUBPIXELS_PER_PX};
