@@ -77,7 +77,7 @@ fn chromium_override(cx: LineBreakContext) -> Option<bool> {
 
 /// A static table mirroring Chromium's preferred line breaking behavior for `before` / `after`
 /// printable ASCII code points.
-pub static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable<5> =
+static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable<5> =
     AsciiLineBreakTableBuilder::chromium().build::<5>();
 
 /// A line break override table for ASCII character pairs.
