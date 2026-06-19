@@ -170,8 +170,10 @@ impl ClusterData {
 #[derive(Clone, Debug, Default)]
 pub struct ShapedText {
     runs: Vec<RunData>,
-    clusters: Vec<ClusterData>,
-    glyphs: Vec<Glyph>,
+    /// Cluster and glyph arrays for all runs. The shaper writes new runs straight onto their ends
+    /// (see [`Self::finish_run`]), so they are `pub(crate)` for the `shape` module to append into.
+    pub(crate) clusters: Vec<ClusterData>,
+    pub(crate) glyphs: Vec<Glyph>,
     coords: Vec<NormalizedCoord>,
     /// Per-run OpenType features; each run indexes a contiguous slice via
     /// [`RunData::features_range`].
@@ -420,16 +422,18 @@ impl ShapedText {
         }
     }
 
-    /// Append a run.
+    /// Finalizes a run.
     ///
-    /// This extends the coord, feature, glyph and cluster arrays with the run's data and fills in
-    /// the run's `coords_range`, `features_range`, `glyph_start` and `cluster_range` accordingly.
-    /// The [`ClusterData::glyph_offset`] are relative to the start of `glyphs`.
-    pub(crate) fn append_run(
+    /// The clusters and glyphs must already have been appended onto [`Self::clusters`] and
+    /// [`Self::glyphs`] (starting at `cluster_start`/`glyph_start`).
+    ///
+    /// This appends `coords` and `features`, and fills in the run's `coords_range`,
+    /// `features_range`, `glyph_start` and `cluster_range` accordingly.
+    pub(crate) fn finish_run(
         &mut self,
         mut run: RunData,
-        clusters: &[ClusterData],
-        glyphs: &[Glyph],
+        cluster_start: usize,
+        glyph_start: usize,
         coords: &[NormalizedCoord],
         features: &[FontFeature],
     ) {
@@ -439,10 +443,7 @@ impl ShapedText {
         let features_start = self.features.len();
         self.features.extend_from_slice(features);
         run.features_range = features_start..self.features.len();
-        run.glyph_start = self.glyphs.len();
-        let cluster_start = self.clusters.len();
-        self.glyphs.extend_from_slice(glyphs);
-        self.clusters.extend_from_slice(clusters);
+        run.glyph_start = glyph_start;
         run.cluster_range = cluster_start..self.clusters.len();
         self.runs.push(run);
     }

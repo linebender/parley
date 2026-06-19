@@ -58,7 +58,6 @@ pub struct ShapeContext {
     shape_data_cache: LruCache<ShapeDataKey, ShaperData>,
     shape_instance_cache: LruCache<ShapeInstanceId, ShaperInstance>,
     shape_plan_cache: LruCache<ShapePlanId, ShapePlan>,
-    clusters: Vec<ClusterData>,
     glyphs: Vec<Glyph>,
     coords: Vec<NormalizedCoord>,
 
@@ -70,6 +69,8 @@ pub struct ShapeContext {
     font_candidates: Vec<QueryFont>,
     charmaps: Vec<Option<Charmap<'static>>>,
     char_offsets: Vec<(usize, char)>,
+    /// Scratch used only by the reshaping path.
+    clusters: Vec<ClusterData>,
 }
 
 impl Default for ShapeContext {
@@ -152,6 +153,8 @@ impl ShapeContext {
                 &run_char_infos[char_cursor..char_cursor + font_run_char_count];
             char_cursor += font_run_char_count;
 
+            let cluster_start = out.clusters.len();
+            let glyph_start = out.glyphs.len();
             let Some((advance, metrics)) = self.shape_font_run(
                 &font.blob,
                 font.index,
@@ -162,10 +165,12 @@ impl ShapeContext {
                 &params,
                 font_run_text,
                 font_run_char_infos,
+                &mut out.clusters,
+                &mut out.glyphs,
             ) else {
                 continue;
             };
-            if self.clusters.is_empty() {
+            if out.clusters.len() == cluster_start {
                 continue;
             }
 
@@ -192,10 +197,10 @@ impl ShapeContext {
                 kind: RunKind::Text,
                 inline_box_id: 0,
             };
-            out.append_run(
+            out.finish_run(
                 run,
-                &self.clusters,
-                &self.glyphs,
+                cluster_start,
+                glyph_start,
                 &self.coords,
                 input.features,
             );
@@ -253,6 +258,11 @@ impl ShapeContext {
             letter_spacing: run.letter_spacing(),
             word_spacing: run.word_spacing(),
         };
+        // Temporarily take the scratch buffers out of `self` so they don't alias `&mut self`.
+        let mut clusters = core::mem::take(&mut self.clusters);
+        let mut glyphs = core::mem::take(&mut self.glyphs);
+        clusters.clear();
+        glyphs.clear();
         let result = self.shape_font_run(
             &font.data,
             font.index,
@@ -260,11 +270,14 @@ impl ShapeContext {
             &params,
             fragment_text,
             fragment_char_infos,
+            &mut clusters,
+            &mut glyphs,
         );
-        if result.is_none() {
-            return;
+        if result.is_some() {
+            shaped.splice_fragment(&target, &clusters, &glyphs);
         }
-        shaped.splice_fragment(&target, &self.clusters, &self.glyphs);
+        self.clusters = clusters;
+        self.glyphs = glyphs;
     }
 
     /// Commits a line break at byte offset `pos`, reshaping the bounded region on each side so
@@ -386,8 +399,8 @@ impl ShapeContext {
 
     /// Shapes `font_run_text` with one font.
     ///
-    /// Fills [`Self::clusters`], [`Self::glyphs`] and [`Self::coords`], returning the font run
-    /// advance and run metrics. Returns `None` if the font cannot be read.
+    /// Appends to `out_clusters` and `out_glyphs`, and fills [`Self::coords`], returning the font
+    /// run advance and run metrics. Returns `None` if the font cannot be read.
     fn shape_font_run(
         &mut self,
         blob: &Blob<u8>,
@@ -396,6 +409,8 @@ impl ShapeContext {
         params: &FontRunParams<'_>,
         font_run_text: &str,
         font_run_char_infos: &[CharInfo],
+        out_clusters: &mut Vec<ClusterData>,
+        out_glyphs: &mut Vec<Glyph>,
     ) -> Option<(f32, RunMetrics)> {
         let font_ref = harfrust::FontRef::from_index(blob.as_ref(), index).ok()?;
         let blob_id = blob.id();
@@ -533,8 +548,8 @@ impl ShapeContext {
 
         self.char_offsets.clear();
         self.char_offsets.extend(font_run_text.char_indices());
-        self.clusters.clear();
-        self.glyphs.clear();
+        let cluster_start = out_clusters.len();
+        let glyph_start = out_glyphs.len();
         let mut advance = build::build_clusters(
             &glyph_buffer,
             direction == Direction::RightToLeft,
@@ -542,12 +557,12 @@ impl ShapeContext {
             scale,
             &self.char_offsets,
             font_run_char_infos,
-            &mut self.clusters,
-            &mut self.glyphs,
+            out_clusters,
+            out_glyphs,
         );
         advance += build::apply_spacing(
-            &mut self.clusters,
-            &mut self.glyphs,
+            &mut out_clusters[cluster_start..],
+            &mut out_glyphs[glyph_start..],
             params.letter_spacing,
             params.word_spacing,
         );
