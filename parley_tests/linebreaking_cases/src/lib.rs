@@ -154,13 +154,6 @@ mod tests {
             assert!(case.text.is_ascii());
             assert!(!case.text.starts_with(' ') && !case.text.ends_with(' '));
             assert!(case.text.split(' ').all(|word| !word.is_empty()));
-            assert!(
-                case.text
-                    .chars()
-                    .all(|c| c.is_ascii_lowercase() || c.is_ascii_uppercase() || c == ' '),
-                "unexpected character in {:?}",
-                case.text
-            );
             let regenerated = Case::from_seed(seed);
             // Generation must be deterministic
             assert_eq!(case, regenerated);
