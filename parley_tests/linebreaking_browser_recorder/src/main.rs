@@ -355,5 +355,5 @@ async fn yield_now() {
             .expect("Failed to call set_timeout");
     };
     let p = js_sys::Promise::new(&mut cb);
-    wasm_bindgen_futures::JsFuture::from(p).await.unwrap();
+    JsFuture::from(p).await.unwrap();
 }
