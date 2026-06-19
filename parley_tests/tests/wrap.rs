@@ -5,7 +5,10 @@
 
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
-use parley::{Alignment, AlignmentOptions, OverflowWrap, StyleProperty, TextWrapMode, WordBreak};
+use parley::{
+    Alignment, AlignmentOptions, BreakReason, CHROMIUM_LINE_BREAK_OVERRIDE, OverflowWrap,
+    StyleProperty, TextWrapMode, WordBreak,
+};
 use peniko::color::palette::css;
 
 fn test_wrap(
@@ -402,4 +405,58 @@ fn text_wrap_mode_updates_min_content_width() {
         widths_nowrap.min,
         span_width
     );
+}
+
+#[test]
+fn wrap_url_breaks_after_slash() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "https://www.example.com/path/to/resource";
+
+    let mut layout = env.ranged_builder(text).build(text);
+    layout.break_all_lines(Some(150.0));
+    layout.align(Alignment::Start, AlignmentOptions::default());
+
+    assert!(layout.len() > 1);
+
+    let last_line_index = layout.len() - 1;
+    for (i, line) in layout.lines().enumerate() {
+        if i == last_line_index {
+            break;
+        }
+
+        assert_eq!(line.break_reason(), BreakReason::Regular,);
+
+        let line_text = &text[line.text_range()];
+        assert!(line_text.ends_with('/'),);
+    }
+
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn wrap_url_override_no_break_after_slash() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "https://www.example.com/path/to/resource";
+
+    let wrap_width = 150.0;
+
+    let mut builder = env.ranged_builder(text);
+    builder.set_line_break_override(Some(&CHROMIUM_LINE_BREAK_OVERRIDE));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(wrap_width));
+    layout.align(Alignment::Start, AlignmentOptions::default());
+
+    assert_eq!(layout.len(), 1);
+
+    let line_advance = layout
+        .lines()
+        .next()
+        .expect("layout should have one line")
+        .metrics()
+        .advance;
+    assert!(line_advance > wrap_width);
+
+    env.check_layout_snapshot(&layout);
 }

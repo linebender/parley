@@ -110,6 +110,7 @@ pub use fontique;
 
 mod analysis;
 mod bidi;
+mod break_overrides;
 mod builder;
 mod context;
 mod convert;
@@ -131,6 +132,9 @@ mod tests;
 pub use linebender_resource_handle::FontData;
 pub use util::BoundingBox;
 
+pub use break_overrides::{
+    AsciiLineBreakTable, CHROMIUM_LINE_BREAK_OVERRIDE, LineBreakContext, LineBreakOverrideFn,
+};
 pub use builder::{RangedBuilder, StyleRunBuilder, TreeBuilder};
 pub use context::LayoutContext;
 pub use font::FontContext;
