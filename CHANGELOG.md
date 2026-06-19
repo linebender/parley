@@ -12,6 +12,12 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 This release has an [MSRV] of 1.88.
 
+### Added
+
+#### Parley
+
+- `From` conversions into `StyleProperty` for `FontWidth`, `FontStyle`, `FontWeight`, `WordBreak`, `OverflowWrap`, and `TextWrapMode`, matching the existing conversions for font family, variations, features, and line height. (#643 by [@waywardmonkeys][])
+
 ## [0.10.0] - 2026-06-01
 
 This release has an [MSRV] of 1.88.
@@ -652,6 +658,7 @@ This release has an [MSRV][] of 1.70.
 [#621]: https://github.com/linebender/parley/pull/621
 [#626]: https://github.com/linebender/parley/pull/626
 [#632]: https://github.com/linebender/parley/pull/632
+[#643]: https://github.com/linebender/parley/pull/643
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.10.0...HEAD
 [0.10.0]: https://github.com/linebender/parley/compare/v0.9.0...v0.10.0

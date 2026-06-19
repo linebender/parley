@@ -241,3 +241,39 @@ impl<B: Brush> From<LineHeight> for StyleProperty<'_, B> {
         StyleProperty::LineHeight(value)
     }
 }
+
+impl<B: Brush> From<FontWidth> for StyleProperty<'_, B> {
+    fn from(value: FontWidth) -> Self {
+        StyleProperty::FontWidth(value)
+    }
+}
+
+impl<B: Brush> From<FontStyle> for StyleProperty<'_, B> {
+    fn from(value: FontStyle) -> Self {
+        StyleProperty::FontStyle(value)
+    }
+}
+
+impl<B: Brush> From<FontWeight> for StyleProperty<'_, B> {
+    fn from(value: FontWeight) -> Self {
+        StyleProperty::FontWeight(value)
+    }
+}
+
+impl<B: Brush> From<WordBreak> for StyleProperty<'_, B> {
+    fn from(value: WordBreak) -> Self {
+        StyleProperty::WordBreak(value)
+    }
+}
+
+impl<B: Brush> From<OverflowWrap> for StyleProperty<'_, B> {
+    fn from(value: OverflowWrap) -> Self {
+        StyleProperty::OverflowWrap(value)
+    }
+}
+
+impl<B: Brush> From<TextWrapMode> for StyleProperty<'_, B> {
+    fn from(value: TextWrapMode) -> Self {
+        StyleProperty::TextWrapMode(value)
+    }
+}
