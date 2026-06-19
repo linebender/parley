@@ -18,7 +18,7 @@
 use rand::{RngExt, SeedableRng, seq::IndexedRandom};
 use rand_chacha::ChaCha8Rng;
 
-// --- Shared, non-case types between runners --
+// --- Shared, non-case types between runners ---
 
 /// A font the harness collects data for.
 #[derive(Clone, Copy, Debug)]
@@ -59,7 +59,7 @@ pub const SUBPIXELS_PER_PX: f64 = 64.0;
 /// We haven't reasoned about whether starting from zero would work here.
 pub const PROBE_SUBPIXELS: i64 = 64; // 1px
 
-// --- Case generation --
+// --- Case generation ---
 
 const MIN_FONT_SIZE: f32 = 10.0;
 const MAX_FONT_SIZE: f32 = 30.0;
@@ -98,7 +98,9 @@ pub struct Case {
     pub initial_width: f32,
 }
 
-const VALID_LETTERS: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+// The subset of letters which can be in each word. We probably will want a more advanced generation
+// algorithm at some point, especially to handle punctuation's soft-wrap ability.
+const VALID_CHARS: &[u8] = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 impl Case {
     /// Generate the [`Case`] for a given seed.
@@ -127,7 +129,7 @@ impl Case {
             }
             let word_len = rng.random_range(MIN_WORD_LEN..=MAX_WORD_LEN);
             for _ in 0..word_len {
-                let letter = *VALID_LETTERS.choose(&mut rng).unwrap();
+                let letter = *VALID_CHARS.choose(&mut rng).unwrap();
                 text.push(char::from(letter));
             }
         }
