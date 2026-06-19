@@ -3,7 +3,7 @@
 
 //! Parley benchmarks.
 
-use tango_bench::{tango_benchmarks, tango_main};
+use tango_bench::tango_benchmarks;
 
 use parley_bench::benches::{defaults, glyph_cache, styled};
 use parley_bench::fontique_benches::system_fonts_init;
@@ -23,4 +23,3 @@ tango_benchmarks!(
     draw_with_underline_warm_cache(),
     system_fonts_init()
 );
-tango_main!();
