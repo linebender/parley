@@ -47,7 +47,7 @@ impl Analysis {
     /// A `U+FFFC` OBJECT REPLACEMENT CHARACTER also breaks the run on both sides and forms a
     /// one-character [`ItemKind::InlineBox`] item. Every other item is [`ItemKind::Text`].
     ///
-    /// This breask runs on the same conditions as [`Self::items`] plus wherever `split_before`
+    /// This breaks runs on the same conditions as [`Self::items`] plus wherever `split_before`
     /// returns `true`. Use it to split on conditions like style changes that affect shaping.
     ///
     /// `text` must match what was passed to [`Analyzer::analyze`](crate::Analyzer::analyze).
