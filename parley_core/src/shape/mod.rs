@@ -515,7 +515,6 @@ impl ShapeContext {
                 )
             },
         );
-        let shaper = data.shaper(&font_ref).instance(Some(instance)).build();
         let glyph_buffer = shaper.shape(
             buffer,
             ShapeOptions::new()
