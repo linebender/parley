@@ -1,3 +1,6 @@
+// Copyright 2026 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! In-browser data-collection harness for Parley/Chrome line-breaking parity.
 //!
 //! For each test case (see [`parley_linebreaking_cases`]), we find where the browser first breaks,
@@ -14,7 +17,7 @@
 //! ```
 //!
 //! The data is persisted manually, by copying it into the relevant files, using the relevant
-//! 'Copy <Font> Data' buttons. These should go into the appropriately named files in
+//! `Copy <font> Data` buttons. These should go into the appropriately named files in
 //! `parley_tests/linebreaking_browser/data`
 
 use js_sys::Uint8Array;
@@ -38,7 +41,7 @@ struct Record {
     ///
     /// A value of `0` is a sentinel meaning the first line had no interior break
     /// opportunity. In that case, we just validate that Parley chooses to break
-    /// at the same character. See [`PROBE_WIDTH`] for more details.
+    /// at the same character. See [`PROBE_SUBPIXELS`] for more details.
     tightened_width_subpixels: i64,
     /// Characters on the first line. We use this to confirm
     /// that the same place in the line was used by Parley to break.
@@ -299,8 +302,7 @@ fn chrome_version(window: &Window) -> String {
     }
 }
 
-/// Create a "Copy <family> Data" button under `results` that writes `csv` to the
-/// clipboard when clicked.
+/// Ceeate the button which copies the data for a given font to the clipboard.
 fn setup_copy_button(
     document: &Document,
     results: &Element,
@@ -326,8 +328,8 @@ fn setup_copy_button(
     Ok(())
 }
 
-/// Yield to other tasks in the browser. In particular, this allows painting to happen.
-/// Adapted from https://github.com/wasm-bindgen/wasm-bindgen/discussions/3476#discussion-5283084
+/// Yield to other tasks in the browser. In particular, this allows painting/redrawing to happen, so that progress is visible.
+/// Adapted from <https://github.com/wasm-bindgen/wasm-bindgen/discussions/3476#discussion-5283084>
 async fn yield_now() {
     let mut cb = |resolve: js_sys::Function, _reject: js_sys::Function| {
         web_sys::window()

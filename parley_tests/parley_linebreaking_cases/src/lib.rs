@@ -1,3 +1,6 @@
+// Copyright 2026 the Parley Authors
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 //! Seeded random generation of line-breaking test cases.
 //!
 //! We use these to ensure that our Line breaking decision exactly matches Chromium (or can be
