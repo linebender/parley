@@ -3,12 +3,24 @@
 
 //! Overrides for line-break opportunities.
 
-use alloc::boxed::Box;
 use core::ops::RangeInclusive;
+
+/// Context for a potential line break opportunity between two adjacent code points.
+#[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
+pub struct LineBreakContext {
+    /// The code point before the `before` code point, if any.
+    pub before_before: Option<char>,
+    /// The code point before the potential break.
+    pub before: char,
+    /// The code point after the potential break.
+    pub after: char,
+}
 
 /// Line break opportunity override.
 ///
-/// Called for each adjacent pair of Unicode code points.
+/// Called for each adjacent pair of Unicode code points in the text, in order,
+/// with a [`LineBreakContext`] describing the potential break.
 ///
 /// Returning:
 ///    - `Some(true)`  : forces a line break opportunity between the pair
@@ -22,14 +34,11 @@ use core::ops::RangeInclusive;
 /// opportunities within "1/2".
 ///
 /// A separate use case is to match the line breaking behavior of existing systems
-/// such as web browsers. See [`CHROMIUM_LINE_BREAK_TABLE`] for a ready-made
-/// table that mirrors Chromium's behavior.
-pub type LineBreakOverrideFn = dyn Fn(char, char) -> Option<bool> + Send + Sync;
+/// such as web browsers. See [`CHROMIUM_LINE_BREAK_OVERRIDE`] for a ready-made
+/// override function that mirrors Chromium's behavior.
+pub type LineBreakOverrideFn = dyn Fn(LineBreakContext) -> Option<bool> + Send + Sync;
 
-/// A static table mirroring Chromium's preferred line breaking behavior.
-///
-/// Consider using [`CHROMIUM_LINE_BREAK_OVERRIDE`] when passing to builder
-/// methods that accept borrowed overrides.
+/// A line break override function mirroring Chromium's preferred line breaking behavior.
 ///
 /// See: <https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/platform/text/character_property_data_generator.cc;l=449-495>
 ///
@@ -43,23 +52,40 @@ pub type LineBreakOverrideFn = dyn Fn(char, char) -> Option<bool> + Send + Sync;
 /// ## Compared to Firefox
 ///
 /// Firefox always defers to the default ICU behavior.
-pub static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable<5> =
-    AsciiLineBreakTableBuilder::chromium().build::<5>();
-
-/// A borrowable [`LineBreakOverrideFn`] for [`CHROMIUM_LINE_BREAK_TABLE`].
 pub static CHROMIUM_LINE_BREAK_OVERRIDE: &LineBreakOverrideFn =
-    &(chromium_override as fn(char, char) -> Option<bool>);
+    &(chromium_override as fn(LineBreakContext) -> Option<bool>);
 
-fn chromium_override(before: char, after: char) -> Option<bool> {
+fn chromium_override(cx: LineBreakContext) -> Option<bool> {
+    let LineBreakContext {
+        before_before,
+        before,
+        after,
+        ..
+    } = cx;
+    // Before consulting 'before' / 'after' pair table, check for the special "-" case.
+    //
+    // Chromium doesn't allow breaking when it looks like the minus sign is for a negative
+    // number like "Subtract -5 from X". But, Chromium does allow breaking when the minus
+    // sign is part of a long URL like "AAAA-2222".
+    //
+    // See <https://github.com/chromium/chromium/blob/c6bee15e8f336c8feabf539d8bbb540c134ec20a/third_party/blink/renderer/platform/text/text_break_iterator.cc#L224-L240>
+    if before == '-' && after.is_ascii_digit() {
+        return Some(before_before.is_some_and(|c| c.is_ascii_alphanumeric()));
+    }
     CHROMIUM_LINE_BREAK_TABLE.lookup(before, after)
 }
+
+/// A static table mirroring Chromium's preferred line breaking behavior for `before` / `after`
+/// printable ASCII code points.
+pub static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable<5> =
+    AsciiLineBreakTableBuilder::chromium().build::<5>();
 
 /// A line break override table for ASCII character pairs.
 ///
 /// See [`LineBreakOverrideFn`] for more details.
 ///
-/// All table operations are `const`, which means that [`CHROMIUM_LINE_BREAK_TABLE`]
-/// needs no explicit construction step.
+/// All table operations are `const`, which means that derived tables don't
+/// need a runtime construction step.
 ///
 /// The table is row-deduplicated. Each `before` character maps to
 /// one of `N` distinct rows, so tables can be kept tiny.
@@ -99,21 +125,6 @@ impl<const N: usize> AsciiLineBreakTable<N> {
             return None;
         }
         Some(row.allow & (1_u128 << a) != 0)
-    }
-
-    /// Convert into a [`LineBreakOverrideFn`] closure.
-    ///
-    /// Prefer to use [`AsciiLineBreakTable::as_override`] for static tables.
-    pub fn into_override(self) -> Box<LineBreakOverrideFn> {
-        Box::new(move |before, after| self.lookup(before, after))
-    }
-
-    /// Convert into a [`LineBreakOverrideFn`] closure.
-    ///
-    /// Prefer to use this for static tables, like [`CHROMIUM_LINE_BREAK_TABLE`] to avoid the ~4 kB
-    /// allocation overhead for each boxing.
-    pub fn as_override(&'static self) -> Box<LineBreakOverrideFn> {
-        Box::new(move |before, after| self.lookup(before, after))
     }
 }
 
@@ -287,6 +298,39 @@ impl Default for AsciiLineBreakTableBuilder {
 mod tests {
     use super::AsciiLineBreakTableBuilder;
     use super::CHROMIUM_LINE_BREAK_TABLE;
+    use super::LineBreakContext;
+    use super::chromium_override;
+
+    fn cx(before_before: Option<char>, before: char, after: char) -> LineBreakContext {
+        LineBreakContext {
+            before_before,
+            before,
+            after,
+        }
+    }
+
+    #[test]
+    fn chromium_hyphen_digit_depends_on_preceding_char() {
+        // A break between '-' and a digit is allowed only when the character
+        // preceding the '-' is ASCII alphanumeric.
+        assert_eq!(chromium_override(cx(Some('D'), '-', '1')), Some(true));
+        assert_eq!(chromium_override(cx(Some('4'), '-', '5')), Some(true));
+        // Otherwise the '-' may be a minus sign, so the break is suppressed.
+        assert_eq!(chromium_override(cx(Some(' '), '-', '1')), Some(false));
+        assert_eq!(chromium_override(cx(Some('('), '-', '1')), Some(false));
+        // No preceding character (start of text) behaves like a non-alphanumeric
+        // context, matching Chromium's `last_last_ch == 0`.
+        assert_eq!(chromium_override(cx(None, '-', '1')), Some(false));
+    }
+
+    #[test]
+    fn chromium_hyphen_non_digit_defers_to_table() {
+        // '-' followed by a non-digit ignores `before_before` and uses the table.
+        assert_eq!(chromium_override(cx(Some('D'), '-', 'b')), Some(true));
+        assert_eq!(chromium_override(cx(None, '-', 'b')), Some(true));
+        // Non-ASCII after '-' defers to ICU.
+        assert_eq!(chromium_override(cx(Some('D'), '-', 'é')), None);
+    }
 
     #[test]
     fn chromium_suppresses_ascii_punctuation_breaks() {
