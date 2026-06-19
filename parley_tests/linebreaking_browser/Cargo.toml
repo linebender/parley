@@ -1,0 +1,46 @@
+[package]
+name = "linebreaking_browser"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+parley_linebreaking_cases = { workspace = true }
+wasm-bindgen = "0.2.100"
+wasm-bindgen-futures = "0.4.50"
+js-sys = "0.3.77"
+console_error_panic_hook = "0.1.7"
+
+[dependencies.web-sys]
+version = "0.3.77"
+features = [
+    "Window",
+    "Document",
+    "Element",
+    "HtmlElement",
+    "Node",
+    "Range",
+    "DomRect",
+    "CssStyleDeclaration",
+    "EventTarget",
+    "FontFace",
+    "FontFaceSet",
+    "Location",
+    "Navigator",
+    "Clipboard",
+    "console",
+]
+
+# wasm-bindgen generates `unsafe` glue code, which the workspace lint set denies,
+# so this crate cannot simply inherit `[lints] workspace = true`.
+[lints.rust]
+unsafe_code = "allow"
+missing_docs = "warn"
+unreachable_pub = "warn"
+
+[lints.clippy]
+todo = "warn"
+semicolon_if_nothing_returned = "warn"

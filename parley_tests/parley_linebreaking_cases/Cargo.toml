@@ -1,0 +1,17 @@
+[package]
+name = "parley_linebreaking_cases"
+description = "Deterministic, seed-driven line-breaking test cases shared between the browser data-collection harness and the native Parley comparison test"
+keywords = ["text", "layout"]
+categories = ["gui", "graphics"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+rand = { workspace = true }
+rand_chacha = { workspace = true }
+
+[lints]
+workspace = true
