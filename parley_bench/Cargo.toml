@@ -14,7 +14,7 @@ parley = { workspace = true, default-features = true }
 parley_dev = { workspace = true }
 glifo = { workspace = true, default-features = false, features = ["std", "vello_cpu", "png"] }
 skrifa = { workspace = true }
-tango-bench = "0.6"
+tango-bench = { git = "https://github.com/bazhenov/tango", rev = "1d69f0728b707597409be0cc199e7a0173a666dd" }
 vello_cpu = { workspace = true, default-features = false, features = ["std", "png", "text"] }
 
 
