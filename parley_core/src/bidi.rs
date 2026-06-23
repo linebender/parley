@@ -7,11 +7,11 @@ use alloc::vec::Vec;
 use icu_properties::props::{BidiClass, BidiMirroringGlyph, BidiPairedBracketType};
 
 /// Type alias for a bidirectional level.
-pub(crate) type BidiLevel = u8;
+pub type BidiLevel = u8;
 
 /// Resolver for the Unicode bidirectional algorithm.
 #[derive(Clone, Default)]
-pub(crate) struct BidiResolver {
+pub struct BidiResolver {
     base_level: BidiLevel,
     levels: Vec<BidiLevel>,
     initial_types: Vec<BidiClass>,
@@ -23,9 +23,18 @@ pub(crate) struct BidiResolver {
     flags: u16,
 }
 
+impl core::fmt::Debug for BidiResolver {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("BidiResolver")
+            .field("base_level", &self.base_level)
+            .field("levels", &self.levels)
+            .finish_non_exhaustive()
+    }
+}
+
 impl BidiResolver {
     /// Creates a new resolver.
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             base_level: 0,
             levels: Vec::new(),
@@ -40,18 +49,18 @@ impl BidiResolver {
     }
 
     /// Returns the base level of the text.
-    pub(crate) fn base_level(&self) -> u8 {
+    pub fn base_level(&self) -> u8 {
         self.base_level
     }
 
     /// Returns the sequence of bidi levels corresponding to all characters in the
     /// paragraph.
-    pub(crate) fn levels(&self) -> &[BidiLevel] {
+    pub fn levels(&self) -> &[BidiLevel] {
         &self.levels
     }
 
     /// Clears the resolver state.
-    pub(crate) fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.initial_types.clear();
         self.levels.clear();
         self.types.clear();
@@ -63,7 +72,7 @@ impl BidiResolver {
 
     /// Resolves a paragraph with the specified base direction and
     /// precomputed types.
-    pub(crate) fn resolve(
+    pub fn resolve(
         &mut self,
         chars: impl Iterator<Item = (char, (BidiClass, BidiMirroringGlyph))>,
         base_level: Option<u8>,
@@ -240,8 +249,7 @@ impl BidiResolver {
                 } else {
                     (stack.embedding_level() + 2) & !1
                 };
-                if new_level <= MAX_STACK as u8 && overflow_isolates == 0 && overflow_embedding == 0
-                {
+                if new_level <= MAX_STACK && overflow_isolates == 0 && overflow_embedding == 0 {
                     if is_isolate {
                         valid_isolates += 1;
                     }
@@ -387,7 +395,7 @@ impl BidiResolver {
         }
     }
 
-    #[allow(clippy::needless_range_loop)]
+    #[expect(clippy::needless_range_loop, reason = "Deferred")]
     fn resolve_sequence(&mut self, level: u8, sos: BidiClass, eos: BidiClass, len: usize) {
         if len == 0 {
             return;
@@ -718,7 +726,7 @@ where
 
 /// Returns whether the character needs bidirectional resolution.
 #[inline(always)]
-pub(crate) fn needs_bidi_resolution(bidi_class: BidiClass) -> bool {
+pub fn needs_bidi_resolution(bidi_class: BidiClass) -> bool {
     mask(bidi_class) & BIDI_MASK != 0
 }
 
@@ -805,12 +813,12 @@ impl Run {
     }
 }
 
-const MAX_STACK: usize = 125;
+const MAX_STACK: u8 = 125;
 
 struct Stack {
-    embedding_level: [u8; MAX_STACK + 1],
-    override_status: [BidiClass; MAX_STACK + 1],
-    isolate_status: [bool; MAX_STACK + 1],
+    embedding_level: [u8; MAX_STACK as usize + 1],
+    override_status: [BidiClass; MAX_STACK as usize + 1],
+    isolate_status: [bool; MAX_STACK as usize + 1],
     depth: usize,
 }
 
@@ -818,9 +826,9 @@ impl Stack {
     fn new() -> Self {
         Self {
             depth: 0,
-            embedding_level: [0; MAX_STACK + 1],
-            override_status: [BidiClass::OtherNeutral; MAX_STACK + 1],
-            isolate_status: [false; MAX_STACK + 1],
+            embedding_level: [0; MAX_STACK as usize + 1],
+            override_status: [BidiClass::OtherNeutral; MAX_STACK as usize + 1],
+            isolate_status: [false; MAX_STACK as usize + 1],
         }
     }
 

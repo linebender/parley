@@ -37,6 +37,7 @@ repository = "https://github.com/linebender/parley"
 parlance = { version = "0.1.0", default-features = false, path = "parlance" }
 fontique = { version = "0.11.0", default-features = false, path = "fontique" }
 parley = { version = "0.11.0", default-features = false, path = "parley" }
+parley_core = { version = "0.11.0", default-features = false, path = "parley_core" }
 parley_data = { version = "0.11.0", path = "parley_data", default-features = false }
 parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }

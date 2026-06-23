@@ -1,6 +1,6 @@
 [package]
 name = "parley_core"
-version = "0.0.0"
+version = "0.11.0"
 description = "Parley Core provides low level APIs for implementing text layout."
 keywords = ["text", "layout"]
 categories = ["gui", "graphics"]
@@ -9,14 +9,15 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
-publish = false
-
 [package.metadata.docs.rs]
 all-features = true
 
 [features]
 default = ["std"]
 std = []
+
+[dependencies]
+icu_properties = { workspace = true, features = ["compiled_data"] }
 
 [lints]
 workspace = true
