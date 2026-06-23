@@ -9,9 +9,9 @@ use crate::{FontData, IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, Te
 use core::ops::Range;
 
 use alloc::vec::Vec;
+use parley_core::{Boundary, CharInfo};
 
 use crate::analysis::cluster::Whitespace;
-use crate::analysis::{Boundary, CharInfo};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct ClusterData {

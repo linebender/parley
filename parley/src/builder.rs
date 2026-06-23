@@ -307,7 +307,7 @@ fn build_into_layout<B: Brush>(
     layout.data.clear();
     layout.data.scale = scale;
     layout.data.quantize = quantize;
-    layout.data.base_level = lcx.bidi.base_level();
+    layout.data.base_level = lcx.analysis.paragraph_level();
     layout.data.text_len = text.len();
 
     let mut char_index = 0;
@@ -336,7 +336,7 @@ fn build_into_layout<B: Brush>(
             &lcx.style_table,
             &lcx.inline_boxes,
             &lcx.info,
-            lcx.bidi.levels(),
+            lcx.analysis.bidi_levels(),
             &mut lcx.scx,
             text,
             layout,

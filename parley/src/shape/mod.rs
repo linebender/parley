@@ -8,12 +8,12 @@ use alloc::vec::Vec;
 use core::mem;
 use core::ops::RangeInclusive;
 use harfrust::ShapeOptions;
+use parley_core::{AnalysisDataSources, CharInfo};
 
 use super::layout::Layout;
 use super::resolve::{ResolveContext, Resolved, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
 use crate::analysis::cluster::{Char, CharCluster, Status};
-use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::convert::script_to_harfrust;
 use crate::inline_box::InlineBox;
 use crate::lru_cache::LruCache;

@@ -1,11 +1,11 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::analysis::Boundary;
 use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty, WordBreak};
 use alloc::{vec, vec::Vec};
 use fontique::FontWeight;
 use icu_properties::props::{GraphemeClusterBreak, Script};
+use parley_core::Boundary;
 
 #[derive(Default)]
 struct TestContext {
@@ -26,7 +26,7 @@ impl TestContext {
     }
 
     fn expect_bidi_embed_level_list(self, expected: Vec<u8>) -> Self {
-        let actual = self.layout_context.bidi.levels();
+        let actual = self.layout_context.analysis.bidi_levels();
         assert_eq!(actual, expected, "Bidi embed level list mismatch");
         self
     }
