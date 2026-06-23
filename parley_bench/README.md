@@ -12,8 +12,6 @@ Install [`cargo-export`](https://crates.io/crates/cargo-export) via:
 $ cargo install cargo-export
 ```
 
-NOTE: Windows users may require additional setup. See Tango docs for more information.
-
 ## Usage
 
 ```shell
