@@ -24,3 +24,4 @@ extern crate std;
 extern crate alloc;
 
 pub mod bidi;
+pub mod break_overrides;
