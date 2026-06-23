@@ -30,6 +30,7 @@ mod exclusions;
 mod floats;
 mod issues;
 mod line_break;
+mod linebreaking_matches_chrome;
 mod lines;
 mod out_of_flow_boxes;
 mod styles;

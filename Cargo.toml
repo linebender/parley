@@ -11,6 +11,8 @@ members = [
     "parley_data_gen",
     "parley_dev",
     "parley_tests",
+    "parley_tests/linebreaking_cases",
+    "parley_tests/linebreaking_browser_recorder",
     "examples/common",
     "examples/swash_render",
     "examples/tiny_skia_render",
@@ -50,7 +52,10 @@ parley = { version = "0.10.0", default-features = false, path = "parley" }
 parley_data = { version = "0.10.0", path = "parley_data", default-features = false }
 parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
+parley_linebreaking_cases = { path = "parley_tests/linebreaking_cases" }
 glifo = { git = "https://github.com/linebender/vello", rev = "5796226", default-features = false }
+rand = { version = "0.10.1", default-features = false, features = ["std", "std_rng"] }
+rand_chacha = { version = "0.10.0", default-features = false }
 peniko = { version = "0.6.0", default-features = false }
 read-fonts = { version = "0.39.0", default-features = false }
 skrifa = { version = "0.42.0", default-features = false }
