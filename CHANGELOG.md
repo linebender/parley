@@ -21,7 +21,7 @@ This release has an [MSRV] of 1.88.
 #### Parley
 
 - Line break opportunity override (#640 by [@taj-p][]).
-  The builders now have a `set_line_break_override` method which can be used to customise where the parley detects line-breaking opportunities. It can be called with `Some(parley::CHROMIUM_LINE_BREAK_OVERRIDE)` to make line-breaking match Chromium, or with a custom instance of `AsciiLineBreakTable` created with `AsciiLineBreakTableBuilder`. If you do not call the function then you will get the existing standard ICU-defined behavior.
+  The builders now have a `set_line_break_override` method which can be used to customise where Parley detects line-breaking opportunities. It can be called with `Some(parley::CHROMIUM_LINE_BREAK_OVERRIDE)` to make line-breaking match Chromium, or with a custom instance of `AsciiLineBreakTable` created with `AsciiLineBreakTableBuilder`. If you do not call the function then you will get the existing standard ICU-defined behavior.
 - `From` conversions into `StyleProperty` for `FontWidth`, `FontStyle`, `FontWeight`, `WordBreak`, `OverflowWrap`, and `TextWrapMode`, matching the existing conversions for font family, variations, features, and line height. (#643 by [@waywardmonkeys][])
 
 ### Changed
