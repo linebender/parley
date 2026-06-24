@@ -12,11 +12,29 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 This release has an [MSRV] of 1.88.
 
+## [0.11.0] - 2026-06-24
+
+This release has an [MSRV] of 1.88.
+
 ### Added
 
 #### Parley
 
+- Line break opportunity override (#640 by [@taj-p][]).
+  The builders now have a `set_line_break_override` method which can be used to customise where the parley detects line-breaking opportunities. It can be called with `Some(parley::CHROMIUM_LINE_BREAK_OVERRIDE)` to make line-breaking match Chromium, or with a custom instance of `AsciiLineBreakTable` created with `AsciiLineBreakTableBuilder`. If you do not call the function then you will get the existing standard ICU-defined behavior.
 - `From` conversions into `StyleProperty` for `FontWidth`, `FontStyle`, `FontWeight`, `WordBreak`, `OverflowWrap`, and `TextWrapMode`, matching the existing conversions for font family, variations, features, and line height. (#643 by [@waywardmonkeys][])
+
+### Changed
+
+#### Parley
+
+- Upgrade to `read-fonts` 0.40, `skrifa` 0.43, `harfrust` 0.10 (#650 by [@nicoburns][])
+
+### Fixed
+
+#### Parley
+
+- Fix font selection for emoji followed by a variation selector (#637 by [@kane50613][])
 
 ## [0.10.0] - 2026-06-01
 
@@ -500,6 +518,7 @@ This release has an [MSRV][] of 1.70.
 [@guiguiprim]: https://github.com/guiguiprim
 [@grebmeg]: https://github.com/grebmeg
 [@jordanhalase]: https://github.com/jordanhalase
+[@kane50613]: https://github.com/kane50613
 [@kekelp]: https://github.com/kekelp
 [@lainon1]: https://github.com/lainon1
 [@Linktime]: https://github.com/Linktime
@@ -658,9 +677,13 @@ This release has an [MSRV][] of 1.70.
 [#621]: https://github.com/linebender/parley/pull/621
 [#626]: https://github.com/linebender/parley/pull/626
 [#632]: https://github.com/linebender/parley/pull/632
+[#637]: https://github.com/linebender/parley/pull/637
+[#640]: https://github.com/linebender/parley/pull/640
 [#643]: https://github.com/linebender/parley/pull/643
+[#650]: https://github.com/linebender/parley/pull/650
 
-[Unreleased]: https://github.com/linebender/parley/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/linebender/parley/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/linebender/parley/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/linebender/parley/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/linebender/parley/compare/v0.7.0...v0.8.0
