@@ -377,6 +377,25 @@ mod tests {
     }
 
     #[test]
+    fn parse_generic_family_is_case_insensitive_when_unquoted() {
+        assert_eq!(
+            FontFamilyName::parse("SERIF"),
+            Some(FontFamilyName::Generic(GenericFamily::Serif))
+        );
+
+        let families: Result<alloc::vec::Vec<_>, _> =
+            FontFamilyName::parse_css_list(r#"Arial, SERIF, "serif""#).collect();
+        assert_eq!(
+            families.unwrap(),
+            alloc::vec![
+                FontFamilyName::Named(Cow::Borrowed("Arial")),
+                FontFamilyName::Generic(GenericFamily::Serif),
+                FontFamilyName::Named(Cow::Borrowed("serif")),
+            ]
+        );
+    }
+
+    #[test]
     fn parse_generic_family_is_named_when_quoted() {
         assert_eq!(
             FontFamilyName::parse("'monospace'"),

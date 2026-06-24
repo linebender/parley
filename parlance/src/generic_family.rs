@@ -59,25 +59,39 @@ impl GenericFamily {
     ///     GenericFamily::parse("sans-serif"),
     ///     Some(GenericFamily::SansSerif)
     /// );
+    /// assert_eq!(GenericFamily::parse("SERIF"), Some(GenericFamily::Serif));
     /// assert_eq!(GenericFamily::parse("Arial"), None);
     /// ```
     pub fn parse(s: &str) -> Option<Self> {
         let s = s.trim();
-        Some(match s {
-            "serif" => Self::Serif,
-            "sans-serif" => Self::SansSerif,
-            "monospace" => Self::Monospace,
-            "cursive" => Self::Cursive,
-            "fantasy" => Self::Fantasy,
-            "system-ui" => Self::SystemUi,
-            "ui-serif" => Self::UiSerif,
-            "ui-sans-serif" => Self::UiSansSerif,
-            "ui-monospace" => Self::UiMonospace,
-            "ui-rounded" => Self::UiRounded,
-            "emoji" => Self::Emoji,
-            "math" => Self::Math,
-            "fangsong" => Self::FangSong,
-            _ => return None,
+        Some(if s.eq_ignore_ascii_case("serif") {
+            Self::Serif
+        } else if s.eq_ignore_ascii_case("sans-serif") {
+            Self::SansSerif
+        } else if s.eq_ignore_ascii_case("monospace") {
+            Self::Monospace
+        } else if s.eq_ignore_ascii_case("cursive") {
+            Self::Cursive
+        } else if s.eq_ignore_ascii_case("fantasy") {
+            Self::Fantasy
+        } else if s.eq_ignore_ascii_case("system-ui") {
+            Self::SystemUi
+        } else if s.eq_ignore_ascii_case("ui-serif") {
+            Self::UiSerif
+        } else if s.eq_ignore_ascii_case("ui-sans-serif") {
+            Self::UiSansSerif
+        } else if s.eq_ignore_ascii_case("ui-monospace") {
+            Self::UiMonospace
+        } else if s.eq_ignore_ascii_case("ui-rounded") {
+            Self::UiRounded
+        } else if s.eq_ignore_ascii_case("emoji") {
+            Self::Emoji
+        } else if s.eq_ignore_ascii_case("math") {
+            Self::Math
+        } else if s.eq_ignore_ascii_case("fangsong") {
+            Self::FangSong
+        } else {
+            return None;
         })
     }
 
@@ -119,5 +133,41 @@ impl fmt::Display for GenericFamily {
             Self::FangSong => "fangsong",
         };
         f.write_str(name)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::GenericFamily;
+
+    #[test]
+    fn parse_is_ascii_case_insensitive() {
+        assert_eq!(GenericFamily::parse("SERIF"), Some(GenericFamily::Serif));
+        assert_eq!(
+            GenericFamily::parse("Sans-Serif"),
+            Some(GenericFamily::SansSerif)
+        );
+        assert_eq!(
+            GenericFamily::parse("MONOSPACE"),
+            Some(GenericFamily::Monospace)
+        );
+        assert_eq!(
+            GenericFamily::parse("UI-Rounded"),
+            Some(GenericFamily::UiRounded)
+        );
+        assert_eq!(
+            GenericFamily::parse("FangSong"),
+            Some(GenericFamily::FangSong)
+        );
+    }
+
+    #[test]
+    fn parse_preserves_lowercase_trim_and_named_behavior() {
+        assert_eq!(GenericFamily::parse("serif"), Some(GenericFamily::Serif));
+        assert_eq!(
+            GenericFamily::parse("  SERIF  "),
+            Some(GenericFamily::Serif)
+        );
+        assert_eq!(GenericFamily::parse("Arial"), None);
     }
 }
