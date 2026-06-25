@@ -13,7 +13,7 @@ use crate::analysis::cluster::Whitespace;
 use crate::data::ClusterData;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
-    LineMetrics, Run,
+    LineMetrics, Run, RunMetrics,
 };
 use crate::style::Brush;
 use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
@@ -290,24 +290,18 @@ impl Default for BreakerState {
 impl BreakerState {
     /// Add the cluster(s) currently being evaluated to the current line.
     ///
-    /// `ascent` and `descent` are the raw font ascent and descent of the cluster(s) (i.e. the
-    /// distances they extend above and below the baseline, *not* including leading). `line_height`
-    /// is the intrinsic line height of the cluster(s) (i.e. including the full leading), which may
-    /// be smaller than `ascent + descent` when the leading is negative.
-    pub fn append_cluster_to_line(
-        &mut self,
-        next_x: f32,
-        ascent: f32,
-        descent: f32,
-        line_height: f32,
-    ) {
+    /// `metrics` provides the raw font ascent and descent of the cluster(s) (i.e. the distances
+    /// they extend above and below the baseline, *not* including leading) as well as the intrinsic
+    /// line height of the cluster(s) (i.e. including the full leading), which may be smaller than
+    /// `ascent + descent` when the leading is negative.
+    pub fn append_cluster_to_line(&mut self, next_x: f32, metrics: &RunMetrics) {
         self.line.items.end = self.item_idx + 1;
         self.line.clusters.end = self.cluster_idx + 1;
         self.cluster_idx += 1;
         self.line.x = next_x;
-        self.line.text_ascent = self.line.text_ascent.max(ascent);
-        self.line.text_descent = self.line.text_descent.max(descent);
-        self.line.text_line_height = self.line.text_line_height.max(line_height);
+        self.line.text_ascent = self.line.text_ascent.max(metrics.ascent);
+        self.line.text_descent = self.line.text_descent.max(metrics.descent);
+        self.line.text_line_height = self.line.text_line_height.max(metrics.line_height);
         self.update_max_height_exceeded();
     }
 
@@ -697,8 +691,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let boundary = cluster.info().boundary();
                         let metrics = run.metrics();
                         let line_height = metrics.line_height;
-                        let cluster_ascent = metrics.ascent;
-                        let cluster_descent = metrics.descent;
                         let max_height_exceeded = self.state.line.max_height_exceeded;
                         let style = &self.layout.data.styles[cluster.data.style_index as usize];
 
@@ -719,6 +711,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             if max_height_exceeded {
                                 return self.max_height_break_data(line_height);
                             }
+
                             // A CRLF sequence is a single grapheme cluster and must produce
                             // exactly one hard line break (UAX#14: CR × LF, do not break
                             // between). When this newline is a CR immediately followed by an
@@ -749,15 +742,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                         next.info.whitespace() == Whitespace::Newline
                                             && next.info.source_char() == '\n'
                                     });
-                            self.state.append_cluster_to_line(
-                                self.state.line.x,
-                                cluster_ascent,
-                                cluster_descent,
-                                line_height,
-                            );
+
+                            self.state
+                                .append_cluster_to_line(self.state.line.x, metrics);
+
                             if is_cr_before_lf {
                                 continue;
                             }
+
                             return self.start_new_line(
                                 BreakReason::Explicit,
                                 max_advance,
@@ -799,12 +791,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             if max_height_exceeded {
                                 return self.max_height_break_data(line_height);
                             }
-                            self.state.append_cluster_to_line(
-                                next_x,
-                                cluster_ascent,
-                                cluster_descent,
-                                line_height,
-                            );
+                            self.state.append_cluster_to_line(next_x, metrics);
                             if is_space {
                                 self.state.line.num_spaces += 1;
                             }
@@ -822,12 +809,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
-                                self.state.append_cluster_to_line(
-                                    next_x,
-                                    cluster_ascent,
-                                    cluster_descent,
-                                    line_height,
-                                );
+                                self.state.append_cluster_to_line(next_x, metrics);
                                 return self.start_new_line(
                                     BreakReason::Regular,
                                     max_advance,
@@ -870,12 +852,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
-                                self.state.append_cluster_to_line(
-                                    next_x,
-                                    cluster_ascent,
-                                    cluster_descent,
-                                    line_height,
-                                );
+                                self.state.append_cluster_to_line(next_x, metrics);
                             }
                         }
                     }
@@ -992,12 +969,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.state.line.x + advance
                         };
                         let metrics = run.metrics();
-                        self.state.append_cluster_to_line(
-                            next_x,
-                            metrics.ascent,
-                            metrics.descent,
-                            metrics.line_height,
-                        );
+                        self.state.append_cluster_to_line(next_x, metrics);
                         char_count += 1;
 
                         if is_space {
