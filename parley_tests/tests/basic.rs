@@ -247,6 +247,54 @@ fn inboxes_with_matching_baselines() {
     env.check_layout_snapshot(&layout);
 }
 
+/// A box that mostly sits above the baseline (large ascent) and a box that mostly sits below the
+/// baseline (large descent) on the same line. The line height must grow to fit the combined
+/// ascent of the first box and descent of the second box, even though neither box on its own is
+/// as tall as that sum.
+#[test]
+fn inboxes_with_large_ascent_and_descent() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Surround the line containing the boxes with plain text lines, so we can see how the
+    // adjacent lines are positioned relative to the (much taller) box line.
+    let text = "Line above\nAxB\nLine below";
+    let box_line_start = text.find("AxB").unwrap();
+    let mut builder = env.ranged_builder(text);
+    // Large ascent: the baseline is near the bottom of the box, so most of it is above the
+    // baseline.
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        kind: InlineBoxKind::InFlow,
+        index: box_line_start + 1,
+        width: 15.0,
+        height: 40.0,
+        baseline: Some(38.0),
+    });
+    // Large descent: the baseline is near the top of the box, so most of it is below the baseline.
+    builder.push_inline_box(InlineBox {
+        id: 1,
+        kind: InlineBoxKind::InFlow,
+        index: box_line_start + 2,
+        width: 15.0,
+        height: 40.0,
+        baseline: Some(2.0),
+    });
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    layout.align(Alignment::Start, AlignmentOptions::default());
+
+    // The middle line (containing the boxes) should be tall enough to contain the first box's
+    // ascent (38px) plus the second box's descent (40 - 2 = 38px).
+    let box_line = layout.get(1).unwrap();
+    assert!(
+        box_line.metrics().line_height >= 76.0,
+        "expected line height of at least 76px to fit the combined ascent and descent, got {}",
+        box_line.metrics().line_height
+    );
+
+    env.check_layout_snapshot(&layout);
+}
+
 #[test]
 fn trailing_whitespace_ltr() {
     let mut env = TestEnv::new(test_name!(), None);
