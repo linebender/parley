@@ -186,6 +186,67 @@ fn inbox_separated_by_whitespace() {
     env.check_layout_snapshot(&layout);
 }
 
+/// The `baseline` field of an inline box should align the box's baseline with the text baseline.
+///
+/// The rendered snapshots draw the box's baseline (when set) as a horizontal line, which should
+/// always line up with the baseline of the surrounding text.
+#[test]
+fn inbox_with_baseline() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // The box is 30px tall. We vary where its baseline sits within the box:
+    // - `top`: baseline at the top, so the box hangs below the text baseline.
+    // - `middle`: baseline in the middle of the box.
+    // - `bottom`: baseline at the bottom, equivalent to not specifying a baseline.
+    for (baseline, test_case_name) in [(0.0, "top"), (15.0, "middle"), (30.0, "bottom")] {
+        let text = "Hello world!";
+        let mut builder = env.ranged_builder(text);
+        builder.push_inline_box(InlineBox {
+            id: 0,
+            kind: InlineBoxKind::InFlow,
+            index: 5,
+            width: 20.0,
+            height: 30.0,
+            baseline: Some(baseline),
+        });
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(Alignment::Start, AlignmentOptions::default());
+        env.with_name(test_case_name).check_layout_snapshot(&layout);
+    }
+}
+
+/// Inline boxes with differing heights but matching baselines should all align to the same text
+/// baseline.
+#[test]
+fn inboxes_with_matching_baselines() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "AxByC";
+    let mut builder = env.ranged_builder(text);
+    // A short box and a tall box, both with their baselines 10px from the top.
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        kind: InlineBoxKind::InFlow,
+        index: 1,
+        width: 15.0,
+        height: 15.0,
+        baseline: Some(10.0),
+    });
+    builder.push_inline_box(InlineBox {
+        id: 1,
+        kind: InlineBoxKind::InFlow,
+        index: 3,
+        width: 15.0,
+        height: 40.0,
+        baseline: Some(10.0),
+    });
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    layout.align(Alignment::Start, AlignmentOptions::default());
+    env.check_layout_snapshot(&layout);
+}
+
 #[test]
 fn trailing_whitespace_ltr() {
     let mut env = TestEnv::new(test_name!(), None);
