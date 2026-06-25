@@ -178,7 +178,7 @@ fn layout_floats(
                 state.set_line_x(next_slot.x);
                 state.set_line_y((next_slot.y) as f64);
 
-                state.append_inline_box_to_line(box_break_data.advance, 0.0);
+                state.append_inline_box_to_line(box_break_data.advance, 0.0, 0.0);
             }
         }
     }
