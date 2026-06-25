@@ -24,7 +24,9 @@ use std::path::Path;
 use std::sync::Arc;
 
 use fontique::{Blob, Collection, CollectionOptions, SourceCache};
-use parley::{FontContext, FontFamily, Layout, LayoutContext, StyleProperty};
+use parley::{
+    CHROMIUM_LINE_BREAK_OVERRIDE, FontContext, FontFamily, Layout, LayoutContext, StyleProperty,
+};
 use parley_linebreaking_cases::{Case, FONTS, PROBE_SUBPIXELS, SUBPIXELS_PER_PX};
 
 /// If the matching with exactly Chrome's boundary fails, we try again with a very small
@@ -60,12 +62,12 @@ struct Expected {
 fn chrome_linebreaking_roboto() {
     // If changing the residual count for either of these tests, ensure that
     // it's near 1.5%.
-    check_font("Roboto", 8);
+    check_font("Roboto", 14);
 }
 
 #[test]
 fn chrome_linebreaking_arimo() {
-    check_font("Arimo", 16);
+    check_font("Arimo", 18);
 }
 
 fn check_font(font_family: &str, expected_residuals: u64) {
@@ -104,6 +106,7 @@ fn check_font(font_family: &str, expected_residuals: u64) {
         );
 
         let mut builder = layout_cx.ranged_builder(&mut font_cx, &case.text, 1.0, false);
+        builder.set_line_break_override(Some(CHROMIUM_LINE_BREAK_OVERRIDE));
         builder.push_default(FontFamily::named(font.family));
         builder.push_default(StyleProperty::FontSize(chromium_quantized_font_size(
             case.font_size,
