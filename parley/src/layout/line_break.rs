@@ -309,8 +309,7 @@ impl BreakerState {
     ///
     /// `ascent` and `descent` are the distances the box extends above and below the text baseline
     /// respectively. A box with its bottom aligned to the baseline is simply one with a zero
-    /// descent. The box grows the line only insofar as it extends beyond the text (see
-    /// [`LineState::line_height`]).
+    /// descent. The box grows the line only insofar as it extends beyond the text.
     pub fn append_inline_box_to_line(&mut self, next_x: f32, ascent: f32, descent: f32) {
         self.item_idx += 1;
         self.line.items.end += 1;
