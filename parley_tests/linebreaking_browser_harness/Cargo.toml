@@ -1,5 +1,6 @@
 [package]
-name = "parley_linebreaking_browser_recorder"
+name = "parley_linebreaking_browser_harness"
+description = "Shared in-browser Chrome line-breaking measurement for the Parley harness pages."
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -11,7 +12,6 @@ parley_linebreaking_cases = { workspace = true }
 wasm-bindgen = "0.2.100"
 wasm-bindgen-futures = "0.4.50"
 js-sys = "0.3.77"
-console_error_panic_hook = "0.1.7"
 
 [dependencies.web-sys]
 version = "0.3.77"
@@ -24,13 +24,8 @@ features = [
     "Range",
     "DomRect",
     "CssStyleDeclaration",
-    "EventTarget",
     "FontFace",
     "FontFaceSet",
-    "Location",
-    "Navigator",
-    "Clipboard",
-    "console",
 ]
 
 [lints]

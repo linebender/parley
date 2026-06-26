@@ -1,0 +1,45 @@
+[package]
+name = "parley_linebreaking_browser"
+description = "In-browser Parley/Chrome line-breaking harness (recorder + fuzzer pages)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "parley_linebreaking_browser"
+path = "src/lib.rs"
+
+[dependencies]
+parley_linebreaking_cases = { workspace = true, features = ["compare"] }
+parley_linebreaking_browser_harness = { workspace = true }
+wasm-bindgen = "0.2.100"
+wasm-bindgen-futures = "0.4.50"
+js-sys = "0.3.77"
+console_error_panic_hook = "0.1.7"
+
+[dependencies.web-sys]
+version = "0.3.77"
+features = [
+    "Window",
+    "Document",
+    "Element",
+    "HtmlElement",
+    "HtmlInputElement",
+    "Node",
+    "Range",
+    "DomRect",
+    "CssStyleDeclaration",
+    "EventTarget",
+    "FontFace",
+    "FontFaceSet",
+    "Location",
+    "Navigator",
+    "Clipboard",
+    "Storage",
+    "console",
+]
+
+[lints]
+workspace = true

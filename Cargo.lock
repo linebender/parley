@@ -2955,10 +2955,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "parley_linebreaking_browser_recorder"
+name = "parley_linebreaking_browser"
 version = "0.0.0"
 dependencies = [
  "console_error_panic_hook",
+ "js-sys",
+ "parley_linebreaking_browser_harness",
+ "parley_linebreaking_cases",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
+name = "parley_linebreaking_browser_harness"
+version = "0.0.0"
+dependencies = [
  "js-sys",
  "parley_linebreaking_cases",
  "wasm-bindgen",
@@ -2970,6 +2982,8 @@ dependencies = [
 name = "parley_linebreaking_cases"
 version = "0.0.0"
 dependencies = [
+ "fontique",
+ "parley",
  "rand 0.10.1",
  "rand_chacha 0.10.0",
 ]

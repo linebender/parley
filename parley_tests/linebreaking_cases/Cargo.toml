@@ -7,9 +7,17 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[features]
+# Enables the Parley/Chrome comparator (`compare_case`), used by the native
+# regression test and the in-browser fuzzer. Behind a feature so the base crate
+# stays dependency-light (and usable from build scripts / tooling).
+compare = ["dep:parley", "dep:fontique"]
+
 [dependencies]
 rand = { workspace = true }
 rand_chacha = { workspace = true }
+parley = { workspace = true, optional = true, features = ["std"] }
+fontique = { workspace = true, optional = true, features = ["std"] }
 
 [lints]
 workspace = true

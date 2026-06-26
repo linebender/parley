@@ -17,12 +17,17 @@
 //!    special-rule equivalence class in Chromium's override table.
 //!  - [`Strategy::Soup`] — uniform random printable ASCII.
 //!
-//! The boundary cases are calculated by running `parley_tests/linebreaking_browser_recorder`
-//! in the browser, then saved to `parley_tests/linebreaking_browser_recorder/data`, with a
-//! file per family.
+//! The boundary cases are calculated by running the recorder page of
+//! `parley_tests/linebreaking_browser` in the browser, then saved to
+//! `parley_tests/linebreaking_browser/data`, with a file per family.
 
 use rand::{RngExt, SeedableRng, seq::IndexedRandom};
 use rand_chacha::ChaCha8Rng;
+
+#[cfg(feature = "compare")]
+mod compare;
+#[cfg(feature = "compare")]
+pub use compare::*;
 
 // --- Shared, non-case types between runners ---
 

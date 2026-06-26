@@ -12,7 +12,8 @@ members = [
     "parley_dev",
     "parley_tests",
     "parley_tests/linebreaking_cases",
-    "parley_tests/linebreaking_browser_recorder",
+    "parley_tests/linebreaking_browser_harness",
+    "parley_tests/linebreaking_browser",
     "examples/common",
     "examples/swash_render",
     "examples/tiny_skia_render",
@@ -56,6 +57,7 @@ icu_properties = { version = "2.1.2", default-features = false }
 icu_segmenter = { version = "2.1.2", default-features = false }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
 packtab = { version = "1.8.0" }
+parley_linebreaking_browser_harness = { path = "parley_tests/linebreaking_browser_harness" }
 glifo = { git = "https://github.com/linebender/vello", rev = "5796226", default-features = false }
 rand = { version = "0.10.1", default-features = false, features = ["std", "std_rng"] }
 rand_chacha = { version = "0.10.0", default-features = false }

@@ -20,7 +20,7 @@ system = ["parley/system"]
 [dependencies]
 parley = { workspace = true, features = ["std"] }
 parley_dev = { workspace = true }
-parley_linebreaking_cases = { workspace = true }
+parley_linebreaking_cases = { workspace = true, features = ["compare"] }
 glifo = { workspace = true, features = ["std", "vello_cpu", "png"] }
 peniko = { workspace = true, features = ["std"] }
 vello_cpu = { workspace = true, features = ["std", "png"] }

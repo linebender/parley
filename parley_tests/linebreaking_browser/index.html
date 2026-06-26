@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Parley ↔ Chrome line-breaking harness</title>
+  <link data-trunk rel="rust" />
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 1rem;
+      line-height: 1.4;
+    }
+
+    nav {
+      margin-bottom: 0.5rem;
+    }
+
+    #status {
+      font-weight: bold;
+      margin: 0.5rem 0;
+    }
+
+    #controls {
+      margin: 0.5rem 0;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    button {
+      font: 14px system-ui, sans-serif;
+      padding: 0.3rem 0.7rem;
+      cursor: pointer;
+    }
+
+    h2 {
+      margin: 1.2rem 0 0.2rem;
+    }
+
+    li {
+      margin: 0.5rem 0;
+    }
+
+    #failures {
+      margin-top: 0.5rem;
+      max-height: 60vh;
+      overflow-y: auto;
+      font: 13px ui-monospace, monospace;
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+    }
+
+    #failures div {
+      white-space: pre;
+    }
+
+    /* Pages start hidden; the wasm reveals the one matching the URL path. */
+    section {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <nav><a href="/">Home</a> · <a href="/recorder">Recorder</a> · <a href="/fuzzer">Fuzzer</a> · <a
+      href="/inspect">Inspect</a></nav>
+  <p>Please ensure you are using a Chromium based browser.</p>
+  <div id="status"></div>
+
+  <section id="landing-page">
+    <h1>Parley ↔ Chrome line-breaking harness</h1>
+    <ul>
+      <li>
+        <a href="/recorder"><strong>Recorder</strong></a> —
+        records every seed's Chrome break decision to a CSV corpus (copy buttons per font).
+      </li>
+      <li>
+        <a href="/fuzzer"><strong>Fuzzer</strong></a> —
+        sweeps seeds, comparing Parley against Chrome live and persisting only the failing seeds.
+      </li>
+      <li>
+        <a href="/inspect"><strong>Inspect</strong></a> —
+        renders one seed's Chrome layout and overlays where Parley breaks.
+      </li>
+    </ul>
+  </section>
+
+  <section id="recorder-page">
+    <h1>Browser line-breaking data collection</h1>
+    <div id="results"></div>
+  </section>
+
+  <section id="fuzzer-page">
+    <h1>Browser line-breaking fuzzer</h1>
+    <p>
+      Sweeps seeds comparing Parley against Chrome live, persisting only failing seeds.
+      Query params: <code>?start=S</code>, <code>?count=N</code>, <code>?reset=1</code>.
+    </p>
+    <div id="controls">
+      <button id="stop">Stop</button>
+      <button id="copy-seeds">Copy seeds</button>
+      <button id="clear">Clear</button>
+    </div>
+    <div id="failures"></div>
+  </section>
+
+  <section id="inspect-page">
+    <h1>Inspect a seed</h1>
+    <p>
+      Renders each font's case as Chrome lays it out (the visible wrap is Chrome's break) and
+      overlays a red line where Parley breaks. Pass <code>?seed=N</code>, and optionally
+      <code>?width=S</code> to force a width (in subpixels) instead of the tightened one.
+    </p>
+    <div id="controls">
+      <label>Seed <input id="inspect-seed" type="number" min="0" value="0" /></label>
+      <label>Width (subpixels, blank = tightened) <input id="inspect-width" type="number" min="1" /></label>
+      <button id="inspect-go">Go</button>
+    </div>
+    <div id="inspect-output"></div>
+  </section>
+</body>
+
+</html>
