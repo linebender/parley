@@ -5,6 +5,8 @@
 
 use alloc::{vec, vec::Vec};
 
+use parley_core::bidi::BidiResolver;
+
 use super::FontContext;
 use super::builder::{RangedBuilder, StyleRunBuilder};
 use super::resolve::tree::TreeStyleBuilder;
@@ -12,7 +14,6 @@ use super::resolve::{RangedStyleBuilder, ResolveContext, ResolvedStyle, StyleRun
 use super::style::{Brush, TextStyle};
 
 use crate::analysis::{AnalysisDataSources, CharInfo};
-use crate::bidi::BidiResolver;
 use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
 use crate::shape::ShapeContext;

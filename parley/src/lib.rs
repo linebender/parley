@@ -109,7 +109,6 @@ extern crate std;
 pub use fontique;
 
 mod analysis;
-mod bidi;
 mod break_overrides;
 mod builder;
 mod context;

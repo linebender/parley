@@ -25,6 +25,8 @@ use icu_segmenter::{
 };
 use parley_data::Properties;
 
+use parley_core::bidi;
+
 pub(crate) struct AnalysisDataSources;
 
 impl AnalysisDataSources {
@@ -511,7 +513,7 @@ pub(crate) fn analyze_text<B: Brush>(
                 }
             };
 
-            needs_bidi_resolution |= crate::bidi::needs_bidi_resolution(bidi_class);
+            needs_bidi_resolution |= bidi::needs_bidi_resolution(bidi_class);
             // TODO: maybe extend Properties to u64 to fit BidiMirroringGlyph
             let bracket = lcx.analysis_data_sources.brackets().get(ch);
 
