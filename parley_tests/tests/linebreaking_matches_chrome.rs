@@ -67,7 +67,7 @@ fn chrome_linebreaking_roboto() {
 
 #[test]
 fn chrome_linebreaking_arimo() {
-    check_font("Arimo", 18);
+    check_font("Arimo", 17);
 }
 
 fn check_font(font_family: &str, expected_residuals: u64) {

@@ -113,9 +113,9 @@ pub struct Case {
     pub initial_width: f32,
 }
 
-/// A text-generation algorithm. Chosen per seed by [`pick_strategy`].
+/// A text generation algorithm.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Strategy {
+pub enum Strategy {
     /// `[A-Za-z0-9]` words, separated by single spaces.
     Alphanumeric,
     /// Realistic strings following a variety of templates.
@@ -435,6 +435,7 @@ mod tests {
                 case.text.split(' ').all(|word| !word.is_empty()),
                 "seed {seed}: double space; Parley doesn't handle whitespace collapsing"
             );
+            assert!(case.text.len() >= MIN_LEN);
             // Generation must be deterministic.
             assert_eq!(case, Case::from_seed(seed));
         }
