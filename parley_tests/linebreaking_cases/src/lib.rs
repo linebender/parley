@@ -111,6 +111,8 @@ pub struct Case {
     /// the width down to the minimum that preserves that break. This shall not be used by
     /// the Parley test case validator.
     pub initial_width: f32,
+    /// The strategy used to generate this case.
+    pub strategy: Strategy,
 }
 
 /// A text generation algorithm.
@@ -154,6 +156,7 @@ impl Case {
             text,
             font_size,
             initial_width,
+            strategy,
         }
     }
 }
@@ -164,7 +167,7 @@ impl Strategy {
         (Self::Alphanumeric, 15),
         (Self::Templated, 35),
         (Self::Targeted, 30),
-        (Self::Soup, 20),
+        (Self::Soup, 30),
     ];
 
     fn select(rng: &mut ChaCha8Rng) -> Self {
