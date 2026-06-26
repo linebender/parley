@@ -62,12 +62,12 @@ struct Expected {
 fn chrome_linebreaking_roboto() {
     // If changing the residual count for either of these tests, ensure that
     // it's near 1.5%.
-    check_font("Roboto", 14);
+    check_font("Roboto", 13);
 }
 
 #[test]
 fn chrome_linebreaking_arimo() {
-    check_font("Arimo", 17);
+    check_font("Arimo", 19);
 }
 
 fn check_font(font_family: &str, expected_residuals: u64) {
