@@ -160,7 +160,7 @@ impl Case {
 
 impl Strategy {
     const WEIGHTS: &[(Self, u32)] = &[
-        // We want the alphanumeric case ti ==o be slightly rarer.
+        // We want the alphanumeric case to be slightly rarer.
         (Self::Alphanumeric, 15),
         (Self::Templated, 35),
         (Self::Targeted, 30),
@@ -212,17 +212,15 @@ impl Strategy {
         // Initialised to true to avoid starting with a space.
         let mut prev_was_space = true;
         for _ in 0..MIN_LEN {
-            let chr = char::from(rng.random_range(b' '..=b'~'));
-            if chr == ' ' {
-                if prev_was_space {
-                    continue;
-                }
-                prev_was_space = true;
+            let chr = if prev_was_space {
+                char::from(rng.random_range(b'!'..=b'~'))
             } else {
-                prev_was_space = false;
-            }
+                char::from(rng.random_range(b' '..=b'~'))
+            };
+            prev_was_space = chr == ' ';
             out.push(chr);
         }
+        // Avoid a final trailing whitespace.
         if prev_was_space {
             out.push('a');
         }
