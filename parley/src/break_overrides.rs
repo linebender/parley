@@ -62,6 +62,23 @@ fn chromium_override(cx: LineBreakContext) -> Option<bool> {
         after,
         ..
     } = cx;
+    // CSS "does not fully define where soft wrap opportunities occur".
+    // (https://www.w3.org/TR/css-text-3/#line-breaking)
+    // We find that Chrome always treats the position after a space sequence
+    // as a line break opportunity, despite this not matching UAX-14
+    // (see LB13: https://www.unicode.org/reports/tr14/#LB13; we're not currently
+    // aware of any others).
+    //
+    // See also https://github.com/linebender/parley/pull/485, and https://github.com/linebender/parley/issues/619.
+    //
+    // See `LazyLineBreakIterator::NextBreakablePosition`
+    // <https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/platform/text/text_break_iterator.cc;l=282-303>
+    //
+    // Note that we'd need different handling in the `after == ' '` case if we ever get the equivalent of
+    // CSS's whitespace-collapse: break-spaces.
+    if before == ' ' && after != ' ' {
+        return Some(true);
+    }
     // Before consulting 'before' / 'after' pair table, check for the special "-" case.
     //
     // Chromium doesn't allow breaking when it looks like the minus sign is for a negative
@@ -321,6 +338,19 @@ mod tests {
         // No preceding character (start of text) behaves like a non-alphanumeric
         // context, matching Chromium's `last_last_ch == 0`.
         assert_eq!(chromium_override(cx(None, '-', '1')), Some(false));
+    }
+
+    #[test]
+    fn chromium_ignores_uax_14_lb13() {
+        // Blink allows a break after a space run unconditionally.
+        // See comment in non-test code for more details.
+        for after in ['}', ')', ']', '!', '.', ',', '/', ':', ';', '?', 'b', '('] {
+            assert_eq!(
+                chromium_override(cx(None, ' ', after)),
+                Some(true),
+                "expected a break after the space, before {after:?}"
+            );
+        }
     }
 
     #[test]
