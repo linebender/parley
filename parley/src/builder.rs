@@ -11,9 +11,9 @@ use super::layout::Layout;
 
 use alloc::string::String;
 use core::ops::{Bound, Range, RangeBounds};
+use parley_core::break_overrides::LineBreakOverrideFn;
 
 use crate::InlineBoxKind;
-use crate::break_overrides::LineBreakOverrideFn;
 use crate::inline_box::InlineBox;
 use crate::resolve::{ResolvedStyle, StyleRun, tree::ItemKind};
 

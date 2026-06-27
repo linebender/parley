@@ -7,7 +7,8 @@ use core::ops::RangeInclusive;
 
 /// Context for a potential line break opportunity between two adjacent code points.
 #[derive(Clone, Copy, Debug)]
-#[non_exhaustive]
+// #[non_exhaustive]
+// TODO: re-enable the non-exhaustive above
 pub struct LineBreakContext {
     /// The code point before the `before` code point, if any.
     pub before_before: Option<char>,
@@ -109,18 +110,20 @@ static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable<5> =
 ///
 /// # Example
 ///
-/// ```
-/// # use parley::{CHROMIUM_LINE_BREAK_OVERRIDE, FontContext, LayoutContext};
-/// # let mut font_cx = FontContext::default();
-/// # let mut layout_cx: LayoutContext<[u8; 4]> = LayoutContext::new();
+/// ```ignore
+/// # use parley_core::break_overrides::CHROMIUM_LINE_BREAK_OVERRIDE;
+/// # use parley_core::{Analysis, AnalysisOptions, Analyzer};
+/// # let mut analyzer = Analyzer::new();
+/// # let mut analysis = Analysis::new();
 /// let text = "Hello there!";
-/// let mut builder = layout_cx.ranged_builder(&mut font_cx, text, 1.0, true);
-/// // Emulate Chromium:
-/// builder.set_line_break_override(Some(CHROMIUM_LINE_BREAK_OVERRIDE));
-/// let layout = builder.build(text);
-/// # let _ = layout;
+/// let options = AnalysisOptions {
+///     word_break: &[],
+///     // Emulate Chromium:
+///     line_break_override: Some(CHROMIUM_LINE_BREAK_OVERRIDE),
+/// };
+/// analyzer.analyze(text, &options, &mut analysis);
 /// ```
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AsciiLineBreakTable<const N: usize> {
     /// Maps each `before` character (`0..128`) to a row in `rows`.
     row_of: [u8; 128],
@@ -146,7 +149,7 @@ impl<const N: usize> AsciiLineBreakTable<N> {
 }
 
 /// A single deduplicated row of a [`AsciiLineBreakTable`].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Row {
     /// Bits set means the pair has an override.
     overridden: u128,
@@ -158,7 +161,7 @@ struct Row {
 ///
 /// Construction is `const`. We create a dense `128 x 128` grid of overrides,
 /// then compress it into a row-deduplicated table via [`AsciiLineBreakTableBuilder::build`].
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AsciiLineBreakTableBuilder {
     /// Bit `after` set in row `before` means the pair has an explicit override.
     overridden: [u128; 128],
@@ -250,7 +253,13 @@ impl AsciiLineBreakTableBuilder {
                 len += 1;
                 len - 1
             };
-            row_of[b] = r as u8;
+            #[expect(
+                clippy::cast_possible_truncation,
+                reason = "TODO: fix this (`N` should be `u8`, or `row_of` should contain `usize`)"
+            )]
+            {
+                row_of[b] = r as u8;
+            }
             b += 1;
         }
 

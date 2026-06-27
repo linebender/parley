@@ -6,7 +6,6 @@ pub(crate) mod cluster;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 
-use crate::break_overrides::{LineBreakContext, LineBreakOverrideFn};
 use crate::resolve::StyleRun;
 use crate::{Brush, LayoutContext, WordBreak};
 
@@ -23,6 +22,7 @@ use icu_segmenter::{
     GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter,
     LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed,
 };
+use parley_core::break_overrides::{LineBreakContext, LineBreakOverrideFn};
 use parley_data::Properties;
 
 use parley_core::bidi;
