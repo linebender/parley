@@ -166,6 +166,7 @@ impl ResolveContext {
             StyleProperty::WordBreak(value) => WordBreak(*value),
             StyleProperty::OverflowWrap(value) => OverflowWrap(*value),
             StyleProperty::TextWrapMode(value) => TextWrapMode(*value),
+            StyleProperty::GraphemeReplacement(value) => GraphemeReplacement(*value),
         }
     }
 
@@ -203,6 +204,7 @@ impl ResolveContext {
             word_break: raw_style.word_break,
             overflow_wrap: raw_style.overflow_wrap,
             text_wrap_mode: raw_style.text_wrap_mode,
+            grapheme_replacement: raw_style.grapheme_replacement,
         }
     }
 
@@ -387,6 +389,8 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     OverflowWrap(OverflowWrap),
     /// Control over non-"emergency" line-breaking.
     TextWrapMode(TextWrapMode),
+    /// Replacement character used to mask every grapheme cluster.
+    GraphemeReplacement(Option<char>),
 }
 
 /// Flattened group of style properties.
@@ -426,6 +430,8 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     pub(crate) overflow_wrap: OverflowWrap,
     /// Control over non-"emergency" line-breaking.
     pub(crate) text_wrap_mode: TextWrapMode,
+    /// Replacement character used to mask every grapheme cluster.
+    pub(crate) grapheme_replacement: Option<char>,
 }
 
 impl<B: Brush> ResolvedStyle<B> {
@@ -456,6 +462,7 @@ impl<B: Brush> ResolvedStyle<B> {
             WordBreak(value) => self.word_break = value,
             OverflowWrap(value) => self.overflow_wrap = value,
             TextWrapMode(value) => self.text_wrap_mode = value,
+            GraphemeReplacement(value) => self.grapheme_replacement = value,
         }
     }
 
@@ -485,6 +492,7 @@ impl<B: Brush> ResolvedStyle<B> {
             WordBreak(value) => self.word_break == *value,
             OverflowWrap(value) => self.overflow_wrap == *value,
             TextWrapMode(value) => self.text_wrap_mode == *value,
+            GraphemeReplacement(value) => self.grapheme_replacement == *value,
         }
     }
 
@@ -496,6 +504,7 @@ impl<B: Brush> ResolvedStyle<B> {
             line_height: self.line_height,
             overflow_wrap: self.overflow_wrap,
             text_wrap_mode: self.text_wrap_mode,
+            grapheme_replacement: self.grapheme_replacement,
             #[cfg(feature = "accesskit")]
             locale: self.locale,
         }

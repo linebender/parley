@@ -18,6 +18,11 @@ This release has an [MSRV] of 1.88.
 
 ### Added
 
+#### Parley
+
+- `StyleProperty::GraphemeReplacement(Option<char>)` to mask text, e.g. for password fields. ([#657][] by [@nicoburns][])  
+  When set, every grapheme cluster is shaped and rendered as the given character while the underlying text (and thus cursor movement, hit-testing, and selection) is preserved. `PlainEditor` gains `set_password`/`is_password` which masks the text with the bullet character (`•`).
+
 #### Parlance
 
 - `BidiLevel` to encode bidirectional text embedding levels. ([#710][] by [@tomcur][])
@@ -727,6 +732,7 @@ This release has an [MSRV][] of 1.70.
 [#643]: https://github.com/linebender/parley/pull/643
 [#650]: https://github.com/linebender/parley/pull/650
 [#661]: https://github.com/linebender/parley/pull/661
+[#657]: https://github.com/linebender/parley/pull/657
 [#671]: https://github.com/linebender/parley/pull/671
 [#697]: https://github.com/linebender/parley/pull/697
 [#710]: https://github.com/linebender/parley/pull/710
