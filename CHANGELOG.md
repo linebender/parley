@@ -12,6 +12,12 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 This release has an [MSRV] of 1.88.
 
+### Added
+
+#### Parley
+
+- Add a `StyleProperty::GraphemeReplacement(Option<char>)` style. When set to `Some`, the output glyphs of every cluster are replaced with the glyph for the given character, while preserving the underlying text (and thus cursor movement, hit-testing, and selection). `PlainEditor` gains a `set_password`/`is_password` setting which masks the text with the bullet character (`•`).
+
 ## [0.11.0] - 2026-06-24
 
 This release has an [MSRV] of 1.88.

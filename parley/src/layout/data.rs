@@ -13,6 +13,18 @@ use alloc::vec::Vec;
 use crate::analysis::cluster::Whitespace;
 use crate::analysis::{Boundary, CharInfo};
 
+use skrifa::MetadataProvider;
+
+/// A glyph that replaces the shaped output of every cluster, used to mask text
+/// (e.g. for password fields). See [`StyleProperty::GraphemeReplacement`](crate::StyleProperty::GraphemeReplacement).
+#[derive(Copy, Clone)]
+struct GlyphReplacement {
+    /// Identifier of the replacement glyph in the run's font.
+    id: u32,
+    /// Advance of the replacement glyph in layout units.
+    advance: f32,
+}
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct ClusterData {
     pub(crate) info: ClusterInfo,
@@ -482,6 +494,26 @@ impl<B: Brush> LayoutData<B> {
         }
         let glyph_positions = glyph_buffer.glyph_positions();
         let scale_factor = font_size / units_per_em;
+
+        // If this run's style requests grapheme replacement (e.g. password masking), resolve the
+        // replacement glyph and its advance in this run's font. The output glyphs of every cluster
+        // are then replaced with this glyph by `process_clusters`.
+        let replacement = self.styles[style_index as usize]
+            .grapheme_replacement
+            .and_then(|ch| {
+                let font = &self.fonts[font_index];
+                let font_ref = skrifa::FontRef::from_index(font.data.as_ref(), font.index).ok()?;
+                let id = font_ref.charmap().map(ch)?;
+                let advance = font_ref
+                    .glyph_metrics(skrifa::prelude::Size::new(font_size), coords)
+                    .advance_width(id)
+                    .unwrap_or(0.0);
+                Some(GlyphReplacement {
+                    id: id.to_u32(),
+                    advance,
+                })
+            });
+
         let cluster_range_start = self.clusters.len();
         let is_rtl = bidi_level & 1 == 1;
         if !is_rtl {
@@ -494,6 +526,7 @@ impl<B: Brush> LayoutData<B> {
                 glyph_positions,
                 char_infos,
                 source_text.char_indices(),
+                replacement,
             );
         } else {
             run.advance = process_clusters(
@@ -505,6 +538,7 @@ impl<B: Brush> LayoutData<B> {
                 glyph_positions,
                 char_infos,
                 source_text.char_indices().rev(),
+                replacement,
             );
             // Reverse clusters into logical order for RTL
             let clusters_len = self.clusters.len();
@@ -648,6 +682,9 @@ impl<B: Brush> LayoutData<B> {
 /// * `char_infos` - Character information from text analysis, indexed by cluster ID.
 /// * `char_indices_iter` - Iterator over (`byte_offset`, `char`) pairs from the source text.
 ///   Should be in logical order (forward for LTR, reverse for RTL).
+/// * `replacement` - If `Some`, every output glyph's identity and advance are replaced with the
+///   given glyph. Used to mask text (e.g. for password fields). The cluster structure (and thus
+///   cursor movement, hit-testing and selection) is preserved.
 fn process_clusters<I: Iterator<Item = (usize, char)>>(
     direction: Direction,
     clusters: &mut Vec<ClusterData>,
@@ -657,6 +694,7 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
     glyph_positions: &[harfrust::GlyphPosition],
     char_infos: &[(CharInfo, u16)],
     char_indices_iter: I,
+    replacement: Option<GlyphReplacement>,
 ) -> f32 {
     let mut char_indices_iter = char_indices_iter.peekable();
     let mut cluster_start_char = char_indices_iter.next().unwrap();
@@ -779,13 +817,26 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
             pending_inline_glyph = None;
         }
 
-        let glyph = Glyph {
-            id: glyph_info.glyph_id,
-            style_index: char_info.1,
-            x: (glyph_pos.x_offset as f32) * scale_factor,
-            // Convert from font space (Y-up) to layout space (Y-down)
-            y: -(glyph_pos.y_offset as f32) * scale_factor,
-            advance: (glyph_pos.x_advance as f32) * scale_factor,
+        let glyph = if let Some(replacement) = replacement {
+            // Mask the cluster by replacing the shaped glyph with the replacement glyph. We drop
+            // the positioning offsets so the replacement glyph sits on the baseline at its own
+            // advance, yielding uniform-width masking characters.
+            Glyph {
+                id: replacement.id,
+                style_index: char_info.1,
+                x: 0.0,
+                y: 0.0,
+                advance: replacement.advance,
+            }
+        } else {
+            Glyph {
+                id: glyph_info.glyph_id,
+                style_index: char_info.1,
+                x: (glyph_pos.x_offset as f32) * scale_factor,
+                // Convert from font space (Y-up) to layout space (Y-down)
+                y: -(glyph_pos.y_offset as f32) * scale_factor,
+                advance: (glyph_pos.x_advance as f32) * scale_factor,
+            }
         };
         cluster_advance += glyph.advance;
         // Push any pending glyph. If it was a zero-offset, single glyph cluster, it would
