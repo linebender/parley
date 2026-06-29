@@ -42,6 +42,8 @@ pub(crate) fn analyze_text<B: Brush>(
 /// All characters contribute to shaping except:
 /// - Control characters
 /// - Format characters, unless they use the "Inherited" script
+// TODO: this function is duplicated at the time of writing, as it also exists in `parley_core`.
+// Once more of `parley` is moved to `parley_core`, this function should be removable.
 #[inline(always)]
 pub(crate) fn contributes_to_shaping(general_category: GeneralCategory, script: Script) -> bool {
     if matches!(
