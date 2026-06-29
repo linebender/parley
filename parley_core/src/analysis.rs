@@ -48,6 +48,7 @@ impl Analysis {
     /// Create a reusable [`Analysis`].
     ///
     /// Pass this to [`Analyzer::analyze`].
+    #[inline]
     pub fn new() -> Self {
         Self::default()
     }
@@ -60,6 +61,7 @@ impl Analysis {
     }
 
     /// The per-character info in source order.
+    #[inline(always)]
     pub fn char_info(&self) -> &[CharInfo] {
         &self.info
     }
@@ -67,11 +69,13 @@ impl Analysis {
     /// The bidi level for each character, parallel to [`Self::char_info`].
     ///
     /// Empty when the whole paragraph is left-to-right.
+    #[inline(always)]
     pub fn bidi_levels(&self) -> &[u8] {
         &self.levels
     }
 
     /// The base bidi level of the paragraph of text.
+    #[inline(always)]
     pub fn paragraph_level(&self) -> u8 {
         self.paragraph_level
     }
