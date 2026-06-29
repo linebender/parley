@@ -608,7 +608,6 @@ pub(crate) fn analyze_text(
             needs_bidi_resolution |= bidi::needs_bidi_resolution(bidi_class);
             // TODO: maybe extend Properties to u64 to fit BidiMirroringGlyph
             let bracket = data_sources.brackets().get(ch);
-            analyzer.bidi_props.push((bidi_class, bracket));
 
             analysis.info.push(CharInfo::new(
                 boundary,

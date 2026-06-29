@@ -5,8 +5,6 @@
 
 use core::ops::Range;
 
-use alloc::vec::Vec;
-use icu_properties::props::{BidiClass, BidiMirroringGlyph};
 use parlance::WordBreak;
 
 use crate::{bidi::BidiResolver, break_overrides::LineBreakOverrideFn};
@@ -17,7 +15,6 @@ use crate::analysis::{Analysis, analyze_text};
 #[derive(Default)]
 pub struct Analyzer {
     pub(crate) bidi: BidiResolver,
-    pub(crate) bidi_props: Vec<(BidiClass, BidiMirroringGlyph)>,
 }
 
 impl core::fmt::Debug for Analyzer {
