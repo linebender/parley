@@ -640,8 +640,7 @@ pub(crate) fn analyze_text(
             ),
             None,
         );
-        // TODO: perhaps core::mem::swap?
-        analysis.levels.extend_from_slice(analyzer.bidi.levels());
+        core::mem::swap(&mut analysis.levels, &mut analyzer.bidi.levels);
         analysis.paragraph_level = analyzer.bidi.base_level();
     }
 }

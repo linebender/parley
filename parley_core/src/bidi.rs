@@ -13,7 +13,7 @@ pub type BidiLevel = u8;
 #[derive(Clone, Default)]
 pub struct BidiResolver {
     base_level: BidiLevel,
-    levels: Vec<BidiLevel>,
+    pub(crate) levels: Vec<BidiLevel>,
     initial_types: Vec<BidiClass>,
     types: Vec<BidiClass>,
     brackets: Vec<(usize, char, BidiMirroringGlyph)>,
