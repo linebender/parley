@@ -7,8 +7,7 @@ use core::ops::RangeInclusive;
 
 /// Context for a potential line break opportunity between two adjacent code points.
 #[derive(Clone, Copy, Debug)]
-// #[non_exhaustive]
-// TODO: re-enable the non-exhaustive above
+#[non_exhaustive]
 pub struct LineBreakContext {
     /// The code point before the `before` code point, if any.
     pub before_before: Option<char>,
@@ -110,7 +109,7 @@ static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable<5> =
 ///
 /// # Example
 ///
-/// ```ignore
+/// ```
 /// # use parley_core::break_overrides::CHROMIUM_LINE_BREAK_OVERRIDE;
 /// # use parley_core::{Analysis, AnalysisOptions, Analyzer};
 /// # let mut analyzer = Analyzer::new();

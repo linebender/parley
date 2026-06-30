@@ -3,9 +3,12 @@
 
 //! Context for layout.
 
+use core::ops::Range;
+
 use alloc::{vec, vec::Vec};
 
-use parley_core::bidi::BidiResolver;
+use parlance::WordBreak;
+use parley_core::{Analysis, AnalysisDataSources, Analyzer};
 
 use super::FontContext;
 use super::builder::{RangedBuilder, StyleRunBuilder};
@@ -13,7 +16,6 @@ use super::resolve::tree::TreeStyleBuilder;
 use super::resolve::{RangedStyleBuilder, ResolveContext, ResolvedStyle, StyleRun};
 use super::style::{Brush, TextStyle};
 
-use crate::analysis::{AnalysisDataSources, CharInfo};
 use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
 use crate::shape::ShapeContext;
@@ -26,14 +28,18 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) style_table: Vec<ResolvedStyle<B>>,
     pub(crate) style_runs: Vec<StyleRun>,
     pub(crate) inline_boxes: Vec<InlineBox>,
-    pub(crate) bidi: BidiResolver,
+
+    // Reusable text analysis
+    pub(crate) analyzer: Analyzer,
+    pub(crate) analysis: Analysis,
+    pub(crate) word_break: Vec<(Range<usize>, WordBreak)>,
 
     // Reusable style builders (to amortise allocations)
     pub(crate) ranged_style_builder: RangedStyleBuilder<B>,
     pub(crate) tree_style_builder: TreeStyleBuilder<B>,
 
-    // u16: style index for character
-    pub(crate) info: Vec<(CharInfo, u16)>,
+    /// Style index for each character, parallel to [`Analysis::char_info`].
+    pub(crate) char_style_indices: Vec<u16>,
     pub(crate) scx: ShapeContext,
 
     // Unicode analysis data sources (provided by icu)
@@ -47,10 +53,12 @@ impl<B: Brush> LayoutContext<B> {
             style_table: vec![],
             style_runs: vec![],
             inline_boxes: vec![],
-            bidi: BidiResolver::new(),
+            analyzer: Analyzer::new(),
+            analysis: Analysis::new(),
+            word_break: Vec::new(),
             ranged_style_builder: RangedStyleBuilder::default(),
             tree_style_builder: TreeStyleBuilder::default(),
-            info: vec![],
+            char_style_indices: vec![],
             analysis_data_sources: AnalysisDataSources::new(),
             scx: ShapeContext::default(),
         }
@@ -186,8 +194,6 @@ impl<B: Brush> LayoutContext<B> {
         self.style_table.clear();
         self.style_runs.clear();
         self.inline_boxes.clear();
-        self.info.clear();
-        self.bidi.clear();
     }
 }
 

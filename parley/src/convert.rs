@@ -1,9 +1,8 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::analysis::AnalysisDataSources;
-
 use icu_properties::props::Script;
+use parley_core::AnalysisDataSources;
 
 pub(crate) fn script_to_fontique(
     script: Script,

@@ -23,5 +23,10 @@ extern crate std;
 
 extern crate alloc;
 
+mod analysis;
+mod analyzer;
 pub mod bidi;
 pub mod break_overrides;
+
+pub use analysis::{Analysis, AnalysisDataSources, Boundary, CharInfo};
+pub use analyzer::{AnalysisOptions, Analyzer};

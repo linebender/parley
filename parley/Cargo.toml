@@ -18,14 +18,21 @@ workspace = true
 
 [features]
 default = ["system"]
-std = ["fontique/std", "harfrust/std", "peniko/std", "skrifa/std", "parlance/std"]
+std = [
+    "fontique/std",
+    "harfrust/std",
+    "parley_core/std",
+    "peniko/std",
+    "skrifa/std",
+    "parlance/std",
+]
 libm = ["fontique/libm", "harfrust/libm", "peniko/libm", "skrifa/libm", "dep:core_maths"]
 # Enables support for system font backends
 system = ["std", "fontique/system"]
 accesskit = ["dep:accesskit"]
 # Enables dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
 # When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
-complex-scripts = []
+complex-scripts = ["parley_core/complex-scripts"]
 
 [dependencies]
 skrifa = { workspace = true }
@@ -34,13 +41,11 @@ fontique = { workspace = true }
 parlance = { workspace = true }
 parley_core = { workspace = true }
 core_maths = { version = "0.1.1", optional = true }
-parley_data = { workspace = true, features = ["baked"] }
 accesskit = { workspace = true, optional = true }
 hashbrown = { workspace = true }
 harfrust = { workspace = true }
 icu_normalizer = { workspace = true, features = ["compiled_data"] }
 icu_properties = { workspace = true, features = ["compiled_data"] }
-icu_segmenter = { workspace = true, features = ["compiled_data"] }
 
 [dev-dependencies]
 parley_dev = { workspace = true }

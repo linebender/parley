@@ -9,9 +9,9 @@ use crate::{FontData, IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, Te
 use core::ops::Range;
 
 use alloc::vec::Vec;
+use parley_core::{Boundary, CharInfo};
 
 use crate::analysis::cluster::Whitespace;
-use crate::analysis::{Boundary, CharInfo};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct ClusterData {
@@ -390,8 +390,9 @@ impl<B: Brush> LayoutData<B> {
         word_spacing: f32,
         letter_spacing: f32,
         source_text: &str,
-        char_infos: &[(CharInfo, u16)], // From text analysis
-        text_range: Range<usize>,       // The text range this run covers
+        char_infos: &[CharInfo], // From text analysis
+        char_style_indices: &[u16],
+        text_range: Range<usize>, // The text range this run covers
         coords: &[harfrust::NormalizedCoord],
     ) {
         let coords_start = self.coords.len();
@@ -493,6 +494,7 @@ impl<B: Brush> LayoutData<B> {
                 glyph_infos,
                 glyph_positions,
                 char_infos,
+                char_style_indices,
                 source_text.char_indices(),
             );
         } else {
@@ -504,6 +506,7 @@ impl<B: Brush> LayoutData<B> {
                 glyph_infos,
                 glyph_positions,
                 char_infos,
+                char_style_indices,
                 source_text.char_indices().rev(),
             );
             // Reverse clusters into logical order for RTL
@@ -655,16 +658,18 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
     scale_factor: f32,
     glyph_infos: &[harfrust::GlyphInfo],
     glyph_positions: &[harfrust::GlyphPosition],
-    char_infos: &[(CharInfo, u16)],
+    char_infos: &[CharInfo],
+    char_style_indices: &[u16],
     char_indices_iter: I,
 ) -> f32 {
+    let char_info_at = |i: usize| (char_infos[i], char_style_indices[i]);
     let mut char_indices_iter = char_indices_iter.peekable();
     let mut cluster_start_char = char_indices_iter.next().unwrap();
     let mut total_glyphs: u32 = 0;
     let mut cluster_glyph_offset: u32 = 0;
     let start_cluster_id = glyph_infos.first().unwrap().cluster;
     let mut cluster_id = start_cluster_id;
-    let mut char_info = char_infos[cluster_id as usize];
+    let mut char_info = char_info_at(cluster_id as usize);
     let mut run_advance = 0.0;
     let mut cluster_advance = 0.0;
     // If the current cluster might be a single-glyph, zero-offset cluster, we defer
@@ -755,8 +760,8 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
                         break;
                     }
                     let char_info_ = match direction {
-                        Direction::Ltr => char_infos[(cluster_id + i) as usize],
-                        Direction::Rtl => char_infos[(cluster_id + num_components - i) as usize],
+                        Direction::Ltr => char_info_at((cluster_id + i) as usize),
+                        Direction::Rtl => char_info_at((cluster_id + num_components - i) as usize),
                     };
                     push_cluster(
                         clusters,
@@ -775,7 +780,7 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
             cluster_advance = 0.0;
             last_cluster_id = cluster_id;
             cluster_id = glyph_info.cluster;
-            char_info = char_infos[cluster_id as usize];
+            char_info = char_info_at(cluster_id as usize);
             pending_inline_glyph = None;
         }
 
@@ -838,8 +843,8 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
                     break;
                 }
                 let component_char_info = match direction {
-                    Direction::Ltr => char_infos[(cluster_id + i) as usize],
-                    Direction::Rtl => char_infos[(cluster_id + num_components - i) as usize],
+                    Direction::Ltr => char_info_at((cluster_id + i) as usize),
+                    Direction::Rtl => char_info_at((cluster_id + num_components - i) as usize),
                 };
                 push_cluster(
                     clusters,
