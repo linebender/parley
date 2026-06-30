@@ -1,10 +1,10 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Tests for glyph and decoration drawing via `glifo`.
+//! Tests for glyph and decoration drawing.
 //!
 //! These tests focus on the interaction between transforms, hinting, and
-//! decoration rendering (especially ink-skipping underlines).
+//! decoration rendering (especially underlines).
 
 use crate::test_name;
 use crate::util::TestEnv;
@@ -101,7 +101,7 @@ where
     }
 }
 
-/// Test underline ink-skipping across different hinting, per-glyph transform, and scale configurations.
+/// Test underline rendering across different hinting, per-glyph transform, and scale configurations.
 #[test]
 fn draw_underline_descenders() {
     let mut env = TestEnv::new(test_name!(), None);

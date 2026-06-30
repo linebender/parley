@@ -2981,7 +2981,6 @@ name = "parley_tests"
 version = "0.0.0"
 dependencies = [
  "fontique",
- "glifo",
  "oxipng",
  "parley",
  "parley_dev",

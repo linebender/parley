@@ -254,7 +254,7 @@ fn break_by_length_with_emoji() {
 #[test]
 fn break_by_length_with_emoji_only() {
     let mut env = TestEnv::new(test_name!(), None);
-    env.set_tolerance(5.0);
+    env.set_tolerance(10.0);
 
     let text = "✅👀🎉🤠";
     let mut builder = env.ranged_builder(text);
