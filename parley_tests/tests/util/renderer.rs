@@ -185,7 +185,9 @@ pub(crate) fn draw_layout(
 ///
 /// If given [`RenderingConfig::size`] is not specified, [`Layout::width`] and [`Layout::height`]
 /// are used.
-pub(crate) fn render_to_pixmap((mut renderer, mut resources): (RenderContext, Resources)) -> Pixmap {
+pub(crate) fn render_to_pixmap(
+    (mut renderer, mut resources): (RenderContext, Resources),
+) -> Pixmap {
     let mut img = Pixmap::new(renderer.width(), renderer.height());
     renderer.flush();
     renderer.render_to_pixmap(&mut resources, &mut img);
