@@ -1405,24 +1405,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "glifo"
-version = "0.0.0"
-source = "git+https://github.com/linebender/vello.git?rev=5796226#5796226bfafd75fb121e938536ff74bb80a6114f"
-dependencies = [
- "bytemuck",
- "foldhash 0.1.5",
- "hashbrown 0.16.1",
- "log",
- "peniko",
- "png 0.18.1",
- "skrifa 0.40.0",
- "smallvec",
- "vello_common",
- "vello_cpu",
- "vello_hybrid",
-]
-
-[[package]]
 name = "glob-match"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4303,11 +4285,9 @@ dependencies = [
 name = "vello_cpu_render"
 version = "0.1.0"
 dependencies = [
- "glifo",
  "parley",
  "parley_examples_common",
  "peniko",
- "skrifa 0.43.2",
  "vello_cpu",
 ]
 
@@ -4343,21 +4323,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vello_hybrid"
-version = "0.0.7"
-source = "git+https://github.com/linebender/vello.git?rev=5796226#5796226bfafd75fb121e938536ff74bb80a6114f"
-dependencies = [
- "bytemuck",
- "hashbrown 0.16.1",
- "log",
- "thiserror 2.0.18",
- "vello_api",
- "vello_common",
- "vello_sparse_shaders",
- "wgpu",
-]
-
-[[package]]
 name = "vello_shaders"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4369,11 +4334,6 @@ dependencies = [
  "thiserror 2.0.18",
  "vello_encoding",
 ]
-
-[[package]]
-name = "vello_sparse_shaders"
-version = "0.0.7"
-source = "git+https://github.com/linebender/vello.git?rev=5796226#5796226bfafd75fb121e938536ff74bb80a6114f"
 
 [[package]]
 name = "version_check"
