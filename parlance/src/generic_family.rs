@@ -64,34 +64,35 @@ impl GenericFamily {
     /// ```
     pub fn parse(s: &str) -> Option<Self> {
         let s = s.trim();
-        Some(if s.eq_ignore_ascii_case("serif") {
-            Self::Serif
-        } else if s.eq_ignore_ascii_case("sans-serif") {
-            Self::SansSerif
-        } else if s.eq_ignore_ascii_case("monospace") {
-            Self::Monospace
-        } else if s.eq_ignore_ascii_case("cursive") {
-            Self::Cursive
-        } else if s.eq_ignore_ascii_case("fantasy") {
-            Self::Fantasy
-        } else if s.eq_ignore_ascii_case("system-ui") {
-            Self::SystemUi
-        } else if s.eq_ignore_ascii_case("ui-serif") {
-            Self::UiSerif
-        } else if s.eq_ignore_ascii_case("ui-sans-serif") {
-            Self::UiSansSerif
-        } else if s.eq_ignore_ascii_case("ui-monospace") {
-            Self::UiMonospace
-        } else if s.eq_ignore_ascii_case("ui-rounded") {
-            Self::UiRounded
-        } else if s.eq_ignore_ascii_case("emoji") {
-            Self::Emoji
-        } else if s.eq_ignore_ascii_case("math") {
-            Self::Math
-        } else if s.eq_ignore_ascii_case("fangsong") {
-            Self::FangSong
-        } else {
+        // The longest generic family name is `ui-sans-serif` (13 bytes). Any
+        // input longer than this cannot match, and any shorter input is
+        // lowercased once into this fixed-size buffer so we only have to do a
+        // single case-sensitive comparison below.
+        const MAX_LEN: usize = "ui-sans-serif".len();
+        let bytes = s.as_bytes();
+        if bytes.len() > MAX_LEN {
             return None;
+        }
+        let mut buf = [0_u8; MAX_LEN];
+        let buf = &mut buf[..bytes.len()];
+        buf.copy_from_slice(bytes);
+        buf.make_ascii_lowercase();
+
+        Some(match &*buf {
+            b"serif" => Self::Serif,
+            b"sans-serif" => Self::SansSerif,
+            b"monospace" => Self::Monospace,
+            b"cursive" => Self::Cursive,
+            b"fantasy" => Self::Fantasy,
+            b"system-ui" => Self::SystemUi,
+            b"ui-serif" => Self::UiSerif,
+            b"ui-sans-serif" => Self::UiSansSerif,
+            b"ui-monospace" => Self::UiMonospace,
+            b"ui-rounded" => Self::UiRounded,
+            b"emoji" => Self::Emoji,
+            b"math" => Self::Math,
+            b"fangsong" => Self::FangSong,
+            _ => return None,
         })
     }
 
