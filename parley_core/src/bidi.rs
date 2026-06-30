@@ -10,6 +10,10 @@ use icu_properties::props::{BidiClass, BidiMirroringGlyph, BidiPairedBracketType
 pub type BidiLevel = u8;
 
 /// Resolver for the Unicode bidirectional algorithm.
+///
+/// This is initially [created](Self::new) in an empty state.
+/// The various getter methods will not give meaningful results before
+/// [`resolve`](Self::resolve) is called.
 #[derive(Clone, Default)]
 pub struct BidiResolver {
     base_level: BidiLevel,
@@ -48,18 +52,19 @@ impl BidiResolver {
         }
     }
 
-    /// Returns the base level of the text.
-    pub fn base_level(&self) -> u8 {
+    /// Returns the base level of the text which was most recently [resolved](Self::resolve) by this resolver.
+    pub fn base_level(&self) -> BidiLevel {
         self.base_level
     }
 
     /// Returns the sequence of bidi levels corresponding to all characters in the
-    /// paragraph.
+    /// text which was most recently [resolved](Self::resolve) by this resolver.
     pub fn levels(&self) -> &[BidiLevel] {
         &self.levels
     }
 
-    /// Clears the resolver state.
+    /// Clears the resolver state. The other getters on this value will
+    /// not give meaningful results until [`resolve`](Self::resolve) is called again.
     pub fn clear(&mut self) {
         self.initial_types.clear();
         self.levels.clear();
@@ -72,10 +77,14 @@ impl BidiResolver {
 
     /// Resolves a paragraph with the specified base direction and
     /// precomputed types.
+    ///
+    /// This implements the Bidi algorithm in [UAX#9](https://unicode.org/reports/tr9/)
+    ///
+    /// Results can be accessed as [`base_level`](Self::base_level) and [`levels`](Self::levels).
     pub fn resolve(
         &mut self,
         chars: impl Iterator<Item = (char, (BidiClass, BidiMirroringGlyph))>,
-        base_level: Option<u8>,
+        base_level: Option<BidiLevel>,
     ) {
         self.clear();
         let mut needs_bidi = false;
@@ -174,17 +183,13 @@ impl BidiResolver {
     fn default_level(types: &[BidiClass]) -> u8 {
         let mut isolates = 0;
         for ty in types {
-            let ty = *ty;
-            match ty {
+            match *ty {
                 BidiClass::RightToLeftIsolate
                 | BidiClass::LeftToRightIsolate
                 | BidiClass::FirstStrongIsolate => isolates += 1,
                 BidiClass::PopDirectionalIsolate if isolates > 0 => isolates -= 1,
-                BidiClass::LeftToRight | BidiClass::RightToLeft | BidiClass::ArabicLetter
-                    if isolates == 0 =>
-                {
-                    return if ty == BidiClass::LeftToRight { 0 } else { 1 };
-                }
+                BidiClass::LeftToRight if isolates == 0 => return 0,
+                BidiClass::RightToLeft | BidiClass::ArabicLetter if isolates == 0 => return 1,
                 _ => {}
             }
         }
