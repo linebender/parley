@@ -15,19 +15,16 @@ pub fn match_fonts(
     style: FontStyle,
     weight: FontWeight,
     synthesize_style: bool,
-) -> SmallVec<[usize; 4]> {
-    let Some(best) = match_font(set, width, style, weight, synthesize_style) else {
-        return SmallVec::new();
-    };
-    let win = &set[best];
-    let (win_width, win_style, win_weight) = (win.width(), win.style(), win.weight());
-    set.iter()
-        .enumerate()
-        .filter(|(_, font)| {
-            font.width() == win_width && font.style() == win_style && font.weight() == win_weight
-        })
-        .map(|(index, _)| index)
-        .collect()
+) -> impl Iterator<Item = usize> + '_ {
+    let best = match_font(set, width, style, weight, synthesize_style).map(|index| {
+        let font = &set[index];
+        (font.width(), font.style(), font.weight())
+    });
+    set.iter().enumerate().filter_map(move |(index, font)| {
+        let (best_width, best_style, best_weight) = best?;
+        (font.width() == best_width && font.style() == best_style && font.weight() == best_weight)
+            .then_some(index)
+    })
 }
 
 pub fn match_font(
