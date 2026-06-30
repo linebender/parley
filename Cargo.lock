@@ -2915,10 +2915,8 @@ dependencies = [
 name = "parley_bench"
 version = "0.0.0"
 dependencies = [
- "glifo",
  "parley",
  "parley_dev",
- "skrifa 0.43.2",
  "tango-bench",
  "vello_cpu",
 ]
