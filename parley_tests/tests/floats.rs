@@ -74,7 +74,7 @@ fn render_and_check_float_layout(
     layout: &Layout<ColorBrush>,
     floated_boxes: &[TestFloatedBox],
 ) {
-    let mut renderer = draw_layout(&*env.rendering_config(), layout, None, &[]);
+    let (mut renderer, resources) = draw_layout(&*env.rendering_config(), layout, None, &[]);
     renderer.set_paint(Color::from_rgb8(255, 105, 180));
 
     for fbox in floated_boxes {
@@ -88,7 +88,7 @@ fn render_and_check_float_layout(
         ));
     }
 
-    let current_img = render_to_pixmap(renderer);
+    let current_img = render_to_pixmap((renderer, resources));
     env.check_image(&current_img);
 }
 
