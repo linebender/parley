@@ -1039,6 +1039,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8b14ccef22fc6f5a8f4d7d768562a182c04ce9a3b3157b91390b52ddfdf1a76"
 
 [[package]]
+name = "editor"
+version = "0.1.0"
+dependencies = [
+ "accesskit",
+ "accesskit_winit",
+ "anyhow",
+ "clipboard-rs",
+ "parley",
+ "peniko",
+ "pollster",
+ "ui-events",
+ "ui-events-winit",
+ "vello",
+ "web-time",
+ "winit",
+]
+
+[[package]]
 name = "either"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4311,24 +4329,6 @@ dependencies = [
  "peniko",
  "skrifa 0.43.2",
  "vello_cpu",
-]
-
-[[package]]
-name = "vello_editor"
-version = "0.1.0"
-dependencies = [
- "accesskit",
- "accesskit_winit",
- "anyhow",
- "clipboard-rs",
- "parley",
- "peniko",
- "pollster",
- "ui-events",
- "ui-events-winit",
- "vello",
- "web-time",
- "winit",
 ]
 
 [[package]]
