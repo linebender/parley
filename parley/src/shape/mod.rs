@@ -67,7 +67,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
     mut fq: Query<'a>,
     styles: &'a [ResolvedStyle<B>],
     inline_boxes: &[InlineBox],
-    infos: &[(CharInfo, u16)],
+    char_info: &[CharInfo],
+    char_style_indices: &[u16],
     levels: &[u8],
     scx: &mut ShapeContext,
     mut text: &str,
@@ -90,15 +91,15 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 
     // Setup mutable state for iteration
-    let initial_style_index = infos.first().map_or(0, |(_, style_index)| *style_index);
+    let initial_style_index = char_style_indices.first().copied().unwrap_or(0);
     let mut style = &styles[initial_style_index as usize];
     let mut item = Item {
         style_index: initial_style_index,
         size: style.font_size,
         level: levels.first().copied().unwrap_or(0),
-        script: infos
+        script: char_info
             .iter()
-            .map(|x| x.0.script)
+            .map(|x| x.script)
             .find(|&script| real_script(script))
             .unwrap_or(Script::Latin),
         locale: style.locale,
@@ -115,8 +116,10 @@ pub(crate) fn shape_text<'a, B: Brush>(
     let mut current_box = inline_box_iter.next();
 
     // Iterate over characters in the text
-    for ((char_index, (byte_index, ch)), (info, style_index)) in
-        text.char_indices().enumerate().zip(infos)
+    for ((char_index, (byte_index, ch)), (info, style_index)) in text
+        .char_indices()
+        .enumerate()
+        .zip(char_info.iter().zip(char_style_indices))
     {
         let mut break_run = false;
         let mut script = info.script;
@@ -173,7 +176,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 text,
                 &text_range,
                 &char_range,
-                infos,
+                char_info,
+                char_style_indices,
                 layout,
                 analysis_data_sources,
             );
@@ -209,7 +213,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
             text,
             &text_range,
             &char_range,
-            infos,
+            char_info,
+            char_style_indices,
             layout,
             analysis_data_sources,
         );
@@ -228,7 +233,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
 // for the given grapheme `segment_text`, consuming items from `item_infos_iter`.
 fn fill_cluster_in_place(
     segment_text: &str,
-    item_infos_iter: &mut core::slice::Iter<'_, (CharInfo, u16)>,
+    item_infos_iter: &mut impl Iterator<Item = (CharInfo, u16)>,
     code_unit_offset_in_string: &mut usize,
     char_cluster: &mut CharCluster,
 ) {
@@ -274,7 +279,7 @@ fn fill_cluster_in_place(
             ch,
             contributes_to_shaping,
             glyph_id: 0,
-            style_index: *style_index,
+            style_index,
             is_control_character: info.is_control(),
         });
     }
@@ -297,13 +302,18 @@ fn shape_item<'a, B: Brush>(
     text: &str,
     text_range: &core::ops::Range<usize>,
     char_range: &core::ops::Range<usize>,
-    infos: &[(CharInfo, u16)],
+    char_info: &[CharInfo],
+    char_style_indices: &[u16],
     layout: &mut Layout<B>,
     analysis_data_sources: &AnalysisDataSources,
 ) {
     let item_text = &text[text_range.clone()];
-    let item_infos = &infos[char_range.start..char_range.end]; // Only process current item
-    let first_style_index = item_infos[0].1;
+
+    // Only process current item
+    let item_char_info = &char_info[char_range.start..char_range.end];
+    let item_char_style_indices = &char_style_indices[char_range.start..char_range.end];
+    let first_style_index = item_char_style_indices[0];
+
     let fb_script = convert::script_to_fontique(item.script, analysis_data_sources);
     let mut font_selector =
         FontSelector::new(fq, rcx, styles, first_style_index, fb_script, item.locale);
@@ -311,7 +321,10 @@ fn shape_item<'a, B: Brush>(
     let grapheme_cluster_boundaries = analysis_data_sources
         .grapheme_segmenter()
         .segment_str(item_text);
-    let mut item_infos_iter = item_infos.iter();
+    let mut item_infos_iter = item_char_info
+        .iter()
+        .copied()
+        .zip(item_char_style_indices.iter().copied());
     let mut code_unit_offset_in_string = text_range.start;
     let char_cluster = &mut scx.char_cluster;
 
@@ -474,8 +487,10 @@ fn shape_item<'a, B: Brush>(
         let char_start = char_range.start + item_text[..segment_start_offset].chars().count();
         let segment_char_start = char_start - char_range.start;
         let segment_char_count = segment_text.chars().count();
-        let segment_infos =
-            &item_infos[segment_char_start..(segment_char_start + segment_char_count)];
+        let segment_char_info =
+            &item_char_info[segment_char_start..(segment_char_start + segment_char_count)];
+        let segment_char_style_indices =
+            &item_char_style_indices[segment_char_start..(segment_char_start + segment_char_count)];
 
         // Push harfrust-shaped run for the entire segment
         layout.data.push_run(
@@ -489,7 +504,8 @@ fn shape_item<'a, B: Brush>(
             item.word_spacing,
             item.letter_spacing,
             segment_text,
-            segment_infos,
+            segment_char_info,
+            segment_char_style_indices,
             (text_range.start + segment_start_offset)..(text_range.start + segment_end_offset),
             harf_shaper.coords(),
         );

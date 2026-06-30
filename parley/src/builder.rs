@@ -310,10 +310,12 @@ fn build_into_layout<B: Brush>(
     layout.data.base_level = lcx.analysis.paragraph_level();
     layout.data.text_len = text.len();
 
+    lcx.char_style_indices
+        .resize(lcx.analysis.char_info().len(), 0);
     let mut char_index = 0;
     for style_run in &lcx.style_runs {
         for _ in text[style_run.range.clone()].chars() {
-            lcx.info[char_index].1 = style_run.style_index;
+            lcx.char_style_indices[char_index] = style_run.style_index;
             char_index += 1;
         }
     }
@@ -335,7 +337,8 @@ fn build_into_layout<B: Brush>(
             query,
             &lcx.style_table,
             &lcx.inline_boxes,
-            &lcx.info,
+            lcx.analysis.char_info(),
+            &lcx.char_style_indices,
             lcx.analysis.bidi_levels(),
             &mut lcx.scx,
             text,

@@ -33,11 +33,6 @@ pub(crate) fn analyze_text<B: Brush>(
         line_break_override,
     };
     lcx.analyzer.analyze(text, &options, &mut lcx.analysis);
-
-    // Pair the char infos with style indices (which we set later in the builder).
-    lcx.info.clear();
-    lcx.info
-        .extend(lcx.analysis.char_info().iter().map(|&ci| (ci, 0)));
 }
 
 /// All characters contribute to shaping except:

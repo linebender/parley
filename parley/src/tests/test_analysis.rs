@@ -17,9 +17,10 @@ impl TestContext {
     fn expect_boundary_list(self, expected: Vec<Boundary>) -> Self {
         let actual: Vec<_> = self
             .layout_context
-            .info
+            .analysis
+            .char_info()
             .iter()
-            .map(|(info, _)| info.boundary)
+            .map(|info| info.boundary)
             .collect();
         assert_eq!(actual, expected, "Boundary list mismatch");
         self
@@ -34,9 +35,10 @@ impl TestContext {
     fn expect_script_list(self, expected: Vec<Script>) -> Self {
         let actual: Vec<_> = self
             .layout_context
-            .info
+            .analysis
+            .char_info()
             .iter()
-            .map(|(info, _)| info.script)
+            .map(|info| info.script)
             .collect();
         assert_eq!(actual, expected, "Script list mismatch");
         self
@@ -45,9 +47,10 @@ impl TestContext {
     fn expect_grapheme_cluster_break_list(self, expected: Vec<GraphemeClusterBreak>) -> Self {
         let actual: Vec<_> = self
             .layout_context
-            .info
+            .analysis
+            .char_info()
             .iter()
-            .map(|(info, _)| info.grapheme_cluster_break)
+            .map(|info| info.grapheme_cluster_break)
             .collect();
         assert_eq!(actual, expected, "Grapheme cluster break list mismatch");
         self
@@ -56,9 +59,10 @@ impl TestContext {
     fn expect_is_control_list(self, expected: Vec<bool>) -> Self {
         let actual: Vec<_> = self
             .layout_context
-            .info
+            .analysis
+            .char_info()
             .iter()
-            .map(|(info, _)| info.is_control())
+            .map(|info| info.is_control())
             .collect();
         assert_eq!(actual, expected, "Is control list mismatch");
         self
@@ -67,9 +71,10 @@ impl TestContext {
     fn expect_contributes_to_shaping_list(self, expected: Vec<bool>) -> Self {
         let actual: Vec<_> = self
             .layout_context
-            .info
+            .analysis
+            .char_info()
             .iter()
-            .map(|(info, _)| info.contributes_to_shaping())
+            .map(|info| info.contributes_to_shaping())
             .collect();
         assert_eq!(actual, expected, "Contributes to shaping list mismatch");
         self
@@ -78,9 +83,10 @@ impl TestContext {
     fn expect_force_normalize_list(self, expected: Vec<bool>) -> Self {
         let actual: Vec<_> = self
             .layout_context
-            .info
+            .analysis
+            .char_info()
             .iter()
-            .map(|(info, _)| info.force_normalize())
+            .map(|info| info.force_normalize())
             .collect();
         assert_eq!(actual, expected, "Force normalize list mismatch");
         self
@@ -89,9 +95,10 @@ impl TestContext {
     fn expect_is_emoji_or_pictograph_list(self, expected: Vec<bool>) -> Self {
         let actual: Vec<_> = self
             .layout_context
-            .info
+            .analysis
+            .char_info()
             .iter()
-            .map(|(info, _)| info.is_emoji_or_pictograph())
+            .map(|info| info.is_emoji_or_pictograph())
             .collect();
         assert_eq!(actual, expected, "Is emoji or pictograph list mismatch");
         self
@@ -100,9 +107,10 @@ impl TestContext {
     fn expect_is_variation_selector_list(self, expected: Vec<bool>) -> Self {
         let actual: Vec<_> = self
             .layout_context
-            .info
+            .analysis
+            .char_info()
             .iter()
-            .map(|(info, _)| info.is_variation_selector())
+            .map(|info| info.is_variation_selector())
             .collect();
         assert_eq!(actual, expected, "Is variation selector list mismatch");
         self
@@ -110,9 +118,10 @@ impl TestContext {
 
     fn boundary_list(&self) -> Vec<Boundary> {
         self.layout_context
-            .info
+            .analysis
+            .char_info()
             .iter()
-            .map(|(info, _)| info.boundary)
+            .map(|info| info.boundary)
             .collect()
     }
 }
