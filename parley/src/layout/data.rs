@@ -786,7 +786,6 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
 
         let glyph = Glyph {
             id: glyph_info.glyph_id,
-            style_index: char_info.1,
             x: (glyph_pos.x_offset as f32) * scale_factor,
             // Convert from font space (Y-up) to layout space (Y-down)
             y: -(glyph_pos.y_offset as f32) * scale_factor,

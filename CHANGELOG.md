@@ -12,6 +12,12 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 This release has an [MSRV] of 1.88.
 
+### Changed
+
+#### Parley
+
+- Breaking change: the `Glyph::style_index` field was removed. Use `Clusters::{style, style_index}` or `GlyphRun::{style, style_index}` instead. (#661 by [@tomcur][])
+
 ## [0.11.0] - 2026-06-24
 
 This release has an [MSRV] of 1.88.
@@ -681,6 +687,7 @@ This release has an [MSRV][] of 1.70.
 [#640]: https://github.com/linebender/parley/pull/640
 [#643]: https://github.com/linebender/parley/pull/643
 [#650]: https://github.com/linebender/parley/pull/650
+[#661]: https://github.com/linebender/parley/pull/661
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.11.0...HEAD
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0

@@ -151,8 +151,19 @@ impl<'a, B: Brush> Cluster<'a, B> {
     /// Returns the style of the character this cluster represents.
     ///
     /// All of the cluster's glyphs share this style.
+    ///
+    /// See also [`Self::style_index`].
     pub fn style(&self) -> &Style<B> {
         &self.run.layout.styles()[usize::from(self.data.style_index)]
+    }
+
+    /// Returns the style index of the character this cluster represents.
+    ///
+    /// All of the cluster's glyphs share this style.
+    ///
+    /// See also [`Self::style`].
+    pub fn style_index(&self) -> u16 {
+        self.data.style_index
     }
 
     /// Returns the advance of the cluster.
@@ -209,7 +220,6 @@ impl<'a, B: Brush> Cluster<'a, B> {
         if self.data.glyph_len == 0xFF {
             GlyphIter::Single(Some(Glyph {
                 id: self.data.glyph_offset,
-                style_index: self.data.style_index,
                 x: 0.,
                 y: 0.,
                 advance: self.data.advance,
