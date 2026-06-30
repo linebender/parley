@@ -12,36 +12,40 @@
 
 use accesskit::{Node, Role, Tree, TreeId, TreeUpdate};
 use anyhow::Result;
-use std::num::NonZeroUsize;
+use std::num::NonZeroU32;
 use std::sync::Arc;
 use ui_events_winit::{WindowEventReducer, WindowEventTranslation};
-use vello::peniko::Color;
-use vello::util::{RenderContext, RenderSurface};
-use vello::wgpu;
-use vello::{AaConfig, Renderer, RendererOptions, Scene};
+use vello_cpu::peniko::Color;
+use vello_cpu::peniko::color::PremulRgba8;
+use vello_cpu::{Pixmap, RenderContext, Resources, kurbo::Rect};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalPosition, PhysicalSize};
 use winit::event::{StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
 use winit::window::Window;
 
+/// The window background color.
+const BACKGROUND_COLOR: Color = Color::from_rgb8(30, 30, 30);
+
+type SoftbufferSurface = softbuffer::Surface<Arc<Window>, Arc<Window>>;
+
 mod access_ids;
 use access_ids::{TEXT_INPUT_ID, WINDOW_ID};
 
 mod text;
 
-const WINDOW_TITLE: &str = "Vello Text Editor";
+const WINDOW_TITLE: &str = "Text Editor";
 
 // Simple struct to hold the state of the renderer
-pub struct ActiveRenderState<'s> {
+pub struct ActiveRenderState {
     // The fields MUST be in this order, so that the surface and AccessKit adapter are dropped before the window
-    surface: Box<RenderSurface<'s>>,
+    surface: SoftbufferSurface,
     access_adapter: accesskit_winit::Adapter,
     window: Arc<Window>,
     sent_initial_access_update: bool,
 }
 
-impl ActiveRenderState<'_> {
+impl ActiveRenderState {
     fn access_update(&mut self, editor: &mut text::Editor) {
         self.access_adapter.update_if_active(|| {
             let mut update = TreeUpdate {
@@ -79,25 +83,30 @@ impl ActiveRenderState<'_> {
     }
 }
 
-enum RenderState<'s> {
-    Active(ActiveRenderState<'s>),
+enum RenderState {
+    Active(ActiveRenderState),
     // Cache a window so that it can be reused when the app is resumed after being suspended
     Suspended(Option<Arc<Window>>),
 }
 
-struct SimpleVelloApp<'s> {
-    /// The vello `RenderContext` which is a global context that lasts for the
-    /// lifetime of the application.
-    context: RenderContext,
+struct SimpleVelloApp {
+    /// The softbuffer context used to create surfaces for windows.
+    context: Option<softbuffer::Context<Arc<Window>>>,
 
-    /// An array of renderers, one per wgpu device.
-    renderers: Vec<Option<Renderer>>,
+    /// State for our example where we store the winit Window and the softbuffer Surface.
+    state: RenderState,
 
-    /// State for our example where we store the winit Window and the wgpu Surface.
-    state: RenderState<'s>,
+    /// The `vello_cpu` render context into which the editor layout is drawn.
+    renderer: RenderContext,
 
-    /// A `vello::Scene` where the editor layout will be drawn.
-    scene: Scene,
+    /// Resources (e.g. the glyph cache) used by the `vello_cpu` renderer.
+    resources: Resources,
+
+    /// The pixmap that the `vello_cpu` renderer rasterizes into.
+    pixmap: Pixmap,
+
+    /// The size, in physical pixels, of `renderer` and `pixmap`.
+    render_size: (u16, u16),
 
     /// Our `Editor`, which owns a `parley::PlainEditor`.
     editor: text::Editor,
@@ -115,7 +124,7 @@ struct SimpleVelloApp<'s> {
     event_reducer: WindowEventReducer,
 }
 
-impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
+impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let RenderState::Suspended(cached_window) = &mut self.state else {
             return;
@@ -135,41 +144,30 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
 
         let size = window.inner_size();
 
-        // Create a vello Surface
-        let surface_future = {
-            let surface = self
-                .context
-                .instance
-                .create_surface(wgpu::SurfaceTarget::from(window.clone()))
-                .expect("Error creating surface");
-            let dev_id = pollster::block_on(self.context.device(Some(&surface)))
-                .expect("No compatible device");
-            let device_handle = &self.context.devices[dev_id];
-            let capabilities = surface.get_capabilities(device_handle.adapter());
-            let present_mode = if capabilities
-                .present_modes
-                .contains(&wgpu::PresentMode::Mailbox)
-            {
-                wgpu::PresentMode::Mailbox
-            } else {
-                wgpu::PresentMode::AutoVsync
-            };
+        // Create (or reuse) the softbuffer context and create a surface for this window.
+        let context = self
+            .context
+            .get_or_insert_with(|| softbuffer::Context::new(window.clone()).unwrap());
+        let mut surface = softbuffer::Surface::new(context, window.clone()).unwrap();
+        if let (Some(width), Some(height)) =
+            (NonZeroU32::new(size.width), NonZeroU32::new(size.height))
+        {
+            surface.resize(width, height).unwrap();
+        }
 
-            self.context
-                .create_render_surface(surface, size.width, size.height, present_mode)
-        };
-        let surface = pollster::block_on(surface_future).expect("Error creating surface");
-
-        // Create a vello Renderer for the surface (using its device id)
-        self.renderers
-            .resize_with(self.context.devices.len(), || None);
-
-        self.renderers[surface.dev_id]
-            .get_or_insert_with(|| create_vello_renderer(&self.context, &surface));
+        // Ensure the CPU renderer and pixmap match the window size.
+        ensure_render_size(
+            &mut self.renderer,
+            &mut self.pixmap,
+            &mut self.render_size,
+            &mut self.last_drawn_generation,
+            to_u16(size.width),
+            to_u16(size.height),
+        );
 
         // Save the Window and Surface to a state variable
         self.state = RenderState::Active(ActiveRenderState {
-            surface: Box::new(surface),
+            surface,
             access_adapter,
             window,
             sent_initial_access_update: false,
@@ -284,8 +282,19 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
 
             // Resize the surface when the window is resized
             WindowEvent::Resized(size) => {
-                self.context
-                    .resize_surface(&mut render_state.surface, size.width, size.height);
+                if let (Some(width), Some(height)) =
+                    (NonZeroU32::new(size.width), NonZeroU32::new(size.height))
+                {
+                    render_state.surface.resize(width, height).unwrap();
+                }
+                ensure_render_size(
+                    &mut self.renderer,
+                    &mut self.pixmap,
+                    &mut self.render_size,
+                    &mut self.last_drawn_generation,
+                    to_u16(size.width),
+                    to_u16(size.height),
+                );
                 let editor = self.editor.editor();
                 editor.set_scale(1.0);
                 editor.set_width(Some(size.width as f32 - 2_f32 * text::INSET));
@@ -309,69 +318,32 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp<'_> {
                 // Send an accessibility update if accessibility is active.
                 render_state.access_update(&mut self.editor);
 
-                // Get the RenderSurface (surface + config).
-                let surface = &render_state.surface;
+                let (width, height) = self.render_size;
 
-                // Get the window size.
-                let width = surface.config.width;
-                let height = surface.config.height;
-
-                // Get a handle to the device.
-                let device_handle = &self.context.devices[surface.dev_id];
-
-                // Sometimes `Scene` is stale and needs to be redrawn.
+                // Sometimes the pixmap is stale and needs to be redrawn.
                 if self.last_drawn_generation != self.editor.generation() {
-                    // Empty the scene of objects to draw. You could create a new Scene each time, but in this case
-                    // the same Scene is reused so that the underlying memory allocation can also be reused.
-                    self.scene.reset();
+                    // Clear the render context and paint the background.
+                    self.renderer.reset();
+                    self.renderer.set_paint(BACKGROUND_COLOR);
+                    self.renderer
+                        .fill_rect(&Rect::new(0.0, 0.0, width as f64, height as f64));
 
-                    self.last_drawn_generation = self.editor.draw(&mut self.scene);
+                    self.last_drawn_generation =
+                        self.editor.draw(&mut self.renderer, &mut self.resources);
+
+                    // Rasterize the scene into the pixmap.
+                    self.renderer.flush();
+                    self.renderer
+                        .render_to_pixmap(&mut self.resources, &mut self.pixmap);
                 }
 
-                // Render to the surface's texture.
-                self.renderers[surface.dev_id]
-                    .as_mut()
-                    .unwrap()
-                    .render_to_texture(
-                        &device_handle.device,
-                        &device_handle.queue,
-                        &self.scene,
-                        &surface.target_view,
-                        &vello::RenderParams {
-                            base_color: Color::from_rgb8(30, 30, 30), // Background color
-                            width,
-                            height,
-                            antialiasing_method: AaConfig::Area,
-                        },
-                    )
-                    .expect("failed to render to surface");
-
-                // Get the surface's texture.
-                let surface_texture = surface
-                    .surface
-                    .get_current_texture()
-                    .expect("failed to get surface texture");
-
-                // Perform the copy.
-                let mut encoder =
-                    device_handle
-                        .device
-                        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                            label: Some("Surface Blit"),
-                        });
-                surface.blitter.copy(
-                    &device_handle.device,
-                    &mut encoder,
-                    &surface.target_view,
-                    &surface_texture
-                        .texture
-                        .create_view(&wgpu::TextureViewDescriptor::default()),
-                );
-                device_handle.queue.submit([encoder.finish()]);
-                // Queue the texture to be presented on the surface.
-                surface_texture.present();
-
-                device_handle.device.poll(wgpu::PollType::Poll).unwrap();
+                // Copy the pixmap into the softbuffer surface and present it.
+                let mut buffer = render_state.surface.buffer_mut().unwrap();
+                for (dst, src) in buffer.iter_mut().zip(self.pixmap.data()) {
+                    *dst = premul_rgba8_to_softbuffer(*src);
+                }
+                render_state.window.pre_present_notify();
+                buffer.present().unwrap();
             }
             _ => {}
         }
@@ -408,10 +380,13 @@ fn main() -> Result<()> {
 
     // Setup a bunch of state:
     let mut app = SimpleVelloApp {
-        context: RenderContext::new(),
-        renderers: vec![],
+        context: None,
         state: RenderState::Suspended(None),
-        scene: Scene::new(),
+        // These are placeholders; they are recreated to match the window size in `resumed`.
+        renderer: RenderContext::new(1, 1),
+        resources: Resources::new(),
+        pixmap: Pixmap::new(1, 1),
+        render_size: (1, 1),
         editor: text::Editor::new(text::LOREM),
         last_drawn_generation: text::Generation::default(),
         last_sent_ime_cursor_area: parley::BoundingBox::new(f64::NAN, f64::NAN, f64::NAN, f64::NAN),
@@ -438,16 +413,34 @@ fn create_winit_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
     Arc::new(event_loop.create_window(attr).unwrap())
 }
 
-/// Helper function that creates a vello `Renderer` for a given `RenderContext` and `RenderSurface`
-fn create_vello_renderer(render_cx: &RenderContext, surface: &RenderSurface<'_>) -> Renderer {
-    Renderer::new(
-        &render_cx.devices[surface.dev_id].device,
-        RendererOptions {
-            use_cpu: false,
-            antialiasing_support: vello::AaSupport::all(),
-            num_init_threads: NonZeroUsize::new(1),
-            pipeline_cache: None,
-        },
-    )
-    .expect("Couldn't create renderer")
+/// Clamp a physical pixel dimension to a non-zero `u16`, as required by `vello_cpu`.
+fn to_u16(value: u32) -> u16 {
+    value.clamp(1, u16::MAX as u32) as u16
+}
+
+/// Ensure the `vello_cpu` render context and pixmap match the given size, recreating
+/// them (and forcing a redraw) if the size has changed.
+///
+/// This is a free function operating on individual fields so that it can be called
+/// while another field (e.g. the active render state) is mutably borrowed.
+fn ensure_render_size(
+    renderer: &mut RenderContext,
+    pixmap: &mut Pixmap,
+    render_size: &mut (u16, u16),
+    last_drawn_generation: &mut text::Generation,
+    width: u16,
+    height: u16,
+) {
+    if *render_size != (width, height) {
+        *renderer = RenderContext::new(width, height);
+        *pixmap = Pixmap::new(width, height);
+        *render_size = (width, height);
+        // Force the editor to be re-rasterized into the new pixmap.
+        *last_drawn_generation = text::Generation::default();
+    }
+}
+
+/// Convert a premultiplied RGBA8 pixel into the `0RGB` `u32` format expected by softbuffer.
+fn premul_rgba8_to_softbuffer(pixel: PremulRgba8) -> u32 {
+    (u32::from(pixel.r) << 16) | (u32::from(pixel.g) << 8) | u32::from(pixel.b)
 }
