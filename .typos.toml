@@ -39,4 +39,6 @@ extend-exclude = [
     "/.git",
     # Generated code doesn't need typo checking.
     "/parley_data/src/generated/**",
+    # Vendored Unicode test data files contain non-words and code-point sequences.
+    "/parley_core/tests/data/**",
 ]

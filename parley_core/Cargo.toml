@@ -19,5 +19,8 @@ std = []
 [dependencies]
 icu_properties = { workspace = true, features = ["compiled_data"] }
 
+[dev-dependencies]
+icu_properties = { workspace = true, features = ["compiled_data"] }
+
 [lints]
 workspace = true
