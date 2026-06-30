@@ -56,7 +56,6 @@ icu_properties = { version = "2.1.2", default-features = false }
 icu_segmenter = { version = "2.1.2", default-features = false }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
 packtab = { version = "1.8.0" }
-glifo = { git = "https://github.com/linebender/vello", rev = "5796226", default-features = false }
 rand = { version = "0.10.1", default-features = false, features = ["std", "std_rng"] }
 rand_chacha = { version = "0.10.0", default-features = false }
 peniko = { version = "0.6.0", default-features = false }
