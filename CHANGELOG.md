@@ -16,7 +16,7 @@ This release has an [MSRV] of 1.88.
 
 #### Parley
 
-- Breaking change: the `Glyph::style_index` field was removed. Use `Clusters::{style, style_index}` or `GlyphRun::{style, style_index}` instead. (#661 by [@tomcur][])
+- Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. (#661 by [@tomcur][])
 
 ## [0.11.0] - 2026-06-24
 
