@@ -148,9 +148,10 @@ impl<'a, B: Brush> Cluster<'a, B> {
         self.data.text_range(self.run.data)
     }
 
-    /// Returns the first style that applies to the cluster. If the cluster contains multiple glyphs
-    /// then this style may not apply to all glyphs in the cluster (see the `DIVERGENT_STYLES` flag)
-    pub fn first_style(&self) -> &Style<B> {
+    /// Returns the style of the character this cluster represents.
+    ///
+    /// All of the cluster's glyphs share this style.
+    pub fn style(&self) -> &Style<B> {
         &self.run.layout.styles()[usize::from(self.data.style_index)]
     }
 
