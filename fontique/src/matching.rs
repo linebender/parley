@@ -9,6 +9,27 @@ use smallvec::SmallVec;
 
 const DEFAULT_OBLIQUE_ANGLE: f32 = 14.0;
 
+pub fn match_fonts(
+    set: &[FontInfo],
+    width: FontWidth,
+    style: FontStyle,
+    weight: FontWeight,
+    synthesize_style: bool,
+) -> SmallVec<[usize; 4]> {
+    let Some(best) = match_font(set, width, style, weight, synthesize_style) else {
+        return SmallVec::new();
+    };
+    let win = &set[best];
+    let (win_width, win_style, win_weight) = (win.width(), win.style(), win.weight());
+    set.iter()
+        .enumerate()
+        .filter(|(_, font)| {
+            font.width() == win_width && font.style() == win_style && font.weight() == win_weight
+        })
+        .map(|(index, _)| index)
+        .collect()
+}
+
 pub fn match_font(
     set: &[FontInfo],
     width: FontWidth,
