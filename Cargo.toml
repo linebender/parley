@@ -63,8 +63,7 @@ read-fonts = { version = "0.40.0", default-features = false }
 skrifa = { version = "0.43.2", default-features = false }
 smallvec = "1.15.1"
 swash = { version = "0.2.6", default-features = false }
-vello_common = { version = "0.0.7", default-features = false }
-vello_cpu = { version = "0.0.7", default-features = false, features = ["u8_pipeline"] }
+vello_cpu = { version = "0.0.9", default-features = false, features = ["u8_pipeline"] }
 
 [workspace.lints]
 rust.unsafe_code = "deny"
@@ -114,10 +113,6 @@ clippy.negative_feature_names = "warn"
 clippy.redundant_feature_names = "warn"
 clippy.wildcard_dependencies = "warn"
 # END LINEBENDER LINT SET
-
-[patch.crates-io]
-vello_common = { git = "https://github.com/linebender/vello.git", rev = "5796226" }
-vello_cpu = { git = "https://github.com/linebender/vello.git", rev = "5796226" }
 
 [profile.profiling]
 inherits = "release"

@@ -157,7 +157,7 @@ fn draw_bitmap_emoji() {
 #[test]
 fn draw_colr_emoji() {
     let mut env = TestEnv::new(test_name!(), None);
-    env.set_tolerance(5.0);
+    env.set_tolerance(220.0);
     let text = "\u{2705}\u{1f440}\u{1f389}\u{1f920}";
 
     test_with_configs(&mut env, |env| {

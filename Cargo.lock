@@ -1405,6 +1405,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "glifo"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d99fc21d493812643aae86d53b7bbd02f376434a90317e8a790bc209fdd6605e"
+dependencies = [
+ "bytemuck",
+ "foldhash 0.2.0",
+ "hashbrown 0.17.1",
+ "log",
+ "peniko",
+ "png 0.18.1",
+ "skrifa 0.42.1",
+ "smallvec",
+ "vello_common",
+]
+
+[[package]]
 name = "glob-match"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4245,39 +4262,32 @@ dependencies = [
 ]
 
 [[package]]
-name = "vello_api"
-version = "0.0.7"
-source = "git+https://github.com/linebender/vello.git?rev=5796226#5796226bfafd75fb121e938536ff74bb80a6114f"
-dependencies = [
- "bytemuck",
- "peniko",
-]
-
-[[package]]
 name = "vello_common"
-version = "0.0.7"
-source = "git+https://github.com/linebender/vello.git?rev=5796226#5796226bfafd75fb121e938536ff74bb80a6114f"
+version = "0.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19d672facaa2d697285a786cd9d44d614cd2ce54cdc022504bf339f8fff3b750"
 dependencies = [
  "bytemuck",
  "fearless_simd",
  "guillotiere",
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
  "log",
  "peniko",
  "png 0.18.1",
- "skrifa 0.40.0",
  "smallvec",
  "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "vello_cpu"
-version = "0.0.7"
-source = "git+https://github.com/linebender/vello.git?rev=5796226#5796226bfafd75fb121e938536ff74bb80a6114f"
+version = "0.0.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "588691169aed86b5c8fb487266afee01323234e6fd0a3f2aaec0eaa8e4007f23"
 dependencies = [
  "bytemuck",
- "hashbrown 0.16.1",
- "vello_api",
+ "glifo",
+ "hashbrown 0.17.1",
+ "png 0.18.1",
  "vello_common",
 ]
 

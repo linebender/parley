@@ -13,7 +13,7 @@ use parley_examples_common::{
 };
 use peniko::Color;
 use vello_cpu::{
-    Glyph, Pixmap, RenderContext,
+    Glyph, Pixmap, RenderContext, Resources,
     kurbo::{Affine, Rect, Vec2},
 };
 
@@ -31,6 +31,7 @@ fn main() {
 
     stats.start("prepare_rendering");
     let mut renderer = RenderContext::new(width, height);
+    let mut resources = Resources::new();
     stats.end("prepare_rendering");
     let output_path = output_dir(env!("CARGO_MANIFEST_DIR")).join("vello_cpu_render.png");
 
@@ -44,6 +45,7 @@ fn main() {
             layout,
             config,
             &mut renderer,
+            &mut resources,
             width,
             height,
             &output_path,
@@ -61,6 +63,7 @@ fn render_frame(
     layout: &Layout<ColorBrush>,
     config: &ExampleConfig,
     renderer: &mut RenderContext,
+    resources: &mut Resources,
     width: u16,
     height: u16,
     output_path: &Path,
@@ -91,7 +94,7 @@ fn render_frame(
                     stats.start("fill_glyphs");
                     renderer.set_paint(glyph_run.style().brush.color);
                     renderer
-                        .glyph_run(run.font())
+                        .glyph_run(resources, run.font())
                         .font_size(run.font_size())
                         .hint(config.hint)
                         .normalized_coords(run.normalized_coords())
@@ -140,7 +143,7 @@ fn render_frame(
     stats.start("render");
     let mut pixmap = Pixmap::new(width, height);
     renderer.flush();
-    renderer.render_to_pixmap(&mut pixmap);
+    renderer.render_to_pixmap(resources, &mut pixmap);
     stats.end("render");
 
     save_output(pixmap, output_path);

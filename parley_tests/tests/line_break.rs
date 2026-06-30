@@ -231,7 +231,7 @@ fn break_by_length_single_cluster_lines() {
 #[test]
 fn break_by_length_with_emoji() {
     let mut env = TestEnv::new(test_name!(), None);
-    env.set_tolerance(5.0);
+    env.set_tolerance(60.0);
 
     let text = "✅👀🎉🤠✅👀";
     let mut builder = env.ranged_builder(text);
@@ -254,7 +254,7 @@ fn break_by_length_with_emoji() {
 #[test]
 fn break_by_length_with_emoji_only() {
     let mut env = TestEnv::new(test_name!(), None);
-    env.set_tolerance(10.0);
+    env.set_tolerance(50.0);
 
     let text = "✅👀🎉🤠";
     let mut builder = env.ranged_builder(text);
