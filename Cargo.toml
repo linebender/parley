@@ -18,7 +18,6 @@ members = [
     "examples/tiny_skia_render",
     "examples/vello_cpu_render",
     "examples/vello_editor",
-    "examples/vello_hybrid_render",
     "xtask",
 ]
 
@@ -67,7 +66,6 @@ smallvec = "1.15.1"
 swash = { version = "0.2.6", default-features = false }
 vello_common = { version = "0.0.7", default-features = false }
 vello_cpu = { version = "0.0.7", default-features = false, features = ["u8_pipeline"] }
-vello_hybrid = { version = "0.0.7", default-features = false }
 
 [workspace.lints]
 rust.unsafe_code = "deny"
@@ -121,7 +119,6 @@ clippy.wildcard_dependencies = "warn"
 [patch.crates-io]
 vello_common = { git = "https://github.com/linebender/vello.git", rev = "5796226" }
 vello_cpu = { git = "https://github.com/linebender/vello.git", rev = "5796226" }
-vello_hybrid = { git = "https://github.com/linebender/vello.git", rev = "5796226" }
 
 [profile.profiling]
 inherits = "release"

@@ -4359,23 +4359,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "vello_hybrid_render"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "glifo",
- "parley",
- "parley_examples_common",
- "peniko",
- "png 0.17.16",
- "pollster",
- "skrifa 0.43.2",
- "vello_common",
- "vello_hybrid",
- "wgpu",
-]
-
-[[package]]
 name = "vello_shaders"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
