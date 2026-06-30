@@ -253,7 +253,7 @@ impl LayoutAccessibility {
 
                     if prev_style_index.is_none() {
                         prev_style_index = Some(style_index);
-                        let style = cluster.first_style();
+                        let style = cluster.style();
                         set_brush_properties(&mut node, style);
                         if let Some(locale) = &style.locale {
                             node.set_language(locale.as_str());

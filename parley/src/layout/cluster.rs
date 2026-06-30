@@ -151,7 +151,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
     /// Returns the style of the character this cluster represents.
     ///
     /// All of the cluster's glyphs share this style.
-    pub fn first_style(&self) -> &Style<B> {
+    pub fn style(&self) -> &Style<B> {
         &self.run.layout.styles()[usize::from(self.data.style_index)]
     }
 
