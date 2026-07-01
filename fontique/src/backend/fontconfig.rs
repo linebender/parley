@@ -232,9 +232,10 @@ impl std::fmt::Debug for Pattern {
             )
         }) {
             Some(unparsed) => {
-                let res = f.write_str(unsafe {
+                let printable = unsafe {
                     &CStr::from_ptr(unparsed.as_ptr() as *const c_char).to_string_lossy()
-                });
+                };
+                let res = f.write_str(printable);
                 unsafe {
                     ffi_dispatch!(
                         feature = "fontconfig-dlopen",

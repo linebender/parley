@@ -71,111 +71,108 @@ impl SystemFonts {
         let mut script_fallback = vec![];
 
         // Try to get generic info from fonts.xml
-        if let Ok(s) = std::fs::read_to_string(Path::new(&android_root).join("etc/fonts.xml")) {
-            if let Ok(doc) = Document::parse(s.clone().as_str()) {
-                let root = doc.root_element();
-                if root.tag_name().name() == "familyset"
-                    || root
-                        .attribute("version")
-                        .is_some_and(|v| usize::from_str(v).is_ok_and(|x| x >= 21))
-                {
-                    for child in root.children() {
-                        match child.tag_name().name() {
-                            "alias" => {
-                                if let Some((name, to)) =
-                                    child.attribute("name").zip(child.attribute("to"))
-                                {
-                                    if child.attribute("weight").is_some() {
-                                        // weight aliases are an Android quirk and are not in­
-                                        // teresting for use cases other than Android legacy.
-                                        continue;
-                                    }
-                                    let to_n = name_map.get_or_insert(to);
-                                    name_map.add_alias(to_n.id(), name);
+        if let Ok(s) = std::fs::read_to_string(Path::new(&android_root).join("etc/fonts.xml"))
+            && let Ok(doc) = Document::parse(s.clone().as_str())
+        {
+            let root = doc.root_element();
+            if root.tag_name().name() == "familyset"
+                || root
+                    .attribute("version")
+                    .is_some_and(|v| usize::from_str(v).is_ok_and(|x| x >= 21))
+            {
+                for child in root.children() {
+                    match child.tag_name().name() {
+                        "alias" => {
+                            if let Some((name, to)) =
+                                child.attribute("name").zip(child.attribute("to"))
+                            {
+                                if child.attribute("weight").is_some() {
+                                    // weight aliases are an Android quirk and are not in­
+                                    // teresting for use cases other than Android legacy.
+                                    continue;
                                 }
+                                let to_n = name_map.get_or_insert(to);
+                                name_map.add_alias(to_n.id(), name);
                             }
-                            "family" => {
-                                if let Some(name) = child.attribute("name") {
-                                    let f = name_map.get_or_insert(name);
-                                    let _id = f.id();
-                                    for _child in child.children() {
-                                        // TODO: map using postScriptName when available other­
-                                        //       wise use the file name, and perhaps if necess­
-                                        //       ary (e.g. if it's a collection), do something
-                                        //       smarter, or something dumb that meets expecta­
-                                        //       tions on Android.
-                                    }
-                                } else if let Some(langs) = child
-                                    .attribute("lang")
-                                    .map(|s| s.split(',').collect::<Vec<&str>>())
-                                {
-                                    let (_has_for, hasnt_for): (
-                                        Vec<Node<'_, '_>>,
-                                        Vec<Node<'_, '_>>,
-                                    ) = child
+                        }
+                        "family" => {
+                            if let Some(name) = child.attribute("name") {
+                                let f = name_map.get_or_insert(name);
+                                let _id = f.id();
+                                for _child in child.children() {
+                                    // TODO: map using postScriptName when available other­
+                                    //       wise use the file name, and perhaps if necess­
+                                    //       ary (e.g. if it's a collection), do something
+                                    //       smarter, or something dumb that meets expecta­
+                                    //       tions on Android.
+                                }
+                            } else if let Some(langs) = child
+                                .attribute("lang")
+                                .map(|s| s.split(',').collect::<Vec<&str>>())
+                            {
+                                let (_has_for, hasnt_for): (Vec<Node<'_, '_>>, Vec<Node<'_, '_>>) =
+                                    child
                                         .children()
                                         .partition(|c| c.attribute("fallbackFor").is_some());
-                                    {
-                                        // general fallback families
-                                        let (ps_named, _ps_unnamed): (
-                                            Vec<Node<'_, '_>>,
-                                            Vec<Node<'_, '_>>,
-                                        ) = hasnt_for
-                                            .iter()
-                                            .partition(|c| c.attribute("postScriptName").is_some());
+                                {
+                                    // general fallback families
+                                    let (ps_named, _ps_unnamed): (
+                                        Vec<Node<'_, '_>>,
+                                        Vec<Node<'_, '_>>,
+                                    ) = hasnt_for
+                                        .iter()
+                                        .partition(|c| c.attribute("postScriptName").is_some());
 
-                                        if let Some(family) = ps_named.iter().find_map(|x| {
-                                            postscript_names
-                                                .get(x.attribute("postScriptName").unwrap())
-                                        }) {
-                                            for lang in langs {
-                                                if let Some(scr) = lang.strip_prefix("und-") {
-                                                    // Undefined lang for script-only fallbacks
-                                                    script_fallback.push((
-                                                        scr.parse().unwrap_or(Script::UNKNOWN),
-                                                        *family,
-                                                    ));
-                                                } else if let Ok(locale) = Language::parse(lang) {
-                                                    if let Some(scr) = locale
-                                                        .script()
-                                                        .and_then(|s| s.parse::<Script>().ok())
-                                                    {
-                                                        // Also fallback for the script on its own
-                                                        script_fallback.push((scr, *family));
-                                                        if Script::from_bytes(*b"Hant") == scr {
-                                                            // This works around ambiguous han char­
-                                                            // acters going unmapped with current
-                                                            // fallback code. This should be done in
-                                                            // a locale-dependent manner, since that
-                                                            // is the norm.
-                                                            script_fallback.push((
-                                                                Script::from_bytes(*b"Hani"),
-                                                                *family,
-                                                            ));
-                                                        }
+                                    if let Some(family) = ps_named.iter().find_map(|x| {
+                                        postscript_names.get(x.attribute("postScriptName").unwrap())
+                                    }) {
+                                        for lang in langs {
+                                            if let Some(scr) = lang.strip_prefix("und-") {
+                                                // Undefined lang for script-only fallbacks
+                                                script_fallback.push((
+                                                    scr.parse().unwrap_or(Script::UNKNOWN),
+                                                    *family,
+                                                ));
+                                            } else if let Ok(locale) = Language::parse(lang) {
+                                                if let Some(scr) = locale
+                                                    .script()
+                                                    .and_then(|s| s.parse::<Script>().ok())
+                                                {
+                                                    // Also fallback for the script on its own
+                                                    script_fallback.push((scr, *family));
+                                                    if Script::from_bytes(*b"Hant") == scr {
+                                                        // This works around ambiguous han char­
+                                                        // acters going unmapped with current
+                                                        // fallback code. This should be done in
+                                                        // a locale-dependent manner, since that
+                                                        // is the norm.
+                                                        script_fallback.push((
+                                                            Script::from_bytes(*b"Hani"),
+                                                            *family,
+                                                        ));
                                                     }
-                                                    locale_fallback.push((locale, *family));
                                                 }
+                                                locale_fallback.push((locale, *family));
                                             }
                                         }
-
-                                        // TODO: handle mapping to family names from file names
-                                        //       when postScriptName is unavailable.
                                     }
 
-                                    // family-specific fallback families, currently unimplemented
-                                    // because it requires a GenericFamily to be plumbed through
-                                    // the `RangedStyle` `font_stack` from `resolve` where it is
-                                    // currently thrown away.
-                                    {}
+                                    // TODO: handle mapping to family names from file names
+                                    //       when postScriptName is unavailable.
                                 }
-                                // TODO: interpret variant="compact" without fallbackFor as a
-                                //       fallback for system-ui, as falling back to a
-                                //       variant="elegant" for system-ui can mess up a layout
-                                //       in some scripts.
+
+                                // family-specific fallback families, currently unimplemented
+                                // because it requires a GenericFamily to be plumbed through
+                                // the `RangedStyle` `font_stack` from `resolve` where it is
+                                // currently thrown away.
+                                {}
                             }
-                            _ => {}
+                            // TODO: interpret variant="compact" without fallbackFor as a
+                            //       fallback for system-ui, as falling back to a
+                            //       variant="elegant" for system-ui can mess up a layout
+                            //       in some scripts.
                         }
+                        _ => {}
                     }
                 }
             }

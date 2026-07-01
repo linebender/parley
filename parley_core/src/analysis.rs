@@ -530,18 +530,18 @@ pub(crate) fn analyze_text(
         }
 
         let mut is_word = false;
-        if let Some(&w) = wb_iter.peek() {
-            if w == byte_pos {
-                is_word = true;
-                _ = wb_iter.next();
-            }
+        if let Some(&w) = wb_iter.peek()
+            && w == byte_pos
+        {
+            is_word = true;
+            _ = wb_iter.next();
         }
         let mut is_line = false;
-        if let Some(&l) = lb_iter.peek() {
-            if *l == byte_pos {
-                is_line = true;
-                _ = lb_iter.next();
-            }
+        if let Some(&l) = lb_iter.peek()
+            && *l == byte_pos
+        {
+            is_line = true;
+            _ = lb_iter.next();
         }
 
         // This leaves word boundaries intact. Consumers can only impact line boundaries.

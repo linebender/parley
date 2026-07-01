@@ -118,23 +118,23 @@ impl Cursor {
     #[must_use]
     pub fn previous_visual<B: Brush>(&self, layout: &Layout<B>) -> Self {
         let [left, right] = self.visual_clusters(layout);
-        if let (Some(left), Some(right)) = (&left, &right) {
-            if left.is_soft_line_break() {
-                if left.is_rtl() && self.affinity == Affinity::Upstream {
-                    let index = if right.is_rtl() {
-                        left.text_range().start
-                    } else {
-                        left.text_range().end
-                    };
-                    return Self::from_byte_index(layout, index, Affinity::Downstream);
-                } else if !left.is_rtl() && self.affinity == Affinity::Downstream {
-                    let index = if right.is_rtl() {
-                        right.text_range().end
-                    } else {
-                        right.text_range().start
-                    };
-                    return Self::from_byte_index(layout, index, Affinity::Upstream);
-                }
+        if let (Some(left), Some(right)) = (&left, &right)
+            && left.is_soft_line_break()
+        {
+            if left.is_rtl() && self.affinity == Affinity::Upstream {
+                let index = if right.is_rtl() {
+                    left.text_range().start
+                } else {
+                    left.text_range().end
+                };
+                return Self::from_byte_index(layout, index, Affinity::Downstream);
+            } else if !left.is_rtl() && self.affinity == Affinity::Downstream {
+                let index = if right.is_rtl() {
+                    right.text_range().end
+                } else {
+                    right.text_range().start
+                };
+                return Self::from_byte_index(layout, index, Affinity::Upstream);
             }
         }
         if let Some(left) = left {

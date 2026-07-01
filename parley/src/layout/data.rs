@@ -867,10 +867,10 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
             let mut inline_glyph_id = None;
             match cluster_type {
                 ClusterType::Regular => {
-                    if total_glyphs == cluster_glyph_offset {
-                        if let Some(pending) = pending_inline_glyph.take() {
-                            inline_glyph_id = Some(pending.id);
-                        }
+                    if total_glyphs == cluster_glyph_offset
+                        && let Some(pending) = pending_inline_glyph.take()
+                    {
+                        inline_glyph_id = Some(pending.id);
                     }
                 }
                 _ => {

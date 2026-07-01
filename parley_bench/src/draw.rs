@@ -91,25 +91,22 @@ fn render_layout(
                     );
                     run_renderer.fill_glyphs(renderer);
 
-                    if with_underline {
-                        if let Some(decoration) = &glyph_run.style().underline {
-                            let offset =
-                                decoration.offset.unwrap_or(run.metrics().underline_offset);
-                            let size = decoration.size.unwrap_or(run.metrics().underline_size);
+                    if with_underline && let Some(decoration) = &glyph_run.style().underline {
+                        let offset = decoration.offset.unwrap_or(run.metrics().underline_offset);
+                        let size = decoration.size.unwrap_or(run.metrics().underline_size);
 
-                            let x = glyph_run.offset();
-                            let x1 = x + glyph_run.advance();
-                            let baseline = glyph_run.baseline();
+                        let x = glyph_run.offset();
+                        let x1 = x + glyph_run.advance();
+                        let baseline = glyph_run.baseline();
 
-                            run_renderer.render_decoration(
-                                x..=x1,
-                                baseline,
-                                offset,
-                                size,
-                                1.0, // buffer around exclusions
-                                renderer,
-                            );
-                        }
+                        run_renderer.render_decoration(
+                            x..=x1,
+                            baseline,
+                            offset,
+                            size,
+                            1.0, // buffer around exclusions
+                            renderer,
+                        );
                     }
                 }
                 PositionedLayoutItem::InlineBox(_) => {}

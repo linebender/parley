@@ -349,12 +349,12 @@ impl TestEnv {
             // but it's simpler to cover all cases.
             std::fs::write(path, data).unwrap();
 
-            if let Some(max_size) = max_size {
-                if saved_len > max_size {
-                    panic!(
-                        "New screenshot file size ({saved_len}b) was larger than the supported file size ({max_size}b). See TestEnv::max_screenshot_size to change the maximum.",
-                    );
-                }
+            if let Some(max_size) = max_size
+                && saved_len > max_size
+            {
+                panic!(
+                    "New screenshot file size ({saved_len}b) was larger than the supported file size ({max_size}b). See TestEnv::max_screenshot_size to change the maximum.",
+                );
             }
         }
 
@@ -377,12 +377,12 @@ impl TestEnv {
             save_image(img, &comparison_path, max_size);
         } else {
             let reference_size = snapshot_path.metadata().unwrap().len() as usize;
-            if let Some(max_size) = max_size {
-                if reference_size > max_size {
-                    panic!(
-                        "Existing file size ({reference_size}b) was larger than the supported file size ({max_size}b). See TestEnv::max_screenshot_size to change the maximum."
-                    );
-                }
+            if let Some(max_size) = max_size
+                && reference_size > max_size
+            {
+                panic!(
+                    "Existing file size ({reference_size}b) was larger than the supported file size ({max_size}b). See TestEnv::max_screenshot_size to change the maximum."
+                );
             }
         }
     }

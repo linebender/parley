@@ -68,12 +68,14 @@ impl<'a, B: Brush> Line<'a, B> {
     }
 
     /// Returns an iterator over the runs for the line.
-    pub fn runs(&self) -> impl Iterator<Item = Run<'a, B>> + 'a + Clone {
+    pub fn runs(&self) -> impl Iterator<Item = Run<'a, B>> + 'a + Clone + use<'a, B> {
         self.items_nonpositioned().filter_map(|item| item.run())
     }
 
     /// Returns an iterator over the non-glyph runs and inline boxes for the line.
-    pub(crate) fn items_nonpositioned(&self) -> impl Iterator<Item = LineItem<'a, B>> + Clone {
+    pub(crate) fn items_nonpositioned(
+        &self,
+    ) -> impl Iterator<Item = LineItem<'a, B>> + Clone + use<'a, B> {
         let copy = self.clone();
         let line_items = &copy.layout.data.line_items[self.data.item_range.clone()];
         line_items
@@ -94,7 +96,9 @@ impl<'a, B: Brush> Line<'a, B> {
     }
 
     /// Returns an iterator over the glyph runs for the line.
-    pub fn items(&self) -> impl Iterator<Item = PositionedLayoutItem<'a, B>> + 'a + Clone {
+    pub fn items(
+        &self,
+    ) -> impl Iterator<Item = PositionedLayoutItem<'a, B>> + 'a + Clone + use<'a, B> {
         GlyphRunIter {
             line: self.clone(),
             item_index: 0,

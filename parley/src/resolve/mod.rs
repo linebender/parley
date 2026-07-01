@@ -95,13 +95,13 @@ impl<T: Clone + PartialEq> Cache<T> {
             if range.len() != items.len() {
                 continue;
             }
-            if let Some(existing) = self.items.get(range) {
-                if existing == items {
-                    return Resolved {
-                        index: i,
-                        _phantom: core::marker::PhantomData,
-                    };
-                }
+            if let Some(existing) = self.items.get(range)
+                && existing == items
+            {
+                return Resolved {
+                    index: i,
+                    _phantom: core::marker::PhantomData,
+                };
             }
         }
         let index = self.entries.len();
