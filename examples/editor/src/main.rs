@@ -163,7 +163,7 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp {
         }
 
         // Ensure the CPU renderer and pixmap match the window size.
-        self.ensure_render_size(to_u16(size.width), to_u16(size.height));
+        self.ensure_render_size(to_nonzero_u16(size.width), to_nonzero_u16(size.height));
 
         // Save the Window and Surface to a state variable
         self.state = RenderState::Active(ActiveRenderState {
@@ -287,7 +287,7 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp {
                 {
                     render_state.surface.resize(width, height).unwrap();
                 }
-                self.ensure_render_size(to_u16(size.width), to_u16(size.height));
+                self.ensure_render_size(to_nonzero_u16(size.width), to_nonzero_u16(size.height));
                 let editor = self.editor.editor();
                 editor.set_scale(1.0);
                 editor.set_width(Some(size.width as f32 - 2_f32 * text::INSET));
@@ -406,7 +406,7 @@ fn create_winit_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
 }
 
 /// Clamp a physical pixel dimension to a non-zero `u16`, as required by `vello_cpu`.
-fn to_u16(value: u32) -> u16 {
+fn to_nonzero_u16(value: u32) -> u16 {
     value.clamp(1, u16::MAX as u32) as u16
 }
 
