@@ -53,10 +53,10 @@ impl Selection {
     /// Creates a new selection bounding the word at the given coordinates.
     pub fn word_from_point<B: Brush>(layout: &Layout<B>, x: f32, y: f32) -> Self {
         if let Some((mut cluster, _)) = Cluster::from_point(layout, x, y) {
-            if !cluster.is_word_boundary() {
-                if let Some(prev) = cluster.previous_logical_word() {
-                    cluster = prev;
-                }
+            if !cluster.is_word_boundary()
+                && let Some(prev) = cluster.previous_logical_word()
+            {
+                cluster = prev;
             }
             let anchor = Cursor::from_cluster(layout, cluster.clone(), !cluster.is_rtl());
             let focus = anchor.next_logical_word(layout);

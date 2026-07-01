@@ -164,10 +164,9 @@ impl<'a> Query<'a> {
                 &mut family.default,
                 true,
                 self.source_cache,
-            ) {
-                if f(font) == QueryStatus::Stop {
-                    return;
-                }
+            ) && f(font) == QueryStatus::Stop
+            {
+                return;
             }
         }
     }

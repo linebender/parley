@@ -170,12 +170,11 @@ fn collect_files(dir: &Path, max_depth: u32, depth: u32, out: &mut Vec<PathBuf>)
 }
 
 fn create_base_font(prefer_ui_font: bool) -> CFRetained<CTFont> {
-    if prefer_ui_font {
-        if let Some(font) =
+    if prefer_ui_font
+        && let Some(font) =
             unsafe { CTFont::new_ui_font_for_language(CTFontUIFontType::System, 0.0, None) }
-        {
-            return font;
-        }
+    {
+        return font;
     }
     unsafe {
         let attrs = CFDictionary::new(None, null_mut(), null_mut(), 0, null(), null());

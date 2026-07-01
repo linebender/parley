@@ -72,8 +72,6 @@ vello_hybrid = { version = "0.0.7", default-features = false }
 [workspace.lints]
 rust.unsafe_code = "deny"
 
-clippy.collapsible_if = "allow"
-
 # LINEBENDER LINT SET - Cargo.toml - v7
 # See https://linebender.org/wiki/canonical-lints/
 rust.keyword_idents_2024 = "forbid"

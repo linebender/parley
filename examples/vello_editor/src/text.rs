@@ -64,21 +64,21 @@ fn set_accesskit_brush_properties(node: &mut Node, style: &Style<Brush>) {
     if let Some(color) = to_accesskit_color(&style.brush) {
         node.set_foreground_color(color);
     }
-    if let Some(deco) = &style.underline {
-        if let Some(color) = to_accesskit_color(&deco.brush) {
-            node.set_underline(TextDecoration {
-                style: TextDecorationStyle::Solid,
-                color,
-            });
-        }
+    if let Some(deco) = &style.underline
+        && let Some(color) = to_accesskit_color(&deco.brush)
+    {
+        node.set_underline(TextDecoration {
+            style: TextDecorationStyle::Solid,
+            color,
+        });
     }
-    if let Some(deco) = &style.strikethrough {
-        if let Some(color) = to_accesskit_color(&deco.brush) {
-            node.set_strikethrough(TextDecoration {
-                style: TextDecorationStyle::Solid,
-                color,
-            });
-        }
+    if let Some(deco) = &style.strikethrough
+        && let Some(color) = to_accesskit_color(&deco.brush)
+    {
+        node.set_strikethrough(TextDecoration {
+            style: TextDecorationStyle::Solid,
+            color,
+        });
     }
 }
 
@@ -358,10 +358,10 @@ impl Editor {
     }
 
     pub fn handle_accesskit_action_request(&mut self, req: &accesskit::ActionRequest) {
-        if req.action == accesskit::Action::SetTextSelection {
-            if let Some(accesskit::ActionData::SetTextSelection(selection)) = &req.data {
-                self.driver().select_from_accesskit(selection);
-            }
+        if req.action == accesskit::Action::SetTextSelection
+            && let Some(accesskit::ActionData::SetTextSelection(selection)) = &req.data
+        {
+            self.driver().select_from_accesskit(selection);
         }
     }
 
@@ -384,16 +384,16 @@ impl Editor {
                 &convert_rect(&rect),
             );
         });
-        if self.cursor_visible {
-            if let Some(cursor) = self.editor.cursor_geometry(1.5) {
-                scene.fill(
-                    Fill::NonZero,
-                    transform,
-                    palette::css::WHITE,
-                    None,
-                    &convert_rect(&cursor),
-                );
-            }
+        if self.cursor_visible
+            && let Some(cursor) = self.editor.cursor_geometry(1.5)
+        {
+            scene.fill(
+                Fill::NonZero,
+                transform,
+                palette::css::WHITE,
+                None,
+                &convert_rect(&cursor),
+            );
         }
         let layout = self.editor.layout(&mut self.font_cx, &mut self.layout_cx);
         for line in layout.lines() {

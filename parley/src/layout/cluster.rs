@@ -294,15 +294,15 @@ impl<'a, B: Brush> Cluster<'a, B> {
             for line_index in self.path.line_index()..layout.len() {
                 let line = layout.get(line_index)?;
                 for run_index in run_index..line.len() {
-                    if let Some(run) = line.item(run_index).and_then(|item| item.run()) {
-                        if !run.cluster_range().is_empty() {
-                            return ClusterPath {
-                                line_index: line_index as u32,
-                                run_index: run_index as u32,
-                                logical_index: run.visual_to_logical(0)? as u32,
-                            }
-                            .cluster(layout);
+                    if let Some(run) = line.item(run_index).and_then(|item| item.run())
+                        && !run.cluster_range().is_empty()
+                    {
+                        return ClusterPath {
+                            line_index: line_index as u32,
+                            run_index: run_index as u32,
+                            logical_index: run.visual_to_logical(0)? as u32,
                         }
+                        .cluster(layout);
                     }
                 }
                 // Restart at first run on next line

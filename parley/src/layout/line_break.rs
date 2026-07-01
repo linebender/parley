@@ -867,11 +867,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
     /// Consumes the line breaker and finalizes all line computations.
     pub fn finish(mut self) {
-        if self.layout.data.text_len == 0 {
-            if let Some(line) = self.lines.line_items.first_mut() {
-                line.text_range = 0..0;
-                line.cluster_range = 0..0;
-            }
+        if self.layout.data.text_len == 0
+            && let Some(line) = self.lines.line_items.first_mut()
+        {
+            line.text_range = 0..0;
+            line.cluster_range = 0..0;
         }
     }
 
@@ -1126,10 +1126,10 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
         }
 
         // Don't include the last line's line_height in the layout's height if the last line is empty
-        if let Some(last_line) = self.lines.lines.last() {
-            if last_line.item_range.is_empty() {
-                height -= last_line.metrics.line_height as f64;
-            }
+        if let Some(last_line) = self.lines.lines.last()
+            && last_line.item_range.is_empty()
+        {
+            height -= last_line.metrics.line_height as f64;
         }
 
         // Save the computed widths/height to the layout
