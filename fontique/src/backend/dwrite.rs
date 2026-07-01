@@ -209,10 +209,10 @@ impl DWriteSystemFonts {
         unsafe {
             let mut cur_offset = 0;
             while cur_offset < text_len {
-                let mut mapped_len = 0;
-                let mut mapped_font = None;
-                if let Some(fallback) = self.fallback.as_ref()
-                    && fallback
+                if let Some(fallback) = self.fallback.as_ref() {
+                    let mut mapped_len = 0;
+                    let mut mapped_font = None;
+                    if fallback
                         .MapCharacters(
                             &source,
                             cur_offset as u32,
@@ -227,8 +227,8 @@ impl DWriteSystemFonts {
                             &mut 1.0,
                         )
                         .is_ok()
-                {
-                    if let Some(font) = mapped_font {
+                        && let Some(font) = mapped_font
+                    {
                         let family = font.GetFontFamily().ok()?;
                         let names = family.GetFamilyNames().ok()?;
                         let name_len = names.GetStringLength(0).ok()? as usize;
