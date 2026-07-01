@@ -64,6 +64,7 @@ read-fonts = { version = "0.40.0", default-features = false }
 skrifa = { version = "0.43.2", default-features = false }
 smallvec = "1.15.1"
 swash = { version = "0.2.6", default-features = false }
+wuff = { version = "0.2.5", default-features = false }
 vello_common = { version = "0.0.7", default-features = false }
 vello_cpu = { version = "0.0.7", default-features = false, features = ["u8_pipeline"] }
 
