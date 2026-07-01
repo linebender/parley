@@ -277,10 +277,7 @@ impl Cursor {
             // `Cluster::previous_logical_word` stops at the nearest previous cluster marked as word
             // boundary, which can be whitespace. We keep hopping over whitespace boundaries to land
             // on the start of the preceding "actual" word.
-            loop {
-                let Some(prev) = cluster.previous_logical_word() else {
-                    break;
-                };
+            while let Some(prev) = cluster.previous_logical_word() {
                 cluster = prev;
                 if !cluster.data.info.is_whitespace() {
                     break;
