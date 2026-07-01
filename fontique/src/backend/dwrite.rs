@@ -93,13 +93,12 @@ impl SystemFonts {
         let mut fonts = smallvec::SmallVec::<[FontInfo; 4]>::default();
         if let Some(family) = self.dwrite_fonts.family_by_name(name.name()) {
             for font in family.fonts() {
-                if let Some(font) = FontInfo::from_dwrite(&font, &mut self.source_cache) {
-                    if !fonts
+                if let Some(font) = FontInfo::from_dwrite(&font, &mut self.source_cache)
+                    && !fonts
                         .iter()
                         .any(|f| f.source().id() == font.source().id() && f.index() == font.index())
-                    {
-                        fonts.push(font);
-                    }
+                {
+                    fonts.push(font);
                 }
             }
             if !fonts.is_empty() {
@@ -212,8 +211,8 @@ impl DWriteSystemFonts {
             while cur_offset < text_len {
                 let mut mapped_len = 0;
                 let mut mapped_font = None;
-                if let Some(fallback) = self.fallback.as_ref() {
-                    if fallback
+                if let Some(fallback) = self.fallback.as_ref()
+                    && fallback
                         .MapCharacters(
                             &source,
                             cur_offset as u32,
@@ -228,17 +227,16 @@ impl DWriteSystemFonts {
                             &mut 1.0,
                         )
                         .is_ok()
-                    {
-                        if let Some(font) = mapped_font {
-                            let family = font.GetFontFamily().ok()?;
-                            let names = family.GetFamilyNames().ok()?;
-                            let name_len = names.GetStringLength(0).ok()? as usize;
-                            let mut name_buf = smallvec::SmallVec::<[u16; 128]>::default();
-                            name_buf.resize(name_len + 1, 0);
-                            names.GetString(0, &mut name_buf).ok()?;
-                            name_buf.pop();
-                            return Some(String::from_utf16_lossy(&name_buf));
-                        }
+                {
+                    if let Some(font) = mapped_font {
+                        let family = font.GetFontFamily().ok()?;
+                        let names = family.GetFamilyNames().ok()?;
+                        let name_len = names.GetStringLength(0).ok()? as usize;
+                        let mut name_buf = smallvec::SmallVec::<[u16; 128]>::default();
+                        name_buf.resize(name_len + 1, 0);
+                        names.GetString(0, &mut name_buf).ok()?;
+                        name_buf.pop();
+                        return Some(String::from_utf16_lossy(&name_buf));
                     }
                 }
                 cur_offset += 1;
