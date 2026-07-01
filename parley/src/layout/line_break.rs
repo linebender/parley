@@ -584,8 +584,41 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             if max_height_exceeded {
                                 return self.max_height_break_data(line_height);
                             }
+                            // A CRLF sequence is a single grapheme cluster and must produce
+                            // exactly one hard line break (UAX#14: CR × LF, do not break
+                            // between). When this newline is a CR immediately followed by an
+                            // LF, append the CR to the current line but suppress the break
+                            // here and let the LF emit the single break, so CR and LF share
+                            // one line. The lookahead reads the global cluster list so a CRLF
+                            // that shaping split across two runs (e.g. a style boundary at the
+                            // LF) is still coalesced. The LF must be item-adjacent to the CR:
+                            // if it lands in a later run it only coalesces when the next item
+                            // is that run (not an inline box sitting between the two), so an
+                            // inline box at the LF offset keeps the CR's break. Lone CR, lone
+                            // LF, LS, and PS are unaffected.
+                            let lf_is_item_adjacent = self.state.cluster_idx + 1 < cluster_end
+                                || self
+                                    .layout
+                                    .data
+                                    .items
+                                    .get(self.state.item_idx + 1)
+                                    .is_some_and(|item| item.kind == LayoutItemKind::TextRun);
+                            let is_cr_before_lf = cluster.info().source_char() == '\r'
+                                && lf_is_item_adjacent
+                                && self
+                                    .layout
+                                    .data
+                                    .clusters
+                                    .get(self.state.cluster_idx + 1)
+                                    .is_some_and(|next| {
+                                        next.info.whitespace() == Whitespace::Newline
+                                            && next.info.source_char() == '\n'
+                                    });
                             self.state
                                 .append_cluster_to_line(self.state.line.x, line_height);
+                            if is_cr_before_lf {
+                                continue;
+                            }
                             return self.start_new_line(
                                 BreakReason::Explicit,
                                 max_advance,
