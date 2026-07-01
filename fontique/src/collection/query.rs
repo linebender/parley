@@ -5,10 +5,11 @@
 
 use crate::{Charmap, CharmapIndex};
 
-use super::super::{Collection, SourceCache};
+use super::super::{Collection, SourceCache, matching::match_fonts};
 
 use alloc::vec::Vec;
 use parlance::Script;
+use smallvec::SmallVec;
 
 use super::{
     super::{Attributes, Blob, FallbackKey, FamilyId, FamilyInfo, GenericFamily, Synthesis},
@@ -140,22 +141,22 @@ impl<'a> Query<'a> {
             let Entry::Ok(family_info) = &family.family else {
                 continue;
             };
-            let mut best_index = None;
-            if let Some(font) = load_font(
+            let bucket = load_bucket(
                 family_info,
                 self.attributes,
                 &mut family.best,
-                false,
                 self.source_cache,
-            ) {
-                best_index = Some(font.family.1);
+            );
+            let mut yielded_default = false;
+            for font in bucket {
+                if font.family.1 == family_info.default_font_index() {
+                    yielded_default = true;
+                }
                 if f(font) == QueryStatus::Stop {
                     return;
                 }
             }
-            // Don't invoke for the default font if it's the same as the
-            // best match.
-            if best_index == Some(family_info.default_font_index()) {
+            if yielded_default {
                 continue;
             }
             if let Some(font) = load_font(
@@ -243,6 +244,58 @@ impl QueryFont {
     }
 }
 
+/// Loads every font in `family` matching `attributes` (all coverage variants of the best match).
+fn load_bucket<'a>(
+    family: &FamilyInfo,
+    attributes: Attributes,
+    bucket: &'a mut Entry<SmallVec<[QueryFont; 1]>>,
+    source_cache: &mut SourceCache,
+) -> &'a [QueryFont] {
+    match bucket {
+        Entry::Error => &[],
+        Entry::Ok(fonts) => fonts,
+        status @ Entry::Vacant => {
+            *status = Entry::Error;
+            let indices = match_fonts(
+                family.fonts(),
+                attributes.width,
+                attributes.style,
+                attributes.weight,
+                true,
+            );
+            let mut fonts: SmallVec<[QueryFont; 1]> = SmallVec::new();
+            for index in indices {
+                let Some(font_info) = family.fonts().get(index) else {
+                    continue;
+                };
+                let Some(blob) = font_info.load(Some(source_cache)) else {
+                    continue;
+                };
+                fonts.push(QueryFont {
+                    family: (family.id(), index),
+                    blob: blob.clone(),
+                    index: font_info.index(),
+                    synthesis: font_info.synthesis(
+                        attributes.width,
+                        attributes.style,
+                        attributes.weight,
+                    ),
+                    charmap_index: font_info.charmap_index(),
+                });
+            }
+            if fonts.is_empty() {
+                return &[];
+            }
+            *status = Entry::Ok(fonts);
+            if let Entry::Ok(fonts) = status {
+                fonts
+            } else {
+                &[]
+            }
+        }
+    }
+}
+
 fn load_font<'a>(
     family: &FamilyInfo,
     attributes: Attributes,
@@ -287,7 +340,7 @@ fn load_font<'a>(
 struct CachedFamily {
     id: FamilyId,
     family: Entry<FamilyInfo>,
-    best: Entry<QueryFont>,
+    best: Entry<SmallVec<[QueryFont; 1]>>,
     default: Entry<QueryFont>,
 }
 
