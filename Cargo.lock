@@ -2913,12 +2913,9 @@ dependencies = [
 name = "parley_bench"
 version = "0.0.0"
 dependencies = [
- "glifo",
  "parley",
  "parley_dev",
- "skrifa 0.43.2",
  "tango-bench",
- "vello_cpu",
 ]
 
 [[package]]
@@ -4359,23 +4356,6 @@ dependencies = [
  "vello_api",
  "vello_common",
  "vello_sparse_shaders",
- "wgpu",
-]
-
-[[package]]
-name = "vello_hybrid_render"
-version = "0.1.0"
-dependencies = [
- "bytemuck",
- "glifo",
- "parley",
- "parley_examples_common",
- "peniko",
- "png 0.17.16",
- "pollster",
- "skrifa 0.43.2",
- "vello_common",
- "vello_hybrid",
  "wgpu",
 ]
 

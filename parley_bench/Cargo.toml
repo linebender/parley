@@ -12,11 +12,7 @@ publish = false
 [dependencies]
 parley = { workspace = true, default-features = true }
 parley_dev = { workspace = true }
-glifo = { workspace = true, default-features = false, features = ["std", "vello_cpu", "png"] }
-skrifa = { workspace = true }
 tango-bench = { git = "https://github.com/bazhenov/tango", rev = "71e865d655448fbeb4d51b812d66e123049fa51e" }
-vello_cpu = { workspace = true, default-features = false, features = ["std", "png", "text"] }
-
 
 [[bench]]
 name = "main"
