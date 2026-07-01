@@ -14,7 +14,7 @@ use parley::{GenericFamily, StyleProperty};
 use peniko::{
     Brush, Fill,
     color::{AlphaColor, Srgb, palette},
-    kurbo::{Affine, BezPath, PathEl, Point, Stroke},
+    kurbo::{Affine, Line, Shape, Stroke},
 };
 use std::time::Duration;
 use ui_events::pointer::PointerButton;
@@ -44,14 +44,6 @@ pub struct Editor {
 
 fn convert_rect(rect: &parley::BoundingBox) -> peniko::kurbo::Rect {
     peniko::kurbo::Rect::new(rect.x0, rect.y0, rect.x1, rect.y1)
-}
-
-/// Build a horizontal line as a `BezPath` from `(x0, y)` to `(x1, y)`.
-fn line_path(x0: f64, y: f64, x1: f64) -> BezPath {
-    BezPath::from_vec(vec![
-        PathEl::MoveTo(Point::new(x0, y)),
-        PathEl::LineTo(Point::new(x1, y)),
-    ])
 }
 
 /// Set the current paint from a [`Brush`].
@@ -431,14 +423,13 @@ impl Editor {
                     // width to go down from the default expectation
                     let y = glyph_run.baseline() - offset + width / 2.;
 
-                    let line = line_path(
-                        glyph_run.offset() as f64,
-                        y as f64,
-                        (glyph_run.offset() + glyph_run.advance()) as f64,
+                    let line = Line::new(
+                        (glyph_run.offset() as f64, y as f64),
+                        ((glyph_run.offset() + glyph_run.advance()) as f64, y as f64),
                     );
                     renderer.set_stroke(Stroke::new(width.into()));
                     set_brush(renderer, &style.brush);
-                    renderer.stroke_path(&line);
+                    renderer.stroke_path(&line.to_path(0.0));
                 }
                 let run = glyph_run.run();
                 let font = run.font();
@@ -477,14 +468,13 @@ impl Editor {
                     // Remember that we are using a y-down coordinate system
                     let y = glyph_run.baseline() - offset + run_metrics.strikethrough_size / 2.;
 
-                    let line = line_path(
-                        glyph_run.offset() as f64,
-                        y as f64,
-                        (glyph_run.offset() + glyph_run.advance()) as f64,
+                    let line = Line::new(
+                        (glyph_run.offset() as f64, y as f64),
+                        ((glyph_run.offset() + glyph_run.advance()) as f64, y as f64),
                     );
                     renderer.set_stroke(Stroke::new(width.into()));
                     set_brush(renderer, &style.brush);
-                    renderer.stroke_path(&line);
+                    renderer.stroke_path(&line.to_path(0.0));
                 }
             }
         }
