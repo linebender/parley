@@ -102,9 +102,6 @@ struct SimpleVelloApp {
     /// The pixmap that the `vello_cpu` renderer rasterizes into.
     pixmap: Pixmap,
 
-    /// The size, in physical pixels, of `renderer` and `pixmap`.
-    render_size: (u16, u16),
-
     /// Our `Editor`, which owns a `parley::PlainEditor`.
     editor: text::Editor,
 
@@ -119,6 +116,19 @@ struct SimpleVelloApp {
 
     /// Translate winit events into ui-events events.
     event_reducer: WindowEventReducer,
+}
+
+impl SimpleVelloApp {
+    /// Ensure the `vello_cpu` render context and pixmap match the given size, recreating
+    /// them (and forcing a redraw) if the size has changed.
+    fn ensure_render_size(&mut self, width: u16, height: u16) {
+        if self.renderer.width() != width || self.renderer.height() != height {
+            self.renderer = RenderContext::new(width, height);
+            self.pixmap = Pixmap::new(width, height);
+            // Force the editor to be re-rasterized into the new pixmap.
+            self.last_drawn_generation = text::Generation::default();
+        }
+    }
 }
 
 impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp {
@@ -153,14 +163,7 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp {
         }
 
         // Ensure the CPU renderer and pixmap match the window size.
-        ensure_render_size(
-            &mut self.renderer,
-            &mut self.pixmap,
-            &mut self.render_size,
-            &mut self.last_drawn_generation,
-            to_u16(size.width),
-            to_u16(size.height),
-        );
+        self.ensure_render_size(to_u16(size.width), to_u16(size.height));
 
         // Save the Window and Surface to a state variable
         self.state = RenderState::Active(ActiveRenderState {
@@ -284,18 +287,13 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp {
                 {
                     render_state.surface.resize(width, height).unwrap();
                 }
-                ensure_render_size(
-                    &mut self.renderer,
-                    &mut self.pixmap,
-                    &mut self.render_size,
-                    &mut self.last_drawn_generation,
-                    to_u16(size.width),
-                    to_u16(size.height),
-                );
+                self.ensure_render_size(to_u16(size.width), to_u16(size.height));
                 let editor = self.editor.editor();
                 editor.set_scale(1.0);
                 editor.set_width(Some(size.width as f32 - 2_f32 * text::INSET));
-                render_state.window.request_redraw();
+                if let RenderState::Active(state) = &self.state {
+                    state.window.request_redraw();
+                }
             }
 
             // Don't blink the cursor when we're not focused.
@@ -315,7 +313,8 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp {
                 // Send an accessibility update if accessibility is active.
                 render_state.access_update(&mut self.editor);
 
-                let (width, height) = self.render_size;
+                let width = self.renderer.width();
+                let height = self.renderer.height();
 
                 // Sometimes the pixmap is stale and needs to be redrawn.
                 if self.last_drawn_generation != self.editor.generation() {
@@ -380,7 +379,6 @@ fn main() -> Result<()> {
         // These are placeholders; they are recreated to match the window size in `resumed`.
         renderer: RenderContext::new(1, 1),
         pixmap: Pixmap::new(1, 1),
-        render_size: (1, 1),
         editor: text::Editor::new(text::LOREM),
         last_drawn_generation: text::Generation::default(),
         last_sent_ime_cursor_area: parley::BoundingBox::new(f64::NAN, f64::NAN, f64::NAN, f64::NAN),
@@ -410,28 +408,6 @@ fn create_winit_window(event_loop: &ActiveEventLoop) -> Arc<Window> {
 /// Clamp a physical pixel dimension to a non-zero `u16`, as required by `vello_cpu`.
 fn to_u16(value: u32) -> u16 {
     value.clamp(1, u16::MAX as u32) as u16
-}
-
-/// Ensure the `vello_cpu` render context and pixmap match the given size, recreating
-/// them (and forcing a redraw) if the size has changed.
-///
-/// This is a free function operating on individual fields so that it can be called
-/// while another field (e.g. the active render state) is mutably borrowed.
-fn ensure_render_size(
-    renderer: &mut RenderContext,
-    pixmap: &mut Pixmap,
-    render_size: &mut (u16, u16),
-    last_drawn_generation: &mut text::Generation,
-    width: u16,
-    height: u16,
-) {
-    if *render_size != (width, height) {
-        *renderer = RenderContext::new(width, height);
-        *pixmap = Pixmap::new(width, height);
-        *render_size = (width, height);
-        // Force the editor to be re-rasterized into the new pixmap.
-        *last_drawn_generation = text::Generation::default();
-    }
 }
 
 /// Convert a premultiplied RGBA8 pixel into the `0RGB` `u32` format expected by softbuffer.
