@@ -11,18 +11,18 @@ use core::default::Default;
 use parley::editing::SplitString;
 use parley::layout::{PositionedLayoutItem, Style};
 use parley::{GenericFamily, StyleProperty};
+use peniko::{
+    Brush, Fill,
+    color::{AlphaColor, Srgb, palette},
+    kurbo::{Affine, Line, Shape, Stroke},
+};
 use std::time::Duration;
 use ui_events::pointer::PointerButton;
 use ui_events::{
     keyboard::{Key, KeyboardEvent, NamedKey},
     pointer::{PointerButtonEvent, PointerEvent, PointerInfo, PointerState, PointerType},
 };
-use vello::{
-    Scene,
-    kurbo::{Affine, Line, Stroke},
-    peniko::color::{AlphaColor, Srgb, palette},
-    peniko::{Brush, Fill},
-};
+use vello_cpu::{Glyph, RenderContext};
 use winit::event::{Ime, WindowEvent};
 
 pub use parley::editing::Generation;
@@ -44,6 +44,16 @@ pub struct Editor {
 
 fn convert_rect(rect: &parley::BoundingBox) -> peniko::kurbo::Rect {
     peniko::kurbo::Rect::new(rect.x0, rect.y0, rect.x1, rect.y1)
+}
+
+/// Set the current paint from a [`Brush`].
+///
+/// `vello_cpu`'s `PaintType` uses its own image/gradient types, so we can't pass a
+/// `peniko::Brush` directly. This example only ever uses solid-color brushes.
+fn set_brush(renderer: &mut RenderContext, brush: &Brush) {
+    if let Brush::Solid(color) = brush {
+        renderer.set_paint(*color);
+    }
 }
 
 fn to_accesskit_color(brush: &Brush) -> Option<accesskit::Color> {
@@ -370,30 +380,22 @@ impl Editor {
         self.editor.generation()
     }
 
-    /// Draw into scene.
+    /// Draw into the `vello_cpu` render context.
     ///
     /// Returns drawn `Generation`.
-    pub fn draw(&mut self, scene: &mut Scene) -> Generation {
+    pub fn draw(&mut self, renderer: &mut RenderContext) -> Generation {
         let transform = Affine::translate((INSET as f64, INSET as f64));
+        renderer.set_transform(transform);
+        renderer.set_fill_rule(Fill::NonZero);
+        renderer.set_paint(BACKGROUND_COLOR);
         self.editor.selection_geometry_with(|rect, _| {
-            scene.fill(
-                Fill::NonZero,
-                transform,
-                BACKGROUND_COLOR,
-                None,
-                &convert_rect(&rect),
-            );
+            renderer.fill_rect(&convert_rect(&rect));
         });
         if self.cursor_visible
             && let Some(cursor) = self.editor.cursor_geometry(1.5)
         {
-            scene.fill(
-                Fill::NonZero,
-                transform,
-                palette::css::WHITE,
-                None,
-                &convert_rect(&cursor),
-            );
+            renderer.set_paint(palette::css::WHITE);
+            renderer.fill_rect(&convert_rect(&cursor));
         }
         let layout = self.editor.layout(&mut self.font_cx, &mut self.layout_cx);
         for line in layout.lines() {
@@ -405,7 +407,6 @@ impl Editor {
                 // We draw underlines under the text, then the strikethrough on top, following:
                 // https://drafts.csswg.org/css-text-decor/#painting-order
                 if let Some(underline) = &style.underline {
-                    let underline_brush = &style.brush;
                     let run_metrics = glyph_run.run().metrics();
                     let offset = match underline.offset {
                         Some(offset) => offset,
@@ -426,16 +427,10 @@ impl Editor {
                         (glyph_run.offset() as f64, y as f64),
                         ((glyph_run.offset() + glyph_run.advance()) as f64, y as f64),
                     );
-                    scene.stroke(
-                        &Stroke::new(width.into()),
-                        transform,
-                        underline_brush,
-                        None,
-                        &line,
-                    );
+                    renderer.set_stroke(Stroke::new(width.into()));
+                    set_brush(renderer, &style.brush);
+                    renderer.stroke_path(&line.to_path(0.0));
                 }
-                let mut x = glyph_run.offset();
-                let y = glyph_run.baseline();
                 let run = glyph_run.run();
                 let font = run.font();
                 let font_size = run.font_size();
@@ -443,29 +438,21 @@ impl Editor {
                 let glyph_xform = synthesis
                     .skew()
                     .map(|angle| Affine::skew(angle.to_radians().tan() as f64, 0.0));
-                scene
-                    .draw_glyphs(font)
-                    .brush(&style.brush)
-                    .hint(true)
-                    .transform(transform)
-                    .glyph_transform(glyph_xform)
+                set_brush(renderer, &style.brush);
+                let mut builder = renderer
+                    .glyph_run(font)
                     .font_size(font_size)
-                    .normalized_coords(run.normalized_coords())
-                    .draw(
-                        Fill::NonZero,
-                        glyph_run.glyphs().map(|glyph| {
-                            let gx = x + glyph.x;
-                            let gy = y + glyph.y;
-                            x += glyph.advance;
-                            vello::Glyph {
-                                id: glyph.id,
-                                x: gx,
-                                y: gy,
-                            }
-                        }),
-                    );
+                    .hint(true)
+                    .normalized_coords(run.normalized_coords());
+                if let Some(glyph_xform) = glyph_xform {
+                    builder = builder.glyph_transform(glyph_xform);
+                }
+                builder.fill_glyphs(glyph_run.positioned_glyphs().map(|glyph| Glyph {
+                    id: glyph.id,
+                    x: glyph.x,
+                    y: glyph.y,
+                }));
                 if let Some(strikethrough) = &style.strikethrough {
-                    let strikethrough_brush = &style.brush;
                     let run_metrics = glyph_run.run().metrics();
                     let offset = match strikethrough.offset {
                         Some(offset) => offset,
@@ -485,13 +472,9 @@ impl Editor {
                         (glyph_run.offset() as f64, y as f64),
                         ((glyph_run.offset() + glyph_run.advance()) as f64, y as f64),
                     );
-                    scene.stroke(
-                        &Stroke::new(width.into()),
-                        transform,
-                        strikethrough_brush,
-                        None,
-                        &line,
-                    );
+                    renderer.set_stroke(Stroke::new(width.into()));
+                    set_brush(renderer, &style.brush);
+                    renderer.stroke_path(&line.to_path(0.0));
                 }
             }
         }
