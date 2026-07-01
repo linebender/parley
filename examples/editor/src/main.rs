@@ -121,7 +121,7 @@ struct SimpleVelloApp {
 impl SimpleVelloApp {
     /// Ensure the `vello_cpu` render context and pixmap match the given size, recreating
     /// them (and forcing a redraw) if the size has changed.
-    fn ensure_render_size(&mut self, width: u16, height: u16) {
+    fn handle_resize(&mut self, width: u16, height: u16) {
         if self.renderer.width() != width || self.renderer.height() != height {
             self.renderer = RenderContext::new(width, height);
             self.pixmap = Pixmap::new(width, height);
@@ -163,7 +163,7 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp {
         }
 
         // Ensure the CPU renderer and pixmap match the window size.
-        self.ensure_render_size(to_nonzero_u16(size.width), to_nonzero_u16(size.height));
+        self.handle_resize(to_nonzero_u16(size.width), to_nonzero_u16(size.height));
 
         // Save the Window and Surface to a state variable
         self.state = RenderState::Active(ActiveRenderState {
@@ -287,7 +287,7 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp {
                 {
                     render_state.surface.resize(width, height).unwrap();
                 }
-                self.ensure_render_size(to_nonzero_u16(size.width), to_nonzero_u16(size.height));
+                self.handle_resize(to_nonzero_u16(size.width), to_nonzero_u16(size.height));
                 let editor = self.editor.editor();
                 editor.set_scale(1.0);
                 editor.set_width(Some(size.width as f32 - 2_f32 * text::INSET));
