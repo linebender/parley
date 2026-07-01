@@ -17,7 +17,7 @@ use std::sync::Arc;
 use ui_events_winit::{WindowEventReducer, WindowEventTranslation};
 use vello_cpu::peniko::Color;
 use vello_cpu::peniko::color::PremulRgba8;
-use vello_cpu::{Pixmap, RenderContext, Resources, kurbo::Rect};
+use vello_cpu::{Pixmap, RenderContext, kurbo::Rect};
 use winit::application::ApplicationHandler;
 use winit::dpi::{LogicalSize, PhysicalPosition, PhysicalSize};
 use winit::event::{StartCause, WindowEvent};
@@ -98,9 +98,6 @@ struct SimpleVelloApp {
 
     /// The `vello_cpu` render context into which the editor layout is drawn.
     renderer: RenderContext,
-
-    /// Resources (e.g. the glyph cache) used by the `vello_cpu` renderer.
-    resources: Resources,
 
     /// The pixmap that the `vello_cpu` renderer rasterizes into.
     pixmap: Pixmap,
@@ -328,13 +325,11 @@ impl ApplicationHandler<accesskit_winit::Event> for SimpleVelloApp {
                     self.renderer
                         .fill_rect(&Rect::new(0.0, 0.0, width as f64, height as f64));
 
-                    self.last_drawn_generation =
-                        self.editor.draw(&mut self.renderer, &mut self.resources);
+                    self.last_drawn_generation = self.editor.draw(&mut self.renderer);
 
                     // Rasterize the scene into the pixmap.
                     self.renderer.flush();
-                    self.renderer
-                        .render_to_pixmap(&mut self.resources, &mut self.pixmap);
+                    self.renderer.render_to_pixmap(&mut self.pixmap);
                 }
 
                 // Copy the pixmap into the softbuffer surface and present it.
@@ -384,7 +379,6 @@ fn main() -> Result<()> {
         state: RenderState::Suspended(None),
         // These are placeholders; they are recreated to match the window size in `resumed`.
         renderer: RenderContext::new(1, 1),
-        resources: Resources::new(),
         pixmap: Pixmap::new(1, 1),
         render_size: (1, 1),
         editor: text::Editor::new(text::LOREM),

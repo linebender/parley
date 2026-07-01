@@ -22,7 +22,7 @@ use ui_events::{
     keyboard::{Key, KeyboardEvent, NamedKey},
     pointer::{PointerButtonEvent, PointerEvent, PointerInfo, PointerState, PointerType},
 };
-use vello_cpu::{Glyph, RenderContext, Resources};
+use vello_cpu::{Glyph, RenderContext};
 use winit::event::{Ime, WindowEvent};
 
 pub use parley::editing::Generation;
@@ -391,7 +391,7 @@ impl Editor {
     /// Draw into the `vello_cpu` render context.
     ///
     /// Returns drawn `Generation`.
-    pub fn draw(&mut self, renderer: &mut RenderContext, resources: &mut Resources) -> Generation {
+    pub fn draw(&mut self, renderer: &mut RenderContext) -> Generation {
         let transform = Affine::translate((INSET as f64, INSET as f64));
         renderer.set_transform(transform);
         renderer.set_fill_rule(Fill::NonZero);
@@ -401,9 +401,9 @@ impl Editor {
         });
         if self.cursor_visible
             && let Some(cursor) = self.editor.cursor_geometry(1.5)
-                renderer.set_paint(palette::css::WHITE);
-                renderer.fill_rect(&convert_rect(&cursor));
-            }
+        {
+            renderer.set_paint(palette::css::WHITE);
+            renderer.fill_rect(&convert_rect(&cursor));
         }
         let layout = self.editor.layout(&mut self.font_cx, &mut self.layout_cx);
         for line in layout.lines() {
@@ -449,7 +449,7 @@ impl Editor {
                     .map(|angle| Affine::skew(angle.to_radians().tan() as f64, 0.0));
                 set_brush(renderer, &style.brush);
                 let mut builder = renderer
-                    .glyph_run(resources, font)
+                    .glyph_run(font)
                     .font_size(font_size)
                     .hint(true)
                     .normalized_coords(run.normalized_coords());
