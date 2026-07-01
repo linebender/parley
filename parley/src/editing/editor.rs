@@ -108,6 +108,8 @@ where
     font_size: f32,
     scale: f32,
     quantize: bool,
+    /// Whether to mask the text with a bullet character, as for a password field.
+    password: bool,
     // Simple tracking of when the layout needs to be updated
     // before it can be used for `Selection` calculations or
     // for drawing.
@@ -141,6 +143,7 @@ where
             font_size,
             scale: 1.0,
             quantize: true,
+            password: false,
             layout_dirty: true,
             alignment: Alignment::Start,
             // We don't use the `default` value to start with, as our consumers
@@ -1029,6 +1032,21 @@ where
         self.layout_dirty = true;
     }
 
+    /// Set whether the text should be masked as a password.
+    ///
+    /// When enabled, every grapheme cluster is rendered with the bullet character (`•`) instead
+    /// of its actual glyphs. The underlying text is unchanged, so editing, cursor movement,
+    /// selection and hit-testing continue to operate on the real text.
+    pub fn set_password(&mut self, password: bool) {
+        self.password = password;
+        self.layout_dirty = true;
+    }
+
+    /// Get whether the text is masked as a password.
+    pub fn is_password(&self) -> bool {
+        self.password
+    }
+
     /// Modify the styles provided for this editor.
     pub fn edit_styles(&mut self) -> &mut StyleSet<T> {
         self.layout_dirty = true;
@@ -1231,6 +1249,11 @@ where
             layout_cx.ranged_builder(font_cx, &self.buffer, self.scale, self.quantize);
         for prop in self.default_style.inner().values() {
             builder.push_default(prop.to_owned());
+        }
+        if self.password {
+            // Mask the entire text with the bullet character. Pushed last so it overrides any
+            // grapheme replacement that may have been set on the default styles.
+            builder.push_default(StyleProperty::GraphemeReplacement(Some('\u{2022}')));
         }
         if let Some(preedit_range) = &self.compose {
             builder.push(StyleProperty::Underline(true), preedit_range.clone());

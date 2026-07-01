@@ -62,6 +62,8 @@ pub struct Style<B: Brush> {
     pub(crate) overflow_wrap: OverflowWrap,
     /// Per-cluster text-wrap-mode setting
     pub(crate) text_wrap_mode: TextWrapMode,
+    /// Replacement character used to mask every grapheme cluster (e.g. for password fields).
+    pub(crate) grapheme_replacement: Option<char>,
     #[cfg(feature = "accesskit")]
     /// Locale if any, so we can set the corresponding AccessKit property
     pub(crate) locale: Option<fontique::Language>,

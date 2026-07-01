@@ -3,7 +3,7 @@
 
 //! Test that the various builders produce the same results.
 
-use std::{borrow::Cow, path::PathBuf, sync::Arc};
+use std::{borrow::Cow, path::PathBuf, sync::Arc, vec::Vec};
 
 use fontique::{Collection, CollectionOptions, FontStyle, FontWeight, FontWidth, SourceCache};
 use parlance::FontFamilyName;
@@ -12,8 +12,8 @@ use peniko::{Blob, color::palette};
 use super::utils::{ColorBrush, asserts::assert_eq_layout_data};
 use crate::{
     FontContext, FontFamily, FontFeatures, FontVariations, Layout, LayoutContext, LineHeight,
-    OverflowWrap, RangedBuilder, StyleProperty, StyleRunBuilder, TextStyle, TextWrapMode,
-    TreeBuilder, WordBreak,
+    OverflowWrap, PositionedLayoutItem, RangedBuilder, StyleProperty, StyleRunBuilder, TextStyle,
+    TextWrapMode, TreeBuilder, WordBreak,
 };
 
 // TODO: `FONT_FAMILY_LIST`, `load_fonts`, and `create_font_context` are
@@ -255,6 +255,7 @@ fn create_root_style() -> TextStyle<'static, 'static, ColorBrush> {
         word_break: WordBreak::BreakAll,
         overflow_wrap: OverflowWrap::Anywhere,
         text_wrap_mode: TextWrapMode::Wrap,
+        grapheme_replacement: None,
     }
 }
 
@@ -463,6 +464,67 @@ fn builders_root_only() {
         with_ranged_builder,
         with_tree_builder,
         false,
+    );
+}
+
+/// Collects the glyph identifiers of every positioned glyph in a layout, in visual order.
+fn collect_glyph_ids(layout: &Layout<ColorBrush>) -> Vec<u32> {
+    let mut ids = Vec::new();
+    for line in layout.lines() {
+        for item in line.items() {
+            if let PositionedLayoutItem::GlyphRun(run) = item {
+                ids.extend(run.glyphs().map(|glyph| glyph.id));
+            }
+        }
+    }
+    ids
+}
+
+/// Test that `GraphemeReplacement` masks every cluster's glyphs with a single replacement glyph
+/// while leaving the cluster structure intact.
+#[test]
+fn grapheme_replacement_masks_glyphs() {
+    let text = "abcde";
+    let ropts = RangedOptions {
+        scale: 1.0,
+        quantize: false,
+        max_advance: None,
+        text,
+    };
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+
+    let unmasked = build_layout_with_ranged(&mut fcx, &mut lcx, &ropts, |rb| {
+        rb.push_default(FontFamily::from(FONT_FAMILY_LIST));
+    });
+    let unmasked_ids = collect_glyph_ids(&unmasked);
+
+    let masked = build_layout_with_ranged(&mut fcx, &mut lcx, &ropts, |rb| {
+        rb.push_default(FontFamily::from(FONT_FAMILY_LIST));
+        rb.push_default(StyleProperty::GraphemeReplacement(Some('\u{2022}')));
+    });
+    let masked_ids = collect_glyph_ids(&masked);
+
+    // There should be one glyph per character, and the cluster count should be unchanged.
+    assert_eq!(masked_ids.len(), text.chars().count());
+    assert_eq!(masked_ids.len(), unmasked_ids.len());
+    assert_eq!(
+        masked.data.clusters.len(),
+        unmasked.data.clusters.len(),
+        "masking must preserve cluster structure"
+    );
+
+    // Every masked glyph shares the same replacement glyph id.
+    let bullet = masked_ids[0];
+    assert!(
+        masked_ids.iter().all(|&id| id == bullet),
+        "all masked glyphs should be the replacement glyph, got {masked_ids:?}"
+    );
+
+    // The replacement actually changed the rendered glyphs.
+    assert!(
+        unmasked_ids.iter().any(|&id| id != bullet),
+        "masking should change the rendered glyphs"
     );
 }
 
