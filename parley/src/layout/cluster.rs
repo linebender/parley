@@ -205,7 +205,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
     }
 
     /// Returns an iterator over the glyphs in the cluster.
-    pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + 'a + Clone {
+    pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + 'a + Clone + use<'a, B> {
         if self.data.glyph_len == 0xFF {
             GlyphIter::Single(Some(Glyph {
                 id: self.data.glyph_offset,
