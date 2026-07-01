@@ -59,7 +59,11 @@ impl Selection {
                 cluster = prev;
             }
             let anchor = Cursor::from_cluster(layout, cluster.clone(), !cluster.is_rtl());
-            let focus = anchor.next_logical_word(layout);
+            let focus = if let Some(end) = cluster.next_logical_word() {
+                Cursor::from_cluster(layout, end.clone(), !cluster.is_rtl())
+            } else {
+                Cursor::from_byte_index(layout, usize::MAX, Affinity::Downstream)
+            };
             Self {
                 anchor,
                 focus,
