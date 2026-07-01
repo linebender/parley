@@ -243,16 +243,23 @@ impl Cursor {
         cur
     }
 
-    /// Returns a new cursor that is positioned at the next word boundary
-    /// in logical order.
+    /// Returns a new cursor that is positioned at the next word boundary in logical order, skipping
+    /// over whitespace.
     #[must_use]
     pub fn next_logical_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
         let [upstream, downstream] = self.logical_clusters(layout);
-        if let Some(cluster) = downstream.or(upstream) {
-            let start = cluster.clone();
-            let cluster = cluster.next_logical_word().unwrap_or(cluster);
-            if cluster.path == start.path {
-                return Self::from_byte_index(layout, usize::MAX, Affinity::Downstream);
+        if let Some(mut cluster) = downstream.or(upstream) {
+            // `Cluster::next_logical_word` stops at the nearest next cluster marked as word
+            // boundary, which can be whitespace. We keep hopping over whitespace boundaries to land
+            // on the start of the preceding "actual" word.
+            loop {
+                let Some(next) = cluster.next_logical_word() else {
+                    return Self::from_byte_index(layout, usize::MAX, Affinity::Downstream);
+                };
+                cluster = next;
+                if !cluster.data.info.is_whitespace() {
+                    break;
+                }
             }
             // Affine towards the word we land on (e.g., in case of jumping across a soft break, the
             // cursor is attached to the word on the next line).
@@ -261,13 +268,24 @@ impl Cursor {
         *self
     }
 
-    /// Returns a new cursor that is positioned at the previous word boundary
-    /// in logical order.
+    /// Returns a new cursor that is positioned at the previous word boundary in logical order,
+    /// skipping over whitespace.
     #[must_use]
     pub fn previous_logical_word<B: Brush>(&self, layout: &Layout<B>) -> Self {
         let [upstream, downstream] = self.logical_clusters(layout);
-        if let Some(cluster) = downstream.or(upstream) {
-            let cluster = cluster.previous_logical_word().unwrap_or(cluster);
+        if let Some(mut cluster) = downstream.or(upstream) {
+            // `Cluster::previous_logical_word` stops at the nearest previous cluster marked as word
+            // boundary, which can be whitespace. We keep hopping over whitespace boundaries to land
+            // on the start of the preceding "actual" word.
+            loop {
+                let Some(prev) = cluster.previous_logical_word() else {
+                    break;
+                };
+                cluster = prev;
+                if !cluster.data.info.is_whitespace() {
+                    break;
+                }
+            }
             // Affine towards the word we land on (e.g., in case of jumping to a soft break, the
             // cursor is attached to the word on the current line).
             return Self::from_byte_index(layout, cluster.text_range().start, Affinity::Downstream);
