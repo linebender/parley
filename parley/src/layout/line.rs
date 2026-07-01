@@ -192,7 +192,7 @@ pub struct PositionedInlineBox {
 #[derive(Clone)]
 pub struct GlyphRun<'a, B: Brush> {
     run: Run<'a, B>,
-    style: &'a Style<B>,
+    style_index: u16,
     glyph_start: usize,
     glyph_count: usize,
     offset: f32,
@@ -207,8 +207,17 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     }
 
     /// Returns the associated style.
+    ///
+    /// See also [`Self::style_index`].
     pub fn style(&self) -> &Style<B> {
-        self.style
+        &self.run.layout.styles()[usize::from(self.style_index)]
+    }
+
+    /// Returns the associated style index.
+    ///
+    /// See also [`Self::style`].
+    pub fn style_index(&self) -> u16 {
+        self.style_index
     }
 
     /// Returns the offset to the baseline.
@@ -283,27 +292,27 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                     }));
                 }
                 LineItem::Run(run) => {
-                    let mut iter = run
+                    let mut glyphs = run
                         .visual_clusters()
-                        .flat_map(|c| c.glyphs())
+                        .flat_map(|c| c.glyphs().map(|glyph| (glyph, c.data.style_index)))
                         .skip(self.glyph_start);
 
-                    if let Some(first) = iter.next() {
-                        let mut advance = first.advance;
-                        let style_index = first.style_index();
+                    if let Some((first_glyph, first_style_index)) = glyphs.next() {
+                        let mut advance = first_glyph.advance;
                         let mut glyph_count = 1;
-                        for glyph in iter.take_while(|g| g.style_index() == style_index) {
+                        for (glyph, _) in
+                            glyphs.take_while(|(_, style_index)| *style_index == first_style_index)
+                        {
                             glyph_count += 1;
                             advance += glyph.advance;
                         }
-                        let style = run.layout.data.styles.get(style_index)?;
                         let glyph_start = self.glyph_start;
                         self.glyph_start += glyph_count;
                         let offset = self.offset;
                         self.offset += advance;
                         return Some(PositionedLayoutItem::GlyphRun(GlyphRun {
                             run,
-                            style,
+                            style_index: first_style_index,
                             glyph_start,
                             glyph_count,
                             offset: offset
