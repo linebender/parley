@@ -234,6 +234,13 @@ impl Default for Collection {
     }
 }
 
+
+#[cfg(target_has_atomic = "64")]
+type Version = u64;
+
+#[cfg(not(target_has_atomic = "64"))]
+type Version = u32;
+
 /// Collection of fonts.
 #[derive(Clone)]
 struct Inner {
@@ -242,7 +249,7 @@ struct Inner {
     #[allow(unused)]
     shared: Option<Arc<Shared>>,
     #[allow(unused)]
-    shared_version: u64,
+    shared_version: Version,
     fallback_cache: FallbackCache,
 }
 
