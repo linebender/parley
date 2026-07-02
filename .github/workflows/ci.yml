@@ -119,7 +119,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_STABLE_VER }}
-          targets: x86_64-unknown-none,thumbv8m.main-none-eabihf
+          targets: x86_64-unknown-none,thumbv8m.main-none-eabihf,powerpc-unknown-linux-gnu
           components: clippy
 
       - name: Install fontconfig-dev
@@ -143,6 +143,14 @@ jobs:
 
       - name: cargo clippy (no_std 32-bit)
         run: cargo hack clippy ${{ env.RUST_MIN_VER_PKGS }} --locked --optional-deps --each-feature --ignore-unknown-features --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }} --target thumbv8m.main-none-eabihf -- -D warnings
+
+      # We check the std code paths on a 32-bit target without 64-bit atomics
+      # (powerpc-unknown-linux-gnu) to catch regressions like our atomics-based
+      # version counters assuming a 64-bit-wide integer. We omit --optional-deps
+      # and exclude the system feature because the system font backends pull in
+      # C dependencies (e.g. fontconfig) that can't be cross-compiled here.
+      - name: cargo clippy (32-bit with std)
+        run: cargo hack clippy ${{ env.RUST_MIN_VER_PKGS }} --locked --each-feature --ignore-unknown-features --features std --exclude-features default,system,png,vello_hybrid --target powerpc-unknown-linux-gnu -- -D warnings
 
       - name: cargo clippy
         run: cargo hack clippy --workspace --locked --optional-deps --each-feature --ignore-unknown-features --features std -- -D warnings
@@ -275,7 +283,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.RUST_MIN_VER }}
-          targets: x86_64-unknown-none,thumbv8m.main-none-eabihf
+          targets: x86_64-unknown-none,thumbv8m.main-none-eabihf,powerpc-unknown-linux-gnu
 
       - name: Install fontconfig-dev
         if: runner.os == 'Linux'
@@ -298,6 +306,14 @@ jobs:
 
       - name: cargo check (no_std 32-bit)
         run: cargo hack check ${{ env.RUST_MIN_VER_PKGS }} --locked --optional-deps --each-feature --ignore-unknown-features --features libm --exclude-features ${{ env.FEATURES_DEPENDING_ON_STD }} --target thumbv8m.main-none-eabihf
+
+      # We check the std code paths on a 32-bit target without 64-bit atomics
+      # (powerpc-unknown-linux-gnu) to catch regressions like our atomics-based
+      # version counters assuming a 64-bit-wide integer. We omit --optional-deps
+      # and exclude the system feature because the system font backends pull in
+      # C dependencies (e.g. fontconfig) that can't be cross-compiled here.
+      - name: cargo check (32-bit with std)
+        run: cargo hack check ${{ env.RUST_MIN_VER_PKGS }} --locked --each-feature --ignore-unknown-features --features std --exclude-features default,system,png,vello_hybrid --target powerpc-unknown-linux-gnu
 
       - name: cargo check
         run: cargo hack check ${{ env.RUST_MIN_VER_PKGS }} --locked --optional-deps --each-feature --ignore-unknown-features --features std

@@ -75,3 +75,13 @@ pub use source_cache::{SourceCache, SourceCacheOptions};
 use core::sync::atomic::AtomicU32 as AtomicCounter;
 #[cfg(target_has_atomic = "64")]
 use core::sync::atomic::AtomicU64 as AtomicCounter;
+
+/// The integer type underlying [`AtomicCounter`].
+///
+/// This is `u32` on platforms without 64-bit atomics (e.g. many 32-bit
+/// targets) and `u64` elsewhere.
+#[cfg(not(target_has_atomic = "64"))]
+type CounterInt = u32;
+/// The integer type underlying [`AtomicCounter`].
+#[cfg(target_has_atomic = "64")]
+type CounterInt = u64;
