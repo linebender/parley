@@ -18,6 +18,12 @@ This release has an [MSRV] of 1.88.
 
 - Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. (#661 by [@tomcur][])
 
+### Fixed
+
+#### Fontique
+
+- Fix compilation on 32-bit platforms without 64-bit atomics (e.g. `mipsel-unknown-linux-gnu`). (#671 by [@nicoburns][])
+
 ## [0.11.0] - 2026-06-24
 
 This release has an [MSRV] of 1.88.

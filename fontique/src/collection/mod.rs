@@ -21,7 +21,7 @@ use super::{
     generic::GenericFamilyMap,
     source::{SourceId, SourceInfo, SourceKind},
 };
-use crate::AtomicCounter;
+use crate::{AtomicCounter, CounterInt};
 use alloc::{string::String, sync::Arc, vec::Vec};
 use hashbrown::HashMap;
 use read_fonts::types::NameId;
@@ -242,7 +242,7 @@ struct Inner {
     #[allow(unused)]
     shared: Option<Arc<Shared>>,
     #[allow(unused)]
-    shared_version: u64,
+    shared_version: CounterInt,
     fallback_cache: FallbackCache,
 }
 
