@@ -250,11 +250,11 @@ mod tests {
         let items = items(text);
         assert!(items.len() >= 2);
         assert_eq!(items[0].script, LATN);
-        assert!(items[0].bidi_level % 2 == 0);
+        assert!(items[0].bidi_level.is_multiple_of(2));
         assert!(
             items
                 .iter()
-                .any(|item| item.script == ARAB && item.bidi_level % 2 == 1)
+                .any(|item| item.script == ARAB && !item.bidi_level.is_multiple_of(2))
         );
 
         // Items tile the text contiguously.
