@@ -1,16 +1,16 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::analysis::cluster::Whitespace;
 use crate::layout::Style;
 use crate::layout::data::BreakReason;
-use crate::layout::data::ClusterData;
-use crate::layout::glyph::Glyph;
 use crate::layout::layout::Layout;
 use crate::layout::line::{Line, LineItem};
 use crate::layout::run::Run;
 use crate::style::Brush;
+
 use core::ops::Range;
+use parley_core::Glyph;
+use parley_core::shape::{ClusterData, ClusterInfo, Whitespace};
 
 /// Atomic unit of text.
 #[derive(Copy, Clone)]
@@ -145,7 +145,8 @@ impl<'a, B: Brush> Cluster<'a, B> {
 
     /// Returns the range of text that defines the cluster.
     pub fn text_range(&self) -> Range<usize> {
-        self.data.text_range(self.run.data)
+        let start = self.run.data.text_range.start + self.data.text_offset as usize;
+        start..start + self.data.text_len as usize
     }
 
     /// Returns the style of the character this cluster represents.
@@ -439,7 +440,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
         Some(offset)
     }
 
-    pub(crate) fn info(&self) -> &super::data::ClusterInfo {
+    pub(crate) fn info(&self) -> &ClusterInfo {
         &self.data.info
     }
 

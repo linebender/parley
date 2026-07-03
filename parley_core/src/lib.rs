@@ -27,7 +27,10 @@ mod analysis;
 mod analyzer;
 pub mod bidi;
 pub mod break_overrides;
+mod glyph;
 pub mod itemize;
+pub mod shape;
 
 pub use analysis::{Analysis, AnalysisDataSources, Boundary, CharInfo};
 pub use analyzer::{AnalysisOptions, Analyzer};
+pub use glyph::Glyph;

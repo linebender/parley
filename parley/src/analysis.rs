@@ -1,14 +1,12 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-pub(crate) mod cluster;
-
 use crate::{Brush, LayoutContext};
 
 use icu_properties::props::{GeneralCategory, Script};
 use parley_core::break_overrides::LineBreakOverrideFn;
 
-use parley_core::{AnalysisDataSources, AnalysisOptions};
+use parley_core::AnalysisOptions;
 
 use parlance::WordBreak;
 

@@ -9,6 +9,7 @@ publish = false
 
 [dependencies]
 parley = { workspace = true, default-features = true }
+parley_core = { workspace = true, default-features = true }
 skrifa = { workspace = true }
 image = { version = "0.25.10", default-features = false, features = ["png"] }
 swash = { workspace = true, default-features = true }

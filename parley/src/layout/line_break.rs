@@ -9,8 +9,6 @@ use alloc::vec::Vec;
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
 
-use crate::analysis::cluster::Whitespace;
-use crate::data::ClusterData;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run, RunMetrics,
@@ -20,6 +18,7 @@ use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
 
 use core::ops::Range;
 use parley_core::Boundary;
+use parley_core::shape::{ClusterData, Whitespace};
 
 #[derive(Default)]
 struct LineLayout {

@@ -6,6 +6,7 @@ use crate::layout::cluster::{Cluster, ClusterPath};
 use crate::layout::data::{LineItemData, RunData};
 use crate::layout::layout::Layout;
 use crate::style::Brush;
+
 use core::ops::Range;
 use fontique::Synthesis;
 

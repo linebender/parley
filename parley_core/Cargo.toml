@@ -14,12 +14,14 @@ all-features = true
 
 [features]
 default = ["std"]
-std = []
+std = ["fontique/std", "parlance/std"]
+libm = ["fontique/libm"]
 # Enables dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
 # When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
 complex-scripts = []
 
 [dependencies]
+fontique = { workspace = true }
 parlance = { workspace = true }
 parley_data = { workspace = true, features = ["baked"] }
 

@@ -2922,6 +2922,7 @@ dependencies = [
 name = "parley_core"
 version = "0.11.0"
 dependencies = [
+ "fontique",
  "icu_normalizer",
  "icu_properties",
  "icu_segmenter",
@@ -3857,6 +3858,7 @@ version = "0.1.0"
 dependencies = [
  "image",
  "parley",
+ "parley_core",
  "skrifa 0.43.2",
  "swash",
 ]

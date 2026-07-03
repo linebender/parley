@@ -10,7 +10,7 @@ use crate::analysis::AnalysisDataSources;
 const MAX_CLUSTER_SIZE: usize = 32;
 
 #[derive(Debug, Default)]
-pub(crate) struct CharCluster {
+pub struct CharCluster {
     pub chars: Vec<Char>,
     pub is_emoji: bool,
     pub map_len: u8,
@@ -24,7 +24,7 @@ pub(crate) struct CharCluster {
 }
 
 impl CharCluster {
-    pub(crate) fn range(&self) -> SourceRange {
+    pub fn range(&self) -> SourceRange {
         SourceRange {
             start: self.start,
             end: self.end,
@@ -34,13 +34,13 @@ impl CharCluster {
 
 /// Source range of a cluster in code units.
 #[derive(Copy, Clone)]
-pub(crate) struct SourceRange {
+pub struct SourceRange {
     pub start: u32,
     pub end: u32,
 }
 
 #[derive(Copy, Clone, Debug, Default)]
-pub(crate) struct Char {
+pub struct Char {
     /// The character.
     pub ch: char,
     /// Whether the character
@@ -59,7 +59,7 @@ pub(crate) type GlyphId = u16;
 /// Whitespace content of a cluster.
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
 #[repr(u8)]
-pub(crate) enum Whitespace {
+pub enum Whitespace {
     /// Not a space.
     None = 0,
     /// Standard space.
@@ -74,14 +74,14 @@ pub(crate) enum Whitespace {
 
 impl Whitespace {
     /// Returns true for space or no break space.
-    pub(crate) fn is_space_or_nbsp(self) -> bool {
+    pub fn is_space_or_nbsp(self) -> bool {
         matches!(self, Self::Space | Self::NoBreakSpace)
     }
 }
 
 /// Iterative status of mapping a character cluster to nominal glyph identifiers.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub(crate) enum Status {
+pub enum Status {
     /// Mapping should be skipped.
     Discard,
     /// The best mapping so far.
@@ -111,7 +111,7 @@ impl CharCluster {
 
     /// Returns the primary style index for the cluster.
     #[inline(always)]
-    pub(crate) fn style_index(&self) -> u16 {
+    pub fn style_index(&self) -> u16 {
         self.chars[0].style_index
     }
 
@@ -195,7 +195,7 @@ impl CharCluster {
         }
     }
 
-    pub(crate) fn map(
+    pub fn map(
         &mut self,
         f: impl Fn(char) -> GlyphId,
         analysis_data_sources: &AnalysisDataSources,
