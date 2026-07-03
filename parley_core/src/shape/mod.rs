@@ -1,8 +1,10 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+mod cache;
 mod cluster;
 mod data;
+pub(crate) mod shaper;
 
 use crate::CharInfo;
 
@@ -12,8 +14,7 @@ pub use data::{ClusterData, ClusterInfo, to_whitespace};
 
 /// Rebuilds the provided `char_cluster` in-place using the existing allocation
 /// for the given grapheme `segment_text`, consuming items from `item_infos_iter`.
-// TODO: This should become private, once only `parley_core` calls it.
-pub fn fill_cluster_in_place(
+fn fill_cluster_in_place(
     segment_text: &str,
     item_infos_iter: &mut impl Iterator<Item = (CharInfo, u16)>,
     code_unit_offset_in_string: &mut usize,

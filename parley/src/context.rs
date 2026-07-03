@@ -8,7 +8,7 @@ use core::ops::Range;
 use alloc::{vec, vec::Vec};
 
 use parlance::WordBreak;
-use parley_core::{Analysis, AnalysisDataSources, Analyzer};
+use parley_core::{ShapeContext, Analysis, AnalysisDataSources, Analyzer};
 
 use super::FontContext;
 use super::builder::{RangedBuilder, StyleRunBuilder};
@@ -18,7 +18,6 @@ use super::style::{Brush, TextStyle};
 
 use crate::builder::TreeBuilder;
 use crate::inline_box::InlineBox;
-use crate::shape::ShapeContext;
 
 /// Shared scratch space used when constructing text layouts.
 ///
