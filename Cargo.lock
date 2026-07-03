@@ -2849,8 +2849,9 @@ dependencies = [
 
 [[package]]
 name = "packtab"
-version = "1.8.0"
-source = "git+https://github.com/behdad/packtab.rs.git?rev=558be7e723bbf6e7b22873c79ddbb7c9da498fc0#558be7e723bbf6e7b22873c79ddbb7c9da498fc0"
+version = "1.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5113194bb1e649b5af5940def220bef7a62fbae393d37863e5bb94463212725a"
 
 [[package]]
 name = "parking"

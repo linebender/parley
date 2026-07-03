@@ -55,7 +55,7 @@ icu_normalizer = { version = "2.1.1", default-features = false }
 icu_properties = { version = "2.1.2", default-features = false }
 icu_segmenter = { version = "2.1.2", default-features = false }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
-packtab = { git = "https://github.com/behdad/packtab.rs.git", rev = "558be7e723bbf6e7b22873c79ddbb7c9da498fc0" }
+packtab = { version = "1.9.0" }
 glifo = { git = "https://github.com/linebender/vello", rev = "5796226", default-features = false }
 rand = { version = "0.10.1", default-features = false, features = ["std", "std_rng"] }
 rand_chacha = { version = "0.10.0", default-features = false }
