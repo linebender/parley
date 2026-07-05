@@ -48,6 +48,7 @@ pub struct ClusterInfo {
 }
 
 impl ClusterInfo {
+    #[inline]
     pub fn new(boundary: Boundary, source_char: char) -> Self {
         Self {
             boundary,
@@ -56,32 +57,38 @@ impl ClusterInfo {
     }
 
     // Returns the boundary type of the cluster.
+    #[inline]
     pub fn boundary(self) -> Boundary {
         self.boundary
     }
 
     // Returns the whitespace type of the cluster.
+    #[inline]
     pub fn whitespace(self) -> Whitespace {
         to_whitespace(self.source_char)
     }
 
     /// Returns if the cluster is a line boundary.
+    #[inline]
     pub fn is_boundary(self) -> bool {
         self.boundary != Boundary::None
     }
 
     /// Returns if the cluster is an emoji.
+    #[inline]
     pub fn is_emoji(self) -> bool {
         // TODO: Defer to ICU4X properties (see: https://docs.rs/icu/latest/icu/properties/props/struct.Emoji.html).
         matches!(self.source_char as u32, 0x1F600..=0x1F64F | 0x1F300..=0x1F5FF | 0x1F680..=0x1F6FF | 0x2600..=0x26FF | 0x2700..=0x27BF)
     }
 
     /// Returns if the cluster is any whitespace.
+    #[inline]
     pub fn is_whitespace(self) -> bool {
         self.source_char.is_whitespace()
     }
 
     /// Returns the cluster's original character.
+    #[inline]
     pub fn source_char(self) -> char {
         self.source_char
     }
@@ -89,6 +96,7 @@ impl ClusterInfo {
 
 
 // TODO: should become private when more of `parley`'s shaping is in `parley_core`
+#[inline]
 pub const fn to_whitespace(c: char) -> Whitespace {
     const LINE_SEPARATOR: char = '\u{2028}';
     const PARAGRAPH_SEPARATOR: char = '\u{2029}';

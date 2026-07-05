@@ -115,6 +115,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 variations: rcx.variations(style.font_variations).unwrap_or(&[]),
                 char_style_indices,
             },
+            #[inline]
             |char_cluster| {
                 font_selector
                     .select_font(char_cluster, analysis_data_sources)
@@ -125,6 +126,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
                     })
             },
             analysis_data_sources,
+            #[inline]
             |shaped_run| {
                 let run_style_index = char_style_indices[shaped_run.range.char_range.start];
                 let run_style = &styles[usize::from(run_style_index)];

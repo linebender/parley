@@ -27,6 +27,7 @@ pub struct CharCluster {
 }
 
 impl CharCluster {
+    #[inline]
     pub fn range(&self) -> SourceRange {
         SourceRange {
             start: self.start,
@@ -77,6 +78,7 @@ pub enum Whitespace {
 
 impl Whitespace {
     /// Returns true for space or no break space.
+    #[inline]
     pub fn is_space_or_nbsp(self) -> bool {
         matches!(self, Self::Space | Self::NoBreakSpace)
     }
@@ -94,6 +96,7 @@ pub enum Status {
 }
 
 impl CharCluster {
+    #[inline]
     pub(crate) fn clear(&mut self) {
         self.chars.clear();
         self.is_emoji = false;
