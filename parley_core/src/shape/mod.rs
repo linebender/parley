@@ -4,6 +4,7 @@
 mod cache;
 mod cluster;
 mod data;
+pub(crate) mod shaped_text;
 pub(crate) mod shaper;
 
 use crate::CharInfo;

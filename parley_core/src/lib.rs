@@ -35,4 +35,5 @@ pub mod shape;
 pub use analysis::{Analysis, AnalysisDataSources, Boundary, CharInfo};
 pub use analyzer::{AnalysisOptions, Analyzer};
 pub use glyph::Glyph;
+pub use shape::shaped_text::ShapedRun;
 pub use shape::shaper::{FontInstance, ShapeContext, ShapeOptions};

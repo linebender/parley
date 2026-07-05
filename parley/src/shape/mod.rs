@@ -4,15 +4,13 @@
 //! Text shaping implementation using `harfrust`for shaping
 //! and `icu` for text analysis.
 
-use core::mem;
 use parley_core::shape::{CharCluster, Status};
-use parley_core::{
-    Analysis, AnalysisDataSources, CharInfo, FontInstance, ShapeContext, ShapeOptions,
-};
+use parley_core::{Analysis, AnalysisDataSources, FontInstance, ShapeContext, ShapeOptions};
 
 use super::layout::Layout;
-use super::resolve::{ResolveContext, Resolved, ResolvedStyle};
+use super::resolve::{ResolveContext, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
+use crate::FontData;
 use crate::inline_box::InlineBox;
 use crate::util::nearly_eq;
 use fontique::Language;
@@ -121,12 +119,39 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 font_selector
                     .select_font(char_cluster, analysis_data_sources)
                     .map(|selected| FontInstance {
-                        blob: selected.font.blob.clone(),
+                        blob: selected.font.blob,
                         index: selected.font.index,
                         synthesis: selected.font.synthesis,
                     })
             },
             analysis_data_sources,
+            |shaped_run| {
+                let run_style_index = char_style_indices[shaped_run.range.char_range.start];
+                let run_style = &styles[usize::from(run_style_index)];
+                let segment_char_info = &analysis.char_info()[shaped_run.range.char_range.clone()];
+                let segment_char_style_indices =
+                    &char_style_indices[shaped_run.range.char_range.clone()];
+                layout.data.push_run(
+                    FontData::new(shaped_run.font.blob, shaped_run.font.index),
+                    style.font_size,
+                    fontique::Attributes {
+                        width: run_style.font_width,
+                        weight: run_style.font_weight,
+                        style: run_style.font_style,
+                    },
+                    shaped_run.font.synthesis,
+                    shaped_run.glyph_buffer,
+                    item.bidi_level,
+                    run_style_index,
+                    style.word_spacing,
+                    style.letter_spacing,
+                    &text[shaped_run.range.byte_range.clone()],
+                    segment_char_info,
+                    segment_char_style_indices,
+                    shaped_run.range.byte_range,
+                    shaped_run.coords,
+                );
+            },
         );
     }
 

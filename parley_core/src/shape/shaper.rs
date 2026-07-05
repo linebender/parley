@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use alloc::vec::Vec;
-use core::mem;
+use core::{mem, ops::Range};
 use harfrust::ShapeOptions as HarfShapeOptions;
 use parlance::{FontFeature, FontVariation, Language};
 
 use crate::{
-    Analysis, AnalysisDataSources, CharInfo,
-    itemize::Item,
+    Analysis, AnalysisDataSources, CharInfo, ShapedRun,
+    itemize::{Item, TextRange},
     lru_cache::LruCache,
     shape::{CharCluster, cache, fill_cluster_in_place},
 };
@@ -29,10 +29,10 @@ pub struct ShapeOptions<'a> {
 }
 
 /// The font instance to shape an item with.
-#[derive(PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FontInstance {
-    // TODO: perhaps take by reference or use `raw_resource_handle` directly; i.e., perhaps we can
-    // remove the `fontique` dependency
+    // TODO: perhaps use `raw_resource_handle` directly; i.e., perhaps we can remove the `fontique`
+    // dependency
     pub blob: fontique::Blob<u8>,
     pub index: u32,
     // TODO: Synthesis carries more than we need, and ties us to `fontique`. We can likely drop this
@@ -73,6 +73,7 @@ impl ShapeContext {
         options: &ShapeOptions<'_>,
         select_font: impl FnMut(&mut CharCluster) -> Option<FontInstance>,
         analysis_data_sources: &AnalysisDataSources,
+        shaped_runs: impl FnMut(ShapedRun<'_>),
     ) {
         shape_item(
             self,
@@ -83,6 +84,7 @@ impl ShapeContext {
             analysis.char_info(),
             options.char_style_indices,
             analysis_data_sources,
+            shaped_runs,
         )
     }
 }
@@ -96,6 +98,7 @@ fn shape_item(
     char_info: &[CharInfo],
     char_style_indices: &[u16],
     analysis_data_sources: &AnalysisDataSources,
+    mut shaped_runs: impl FnMut(ShapedRun<'_>),
 ) {
     let text_range = &item.range.byte_range;
     let char_range = &item.range.char_range;
@@ -105,7 +108,6 @@ fn shape_item(
     // Only process current item
     let item_char_info = &char_info[char_range.start..char_range.end];
     let item_char_style_indices = &char_style_indices[char_range.start..char_range.end];
-    let first_style_index = item_char_style_indices[0];
 
     let grapheme_cluster_boundaries = analysis_data_sources
         .grapheme_segmenter()
@@ -273,14 +275,18 @@ fn shape_item(
 
         // Extract relevant CharInfo slice for this segment
         let char_start = char_range.start + item_text[..segment_start_offset].chars().count();
-        let segment_char_start = char_start - char_range.start;
         let segment_char_count = segment_text.chars().count();
-        let segment_char_info =
-            &item_char_info[segment_char_start..(segment_char_start + segment_char_count)];
-        let segment_char_style_indices =
-            &item_char_style_indices[segment_char_start..(segment_char_start + segment_char_count)];
 
-        // Return shapedtext?
+        shaped_runs(ShapedRun {
+            range: TextRange {
+                byte_range: (item.range.byte_range.start + segment_start_offset)
+                    ..(item.range.byte_range.start + segment_end_offset),
+                char_range: char_start..char_start + segment_char_count,
+            },
+            font: font.clone(),
+            glyph_buffer: &glyph_buffer,
+            coords: harf_shaper.coords(),
+        });
 
         // Replace buffer to reuse allocation in next iteration.
         scx.unicode_buffer = Some(glyph_buffer.clear());
