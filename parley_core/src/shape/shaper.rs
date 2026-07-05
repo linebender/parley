@@ -1,8 +1,10 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+//! Shaping of text.
+
 use alloc::vec::Vec;
-use core::{mem, ops::Range};
+use core::mem;
 use harfrust::ShapeOptions as HarfShapeOptions;
 use parlance::{FontFeature, FontVariation, Language};
 
@@ -18,28 +20,40 @@ use crate::{
 /// These are styling options relevant for shaping. They're styling, in that they're not derived
 /// from the underlying text. When you [itemize][`Analysis::itemize`] the text, you should split the
 /// text at points where these options change.
+#[derive(Debug)]
 pub struct ShapeOptions<'a> {
-    pub language: Option<Language>,
+    /// The font size to shape the item with.
     pub font_size: f32,
+    /// The language to shape the item with.
+    pub language: Option<Language>,
+    /// The font features to shape the item with.
     pub features: &'a [FontFeature],
     /// The font variations that are constant over an item.
     pub variations: &'a [FontVariation],
-    // TODO: rename to something like `user_data` (s.t. we don't assume it's a style per se)
+    /// The per-character style indices.
+    // TODO: rename to something like `user_data` (s.t. we don't assume it's a style per se).
+    // Currently this field is not actually read, but once `parley_core` puts shaping into a
+    // `ShapedText`, perhaps these tags will be copied along (so users don't have to bookkeep
+    // manually).
     pub char_style_indices: &'a [u16],
 }
 
 /// The font instance to shape an item with.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FontInstance {
+    /// The font blob.
     // TODO: perhaps use `raw_resource_handle` directly; i.e., perhaps we can remove the `fontique`
     // dependency
     pub blob: fontique::Blob<u8>,
+    /// The index of the font.
     pub index: u32,
+    /// Font synthesis suggestions.
     // TODO: Synthesis carries more than we need, and ties us to `fontique`. We can likely drop this
     // in the future.
     pub synthesis: fontique::Synthesis,
 }
 
+/// Reusable scratch to shape [items][`Item`] into shaped text using [`Self::shape_item`].
 // TODO: rename to `Shaper`
 pub struct ShapeContext {
     shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::ShaperData>,
@@ -64,7 +78,21 @@ impl Default for ShapeContext {
     }
 }
 
+impl core::fmt::Debug for ShapeContext {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ShapeContext").finish_non_exhaustive()
+    }
+}
+
 impl ShapeContext {
+    /// Shape an [`Item`] produced by [`Analysis::itemize`] into glyphs.
+    ///
+    /// The `shaped_runs` callback is called for each run of glyphs.
+    ///
+    /// `text` must be the same text as originally passed to create [`Analysis`]. `item` must be an
+    /// [`Item`] produced by [`Analysis::itemize`].
+    ///
+    // TODO: Once we have a `ShapedText`, this will probably take a `&mut ShapedText` instead.
     pub fn shape_item(
         &mut self,
         text: &str,

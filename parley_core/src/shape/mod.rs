@@ -1,6 +1,8 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+//! Text shaping utilities.
+
 mod cache;
 mod cluster;
 mod data;
@@ -9,8 +11,7 @@ pub(crate) mod shaper;
 
 use crate::CharInfo;
 
-use cluster::Char;
-pub use cluster::{CharCluster, SourceRange, Status, Whitespace};
+pub use cluster::{Char, CharCluster, SourceRange, Status, Whitespace};
 pub use data::{ClusterData, ClusterInfo, to_whitespace};
 
 /// Rebuilds the provided `char_cluster` in-place using the existing allocation
