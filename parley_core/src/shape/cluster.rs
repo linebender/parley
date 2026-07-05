@@ -1,6 +1,9 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+#![expect(missing_docs, reason = "Deferred")]
+#![expect(missing_debug_implementations, reason = "Deferred")]
+
 use alloc::vec::Vec;
 use icu_normalizer::properties::Decomposed;
 
@@ -211,7 +214,7 @@ impl CharCluster {
             ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
-                self.form = FormKind::NFC;
+                self.form = FormKind::Nfc;
                 if ratio >= 1. {
                     return Status::Complete;
                 }
@@ -234,7 +237,7 @@ impl CharCluster {
             ratio = self.decomp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
-                self.form = FormKind::NFD;
+                self.form = FormKind::Nfd;
                 if ratio >= 1. {
                     return Status::Complete;
                 }
@@ -243,7 +246,7 @@ impl CharCluster {
                 ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
                 if ratio > self.best_ratio {
                     self.best_ratio = ratio;
-                    self.form = FormKind::NFC;
+                    self.form = FormKind::Nfc;
                     if ratio >= 1. {
                         return Status::Complete;
                     }
@@ -259,12 +262,11 @@ impl CharCluster {
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-#[allow(clippy::upper_case_acronyms)]
 enum FormKind {
     #[default]
     Original,
-    NFD,
-    NFC,
+    Nfd,
+    Nfc,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -314,6 +316,7 @@ impl Form {
     }
 
     #[inline(always)]
+    #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     fn setup(&mut self) {
         self.map_len = (self
             .chars()

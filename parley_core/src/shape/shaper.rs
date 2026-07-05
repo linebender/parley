@@ -113,7 +113,7 @@ impl ShapeContext {
             options.char_style_indices,
             analysis_data_sources,
             shaped_runs,
-        )
+        );
     }
 }
 
@@ -274,6 +274,7 @@ fn shape_item(
 
         // Use the entire segment text including newlines
         buffer.reserve(segment_text.len());
+        #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
         for (i, ch) in segment_text.chars().enumerate() {
             // Ensure that each cluster's index matches the index into `infos`. This is required
             // for efficient cluster lookup within `data.rs`.

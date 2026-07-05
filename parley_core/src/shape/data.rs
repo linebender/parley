@@ -1,7 +1,7 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use core::ops::Range;
+#![expect(missing_docs, reason = "Deferred")]
 
 use crate::{Boundary, shape::Whitespace};
 
