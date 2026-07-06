@@ -109,8 +109,10 @@ pub const SCRIPT_SAMPLES: &[(Script, &str)] = &[
         "\u{a01}\u{a02}ਃਅਆਇਈਉਊਏਐਓਔਕਖਗ",
     ),
     (Script::from_str_unchecked("Hang"), "가"),
-    (Script::from_str_unchecked("Hani"), "今"),
+    (Script::from_str_unchecked("Hani"), "严揯今"),
     (Script::from_str_unchecked("Hano"), "ᜠᜡᜢᜣᜤᜥᜦᜧᜨᜩᜪᜫᜬᜭᜮᜯ"),
+    (Script::from_str_unchecked("Hans"), "严"),
+    (Script::from_str_unchecked("Hant"), "揯"),
     (Script::from_str_unchecked("Hatr"), "𐣠𐣡𐣢𐣣𐣤𐣥𐣦𐣧𐣨𐣩𐣪𐣫𐣬𐣭𐣮𐣯"),
     (
         Script::from_str_unchecked("Hebr"),
