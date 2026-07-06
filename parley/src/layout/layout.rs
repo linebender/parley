@@ -86,7 +86,7 @@ impl<B: Brush> Layout<B> {
     /// Returns the y-offset of the baseline of the last line in the layout.
     /// Returns `None` if the layout is empty.
     pub fn last_baseline(&self) -> Option<f32> {
-        self.lines().last().map(|line| {
+        self.lines().next_back().map(|line| {
             let metrics = line.metrics();
             metrics.block_min_coord + metrics.baseline
         })
