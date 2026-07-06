@@ -32,9 +32,6 @@ pub struct ShapeOptions<'a> {
     pub variations: &'a [FontVariation],
     /// The per-character style indices.
     // TODO: rename to something like `user_data` (s.t. we don't assume it's a style per se).
-    // Currently this field is not actually read, but once `parley_core` puts shaping into a
-    // `ShapedText`, perhaps these tags will be copied along (so users don't have to bookkeep
-    // manually).
     pub char_style_indices: &'a [u16],
 }
 
@@ -87,13 +84,19 @@ impl core::fmt::Debug for ShapeContext {
 impl ShapeContext {
     /// Shape an [`Item`] produced by [`Analysis::itemize`] into glyphs.
     ///
-    /// The `shaped_runs` callback is called for each run of glyphs.
+    /// The item is broken into runs of maximal sequences of character clusters for which
+    /// `select_font` returns the same font. The `shaped_runs` callback is called with each shaped
+    /// run.
     ///
     /// `text` must be the same text as originally passed to create [`Analysis`]. `item` must be an
-    /// [`Item`] produced by [`Analysis::itemize`].
+    /// [`Item`] produced by [`Analysis::itemize`] on this text's analysis.
     ///
     /// The `select_font` callback should return the font to shape `char_cluster` with. If
-    /// consecutive characters select a different font, they become separately-shaped runs.
+    /// consecutive character clusters select a different font, they become separately-shaped runs.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the font returned by `select_font` isn't a parseable font.
     ///
     // TODO: For `select_font`, on `None`, the previous font is taken (and the run is dropped if
     // `None` is returned on the first call). This is identical to Parley's old behavior, but we
