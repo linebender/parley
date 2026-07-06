@@ -96,9 +96,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
             // We loop because there may be multiple boxes at this index.
             while let Some(inline_box) = inline_box_iter.peek() {
                 if inline_box.index < item_range.byte_range.end {
-                    // Inline boxes *before* this indexed are popped (this occurs if the itemizer
-                    // split a run and we were not called). We push all boxes to the layout when we
-                    // loop over the produced items.
+                    // Inline boxes *before* this index are popped (this occurs if the itemizer
+                    // split a run and we were not called, such as at a bidi boundary).
                     inline_box_iter.next();
                 } else if inline_box.index == item_range.byte_range.end {
                     inline_box_iter.next();

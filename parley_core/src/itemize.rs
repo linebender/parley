@@ -40,9 +40,9 @@ pub struct Item {
     pub script: Script,
 }
 
-/// The text itemizer, produced by [`Analysis::itemize`].
+/// An iterator over items in text, produced by [`Analysis::itemize`].
 pub struct Itemizer<'a, F> {
-    /// The characters and character indices of the input text.
+    /// Our underlying iterator over the input text.
     char_indices: CharIndices<'a>,
     /// The per-char info, parallel to [`Self::char_indices`].
     char_info: &'a [CharInfo],
