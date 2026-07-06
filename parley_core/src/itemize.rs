@@ -224,9 +224,9 @@ mod tests {
 
     use super::Item;
 
-    const LATN: Script = Script::from_str_unchecked("Latn");
-    const GREK: Script = Script::from_str_unchecked("Grek");
-    const ARAB: Script = Script::from_str_unchecked("Arab");
+    const LATN: Script = Script::from_bytes(*b"Latn");
+    const GREK: Script = Script::from_bytes(*b"Grek");
+    const ARAB: Script = Script::from_bytes(*b"Arab");
 
     fn analyze(text: &str) -> Analysis {
         let mut analyzer = Analyzer::new();
