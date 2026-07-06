@@ -296,6 +296,44 @@ fn inboxes_with_large_ascent_and_descent() {
 }
 
 #[test]
+fn inbox_below_baseline_keeps_grid() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "AAAA\nBBBB\nCCCC";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::LineHeight(LineHeight::Absolute(60.0)));
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        kind: InlineBoxKind::InFlow,
+        index: 7, // between the B's on the middle line
+        width: 20.0,
+        height: 15.0,
+        baseline: Some(0.0),
+    });
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    layout.align(Alignment::Start, AlignmentOptions::default());
+
+    // Every line has the same 60px line height, so consecutive baselines must be exactly 60px
+    // apart. The inline box on the middle line fits within the line and must not disturb this.
+    let baselines: Vec<f32> = (0..layout.len())
+        .map(|i| layout.get(i).unwrap().metrics().baseline)
+        .collect();
+    assert_eq!(
+        baselines[1] - baselines[0],
+        60.0,
+        "middle line baseline off-grid: {baselines:?}"
+    );
+    assert_eq!(
+        baselines[2] - baselines[1],
+        60.0,
+        "bottom line baseline off-grid: {baselines:?}"
+    );
+
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
 fn trailing_whitespace_ltr() {
     let mut env = TestEnv::new(test_name!(), None);
 

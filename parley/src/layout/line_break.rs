@@ -1087,6 +1087,17 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // Compute metrics for the line, but ignore trailing whitespace.
         let mut have_metrics = false;
         let mut needs_reorder = false;
+        // The text's intrinsic line height (the largest of the constituent runs'). This is the
+        // line height *without* any growth caused by inline boxes, and is what the text strut and
+        // its leading are derived from.
+        let mut text_line_height = 0.0_f32;
+        // The maximum ascent/descent of the inline boxes on the line, i.e. how far they extend
+        // above and below the text baseline. These are kept separate from the text ascent/descent
+        // so that a box only shifts the baseline / grows the line when it extends beyond the text
+        // strut (see below). `NEG_INFINITY` means "no box", so the box terms drop out of the
+        // `max` comparisons when the line has no inline boxes.
+        let mut box_ascent = f32::NEG_INFINITY;
+        let mut box_descent = f32::NEG_INFINITY;
         for line_item in self.lines.line_items[line.item_range.clone()]
             .iter_mut()
             .rev()
@@ -1100,8 +1111,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // Default vertical alignment is to align the bottom of boxes with the text baseline.
                         // This is equivalent to the entire height of the box being "ascent"
                         let baseline = item.baseline.unwrap_or(item.height);
-                        line.metrics.ascent = line.metrics.ascent.max(baseline);
-                        line.metrics.descent = line.metrics.descent.max(item.height - baseline);
+                        box_ascent = box_ascent.max(baseline);
+                        box_descent = box_descent.max(item.height - baseline);
 
                         // Mark us as having seen non-whitespace content on this line
                         have_metrics = true;
@@ -1137,6 +1148,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let run = &self.layout.data.runs[line_item.index];
                     line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent);
                     line.metrics.descent = line.metrics.descent.max(run.metrics.descent);
+                    text_line_height = text_line_height.max(run.metrics.line_height);
 
                     // Mark us as having seen non-whitespace content on this line
                     have_metrics = true;
@@ -1185,12 +1197,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let run = &self.layout.data.runs[line_item.index];
                     line.metrics.ascent = run.metrics.ascent;
                     line.metrics.descent = run.metrics.descent;
+                    text_line_height = run.metrics.line_height;
                 }
             } else if let Some(metrics) = prev_line_metrics {
                 // HACK: copy metrics from previous line if we don't have
                 // any; this should only occur for an empty line following
                 // a newline at the end of a layout
                 line.metrics = metrics;
+                text_line_height = metrics.line_height;
                 // If we have no items on this line, it must be the last (empty)
                 // line in a layout following a newline. Commit an empty run so
                 // that AccessKit has a node with which to identify the visual
@@ -1236,9 +1250,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             (line.metrics.ascent, line.metrics.descent)
         };
 
+        // The leading is distributed around the baseline using the text's *intrinsic* line height,
+        // never the (possibly larger) line height caused by inline boxes. This is what keeps
+        // consecutive baselines on a consistent grid: an inline box that fits within the line does
+        // not perturb the text strut, and therefore does not move the baseline.
         let (leading_above, leading_below) = if quantize {
             // Calculate leading using the rounded ascent and descent.
-            let leading = line.metrics.line_height - (ascent + descent);
+            let leading = text_line_height - (ascent + descent);
             // We mimic Chrome in giving 'below' the larger leading half.
             // Although the comment in Chromium's NGLineHeightMetrics::AddLeading function
             // in ng_line_height_metrics.cc claims it's for legacy test compatibility.
@@ -1247,19 +1265,40 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             let below = leading.round() - above;
             (above, below)
         } else {
-            (line.metrics.leading * 0.5, line.metrics.leading * 0.5)
+            let leading = text_line_height - (ascent + descent);
+            (leading * 0.5, leading - leading * 0.5)
+        };
+
+        // The text strut extends `ascent + positive-half-leading` above the baseline and
+        // `descent + positive-half-leading` below it. An inline box only grows a side of the line
+        // (and, for the ascent side, pushes the baseline down) when it extends beyond this strut.
+        // A box sitting below the baseline therefore grows the line downwards without disturbing
+        // the baseline. This mirrors `LineState::line_height`.
+        let threshold_above = ascent + leading_above.max(0.);
+        let threshold_below = descent + leading_below.max(0.);
+
+        // Distance from the top of the line down to the baseline. Note the unclamped
+        // `leading_above` here (as opposed to the clamped value used for the min coord below):
+        // negative leading is correct for baseline placement but must not shrink the min/max
+        // coords.
+        let above = if box_ascent > threshold_above {
+            box_ascent
+        } else {
+            ascent + leading_above
         };
 
         let y = self.state.line_y;
-        line.metrics.baseline =
-            ascent + leading_above + if quantize { y.round() as f32 } else { y as f32 };
+        line.metrics.baseline = above + if quantize { y.round() as f32 } else { y as f32 };
 
         // Small line heights will cause leading to be negative.
         // Negative leadings are correct for baseline calculation, but not for min/max coords.
         // We clamp leading to zero for the purposes of min/max coords,
         // which in turn clamps the selection box minimum height to ascent + descent.
-        line.metrics.block_min_coord = line.metrics.baseline - ascent - leading_above.max(0.);
-        line.metrics.block_max_coord = line.metrics.baseline + descent + leading_below.max(0.);
+        // Inline boxes extend the coords whenever they reach beyond the (leading-padded) text.
+        let block_above = threshold_above.max(box_ascent);
+        let block_below = threshold_below.max(box_descent);
+        line.metrics.block_min_coord = line.metrics.baseline - block_above;
+        line.metrics.block_max_coord = line.metrics.baseline + block_below;
 
         // let max_advance = if self.state.line_max_advance < f32::MAX {
         //     self.state.line_max_advance
