@@ -92,6 +92,20 @@ impl ShapeContext {
     /// `text` must be the same text as originally passed to create [`Analysis`]. `item` must be an
     /// [`Item`] produced by [`Analysis::itemize`].
     ///
+    /// The `select_font` callback should return the font to shape `char_cluster` with. If
+    /// consecutive characters select a different font, they become separately-shaped runs.
+    ///
+    // TODO: For `select_font`, on `None`, the previous font is taken (and the run is dropped if
+    // `None` is returned on the first call). This is identical to Parley's old behavior, but we
+    // probably want the commented-out documented behavior that follows, as returning a font is
+    // cheap and it probably doesn't make a ton of sense to hardcode some font fallback behavior
+    // here.
+    //
+    // /// Return `None` if there are no fonts available at all. The character cluster's text will be
+    // /// omitted from the shaped result. Instead, you probably want to render a `.notdef` glyph from a
+    // /// font you do have available, in which case you can return the previous font or some
+    // /// last-resort fallback font instead.
+    //
     // TODO: Once we have a `ShapedText`, this will probably take a `&mut ShapedText` instead.
     pub fn shape_item(
         &mut self,
