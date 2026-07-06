@@ -153,8 +153,7 @@ impl<F: FnMut(TextRange) -> bool> Iterator for Itemizer<'_, F> {
                 self.current_script = script;
             }
 
-            if bidi_level != item_bidi_level || real_script(script) && script != self.current_script
-            {
+            if bidi_level != item_bidi_level || script != self.current_script {
                 break;
             }
 
