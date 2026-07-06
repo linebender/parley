@@ -12,7 +12,7 @@ use parley::editing::SplitString;
 use parley::layout::{PositionedLayoutItem, Style};
 use parley::{GenericFamily, StyleProperty};
 use peniko::{
-    Brush, Fill,
+    Color, Fill,
     color::{AlphaColor, Srgb, palette},
     kurbo::{Affine, Line, Shape, Stroke},
 };
@@ -33,10 +33,29 @@ use crate::access_ids::next_node_id;
 pub const BACKGROUND_COLOR: AlphaColor<Srgb> = palette::css::STEEL_BLUE;
 pub const INSET: f32 = 32.0;
 
+/// A newtype wrapper around [`peniko::Color`] used as the [`Brush`](parley::style::Brush) for text.
+///
+/// `vello_cpu`'s `PaintType` uses its own image/gradient types, so we can't pass a
+/// `peniko::Brush` directly. This example only ever uses solid-color brushes.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ColorBrush(pub Color);
+
+impl Default for ColorBrush {
+    fn default() -> Self {
+        Self(Color::BLACK)
+    }
+}
+
+impl From<Color> for ColorBrush {
+    fn from(color: Color) -> Self {
+        Self(color)
+    }
+}
+
 pub struct Editor {
     font_cx: FontContext,
-    layout_cx: LayoutContext<Brush>,
-    editor: PlainEditor<Brush>,
+    layout_cx: LayoutContext<ColorBrush>,
+    editor: PlainEditor<ColorBrush>,
     cursor_visible: bool,
     start_time: Option<Instant>,
     blink_period: Duration,
@@ -46,48 +65,33 @@ fn convert_rect(rect: &parley::BoundingBox) -> peniko::kurbo::Rect {
     peniko::kurbo::Rect::new(rect.x0, rect.y0, rect.x1, rect.y1)
 }
 
-/// Set the current paint from a [`Brush`].
-///
-/// `vello_cpu`'s `PaintType` uses its own image/gradient types, so we can't pass a
-/// `peniko::Brush` directly. This example only ever uses solid-color brushes.
-fn set_brush(renderer: &mut RenderContext, brush: &Brush) {
-    if let Brush::Solid(color) = brush {
-        renderer.set_paint(*color);
+/// Set the current paint from a [`ColorBrush`].
+fn set_brush(renderer: &mut RenderContext, brush: &ColorBrush) {
+    renderer.set_paint(brush.0);
+}
+
+fn to_accesskit_color(brush: &ColorBrush) -> accesskit::Color {
+    let rgba = brush.0.to_rgba8();
+    accesskit::Color {
+        red: rgba.r,
+        green: rgba.g,
+        blue: rgba.b,
+        alpha: rgba.a,
     }
 }
 
-fn to_accesskit_color(brush: &Brush) -> Option<accesskit::Color> {
-    if let Brush::Solid(color) = brush {
-        let rgba = color.to_rgba8();
-        Some(accesskit::Color {
-            red: rgba.r,
-            green: rgba.g,
-            blue: rgba.b,
-            alpha: rgba.a,
-        })
-    } else {
-        None
-    }
-}
-
-fn set_accesskit_brush_properties(node: &mut Node, style: &Style<Brush>) {
-    if let Some(color) = to_accesskit_color(&style.brush) {
-        node.set_foreground_color(color);
-    }
-    if let Some(deco) = &style.underline
-        && let Some(color) = to_accesskit_color(&deco.brush)
-    {
+fn set_accesskit_brush_properties(node: &mut Node, style: &Style<ColorBrush>) {
+    node.set_foreground_color(to_accesskit_color(&style.brush));
+    if let Some(deco) = &style.underline {
         node.set_underline(TextDecoration {
             style: TextDecorationStyle::Solid,
-            color,
+            color: to_accesskit_color(&deco.brush),
         });
     }
-    if let Some(deco) = &style.strikethrough
-        && let Some(color) = to_accesskit_color(&deco.brush)
-    {
+    if let Some(deco) = &style.strikethrough {
         node.set_strikethrough(TextDecoration {
             style: TextDecorationStyle::Solid,
-            color,
+            color: to_accesskit_color(&deco.brush),
         });
     }
 }
@@ -99,7 +103,7 @@ impl Editor {
         editor.set_scale(1.0);
         let styles = editor.edit_styles();
         styles.insert(GenericFamily::SystemUi.into());
-        styles.insert(StyleProperty::Brush(palette::css::WHITE.into()));
+        styles.insert(StyleProperty::Brush(ColorBrush(palette::css::WHITE)));
         Self {
             font_cx: FontContext::default(),
             layout_cx: LayoutContext::default(),
@@ -111,11 +115,11 @@ impl Editor {
         }
     }
 
-    fn driver(&mut self) -> PlainEditorDriver<'_, Brush> {
+    fn driver(&mut self) -> PlainEditorDriver<'_, ColorBrush> {
         self.editor.driver(&mut self.font_cx, &mut self.layout_cx)
     }
 
-    pub fn editor(&mut self) -> &mut PlainEditor<Brush> {
+    pub fn editor(&mut self) -> &mut PlainEditor<ColorBrush> {
         &mut self.editor
     }
 
