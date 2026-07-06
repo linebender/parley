@@ -127,7 +127,6 @@ impl ShapeContext {
             options,
             select_font,
             analysis.char_info(),
-            options.char_style_indices,
             analysis_data_sources,
             shaped_runs,
         );
@@ -141,7 +140,6 @@ fn shape_item(
     options: &ShapeOptions<'_>,
     mut select_font: impl FnMut(&mut CharCluster) -> Option<FontInstance>,
     char_info: &[CharInfo],
-    char_style_indices: &[u16],
     analysis_data_sources: &AnalysisDataSources,
     mut shaped_runs: impl FnMut(ShapedRun<'_>),
 ) {
@@ -152,7 +150,7 @@ fn shape_item(
 
     // Only process current item
     let item_char_info = &char_info[char_range.start..char_range.end];
-    let item_char_style_indices = &char_style_indices[char_range.start..char_range.end];
+    let item_char_style_indices = &options.char_style_indices[char_range.start..char_range.end];
 
     let grapheme_cluster_boundaries = analysis_data_sources
         .grapheme_segmenter()
