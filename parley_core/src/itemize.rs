@@ -87,6 +87,12 @@ impl Analysis {
     /// called with the growing item range, and can be used to split on additional properties like
     /// shaping-relevant style changes (e.g., font size) or properties like language.
     ///
+    /// The predicate is given a range encoding the current item and considers whether to split
+    /// after that item based on the next character. Iff the predicate returns `true`, the text is
+    /// split after that item; i.e., given a range of `start..end`, the predicate controls whether
+    /// that item is now finished, or whether it is extended to include the character at `end` (at
+    /// which point the item spans `start..end+1`).
+    ///
     /// Characters that don't have a particular script have their script resolved based on
     /// surrounding context (see [`Item::script`]).
     pub fn itemize<'a, F: FnMut(TextRange) -> bool>(
