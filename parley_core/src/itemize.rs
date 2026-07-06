@@ -120,6 +120,11 @@ impl<F: FnMut(TextRange) -> bool> Iterator for Itemizer<'_, F> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.char_info.is_empty() {
             // We're already finished.
+            debug_assert!(
+                self.char_indices.next().is_none() && self.bidi_levels.is_empty(),
+                "`char_info`, `bidi_levels`, and `char_indices` should now all be empty \
+                (though note `bidi_levels` may already have been empty as a special-case)"
+            );
             return None;
         }
 
