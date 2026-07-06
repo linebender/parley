@@ -457,11 +457,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         self.state.items = self.lines.line_items.len();
         self.state.lines = self.lines.lines.len();
-        self.state.line.reset();
         self.state.prev_boundary = None;
         self.state.emergency_boundary = None;
 
+        // `finish_line` reads the line's accumulated vertical metrics from `self.state.line`, so
+        // it must run before we reset the per-line running state.
         self.finish_line(self.lines.lines.len() - 1, line_height);
+        self.state.line.reset();
 
         self.state.line_y += line_height as f64;
 
@@ -1084,20 +1086,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         if line.item_range.is_empty() {
             line.text_range = self.layout.data.text_len..self.layout.data.text_len;
         }
-        // Compute metrics for the line, but ignore trailing whitespace.
+        // Walk the line's items to compute text ranges, per-run advances and bidi ordering. The
+        // vertical metrics (ascent/descent/line-height and inline box extents) are *not* computed
+        // here: they were already accumulated into `self.state.line` as the line was built and are
+        // read from there below. `have_metrics` records whether the line has any non-whitespace
+        // content (text or an in-flow box), which distinguishes a genuinely empty line from a
+        // whitespace-only one.
         let mut have_metrics = false;
         let mut needs_reorder = false;
-        // The text's intrinsic line height (the largest of the constituent runs'). This is the
-        // line height *without* any growth caused by inline boxes, and is what the text strut and
-        // its leading are derived from.
-        let mut text_line_height = 0.0_f32;
-        // The maximum ascent/descent of the inline boxes on the line, i.e. how far they extend
-        // above and below the text baseline. These are kept separate from the text ascent/descent
-        // so that a box only shifts the baseline / grows the line when it extends beyond the text
-        // strut (see below). `NEG_INFINITY` means "no box", so the box terms drop out of the
-        // `max` comparisons when the line has no inline boxes.
-        let mut box_ascent = f32::NEG_INFINITY;
-        let mut box_descent = f32::NEG_INFINITY;
         for line_item in self.lines.line_items[line.item_range.clone()]
             .iter_mut()
             .rev()
@@ -1108,12 +1104,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                     // Advance is already computed in "commit line" for items
                     if item.kind == InlineBoxKind::InFlow {
-                        // Default vertical alignment is to align the bottom of boxes with the text baseline.
-                        // This is equivalent to the entire height of the box being "ascent"
-                        let baseline = item.baseline.unwrap_or(item.height);
-                        box_ascent = box_ascent.max(baseline);
-                        box_descent = box_descent.max(item.height - baseline);
-
                         // Mark us as having seen non-whitespace content on this line
                         have_metrics = true;
                     }
@@ -1138,17 +1128,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         .map(|c| c.advance)
                         .sum();
 
-                    // Ignore trailing whitespace for metrics computation
+                    // Ignore trailing whitespace when deciding whether the line has content
                     // (we are iterating backwards so trailing whitespace comes first)
                     if !have_metrics && line_item.is_whitespace {
                         continue;
                     }
-
-                    // Compute the run's vertical metrics
-                    let run = &self.layout.data.runs[line_item.index];
-                    line.metrics.ascent = line.metrics.ascent.max(run.metrics.ascent);
-                    line.metrics.descent = line.metrics.descent.max(run.metrics.descent);
-                    text_line_height = text_line_height.max(run.metrics.line_height);
 
                     // Mark us as having seen non-whitespace content on this line
                     have_metrics = true;
@@ -1189,49 +1173,60 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             })
             .unwrap_or(0.0);
 
-        if !have_metrics {
-            // Line consisting entirely of whitespace?
-            if !line.item_range.is_empty() {
-                let line_item = &self.lines.line_items[line.item_range.start];
-                if line_item.is_text_run() {
-                    let run = &self.layout.data.runs[line_item.index];
-                    line.metrics.ascent = run.metrics.ascent;
-                    line.metrics.descent = run.metrics.descent;
-                    text_line_height = run.metrics.line_height;
-                }
-            } else if let Some(metrics) = prev_line_metrics {
-                // HACK: copy metrics from previous line if we don't have
-                // any; this should only occur for an empty line following
-                // a newline at the end of a layout
-                line.metrics = metrics;
-                text_line_height = metrics.line_height;
-                // If we have no items on this line, it must be the last (empty)
-                // line in a layout following a newline. Commit an empty run so
-                // that AccessKit has a node with which to identify the visual
-                // cursor position
-                if let Some((index, run)) = self
-                    .layout
-                    .data
-                    .runs
-                    .iter()
-                    .enumerate()
-                    .rfind(|(_, run)| !run.text_range.is_empty())
-                {
-                    let run_index = self.lines.line_items.len();
-                    let cluster = run.cluster_range.end;
-                    let text = run.text_range.end;
-                    self.lines.line_items.push(LineItemData {
-                        kind: LayoutItemKind::TextRun,
-                        index,
-                        bidi_level: 0,
-                        advance: 0.,
-                        is_whitespace: false,
-                        has_trailing_whitespace: false,
-                        cluster_range: cluster..cluster,
-                        text_range: text..text,
-                    });
-                    line.item_range = run_index..run_index + 1;
-                }
+        // Read the line's vertical extents from the running line state, which accumulated the
+        // maximum text ascent/descent/line-height and inline box ascent/descent as content was
+        // added (see `append_cluster_to_line` / `append_inline_box_to_line`). This runs before the
+        // caller resets the state, and keeps `finish_line` consistent with the line height
+        // computed by `LineState::line_height`. Whitespace-only lines still get their metrics from
+        // the (whitespace) clusters that were appended to the state.
+        line.metrics.ascent = self.state.line.text_ascent;
+        line.metrics.descent = self.state.line.text_descent;
+        // The text's intrinsic line height (without any growth caused by inline boxes); the text
+        // strut and its leading are derived from this.
+        let mut text_line_height = self.state.line.text_line_height;
+        // How far the inline boxes on the line extend above/below the text baseline. Kept separate
+        // from the text extents so that a box only shifts the baseline / grows the line when it
+        // reaches beyond the text strut. `NEG_INFINITY` (the state's default) means "no box".
+        let mut box_ascent = self.state.line.box_ascent;
+        let mut box_descent = self.state.line.box_descent;
+
+        if !have_metrics
+            && line.item_range.is_empty()
+            && let Some(metrics) = prev_line_metrics
+        {
+            // HACK: copy metrics from previous line if we don't have
+            // any; this should only occur for an empty line following
+            // a newline at the end of a layout
+            line.metrics = metrics;
+            text_line_height = metrics.line_height;
+            box_ascent = f32::NEG_INFINITY;
+            box_descent = f32::NEG_INFINITY;
+            // If we have no items on this line, it must be the last (empty)
+            // line in a layout following a newline. Commit an empty run so
+            // that AccessKit has a node with which to identify the visual
+            // cursor position
+            if let Some((index, run)) = self
+                .layout
+                .data
+                .runs
+                .iter()
+                .enumerate()
+                .rfind(|(_, run)| !run.text_range.is_empty())
+            {
+                let run_index = self.lines.line_items.len();
+                let cluster = run.cluster_range.end;
+                let text = run.text_range.end;
+                self.lines.line_items.push(LineItemData {
+                    kind: LayoutItemKind::TextRun,
+                    index,
+                    bidi_level: 0,
+                    advance: 0.,
+                    is_whitespace: false,
+                    has_trailing_whitespace: false,
+                    cluster_range: cluster..cluster,
+                    text_range: text..text,
+                });
+                line.item_range = run_index..run_index + 1;
             }
         }
 
