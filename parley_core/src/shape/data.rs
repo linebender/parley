@@ -94,7 +94,6 @@ impl ClusterInfo {
     }
 }
 
-
 // TODO: should become private when more of `parley`'s shaping is in `parley_core`
 #[inline]
 pub const fn to_whitespace(c: char) -> Whitespace {
