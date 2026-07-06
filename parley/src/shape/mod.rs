@@ -6,23 +6,22 @@
 
 use alloc::vec::Vec;
 use core::mem;
-use core::ops::RangeInclusive;
 use harfrust::ShapeOptions;
-use parley_core::{AnalysisDataSources, CharInfo};
+use parley_core::{Analysis, AnalysisDataSources, CharInfo};
 
 use super::layout::Layout;
 use super::resolve::{ResolveContext, Resolved, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
+use crate::FontData;
 use crate::analysis::cluster::{Char, CharCluster, Status};
 use crate::convert::script_to_harfrust;
 use crate::inline_box::InlineBox;
 use crate::lru_cache::LruCache;
 use crate::util::nearly_eq;
-use crate::{FontData, convert};
 use fontique::Language;
-use icu_properties::props::Script;
 
 use fontique::{self, Query, QueryFamily, QueryFont};
+use parlance::Script;
 
 mod cache;
 
@@ -67,9 +66,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
     mut fq: Query<'a>,
     styles: &'a [ResolvedStyle<B>],
     inline_boxes: &[InlineBox],
-    char_info: &[CharInfo],
+    analysis: &Analysis,
     char_style_indices: &[u16],
-    levels: &[u8],
     scx: &mut ShapeContext,
     mut text: &str,
     layout: &mut Layout<B>,
@@ -90,130 +88,81 @@ pub(crate) fn shape_text<'a, B: Brush>(
         return;
     }
 
-    // Setup mutable state for iteration
-    let initial_style_index = char_style_indices.first().copied().unwrap_or(0);
-    let mut style = &styles[initial_style_index as usize];
-    let mut item = Item {
-        style_index: initial_style_index,
-        size: style.font_size,
-        level: levels.first().copied().unwrap_or(0),
-        script: char_info
-            .iter()
-            .map(|x| x.script)
-            .find(|&script| real_script(script))
-            .unwrap_or(Script::Latin),
-        locale: style.locale,
-        variations: style.font_variations,
-        features: style.font_features,
-        word_spacing: style.word_spacing,
-        letter_spacing: style.letter_spacing,
-    };
+    let mut inline_box_iter = inline_boxes.iter().peekable();
+    let split_after = |item_range: parley_core::itemize::TextRange| {
+        // Split at inlines boxes, so each box falls on a shaping boundary.
+        {
+            let mut split = false;
+            // We loop because there may be multiple boxes at this index.
+            while let Some(inline_box) = inline_box_iter.peek() {
+                if inline_box.index < item_range.byte_range.end {
+                    // Inline boxes *before* this index are popped (this occurs if the itemizer
+                    // split a run and we were not called, such as at a bidi boundary).
+                    inline_box_iter.next();
+                } else if inline_box.index == item_range.byte_range.end {
+                    inline_box_iter.next();
+                    split = true;
+                } else {
+                    break;
+                }
+            }
 
-    let mut char_range = 0..0;
-    let mut text_range = 0..0;
-
-    let mut inline_box_iter = inline_boxes.iter().enumerate();
-    let mut current_box = inline_box_iter.next();
-
-    // Iterate over characters in the text
-    for ((char_index, (byte_index, ch)), (info, style_index)) in text
-        .char_indices()
-        .enumerate()
-        .zip(char_info.iter().zip(char_style_indices))
-    {
-        let mut break_run = false;
-        let mut script = info.script;
-        if !real_script(script) {
-            script = item.script;
-        }
-        let level = levels.get(char_index).copied().unwrap_or(0);
-        if item.style_index != *style_index {
-            item.style_index = *style_index;
-            style = &styles[*style_index as usize];
-            if !nearly_eq(style.font_size, item.size)
-                || style.locale != item.locale
-                || style.font_variations != item.variations
-                || style.font_features != item.features
-                || !nearly_eq(style.letter_spacing, item.letter_spacing)
-                || !nearly_eq(style.word_spacing, item.word_spacing)
-            {
-                break_run = true;
+            if split {
+                return true;
             }
         }
 
-        if level != item.level || script != item.script {
-            break_run = true;
-        }
+        let item_style_index = char_style_indices[item_range.char_range.start];
+        let style_index = char_style_indices[item_range.char_range.end];
 
-        // Check if there is an inline box at this index
-        // Note:
-        //   - We loop because there may be multiple boxes at this index
-        //   - We do this *before* processing the text run because we need to know whether we should
-        //     break the run due to the presence of an inline box.
-        let mut deferred_boxes: Option<RangeInclusive<usize>> = None;
-        while let Some((box_idx, inline_box)) = current_box {
-            if inline_box.index == byte_index {
-                break_run = true;
-                if let Some(boxes) = &mut deferred_boxes {
-                    deferred_boxes = Some((*boxes.start())..=box_idx);
-                } else {
-                    deferred_boxes = Some(box_idx..=box_idx);
-                };
-                // Update the current box to the next box
-                current_box = inline_box_iter.next();
+        if style_index != item_style_index {
+            let item_style = &styles[usize::from(item_style_index)];
+            let style = &styles[usize::from(style_index)];
+            !nearly_eq(style.font_size, item_style.font_size)
+                || style.locale != item_style.locale
+                || style.font_variations != item_style.font_variations
+                || style.font_features != item_style.font_features
+                || !nearly_eq(style.letter_spacing, item_style.letter_spacing)
+                || !nearly_eq(style.word_spacing, item_style.word_spacing)
+        } else {
+            false
+        }
+    };
+
+    let mut inline_box_iter = inline_boxes.iter().enumerate().peekable();
+    for item in analysis.itemize(text, split_after) {
+        // Push inline boxes positioned before the start of this item.
+        while let Some((box_idx, inline_box)) = inline_box_iter.peek() {
+            if inline_box.index <= item.range.byte_range.start {
+                layout.data.push_inline_box(*box_idx);
+                inline_box_iter.next();
             } else {
                 break;
             }
         }
 
-        if break_run && !text_range.is_empty() {
-            shape_item(
-                &mut fq,
-                rcx,
-                styles,
-                &item,
-                scx,
-                text,
-                &text_range,
-                &char_range,
-                char_info,
-                char_style_indices,
-                layout,
-                analysis_data_sources,
-            );
-            item.size = style.font_size;
-            item.level = level;
-            item.script = script;
-            item.locale = style.locale;
-            item.variations = style.font_variations;
-            item.features = style.font_features;
-            item.word_spacing = style.word_spacing;
-            item.letter_spacing = style.letter_spacing;
-            text_range.start = text_range.end;
-            char_range.start = char_range.end;
-        }
-
-        if let Some(deferred_boxes) = deferred_boxes {
-            for box_idx in deferred_boxes {
-                layout.data.push_inline_box(box_idx);
-            }
-        }
-
-        text_range.end += ch.len_utf8();
-        char_range.end += 1;
-    }
-
-    if !text_range.is_empty() {
+        let style_index = char_style_indices[item.range.char_range.start];
+        let style = &styles[usize::from(style_index)];
         shape_item(
             &mut fq,
             rcx,
             styles,
-            &item,
+            &Item {
+                style_index,
+                size: style.font_size,
+                level: item.bidi_level,
+                script: item.script,
+                locale: style.locale,
+                variations: style.font_variations,
+                features: style.font_features,
+                word_spacing: style.word_spacing,
+                letter_spacing: style.letter_spacing,
+            },
             scx,
             text,
-            &text_range,
-            &char_range,
-            char_info,
+            &item.range.byte_range,
+            &item.range.char_range,
+            analysis.char_info(),
             char_style_indices,
             layout,
             analysis_data_sources,
@@ -221,9 +170,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 
     // Process any remaining inline boxes whose index is greater than the length of the text
-    if let Some((box_idx, _inline_box)) = current_box {
-        layout.data.push_inline_box(box_idx);
-    }
     for (box_idx, _inline_box) in inline_box_iter {
         layout.data.push_inline_box(box_idx);
     }
@@ -314,9 +260,8 @@ fn shape_item<'a, B: Brush>(
     let item_char_style_indices = &char_style_indices[char_range.start..char_range.end];
     let first_style_index = item_char_style_indices[0];
 
-    let fb_script = convert::script_to_fontique(item.script, analysis_data_sources);
     let mut font_selector =
-        FontSelector::new(fq, rcx, styles, first_style_index, fb_script, item.locale);
+        FontSelector::new(fq, rcx, styles, first_style_index, item.script, item.locale);
 
     let grapheme_cluster_boundaries = analysis_data_sources
         .grapheme_segmenter()
@@ -411,7 +356,7 @@ fn shape_item<'a, B: Brush>(
         } else {
             harfrust::Direction::LeftToRight
         };
-        let hb_script = script_to_harfrust(fb_script);
+        let hb_script = script_to_harfrust(item.script);
         let language = item
             .locale
             .as_ref()
@@ -515,10 +460,6 @@ fn shape_item<'a, B: Brush>(
     }
 }
 
-fn real_script(script: Script) -> bool {
-    script != Script::Common && script != Script::Unknown && script != Script::Inherited
-}
-
 fn variations_iter<'a>(
     synthesis: &'a fontique::Synthesis,
     item: Option<&'a [FontVariation]>,
@@ -557,7 +498,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         rcx: &'a ResolveContext,
         styles: &'a [ResolvedStyle<B>],
         style_index: u16,
-        fb_script: fontique::Script,
+        script: Script,
         locale: Option<Language>,
     ) -> Self {
         let style = &styles[style_index as usize];
@@ -572,7 +513,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         let features = rcx.features(style.font_features).unwrap_or(&[]);
         query.set_families(fonts.iter().copied());
 
-        query.set_fallbacks(fontique::FallbackKey::new(fb_script, locale.as_ref()));
+        query.set_fallbacks(fontique::FallbackKey::new(script, locale.as_ref()));
         query.set_attributes(attrs);
 
         Self {
