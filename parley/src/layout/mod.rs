@@ -18,6 +18,8 @@ mod run;
 )]
 mod layout;
 
+pub use parley_core::Glyph;
+
 pub(crate) mod data;
 
 #[cfg(feature = "accesskit")]
