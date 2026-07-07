@@ -25,6 +25,12 @@ impl Script {
     /// Creates a `Script` from raw ISO 15924 bytes.
     ///
     /// The input must be four ASCII bytes in canonical form. This function does not validate.
+    ///
+    /// The ASCII bytes can be provided as a byte array literal:
+    /// ```
+    /// # use parlance::Script;
+    /// const LATIN: Script = Script::from_bytes(*b"Latn");
+    /// ```
     #[must_use]
     #[inline(always)]
     pub const fn from_bytes(raw: [u8; 4]) -> Self {
@@ -33,9 +39,14 @@ impl Script {
 
     /// Creates a `Script` from a 4-byte string literal.
     ///
-    /// This is intended for `const` construction and does not validate the input.
+    /// This was intended for `const` construction and does not validate the input.
+    /// This method has been deprecated in favour of [`Self::from_bytes`].
     #[must_use]
     #[inline(always)]
+    #[deprecated(
+        since = "0.1.1",
+        note = r#"You should use `from_bytes(*b"....")` instead."#
+    )]
     pub const fn from_str_unchecked(s: &str) -> Self {
         let bytes = s.as_bytes();
         Self::from_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
