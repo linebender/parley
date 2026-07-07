@@ -76,7 +76,11 @@ fn chromium_override(cx: LineBreakContext) -> Option<bool> {
     //
     // Note that we'd need different handling in the `after == ' '` case if we ever get the equivalent of
     // CSS's whitespace-collapse: break-spaces.
-    if before == ' ' && after != ' ' {
+    if before == ' ' && after != ' '
+        // Mandatory break characters. A soft wrap opportunity is never valid
+        // immediately before one (see UAX-14 rule LB6).
+        && !matches!(after, '\n' | '\u{0B}' | '\u{0C}' | '\r' | '\u{85}' | '\u{2028}' | '\u{2029}')
+    {
         return Some(true);
     }
     // Before consulting 'before' / 'after' pair table, check for the special "-" case.
