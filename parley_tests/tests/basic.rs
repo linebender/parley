@@ -7,7 +7,8 @@ use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
     Alignment, AlignmentOptions, BreakReason, ContentWidths, FontFamily, InlineBox, InlineBoxKind,
-    Layout, LineHeight, PositionedLayoutItem, StyleProperty, TextStyle, WhiteSpaceCollapse,
+    Layout, LineHeight, PositionedLayoutItem, StyleProperty, TextStyle, TextWrapMode,
+    WhiteSpaceCollapse,
 };
 use peniko::color::{AlphaColor, Srgb, palette};
 use peniko::kurbo::Size;
@@ -536,6 +537,81 @@ fn preserve_conditionally_hangs_trailing_whitespace_at_forced_break() {
 
     assert!(preserve > preserve_breaks);
     assert!((preserve - break_spaces).abs() < 0.01);
+}
+
+/// Per CSS Text Level 4, preserved trailing white space only hangs when wrapping is enabled: under
+/// `nowrap` (CSS `white-space: pre`) it takes up space, even when it overflows the line.
+#[test]
+fn preserve_nowrap_trailing_whitespace_takes_up_space() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let build = |env: &mut TestEnv, text: &str, wrap_mode, max_advance| {
+        let mut builder = env.tree_builder();
+        builder.set_white_space_mode(WhiteSpaceCollapse::Preserve);
+        builder.push_style_modification_span(&[StyleProperty::TextWrapMode(wrap_mode)]);
+        builder.push_text(text);
+        builder.pop_style_span();
+        let (mut layout, _) = builder.build();
+        layout.break_all_lines(max_advance);
+        layout.align(Alignment::Start, AlignmentOptions::default());
+        layout
+    };
+
+    // Reference widths, measured without a width constraint.
+    let full_width = build(&mut env, "xx ", TextWrapMode::Wrap, None).width();
+    let text_width = build(&mut env, "xx", TextWrapMode::Wrap, None).width();
+    assert!(full_width > text_width);
+
+    // Constrain the line so that "xx" fits but the trailing space overflows.
+    let max_advance = Some((text_width + full_width) / 2.0);
+
+    // With wrapping enabled, the overflowing trailing space hangs and is excluded from the width.
+    let wrap = build(&mut env, "xx ", TextWrapMode::Wrap, max_advance);
+    assert!((wrap.width() - text_width).abs() < 0.01);
+
+    // Under `nowrap` the trailing space cannot hang: it takes up space and overflows the line.
+    let nowrap = build(&mut env, "xx ", TextWrapMode::NoWrap, max_advance);
+    assert!((nowrap.width() - full_width).abs() < 0.01);
+    assert_eq!(nowrap.get(0).unwrap().metrics().trailing_whitespace, 0.0);
+
+    // It is also counted in the min-content intrinsic size.
+    let widths = nowrap.calculate_content_widths();
+    assert!((widths.min - full_width).abs() < 0.01);
+}
+
+/// A no-break space (U+00A0) is not hangable white space per the CSS Text white space processing
+/// rules: it is treated like any other visible character. It must not hang at the end of a line,
+/// and — being non-breaking — an overflowing no-break space must not force a line break.
+#[test]
+fn no_break_space_does_not_hang() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let build = |env: &mut TestEnv, text: &str, max_advance| {
+        let mut builder = env.tree_builder();
+        builder.set_white_space_mode(WhiteSpaceCollapse::Preserve);
+        builder.push_text(text);
+        let (mut layout, _) = builder.build();
+        layout.break_all_lines(max_advance);
+        layout.align(Alignment::Start, AlignmentOptions::default());
+        layout
+    };
+
+    // Reference widths, measured without a width constraint.
+    let full_width = build(&mut env, "xx\u{00A0}", None).width();
+    let text_width = build(&mut env, "xx", None).width();
+    assert!(full_width > text_width);
+
+    // Constrain the line so that "xx" fits but the trailing no-break space overflows. Unlike a
+    // regular space, the no-break space must not hang (it counts toward the line width) and must
+    // not cause a line break (the line overflows instead).
+    let layout = build(
+        &mut env,
+        "xx\u{00A0}",
+        Some((text_width + full_width) / 2.0),
+    );
+    assert_eq!(layout.len(), 1);
+    assert!((layout.width() - full_width).abs() < 0.01);
+    assert_eq!(layout.get(0).unwrap().metrics().trailing_whitespace, 0.0);
 }
 
 #[test]

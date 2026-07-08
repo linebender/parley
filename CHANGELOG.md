@@ -28,7 +28,9 @@ This release has an [MSRV] of 1.88.
 
 #### Parley
 
-- Trailing white space now hangs according to the CSS Text white space processing rules, which differs per `WhiteSpaceCollapse` mode: it is removed (`Collapse`, `PreserveBreaks`), hangs — conditionally at forced breaks and the last line — (`Preserve`, `PreserveSpaces`), or always takes up space (`BreakSpaces`). This also determines its contribution to the min-content and max-content intrinsic sizes.
+- Trailing white space now hangs according to the CSS Text Level 4 white space processing rules, which differs per `WhiteSpaceCollapse` mode: it is removed (`Collapse`, `PreserveBreaks`), hangs — conditionally at forced breaks and the last line — (`Preserve`, `PreserveSpaces`), or always takes up space (`BreakSpaces`). This also determines its contribution to the min-content and max-content intrinsic sizes.
+- Per CSS Text Level 4, preserved trailing white space only hangs when wrapping is enabled: under `TextWrapMode::NoWrap` it takes up space instead.
+- A no-break space (U+00A0) is no longer treated as hangable white space: it takes up space at the end of a line like any other visible character, and an overflowing no-break space no longer forces a line break.
 
 #### Fontique
 

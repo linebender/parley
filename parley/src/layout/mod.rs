@@ -62,8 +62,10 @@ pub struct Style<B: Brush> {
     pub(crate) overflow_wrap: OverflowWrap,
     /// Per-cluster text-wrap-mode setting
     pub(crate) text_wrap_mode: TextWrapMode,
-    /// Per-cluster white-space-collapse setting (only [`WhiteSpaceCollapse::BreakSpaces`] affects
-    /// line breaking; the other modes are applied to the text during style resolution)
+    /// Per-cluster white-space-collapse setting. The collapsing itself is applied to the text
+    /// during style resolution; during line breaking this (together with `text_wrap_mode`)
+    /// determines the extra soft-wrap opportunities of [`WhiteSpaceCollapse::BreakSpaces`] and how
+    /// trailing white space at the end of a line "hangs".
     pub(crate) white_space_collapse: WhiteSpaceCollapse,
     #[cfg(feature = "accesskit")]
     /// Locale if any, so we can set the corresponding AccessKit property

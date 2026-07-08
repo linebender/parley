@@ -22,9 +22,10 @@ use crate::util::nearly_eq;
 
 /// Controls how white space and segment breaks (newlines) inside text are collapsed.
 ///
-/// This mirrors the CSS [`white-space-collapse`] property.
+/// This mirrors the CSS [`white-space-collapse`] property from [CSS Text Level 4].
 ///
-/// [`white-space-collapse`]: https://developer.mozilla.org/en-US/docs/Web/CSS/white-space-collapse
+/// [`white-space-collapse`]: https://drafts.csswg.org/css-text-4/#white-space-collapsing
+/// [CSS Text Level 4]: https://drafts.csswg.org/css-text-4/
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum WhiteSpaceCollapse {
     /// White space sequences and segment breaks are collapsed.
@@ -45,18 +46,31 @@ pub enum WhiteSpaceCollapse {
 }
 
 impl WhiteSpaceCollapse {
-    /// How white space at the end of a line behaves for this mode, per the CSS Text
-    /// [white space processing rules] ("End-of-line spaces" column of the informative table).
+    /// How white space at the end of a line behaves for this mode, per step 4 of the CSS Text
+    /// Level 4 [Phase II white space processing rules].
     ///
-    /// [white space processing rules]: https://www.w3.org/TR/css-text-3/#white-space-phase-2
-    pub(crate) fn end_of_line_whitespace(self) -> EndOfLineWhitespace {
+    /// Whether preserved white space hangs depends on the `text-wrap-mode` that applies to it:
+    /// with `nowrap` it is not hung and instead takes up space. (Level 4 leaves `preserve-spaces`
+    /// undefined here; it is treated like `preserve`, consistent with its Phase I grouping.)
+    ///
+    /// [Phase II white space processing rules]: https://drafts.csswg.org/css-text-4/#white-space-phase-2
+    pub(crate) fn end_of_line_whitespace(
+        self,
+        text_wrap_mode: TextWrapMode,
+    ) -> EndOfLineWhitespace {
         match self {
-            // Collapsible trailing white space is removed.
+            // Collapsible trailing white space is removed / hangs unconditionally (regardless of
+            // the text-wrap-mode).
             Self::Collapse | Self::PreserveBreaks => EndOfLineWhitespace::Remove,
-            // Preserved trailing white space hangs (conditionally at forced breaks).
-            Self::Preserve | Self::PreserveSpaces => EndOfLineWhitespace::Hang,
+            // Preserved trailing white space hangs (conditionally at forced breaks), but only
+            // when wrapping is enabled; under `nowrap` (CSS `white-space: pre`) it is simply
+            // preserved and takes up space.
+            Self::Preserve | Self::PreserveSpaces => match text_wrap_mode {
+                TextWrapMode::Wrap => EndOfLineWhitespace::Hang,
+                TextWrapMode::NoWrap => EndOfLineWhitespace::TakesUpSpace,
+            },
             // Preserved trailing white space always takes up space.
-            Self::BreakSpaces => EndOfLineWhitespace::Wrap,
+            Self::BreakSpaces => EndOfLineWhitespace::TakesUpSpace,
         }
     }
 }
@@ -67,17 +81,17 @@ impl WhiteSpaceCollapse {
 /// See [`WhiteSpaceCollapse::end_of_line_whitespace`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum EndOfLineWhitespace {
-    /// The trailing white space is removed: excluded from the used width, the min-content size,
-    /// and the max-content size (`collapse`, `preserve-breaks`).
+    /// The trailing white space is removed or hangs unconditionally: excluded from the used width,
+    /// the min-content size, and the max-content size (`collapse`, `preserve-breaks`).
     Remove,
     /// The trailing white space hangs: excluded from the used width at soft wraps and from the
     /// min-content size, but counted in the max-content size. At a forced line break or the last
     /// line it *conditionally* hangs — only the part that overflows the line is excluded
-    /// (`preserve`, `preserve-spaces`).
+    /// (`preserve` and `preserve-spaces` when wrapping is enabled).
     Hang,
     /// The trailing white space never hangs: it always takes up space and is counted everywhere
-    /// (`break-spaces`).
-    Wrap,
+    /// (`break-spaces`, and `preserve`/`preserve-spaces` under `nowrap`).
+    TakesUpSpace,
 }
 
 /// The height that this text takes up. The default is `MetricsRelative(1.0)`, which is the given

@@ -3,7 +3,7 @@
 
 use crate::inline_box::InlineBox;
 use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
-use crate::style::{Brush, EndOfLineWhitespace, WhiteSpaceCollapse};
+use crate::style::{Brush, EndOfLineWhitespace};
 use crate::util::nearly_zero;
 use crate::{FontData, IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode};
 use core::ops::Range;
@@ -223,12 +223,18 @@ impl LineItemData {
             return;
         }
 
-        // In `break-spaces` mode, preserved white space takes up space and does not "hang" at the
-        // end of a line, so it must not be treated as trailing white space.
+        // White space that takes up space at the end of a line (`break-spaces`, or preserved
+        // white space under `nowrap`) does not "hang", so it must not be treated as trailing
+        // white space. A no-break space is not hangable white space at all: it is treated like
+        // any other visible character.
         let is_trailing_whitespace = |cluster: &ClusterData| {
+            let style = &layout_data.styles[cluster.style_index as usize];
             cluster.info.is_whitespace()
-                && layout_data.styles[cluster.style_index as usize].white_space_collapse
-                    != WhiteSpaceCollapse::BreakSpaces
+                && cluster.info.whitespace() != Whitespace::NoBreakSpace
+                && style
+                    .white_space_collapse
+                    .end_of_line_whitespace(style.text_wrap_mode)
+                    != EndOfLineWhitespace::TakesUpSpace
         };
 
         self.is_whitespace = true;
@@ -568,27 +574,30 @@ impl<B: Brush> LayoutData<B> {
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
         let styles = &self.styles;
         let end_of_line = |cluster: &ClusterData| {
-            styles[cluster.style_index as usize]
+            let style = &styles[cluster.style_index as usize];
+            style
                 .white_space_collapse
-                .end_of_line_whitespace()
+                .end_of_line_whitespace(style.text_wrap_mode)
         };
         // Advance of trailing white space excluded from the min-content size. All hanging and
-        // removed white space is excluded; only `break-spaces` (`Wrap`) white space is counted.
+        // removed white space is excluded; only white space that takes up space (`break-spaces`,
+        // or preserved white space under `nowrap`) is counted. A no-break space is not hangable
+        // white space and is always counted.
         let min_trailing_whitespace = |cluster: Option<&ClusterData>| -> f32 {
             cluster
                 .filter(|cluster| {
-                    cluster.info.whitespace().is_space_or_nbsp()
-                        && end_of_line(cluster) != EndOfLineWhitespace::Wrap
+                    cluster.info.whitespace() == Whitespace::Space
+                        && end_of_line(cluster) != EndOfLineWhitespace::TakesUpSpace
                 })
                 .map_or(0.0, |cluster| cluster.advance)
         };
         // Advance of trailing white space excluded from the max-content size. Only *removed*
         // white space is excluded; hanging white space conditionally hangs before the (forced)
-        // line break and so is counted, and `break-spaces` white space is always counted.
+        // line break and so is counted, and white space that takes up space is always counted.
         let max_trailing_whitespace = |cluster: Option<&ClusterData>| -> f32 {
             cluster
                 .filter(|cluster| {
-                    cluster.info.whitespace().is_space_or_nbsp()
+                    cluster.info.whitespace() == Whitespace::Space
                         && end_of_line(cluster) == EndOfLineWhitespace::Remove
                 })
                 .map_or(0.0, |cluster| cluster.advance)
