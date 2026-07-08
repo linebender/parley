@@ -432,7 +432,8 @@ impl Cursor {
         let (span_path, character_index) = if self.index == layout.data.text_len
             && layout
                 .data
-                .clusters
+                .shaped_text
+                .clusters()
                 .last()
                 .map(|cluster| cluster.info.whitespace() == Whitespace::Newline)
                 .unwrap_or_default()

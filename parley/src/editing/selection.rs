@@ -563,7 +563,7 @@ impl Selection {
                         );
                         let run = newline_cluster.run();
                         let run_metrics = run.metrics();
-                        (run_metrics.ascent as f64 + run_metrics.descent as f64)
+                        (run_metrics.font.ascent as f64 + run_metrics.font.descent as f64)
                             * NEWLINE_WHITESPACE_WIDTH_RATIO
                     }
                     None => 0.0,

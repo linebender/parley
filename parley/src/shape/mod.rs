@@ -104,7 +104,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         let mut font_selector =
             FontSelector::new(&mut fq, rcx, styles, style_index, item.script, style.locale);
 
-        scx.shape_item(
+        let shaped_runs_range = scx.shape_item(
             text,
             analysis,
             &item,
@@ -120,41 +120,27 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 font_selector
                     .select_font(char_cluster, analysis_data_sources)
                     .map(|selected| FontInstance {
-                        blob: selected.font.blob,
-                        index: selected.font.index,
+                        font: FontData {
+                            data: selected.font.blob,
+                            index: selected.font.index,
+                        },
                         synthesis: selected.font.synthesis,
                     })
             },
             analysis_data_sources,
-            #[inline(always)]
-            |shaped_run| {
-                let run_style_index = char_style_indices[shaped_run.range.char_range.start];
-                let run_style = &styles[usize::from(run_style_index)];
-                let segment_char_info = &analysis.char_info()[shaped_run.range.char_range.clone()];
-                let segment_char_style_indices =
-                    &char_style_indices[shaped_run.range.char_range.clone()];
-                layout.data.push_run(
-                    FontData::new(shaped_run.font.blob, shaped_run.font.index),
-                    style.font_size,
-                    fontique::Attributes {
-                        width: run_style.font_width,
-                        weight: run_style.font_weight,
-                        style: run_style.font_style,
-                    },
-                    shaped_run.font.synthesis,
-                    shaped_run.glyph_buffer,
-                    item.bidi_level,
-                    run_style_index,
-                    style.word_spacing,
-                    style.letter_spacing,
-                    &text[shaped_run.range.byte_range.clone()],
-                    segment_char_info,
-                    segment_char_style_indices,
-                    shaped_run.range.byte_range,
-                    shaped_run.coords,
-                );
-            },
+            &mut layout.data.shaped_text,
         );
+        for shaped_run_idx in shaped_runs_range {
+            let shaped_run = &layout.data.shaped_text.runs()[shaped_run_idx];
+            let run_style_index = char_style_indices[shaped_run.range.char_range.start];
+            let run_style = &styles[usize::from(run_style_index)];
+            layout.data.process_shaped_run(
+                shaped_run_idx,
+                run_style,
+                style.word_spacing,
+                style.letter_spacing,
+            );
+        }
     }
 
     // Process any remaining inline boxes whose index is greater than the length of the text

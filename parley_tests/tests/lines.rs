@@ -62,8 +62,8 @@ fn line_text_metrics<B: Brush>(line: &Line<'_, B>) -> TextMetrics {
     let mut line_height = 0_f32;
     for run in line.runs() {
         let metrics = run.metrics();
-        ascent = ascent.max(metrics.ascent);
-        descent = descent.max(metrics.descent);
+        ascent = ascent.max(metrics.font.ascent);
+        descent = descent.max(metrics.font.descent);
         line_height = line_height.max(metrics.line_height);
     }
     TextMetrics {

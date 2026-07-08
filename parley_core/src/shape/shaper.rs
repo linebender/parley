@@ -4,12 +4,13 @@
 //! Shaping of text.
 
 use alloc::vec::Vec;
-use core::mem;
+use core::{mem, ops::Range};
 use harfrust::ShapeOptions as HarfShapeOptions;
+use linebender_resource_handle::FontData;
 use parlance::{FontFeature, FontVariation, Language};
 
 use crate::{
-    Analysis, AnalysisDataSources, CharInfo, ShapedRun,
+    Analysis, AnalysisDataSources, CharInfo, ShapedText,
     itemize::{Item, TextRange},
     lru_cache::LruCache,
     shape::{CharCluster, cache},
@@ -38,15 +39,11 @@ pub struct ShapeOptions<'a> {
 /// The font instance to shape an item with.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FontInstance {
-    /// The font blob.
-    // TODO: perhaps use `raw_resource_handle` directly; i.e., perhaps we can remove the `fontique`
-    // dependency
-    pub blob: fontique::Blob<u8>,
-    /// The index of the font.
-    pub index: u32,
+    /// The font.
+    pub font: FontData,
     /// Font synthesis suggestions.
-    // TODO: Synthesis carries more than we need, and ties us to `fontique`. We can likely drop this
-    // in the future.
+    // TODO: Synthesis carries more than we need, and ties us to `fontique`. We can likely change
+    // this to opaque user data.
     pub synthesis: fontique::Synthesis,
 }
 
@@ -93,6 +90,8 @@ impl Shaper {
     /// The `select_font` callback should return the font to shape `char_cluster` with. If
     /// consecutive character clusters select a different font, they become separately-shaped runs.
     ///
+    /// Returns the index range of runs appended to `shaped_text`.
+    ///
     /// # Panics
     ///
     /// Panics if the font returned by `select_font` isn't a parseable font.
@@ -117,8 +116,9 @@ impl Shaper {
         options: &ShapeOptions<'_>,
         select_font: impl FnMut(&mut CharCluster) -> Option<FontInstance>,
         analysis_data_sources: &AnalysisDataSources,
-        shaped_runs: impl FnMut(ShapedRun<'_>),
-    ) {
+        shaped_text: &mut ShapedText,
+    ) -> Range<usize> {
+        let start = shaped_text.runs().len();
         shape_item(
             self,
             text,
@@ -127,8 +127,9 @@ impl Shaper {
             select_font,
             analysis.char_info(),
             analysis_data_sources,
-            shaped_runs,
+            shaped_text,
         );
+        start..shaped_text.runs().len()
     }
 }
 
@@ -140,7 +141,7 @@ fn shape_item(
     mut select_font: impl FnMut(&mut CharCluster) -> Option<FontInstance>,
     char_info: &[CharInfo],
     analysis_data_sources: &AnalysisDataSources,
-    mut shaped_runs: impl FnMut(ShapedRun<'_>),
+    shaped_text: &mut ShapedText,
 ) {
     let text_range = &item.range.byte_range;
     let char_range = &item.range.char_range;
@@ -213,18 +214,18 @@ fn shape_item(
         // The line breaking algorithm will handle newlines automatically
 
         // TODO: How do we want to handle errors like this?
-        let font_ref = harfrust::FontRef::from_index(font.blob.as_ref(), font.index).unwrap();
+        let font_ref =
+            harfrust::FontRef::from_index(font.font.data.as_ref(), font.font.index).unwrap();
 
         // Create harfrust shaper
-        let shaper_data = scx
-            .shape_data_cache
-            .entry(cache::ShapeDataKey::new(font.blob.id(), font.index), || {
-                harfrust::ShaperData::new(&font_ref)
-            });
+        let shaper_data = scx.shape_data_cache.entry(
+            cache::ShapeDataKey::new(font.font.data.id(), font.font.index),
+            || harfrust::ShaperData::new(&font_ref),
+        );
         let instance = scx.shape_instance_cache.entry(
             cache::ShapeInstanceKey::new(
-                font.blob.id(),
-                font.index,
+                font.font.data.id(),
+                font.font.index,
                 &font.synthesis,
                 Some(options.variations),
             ),
@@ -260,8 +261,8 @@ fn shape_item(
             .build();
         let shaper_plan = scx.shape_plan_cache.entry(
             cache::ShapePlanKey::new(
-                font.blob.id(),
-                font.index,
+                font.font.data.id(),
+                font.font.index,
                 &font.synthesis,
                 direction,
                 hb_script,
@@ -314,20 +315,23 @@ fn shape_item(
                 .point_size(Some(options.font_size)),
         );
 
-        // Extract relevant CharInfo slice for this segment
         let char_start = char_range.start + item_text[..segment_start_offset].chars().count();
         let segment_char_count = segment_text.chars().count();
-
-        shaped_runs(ShapedRun {
-            range: TextRange {
-                byte_range: (item.range.byte_range.start + segment_start_offset)
-                    ..(item.range.byte_range.start + segment_end_offset),
-                char_range: char_start..char_start + segment_char_count,
-            },
-            font: font.clone(),
-            glyph_buffer: &glyph_buffer,
-            coords: harf_shaper.coords(),
-        });
+        let range = TextRange {
+            byte_range: (item.range.byte_range.start + segment_start_offset)
+                ..(item.range.byte_range.start + segment_end_offset),
+            char_range: char_start..char_start + segment_char_count,
+        };
+        shaped_text.push_run(
+            text,
+            range,
+            item,
+            options,
+            char_info,
+            &font,
+            &glyph_buffer,
+            harf_shaper.coords(),
+        );
 
         // Replace buffer to reuse allocation in next iteration.
         scx.unicode_buffer = Some(glyph_buffer.clear());

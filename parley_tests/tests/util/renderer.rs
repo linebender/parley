@@ -423,10 +423,11 @@ fn render_glyph_run_impl(
     renderer.set_paint(glyph_run.style().brush.color);
     let run = glyph_run.run();
 
-    let mut builder = GlyphRunBuilder::new(run.font().clone(), *renderer.transform())
+    let normalized_coords = &Vec::from_iter(run.normalized_coords().iter().map(|c| c.to_bits()));
+    let mut builder = GlyphRunBuilder::new(run.font().font.clone(), *renderer.transform())
         .font_size(run.font_size())
         .hint(config.hint)
-        .normalized_coords(run.normalized_coords());
+        .normalized_coords(normalized_coords);
     if let Some(glyph_transform) = config.glyph_transform {
         builder = builder.glyph_transform(glyph_transform);
     }
@@ -443,8 +444,10 @@ fn render_glyph_run_impl(
 
     let style = glyph_run.style();
     if let Some(decoration) = &style.underline {
-        let underline_offset = decoration.offset.unwrap_or(run.metrics().underline_offset);
-        let size = decoration.size.unwrap_or(run.metrics().underline_size);
+        let underline_offset = decoration
+            .offset
+            .unwrap_or(run.metrics().font.underline_offset);
+        let size = decoration.size.unwrap_or(run.metrics().font.underline_size);
 
         renderer.set_paint(decoration.brush.color);
         let x = glyph_run.offset() + x_offset;
@@ -464,8 +467,10 @@ fn render_glyph_run_impl(
     if let Some(decoration) = &style.strikethrough {
         let strikethrough_offset = decoration
             .offset
-            .unwrap_or(run.metrics().strikethrough_offset);
-        let size = decoration.size.unwrap_or(run.metrics().strikethrough_size);
+            .unwrap_or(run.metrics().font.strikethrough_offset);
+        let size = decoration
+            .size
+            .unwrap_or(run.metrics().font.strikethrough_size);
 
         // Strikethrough uses simple rect (doesn't skip ink)
         let y = glyph_run.baseline() as f64 - strikethrough_offset as f64 + y_offset as f64;

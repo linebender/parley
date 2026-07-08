@@ -104,7 +104,7 @@ impl LayoutAccessibility {
         });
 
         let font = run.font();
-        if let Ok(font_ref) = FontRef::from_index(font.data.as_ref(), font.index)
+        if let Ok(font_ref) = FontRef::from_index(font.font.data.as_ref(), font.font.index)
             && let Ok(name) = font_ref.name()
         {
             for n in name.name_record().iter() {

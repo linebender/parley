@@ -163,12 +163,12 @@ fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<
     let normalized_coords = run
         .normalized_coords()
         .iter()
-        .map(|coord| NormalizedCoord::from_bits(*coord))
+        .map(|coord| NormalizedCoord::from_bits(coord.to_bits()))
         .collect::<Vec<_>>();
 
     // Get glyph outlines using Skrifa. This can be cached in production code.
-    let font_collection_ref = font.data.as_ref();
-    let font_ref = ReadFontsRef::from_index(font_collection_ref, font.index).unwrap();
+    let font_collection_ref = font.font.data.as_ref();
+    let font_ref = ReadFontsRef::from_index(font_collection_ref, font.font.index).unwrap();
     let outlines = font_ref.outline_glyphs();
 
     // Iterates over the glyphs in the GlyphRun
@@ -189,15 +189,19 @@ fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<
     let style = glyph_run.style();
     let run_metrics = run.metrics();
     if let Some(decoration) = &style.underline {
-        let offset = decoration.offset.unwrap_or(run_metrics.underline_offset);
-        let size = decoration.size.unwrap_or(run_metrics.underline_size);
+        let offset = decoration
+            .offset
+            .unwrap_or(run_metrics.font.underline_offset);
+        let size = decoration.size.unwrap_or(run_metrics.font.underline_size);
         render_decoration(pen, glyph_run, decoration.brush, offset, size, padding);
     }
     if let Some(decoration) = &style.strikethrough {
         let offset = decoration
             .offset
-            .unwrap_or(run_metrics.strikethrough_offset);
-        let size = decoration.size.unwrap_or(run_metrics.strikethrough_size);
+            .unwrap_or(run_metrics.font.strikethrough_offset);
+        let size = decoration
+            .size
+            .unwrap_or(run_metrics.font.strikethrough_size);
         render_decoration(pen, glyph_run, decoration.brush, offset, size, padding);
     }
 }

@@ -1,7 +1,6 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::FontData;
 use crate::layout::cluster::{Cluster, ClusterPath};
 use crate::layout::data::{LineItemData, RunData};
 use crate::layout::layout::Layout;
@@ -9,13 +8,17 @@ use crate::style::Brush;
 
 use core::ops::Range;
 use fontique::Synthesis;
+use parley_core::{FontInstance, FontMetrics, NormalizedCoord, ShapedRun};
 
 /// Sequence of clusters with a single font and style.
 #[derive(Copy, Clone)]
 pub struct Run<'a, B: Brush> {
     pub(crate) layout: &'a Layout<B>,
+    /// The index of the line this run is part of.
     pub(crate) line_index: u32,
+    /// The index of the run within the line it is part of.
     pub(crate) index: u32,
+    pub(crate) shaped: &'a ShapedRun,
     pub(crate) data: &'a RunData,
     pub(crate) line_data: Option<&'a LineItemData>,
 }
@@ -25,14 +28,16 @@ impl<'a, B: Brush> Run<'a, B> {
         layout: &'a Layout<B>,
         line_index: u32,
         index: u32,
-        data: &'a RunData,
+        run_index: usize,
+        // data: &'a RunData,
         line_data: Option<&'a LineItemData>,
     ) -> Self {
         Self {
             layout,
             line_index,
             index,
-            data,
+            shaped: &layout.data.shaped_text.runs()[run_index],
+            data: &layout.data.runs[run_index],
             line_data,
         }
     }
@@ -43,13 +48,18 @@ impl<'a, B: Brush> Run<'a, B> {
     }
 
     /// Returns the font for the run.
-    pub fn font(&self) -> &FontData {
-        self.layout.data.fonts.get(self.data.font_index).unwrap()
+    pub fn font(&self) -> &FontInstance {
+        self.layout
+            .data
+            .shaped_text
+            .fonts()
+            .get(self.shaped.font_index)
+            .unwrap()
     }
 
     /// Returns the font size for the run.
     pub fn font_size(&self) -> f32 {
-        self.data.font_size
+        self.shaped.font_size
     }
 
     /// Returns the font attributes for the run.
@@ -64,11 +74,12 @@ impl<'a, B: Brush> Run<'a, B> {
 
     /// Returns the normalized variation coordinates for the font associated
     /// with the run.
-    pub fn normalized_coords(&self) -> &[i16] {
+    pub fn normalized_coords(&self) -> &[NormalizedCoord] {
         self.layout
             .data
-            .coords
-            .get(self.data.coords_range.clone())
+            .shaped_text
+            .normalized_coords()
+            .get(self.shaped.normalized_coords_range.clone())
             .unwrap_or(&[])
     }
 
@@ -81,27 +92,27 @@ impl<'a, B: Brush> Run<'a, B> {
     pub fn advance(&self) -> f32 {
         self.line_data
             .map(|d| d.advance)
-            .unwrap_or(self.data.advance)
+            .unwrap_or(self.shaped.advance)
     }
 
     /// Returns the original text range for the run.
     pub fn text_range(&self) -> Range<usize> {
         self.line_data
             .map(|d| &d.text_range)
-            .unwrap_or(&self.data.text_range)
+            .unwrap_or(&self.shaped.range.byte_range)
             .clone()
     }
 
     /// Returns `true` if the run has right-to-left directionality.
     pub fn is_rtl(&self) -> bool {
-        self.data.bidi_level & 1 != 0
+        self.shaped.bidi_level & 1 != 0
     }
 
     /// Returns the cluster range for the run.
     pub fn cluster_range(&self) -> Range<usize> {
         self.line_data
             .map(|d| &d.cluster_range)
-            .unwrap_or(&self.data.cluster_range)
+            .unwrap_or(&self.shaped.clusters_range)
             .clone()
     }
 
@@ -120,13 +131,13 @@ impl<'a, B: Brush> Run<'a, B> {
         let range = self
             .line_data
             .map(|d| &d.cluster_range)
-            .unwrap_or(&self.data.cluster_range);
+            .unwrap_or(&self.shaped.clusters_range);
         let original_index = index;
         let index = range.start + index;
         Some(Cluster {
             path: ClusterPath::new(self.line_index, self.index, original_index as u32),
             run: self.clone(),
-            data: self.layout.data.clusters.get(index)?,
+            data: self.layout.data.shaped_text.clusters().get(index)?,
         })
     }
 
@@ -215,32 +226,16 @@ impl<'a, B: Brush> Iterator for Clusters<'a, B> {
                 (index - self.run.cluster_range().start) as u32,
             ),
             run: self.run.clone(),
-            data: self.run.layout.data.clusters.get(index)?,
+            data: self.run.layout.data.shaped_text.clusters().get(index)?,
         })
     }
 }
 
 /// Metrics information for a run.
-#[derive(Copy, Clone, Default, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct RunMetrics {
-    /// Typographic ascent.
-    pub ascent: f32,
-    /// Typographic descent.
-    pub descent: f32,
-    /// Typographic leading.
-    pub leading: f32,
-    /// Offset of the top of underline decoration from the baseline.
-    pub underline_offset: f32,
-    /// Thickness of the underline decoration.
-    pub underline_size: f32,
-    /// Offset of the top of strikethrough decoration from the baseline.
-    pub strikethrough_offset: f32,
-    /// Thickness of the strikethrough decoration.
-    pub strikethrough_size: f32,
+    /// Metrics that apply to the glyphs of this run's font.
+    pub font: FontMetrics,
     /// The line height
     pub line_height: f32,
-    /// Distance from the baseline to the top of short lowercase letters.
-    pub x_height: Option<f32>,
-    /// Distance from the baseline to the top of capital letters.
-    pub cap_height: Option<f32>,
 }

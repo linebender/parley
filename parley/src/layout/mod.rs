@@ -18,7 +18,7 @@ mod run;
 )]
 mod layout;
 
-pub use parley_core::Glyph;
+pub use parley_core::{FontMetrics, Glyph};
 
 pub(crate) mod data;
 

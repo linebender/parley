@@ -14,8 +14,8 @@ all-features = true
 
 [features]
 default = ["std"]
-std = ["fontique/std", "harfrust/std", "parlance/std"]
-libm = ["fontique/libm", "harfrust/libm"]
+std = ["fontique/std", "harfrust/std", "parlance/std", "skrifa/std"]
+libm = ["fontique/libm", "harfrust/libm", "skrifa/libm"]
 # Enables dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
 # When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
 complex-scripts = []
@@ -30,6 +30,8 @@ hashbrown = { workspace = true }
 icu_normalizer = { workspace = true, features = ["compiled_data"] }
 icu_properties = { workspace = true, features = ["compiled_data"] }
 icu_segmenter = { workspace = true, features = ["compiled_data"] }
+linebender_resource_handle = { workspace = true }
+skrifa = { workspace = true }
 
 [lints]
 workspace = true

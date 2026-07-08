@@ -409,11 +409,11 @@ impl Editor {
                     let run_metrics = glyph_run.run().metrics();
                     let offset = match underline.offset {
                         Some(offset) => offset,
-                        None => run_metrics.underline_offset,
+                        None => run_metrics.font.underline_offset,
                     };
                     let width = match underline.size {
                         Some(size) => size,
-                        None => run_metrics.underline_size,
+                        None => run_metrics.font.underline_size,
                     };
                     // The `offset` is the distance from the baseline to the top of the underline
                     // so we move the line down by half the width
@@ -444,13 +444,15 @@ impl Editor {
                     .skew()
                     .map(|angle| Affine::skew(angle.to_radians().tan() as f64, 0.0));
                 scene
-                    .draw_glyphs(font)
+                    .draw_glyphs(&font.font)
                     .brush(&style.brush)
                     .hint(true)
                     .transform(transform)
                     .glyph_transform(glyph_xform)
                     .font_size(font_size)
-                    .normalized_coords(run.normalized_coords())
+                    .normalized_coords(&Vec::from_iter(
+                        run.normalized_coords().iter().map(|c| c.to_bits()),
+                    ))
                     .draw(
                         Fill::NonZero,
                         glyph_run.glyphs().map(|glyph| {
@@ -469,17 +471,18 @@ impl Editor {
                     let run_metrics = glyph_run.run().metrics();
                     let offset = match strikethrough.offset {
                         Some(offset) => offset,
-                        None => run_metrics.strikethrough_offset,
+                        None => run_metrics.font.strikethrough_offset,
                     };
                     let width = match strikethrough.size {
                         Some(size) => size,
-                        None => run_metrics.strikethrough_size,
+                        None => run_metrics.font.strikethrough_size,
                     };
                     // The `offset` is the distance from the baseline to the *top* of the strikethrough
                     // so we calculate the middle y-position of the strikethrough based on the font's
                     // standard strikethrough width.
                     // Remember that we are using a y-down coordinate system
-                    let y = glyph_run.baseline() - offset + run_metrics.strikethrough_size / 2.;
+                    let y =
+                        glyph_run.baseline() - offset + run_metrics.font.strikethrough_size / 2.;
 
                     let line = Line::new(
                         (glyph_run.offset() as f64, y as f64),
