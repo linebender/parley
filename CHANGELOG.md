@@ -26,6 +26,10 @@ This release has an [MSRV] of 1.88.
 
 ### Fixed
 
+#### Parley
+
+- Trailing white space now hangs according to the CSS Text white space processing rules, which differs per `WhiteSpaceCollapse` mode: it is removed (`Collapse`, `PreserveBreaks`), hangs — conditionally at forced breaks and the last line — (`Preserve`, `PreserveSpaces`), or always takes up space (`BreakSpaces`). This also determines its contribution to the min-content and max-content intrinsic sizes.
+
 #### Fontique
 
 - Fix compilation on 32-bit platforms without 64-bit atomics (e.g. `mipsel-unknown-linux-gnu`). (#671 by [@nicoburns][])

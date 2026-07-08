@@ -15,7 +15,7 @@ use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run, RunMetrics,
 };
-use crate::style::{Brush, WhiteSpaceCollapse};
+use crate::style::{Brush, EndOfLineWhitespace, WhiteSpaceCollapse};
 use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
 
 use core::ops::Range;
@@ -1173,26 +1173,45 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         // Compute size of line's trailing whitespace. "Trailing" is considered the right edge
         // for LTR text and the left edge for RTL text.
+        //
+        // How much of the trailing white space "hangs" (i.e. is excluded from the line's used
+        // width and alignment) depends on the white-space-collapse mode (see
+        // `EndOfLineWhitespace`). Removed and (unconditionally) hanging white space is fully
+        // excluded; white space that only *conditionally* hangs (preserved white space at a forced
+        // break or the last line) is excluded only insofar as it overflows the line.
         let run = if self.layout.is_rtl() {
             self.lines.line_items[line.item_range.clone()].first()
         } else {
             self.lines.line_items[line.item_range.clone()].last()
         };
+        let break_reason = line.break_reason;
+        let line_max_advance = line.max_advance;
+        let line_advance = line.metrics.advance;
         line.metrics.trailing_whitespace = run
             .filter(|item| item.is_text_run() && item.has_trailing_whitespace)
             .map(|run| {
-                fn whitespace_advance<'c, I: Iterator<Item = &'c ClusterData>>(clusters: I) -> f32 {
-                    clusters
-                        .take_while(|cluster| cluster.info.whitespace() != Whitespace::None)
-                        .map(|cluster| cluster.advance)
-                        .sum()
-                }
-
+                let styles = &self.layout.data.styles;
                 let clusters = &self.layout.data.clusters[run.cluster_range.clone()];
-                if run.is_rtl() {
-                    whitespace_advance(clusters.iter())
+                let (ws_advance, end_of_line) = if run.is_rtl() {
+                    trailing_whitespace_advance(clusters.iter(), styles)
                 } else {
-                    whitespace_advance(clusters.iter().rev())
+                    trailing_whitespace_advance(clusters.iter().rev(), styles)
+                };
+                match end_of_line {
+                    // `break-spaces`: never hangs. (Normally unreachable, as such clusters are not
+                    // reported as trailing white space.)
+                    EndOfLineWhitespace::Wrap => 0.0,
+                    // Removed white space always hangs (it is conceptually removed entirely).
+                    EndOfLineWhitespace::Remove => ws_advance,
+                    EndOfLineWhitespace::Hang => match break_reason {
+                        // Soft wrap: the preserved white space hangs unconditionally.
+                        BreakReason::Regular | BreakReason::Emergency => ws_advance,
+                        // Forced break or last line (end of block): the white space only
+                        // *conditionally* hangs, i.e. only the part that overflows the line hangs.
+                        BreakReason::Explicit | BreakReason::None => {
+                            (line_advance - line_max_advance).clamp(0.0, ws_advance)
+                        }
+                    },
                 }
             })
             .unwrap_or(0.0);
@@ -1383,6 +1402,31 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
         // Save the computed lines to the layout
         self.lines.swap(&mut self.layout.data);
     }
+}
+
+/// Sums the advance of the run of trailing white space yielded by `clusters` (which must iterate
+/// from the trailing edge of the line inward), and returns it along with the
+/// [`EndOfLineWhitespace`] behavior of the cluster at the very trailing edge.
+fn trailing_whitespace_advance<'c, B: Brush>(
+    clusters: impl Iterator<Item = &'c ClusterData>,
+    styles: &[crate::layout::Style<B>],
+) -> (f32, EndOfLineWhitespace) {
+    let mut advance = 0.0;
+    // Overwritten by the trailing-edge (first-yielded) white space cluster below. The default is
+    // only used if there is no trailing white space, in which case the advance is zero anyway.
+    let mut end_of_line = EndOfLineWhitespace::Remove;
+    for (i, cluster) in clusters
+        .take_while(|cluster| cluster.info.whitespace() != Whitespace::None)
+        .enumerate()
+    {
+        advance += cluster.advance;
+        if i == 0 {
+            end_of_line = styles[cluster.style_index as usize]
+                .white_space_collapse
+                .end_of_line_whitespace();
+        }
+    }
+    (advance, end_of_line)
 }
 
 fn commit_line<B: Brush>(

@@ -474,33 +474,68 @@ fn white_space_collapse_hard_breaks() {
     }
 }
 
-/// In `break-spaces` mode, preserved white space at the end of a line takes up space and does not
-/// "hang", so it is not reported as trailing white space and it contributes to the content widths.
+/// The different `WhiteSpaceCollapse` modes hang trailing white space differently, which is
+/// reflected in the min-content and max-content intrinsic sizes:
+///
+/// - `Collapse`/`PreserveBreaks` remove trailing white space: excluded from both sizes.
+/// - `Preserve`/`PreserveSpaces` hang trailing white space: excluded from min-content, but counted
+///   in max-content (it conditionally hangs at the forced break / end of the text).
+/// - `BreakSpaces` never hangs: counted in both sizes.
 #[test]
-fn break_spaces_preserved_white_space_takes_up_space() {
+fn white_space_collapse_trailing_whitespace_intrinsic_sizes() {
+    use WhiteSpaceCollapse::*;
     let mut env = TestEnv::new(test_name!(), None);
 
-    let build = |env: &mut TestEnv, mode| {
+    let widths = |env: &mut TestEnv, mode| {
         let mut builder = env.tree_builder();
         builder.set_white_space_mode(mode);
-        builder.push_text("a b ");
+        builder.push_text("xx yy ");
+        let (layout, _) = builder.build();
+        layout.calculate_content_widths()
+    };
+
+    let collapse = widths(&mut env, Collapse);
+    let preserve = widths(&mut env, Preserve);
+    let break_spaces = widths(&mut env, BreakSpaces);
+
+    // max-content: the trailing space is removed for `Collapse` but counted for `Preserve` and
+    // `BreakSpaces`.
+    assert!(preserve.max > collapse.max);
+    assert!((preserve.max - break_spaces.max).abs() < 0.01);
+
+    // min-content: only `BreakSpaces` counts the trailing space (it never hangs).
+    assert!(break_spaces.min > preserve.min);
+    assert!((preserve.min - collapse.min).abs() < 0.01);
+}
+
+/// Preserved trailing white space *conditionally* hangs at a forced break / the end of the text: it
+/// is counted when it fits, unlike collapsible white space (which is removed) and unlike white
+/// space at a soft wrap (which always hangs).
+#[test]
+fn preserve_conditionally_hangs_trailing_whitespace_at_forced_break() {
+    use WhiteSpaceCollapse::*;
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let width = |env: &mut TestEnv, mode| {
+        let mut builder = env.tree_builder();
+        builder.set_white_space_mode(mode);
+        // Trailing space before a forced break, on both lines.
+        builder.push_text("xx \nxx");
         let (mut layout, _) = builder.build();
         layout.break_all_lines(None);
         layout.align(Alignment::Start, AlignmentOptions::default());
-        let trailing = layout.get(0).unwrap().metrics().trailing_whitespace;
-        (trailing, layout.calculate_content_widths())
+        layout.width()
     };
 
-    let (preserve_trailing, preserve_widths) = build(&mut env, WhiteSpaceCollapse::Preserve);
-    let (break_spaces_trailing, break_spaces_widths) =
-        build(&mut env, WhiteSpaceCollapse::BreakSpaces);
+    // `PreserveBreaks` keeps the forced break but removes the trailing space, so the line is only
+    // as wide as "xx". `Preserve` and `BreakSpaces` keep the space (it fits, so it does not hang),
+    // making the line wider. (`Collapse` is not comparable here as it also collapses the newline.)
+    let preserve_breaks = width(&mut env, PreserveBreaks);
+    let preserve = width(&mut env, Preserve);
+    let break_spaces = width(&mut env, BreakSpaces);
 
-    // `Preserve` hangs the trailing space (excluded from the line width); `BreakSpaces` does not.
-    assert!(preserve_trailing > 0.0);
-    assert_eq!(break_spaces_trailing, 0.0);
-
-    // The trailing space contributes to the max-content width only in `break-spaces` mode.
-    assert!(break_spaces_widths.max > preserve_widths.max);
+    assert!(preserve > preserve_breaks);
+    assert!((preserve - break_spaces).abs() < 0.01);
 }
 
 #[test]

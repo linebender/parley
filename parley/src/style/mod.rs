@@ -44,6 +44,42 @@ pub enum WhiteSpaceCollapse {
     BreakSpaces,
 }
 
+impl WhiteSpaceCollapse {
+    /// How white space at the end of a line behaves for this mode, per the CSS Text
+    /// [white space processing rules] ("End-of-line spaces" column of the informative table).
+    ///
+    /// [white space processing rules]: https://www.w3.org/TR/css-text-3/#white-space-phase-2
+    pub(crate) fn end_of_line_whitespace(self) -> EndOfLineWhitespace {
+        match self {
+            // Collapsible trailing white space is removed.
+            Self::Collapse | Self::PreserveBreaks => EndOfLineWhitespace::Remove,
+            // Preserved trailing white space hangs (conditionally at forced breaks).
+            Self::Preserve | Self::PreserveSpaces => EndOfLineWhitespace::Hang,
+            // Preserved trailing white space always takes up space.
+            Self::BreakSpaces => EndOfLineWhitespace::Wrap,
+        }
+    }
+}
+
+/// How a run of white space at the end of a line is treated, which determines whether it "hangs"
+/// (is excluded from the line's used width, alignment, and intrinsic sizes).
+///
+/// See [`WhiteSpaceCollapse::end_of_line_whitespace`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EndOfLineWhitespace {
+    /// The trailing white space is removed: excluded from the used width, the min-content size,
+    /// and the max-content size (`collapse`, `preserve-breaks`).
+    Remove,
+    /// The trailing white space hangs: excluded from the used width at soft wraps and from the
+    /// min-content size, but counted in the max-content size. At a forced line break or the last
+    /// line it *conditionally* hangs — only the part that overflows the line is excluded
+    /// (`preserve`, `preserve-spaces`).
+    Hang,
+    /// The trailing white space never hangs: it always takes up space and is counted everywhere
+    /// (`break-spaces`).
+    Wrap,
+}
+
 /// The height that this text takes up. The default is `MetricsRelative(1.0)`, which is the given
 /// font's preferred line height.
 #[derive(Debug, Clone, Copy, PartialEq)]

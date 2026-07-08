@@ -3,7 +3,7 @@
 
 use crate::inline_box::InlineBox;
 use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
-use crate::style::{Brush, WhiteSpaceCollapse};
+use crate::style::{Brush, EndOfLineWhitespace, WhiteSpaceCollapse};
 use crate::util::nearly_zero;
 use crate::{FontData, IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode};
 use core::ops::Range;
@@ -567,14 +567,29 @@ impl<B: Brush> LayoutData<B> {
     // TODO: this method does not handle mixed direction text at all.
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
         let styles = &self.styles;
-        // `break-spaces` white space is not treated as trailing white space, as it takes up space
-        // and thus contributes to the intrinsic sizes.
-        let whitespace_advance = |cluster: Option<&ClusterData>| -> f32 {
+        let end_of_line = |cluster: &ClusterData| {
+            styles[cluster.style_index as usize]
+                .white_space_collapse
+                .end_of_line_whitespace()
+        };
+        // Advance of trailing white space excluded from the min-content size. All hanging and
+        // removed white space is excluded; only `break-spaces` (`Wrap`) white space is counted.
+        let min_trailing_whitespace = |cluster: Option<&ClusterData>| -> f32 {
             cluster
                 .filter(|cluster| {
                     cluster.info.whitespace().is_space_or_nbsp()
-                        && styles[cluster.style_index as usize].white_space_collapse
-                            != WhiteSpaceCollapse::BreakSpaces
+                        && end_of_line(cluster) != EndOfLineWhitespace::Wrap
+                })
+                .map_or(0.0, |cluster| cluster.advance)
+        };
+        // Advance of trailing white space excluded from the max-content size. Only *removed*
+        // white space is excluded; hanging white space conditionally hangs before the (forced)
+        // line break and so is counted, and `break-spaces` white space is always counted.
+        let max_trailing_whitespace = |cluster: Option<&ClusterData>| -> f32 {
+            cluster
+                .filter(|cluster| {
+                    cluster.info.whitespace().is_space_or_nbsp()
+                        && end_of_line(cluster) == EndOfLineWhitespace::Remove
                 })
                 .map_or(0.0, |cluster| cluster.advance)
         };
@@ -605,11 +620,12 @@ impl<B: Brush> LayoutData<B> {
                                 && (boundary == Boundary::Line
                                     || style.overflow_wrap == OverflowWrap::Anywhere))
                         {
-                            let trailing_whitespace = whitespace_advance(prev_cluster);
-                            min_width = min_width.max(running_min_width - trailing_whitespace);
+                            min_width = min_width
+                                .max(running_min_width - min_trailing_whitespace(prev_cluster));
                             running_min_width = 0.0;
                             if boundary == Boundary::Mandatory {
-                                max_width = max_width.max(running_max_width - trailing_whitespace);
+                                max_width = max_width
+                                    .max(running_max_width - max_trailing_whitespace(prev_cluster));
                                 running_max_width = 0.0;
                             }
                         }
@@ -619,16 +635,16 @@ impl<B: Brush> LayoutData<B> {
                             prev_cluster = Some(cluster);
                         }
                     }
-                    let trailing_whitespace = whitespace_advance(prev_cluster);
-                    min_width = min_width.max(running_min_width - trailing_whitespace);
+                    min_width =
+                        min_width.max(running_min_width - min_trailing_whitespace(prev_cluster));
                 }
                 LayoutItemKind::InlineBox => {
                     let ibox = &self.inline_boxes[item.index];
                     if ibox.kind == InlineBoxKind::InFlow {
                         running_max_width += ibox.width;
                         if text_wrap_mode == TextWrapMode::Wrap {
-                            let trailing_whitespace = whitespace_advance(prev_cluster);
-                            min_width = min_width.max(running_min_width - trailing_whitespace);
+                            min_width = min_width
+                                .max(running_min_width - min_trailing_whitespace(prev_cluster));
                             min_width = min_width.max(ibox.width);
                             running_min_width = 0.0;
                         } else {
@@ -638,12 +654,10 @@ impl<B: Brush> LayoutData<B> {
                     prev_cluster = None;
                 }
             }
-            let trailing_whitespace = whitespace_advance(prev_cluster);
-            max_width = max_width.max(running_max_width - trailing_whitespace);
+            max_width = max_width.max(running_max_width - max_trailing_whitespace(prev_cluster));
         }
 
-        let trailing_whitespace = whitespace_advance(prev_cluster);
-        min_width = min_width.max(running_min_width - trailing_whitespace);
+        min_width = min_width.max(running_min_width - min_trailing_whitespace(prev_cluster));
 
         ContentWidths {
             min: min_width,
