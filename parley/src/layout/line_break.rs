@@ -1230,8 +1230,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
         }
 
-        line.metrics.leading =
-            line.metrics.line_height - (line.metrics.ascent + line.metrics.descent);
+        // Like `ascent` and `descent`, the reported leading ignores inline boxes: it is derived
+        // from the text's *intrinsic* line height, not the (possibly larger) `line_height` that an
+        // inline box may have grown the line to.
+        line.metrics.leading = text_line_height - (line.metrics.ascent + line.metrics.descent);
 
         // Whether metrics should be quantized to pixel boundaries
         let quantize = self.layout.data.quantize;

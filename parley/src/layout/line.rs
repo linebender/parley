@@ -116,6 +116,11 @@ pub struct LineMetrics {
     /// Typographic descent.
     pub descent: f32,
     /// Typographic leading.
+    ///
+    /// Like [`ascent`](Self::ascent) and [`descent`](Self::descent), this reflects only the text on
+    /// the line and ignores any inline boxes. It is therefore derived from the text's intrinsic
+    /// line height and may be smaller than `line_height - (ascent + descent)` when an inline box
+    /// has grown the line.
     pub leading: f32,
     /// The absolute line height (in layout units).
     pub line_height: f32,
