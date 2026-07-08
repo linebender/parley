@@ -544,3 +544,87 @@ fn builders_mixed_styles() {
         false,
     );
 }
+
+#[test]
+fn builders_crlf_counts_as_single_line_break() {
+    let mut fcx = create_font_context();
+    let mut line_count = |text: &str| -> usize {
+        let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+        let ropts = RangedOptions {
+            scale: 1.0,
+            quantize: false,
+            max_advance: None,
+            text,
+        };
+        let layout = build_layout_with_ranged(&mut fcx, &mut lcx, &ropts, |rb| {
+            set_root_style(rb);
+        });
+        layout.lines().len()
+    };
+
+    let crlf = line_count("a\r\nb");
+    let lf = line_count("a\nb");
+    let cr = line_count("a\rb");
+
+    assert_eq!(crlf, 2, "CRLF should produce exactly two lines");
+    assert_eq!(lf, 2, "LF should produce exactly two lines");
+    assert_eq!(crlf, lf, "CRLF should match LF line count");
+    assert_eq!(crlf, cr, "CRLF, LF, and CR should match line count");
+
+    let double_crlf = line_count("a\r\n\r\nb");
+    let double_lf = line_count("a\n\nb");
+
+    assert_eq!(
+        double_crlf, 3,
+        "two CRLF breaks should produce one blank line, not extra blanks"
+    );
+    assert_eq!(
+        double_crlf, double_lf,
+        "two CRLF breaks should match two LF breaks"
+    );
+
+    let trailing_cr = line_count("a\r");
+    let trailing_lf = line_count("a\n");
+
+    assert_eq!(
+        trailing_cr, trailing_lf,
+        "trailing CR should match trailing LF line count"
+    );
+}
+
+/// A CRLF whose `\r` and `\n` land in different shaped runs (because a style
+/// change starts at the `\n`) must still coalesce into a single hard break.
+#[test]
+fn builders_crlf_across_run_boundary_counts_as_single_line_break() {
+    let mut fcx = create_font_context();
+    let styled_line_count =
+        |fcx: &mut FontContext, text: &str, style_range: std::ops::Range<usize>| -> usize {
+            let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+            let ropts = RangedOptions {
+                scale: 1.0,
+                quantize: false,
+                max_advance: None,
+                text,
+            };
+            let layout = build_layout_with_ranged(fcx, &mut lcx, &ropts, |rb| {
+                set_root_style(rb);
+                // A style change starting at the `\n` forces shaping to split the
+                // CRLF pair across two runs.
+                rb.push(StyleProperty::FontSize(40.), style_range.clone());
+            });
+            layout.lines().len()
+        };
+
+    // The `\n` in "a\r\nb" is byte 2.
+    let split_crlf = styled_line_count(&mut fcx, "a\r\nb", 2..3);
+    let split_lf = styled_line_count(&mut fcx, "a\nb", 2..3);
+
+    assert_eq!(
+        split_crlf, 2,
+        "a style boundary at the LF must not turn CRLF into two hard breaks"
+    );
+    assert_eq!(
+        split_crlf, split_lf,
+        "styled CRLF should match styled LF line count"
+    );
+}
