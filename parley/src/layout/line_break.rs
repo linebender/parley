@@ -1240,10 +1240,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // Whether metrics should be quantized to pixel boundaries
         let quantize = self.layout.data.quantize;
 
+        // We mimic Chrome in rounding ascent and descent separately,
+        // before calculating the rest.
+        // See lines_integral_line_height_ascent_descent_rounding() for more details.
         let (ascent, descent) = if quantize {
-            // We mimic Chrome in rounding ascent and descent separately,
-            // before calculating the rest.
-            // See lines_integral_line_height_ascent_descent_rounding() for more details.
+            box_ascent = box_ascent.round();
+            box_descent = box_descent.round();
             (line.metrics.ascent.round(), line.metrics.descent.round())
         } else {
             (line.metrics.ascent, line.metrics.descent)
