@@ -92,48 +92,49 @@ impl<B: Brush> TreeStyleBuilder<B> {
     }
 
     pub(crate) fn push_uncommitted_text(&mut self, is_span_last: bool) {
-        let uncommitted_text = core::mem::take(&mut self.uncommitted_text);
-        let span_text = match self.white_space_collapse {
+        // The white space collapsing is performed in place within `self.uncommitted_text` (all
+        // modes only ever shrink the text), whose allocation is also retained across commits.
+        match self.white_space_collapse {
             // Text is kept verbatim. `BreakSpaces` behaves identically to `Preserve` at this
             // stage; its extra soft-wrap opportunities and non-hanging white space are handled
             // during line breaking.
-            WhiteSpaceCollapse::Preserve | WhiteSpaceCollapse::BreakSpaces => uncommitted_text,
+            WhiteSpaceCollapse::Preserve | WhiteSpaceCollapse::BreakSpaces => {}
             WhiteSpaceCollapse::Collapse | WhiteSpaceCollapse::PreserveBreaks => {
                 let preserve_breaks = matches!(
                     self.white_space_collapse,
                     WhiteSpaceCollapse::PreserveBreaks
                 );
-                let mut span_text = uncommitted_text.as_str();
-
-                if self.is_span_first
+                let trim_start = self.is_span_first
                     || (self.last_item_kind == ItemKind::TextRun
                         && self
                             .text
                             .chars()
                             .last()
-                            .is_some_and(|c| c.is_ascii_whitespace()))
-                {
-                    span_text = span_text.trim_start();
-                }
-                if is_span_last {
-                    span_text = span_text.trim_end();
-                }
+                            .is_some_and(|c| c.is_ascii_whitespace()));
 
-                collapse_white_space(span_text, preserve_breaks)
+                collapse_white_space(
+                    &mut self.uncommitted_text,
+                    preserve_breaks,
+                    trim_start,
+                    is_span_last,
+                );
             }
             // Preserve all white space, but convert tabs and segment breaks to spaces.
-            WhiteSpaceCollapse::PreserveSpaces => convert_white_space_to_spaces(&uncommitted_text),
-        };
+            WhiteSpaceCollapse::PreserveSpaces => {
+                convert_white_space_to_spaces(&mut self.uncommitted_text);
+            }
+        }
 
         // Nothing to do if there is no uncommitted text.
-        if span_text.is_empty() {
+        if self.uncommitted_text.is_empty() {
             return;
         }
 
-        let range = self.text.len()..(self.text.len() + span_text.len());
+        let range = self.text.len()..(self.text.len() + self.uncommitted_text.len());
         let style_index = self.resolve_current_style_id();
         self.style_runs.push(StyleRun { style_index, range });
-        self.text.push_str(&span_text);
+        self.text.push_str(&self.uncommitted_text);
+        self.uncommitted_text.clear();
         self.is_span_first = false;
         self.last_item_kind = ItemKind::TextRun;
     }
@@ -219,7 +220,10 @@ impl<B: Brush> TreeStyleBuilder<B> {
     }
 }
 
-/// Collapses sequences of white space into a single space.
+/// Collapses sequences of white space into a single space, in place, reusing `text`'s allocation.
+///
+/// If `trim_start`/`trim_end` are `true`, white space at the respective edge of the text is
+/// removed entirely instead of being collapsed.
 ///
 /// When `preserve_breaks` is `true`, segment breaks (newlines) within a white space sequence are
 /// preserved (with any surrounding spaces and tabs removed), matching the CSS
@@ -227,67 +231,128 @@ impl<B: Brush> TreeStyleBuilder<B> {
 /// to a single space (`white-space-collapse: collapse`).
 ///
 /// A CRLF (`"\r\n"`) is treated as a single segment break.
-fn collapse_white_space(text: &str, preserve_breaks: bool) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut chars = text.chars().peekable();
-    while let Some(c) = chars.next() {
-        if !c.is_ascii_whitespace() {
-            out.push(c);
+fn collapse_white_space(
+    text: &mut String,
+    preserve_breaks: bool,
+    trim_start: bool,
+    trim_end: bool,
+) {
+    // Compute the byte range that remains after trimming (`str::trim_start`/`str::trim_end` trim
+    // Unicode white space).
+    let mut trimmed = text.as_str();
+    if trim_start {
+        trimmed = trimmed.trim_start();
+    }
+    if trim_end {
+        trimmed = trimmed.trim_end();
+    }
+    let start = if trim_start {
+        text.len() - text.trim_start().len()
+    } else {
+        0
+    };
+    let end = start + trimmed.len();
+
+    // Collapse the white space by compacting the buffer in place, with separate read (`read`) and
+    // write (`write`) positions. This operates on the underlying bytes: the white space collapsed
+    // here is ASCII, and ASCII bytes never occur within a multi-byte UTF-8 sequence, so scanning
+    // the bytes for ASCII white space is sound, and all other bytes are copied verbatim. The
+    // write position can never overtake the read position, as no replacement is longer than the
+    // white space sequence it replaces.
+    let mut bytes = core::mem::take(text).into_bytes();
+    let mut write = 0;
+    let mut read = start;
+    while read < end {
+        let byte = bytes[read];
+        if !byte.is_ascii_whitespace() {
+            bytes[write] = byte;
+            write += 1;
+            read += 1;
             continue;
         }
 
         // We are at the start of a white space sequence; consume the whole run, counting the
         // number of segment breaks it contains (treating CRLF as a single break).
         let mut segment_breaks = 0_usize;
-        let mut current = Some(c);
-        while let Some(w) = current {
-            match w {
-                '\r' => {
+        while read < end && bytes[read].is_ascii_whitespace() {
+            match bytes[read] {
+                b'\r' => {
                     segment_breaks += 1;
-                    if chars.peek() == Some(&'\n') {
-                        chars.next();
+                    read += 1;
+                    if read < end && bytes[read] == b'\n' {
+                        read += 1;
                     }
                 }
-                '\n' => segment_breaks += 1,
-                _ => {}
+                b'\n' => {
+                    segment_breaks += 1;
+                    read += 1;
+                }
+                _ => read += 1,
             }
-            current = match chars.peek() {
-                Some(&next) if next.is_ascii_whitespace() => chars.next(),
-                _ => None,
-            };
         }
 
         if preserve_breaks && segment_breaks > 0 {
             for _ in 0..segment_breaks {
-                out.push('\n');
+                bytes[write] = b'\n';
+                write += 1;
             }
         } else {
-            out.push(' ');
+            bytes[write] = b' ';
+            write += 1;
         }
     }
-    out
+    bytes.truncate(write);
+    *text = String::from_utf8(bytes).expect("collapsing preserves UTF-8 validity");
 }
 
-/// Preserves white space but converts tabs and segment breaks (newlines) to spaces, matching the
-/// CSS `white-space-collapse: preserve-spaces` behavior.
+/// Preserves white space but converts tabs and segment breaks (newlines) to spaces, in place,
+/// reusing `text`'s allocation, matching the CSS `white-space-collapse: preserve-spaces` behavior.
 ///
 /// A CRLF (`"\r\n"`) is treated as a single segment break and thus becomes a single space.
-fn convert_white_space_to_spaces(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut chars = text.chars().peekable();
-    while let Some(c) = chars.next() {
-        match c {
-            '\t' | '\n' | '\u{2028}' | '\u{2029}' => out.push(' '),
-            '\r' => {
-                if chars.peek() == Some(&'\n') {
-                    chars.next();
-                }
-                out.push(' ');
+fn convert_white_space_to_spaces(text: &mut String) {
+    // U+2028 LINE SEPARATOR and U+2029 PARAGRAPH SEPARATOR (which are segment breaks) as UTF-8.
+    const LINE_SEPARATOR: [u8; 3] = [0xE2, 0x80, 0xA8];
+    const PARAGRAPH_SEPARATOR: [u8; 3] = [0xE2, 0x80, 0xA9];
+
+    // Like `collapse_white_space`, this compacts the underlying bytes in place. All replacements
+    // are ASCII bytes replacing either ASCII bytes or whole multi-byte sequences (the separators
+    // above), so UTF-8 validity is preserved and the write position can never overtake the read
+    // position.
+    let mut bytes = core::mem::take(text).into_bytes();
+    let len = bytes.len();
+    let mut write = 0;
+    let mut read = 0;
+    while read < len {
+        match bytes[read] {
+            b'\t' | b'\n' => {
+                bytes[write] = b' ';
+                write += 1;
+                read += 1;
             }
-            other => out.push(other),
+            b'\r' => {
+                read += 1;
+                if read < len && bytes[read] == b'\n' {
+                    read += 1;
+                }
+                bytes[write] = b' ';
+                write += 1;
+            }
+            0xE2 if bytes[read..].starts_with(&LINE_SEPARATOR)
+                || bytes[read..].starts_with(&PARAGRAPH_SEPARATOR) =>
+            {
+                bytes[write] = b' ';
+                write += 1;
+                read += LINE_SEPARATOR.len();
+            }
+            byte => {
+                bytes[write] = byte;
+                write += 1;
+                read += 1;
+            }
         }
     }
-    out
+    bytes.truncate(write);
+    *text = String::from_utf8(bytes).expect("conversion preserves UTF-8 validity");
 }
 
 #[cfg(test)]
@@ -419,6 +484,42 @@ mod tests {
         assert_eq!(collapsed_text(PreserveSpaces, "a\tb"), "a b");
         assert_eq!(collapsed_text(PreserveSpaces, "a\r\nb"), "a b");
         assert_eq!(collapsed_text(PreserveSpaces, "a  b"), "a  b");
+        assert_eq!(
+            collapsed_text(PreserveSpaces, "a\u{2028}b\u{2029}c"),
+            "a b c"
+        );
+    }
+
+    #[test]
+    fn white_space_collapse_handles_multibyte_content() {
+        use WhiteSpaceCollapse::*;
+        // The collapsing is performed on the underlying (UTF-8) bytes; multi-byte characters
+        // adjacent to white space must be copied through intact.
+        assert_eq!(collapsed_text(Collapse, "é  ü\t☃"), "é ü ☃");
+        assert_eq!(collapsed_text(Collapse, "  éü  "), "éü");
+        assert_eq!(collapsed_text(PreserveBreaks, "é \r\n ü"), "é\nü");
+        assert_eq!(collapsed_text(PreserveSpaces, "é\u{2028}ü"), "é ü");
+    }
+
+    #[test]
+    fn white_space_collapse_reuses_the_allocation() {
+        let mut text = String::from("a  b \t c\n\n d\r\ne  ");
+        let pointer = text.as_ptr();
+        let capacity = text.capacity();
+
+        collapse_white_space(&mut text, false, true, true);
+        assert_eq!(text, "a b c d e");
+        assert_eq!(text.as_ptr(), pointer);
+        assert_eq!(text.capacity(), capacity);
+
+        let mut text = String::from("a\tb\r\nc\u{2028}d");
+        let pointer = text.as_ptr();
+        let capacity = text.capacity();
+
+        convert_white_space_to_spaces(&mut text);
+        assert_eq!(text, "a b c d");
+        assert_eq!(text.as_ptr(), pointer);
+        assert_eq!(text.capacity(), capacity);
     }
 
     #[test]
