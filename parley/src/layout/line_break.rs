@@ -823,7 +823,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         else {
                             // Case: cluster is a space character (and wrapping is enabled)
                             //
-                            // We hang any overflowing whitespace and then line-break.
+                            // Hanging white space is not considered when measuring the line's
+                            // contents for fit, so an overflowing space must not cause a break by
+                            // itself. We append it to the line (where it will hang) and keep
+                            // consuming the rest of the white space run: the line then breaks at
+                            // the next soft-wrap opportunity (just after the run, before the
+                            // following content), at a forced break — where the white space
+                            // *conditionally* hangs — or at the end of the text.
                             //
                             // In `break-spaces` mode, preserved white space does not hang; instead
                             // it takes up space and wraps like other content, so we fall through to
@@ -841,11 +847,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     return self.max_height_break_data(line_height);
                                 }
                                 self.state.append_cluster_to_line(next_x, metrics);
-                                return self.start_new_line(
-                                    BreakReason::Regular,
-                                    max_advance,
-                                    line_indent,
-                                );
+                                continue;
                             }
                             // Case: we have previously encountered a REGULAR line-breaking opportunity in the current line
                             //

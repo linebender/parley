@@ -579,46 +579,28 @@ impl<B: Brush> LayoutData<B> {
                 .white_space_collapse
                 .end_of_line_whitespace(style.text_wrap_mode)
         };
-        // Advance of trailing white space excluded from the min-content size. All hanging and
-        // removed white space is excluded; only white space that takes up space (`break-spaces`,
-        // or preserved white space under `nowrap`) is counted. A no-break space is not hangable
-        // white space and is always counted.
-        let min_trailing_whitespace = |cluster: Option<&ClusterData>| -> f32 {
-            cluster
-                .filter(|cluster| {
-                    cluster.info.whitespace() == Whitespace::Space
-                        && end_of_line(cluster) != EndOfLineWhitespace::TakesUpSpace
-                })
-                .map_or(0.0, |cluster| cluster.advance)
-        };
-        // Advance of trailing white space excluded from the max-content size. Only *removed*
-        // white space is excluded; hanging white space conditionally hangs before the (forced)
-        // line break and so is counted, and white space that takes up space is always counted.
-        let max_trailing_whitespace = |cluster: Option<&ClusterData>| -> f32 {
-            cluster
-                .filter(|cluster| {
-                    cluster.info.whitespace() == Whitespace::Space
-                        && end_of_line(cluster) == EndOfLineWhitespace::Remove
-                })
-                .map_or(0.0, |cluster| cluster.advance)
-        };
 
         let mut min_width = 0.0_f32;
         let mut max_width = 0.0_f32;
 
         let mut running_min_width = 0.0;
         let mut running_max_width = 0.0;
+        // Advance of the run of white space at the end of the content measured so far that hangs
+        // or is removed, and is therefore excluded from the min-content and max-content sizes
+        // respectively. All hanging and removed white space is excluded from the min-content
+        // size, while only *removed* white space is excluded from the max-content size (hanging
+        // white space conditionally hangs at the forced break ending a max-content line and so is
+        // counted). White space that takes up space (`break-spaces`, or preserved white space
+        // under `nowrap`) is never excluded, and a no-break space is not hangable white space at
+        // all. See the accumulation logic in the cluster loop below.
+        let mut min_trailing_whitespace = 0.0_f32;
+        let mut max_trailing_whitespace = 0.0_f32;
         let mut text_wrap_mode = TextWrapMode::Wrap;
-        let mut prev_cluster: Option<&ClusterData> = None;
-        let is_rtl = self.base_level & 1 == 1;
         for item in &self.items {
             match item.kind {
                 LayoutItemKind::TextRun => {
                     let run = &self.runs[item.index];
                     let clusters = &self.clusters[run.cluster_range.clone()];
-                    if is_rtl {
-                        prev_cluster = clusters.first();
-                    }
                     for cluster in clusters {
                         let boundary = cluster.info.boundary();
                         let style = &self.styles[cluster.style_index as usize];
@@ -629,44 +611,67 @@ impl<B: Brush> LayoutData<B> {
                                 && (boundary == Boundary::Line
                                     || style.overflow_wrap == OverflowWrap::Anywhere))
                         {
-                            min_width = min_width
-                                .max(running_min_width - min_trailing_whitespace(prev_cluster));
+                            min_width = min_width.max(running_min_width - min_trailing_whitespace);
                             running_min_width = 0.0;
+                            min_trailing_whitespace = 0.0;
                             if boundary == Boundary::Mandatory {
-                                max_width = max_width
-                                    .max(running_max_width - max_trailing_whitespace(prev_cluster));
+                                max_width =
+                                    max_width.max(running_max_width - max_trailing_whitespace);
                                 running_max_width = 0.0;
+                                max_trailing_whitespace = 0.0;
                             }
                         }
                         running_min_width += cluster.advance;
                         running_max_width += cluster.advance;
-                        if !is_rtl {
-                            prev_cluster = Some(cluster);
+                        match cluster.info.whitespace() {
+                            Whitespace::Space => {
+                                let eol = end_of_line(cluster);
+                                if eol != EndOfLineWhitespace::TakesUpSpace {
+                                    min_trailing_whitespace += cluster.advance;
+                                } else {
+                                    min_trailing_whitespace = 0.0;
+                                }
+                                if eol == EndOfLineWhitespace::Remove {
+                                    max_trailing_whitespace += cluster.advance;
+                                } else {
+                                    max_trailing_whitespace = 0.0;
+                                }
+                            }
+                            // Newlines have zero advance and do not end the trailing white space
+                            // run: spaces before a segment break are still at the end of their
+                            // line.
+                            Whitespace::Newline => {}
+                            // Any other cluster (including tabs and no-break spaces, which are
+                            // not treated as hangable here) ends the trailing white space run.
+                            _ => {
+                                min_trailing_whitespace = 0.0;
+                                max_trailing_whitespace = 0.0;
+                            }
                         }
                     }
-                    min_width =
-                        min_width.max(running_min_width - min_trailing_whitespace(prev_cluster));
+                    min_width = min_width.max(running_min_width - min_trailing_whitespace);
                 }
                 LayoutItemKind::InlineBox => {
                     let ibox = &self.inline_boxes[item.index];
                     if ibox.kind == InlineBoxKind::InFlow {
                         running_max_width += ibox.width;
                         if text_wrap_mode == TextWrapMode::Wrap {
-                            min_width = min_width
-                                .max(running_min_width - min_trailing_whitespace(prev_cluster));
+                            min_width = min_width.max(running_min_width - min_trailing_whitespace);
                             min_width = min_width.max(ibox.width);
                             running_min_width = 0.0;
                         } else {
                             running_min_width += ibox.width;
                         }
                     }
-                    prev_cluster = None;
+                    // An inline box is content: it ends any trailing white space run.
+                    min_trailing_whitespace = 0.0;
+                    max_trailing_whitespace = 0.0;
                 }
             }
-            max_width = max_width.max(running_max_width - max_trailing_whitespace(prev_cluster));
+            max_width = max_width.max(running_max_width - max_trailing_whitespace);
         }
 
-        min_width = min_width.max(running_min_width - min_trailing_whitespace(prev_cluster));
+        min_width = min_width.max(running_min_width - min_trailing_whitespace);
 
         ContentWidths {
             min: min_width,

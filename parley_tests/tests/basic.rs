@@ -563,20 +563,86 @@ fn preserve_nowrap_trailing_whitespace_takes_up_space() {
     assert!(full_width > text_width);
 
     // Constrain the line so that "xx" fits but the trailing space overflows.
-    let max_advance = Some((text_width + full_width) / 2.0);
+    let max_advance = (text_width + full_width) / 2.0;
 
-    // With wrapping enabled, the overflowing trailing space hangs and is excluded from the width.
-    let wrap = build(&mut env, "xx ", TextWrapMode::Wrap, max_advance);
+    // With wrapping enabled, trailing white space at a *soft wrap* hangs unconditionally and is
+    // excluded from the width.
+    let wrap = build(&mut env, "xx xx", TextWrapMode::Wrap, Some(max_advance));
+    assert_eq!(wrap.len(), 2);
     assert!((wrap.width() - text_width).abs() < 0.01);
 
+    // At the end of the text the trailing space *conditionally* hangs: it must not cause a line
+    // break, and only the part of it that does not fit hangs.
+    let wrap = build(&mut env, "xx ", TextWrapMode::Wrap, Some(max_advance));
+    assert_eq!(wrap.len(), 1);
+    assert!((wrap.width() - max_advance).abs() < 0.01);
+
     // Under `nowrap` the trailing space cannot hang: it takes up space and overflows the line.
-    let nowrap = build(&mut env, "xx ", TextWrapMode::NoWrap, max_advance);
+    let nowrap = build(&mut env, "xx ", TextWrapMode::NoWrap, Some(max_advance));
     assert!((nowrap.width() - full_width).abs() < 0.01);
     assert_eq!(nowrap.get(0).unwrap().metrics().trailing_whitespace, 0.0);
 
     // It is also counted in the min-content intrinsic size.
     let widths = nowrap.calculate_content_widths();
     assert!((widths.min - full_width).abs() < 0.01);
+}
+
+/// Hanging white space is "not considered when measuring the line's contents for fit": an
+/// overflowing preserved space run must not be split across lines. It stays on its line, breaking
+/// only after the run — and at a forced break it *conditionally* hangs (only the part that does
+/// not fit hangs). The whole run is also excluded from the min-content size but, conditionally
+/// hanging before the forced break, counted in the max-content size.
+#[test]
+fn preserved_trailing_whitespace_not_considered_for_fit() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let build = |env: &mut TestEnv, text: &str, max_advance| {
+        let mut builder = env.tree_builder();
+        builder.set_white_space_mode(WhiteSpaceCollapse::Preserve);
+        builder.push_text(text);
+        let (mut layout, _) = builder.build();
+        layout.break_all_lines(max_advance);
+        layout.align(Alignment::Start, AlignmentOptions::default());
+        layout
+    };
+
+    // Reference widths, measured without a width constraint.
+    let aaa_width = build(&mut env, "aaa", None).width();
+    let full_width = build(&mut env, "aaa   ", None).width(); // three trailing spaces
+    let space_width = (full_width - aaa_width) / 3.0;
+
+    // Constrain the line so that "aaa" plus half of the space run fits.
+    let max_advance = aaa_width + 1.5 * space_width;
+
+    // The space run before the forced break must stay on the first line, with only the
+    // overflowing half of it hanging.
+    let layout = build(&mut env, "aaa   \naaa", Some(max_advance));
+    assert_eq!(layout.len(), 2);
+    let line = layout.get(0).unwrap();
+    assert_eq!(line.break_reason(), BreakReason::Explicit);
+    assert!((line.metrics().advance - full_width).abs() < 0.01);
+    assert!((line.metrics().trailing_whitespace - (full_width - max_advance)).abs() < 0.01);
+    assert!((layout.width() - max_advance).abs() < 0.01);
+
+    // The whole space run is excluded from the min-content size, but (conditionally hanging
+    // before the forced break) counted in the max-content size.
+    let widths = layout.calculate_content_widths();
+    assert!((widths.min - aaa_width).abs() < 0.01);
+    assert!((widths.max - full_width).abs() < 0.01);
+
+    // The same applies at the end of the text (which behaves like a forced break).
+    let layout = build(&mut env, "aaa   ", Some(max_advance));
+    assert_eq!(layout.len(), 1);
+    assert!((layout.width() - max_advance).abs() < 0.01);
+
+    // At a soft wrap, the whole run stays on the first line and hangs unconditionally.
+    let layout = build(&mut env, "aaa   aaa", Some(max_advance));
+    assert_eq!(layout.len(), 2);
+    let line = layout.get(0).unwrap();
+    assert_eq!(line.break_reason(), BreakReason::Regular);
+    assert!((line.metrics().advance - full_width).abs() < 0.01);
+    assert!((line.metrics().trailing_whitespace - 3.0 * space_width).abs() < 0.01);
+    assert!((layout.width() - aaa_width).abs() < 0.01);
 }
 
 /// A no-break space (U+00A0) is not hangable white space per the CSS Text white space processing
