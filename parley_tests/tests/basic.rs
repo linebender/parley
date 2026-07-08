@@ -70,6 +70,7 @@ fn placing_inboxes() {
             index: position,
             width: 10.0,
             height: 10.0,
+            baseline: None,
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
@@ -91,6 +92,7 @@ fn only_inboxes_wrap() {
             index: 0,
             width: 10.0,
             height: 10.0,
+            baseline: None,
         });
     }
     let mut layout = builder.build(text);
@@ -113,6 +115,7 @@ fn full_width_inbox() {
             index: 1,
             width: 10.,
             height: 10.0,
+            baseline: None,
         });
         builder.push_inline_box(InlineBox {
             id: 1,
@@ -120,6 +123,7 @@ fn full_width_inbox() {
             index: 1,
             width,
             height: 10.0,
+            baseline: None,
         });
         builder.push_inline_box(InlineBox {
             id: 2,
@@ -127,6 +131,7 @@ fn full_width_inbox() {
             index: 2,
             width,
             height: 10.0,
+            baseline: None,
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(100.));
@@ -146,6 +151,7 @@ fn inbox_separated_by_whitespace() {
         index: 0,
         width: 10.,
         height: 10.0,
+        baseline: None,
     });
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
@@ -154,6 +160,7 @@ fn inbox_separated_by_whitespace() {
         index: 1,
         width: 10.0,
         height: 10.0,
+        baseline: None,
     });
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
@@ -162,6 +169,7 @@ fn inbox_separated_by_whitespace() {
         index: 2,
         width: 10.0,
         height: 10.0,
+        baseline: None,
     });
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
@@ -170,10 +178,158 @@ fn inbox_separated_by_whitespace() {
         index: 3,
         width: 10.0,
         height: 10.0,
+        baseline: None,
     });
     let (mut layout, _text) = builder.build();
     layout.break_all_lines(Some(100.));
     layout.align(Alignment::Start, AlignmentOptions::default());
+    env.check_layout_snapshot(&layout);
+}
+
+/// The `baseline` field of an inline box should align the box's baseline with the text baseline.
+///
+/// The rendered snapshots draw the box's baseline (when set) as a horizontal line, which should
+/// always line up with the baseline of the surrounding text.
+#[test]
+fn inbox_with_baseline() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // The box is 30px tall. We vary where its baseline sits within the box:
+    // - `top`: baseline at the top, so the box hangs below the text baseline.
+    // - `middle`: baseline in the middle of the box.
+    // - `bottom`: baseline at the bottom, equivalent to not specifying a baseline.
+    for (baseline, test_case_name) in [(0.0, "top"), (15.0, "middle"), (30.0, "bottom")] {
+        let text = "Hello world!";
+        let mut builder = env.ranged_builder(text);
+        builder.push_inline_box(InlineBox {
+            id: 0,
+            kind: InlineBoxKind::InFlow,
+            index: 5,
+            width: 20.0,
+            height: 30.0,
+            baseline: Some(baseline),
+        });
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(Alignment::Start, AlignmentOptions::default());
+        env.with_name(test_case_name).check_layout_snapshot(&layout);
+    }
+}
+
+/// Inline boxes with differing heights but matching baselines should all align to the same text
+/// baseline.
+#[test]
+fn inboxes_with_matching_baselines() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "AxByC";
+    let mut builder = env.ranged_builder(text);
+    // A short box and a tall box, both with their baselines 10px from the top.
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        kind: InlineBoxKind::InFlow,
+        index: 1,
+        width: 15.0,
+        height: 15.0,
+        baseline: Some(10.0),
+    });
+    builder.push_inline_box(InlineBox {
+        id: 1,
+        kind: InlineBoxKind::InFlow,
+        index: 3,
+        width: 15.0,
+        height: 40.0,
+        baseline: Some(10.0),
+    });
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    layout.align(Alignment::Start, AlignmentOptions::default());
+    env.check_layout_snapshot(&layout);
+}
+
+/// A box that mostly sits above the baseline (large ascent) and a box that mostly sits below the
+/// baseline (large descent) on the same line. The line height must grow to fit the combined
+/// ascent of the first box and descent of the second box, even though neither box on its own is
+/// as tall as that sum.
+#[test]
+fn inboxes_with_large_ascent_and_descent() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Surround the line containing the boxes with plain text lines, so we can see how the
+    // adjacent lines are positioned relative to the (much taller) box line.
+    let text = "Line above\nAxB\nLine below";
+    let box_line_start = text.find("AxB").unwrap();
+    let mut builder = env.ranged_builder(text);
+    // Large ascent: the baseline is near the bottom of the box, so most of it is above the
+    // baseline.
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        kind: InlineBoxKind::InFlow,
+        index: box_line_start + 1,
+        width: 15.0,
+        height: 40.0,
+        baseline: Some(38.0),
+    });
+    // Large descent: the baseline is near the top of the box, so most of it is below the baseline.
+    builder.push_inline_box(InlineBox {
+        id: 1,
+        kind: InlineBoxKind::InFlow,
+        index: box_line_start + 2,
+        width: 15.0,
+        height: 40.0,
+        baseline: Some(2.0),
+    });
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    layout.align(Alignment::Start, AlignmentOptions::default());
+
+    // The middle line (containing the boxes) should be tall enough to contain the first box's
+    // ascent (38px) plus the second box's descent (40 - 2 = 38px).
+    let box_line = layout.get(1).unwrap();
+    assert!(
+        box_line.metrics().line_height >= 76.0,
+        "expected line height of at least 76px to fit the combined ascent and descent, got {}",
+        box_line.metrics().line_height
+    );
+
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
+fn inbox_below_baseline_keeps_grid() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "AAAA\nBBBB\nCCCC";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::LineHeight(LineHeight::Absolute(60.0)));
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        kind: InlineBoxKind::InFlow,
+        index: 7, // between the B's on the middle line
+        width: 20.0,
+        height: 15.0,
+        baseline: Some(0.0),
+    });
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    layout.align(Alignment::Start, AlignmentOptions::default());
+
+    // Every line has the same 60px line height, so consecutive baselines must be exactly 60px
+    // apart. The inline box on the middle line fits within the line and must not disturb this.
+    let baselines: Vec<f32> = (0..layout.len())
+        .map(|i| layout.get(i).unwrap().metrics().baseline)
+        .collect();
+    assert_eq!(
+        baselines[1] - baselines[0],
+        60.0,
+        "middle line baseline off-grid: {baselines:?}"
+    );
+    assert_eq!(
+        baselines[2] - baselines[1],
+        60.0,
+        "bottom line baseline off-grid: {baselines:?}"
+    );
+
     env.check_layout_snapshot(&layout);
 }
 
@@ -452,6 +608,7 @@ fn inbox_content_width() {
             index: 3,
             width: 100.0,
             height: 10.0,
+            baseline: None,
         });
         let mut layout = builder.build(text);
         let ContentWidths {
@@ -473,6 +630,7 @@ fn inbox_content_width() {
             index: 2,
             width: 10.0,
             height: 10.0,
+            baseline: None,
         });
         let mut layout = builder.build(text);
         let ContentWidths {

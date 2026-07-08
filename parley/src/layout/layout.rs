@@ -74,6 +74,18 @@ impl<B: Brush> Layout<B> {
         self.data.full_width
     }
 
+    /// Returns the y-offset of the baseline of the first line in the layout.
+    /// Returns `None` if the layout is empty.
+    pub fn first_baseline(&self) -> Option<f32> {
+        self.lines().next().map(|line| line.metrics().baseline)
+    }
+
+    /// Returns the y-offset of the baseline of the last line in the layout.
+    /// Returns `None` if the layout is empty.
+    pub fn last_baseline(&self) -> Option<f32> {
+        self.lines().next_back().map(|line| line.metrics().baseline)
+    }
+
     /// Calculates the lower and upper bounds on the width of the layout. These
     /// are recalculated every time this method is called.
     ///

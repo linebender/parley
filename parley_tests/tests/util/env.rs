@@ -35,6 +35,10 @@ pub(crate) const FONT_FAMILY_LIST: &[FontFamilyName<'_>] = &[
 
 pub(crate) const CLUSTER_INFO_COLOR: Color = Color::from_rgba8(100, 100, 100, 255);
 
+/// Color used to render the baseline of inline boxes. Chosen to contrast against the (black)
+/// inline box fill.
+pub(crate) const INLINE_BOX_BASELINE_COLOR: Color = Color::from_rgba8(255, 0, 255, 255);
+
 pub(crate) struct TestEnv {
     test_name: String,
     check_counter: u32,

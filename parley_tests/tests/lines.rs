@@ -112,6 +112,7 @@ fn build_layout<A: Into<Option<f32>>>(
         index: 40,
         width: 50.0,
         height: 5.0,
+        baseline: None,
     });
     builder.push_inline_box(InlineBox {
         id: 1,
@@ -119,6 +120,7 @@ fn build_layout<A: Into<Option<f32>>>(
         index: 51,
         width: 50.0,
         height: 3.0,
+        baseline: None,
     });
 
     let mut layout = builder.build(TEXT);

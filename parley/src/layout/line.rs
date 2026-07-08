@@ -116,6 +116,11 @@ pub struct LineMetrics {
     /// Typographic descent.
     pub descent: f32,
     /// Typographic leading.
+    ///
+    /// Like [`ascent`](Self::ascent) and [`descent`](Self::descent), this reflects only the text on
+    /// the line and ignores any inline boxes. It is therefore derived from the text's intrinsic
+    /// line height and may be smaller than `line_height - (ascent + descent)` when an inline box
+    /// has grown the line.
     pub leading: f32,
     /// The absolute line height (in layout units).
     pub line_height: f32,
@@ -184,6 +189,11 @@ pub struct PositionedInlineBox {
     pub y: f32,
     pub width: f32,
     pub height: f32,
+    /// The baseline of the box in pixels, relative to the top of the box (i.e. to [`Self::y`]).
+    ///
+    /// This is `None` if the box does not specify a baseline, in which case its bottom edge is
+    /// aligned with the text baseline.
+    pub baseline: Option<f32>,
     pub id: u64,
     pub kind: InlineBoxKind,
 }
@@ -284,9 +294,11 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                     }
                     return Some(PositionedLayoutItem::InlineBox(PositionedInlineBox {
                         x,
-                        y: self.line.data.metrics.baseline - inline_box.height,
+                        y: self.line.data.metrics.baseline
+                            - inline_box.baseline.unwrap_or(inline_box.height),
                         width: inline_box.width,
                         height: inline_box.height,
+                        baseline: inline_box.baseline,
                         id: inline_box.id,
                         kind: inline_box.kind,
                     }));
