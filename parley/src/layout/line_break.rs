@@ -610,11 +610,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // and the portion below to its descent. By default (no explicit baseline) the
                     // bottom of the box is aligned with the text baseline, i.e. the box is all
                     // ascent and zero descent. Out-of-flow boxes contribute nothing.
-                    let (width_contribution, ascent_contribution, descent_contribution) =
+                    let (width_contribution, height_contribution, resolved_baseline) =
                         match inline_box.kind {
                             InlineBoxKind::InFlow => {
                                 let baseline = inline_box.baseline.unwrap_or(inline_box.height);
-                                (inline_box.width, baseline, inline_box.height - baseline)
+                                (inline_box.width, inline_box.height, baseline)
                             }
                             InlineBoxKind::OutOfFlow => (0.0, 0.0, 0.0),
                             // If the box is a `CustomOutOfFlow` box then we yield control flow back to the caller.
@@ -627,7 +627,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 }));
                             }
                         };
-                    let height_contribution = ascent_contribution + descent_contribution;
+
+                    let ascent_contribution = resolved_baseline;
+                    let descent_contribution = height_contribution - resolved_baseline;
 
                     // Compute the x position of the content being currently processed
                     let next_x = self.state.line.x + width_contribution;
