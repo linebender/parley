@@ -15,7 +15,7 @@ use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run, RunMetrics,
 };
-use crate::style::Brush;
+use crate::style::{Brush, WhiteSpaceCollapse};
 use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
 
 use core::ops::Range;
@@ -697,6 +697,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let max_height_exceeded = self.state.line.max_height_exceeded;
                         let style = &self.layout.data.styles[cluster.data.style_index as usize];
 
+                        // In `break-spaces` mode, preserved white space gets a soft-wrap
+                        // opportunity after each character and does not "hang" at the end of a
+                        // line (see the handling below).
+                        let is_break_spaces =
+                            style.white_space_collapse == WhiteSpaceCollapse::BreakSpaces;
+
                         // Lag text_wrap_mode style by one cluster
                         let text_wrap_mode = self.state.line.text_wrap_mode;
                         self.state.line.text_wrap_mode = style.text_wrap_mode;
@@ -798,6 +804,16 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             if is_space {
                                 self.state.line.num_spaces += 1;
                             }
+                            // `break-spaces`: a soft-wrap opportunity exists after every preserved
+                            // white space character (including between consecutive spaces). Record
+                            // it here, *after* appending, so the white space stays on the current
+                            // line and the break happens before the following content.
+                            if is_break_spaces
+                                && whitespace != Whitespace::None
+                                && text_wrap_mode == TextWrapMode::Wrap
+                            {
+                                self.state.mark_line_break_opportunity();
+                            }
                         }
                         // Else we attempt to line break:
                         //
@@ -808,7 +824,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             // Case: cluster is a space character (and wrapping is enabled)
                             //
                             // We hang any overflowing whitespace and then line-break.
-                            if is_space && text_wrap_mode == TextWrapMode::Wrap {
+                            //
+                            // In `break-spaces` mode, preserved white space does not hang; instead
+                            // it takes up space and wraps like other content, so we fall through to
+                            // the regular break-opportunity handling below (a soft-wrap opportunity
+                            // was recorded after the preceding preserved white space character).
+                            if is_space && !is_break_spaces && text_wrap_mode == TextWrapMode::Wrap
+                            {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }

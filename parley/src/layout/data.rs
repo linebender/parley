@@ -3,7 +3,7 @@
 
 use crate::inline_box::InlineBox;
 use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
-use crate::style::Brush;
+use crate::style::{Brush, WhiteSpaceCollapse};
 use crate::util::nearly_zero;
 use crate::{FontData, IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode};
 use core::ops::Range;
@@ -223,11 +223,19 @@ impl LineItemData {
             return;
         }
 
+        // In `break-spaces` mode, preserved white space takes up space and does not "hang" at the
+        // end of a line, so it must not be treated as trailing white space.
+        let is_trailing_whitespace = |cluster: &ClusterData| {
+            cluster.info.is_whitespace()
+                && layout_data.styles[cluster.style_index as usize].white_space_collapse
+                    != WhiteSpaceCollapse::BreakSpaces
+        };
+
         self.is_whitespace = true;
         if self.is_rtl() {
             // RTL runs check for "trailing" whitespace at the front.
             for cluster in layout_data.clusters[self.cluster_range.clone()].iter() {
-                if cluster.info.is_whitespace() {
+                if is_trailing_whitespace(cluster) {
                     self.has_trailing_whitespace = true;
                 } else {
                     self.is_whitespace = false;
@@ -239,7 +247,7 @@ impl LineItemData {
                 .iter()
                 .rev()
             {
-                if cluster.info.is_whitespace() {
+                if is_trailing_whitespace(cluster) {
                     self.has_trailing_whitespace = true;
                 } else {
                     self.is_whitespace = false;
@@ -558,11 +566,18 @@ impl<B: Brush> LayoutData<B> {
 
     // TODO: this method does not handle mixed direction text at all.
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
-        fn whitespace_advance(cluster: Option<&ClusterData>) -> f32 {
+        let styles = &self.styles;
+        // `break-spaces` white space is not treated as trailing white space, as it takes up space
+        // and thus contributes to the intrinsic sizes.
+        let whitespace_advance = |cluster: Option<&ClusterData>| -> f32 {
             cluster
-                .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
+                .filter(|cluster| {
+                    cluster.info.whitespace().is_space_or_nbsp()
+                        && styles[cluster.style_index as usize].white_space_collapse
+                            != WhiteSpaceCollapse::BreakSpaces
+                })
                 .map_or(0.0, |cluster| cluster.advance)
-        }
+        };
 
         let mut min_width = 0.0_f32;
         let mut max_width = 0.0_f32;

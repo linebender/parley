@@ -440,6 +440,69 @@ fn leading_whitespace() {
     }
 }
 
+/// Each [`WhiteSpaceCollapse`] mode should preserve or collapse segment breaks (newlines) as
+/// specified, which is observable as the number of hard-broken lines.
+#[test]
+fn white_space_collapse_hard_breaks() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // (mode, text, expected number of lines)
+    let cases = [
+        // Segment breaks are preserved.
+        (WhiteSpaceCollapse::Preserve, "a\nb", 2),
+        (WhiteSpaceCollapse::BreakSpaces, "a\nb", 2),
+        // Segment breaks are collapsed away.
+        (WhiteSpaceCollapse::Collapse, "a\nb", 1),
+        // Segment breaks are preserved, surrounding white space collapsed.
+        (WhiteSpaceCollapse::PreserveBreaks, "a  \n  b", 2),
+        // Segment breaks are converted to spaces.
+        (WhiteSpaceCollapse::PreserveSpaces, "a\nb", 1),
+    ];
+
+    for (mode, text, expected_lines) in cases {
+        let mut builder = env.tree_builder();
+        builder.set_white_space_mode(mode);
+        builder.push_text(text);
+        let (mut layout, _) = builder.build();
+        layout.break_all_lines(None);
+        layout.align(Alignment::Start, AlignmentOptions::default());
+        assert_eq!(
+            layout.len(),
+            expected_lines,
+            "unexpected line count for mode {mode:?} and text {text:?}"
+        );
+    }
+}
+
+/// In `break-spaces` mode, preserved white space at the end of a line takes up space and does not
+/// "hang", so it is not reported as trailing white space and it contributes to the content widths.
+#[test]
+fn break_spaces_preserved_white_space_takes_up_space() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let build = |env: &mut TestEnv, mode| {
+        let mut builder = env.tree_builder();
+        builder.set_white_space_mode(mode);
+        builder.push_text("a b ");
+        let (mut layout, _) = builder.build();
+        layout.break_all_lines(None);
+        layout.align(Alignment::Start, AlignmentOptions::default());
+        let trailing = layout.get(0).unwrap().metrics().trailing_whitespace;
+        (trailing, layout.calculate_content_widths())
+    };
+
+    let (preserve_trailing, preserve_widths) = build(&mut env, WhiteSpaceCollapse::Preserve);
+    let (break_spaces_trailing, break_spaces_widths) =
+        build(&mut env, WhiteSpaceCollapse::BreakSpaces);
+
+    // `Preserve` hangs the trailing space (excluded from the line width); `BreakSpaces` does not.
+    assert!(preserve_trailing > 0.0);
+    assert_eq!(break_spaces_trailing, 0.0);
+
+    // The trailing space contributes to the max-content width only in `break-spaces` mode.
+    assert!(break_spaces_widths.max > preserve_widths.max);
+}
+
 #[test]
 fn nested_span_inheritance() {
     let ts = |c: AlphaColor<Srgb>| TextStyle {

@@ -12,6 +12,12 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 This release has an [MSRV] of 1.88.
 
+### Added
+
+#### Parley
+
+- Support for the `PreserveBreaks`, `PreserveSpaces`, and `BreakSpaces` `WhiteSpaceCollapse` modes, matching the corresponding CSS `white-space-collapse` values.
+
 ### Changed
 
 #### Parley

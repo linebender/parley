@@ -20,10 +20,28 @@ pub use styleset::StyleSet;
 
 use crate::util::nearly_eq;
 
-#[derive(Debug, Clone, Copy)]
+/// Controls how white space and segment breaks (newlines) inside text are collapsed.
+///
+/// This mirrors the CSS [`white-space-collapse`] property.
+///
+/// [`white-space-collapse`]: https://developer.mozilla.org/en-US/docs/Web/CSS/white-space-collapse
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum WhiteSpaceCollapse {
+    /// White space sequences and segment breaks are collapsed.
     Collapse,
+    /// White space sequences and segment breaks are preserved.
+    ///
+    /// This is the default, matching the initial white-space mode of the tree style builder.
+    #[default]
     Preserve,
+    /// White space sequences are collapsed, while segment breaks are preserved.
+    PreserveBreaks,
+    /// White space sequences are preserved, while tabs and segment breaks are converted to spaces.
+    PreserveSpaces,
+    /// Identical to [`Preserve`](Self::Preserve), except that a soft-wrap opportunity exists after
+    /// every preserved white space character, and preserved white space at the end of a line takes
+    /// up space (it does not "hang") and thus contributes to the line's width and intrinsic sizes.
+    BreakSpaces,
 }
 
 /// The height that this text takes up. The default is `MetricsRelative(1.0)`, which is the given
