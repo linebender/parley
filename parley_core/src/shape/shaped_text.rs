@@ -16,7 +16,7 @@ use crate::{
 
 /// A normalized font coordinate.
 ///
-/// This is a 16-bit fixed-point number with a 14-bit frational part. For font coordinates, its
+/// This is a 16-bit fixed-point number with a 14-bit fractional part. For font coordinates, its
 /// useful values are in the range -1.0..=1.0.
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
