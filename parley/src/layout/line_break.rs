@@ -1243,7 +1243,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             {
                 let run_index = self.lines.line_items.len();
                 let cluster = run.range.char_range.end;
-                let text = run.range.char_range.end;
+                let text = run.range.byte_range.end;
                 self.lines.line_items.push(LineItemData {
                     kind: LayoutItemKind::TextRun,
                     index,

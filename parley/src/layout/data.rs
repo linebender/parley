@@ -314,7 +314,7 @@ impl<B: Brush> LayoutData<B> {
     pub(crate) fn finish(&mut self) {
         for (run_index, run_data) in self.runs.iter().enumerate() {
             let cluster_range = self.shaped_text.runs()[run_index].clusters_range.clone();
-            let glyph_range = self.shaped_text.runs()[run_index].clusters_range.clone();
+            let glyph_range = self.shaped_text.runs()[run_index].glyphs_range.clone();
             let word = run_data.word_spacing;
             let letter = run_data.letter_spacing;
             if nearly_zero(word) && nearly_zero(letter) {
