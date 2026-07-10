@@ -12,6 +12,12 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 This release has an [MSRV] of 1.88.
 
+### Added
+
+#### Parley
+
+- Support for the `PreserveBreaks`, `PreserveSpaces`, and `BreakSpaces` `WhiteSpaceCollapse` modes, matching the corresponding CSS `white-space-collapse` values.
+
 ### Changed
 
 #### Parley
@@ -19,6 +25,14 @@ This release has an [MSRV] of 1.88.
 - Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. (#661 by [@tomcur][])
 
 ### Fixed
+
+#### Parley
+
+- Trailing white space now hangs according to the CSS Text Level 4 white space processing rules, which differs per `WhiteSpaceCollapse` mode: it is removed (`Collapse`, `PreserveBreaks`), hangs — conditionally at forced breaks and the last line — (`Preserve`, `PreserveSpaces`), or always takes up space (`BreakSpaces`). This also determines its contribution to the min-content and max-content intrinsic sizes.
+- Per CSS Text Level 4, preserved trailing white space only hangs when wrapping is enabled: under `TextWrapMode::NoWrap` it takes up space instead.
+- A no-break space (U+00A0) is no longer treated as hangable white space: it takes up space at the end of a line like any other visible character, and an overflowing no-break space no longer forces a line break.
+- Hanging white space is no longer considered when measuring a line's contents for fit: an overflowing run of preserved spaces is no longer split across lines. It stays on its line (hanging past the edge), and the line breaks after the run, at a forced break — where only the overflowing part of the run hangs — or at the end of the text.
+- Intrinsic content widths now exclude the entire trailing white space run from the min-content size (previously only the last space was excluded, and none when the run preceded a newline), including for RTL text.
 
 #### Fontique
 

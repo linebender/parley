@@ -15,7 +15,7 @@ use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run, RunMetrics,
 };
-use crate::style::Brush;
+use crate::style::{Brush, EndOfLineWhitespace, WhiteSpaceCollapse};
 use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
 
 use core::ops::Range;
@@ -697,6 +697,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let max_height_exceeded = self.state.line.max_height_exceeded;
                         let style = &self.layout.data.styles[cluster.data.style_index as usize];
 
+                        // In `break-spaces` mode, preserved white space gets a soft-wrap
+                        // opportunity after each character and does not "hang" at the end of a
+                        // line (see the handling below).
+                        let is_break_spaces =
+                            style.white_space_collapse == WhiteSpaceCollapse::BreakSpaces;
+
                         // Lag text_wrap_mode style by one cluster
                         let text_wrap_mode = self.state.line.text_wrap_mode;
                         self.state.line.text_wrap_mode = style.text_wrap_mode;
@@ -798,6 +804,16 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             if is_space {
                                 self.state.line.num_spaces += 1;
                             }
+                            // `break-spaces`: a soft-wrap opportunity exists after every preserved
+                            // white space character (including between consecutive spaces). Record
+                            // it here, *after* appending, so the white space stays on the current
+                            // line and the break happens before the following content.
+                            if is_break_spaces
+                                && whitespace != Whitespace::None
+                                && text_wrap_mode == TextWrapMode::Wrap
+                            {
+                                self.state.mark_line_break_opportunity();
+                            }
                         }
                         // Else we attempt to line break:
                         //
@@ -807,17 +823,31 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         else {
                             // Case: cluster is a space character (and wrapping is enabled)
                             //
-                            // We hang any overflowing whitespace and then line-break.
-                            if is_space && text_wrap_mode == TextWrapMode::Wrap {
+                            // Hanging white space is not considered when measuring the line's
+                            // contents for fit, so an overflowing space must not cause a break by
+                            // itself. We append it to the line (where it will hang) and keep
+                            // consuming the rest of the white space run: the line then breaks at
+                            // the next soft-wrap opportunity (just after the run, before the
+                            // following content), at a forced break — where the white space
+                            // *conditionally* hangs — or at the end of the text.
+                            //
+                            // In `break-spaces` mode, preserved white space does not hang; instead
+                            // it takes up space and wraps like other content, so we fall through to
+                            // the regular break-opportunity handling below (a soft-wrap opportunity
+                            // was recorded after the preceding preserved white space character).
+                            //
+                            // A no-break space is not hangable white space: it is treated like any
+                            // other visible character (and provides no soft-wrap opportunity), so
+                            // it also falls through to the regular handling below.
+                            if whitespace == Whitespace::Space
+                                && !is_break_spaces
+                                && text_wrap_mode == TextWrapMode::Wrap
+                            {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
                                 self.state.append_cluster_to_line(next_x, metrics);
-                                return self.start_new_line(
-                                    BreakReason::Regular,
-                                    max_advance,
-                                    line_indent,
-                                );
+                                continue;
                             }
                             // Case: we have previously encountered a REGULAR line-breaking opportunity in the current line
                             //
@@ -1151,26 +1181,46 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         // Compute size of line's trailing whitespace. "Trailing" is considered the right edge
         // for LTR text and the left edge for RTL text.
+        //
+        // How much of the trailing white space "hangs" (i.e. is excluded from the line's used
+        // width and alignment) depends on the white-space-collapse mode (see
+        // `EndOfLineWhitespace`). Removed and (unconditionally) hanging white space is fully
+        // excluded; white space that only *conditionally* hangs (preserved white space at a forced
+        // break or the last line) is excluded only insofar as it overflows the line.
         let run = if self.layout.is_rtl() {
             self.lines.line_items[line.item_range.clone()].first()
         } else {
             self.lines.line_items[line.item_range.clone()].last()
         };
+        let break_reason = line.break_reason;
+        let line_max_advance = line.max_advance;
+        let line_advance = line.metrics.advance;
         line.metrics.trailing_whitespace = run
             .filter(|item| item.is_text_run() && item.has_trailing_whitespace)
             .map(|run| {
-                fn whitespace_advance<'c, I: Iterator<Item = &'c ClusterData>>(clusters: I) -> f32 {
-                    clusters
-                        .take_while(|cluster| cluster.info.whitespace() != Whitespace::None)
-                        .map(|cluster| cluster.advance)
-                        .sum()
-                }
-
+                let styles = &self.layout.data.styles;
                 let clusters = &self.layout.data.clusters[run.cluster_range.clone()];
-                if run.is_rtl() {
-                    whitespace_advance(clusters.iter())
+                let (ws_advance, end_of_line) = if run.is_rtl() {
+                    trailing_whitespace_advance(clusters.iter(), styles)
                 } else {
-                    whitespace_advance(clusters.iter().rev())
+                    trailing_whitespace_advance(clusters.iter().rev(), styles)
+                };
+                match end_of_line {
+                    // White space that takes up space (`break-spaces`, or preserved white space
+                    // under `nowrap`) never hangs. (Normally unreachable, as such clusters are not
+                    // reported as trailing white space.)
+                    EndOfLineWhitespace::TakesUpSpace => 0.0,
+                    // Removed white space always hangs (it is conceptually removed entirely).
+                    EndOfLineWhitespace::Remove => ws_advance,
+                    EndOfLineWhitespace::Hang => match break_reason {
+                        // Soft wrap: the preserved white space hangs unconditionally.
+                        BreakReason::Regular | BreakReason::Emergency => ws_advance,
+                        // Forced break or last line (end of block): the white space only
+                        // *conditionally* hangs, i.e. only the part that overflows the line hangs.
+                        BreakReason::Explicit | BreakReason::None => {
+                            (line_advance - line_max_advance).clamp(0.0, ws_advance)
+                        }
+                    },
                 }
             })
             .unwrap_or(0.0);
@@ -1361,6 +1411,40 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
         // Save the computed lines to the layout
         self.lines.swap(&mut self.layout.data);
     }
+}
+
+/// Sums the advance of the run of trailing white space yielded by `clusters` (which must iterate
+/// from the trailing edge of the line inward), and returns it along with the
+/// [`EndOfLineWhitespace`] behavior of the cluster at the very trailing edge.
+///
+/// A no-break space is not hangable white space (it is treated like any other visible character),
+/// so it terminates the trailing white space run.
+fn trailing_whitespace_advance<'c, B: Brush>(
+    clusters: impl Iterator<Item = &'c ClusterData>,
+    styles: &[crate::layout::Style<B>],
+) -> (f32, EndOfLineWhitespace) {
+    let mut advance = 0.0;
+    // Overwritten by the trailing-edge (first-yielded) white space cluster below. The default is
+    // only used if there is no trailing white space, in which case the advance is zero anyway.
+    let mut end_of_line = EndOfLineWhitespace::Remove;
+    for (i, cluster) in clusters
+        .take_while(|cluster| {
+            !matches!(
+                cluster.info.whitespace(),
+                Whitespace::None | Whitespace::NoBreakSpace
+            )
+        })
+        .enumerate()
+    {
+        advance += cluster.advance;
+        if i == 0 {
+            let style = &styles[cluster.style_index as usize];
+            end_of_line = style
+                .white_space_collapse
+                .end_of_line_whitespace(style.text_wrap_mode);
+        }
+    }
+    (advance, end_of_line)
 }
 
 fn commit_line<B: Brush>(

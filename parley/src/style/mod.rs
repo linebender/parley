@@ -20,10 +20,78 @@ pub use styleset::StyleSet;
 
 use crate::util::nearly_eq;
 
-#[derive(Debug, Clone, Copy)]
+/// Controls how white space and segment breaks (newlines) inside text are collapsed.
+///
+/// This mirrors the CSS [`white-space-collapse`] property from [CSS Text Level 4].
+///
+/// [`white-space-collapse`]: https://drafts.csswg.org/css-text-4/#white-space-collapsing
+/// [CSS Text Level 4]: https://drafts.csswg.org/css-text-4/
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum WhiteSpaceCollapse {
+    /// White space sequences and segment breaks are collapsed.
     Collapse,
+    /// White space sequences and segment breaks are preserved.
+    ///
+    /// This is the default, matching the initial white-space mode of the tree style builder.
+    #[default]
     Preserve,
+    /// White space sequences are collapsed, while segment breaks are preserved.
+    PreserveBreaks,
+    /// White space sequences are preserved, while tabs and segment breaks are converted to spaces.
+    PreserveSpaces,
+    /// Identical to [`Preserve`](Self::Preserve), except that a soft-wrap opportunity exists after
+    /// every preserved white space character, and preserved white space at the end of a line takes
+    /// up space (it does not "hang") and thus contributes to the line's width and intrinsic sizes.
+    BreakSpaces,
+}
+
+impl WhiteSpaceCollapse {
+    /// How white space at the end of a line behaves for this mode, per step 4 of the CSS Text
+    /// Level 4 [Phase II white space processing rules].
+    ///
+    /// Whether preserved white space hangs depends on the `text-wrap-mode` that applies to it:
+    /// with `nowrap` it is not hung and instead takes up space. (Level 4 leaves `preserve-spaces`
+    /// undefined here; it is treated like `preserve`, consistent with its Phase I grouping.)
+    ///
+    /// [Phase II white space processing rules]: https://drafts.csswg.org/css-text-4/#white-space-phase-2
+    pub(crate) fn end_of_line_whitespace(
+        self,
+        text_wrap_mode: TextWrapMode,
+    ) -> EndOfLineWhitespace {
+        match self {
+            // Collapsible trailing white space is removed / hangs unconditionally (regardless of
+            // the text-wrap-mode).
+            Self::Collapse | Self::PreserveBreaks => EndOfLineWhitespace::Remove,
+            // Preserved trailing white space hangs (conditionally at forced breaks), but only
+            // when wrapping is enabled; under `nowrap` (CSS `white-space: pre`) it is simply
+            // preserved and takes up space.
+            Self::Preserve | Self::PreserveSpaces => match text_wrap_mode {
+                TextWrapMode::Wrap => EndOfLineWhitespace::Hang,
+                TextWrapMode::NoWrap => EndOfLineWhitespace::TakesUpSpace,
+            },
+            // Preserved trailing white space always takes up space.
+            Self::BreakSpaces => EndOfLineWhitespace::TakesUpSpace,
+        }
+    }
+}
+
+/// How a run of white space at the end of a line is treated, which determines whether it "hangs"
+/// (is excluded from the line's used width, alignment, and intrinsic sizes).
+///
+/// See [`WhiteSpaceCollapse::end_of_line_whitespace`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EndOfLineWhitespace {
+    /// The trailing white space is removed or hangs unconditionally: excluded from the used width,
+    /// the min-content size, and the max-content size (`collapse`, `preserve-breaks`).
+    Remove,
+    /// The trailing white space hangs: excluded from the used width at soft wraps and from the
+    /// min-content size, but counted in the max-content size. At a forced line break or the last
+    /// line it *conditionally* hangs — only the part that overflows the line is excluded
+    /// (`preserve` and `preserve-spaces` when wrapping is enabled).
+    Hang,
+    /// The trailing white space never hangs: it always takes up space and is counted everywhere
+    /// (`break-spaces`, and `preserve`/`preserve-spaces` under `nowrap`).
+    TakesUpSpace,
 }
 
 /// The height that this text takes up. The default is `MetricsRelative(1.0)`, which is the given
