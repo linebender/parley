@@ -108,8 +108,8 @@ fn render_frame(
                     if let Some(decoration) = &style.underline {
                         let offset = decoration
                             .offset
-                            .unwrap_or(run.metrics().font.underline_offset);
-                        let size = decoration.size.unwrap_or(run.metrics().font.underline_size);
+                            .unwrap_or(run.font_metrics().underline_offset);
+                        let size = decoration.size.unwrap_or(run.font_metrics().underline_size);
 
                         stats.start("render_underline");
                         render_decoration(renderer, &decoration.brush, &glyph_run, offset, size);
@@ -118,10 +118,10 @@ fn render_frame(
                     if let Some(decoration) = &style.strikethrough {
                         let offset = decoration
                             .offset
-                            .unwrap_or(run.metrics().font.strikethrough_offset);
+                            .unwrap_or(run.font_metrics().strikethrough_offset);
                         let size = decoration
                             .size
-                            .unwrap_or(run.metrics().font.strikethrough_size);
+                            .unwrap_or(run.font_metrics().strikethrough_size);
 
                         stats.start("render_strikethrough");
                         render_decoration(renderer, &decoration.brush, &glyph_run, offset, size);

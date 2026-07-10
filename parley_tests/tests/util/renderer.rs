@@ -446,8 +446,8 @@ fn render_glyph_run_impl(
     if let Some(decoration) = &style.underline {
         let underline_offset = decoration
             .offset
-            .unwrap_or(run.metrics().font.underline_offset);
-        let size = decoration.size.unwrap_or(run.metrics().font.underline_size);
+            .unwrap_or(run.font_metrics().underline_offset);
+        let size = decoration.size.unwrap_or(run.font_metrics().underline_size);
 
         renderer.set_paint(decoration.brush.color);
         let x = glyph_run.offset() + x_offset;
@@ -467,10 +467,10 @@ fn render_glyph_run_impl(
     if let Some(decoration) = &style.strikethrough {
         let strikethrough_offset = decoration
             .offset
-            .unwrap_or(run.metrics().font.strikethrough_offset);
+            .unwrap_or(run.font_metrics().strikethrough_offset);
         let size = decoration
             .size
-            .unwrap_or(run.metrics().font.strikethrough_size);
+            .unwrap_or(run.font_metrics().strikethrough_size);
 
         // Strikethrough uses simple rect (doesn't skip ink)
         let y = glyph_run.baseline() as f64 - strikethrough_offset as f64 + y_offset as f64;

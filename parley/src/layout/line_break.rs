@@ -11,14 +11,14 @@ use core_maths::CoreFloat;
 
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
-    LineMetrics, Run, RunMetrics,
+    LineMetrics, Run,
 };
 use crate::style::Brush;
 use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
 
 use core::ops::Range;
-use parley_core::Boundary;
 use parley_core::shape::{ClusterData, Whitespace};
+use parley_core::{Boundary, FontMetrics};
 
 #[derive(Default)]
 struct LineLayout {
@@ -116,14 +116,14 @@ impl LineBoxMetrics {
         self.line_box.over + self.line_box.under
     }
 
-    fn add_text(&mut self, metrics: &RunMetrics, quantize: bool) {
+    fn add_text(&mut self, metrics: &FontMetrics, line_height: f32, quantize: bool) {
         // TODO: perhaps precompute these run metrics and store in `RunMetrics`.
         let (ascent, descent) = if quantize {
-            (metrics.font.ascent.round(), metrics.font.descent.round())
+            (metrics.ascent.round(), metrics.descent.round())
         } else {
-            (metrics.font.ascent, metrics.font.descent)
+            (metrics.ascent, metrics.descent)
         };
-        let half_leading = (metrics.line_height - (ascent + descent)) / 2.;
+        let half_leading = (line_height - (ascent + descent)) / 2.;
         let over = if quantize {
             ascent + half_leading.floor()
         } else {
@@ -132,7 +132,7 @@ impl LineBoxMetrics {
         // Note the `under` part is *not* quantized. This is such that the exact line height is
         // reached. For determining the line box block, add this to the baseline and then quantize
         // by rounding.
-        let under = metrics.line_height - over;
+        let under = line_height - over;
 
         self.line_box.over = self.line_box.over.max(over);
         self.line_box.under = self.line_box.under.max(under);
@@ -296,12 +296,20 @@ impl BreakerState {
     /// they extend above and below the baseline, *not* including leading) as well as the intrinsic
     /// line height of the cluster(s) (i.e. including the full leading), which may be smaller than
     /// `ascent + descent` when the leading is negative.
-    pub fn append_cluster_to_line(&mut self, next_x: f32, metrics: &RunMetrics, quantize: bool) {
+    pub fn append_cluster_to_line(
+        &mut self,
+        next_x: f32,
+        font_metrics: &FontMetrics,
+        line_height: f32,
+        quantize: bool,
+    ) {
         self.line.items.end = self.item_idx + 1;
         self.line.clusters.end = self.cluster_idx + 1;
         self.cluster_idx += 1;
         self.line.x = next_x;
-        self.line.box_metrics.add_text(metrics, quantize);
+        self.line
+            .box_metrics
+            .add_text(font_metrics, line_height, quantize);
         self.update_max_height_exceeded();
     }
 
@@ -701,8 +709,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let is_newline = whitespace == Whitespace::Newline;
                         let is_space = whitespace.is_space_or_nbsp();
                         let boundary = cluster.info().boundary();
-                        let metrics = run.metrics();
-                        let line_height = metrics.line_height;
+                        let metrics = run.font_metrics();
+                        let line_height = run.data.line_height;
                         let max_height_exceeded = self.state.line.max_height_exceeded;
                         let style = &self.layout.data.styles[cluster.data.style_index as usize];
 
@@ -759,6 +767,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.state.append_cluster_to_line(
                                 self.state.line.x,
                                 metrics,
+                                line_height,
                                 self.layout.data.quantize,
                             );
 
@@ -810,6 +819,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.state.append_cluster_to_line(
                                 next_x,
                                 metrics,
+                                line_height,
                                 self.layout.data.quantize,
                             );
                             if is_space {
@@ -832,6 +842,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 self.state.append_cluster_to_line(
                                     next_x,
                                     metrics,
+                                    line_height,
                                     self.layout.data.quantize,
                                 );
                                 return self.start_new_line(
@@ -879,6 +890,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 self.state.append_cluster_to_line(
                                     next_x,
                                     metrics,
+                                    line_height,
                                     self.layout.data.quantize,
                                 );
                             }
@@ -1001,10 +1013,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         } else {
                             self.state.line.x + advance
                         };
-                        let metrics = run.metrics();
+                        let metrics = run.font_metrics();
                         self.state.append_cluster_to_line(
                             next_x,
                             metrics,
+                            run.data.line_height,
                             self.layout.data.quantize,
                         );
                         char_count += 1;

@@ -406,14 +406,14 @@ impl Editor {
                 // https://drafts.csswg.org/css-text-decor/#painting-order
                 if let Some(underline) = &style.underline {
                     let underline_brush = &style.brush;
-                    let run_metrics = glyph_run.run().metrics();
+                    let run_metrics = glyph_run.run().font_metrics();
                     let offset = match underline.offset {
                         Some(offset) => offset,
-                        None => run_metrics.font.underline_offset,
+                        None => run_metrics.underline_offset,
                     };
                     let width = match underline.size {
                         Some(size) => size,
-                        None => run_metrics.font.underline_size,
+                        None => run_metrics.underline_size,
                     };
                     // The `offset` is the distance from the baseline to the top of the underline
                     // so we move the line down by half the width
@@ -468,21 +468,20 @@ impl Editor {
                     );
                 if let Some(strikethrough) = &style.strikethrough {
                     let strikethrough_brush = &style.brush;
-                    let run_metrics = glyph_run.run().metrics();
+                    let run_metrics = glyph_run.run().font_metrics();
                     let offset = match strikethrough.offset {
                         Some(offset) => offset,
-                        None => run_metrics.font.strikethrough_offset,
+                        None => run_metrics.strikethrough_offset,
                     };
                     let width = match strikethrough.size {
                         Some(size) => size,
-                        None => run_metrics.font.strikethrough_size,
+                        None => run_metrics.strikethrough_size,
                     };
                     // The `offset` is the distance from the baseline to the *top* of the strikethrough
                     // so we calculate the middle y-position of the strikethrough based on the font's
                     // standard strikethrough width.
                     // Remember that we are using a y-down coordinate system
-                    let y =
-                        glyph_run.baseline() - offset + run_metrics.font.strikethrough_size / 2.;
+                    let y = glyph_run.baseline() - offset + run_metrics.strikethrough_size / 2.;
 
                     let line = Line::new(
                         (glyph_run.offset() as f64, y as f64),

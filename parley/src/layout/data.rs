@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::inline_box::InlineBox;
-use crate::layout::{ContentWidths, LineMetrics, RunMetrics, Style};
+use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
 use crate::util::nearly_zero;
@@ -20,8 +20,8 @@ pub(crate) struct RunData {
     pub(crate) font_attrs: fontique::Attributes,
     /// Synthesis for rendering (contains variation settings)
     pub(crate) synthesis: fontique::Synthesis,
-    /// Metrics for the run.
-    pub(crate) metrics: RunMetrics,
+    /// The line height
+    pub line_height: f32,
     /// Additional word spacing.
     pub(crate) word_spacing: f32,
     /// Additional letter spacing.
@@ -270,10 +270,10 @@ impl<B: Brush> LayoutData<B> {
         );
         let style_index = self.shaped_text.clusters()[shaped_run.clusters_range.start].style_index;
 
-        let metrics = {
+        let line_height = {
             // Compute line height
             let style = &self.styles[style_index as usize];
-            let line_height = match style.line_height {
+            match style.line_height {
                 LineHeight::Absolute(value) => value,
                 LineHeight::FontSizeRelative(value) => value * shaped_run.font_size,
                 LineHeight::MetricsRelative(value) => {
@@ -282,11 +282,6 @@ impl<B: Brush> LayoutData<B> {
                         + shaped_run.font_metrics.leading)
                         * value
                 }
-            };
-
-            RunMetrics {
-                font: shaped_run.font_metrics,
-                line_height,
             }
         };
 
@@ -298,7 +293,7 @@ impl<B: Brush> LayoutData<B> {
                 style: run_style.font_style,
             },
             synthesis: font.synthesis,
-            metrics,
+            line_height,
             word_spacing,
             letter_spacing,
         };

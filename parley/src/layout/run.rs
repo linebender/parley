@@ -84,8 +84,13 @@ impl<'a, B: Brush> Run<'a, B> {
     }
 
     /// Returns metrics for the run.
-    pub fn metrics(&self) -> &RunMetrics {
-        &self.data.metrics
+    pub fn font_metrics(&self) -> &FontMetrics {
+        &self.shaped.font_metrics
+    }
+
+    /// This run's line height.
+    pub fn line_height(&self) -> f32 {
+        self.data.line_height
     }
 
     /// Returns the advance for the run.
@@ -229,13 +234,4 @@ impl<'a, B: Brush> Iterator for Clusters<'a, B> {
             data: self.run.layout.data.shaped_text.clusters().get(index)?,
         })
     }
-}
-
-/// Metrics information for a run.
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct RunMetrics {
-    /// Metrics that apply to the glyphs of this run's font.
-    pub font: FontMetrics,
-    /// The line height
-    pub line_height: f32,
 }

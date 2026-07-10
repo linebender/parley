@@ -267,21 +267,17 @@ fn render_glyph_run(
 
     // Draw decorations: underline & strikethrough
     let style = glyph_run.style();
-    let run_metrics = run.metrics();
+    let run_metrics = run.font_metrics();
     if let Some(decoration) = &style.underline {
-        let offset = decoration
-            .offset
-            .unwrap_or(run_metrics.font.underline_offset);
-        let size = decoration.size.unwrap_or(run_metrics.font.underline_size);
+        let offset = decoration.offset.unwrap_or(run_metrics.underline_offset);
+        let size = decoration.size.unwrap_or(run_metrics.underline_size);
         render_decoration(img, glyph_run, decoration.brush, offset, size, padding);
     }
     if let Some(decoration) = &style.strikethrough {
         let offset = decoration
             .offset
-            .unwrap_or(run_metrics.font.strikethrough_offset);
-        let size = decoration
-            .size
-            .unwrap_or(run_metrics.font.strikethrough_size);
+            .unwrap_or(run_metrics.strikethrough_offset);
+        let size = decoration.size.unwrap_or(run_metrics.strikethrough_size);
         render_decoration(img, glyph_run, decoration.brush, offset, size, padding);
     }
 }
