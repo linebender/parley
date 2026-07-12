@@ -4,12 +4,13 @@
 use crate::layout::Style;
 use crate::layout::data::BreakReason;
 use crate::layout::data::{LayoutItemKind, LineData};
-use crate::layout::glyph::Glyph;
 use crate::layout::layout::Layout;
 use crate::layout::run::Run;
 use crate::style::Brush;
 use crate::{InlineBox, InlineBoxKind};
+
 use core::ops::Range;
+use parley_core::Glyph;
 
 /// Line in a text layout.
 #[derive(Copy, Clone)]

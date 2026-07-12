@@ -44,12 +44,12 @@ core_maths = { version = "0.1.1", optional = true }
 accesskit = { workspace = true, optional = true }
 hashbrown = { workspace = true }
 harfrust = { workspace = true }
-icu_normalizer = { workspace = true, features = ["compiled_data"] }
-icu_properties = { workspace = true, features = ["compiled_data"] }
 
 [dev-dependencies]
 parley_dev = { workspace = true }
 peniko = { workspace = true }
+
+icu_properties = { workspace = true, features = ["compiled_data"] }
 
 # We special-case android targets because oxipng doesn't build in Android CI.
 [target.'cfg(not(target_os = "android"))'.dev-dependencies]

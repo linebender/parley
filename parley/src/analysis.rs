@@ -1,14 +1,11 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-pub(crate) mod cluster;
-
 use crate::{Brush, LayoutContext};
 
-use icu_properties::props::{GeneralCategory, Script};
 use parley_core::break_overrides::LineBreakOverrideFn;
 
-use parley_core::{AnalysisDataSources, AnalysisOptions};
+use parley_core::AnalysisOptions;
 
 use parlance::WordBreak;
 
@@ -33,23 +30,4 @@ pub(crate) fn analyze_text<B: Brush>(
         line_break_override,
     };
     lcx.analyzer.analyze(text, &options, &mut lcx.analysis);
-}
-
-/// All characters contribute to shaping except:
-/// - Control characters
-/// - Format characters, unless they use the "Inherited" script
-// TODO: this function is duplicated at the time of writing, as it also exists in `parley_core`.
-// Once more of `parley` is moved to `parley_core`, this function should be removable.
-#[inline(always)]
-pub(crate) fn contributes_to_shaping(general_category: GeneralCategory, script: Script) -> bool {
-    if matches!(
-        general_category,
-        GeneralCategory::Control
-            | GeneralCategory::LineSeparator
-            | GeneralCategory::ParagraphSeparator
-    ) {
-        return false;
-    }
-
-    !(general_category == GeneralCategory::Format && script != Script::Inherited)
 }

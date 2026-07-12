@@ -2898,7 +2898,6 @@ dependencies = [
  "fontique",
  "harfrust",
  "hashbrown 0.17.1",
- "icu_normalizer",
  "icu_properties",
  "linebender_resource_handle",
  "oxipng",
@@ -2922,6 +2921,9 @@ dependencies = [
 name = "parley_core"
 version = "0.11.0"
 dependencies = [
+ "fontique",
+ "harfrust",
+ "hashbrown 0.17.1",
  "icu_normalizer",
  "icu_properties",
  "icu_segmenter",

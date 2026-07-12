@@ -1,6 +1,9 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+#![expect(missing_docs, reason = "Deferred")]
+#![expect(missing_debug_implementations, reason = "Deferred")]
+
 use alloc::vec::Vec;
 use icu_normalizer::properties::Decomposed;
 
@@ -10,13 +13,13 @@ use crate::analysis::AnalysisDataSources;
 const MAX_CLUSTER_SIZE: usize = 32;
 
 #[derive(Debug, Default)]
-pub(crate) struct CharCluster {
-    pub chars: Vec<Char>,
-    pub is_emoji: bool,
-    pub map_len: u8,
-    pub start: u32,
-    pub end: u32,
-    pub force_normalize: bool,
+pub struct CharCluster {
+    pub(crate) chars: Vec<Char>,
+    pub(crate) is_emoji: bool,
+    pub(crate) map_len: u8,
+    pub(crate) start: u32,
+    pub(crate) end: u32,
+    pub(crate) force_normalize: bool,
     comp: Form,
     decomp: Form,
     form: FormKind,
@@ -24,23 +27,34 @@ pub(crate) struct CharCluster {
 }
 
 impl CharCluster {
-    pub(crate) fn range(&self) -> SourceRange {
+    #[inline]
+    pub fn range(&self) -> SourceRange {
         SourceRange {
             start: self.start,
             end: self.end,
         }
     }
+
+    #[inline(always)]
+    pub fn chars(&self) -> &[Char] {
+        &self.chars
+    }
+
+    #[inline(always)]
+    pub fn is_emoji(&self) -> bool {
+        self.is_emoji
+    }
 }
 
 /// Source range of a cluster in code units.
 #[derive(Copy, Clone)]
-pub(crate) struct SourceRange {
+pub struct SourceRange {
     pub start: u32,
     pub end: u32,
 }
 
 #[derive(Copy, Clone, Debug, Default)]
-pub(crate) struct Char {
+pub struct Char {
     /// The character.
     pub ch: char,
     /// Whether the character
@@ -59,7 +73,7 @@ pub(crate) type GlyphId = u16;
 /// Whitespace content of a cluster.
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
 #[repr(u8)]
-pub(crate) enum Whitespace {
+pub enum Whitespace {
     /// Not a space.
     None = 0,
     /// Standard space.
@@ -74,14 +88,15 @@ pub(crate) enum Whitespace {
 
 impl Whitespace {
     /// Returns true for space or no break space.
-    pub(crate) fn is_space_or_nbsp(self) -> bool {
+    #[inline]
+    pub fn is_space_or_nbsp(self) -> bool {
         matches!(self, Self::Space | Self::NoBreakSpace)
     }
 }
 
 /// Iterative status of mapping a character cluster to nominal glyph identifiers.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub(crate) enum Status {
+pub enum Status {
     /// Mapping should be skipped.
     Discard,
     /// The best mapping so far.
@@ -91,6 +106,7 @@ pub(crate) enum Status {
 }
 
 impl CharCluster {
+    #[inline]
     pub(crate) fn clear(&mut self) {
         self.chars.clear();
         self.is_emoji = false;
@@ -111,7 +127,7 @@ impl CharCluster {
 
     /// Returns the primary style index for the cluster.
     #[inline(always)]
-    pub(crate) fn style_index(&self) -> u16 {
+    pub fn style_index(&self) -> u16 {
         self.chars[0].style_index
     }
 
@@ -195,7 +211,7 @@ impl CharCluster {
         }
     }
 
-    pub(crate) fn map(
+    pub fn map(
         &mut self,
         f: impl Fn(char) -> GlyphId,
         analysis_data_sources: &AnalysisDataSources,
@@ -211,7 +227,7 @@ impl CharCluster {
             ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
-                self.form = FormKind::NFC;
+                self.form = FormKind::Nfc;
                 if ratio >= 1. {
                     return Status::Complete;
                 }
@@ -234,7 +250,7 @@ impl CharCluster {
             ratio = self.decomp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
-                self.form = FormKind::NFD;
+                self.form = FormKind::Nfd;
                 if ratio >= 1. {
                     return Status::Complete;
                 }
@@ -243,7 +259,7 @@ impl CharCluster {
                 ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
                 if ratio > self.best_ratio {
                     self.best_ratio = ratio;
-                    self.form = FormKind::NFC;
+                    self.form = FormKind::Nfc;
                     if ratio >= 1. {
                         return Status::Complete;
                     }
@@ -259,12 +275,11 @@ impl CharCluster {
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-#[allow(clippy::upper_case_acronyms)]
 enum FormKind {
     #[default]
     Original,
-    NFD,
-    NFC,
+    Nfd,
+    Nfc,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -314,6 +329,7 @@ impl Form {
     }
 
     #[inline(always)]
+    #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     fn setup(&mut self) {
         self.map_len = (self
             .chars()

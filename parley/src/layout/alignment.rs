@@ -1,12 +1,11 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::{
-    BreakReason,
-    data::{ClusterData, LineItemData},
-};
+use super::{BreakReason, data::LineItemData};
 use crate::data::LayoutData;
 use crate::style::Brush;
+
+use parley_core::shape::ClusterData;
 
 /// Alignment of a layout.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]

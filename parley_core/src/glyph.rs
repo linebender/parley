@@ -3,6 +3,7 @@
 
 /// Glyph with an offset and advance.
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
+#[expect(missing_docs, reason = "Deferred")]
 pub struct Glyph {
     pub id: u32,
     pub x: f32,

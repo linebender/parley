@@ -1,9 +1,9 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::FontVariation;
 use alloc::boxed::Box;
 use hashbrown::Equivalent;
+use parlance::FontVariation;
 
 #[derive(PartialEq, Copy, Clone)]
 pub(crate) struct ShapeDataKey {
