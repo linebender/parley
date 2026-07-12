@@ -37,7 +37,7 @@ use crate::{FontInstance, itemize::TextRange};
 /// rendered with a single font.
 ///
 /// This struct will change shape, as it's currently provided in the callback of
-/// [`crate::ShapeContext::shape_item`], but will become an encoding of a run within a larger
+/// [`crate::Shaper::shape_item`], but will become an encoding of a run within a larger
 /// `parley_core::ShapedText`.
 #[derive(Clone, Debug)]
 pub struct ShapedRun<'a> {

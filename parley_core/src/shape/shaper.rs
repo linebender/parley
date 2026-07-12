@@ -51,8 +51,7 @@ pub struct FontInstance {
 }
 
 /// Reusable scratch to shape [items][`Item`] into shaped text using [`Self::shape_item`].
-// TODO: rename to `Shaper`
-pub struct ShapeContext {
+pub struct Shaper {
     shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::ShaperData>,
     shape_instance_cache: LruCache<cache::ShapeInstanceId, harfrust::ShaperInstance>,
     shape_plan_cache: LruCache<cache::ShapePlanId, harfrust::ShapePlan>,
@@ -61,7 +60,7 @@ pub struct ShapeContext {
     char_cluster: CharCluster,
 }
 
-impl Default for ShapeContext {
+impl Default for Shaper {
     fn default() -> Self {
         const MAX_ENTRIES: usize = 16;
         Self {
@@ -75,13 +74,13 @@ impl Default for ShapeContext {
     }
 }
 
-impl core::fmt::Debug for ShapeContext {
+impl core::fmt::Debug for Shaper {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("ShapeContext").finish_non_exhaustive()
+        f.debug_struct("Shaper").finish_non_exhaustive()
     }
 }
 
-impl ShapeContext {
+impl Shaper {
     /// Shape an [`Item`] produced by [`Analysis::itemize`] into glyphs.
     ///
     /// The item is broken into runs of maximal sequences of character clusters for which
@@ -134,7 +133,7 @@ impl ShapeContext {
 }
 
 fn shape_item(
-    scx: &mut ShapeContext,
+    scx: &mut Shaper,
     text: &str,
     item: &Item,
     options: &ShapeOptions<'_>,

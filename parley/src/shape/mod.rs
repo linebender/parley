@@ -5,7 +5,7 @@
 //! and `icu` for text analysis.
 
 use parley_core::shape::{CharCluster, Status};
-use parley_core::{Analysis, AnalysisDataSources, FontInstance, ShapeContext, ShapeOptions};
+use parley_core::{Analysis, AnalysisDataSources, FontInstance, ShapeOptions, Shaper};
 
 use super::layout::Layout;
 use super::resolve::{ResolveContext, ResolvedStyle};
@@ -26,7 +26,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     inline_boxes: &[InlineBox],
     analysis: &Analysis,
     char_style_indices: &[u16],
-    scx: &mut ShapeContext,
+    scx: &mut Shaper,
     mut text: &str,
     layout: &mut Layout<B>,
     analysis_data_sources: &AnalysisDataSources,
