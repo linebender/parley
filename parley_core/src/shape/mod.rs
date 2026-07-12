@@ -17,6 +17,7 @@ pub use data::{ClusterData, ClusterInfo, to_whitespace};
 /// Rebuilds the provided `char_cluster` in-place using the existing allocation
 /// for the given grapheme `segment_text`, consuming items from `item_infos_iter`.
 #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
+#[inline]
 fn fill_cluster_in_place(
     segment_text: &str,
     item_infos_iter: &mut impl Iterator<Item = (CharInfo, u16)>,
