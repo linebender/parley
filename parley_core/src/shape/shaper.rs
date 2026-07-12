@@ -233,7 +233,7 @@ fn shape_item(
             || {
                 harfrust::ShaperInstance::from_variations(
                     &font_ref,
-                    variations_iter(&font.synthesis, Some(options.variations)),
+                    variations_iter(&font.synthesis, options.variations),
                 )
             },
         );
@@ -336,9 +336,10 @@ fn shape_item(
     }
 }
 
+#[inline]
 fn variations_iter<'a>(
     synthesis: &'a fontique::Synthesis,
-    item: Option<&'a [FontVariation]>,
+    item: &'a [FontVariation],
 ) -> impl Iterator<Item = harfrust::Variation> + 'a {
     synthesis
         .variation_settings()
@@ -347,14 +348,10 @@ fn variations_iter<'a>(
             tag: *tag,
             value: *value,
         })
-        .chain(
-            item.unwrap_or(&[])
-                .iter()
-                .map(|variation| harfrust::Variation {
-                    tag: harfrust::Tag::new(&variation.tag.to_bytes()),
-                    value: variation.value,
-                }),
-        )
+        .chain(item.iter().map(|variation| harfrust::Variation {
+            tag: harfrust::Tag::new(&variation.tag.to_bytes()),
+            value: variation.value,
+        }))
 }
 
 pub(crate) fn script_to_harfrust(script: fontique::Script) -> harfrust::Script {
