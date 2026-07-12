@@ -48,7 +48,7 @@ pub struct ClusterInfo {
 }
 
 impl ClusterInfo {
-    #[inline]
+    #[inline(always)]
     pub fn new(boundary: Boundary, source_char: char) -> Self {
         Self {
             boundary,
@@ -57,13 +57,13 @@ impl ClusterInfo {
     }
 
     // Returns the boundary type of the cluster.
-    #[inline]
+    #[inline(always)]
     pub fn boundary(self) -> Boundary {
         self.boundary
     }
 
     // Returns the whitespace type of the cluster.
-    #[inline]
+    #[inline(always)]
     pub fn whitespace(self) -> Whitespace {
         to_whitespace(self.source_char)
     }
@@ -82,13 +82,13 @@ impl ClusterInfo {
     }
 
     /// Returns if the cluster is any whitespace.
-    #[inline]
+    #[inline(always)]
     pub fn is_whitespace(self) -> bool {
         self.source_char.is_whitespace()
     }
 
     /// Returns the cluster's original character.
-    #[inline]
+    #[inline(always)]
     pub fn source_char(self) -> char {
         self.source_char
     }
