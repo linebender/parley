@@ -14,12 +14,12 @@ const MAX_CLUSTER_SIZE: usize = 32;
 
 #[derive(Debug, Default)]
 pub struct CharCluster {
-    pub chars: Vec<Char>,
-    pub is_emoji: bool,
-    pub map_len: u8,
-    pub start: u32,
-    pub end: u32,
-    pub force_normalize: bool,
+    pub(crate) chars: Vec<Char>,
+    pub(crate) is_emoji: bool,
+    pub(crate) map_len: u8,
+    pub(crate) start: u32,
+    pub(crate) end: u32,
+    pub(crate) force_normalize: bool,
     comp: Form,
     decomp: Form,
     form: FormKind,
@@ -33,6 +33,16 @@ impl CharCluster {
             start: self.start,
             end: self.end,
         }
+    }
+
+    #[inline(always)]
+    pub fn chars(&self) -> &[Char] {
+        &self.chars
+    }
+
+    #[inline(always)]
+    pub fn is_emoji(&self) -> bool {
+        self.is_emoji
     }
 }
 

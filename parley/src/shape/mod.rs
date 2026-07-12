@@ -216,7 +216,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         analysis_data_sources: &AnalysisDataSources,
     ) -> Option<SelectedFont> {
         let style_index = cluster.style_index();
-        let is_emoji = cluster.is_emoji;
+        let is_emoji = cluster.is_emoji();
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize];
