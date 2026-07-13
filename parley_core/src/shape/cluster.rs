@@ -315,10 +315,13 @@ impl CharCluster {
             // Its presentation depends on the platform and font.
             //
             // e.g.
-            //  - `U+270C + U+FE0F`: `✌`, force basic presentation
+            //  - `U+270C + U+FE0E`: `✌`, force text presentation
             //  - `U+270C + U+FE0F`: `✌️`, force emoji presentation
             //
-            // <https://www.unicode.org/reports/tr37/>
+            // See <https://www.unicode.org/reports/tr51/#Emoji_Variation_Sequences> for emoji
+            // variation sequences and
+            // <https://www.unicode.org/versions/Unicode17.0.0/core-spec/chapter-23/#G19053> for
+            // variation selectors more generally.
             let is_emoji_with_non_printing_variation_selector =
                 is_emoji_or_pictograph && info.is_variation_selector();
 
