@@ -12,7 +12,7 @@ use crate::{
     Analysis, AnalysisDataSources, CharInfo, ShapedRun,
     itemize::{Item, TextRange},
     lru_cache::LruCache,
-    shape::{CharCluster, cache, fill_cluster_in_place},
+    shape::{CharCluster, cache},
 };
 
 /// Shaping options for one item.
@@ -168,11 +168,10 @@ fn shape_item(
         return; // No clusters
     };
 
-    fill_cluster_in_place(
+    char_cluster.fill(
         &item_text[last_boundary..current_boundary],
         &mut item_infos_iter,
         &mut code_unit_offset_in_string,
-        char_cluster,
     );
 
     let mut current_font = select_font(char_cluster);
@@ -188,11 +187,10 @@ fn shape_item(
             // Build next cluster in-place
             last_boundary = current_boundary;
             current_boundary = next_boundary;
-            fill_cluster_in_place(
+            char_cluster.fill(
                 &item_text[last_boundary..current_boundary],
                 &mut item_infos_iter,
                 &mut code_unit_offset_in_string,
-                char_cluster,
             );
 
             if let Some(next_font) = select_font(char_cluster) {
