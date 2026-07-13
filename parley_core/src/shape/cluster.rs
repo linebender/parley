@@ -7,19 +7,19 @@
 use alloc::vec::Vec;
 use icu_normalizer::properties::Decomposed;
 
-use crate::analysis::AnalysisDataSources;
+use crate::{CharInfo, analysis::AnalysisDataSources};
 
 /// The maximum number of characters in a single cluster.
 const MAX_CLUSTER_SIZE: usize = 32;
 
 #[derive(Debug, Default)]
 pub struct CharCluster {
-    pub(crate) chars: Vec<Char>,
-    pub(crate) is_emoji: bool,
-    pub(crate) map_len: u8,
-    pub(crate) start: u32,
-    pub(crate) end: u32,
-    pub(crate) force_normalize: bool,
+    chars: Vec<Char>,
+    is_emoji: bool,
+    map_len: u8,
+    start: u32,
+    end: u32,
+    force_normalize: bool,
     comp: Form,
     decomp: Form,
     form: FormKind,
@@ -271,6 +271,79 @@ impl CharCluster {
         } else {
             Status::Discard
         }
+    }
+
+    /// Rebuilds `self` in-place using the existing allocation for the given grapheme
+    /// `segment_text` and consuming items from `item_infos_iter`.
+    ///
+    /// The iterator must yield one item for each character in `segment_text`.
+    ///
+    /// `code_unit_offset_in_string` must be the byte offset of the start of `segment_text` in the
+    /// source string. When this method returns, its value is the byte offset just past the end of
+    /// `segment_text` in the source string.
+    #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
+    #[inline]
+    pub(crate) fn fill(
+        &mut self,
+        segment_text: &str,
+        item_infos_iter: &mut impl Iterator<Item = (CharInfo, u16)>,
+        code_unit_offset_in_string: &mut usize,
+    ) {
+        // Reset cluster but keep allocation
+        self.clear();
+
+        let mut force_normalize = false;
+        let mut is_emoji_or_pictograph = false;
+        let mut map_len: u8 = 0;
+        let start = *code_unit_offset_in_string as u32;
+
+        for ((_, ch), (info, style_index)) in
+            segment_text.char_indices().zip(item_infos_iter.by_ref())
+        {
+            force_normalize |= info.force_normalize();
+            // TODO - make emoji detection more complete, as per (except using composite Trie tables as
+            //  much as possible:
+            //  https://github.com/conor-93/parley/blob/4637d826732a1a82bbb3c904c7f47a16a21cceec/parley/src/shape/mod.rs#L221-L269
+            is_emoji_or_pictograph |= info.is_emoji_or_pictograph();
+            *code_unit_offset_in_string += ch.len_utf8();
+
+            // TODO: Explore ignoring other modifiers in determining `contributes_to_shaping`:
+            //  regional indicators, subdivision flag tag sequences, skin tone modifiers
+            //  See also: https://github.com/google/emoji-segmenter
+
+            // If the color emoji has a non-printing variation selector, ignore the variation selector.
+            // Its presentation depends on the platform and font.
+            //
+            // e.g.
+            //  - `U+270C + U+FE0F`: `✌`, force basic presentation
+            //  - `U+270C + U+FE0F`: `✌️`, force emoji presentation
+            //
+            // <https://www.unicode.org/reports/tr37/>
+            let is_emoji_with_non_printing_variation_selector =
+                is_emoji_or_pictograph && info.is_variation_selector();
+
+            let contributes_to_shaping =
+                info.contributes_to_shaping() && !is_emoji_with_non_printing_variation_selector;
+            if contributes_to_shaping {
+                map_len += 1;
+            }
+
+            self.chars.push(Char {
+                ch,
+                contributes_to_shaping,
+                glyph_id: 0,
+                style_index,
+                is_control_character: info.is_control(),
+            });
+        }
+
+        // Finalize cluster metadata
+        let end = *code_unit_offset_in_string as u32;
+        self.is_emoji = is_emoji_or_pictograph;
+        self.map_len = map_len;
+        self.start = start;
+        self.end = end;
+        self.force_normalize = force_normalize;
     }
 }
 
