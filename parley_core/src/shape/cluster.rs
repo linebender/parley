@@ -208,7 +208,7 @@ impl CharCluster {
     /// consideration. If the font covers the full character cluster or the characters of its
     /// normalized forms (see <https://www.unicode.org/reports/tr15/>), it's considered complete.
     /// Otherwise, the font is kept if its coverage is greater than fonts considered previously,
-    /// else it's discared.
+    /// else it's discarded.
     pub fn map(
         &mut self,
         covers: impl Fn(char) -> bool,
