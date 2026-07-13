@@ -22,7 +22,6 @@ pub struct CharCluster {
     force_normalize: bool,
     comp: Form,
     decomp: Form,
-    form: FormKind,
     best_ratio: f32,
 }
 
@@ -116,7 +115,6 @@ impl CharCluster {
         self.force_normalize = false;
         self.comp.clear();
         self.decomp.clear();
-        self.form = FormKind::Original;
         self.best_ratio = 0.;
     }
 
@@ -227,7 +225,6 @@ impl CharCluster {
             ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
-                self.form = FormKind::Nfc;
                 if ratio >= 1. {
                     return Status::Complete;
                 }
@@ -241,7 +238,6 @@ impl CharCluster {
         .map(&f, &mut glyph_ids, self.best_ratio);
         if ratio > self.best_ratio {
             self.best_ratio = ratio;
-            self.form = FormKind::Original;
             if ratio >= 1. {
                 return Status::Complete;
             }
@@ -250,7 +246,6 @@ impl CharCluster {
             ratio = self.decomp.map(&f, &mut glyph_ids, self.best_ratio);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
-                self.form = FormKind::Nfd;
                 if ratio >= 1. {
                     return Status::Complete;
                 }
@@ -259,7 +254,6 @@ impl CharCluster {
                 ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
                 if ratio > self.best_ratio {
                     self.best_ratio = ratio;
-                    self.form = FormKind::Nfc;
                     if ratio >= 1. {
                         return Status::Complete;
                     }
@@ -348,14 +342,6 @@ impl CharCluster {
         self.end = end;
         self.force_normalize = force_normalize;
     }
-}
-
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-enum FormKind {
-    #[default]
-    Original,
-    Nfd,
-    Nfc,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
