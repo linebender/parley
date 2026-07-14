@@ -183,7 +183,10 @@ impl CharCluster {
                 let composer = analysis_data_sources.composing_normalizer();
                 let comp = composer.compose(self.chars[0].ch, self.chars[1].ch);
                 match comp {
-                    None => {}
+                    None => {
+                        // The characters don't compose.
+                        return None;
+                    }
                     Some(ch) => {
                         let mut copy = self.chars[0];
                         copy.ch = ch;
