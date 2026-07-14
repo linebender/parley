@@ -4,7 +4,7 @@
 //! Text shaping implementation using `harfrust`for shaping
 //! and `icu` for text analysis.
 
-use parley_core::shape::{CharCluster, Status};
+use parley_core::shape::{CharCluster, Coverage};
 use parley_core::{Analysis, AnalysisDataSources, FontInstance, ShapeOptions, Shaper};
 
 use super::layout::Layout;
@@ -233,12 +233,13 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             self.features = self.rcx.features(style.font_features).unwrap_or(&[]);
         }
         let mut selected_font = None;
+        let mut best_coverage = Coverage::NONE;
         self.query.matches_with(|font| {
             let Some(charmap) = font.charmap() else {
                 return fontique::QueryStatus::Continue;
             };
 
-            let map_status = cluster.map(
+            let coverage = cluster.calculate_coverage(
                 |ch| {
                     charmap
                         .map(ch)
@@ -250,22 +251,20 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
                 },
                 analysis_data_sources,
             );
+            if coverage > best_coverage {
+                selected_font = Some(SelectedFont { font: font.clone() });
+                best_coverage = coverage;
 
-            match map_status {
-                Status::Complete => {
-                    selected_font = Some(SelectedFont { font: font.clone() });
+                if coverage.is_complete() {
                     fontique::QueryStatus::Stop
+                } else {
+                    fontique::QueryStatus::Continue
                 }
-                Status::Keep => {
+            } else {
+                if selected_font.is_none() {
                     selected_font = Some(SelectedFont { font: font.clone() });
-                    fontique::QueryStatus::Continue
                 }
-                Status::Discard => {
-                    if selected_font.is_none() {
-                        selected_font = Some(SelectedFont { font: font.clone() });
-                    }
-                    fontique::QueryStatus::Continue
-                }
+                fontique::QueryStatus::Continue
             }
         });
         selected_font
