@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use super::{
-    FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily, GenericFamilyMap, ScriptExt,
-    scan,
+    FallbackFamilies, FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily,
+    GenericFamilyMap, ScriptExt, scan,
 };
 use alloc::format;
 use alloc::string::ToString;
@@ -15,7 +15,8 @@ use objc2_core_foundation::{
     CFArray, CFDictionary, CFRange, CFRetained, CFString, CFType, CFURL, CFURLPathStyle,
 };
 use objc2_core_text::{
-    CTFont, CTFontCollection, CTFontDescriptor, CTFontUIFontType, kCTFontURLAttribute,
+    CTFont, CTFontCollection, CTFontDescriptor, CTFontUIFontType, kCTFontFamilyNameAttribute,
+    kCTFontURLAttribute,
 };
 use objc2_foundation::{
     NSSearchPathDirectory, NSSearchPathDomainMask, NSSearchPathForDirectoriesInDomains,
@@ -65,25 +66,91 @@ impl SystemFonts {
         self.family_map.get(&id).cloned()
     }
 
-    pub(crate) fn fallback(&mut self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
+    pub(crate) fn fallback(&mut self, key: impl Into<FallbackKey>) -> FallbackFamilies {
         const HANI: Script = Script::from_bytes(*b"Hani");
         const HANT: Script = Script::from_bytes(*b"Hant");
         const HANS: Script = Script::from_bytes(*b"Hans");
         let key = key.into();
         let script = key.script();
-        let font = create_fallback_font_for_text(script.sample()?, key.locale_str(), false)?;
+        let mut families = FallbackFamilies::new();
+        let Some(sample) = script.sample() else {
+            return families;
+        };
+        let Some(font) = create_fallback_font_for_text(sample, key.locale_str(), false) else {
+            return families;
+        };
         let family_name = unsafe { font.family_name() };
         if let Some(family) = self.name_map.get(&family_name.to_string()) {
-            return Some(family.id());
+            families.push(family.id());
+        } else {
+            // HACK: if we don't have a usable PingFangUI due to our inability
+            // to render hvgl outlines then try another font
+            let name = match script {
+                HANI | HANS => Some("Heiti SC"),
+                HANT => Some("Heiti TC"),
+                _ => None,
+            };
+            if let Some(family) = name.and_then(|name| self.name_map.get(name)) {
+                families.push(family.id());
+            }
         }
-        // HACK: if we don't have a usable PingFangUI due to our inability
-        // to render hvgl outlines then try another font
-        let name = match script {
-            HANI | HANS => "Heiti SC",
-            HANT => "Heiti TC",
-            _ => return None,
+        // Extend the list with the font's default cascade list, providing
+        // coverage for characters that the primary fallback font is missing.
+        let langs = key
+            .locale_str()
+            .map(|locale| CFArray::from_objects(&[&*CFString::from_str(locale)]));
+        let cascade = unsafe {
+            font.default_cascade_list_for_languages(langs.as_deref().map(CFArray::as_opaque))
         };
-        self.name_map.get(name).map(|family| family.id())
+        if let Some(cascade) = cascade {
+            let cascade: CFRetained<CFArray<CTFontDescriptor>> =
+                unsafe { CFRetained::cast_unchecked(cascade) };
+            for index in 0..cascade.len() {
+                let Some(descriptor) = cascade.get(index) else {
+                    continue;
+                };
+                let Some(name): Option<CFRetained<CFType>> =
+                    (unsafe { descriptor.attribute(kCTFontFamilyNameAttribute) })
+                else {
+                    continue;
+                };
+                let Ok(name) = name.downcast::<CFString>() else {
+                    continue;
+                };
+                let name = name.to_string();
+                // Skip the LastResort font; it claims coverage of all
+                // codepoints while only rendering placeholder glyphs.
+                if name.eq_ignore_ascii_case(".LastResort")
+                    || name.eq_ignore_ascii_case("LastResort")
+                {
+                    continue;
+                }
+                if let Some(family) = self.name_map.get(&name)
+                    && !families.contains(&family.id())
+                {
+                    families.push(family.id());
+                }
+            }
+        }
+        families
+    }
+
+    pub(crate) fn fallback_for_text(
+        &mut self,
+        text: &str,
+        locale: Option<&str>,
+    ) -> Option<FamilyId> {
+        let font = create_fallback_font_for_text(text, locale, false)?;
+        let family_name = unsafe { font.family_name() }.to_string();
+        // The LastResort font claims coverage of all codepoints while only
+        // rendering placeholder glyphs, so ignore it to give fonts with
+        // real glyphs a chance.
+        if family_name.eq_ignore_ascii_case(".LastResort")
+            || family_name.eq_ignore_ascii_case("LastResort")
+        {
+            return None;
+        }
+        self.name_map.get(&family_name).map(|family| family.id())
     }
 }
 

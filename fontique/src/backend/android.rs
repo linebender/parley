@@ -15,8 +15,8 @@ use hashbrown::HashMap;
 use roxmltree::{Document, Node};
 
 use super::{
-    FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily, GenericFamilyMap, Language,
-    Script, scan,
+    FallbackFamilies, FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, GenericFamily,
+    GenericFamilyMap, Language, Script, scan,
 };
 
 // TODO: Use actual generic families here, where available, when fonts.xml is properly parsed.
@@ -191,28 +191,39 @@ impl SystemFonts {
         self.family_map.get(&id).cloned()
     }
 
-    pub(crate) fn fallback(&self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
+    pub(crate) fn fallback(&self, key: impl Into<FallbackKey>) -> FallbackFamilies {
         let key: FallbackKey = key.into();
         let script = key.script();
+        let mut families = FallbackFamilies::new();
 
-        key.locale()
-            .and_then(|locale| {
-                self.locale_fallback
-                    .iter()
-                    .find(|(other, _)| locale == *other)
-                    .map(|(_, fid)| *fid)
-            })
-            .or_else(|| {
-                self.script_fallback
-                    .iter()
-                    .find(|(s, _)| script == *s)
-                    .map(|(_, fid)| *fid)
-            })
-            .or_else(|| {
-                self.generic_families
-                    .get(GenericFamily::SansSerif)
-                    .first()
-                    .copied()
-            })
+        if let Some(locale) = key.locale() {
+            for (_, fid) in self
+                .locale_fallback
+                .iter()
+                .filter(|(other, _)| locale == *other)
+            {
+                if !families.contains(fid) {
+                    families.push(*fid);
+                }
+            }
+        }
+        for (_, fid) in self.script_fallback.iter().filter(|(s, _)| script == *s) {
+            if !families.contains(fid) {
+                families.push(*fid);
+            }
+        }
+        if families.is_empty()
+            && let Some(fid) = self.generic_families.get(GenericFamily::SansSerif).first()
+        {
+            families.push(*fid);
+        }
+        families
+    }
+
+    pub(crate) fn fallback_for_text(&self, _text: &str, _locale: Option<&str>) -> Option<FamilyId> {
+        // Android has no system API for per-character fallback; coverage
+        // is provided by the fallback chains above and by the exhaustive
+        // scan in `Query::matches_with`.
+        None
     }
 }

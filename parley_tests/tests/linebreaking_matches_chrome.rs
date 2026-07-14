@@ -85,6 +85,7 @@ fn check_font(font_family: &str, expected_residuals: u64) {
     let mut collection = Collection::new(CollectionOptions {
         shared: false,
         system_fonts: false,
+        exhaustive_fallback: true,
     });
     collection.register_fonts(Blob::new(Arc::new(font.bytes.to_vec())), None);
     let mut font_cx = FontContext {
