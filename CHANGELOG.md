@@ -12,7 +12,18 @@ Subheadings to categorize changes are `added, changed, deprecated, removed, fixe
 
 This release has an [MSRV] of 1.88.
 
+### Added
+
+#### Fontique
+
+- Per-character font fallback. `Query::set_fallback_chars` lets a query specify the characters that fallback fonts are expected to cover. When none of the requested or script fallback families provide coverage, the query now asks the platform for a font covering those specific characters (CoreText, DirectWrite, and fontconfig) and, as a last resort, scans all available fonts for one with real coverage, guaranteeing that a glyph is found if any font provides one. Results are cached per set of characters. The scan can be disabled via the new `CollectionOptions::exhaustive_fallback` option (default `true`). (#644, #678 by [@nicoburns][])
+
 ### Changed
+
+#### Fontique
+
+- Breaking change: `CollectionOptions` has a new `exhaustive_fallback` field. (#644 by [@nicoburns][])
+- Script/locale fallback now produces an ordered list of families (the CoreText cascade list, fontconfig's sorted coverage list, and all matching Android fallback chain entries) rather than a single family. (#644 by [@nicoburns][])
 
 #### Parley
 
@@ -23,6 +34,11 @@ This release has an [MSRV] of 1.88.
 #### Fontique
 
 - Fix compilation on 32-bit platforms without 64-bit atomics (e.g. `mipsel-unknown-linux-gnu`). (#671 by [@nicoburns][])
+- Font fallback no longer fails to find a glyph that an installed font provides (fixes #644 and #678). Punctuation shared between scripts (e.g. `。` in Latin text) is now handled by per-character fallback rather than the previous Han-specific workaround for #597. (#644 by [@nicoburns][])
+
+#### Parley
+
+- Empty layouts now shape their cursor-metrics run with the resolved default style instead of a zero font size. (#644 by [@nicoburns][])
 
 ## [0.11.0] - 2026-06-24
 

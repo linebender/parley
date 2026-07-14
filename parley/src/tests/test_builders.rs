@@ -55,6 +55,7 @@ fn create_font_context() -> FontContext {
     let mut collection = Collection::new(CollectionOptions {
         shared: false,
         system_fonts: false,
+        exhaustive_fallback: true,
     });
     load_fonts(&mut collection, parley_dev::font_dirs()).unwrap();
     for font in FONT_FAMILY_LIST {
@@ -478,6 +479,10 @@ fn builders_empty() {
     let with_ranged_builder = |_rb: &mut RangedBuilder<'_, ColorBrush>| {};
     let with_tree_builder = |_tb: &mut TreeBuilder<'_, ColorBrush>| {};
 
+    // Empty text is shaped with a fake space to produce metrics for sizing
+    // a cursor, so a single run is expected. (The default style's generic
+    // `sans-serif` family resolves to no font in the test environment, but
+    // fontique's exhaustive fallback still finds a font covering the space.)
     assert_builders_produce_same_result(
         text,
         scale,
@@ -486,7 +491,7 @@ fn builders_empty() {
         &root_style,
         with_ranged_builder,
         with_tree_builder,
-        true,
+        false,
     );
 }
 

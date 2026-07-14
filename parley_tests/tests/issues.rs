@@ -5,7 +5,10 @@
 
 use crate::test_name;
 use crate::util::TestEnv;
-use parley::{Alignment, AlignmentOptions, PositionedLayoutItem, StyleProperty, TextWrapMode};
+use parley::{
+    Alignment, AlignmentOptions, FontFamily, FontFamilyName, PositionedLayoutItem, StyleProperty,
+    TextWrapMode,
+};
 
 /// Test that rendering RTL text doesn't affect subsequent LTR layouts.
 /// See <https://github.com/linebender/parley/issues/489>.
@@ -82,6 +85,45 @@ And, finally, yet another sentence."#;
         layout.align(Alignment::Justify, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
+}
+
+/// Test that font fallback finds a glyph in any available font, even when
+/// the requested families and the script's fallback families don't cover
+/// the character.
+/// See <https://github.com/linebender/parley/issues/644> and
+/// <https://github.com/linebender/parley/issues/678>.
+#[test]
+fn issue_644_fallback_finds_available_glyph() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Restrict the requested family to Roboto, which has no Arabic
+    // coverage. The test environment has no system fonts and no fallback
+    // families registered for Arabic, so a glyph can only be found via
+    // fontique's per-character fallback scan.
+    let text = "AمB";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::FontFamily(FontFamily::Single(
+        FontFamilyName::named("Roboto"),
+    )));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+
+    let mut glyph_count = 0;
+    for line in layout.lines() {
+        for item in line.items() {
+            let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
+                continue;
+            };
+            for glyph in glyph_run.glyphs() {
+                glyph_count += 1;
+                assert_ne!(
+                    glyph.id, 0,
+                    "expected fallback to find a glyph for every character"
+                );
+            }
+        }
+    }
+    assert_eq!(glyph_count, 3);
 }
 
 /// Test that mandatory line breaks don't zero-out the max content width.
