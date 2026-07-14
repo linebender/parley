@@ -9,9 +9,6 @@ use icu_normalizer::properties::Decomposed;
 
 use crate::{CharInfo, analysis::AnalysisDataSources};
 
-/// The maximum number of characters in a single cluster.
-const MAX_CLUSTER_SIZE: usize = 32;
-
 #[derive(Debug, Default)]
 pub struct CharCluster {
     chars: Vec<Char>,
@@ -60,14 +57,10 @@ pub struct Char {
     pub is_control_character: bool,
     /// True if the character should be considered when mapping glyphs.
     pub contributes_to_shaping: bool,
-    /// Nominal glyph identifier.
-    pub glyph_id: GlyphId,
     /// Indexes into the list of styles for the containing text run, to find the style applicable
     /// to this character.
     pub style_index: u16,
 }
-
-pub(crate) type GlyphId = u16;
 
 /// Whitespace content of a cluster.
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
@@ -93,14 +86,14 @@ impl Whitespace {
     }
 }
 
-/// Iterative status of mapping a character cluster to nominal glyph identifiers.
+/// Iterative status of finding a font with the greatest coverage of a character cluster.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Status {
-    /// Mapping should be skipped.
+    /// Font covers less than previously considered fonts.
     Discard,
-    /// The best mapping so far.
+    /// The best font so far that isn't `Status::Complete`.
     Keep,
-    /// Complete mapping.
+    /// Font with complete coverage.
     Complete,
 }
 
@@ -209,20 +202,26 @@ impl CharCluster {
         }
     }
 
+    /// Decide whether a candidate font is complete, should be kept, or should be discarded.
+    ///
+    /// The callback `covers` should return whether the character is covered by the font under
+    /// consideration. If the font covers the full character cluster or the characters of its
+    /// normalized forms (see <https://www.unicode.org/reports/tr15/>), it's considered complete.
+    /// Otherwise, the font is kept if its coverage is greater than fonts considered previously,
+    /// else it's discarded.
     pub fn map(
         &mut self,
-        f: impl Fn(char) -> GlyphId,
+        covers: impl Fn(char) -> bool,
         analysis_data_sources: &AnalysisDataSources,
     ) -> Status {
         let len = self.len();
         if len == 0 {
             return Status::Complete;
         }
-        let mut glyph_ids = [0_u16; MAX_CLUSTER_SIZE];
         let prev_ratio = self.best_ratio;
         let mut ratio;
         if self.force_normalize && self.composed(analysis_data_sources).is_some() {
-            ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
+            ratio = self.comp.coverage(&covers);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
                 if ratio >= 1. {
@@ -235,7 +234,7 @@ impl CharCluster {
             map_len: self.map_len.max(1),
             has_contributing: self.map_len > 0,
         }
-        .map(&f, &mut glyph_ids, self.best_ratio);
+        .coverage(&covers);
         if ratio > self.best_ratio {
             self.best_ratio = ratio;
             if ratio >= 1. {
@@ -243,7 +242,7 @@ impl CharCluster {
             }
         }
         if self.decomposed(analysis_data_sources).is_some() {
-            ratio = self.decomp.map(&f, &mut glyph_ids, self.best_ratio);
+            ratio = self.decomp.coverage(&covers);
             if ratio > self.best_ratio {
                 self.best_ratio = ratio;
                 if ratio >= 1. {
@@ -251,7 +250,7 @@ impl CharCluster {
                 }
             }
             if !self.force_normalize && self.composed(analysis_data_sources).is_some() {
-                ratio = self.comp.map(&f, &mut glyph_ids, self.best_ratio);
+                ratio = self.comp.coverage(&covers);
                 if ratio > self.best_ratio {
                     self.best_ratio = ratio;
                     if ratio >= 1. {
@@ -328,7 +327,6 @@ impl CharCluster {
             self.chars.push(Char {
                 ch,
                 contributes_to_shaping,
-                glyph_id: 0,
                 style_index,
                 is_control_character: info.is_control(),
             });
@@ -403,58 +401,40 @@ impl Form {
     }
 
     #[inline(always)]
-    fn map(
-        &mut self,
-        f: &impl Fn(char) -> u16,
-        glyphs: &mut [u16; MAX_CLUSTER_SIZE],
-        best_ratio: f32,
-    ) -> f32 {
+    fn coverage(&self, covers: &impl Fn(char) -> bool) -> f32 {
         Mapper {
-            chars: &mut self.chars[..self.len as usize],
+            chars: &self.chars[..self.len as usize],
             map_len: self.map_len,
             has_contributing: self.has_contributing,
         }
-        .map(f, glyphs, best_ratio)
+        .coverage(covers)
     }
 }
 
 struct Mapper<'a> {
-    chars: &'a mut [Char],
+    chars: &'a [Char],
     map_len: u8,
     has_contributing: bool,
 }
 
 impl<'a> Mapper<'a> {
-    fn map(
-        &mut self,
-        f: &impl Fn(char) -> u16,
-        glyphs: &mut [u16; MAX_CLUSTER_SIZE],
-        best_ratio: f32,
-    ) -> f32 {
+    /// Returns the ratio of characters contributing to shaping that are covered.
+    fn coverage(&self, covers: &impl Fn(char) -> bool) -> f32 {
         if self.map_len == 0 {
             return 1.;
         }
         let mut mapped = 0;
-        for (c, g) in self.chars.iter().zip(glyphs.iter_mut()) {
+        for c in self.chars.iter() {
             if !c.contributes_to_shaping {
-                *g = f(c.ch);
                 if !self.has_contributing {
                     mapped += 1;
                 }
             } else {
-                let gid = f(c.ch);
-                *g = gid;
-                if gid != 0 {
+                if covers(c.ch) {
                     mapped += 1;
                 }
             }
         }
-        let ratio = mapped as f32 / self.map_len as f32;
-        if ratio > best_ratio {
-            for (ch, glyph) in self.chars.iter_mut().zip(glyphs) {
-                ch.glyph_id = *glyph;
-            }
-        }
-        ratio
+        mapped as f32 / self.map_len as f32
     }
 }
