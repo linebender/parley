@@ -91,7 +91,7 @@ impl Whitespace {
 pub enum Status {
     /// Font covers less than previously considered fonts.
     Discard,
-    /// The best font so far.
+    /// The best font so far that isn't `Status::Complete`.
     Keep,
     /// Font with complete coverage.
     Complete,
