@@ -181,18 +181,14 @@ impl CharCluster {
                 }
 
                 let composer = analysis_data_sources.composing_normalizer();
-                let comp = composer.compose(self.chars[0].ch, self.chars[1].ch);
-                match comp {
-                    None => {}
-                    Some(ch) => {
-                        let mut copy = self.chars[0];
-                        copy.ch = ch;
-                        copy.contributes_to_shaping =
-                            Self::contributes_to_shaping(ch, analysis_data_sources);
-                        self.comp.chars[0] = copy;
-                        self.comp.len = 1;
-                    }
-                }
+                let ch = composer.compose(self.chars[0].ch, self.chars[1].ch)?;
+
+                let mut copy = self.chars[0];
+                copy.ch = ch;
+                copy.contributes_to_shaping =
+                    Self::contributes_to_shaping(ch, analysis_data_sources);
+                self.comp.chars[0] = copy;
+                self.comp.len = 1;
 
                 self.comp.state = FormState::Valid;
                 self.comp.setup();
