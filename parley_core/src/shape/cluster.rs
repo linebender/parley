@@ -9,10 +9,19 @@ use icu_normalizer::properties::Decomposed;
 
 use crate::{CharInfo, analysis::AnalysisDataSources};
 
+/// `U+FE0E` VARIATION SELECTOR-15, which requests the text presentation of the
+/// preceding codepoint.
+const TEXT_PRESENTATION_SELECTOR: char = '\u{FE0E}';
+
+/// `U+FE0F` VARIATION SELECTOR-16, which requests the emoji presentation of the
+/// preceding codepoint.
+const EMOJI_PRESENTATION_SELECTOR: char = '\u{FE0F}';
+
 #[derive(Debug, Default)]
 pub struct CharCluster {
     chars: Vec<Char>,
     is_emoji: bool,
+    presentation: Presentation,
     map_len: u8,
     start: u32,
     end: u32,
@@ -20,6 +29,27 @@ pub struct CharCluster {
     comp: Form,
     decomp: Form,
     best_ratio: f32,
+}
+
+/// The glyph presentation a cluster explicitly asks for with a variation
+/// selector, per [UTS #51].
+///
+/// A cluster only carries [`Presentation::Emoji`] or [`Presentation::Text`] when
+/// it actually contains the corresponding selector; the common case is
+/// [`Presentation::Unspecified`], leaving the choice to font coverage and the
+/// default presentation of the codepoint.
+///
+/// [UTS #51]: https://www.unicode.org/reports/tr51/#Emoji_Variation_Sequences
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
+pub enum Presentation {
+    /// No variation selector: presentation is left to the codepoint's default
+    /// and to which fonts happen to cover it.
+    #[default]
+    Unspecified,
+    /// `U+FE0E` (VS15) requests the *text* presentation.
+    Text,
+    /// `U+FE0F` (VS16) requests the *emoji* presentation.
+    Emoji,
 }
 
 impl CharCluster {
@@ -39,6 +69,13 @@ impl CharCluster {
     #[inline(always)]
     pub fn is_emoji(&self) -> bool {
         self.is_emoji
+    }
+
+    /// The presentation this cluster explicitly requests with a variation
+    /// selector, if any. See [`Presentation`].
+    #[inline(always)]
+    pub fn presentation(&self) -> Presentation {
+        self.presentation
     }
 }
 
@@ -102,6 +139,7 @@ impl CharCluster {
     pub(crate) fn clear(&mut self) {
         self.chars.clear();
         self.is_emoji = false;
+        self.presentation = Presentation::Unspecified;
         self.map_len = 0;
         self.start = 0;
         self.end = 0;
@@ -283,6 +321,7 @@ impl CharCluster {
 
         let mut force_normalize = false;
         let mut is_emoji_or_pictograph = false;
+        let mut presentation = Presentation::Unspecified;
         let mut map_len: u8 = 0;
         let start = *code_unit_offset_in_string as u32;
 
@@ -311,6 +350,16 @@ impl CharCluster {
             // variation sequences and
             // <https://www.unicode.org/versions/Unicode17.0.0/core-spec/chapter-23/#G19053> for
             // variation selectors more generally.
+            // Which presentation, if either, the sequence explicitly asks for.
+            // This is deliberately finer-grained than `is_variation_selector()`:
+            // the two emoji variation selectors request *opposite* presentations,
+            // and font selection has to tell them apart to honour either.
+            match ch {
+                EMOJI_PRESENTATION_SELECTOR => presentation = Presentation::Emoji,
+                TEXT_PRESENTATION_SELECTOR => presentation = Presentation::Text,
+                _ => {}
+            }
+
             let is_emoji_with_non_printing_variation_selector =
                 is_emoji_or_pictograph && info.is_variation_selector();
 
@@ -331,6 +380,7 @@ impl CharCluster {
         // Finalize cluster metadata
         let end = *code_unit_offset_in_string as u32;
         self.is_emoji = is_emoji_or_pictograph;
+        self.presentation = presentation;
         self.map_len = map_len;
         self.start = start;
         self.end = end;
@@ -432,5 +482,60 @@ impl<'a> Mapper<'a> {
             }
         }
         mapped as f32 / self.map_len as f32
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CharCluster, Presentation};
+    use crate::{Analysis, AnalysisOptions, Analyzer};
+
+    /// Build the first cluster of `text` and report the presentation it
+    /// requests.
+    fn presentation_of(text: &str) -> Presentation {
+        let mut analyzer = Analyzer::new();
+        let mut analysis = Analysis::new();
+        let options = AnalysisOptions {
+            word_break: &[],
+            line_break_override: None,
+        };
+        analyzer.analyze(text, &options, &mut analysis);
+
+        let mut infos = analysis
+            .char_info()
+            .iter()
+            .copied()
+            .map(|info| (info, 0_u16));
+        let mut cluster = CharCluster::default();
+        let mut offset = 0_usize;
+        cluster.fill(text, &mut infos, &mut offset);
+        cluster.presentation()
+    }
+
+    /// `U+FE0F` (VS16) requests the emoji presentation. Font selection relies on
+    /// this to honour UTS #51 for codepoints a text font also covers — `❤️`
+    /// being the motivating case.
+    #[test]
+    fn emoji_presentation_selector_is_detected() {
+        assert_eq!(presentation_of("\u{2764}\u{FE0F}"), Presentation::Emoji);
+        assert_eq!(presentation_of("\u{270C}\u{FE0F}"), Presentation::Emoji);
+    }
+
+    /// `U+FE0E` (VS15) requests the *text* presentation — the opposite request,
+    /// so it must not be conflated with VS16.
+    #[test]
+    fn text_presentation_selector_is_detected() {
+        assert_eq!(presentation_of("\u{2764}\u{FE0E}"), Presentation::Text);
+        assert_eq!(presentation_of("\u{270C}\u{FE0E}"), Presentation::Text);
+    }
+
+    /// Without a selector nothing is requested, and presentation is left to the
+    /// codepoint's default and to font coverage.
+    #[test]
+    fn no_selector_requests_nothing() {
+        assert_eq!(presentation_of("\u{2764}"), Presentation::Unspecified);
+        assert_eq!(presentation_of("\u{1F389}"), Presentation::Unspecified);
+        assert_eq!(presentation_of("a"), Presentation::Unspecified);
+        assert_eq!(presentation_of("5"), Presentation::Unspecified);
     }
 }

@@ -4,7 +4,7 @@
 //! Text shaping implementation using `harfrust`for shaping
 //! and `icu` for text analysis.
 
-use parley_core::shape::{CharCluster, Status};
+use parley_core::shape::{CharCluster, Presentation, Status};
 use parley_core::{Analysis, AnalysisDataSources, FontInstance, ShapeOptions, Shaper};
 
 use super::layout::Layout;
@@ -227,7 +227,24 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             if is_emoji {
                 use core::iter::once;
                 let emoji_family = QueryFamily::Generic(fontique::GenericFamily::Emoji);
-                self.query.set_families(fonts.chain(once(emoji_family)));
+                // The emoji family normally goes *after* the requested families:
+                // `is_emoji` covers every Emoji/Extended_Pictographic codepoint,
+                // including ones whose default presentation is text (`5`, `#`,
+                // `▶`), so trying it first would render those as emoji.
+                //
+                // A cluster carrying `U+FE0F` (VS16) is the exception: per
+                // UTS #51 it explicitly requests the emoji presentation, and must
+                // get it even when a text font in the requested families happens
+                // to cover the base codepoint as a dingbat — which is exactly the
+                // case for `U+2764` + VS16 (`❤️`) in fonts like DejaVu Sans or
+                // Inter. Putting the emoji family first is what honours that
+                // request; `U+FE0E` (VS15) asks for the opposite and so keeps the
+                // default ordering.
+                if cluster.presentation() == Presentation::Emoji {
+                    self.query.set_families(once(emoji_family).chain(fonts));
+                } else {
+                    self.query.set_families(fonts.chain(once(emoji_family)));
+                }
                 self.fonts_id = None;
             } else if self.fonts_id != Some(fonts_id) {
                 self.query.set_families(fonts);
