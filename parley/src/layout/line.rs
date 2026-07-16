@@ -136,7 +136,7 @@ pub struct LineMetrics {
     /// In CSS parlance, this is the start of the "line box." See, e.g., CSS 2.1 § 9.4.2
     /// <https://www.w3.org/TR/CSS2/visuren.html#line-box>. The line box is tall enough to cover all
     /// its inline boxes, but note glyphs may overflow their box height, especially when the
-    /// typographic line height is small.
+    /// typographic line height is small. See also [`Self::content_block_min_coord`].
     ///
     /// For horizontal text, this would be the top of the line.
     pub block_min_coord: f32,
@@ -145,6 +145,23 @@ pub struct LineMetrics {
     ///
     /// For horizontal text, this would be the bottom of the line.
     pub block_max_coord: f32,
+    /// Minimum coordinate of the line's content in the direction orthogonal to line direction.
+    ///
+    /// This covers, roughly, the line's glyphs and inline boxes. This does not take into account
+    /// typographic leading, but only the typographic ascent and descent. In case of negative
+    /// leading, the content block can be larger than the line's block. Glyphs can overflow the
+    /// content area: tall diacritics can exceed the area, stacking combining marks can easily
+    /// exceed the area, and some fonts will simply have glyphs that exceed this.
+    ///
+    /// For horizontal text, this would be the top of the line's content.
+    pub content_block_min_coord: f32,
+    /// Maximum coordinate of the line's content in the direction orthogonal to line direction.
+    ///
+    /// See [`LineMetrics::content_block_min_coord`] for a caveat about glyphs overflowing the
+    /// content area.
+    ///
+    /// For horizontal text, this would be the bottom of the line's content.
+    pub content_block_max_coord: f32,
 }
 
 impl LineMetrics {

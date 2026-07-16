@@ -274,7 +274,9 @@ impl Selection {
         let line_limit = layout.len().saturating_sub(1);
         let geometry = self.focus.geometry(layout, 0.0);
         let line_index = layout
-            .line_for_offset(geometry.y0 as f32)
+            // TODO: we're determining the line for the cursor through its rendered position. In
+            // case of extreme geometry (like zero line height), this won't work.
+            .line_for_offset(((geometry.y0 + geometry.y1) / 2.) as f32)
             .map(|(ix, _)| ix)
             .unwrap_or(line_limit);
         let new_line_index = line_index.saturating_add_signed(delta);
@@ -536,11 +538,13 @@ impl Selection {
                 continue;
             };
             let metrics = line.metrics();
-            let line_min = metrics.block_min_coord as f64;
-            let line_max = metrics.block_max_coord as f64;
+            let line_min =
+                f32::min(metrics.block_min_coord, metrics.content_block_min_coord) as f64;
+            let line_max =
+                f32::max(metrics.block_max_coord, metrics.content_block_max_coord) as f64;
             // Trailing whitespace to indicate that the newline character at the
-            // end of this line is selected. It's based on the ascent and
-            // descent so it doesn't change with the line height.
+            // end of this line is selected. It's based on the content block so
+            // it doesn't change with the line height.
             //
             // TODO: the width of this whitespace should be the width of a space
             // (U+0020) character.

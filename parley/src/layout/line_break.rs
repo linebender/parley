@@ -70,15 +70,27 @@ impl LineState {
 /// (we currently only align content by their baselines). We model this as the inline content being
 /// aligned to the line box's own "baseline," and carry the line box's height over and under that
 /// baseline. See <https://www.w3.org/TR/CSS2/visudet.html#line-height>.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 struct LineBoxMetrics {
+    /// The extents from the line box's baseline.
+    line_box: Extents,
+    /// The content extents from the line box's baseline.
+    ///
+    /// This covers, roughly, the glyphs and inline boxes. This does not take into account
+    /// typographic leading, but only the typographic ascent and descent. In case of negative
+    /// leading, this can be larger than [`Self::line_box`].
+    content_box: Extents,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Extents {
     /// The space over the line box's baseline.
     over: f32,
     /// The space under the line box's baseline.
     under: f32,
 }
 
-impl Default for LineBoxMetrics {
+impl Default for Extents {
     fn default() -> Self {
         Self {
             over: 0.,
@@ -91,7 +103,7 @@ impl LineBoxMetrics {
     /// The line height seen so far.
     #[inline(always)]
     fn line_height(&self) -> f32 {
-        self.over + self.under
+        self.line_box.over + self.line_box.under
     }
 
     fn add_text(&mut self, metrics: &RunMetrics, quantize: bool) {
@@ -111,17 +123,24 @@ impl LineBoxMetrics {
         // reached. For determining the line box block, add this to the baseline and then quantize
         // by rounding.
         let under = metrics.line_height - over;
-        self.over = self.over.max(over);
-        self.under = self.under.max(under);
+
+        self.line_box.over = self.line_box.over.max(over);
+        self.line_box.under = self.line_box.under.max(under);
+        self.content_box.over = self.content_box.over.max(ascent);
+        self.content_box.under = self.content_box.under.max(descent);
     }
 
     fn add_inline_box(&mut self, ascent: f32, descent: f32, quantize: bool) {
         if quantize {
-            self.over = self.over.max(ascent.round());
-            self.under = self.under.max(descent.round());
+            self.line_box.over = self.line_box.over.max(ascent.round());
+            self.line_box.under = self.line_box.under.max(descent.round());
+            self.content_box.over = self.content_box.over.max(ascent.round());
+            self.content_box.under = self.content_box.under.max(descent.round());
         } else {
-            self.over = self.over.max(ascent);
-            self.under = self.under.max(descent);
+            self.line_box.over = self.line_box.over.max(ascent);
+            self.line_box.under = self.line_box.under.max(descent);
+            self.content_box.over = self.content_box.over.max(ascent);
+            self.content_box.under = self.content_box.under.max(descent);
         }
     }
 }
@@ -1179,10 +1198,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // Whether metrics should be quantized to pixel boundaries
         let quantize = self.layout.data.quantize;
 
-        let (mut over, mut under) = (
-            self.state.line.box_metrics.over,
-            self.state.line.box_metrics.under,
-        );
+        let mut line_box_extents = self.state.line.box_metrics.line_box;
+        let mut content_box_extents = self.state.line.box_metrics.content_box;
         if !have_metrics
             && line.item_range.is_empty()
             && let Some(metrics) = prev_line_metrics
@@ -1191,8 +1208,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             // any; this should only occur for an empty line following
             // a newline at the end of a layout
             line.metrics = metrics;
-            over = metrics.baseline - metrics.block_min_coord;
-            under = metrics.block_max_coord - metrics.baseline;
+            line_box_extents = Extents {
+                over: metrics.baseline - metrics.block_min_coord,
+                under: metrics.block_max_coord - metrics.baseline,
+            };
+            content_box_extents = Extents {
+                over: metrics.baseline - metrics.content_block_min_coord,
+                under: metrics.content_block_max_coord - metrics.baseline,
+            };
             // If we have no items on this line, it must be the last (empty)
             // line in a layout following a newline. Commit an empty run so
             // that AccessKit has a node with which to identify the visual
@@ -1227,13 +1250,15 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         } else {
             self.state.line_y as f32
         };
-        line.metrics.baseline = top + over;
+        line.metrics.baseline = top + line_box_extents.over;
         line.metrics.block_min_coord = top;
         line.metrics.block_max_coord = if quantize {
-            (line.metrics.baseline + under).round()
+            (line.metrics.baseline + line_box_extents.under).round()
         } else {
-            line.metrics.baseline + under
+            line.metrics.baseline + line_box_extents.under
         };
+        line.metrics.content_block_min_coord = line.metrics.baseline - content_box_extents.over;
+        line.metrics.content_block_max_coord = line.metrics.baseline + content_box_extents.under;
 
         line.metrics.inline_min_coord = self.state.line_x;
         line.metrics.inline_max_coord = self.state.line_x + self.state.line_max_advance;
