@@ -298,7 +298,8 @@ impl Selection {
         let h_pos = self
             .h_pos
             .unwrap_or_else(|| self.focus.geometry(layout, 0.0).x0 as f32);
-        let y = line.metrics().block_max_coord - line.metrics().ascent * 0.5;
+        // Set the `y` to be in the middle of the line.
+        let y = (line.metrics().block_max_coord + line.metrics().block_min_coord) / 2.;
         let new_focus = Cursor::from_point(layout, h_pos, y);
         let h_pos = Some(h_pos);
         if extend {
@@ -544,7 +545,15 @@ impl Selection {
             // TODO: the width of this whitespace should be the width of a space
             // (U+0020) character.
             let newline_whitespace = if line.break_reason() == BreakReason::Explicit {
-                (metrics.ascent as f64 + metrics.descent as f64) * NEWLINE_WHITESPACE_WIDTH_RATIO
+                // The newline's metrics are those of the last run.
+                line.runs()
+                    .last()
+                    .map(|run| {
+                        let run_metrics = run.metrics();
+                        (run_metrics.ascent as f64 + run_metrics.descent as f64)
+                            * NEWLINE_WHITESPACE_WIDTH_RATIO
+                    })
+                    .unwrap_or(0.0)
             } else {
                 0.0
             };

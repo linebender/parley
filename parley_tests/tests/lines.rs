@@ -10,7 +10,7 @@ use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
 use parley::{
     Affinity, Alignment, AlignmentOptions, BoundingBox, Brush, Cursor, InlineBox, InlineBoxKind,
-    Layout, LineHeight, Selection, StyleProperty,
+    Layout, Line, LineHeight, Selection, StyleProperty,
 };
 use peniko::kurbo::Size;
 
@@ -41,14 +41,42 @@ fn roboto_ascent_descent(font_size: f32) -> (f32, f32) {
     (ascent / 16. * font_size, descent / 16. * font_size)
 }
 
+/// Line-wide text metrics derived from a line's runs.
+///
+/// Ascent, descent, and leading are per-run metrics; the line-wide values these tests
+/// reason about are the maxima over the runs on the line (ignoring inline boxes), with
+/// the leading defined as the text's intrinsic line height minus ascent and descent.
+struct TextMetrics {
+    ascent: f32,
+    descent: f32,
+    leading: f32,
+}
+
+/// Returns the line-wide text metrics for a line.
+fn line_text_metrics<B: Brush>(line: &Line<'_, B>) -> TextMetrics {
+    let mut ascent = 0f32;
+    let mut descent = 0f32;
+    let mut line_height = 0f32;
+    for run in line.runs() {
+        let metrics = run.metrics();
+        ascent = ascent.max(metrics.ascent);
+        descent = descent.max(metrics.descent);
+        line_height = line_height.max(metrics.line_height);
+    }
+    TextMetrics {
+        ascent,
+        descent,
+        leading: line_height - (ascent + descent),
+    }
+}
+
 /// Returns the expected outputs for ascent, descent, and line box height.
 fn ascent_descent_box_height(font_size: f32, line_height_px: f32) -> (f32, f32, f32) {
     let (ascent, descent) = roboto_ascent_descent(font_size);
     // Ascent and descent must be rounded separately to match the line box height of Chrome.
     // See lines_integral_line_height_ascent_descent_rounding() for more details.
     let ascent_descent = ascent.round() + descent.round();
-    // Line box height does not get reduced by negative leading, so clamp leading to zero.
-    let line_box_height = ascent_descent + (line_height_px.round() - ascent_descent).max(0.);
+    let line_box_height = ascent_descent + (line_height_px.round() - ascent_descent);
     (ascent, descent, line_box_height)
 }
 
@@ -163,8 +191,9 @@ fn assert_common_truths(
     );
     for line in layout.lines() {
         let metrics = line.metrics();
-        assert_eq!(metrics.ascent, ascent, "expected ascent {ascent}");
-        assert_eq!(metrics.descent, descent, "expected descent {descent}");
+        let text_metrics = line_text_metrics(&line);
+        assert_eq!(text_metrics.ascent, ascent, "expected ascent {ascent}");
+        assert_eq!(text_metrics.descent, descent, "expected descent {descent}");
         assert_eq!(
             metrics.block_max_coord - metrics.block_min_coord,
             line_box_height,
@@ -194,7 +223,6 @@ fn lines_integral_line_height_zero_leading() {
     // Confirm metrics
     assert_common_truths(&layout, ascent, descent, line_box_height, line_height_px);
     for line in layout.lines() {
-        let metrics = line.metrics();
         assert!(
             ascent.fract() >= 0.5,
             "expected ascent {ascent} to round up"
@@ -203,7 +231,8 @@ fn lines_integral_line_height_zero_leading() {
             descent.fract() >= 0.5,
             "expected descent {descent} to round up"
         );
-        let leading = metrics.leading - (1. - ascent.fract()) - (1. - descent.fract());
+        let leading =
+            line_text_metrics(&line).leading - (1. - ascent.fract()) - (1. - descent.fract());
         assert_eq!(leading, 0., "expected zero leading");
     }
 
@@ -229,7 +258,6 @@ fn lines_integral_line_height_minus_one_leading() {
     // Confirm metrics
     assert_common_truths(&layout, ascent, descent, line_box_height, line_height_px);
     for line in layout.lines() {
-        let metrics = line.metrics();
         assert!(
             ascent.fract() >= 0.5,
             "expected ascent {ascent} to round up"
@@ -238,7 +266,7 @@ fn lines_integral_line_height_minus_one_leading() {
             descent.fract() < 0.5,
             "expected descent {descent} to round down"
         );
-        let leading = metrics.leading - (1. - ascent.fract()) + descent.fract();
+        let leading = line_text_metrics(&line).leading - (1. - ascent.fract()) + descent.fract();
         assert_eq!(leading, -1., "expected -1 leading");
     }
 
@@ -264,7 +292,6 @@ fn lines_integral_line_height_plus_one_leading() {
     // Confirm metrics
     assert_common_truths(&layout, ascent, descent, line_box_height, line_height_px);
     for line in layout.lines() {
-        let metrics = line.metrics();
         assert!(
             ascent.fract() >= 0.5,
             "expected ascent {ascent} to round up"
@@ -273,7 +300,8 @@ fn lines_integral_line_height_plus_one_leading() {
             descent.fract() >= 0.5,
             "expected descent {descent} to round up"
         );
-        let leading = metrics.leading - (1. - ascent.fract()) - (1. - descent.fract());
+        let leading =
+            line_text_metrics(&line).leading - (1. - ascent.fract()) - (1. - descent.fract());
         assert_eq!(leading, 1., "expected +1 leading");
 
         let above = line.metrics().baseline - line.metrics().block_min_coord;
@@ -319,10 +347,10 @@ fn lines_integral_line_height_ascent_descent_rounding() {
     // Confirm metrics
     assert_common_truths(&layout, ascent, descent, line_box_height, line_height_px);
     for line in layout.lines() {
+        let text_metrics = line_text_metrics(&line);
         let ascent_descent_round_before_sum =
-            line.metrics().ascent.round() + line.metrics().descent.round();
-        let ascent_descent_round_after_sum =
-            (line.metrics().ascent + line.metrics().descent).round();
+            text_metrics.ascent.round() + text_metrics.descent.round();
+        let ascent_descent_round_after_sum = (text_metrics.ascent + text_metrics.descent).round();
         assert_ne!(
             ascent_descent_round_before_sum, ascent_descent_round_after_sum,
             "expected ascent and descent to be such that the ordering of round and sum matters"
@@ -444,11 +472,11 @@ fn lines_fractional_line_height_negative_leading_internal(
     // Confirm metrics
     assert_common_truths(&layout, ascent, descent, line_box_height, line_height_px);
     for line in layout.lines() {
-        let metrics = line.metrics();
+        let text_metrics = line_text_metrics(&line);
         assert!(
-            metrics.leading < 0.,
+            text_metrics.leading < 0.,
             "expected negative leading, but got {}",
-            metrics.leading
+            text_metrics.leading
         );
     }
 
@@ -503,10 +531,11 @@ fn lines_fractional_line_height_positive_leading_internal(
     assert_common_truths(&layout, ascent, descent, line_box_height, line_height_px);
     for line in layout.lines() {
         let metrics = line.metrics();
+        let text_metrics = line_text_metrics(&line);
         assert!(
-            metrics.leading > 0.,
+            text_metrics.leading > 0.,
             "expected positive leading, but got {}",
-            metrics.leading
+            text_metrics.leading
         );
 
         let above = metrics.baseline - metrics.block_min_coord;

@@ -112,17 +112,6 @@ impl<'a, B: Brush> Line<'a, B> {
 /// Metrics information for a line.
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
 pub struct LineMetrics {
-    /// Typographic ascent.
-    pub ascent: f32,
-    /// Typographic descent.
-    pub descent: f32,
-    /// Typographic leading.
-    ///
-    /// Like [`ascent`](Self::ascent) and [`descent`](Self::descent), this reflects only the text on
-    /// the line and ignores any inline boxes. It is therefore derived from the text's intrinsic
-    /// line height and may be smaller than `line_height - (ascent + descent)` when an inline box
-    /// has grown the line.
-    pub leading: f32,
     /// The absolute line height (in layout units).
     pub line_height: f32,
     /// Offset to the baseline.
@@ -143,6 +132,11 @@ pub struct LineMetrics {
     pub inline_max_coord: f32,
     /// Minimum coordinate in the direction orthogonal to line
     /// direction.
+    ///
+    /// In CSS parlance, this is the start of the "line box." See, e.g., CSS 2.1 § 9.4.2
+    /// <https://www.w3.org/TR/CSS2/visuren.html#line-box>. The line box is tall enough to cover all
+    /// its inline boxes, but note glyphs may overflow their box height, especially when the
+    /// typographic line height is small.
     ///
     /// For horizontal text, this would be the top of the line.
     pub block_min_coord: f32,
