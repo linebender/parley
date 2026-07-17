@@ -76,11 +76,8 @@ fn line_text_metrics<B: Brush>(line: &Line<'_, B>) -> TextMetrics {
 /// Returns the expected outputs for ascent, descent, and line box height.
 fn ascent_descent_box_height(font_size: f32, line_height_px: f32) -> (f32, f32, f32) {
     let (ascent, descent) = roboto_ascent_descent(font_size);
-    // Ascent and descent must be rounded separately to match the line box height of Chrome.
-    // See lines_integral_line_height_ascent_descent_rounding() for more details.
-    let ascent_descent = ascent.round() + descent.round();
-    let line_box_height = ascent_descent + (line_height_px.round() - ascent_descent);
-    (ascent, descent, line_box_height)
+    // The line height is the one the user specified, but we quantize it to whole pixels.
+    (ascent, descent, line_height_px.round())
 }
 
 /// Returns selection geometry such that every line is covered.
