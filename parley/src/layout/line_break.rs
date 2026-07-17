@@ -93,6 +93,11 @@ struct Extents {
 impl Default for Extents {
     fn default() -> Self {
         Self {
+            // NOTE: these should be `f32::NEG_INFINITY`, but that's currently causing
+            // `tests::test_builders::builders_empty` to fail with a `NaN`.
+            //
+            // And even more ideally, a line's initial extents should be sourced from the primary
+            // font.
             over: 0.,
             under: 0.,
         }
@@ -1253,6 +1258,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.baseline = top + line_box_extents.over;
         line.metrics.block_min_coord = top;
         line.metrics.block_max_coord = if quantize {
+            // TODO: perhaps this should be something like the following, to ensure quantized line
+            // boxes tile exactly without gaps or overlap. However, that would cause some
+            // line height asserts to fail in the tests.
+            // ```
+            // (self.state.line_y as f32 + self.state.line.box_metrics.line_height()).round()
+            // ```
             (line.metrics.baseline + line_box_extents.under).round()
         } else {
             line.metrics.baseline + line_box_extents.under

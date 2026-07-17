@@ -54,6 +54,9 @@ struct TextMetrics {
 
 /// Returns the line-wide text metrics for a line.
 fn line_text_metrics<B: Brush>(line: &Line<'_, B>) -> TextMetrics {
+    // Calculating the running max of these metrics over a line doesn't really have a typographic
+    // meaning, but the tests still depend on them (we used to calculate and store these in
+    // `LineMetrics`).
     let mut ascent = 0f32;
     let mut descent = 0f32;
     let mut line_height = 0f32;
@@ -241,8 +244,6 @@ fn lines_integral_line_height_zero_leading() {
 }
 
 /// Test integral line height that gives a negative leading of -1.
-///
-/// The line box height must not be reduced by the negative leading.
 #[test]
 fn lines_integral_line_height_minus_one_leading() {
     // Inputs
@@ -456,8 +457,6 @@ fn lines_line_height_rounds_down() {
 }
 
 /// Test fractional line height with a negative leading.
-///
-/// The line box height must not be reduced by the negative leading.
 fn lines_fractional_line_height_negative_leading_internal(
     test_name: &str,
     font_size: f32,
@@ -485,8 +484,6 @@ fn lines_fractional_line_height_negative_leading_internal(
 }
 
 /// Test fractional line height with a negative leading.
-///
-/// The line box height must not be reduced by the negative leading.
 #[test]
 fn lines_fractional_line_height_negative_leading() {
     // Inputs
@@ -498,8 +495,6 @@ fn lines_fractional_line_height_negative_leading() {
 }
 
 /// Test fractional line height with a big negative leading.
-///
-/// The line box height must not be reduced by the negative leading.
 ///
 /// NOTE: Going even lower (than the 0.675em in this test) will start divergence from Chrome.
 #[test]

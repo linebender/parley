@@ -72,9 +72,6 @@ pub(crate) struct LineData {
 
 impl LineData {
     pub(crate) fn size(&self) -> f32 {
-        // `leading` ignores inline boxes (like `ascent` and `descent`), so the full line height
-        // (which may have been grown by an inline box) is read directly from `line_height` rather
-        // than reconstructed from `ascent + descent + leading`.
         self.metrics.line_height
     }
 }
