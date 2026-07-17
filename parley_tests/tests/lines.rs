@@ -10,7 +10,7 @@ use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
 use parley::{
     Affinity, Alignment, AlignmentOptions, BoundingBox, Brush, Cursor, InlineBox, InlineBoxKind,
-    Layout, Line, LineHeight, PositionedLayoutItem, Selection, StyleProperty,
+    Layout, Line, LineHeight, Selection, StyleProperty,
 };
 use peniko::kurbo::Size;
 
@@ -57,9 +57,9 @@ fn line_text_metrics<B: Brush>(line: &Line<'_, B>) -> TextMetrics {
     // Calculating the running max of these metrics over a line doesn't really have a typographic
     // meaning, but the tests still depend on them (we used to calculate and store these in
     // `LineMetrics`).
-    let mut ascent = 0f32;
-    let mut descent = 0f32;
-    let mut line_height = 0f32;
+    let mut ascent = 0_f32;
+    let mut descent = 0_f32;
+    let mut line_height = 0_f32;
     for run in line.runs() {
         let metrics = run.metrics();
         ascent = ascent.max(metrics.ascent);

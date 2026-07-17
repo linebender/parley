@@ -107,7 +107,7 @@ impl Default for Extents {
 impl LineBoxMetrics {
     /// The line height seen so far.
     #[inline(always)]
-    fn line_height(&self) -> f32 {
+    fn line_height(self) -> f32 {
         self.line_box.over + self.line_box.under
     }
 
