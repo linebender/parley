@@ -10,7 +10,7 @@ use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
 use parley::{
     Affinity, Alignment, AlignmentOptions, BoundingBox, Brush, Cursor, InlineBox, InlineBoxKind,
-    Layout, Line, LineHeight, Selection, StyleProperty,
+    Layout, Line, LineHeight, PositionedLayoutItem, Selection, StyleProperty,
 };
 use peniko::kurbo::Size;
 
@@ -502,6 +502,36 @@ fn lines_fractional_line_height_big_negative_leading() {
 
     // Run the test
     lines_fractional_line_height_negative_leading_internal(test_name!(), font_size, line_height_px);
+}
+
+/// Test that an inline box interacts correctly with negative typographic leading.
+///
+/// An inline box should grow its line's line box so it fits. Negative leading just means glyphs
+/// from other lines may overlap this box.
+#[test]
+fn lines_negative_leading_inline_box_grows_line_box() {
+    // Inputs
+    let font_size = 16.0;
+    let line_height_px = 12.0;
+    let box_height = 14.0;
+    let text = "dig\npug\nyak";
+
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::FontSize(font_size));
+    builder.push_default(LineHeight::Absolute(line_height_px));
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        kind: InlineBoxKind::InFlow,
+        index: 5,
+        width: 12.0,
+        height: box_height,
+        baseline: None,
+    });
+    let mut layout: Layout<ColorBrush> = builder.build(text);
+    layout.break_all_lines(None);
+
+    env.check_layout_snapshot(&layout);
 }
 
 /// Test fractional line height with a positive leading.
