@@ -163,7 +163,6 @@ impl<'a> Query<'a> {
                 family_info,
                 self.attributes,
                 &mut family.default,
-                true,
                 self.source_cache,
             ) {
                 if f(font) == QueryStatus::Stop {
@@ -288,11 +287,10 @@ fn load_bucket<'a>(
                 return &[];
             }
             *status = Entry::Ok(fonts);
-            if let Entry::Ok(fonts) = status {
-                fonts
-            } else {
-                &[]
-            }
+            let Entry::Ok(fonts) = status else {
+                unreachable!()
+            };
+            fonts
         }
     }
 }
@@ -301,7 +299,6 @@ fn load_font<'a>(
     family: &FamilyInfo,
     attributes: Attributes,
     font: &'a mut Entry<QueryFont>,
-    is_default: bool,
     source_cache: &mut SourceCache,
 ) -> Option<&'a QueryFont> {
     match font {
@@ -311,11 +308,7 @@ fn load_font<'a>(
             // Set to error in case we fail. This simplifies
             // the following code.
             *status = Entry::Error;
-            let family_index = if is_default {
-                family.default_font_index()
-            } else {
-                family.match_index(attributes.width, attributes.style, attributes.weight, true)?
-            };
+            let family_index = family.default_font_index();
             let font_info = family.fonts().get(family_index)?;
             let blob = font_info.load(Some(source_cache))?;
             let blob_index = font_info.index();

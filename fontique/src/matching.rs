@@ -9,7 +9,7 @@ use smallvec::SmallVec;
 
 const DEFAULT_OBLIQUE_ANGLE: f32 = 14.0;
 
-pub fn match_fonts(
+pub(crate) fn match_fonts(
     set: &[FontInfo],
     width: FontWidth,
     style: FontStyle,
@@ -22,6 +22,7 @@ pub fn match_fonts(
     });
     set.iter().enumerate().filter_map(move |(index, font)| {
         let (best_width, best_style, best_weight) = best?;
+        // We need to return each font with the best attributes, as there might be multiple subsets.
         (font.width() == best_width && font.style() == best_style && font.weight() == best_weight)
             .then_some(index)
     })
