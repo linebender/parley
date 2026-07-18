@@ -177,7 +177,9 @@ impl LineBoxMetrics {
             let below = leading.round() - above;
             (above, below)
         } else {
-            (leading * 0.5, leading - leading * 0.5)
+            let above = leading * 0.5;
+            // We calculate like this to limit floating point error.
+            (above, leading - above)
         };
 
         // The text strut extends `ascent + positive-half-leading` above the baseline and
