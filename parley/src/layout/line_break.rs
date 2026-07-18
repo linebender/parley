@@ -63,7 +63,7 @@ impl LineState {
 /// The metrics of a line box.
 ///
 /// Note a line box is distinct from an *inline* box. A line box is a single line within the layout,
-/// and can hold multiple inline boxes.
+/// and can hold multiple text runs and inline boxes.
 #[derive(Clone, Copy, Debug)]
 struct LineBoxMetrics {
     /// Of the text on the line currently being built, the maximum ascent (distance above the
