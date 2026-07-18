@@ -65,11 +65,11 @@ impl LineState {
 /// Note a line box is distinct from an *inline* box. A line box is a single line within the layout,
 /// and can hold multiple text runs and inline boxes.
 ///
-/// Following CSS 2.1 § 10.8 (line height calculations in "Visual formatting model details"), line
+/// Following CSS 2.2 § 10.8 (line height calculations in "Visual formatting model details"), line
 /// boxes are sized to fit the line's inline content. Inline content is first aligned to each other
 /// (we currently only align content by their baselines). We model this as the inline content being
 /// aligned to the line box's own "baseline," and carry the line box's height over and under that
-/// baseline. See <https://www.w3.org/TR/CSS2/visudet.html#line-height>.
+/// baseline. See <https://www.w3.org/TR/CSS22/visudet.html#line-height>.
 #[derive(Clone, Copy, Debug, Default)]
 struct LineBoxMetrics {
     /// The extents from the line box's baseline.

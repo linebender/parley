@@ -133,9 +133,9 @@ pub struct LineMetrics {
     /// Minimum coordinate in the direction orthogonal to line
     /// direction.
     ///
-    /// In CSS parlance, this is the start of the "line box." See, e.g., CSS 2.1 § 9.4.2
-    /// <https://www.w3.org/TR/CSS2/visuren.html#line-box>. The line box is tall enough to cover all
-    /// its inline boxes, but note glyphs may overflow their box height, especially when the
+    /// In CSS parlance, this is the start of the "line box." See, e.g., CSS 2.2 § 9.4.2
+    /// <https://www.w3.org/TR/CSS22/visuren.html#line-box>. The line box is tall enough to cover
+    /// all its inline boxes, but note glyphs may overflow their box height, especially when the
     /// typographic line height is small. See also [`Self::content_block_min_coord`].
     ///
     /// For horizontal text, this would be the top of the line.
