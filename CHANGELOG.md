@@ -16,14 +16,14 @@ This release has an [MSRV] of 1.88.
 
 #### Parley
 
-- Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. (#661 by [@tomcur][])
+- Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. ([#661][] by [@tomcur][])
 - `parley::editing::Cursor::{previous,next}_logical_word` now land at the previous/next logical start of a word and skip over whitespace. ([#215][] by [@tomcur][])
 
 ### Fixed
 
 #### Fontique
 
-- Fix compilation on 32-bit platforms without 64-bit atomics (e.g. `mipsel-unknown-linux-gnu`). (#671 by [@nicoburns][])
+- Fix compilation on 32-bit platforms without 64-bit atomics (e.g. `mipsel-unknown-linux-gnu`). ([#671][] by [@nicoburns][])
 
 ## [0.11.0] - 2026-06-24
 
@@ -33,21 +33,21 @@ This release has an [MSRV] of 1.88.
 
 #### Parley
 
-- Line break opportunity override (#640 by [@taj-p][]).
+- Line break opportunity override ([#640][] by [@taj-p][]).
   The builders now have a `set_line_break_override` method which can be used to customise where Parley detects line-breaking opportunities. It can be called with `Some(parley::CHROMIUM_LINE_BREAK_OVERRIDE)` to make line-breaking match Chromium, or with a custom instance of `AsciiLineBreakTable` created with `AsciiLineBreakTableBuilder`. If you do not call the function then you will get the existing standard ICU-defined behavior.
-- `From` conversions into `StyleProperty` for `FontWidth`, `FontStyle`, `FontWeight`, `WordBreak`, `OverflowWrap`, and `TextWrapMode`, matching the existing conversions for font family, variations, features, and line height. (#643 by [@waywardmonkeys][])
+- `From` conversions into `StyleProperty` for `FontWidth`, `FontStyle`, `FontWeight`, `WordBreak`, `OverflowWrap`, and `TextWrapMode`, matching the existing conversions for font family, variations, features, and line height. ([#643][] by [@waywardmonkeys][])
 
 ### Changed
 
 #### Parley
 
-- Upgrade to `read-fonts` 0.40, `skrifa` 0.43, `harfrust` 0.10 (#650 by [@nicoburns][])
+- Upgrade to `read-fonts` 0.40, `skrifa` 0.43, `harfrust` 0.10 ([#650][] by [@nicoburns][])
 
 ### Fixed
 
 #### Parley
 
-- Fix font selection for emoji followed by a variation selector (#637 by [@kane50613][])
+- Fix font selection for emoji followed by a variation selector ([#637][] by [@kane50613][])
 
 ## [0.10.0] - 2026-06-01
 
@@ -696,6 +696,7 @@ This release has an [MSRV][] of 1.70.
 [#643]: https://github.com/linebender/parley/pull/643
 [#650]: https://github.com/linebender/parley/pull/650
 [#661]: https://github.com/linebender/parley/pull/661
+[#671]: https://github.com/linebender/parley/pull/671
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.11.0...HEAD
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0
