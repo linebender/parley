@@ -17,6 +17,7 @@ This release has an [MSRV] of 1.88.
 #### Parley
 
 - Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. (#661 by [@tomcur][])
+- `parley::editing::Cursor::{previous,next}_logical_word` now land at the previous/next logical start of a word and skip over whitespace. ([#215][] by [@tomcur][])
 
 ### Fixed
 
@@ -587,6 +588,7 @@ This release has an [MSRV][] of 1.70.
 [#211]: https://github.com/linebender/parley/pull/211
 [#212]: https://github.com/linebender/parley/pull/212
 [#213]: https://github.com/linebender/parley/pull/213
+[#215]: https://github.com/linebender/parley/pull/215
 [#223]: https://github.com/linebender/parley/pull/223
 [#224]: https://github.com/linebender/parley/pull/224
 [#241]: https://github.com/linebender/parley/pull/241
