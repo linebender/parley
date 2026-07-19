@@ -15,7 +15,7 @@ use parley_core::break_overrides::LineBreakOverrideFn;
 
 use crate::InlineBoxKind;
 use crate::inline_box::InlineBox;
-use crate::resolve::{ResolvedStyle, StyleRun, tree::ItemKind};
+use crate::resolve::{StyleRun, tree::ItemKind};
 
 /// Builder for constructing a text layout with ranged attributes.
 #[must_use]
@@ -291,7 +291,14 @@ fn build_into_layout<B: Brush>(
     line_break_override: Option<&LineBreakOverrideFn>,
 ) {
     if text.is_empty() && lcx.style_runs.is_empty() {
-        lcx.style_table.push(ResolvedStyle::default());
+        // Resolve the default style rather than using
+        // `ResolvedStyle::default()` (which has a font size of zero) so
+        // that the fake space shaped for empty text produces sensible
+        // metrics for sizing a cursor.
+        let style = lcx
+            .rcx
+            .resolve_entire_style_set(fcx, &TextStyle::default(), scale);
+        lcx.style_table.push(style);
         lcx.style_runs.push(StyleRun {
             style_index: 0,
             range: 0..0,

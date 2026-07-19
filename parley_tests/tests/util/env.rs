@@ -101,6 +101,7 @@ pub(crate) fn create_font_context() -> FontContext {
     let mut collection = Collection::new(CollectionOptions {
         shared: false,
         system_fonts: false,
+        exhaustive_fallback: true,
     });
     load_fonts(&mut collection, parley_dev::font_dirs()).unwrap();
     for font in FONT_FAMILY_LIST {

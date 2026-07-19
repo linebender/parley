@@ -36,6 +36,7 @@ use fontconfig_sys::{
 use hashbrown::{HashMap, HashSet, hash_map::Entry};
 use smallvec::SmallVec;
 
+use super::FallbackFamilies;
 use crate::{
     FallbackKey, FamilyId, FamilyInfo, FontInfo, FontStyle, FontWeight, FontWidth,
     FromFontconfig as _, GenericFamily, Script, ScriptExt,
@@ -733,11 +734,16 @@ impl SystemFonts {
         family
     }
 
-    pub(crate) fn fallback(&mut self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
-        let config = self.config.as_ref()?;
+    pub(crate) fn fallback(&mut self, key: impl Into<FallbackKey>) -> FallbackFamilies {
+        let mut families = FallbackFamilies::new();
+        let Some(config) = self.config.as_ref() else {
+            return families;
+        };
         let key: FallbackKey = key.into();
 
-        let mut pattern = Pattern::new()?;
+        let Some(mut pattern) = Pattern::new() else {
+            return families;
+        };
 
         let locale_lang_set = key.locale_str().and_then(|locale| {
             let mut lang_set = LangSet::new()?;
@@ -751,6 +757,51 @@ impl SystemFonts {
         }
         if let Some(set) = script_char_set {
             pattern.add_charset(FC_CHARSET, set);
+        }
+
+        config.substitute(&mut pattern, FcMatchPattern);
+
+        // We enable the "trim" option here which ignores later fonts if
+        // they provide no new Unicode coverage. This produces an ordered
+        // list of families that together cover the script rather than just
+        // the single best match.
+        let Ok(font_set) = config.font_sort(&pattern, true) else {
+            return families;
+        };
+        for font in font_set.iter() {
+            let Some(font) = config.font_render_prepare(&pattern, &font) else {
+                continue;
+            };
+            let Ok(family_name) = font.get_string(FC_FAMILY, 0) else {
+                continue;
+            };
+            if let Some(family) = self.name_map.get(&family_name)
+                && !families.contains(&family.id())
+            {
+                families.push(family.id());
+            }
+        }
+        families
+    }
+
+    pub(crate) fn fallback_for_text(
+        &mut self,
+        text: &str,
+        locale: Option<&str>,
+    ) -> Option<FamilyId> {
+        let config = self.config.as_ref()?;
+
+        let mut pattern = Pattern::new()?;
+
+        let mut charset = CharSet::new()?;
+        for ch in text.chars() {
+            charset.add(ch);
+        }
+        pattern.add_charset(FC_CHARSET, &charset);
+        if let Some(locale) = locale {
+            let mut lang_set = LangSet::new()?;
+            lang_set.add(CString::new(locale).ok()?.as_c_str());
+            pattern.add_langset(FC_LANG, &lang_set);
         }
 
         config.substitute(&mut pattern, FcMatchPattern);
