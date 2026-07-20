@@ -21,6 +21,13 @@ pub struct CharCluster {
     comp: Form,
     decomp: Form,
     best_ratio: f32,
+<<<<<<< HEAD
+||||||| parent of 79a3774 (remove is_emoji)
+    is_emoji: bool,
+    emoji_presentation_style: EmojiPresentationStyle,
+=======
+    emoji_presentation_style: EmojiPresentationStyle,
+>>>>>>> 79a3774 (remove is_emoji)
 }
 
 impl CharCluster {
@@ -39,7 +46,14 @@ impl CharCluster {
 
     #[inline(always)]
     pub fn is_emoji(&self) -> bool {
+<<<<<<< HEAD
         self.is_emoji
+||||||| parent of 79a3774 (remove is_emoji)
+        // self.is_emoji
+        self.emoji_presentation_style.is_emoji()
+=======
+        self.emoji_presentation_style.is_emoji()
+>>>>>>> 79a3774 (remove is_emoji)
     }
 }
 
@@ -61,7 +75,7 @@ pub struct Char {
     /// Indexes into the list of styles for the containing text run, to find the style applicable
     /// to this character.
     pub style_index: u16,
-    /// Whether the emoji presentation selector
+    /// True if the character is an emoji presentation selector (VS15 or VS16).
     pub is_emoji_presentation_selector: bool,
 }
 
