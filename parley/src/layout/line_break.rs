@@ -73,12 +73,17 @@ impl LineState {
 #[derive(Clone, Copy, Debug, Default)]
 struct LineBoxMetrics {
     /// The extents from the line box's baseline.
+    ///
+    /// The extents are in block flow direction; i.e., for horizontal text, these are vertical, and
+    /// for vertical text, these are horizontal.
     line_box: Extents,
     /// The content extents from the line box's baseline.
     ///
     /// This covers, roughly, the glyphs and inline boxes. This does not take into account
     /// typographic leading, but only the typographic ascent and descent. In case of negative
     /// leading, this can be larger than [`Self::line_box`].
+    ///
+    /// Like [`Self::line_box`], these are in block flow direction.
     content_box: Extents,
 }
 
