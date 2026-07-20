@@ -549,15 +549,25 @@ impl Selection {
             // TODO: the width of this whitespace should be the width of a space
             // (U+0020) character.
             let newline_whitespace = if line.break_reason() == BreakReason::Explicit {
-                // The newline's metrics are those of the last run.
-                line.runs()
-                    .last()
-                    .map(|run| {
+                // The newline's metrics are those of the line's last logical run.
+                match line
+                    .text_range()
+                    .end
+                    .checked_sub(1)
+                    .and_then(|index| Cluster::from_byte_index(layout, index))
+                {
+                    Some(newline_cluster) => {
+                        debug_assert!(
+                            newline_cluster.is_hard_line_break(),
+                            "Expected the line's last logical run to be a newline cluster."
+                        );
+                        let run = newline_cluster.run();
                         let run_metrics = run.metrics();
                         (run_metrics.ascent as f64 + run_metrics.descent as f64)
                             * NEWLINE_WHITESPACE_WIDTH_RATIO
-                    })
-                    .unwrap_or(0.0)
+                    }
+                    None => 0.0,
+                }
             } else {
                 0.0
             };
