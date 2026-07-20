@@ -40,7 +40,7 @@ impl CharCluster {
 
     #[inline(always)]
     pub fn is_emoji(&self) -> bool {
-        self.is_emoji
+        self.emoji_presentation_style.is_emoji()
     }
 }
 
@@ -62,7 +62,7 @@ pub struct Char {
     /// Indexes into the list of styles for the containing text run, to find the style applicable
     /// to this character.
     pub style_index: u16,
-    /// Whether the emoji presentation selector
+    /// True if the character is an emoji presentation selector (VS15 or VS16).
     pub is_emoji_presentation_selector: bool,
 }
 
