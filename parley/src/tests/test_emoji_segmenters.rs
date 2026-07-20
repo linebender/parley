@@ -241,7 +241,7 @@ fn lone_regional_indicator() {
         sequence: &[
             0x1F1FA, // REGIONAL INDICATOR SYMBOL LETTER U
         ],
-        categories: &[EmojiSegmentationCategory::Ri],
+        categories: &[EmojiSegmentationCategory::RegionalIndicator],
         style: EmojiPresentationStyle::Default,
     });
 }
@@ -254,7 +254,10 @@ fn flag_sequence_us() {
             0x1F1FA, // REGIONAL INDICATOR SYMBOL LETTER U
             0x1F1F8, // REGIONAL INDICATOR SYMBOL LETTER S
         ],
-        categories: &[EmojiSegmentationCategory::Ri, EmojiSegmentationCategory::Ri],
+        categories: &[
+            EmojiSegmentationCategory::RegionalIndicator,
+            EmojiSegmentationCategory::RegionalIndicator,
+        ],
         style: EmojiPresentationStyle::Emoji,
     });
 }
@@ -274,9 +277,9 @@ fn double_lone_regional_indicator_flag_sequence_us() {
             0x1F1F8, // REGIONAL INDICATOR SYMBOL LETTER S
         ],
         categories: &[
-            EmojiSegmentationCategory::Ri,
-            EmojiSegmentationCategory::Ri,
-            EmojiSegmentationCategory::Ri,
+            EmojiSegmentationCategory::RegionalIndicator,
+            EmojiSegmentationCategory::RegionalIndicator,
+            EmojiSegmentationCategory::RegionalIndicator,
         ],
         style: EmojiPresentationStyle::Emoji,
     });

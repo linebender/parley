@@ -65,9 +65,17 @@ static DFA_TRANS: [[u8; 13]; 13] = {
     //
     // <https://unicode.org/reports/tr51/#def_emoji_flag_sequence>
     {
-        add!(State::Start, Category::Ri, State::Ri);
+        add!(
+            State::Start,
+            Category::RegionalIndicator,
+            State::RegionalIndicator
+        );
 
-        add!(State::Ri, Category::Ri, State::Terminal);
+        add!(
+            State::RegionalIndicator,
+            Category::RegionalIndicator,
+            State::Terminal
+        );
     }
 
     // Emoji tag sequence (ETS).
@@ -168,7 +176,7 @@ impl EmojiDFA {
     #[inline]
     pub(crate) const fn is_accepting(self) -> bool {
         const START: u8 = EmojiState::Terminal.as_u8();
-        const END: u8 = EmojiState::Ri.as_u8();
+        const END: u8 = EmojiState::RegionalIndicator.as_u8();
 
         let cur = self.state.as_u8();
 
@@ -198,7 +206,9 @@ impl EmojiDFA {
             return EmojiSequence::Tag;
         }
 
-        if self.contains_state(EmojiState::Ri) && self.contains_state(EmojiState::Terminal) {
+        if self.contains_state(EmojiState::RegionalIndicator)
+            && self.contains_state(EmojiState::Terminal)
+        {
             return EmojiSequence::Flag;
         }
 
