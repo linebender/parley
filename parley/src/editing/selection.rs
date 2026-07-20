@@ -274,7 +274,9 @@ impl Selection {
         let line_limit = layout.len().saturating_sub(1);
         let geometry = self.focus.geometry(layout, 0.0);
         let line_index = layout
-            .line_for_offset(geometry.y0 as f32)
+            // TODO: we're determining the line for the cursor through its rendered position. In
+            // case of extreme geometry (like zero line height), this won't work.
+            .line_for_offset(((geometry.y0 + geometry.y1) / 2.) as f32)
             .map(|(ix, _)| ix)
             .unwrap_or(line_limit);
         let new_line_index = line_index.saturating_add_signed(delta);
@@ -298,7 +300,8 @@ impl Selection {
         let h_pos = self
             .h_pos
             .unwrap_or_else(|| self.focus.geometry(layout, 0.0).x0 as f32);
-        let y = line.metrics().block_max_coord - line.metrics().ascent * 0.5;
+        // Set the `y` to be in the middle of the line.
+        let y = (line.metrics().block_max_coord + line.metrics().block_min_coord) / 2.;
         let new_focus = Cursor::from_point(layout, h_pos, y);
         let h_pos = Some(h_pos);
         if extend {
@@ -535,16 +538,36 @@ impl Selection {
                 continue;
             };
             let metrics = line.metrics();
-            let line_min = metrics.block_min_coord as f64;
-            let line_max = metrics.block_max_coord as f64;
+            let line_min =
+                f32::min(metrics.block_min_coord, metrics.content_block_min_coord) as f64;
+            let line_max =
+                f32::max(metrics.block_max_coord, metrics.content_block_max_coord) as f64;
             // Trailing whitespace to indicate that the newline character at the
-            // end of this line is selected. It's based on the ascent and
-            // descent so it doesn't change with the line height.
+            // end of this line is selected. It's based on the content block so
+            // it doesn't change with the line height.
             //
             // TODO: the width of this whitespace should be the width of a space
             // (U+0020) character.
             let newline_whitespace = if line.break_reason() == BreakReason::Explicit {
-                (metrics.ascent as f64 + metrics.descent as f64) * NEWLINE_WHITESPACE_WIDTH_RATIO
+                // The newline's metrics are those of the line's last logical run.
+                match line
+                    .text_range()
+                    .end
+                    .checked_sub(1)
+                    .and_then(|index| Cluster::from_byte_index(layout, index))
+                {
+                    Some(newline_cluster) => {
+                        debug_assert!(
+                            newline_cluster.is_hard_line_break(),
+                            "Expected the line's last logical run to be a newline cluster."
+                        );
+                        let run = newline_cluster.run();
+                        let run_metrics = run.metrics();
+                        (run_metrics.ascent as f64 + run_metrics.descent as f64)
+                            * NEWLINE_WHITESPACE_WIDTH_RATIO
+                    }
+                    None => 0.0,
+                }
             } else {
                 0.0
             };

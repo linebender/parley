@@ -64,180 +64,94 @@ impl LineState {
 ///
 /// Note a line box is distinct from an *inline* box. A line box is a single line within the layout,
 /// and can hold multiple text runs and inline boxes.
-#[derive(Clone, Copy, Debug)]
+///
+/// Following CSS 2.2 § 10.8 (line height calculations in "Visual formatting model details"), line
+/// boxes are sized to fit the line's inline content. Inline content is first aligned to each other
+/// (we currently only align content by their baselines). We model this as the inline content being
+/// aligned to the line box's own "baseline," and carry the line box's height over and under that
+/// baseline. See <https://www.w3.org/TR/CSS22/visudet.html#line-height>.
+#[derive(Clone, Copy, Debug, Default)]
 struct LineBoxMetrics {
-    /// Of the text on the line currently being built, the maximum ascent (distance above the
-    /// baseline) of any run seen so far. This is the raw font ascent and does *not* include any
-    /// leading.
-    text_ascent: f32,
-    /// Of the text on the line currently being built, the maximum descent (distance below the
-    /// baseline) of any run seen so far. This is the raw font descent and does *not* include any
-    /// leading.
-    text_descent: f32,
-    /// Of the text on the line currently being built, the maximum intrinsic line height (i.e.
-    /// including the full leading) of any run seen so far. This may be *smaller* than
-    /// `text_ascent + text_descent` when the line height is smaller than the font metrics (negative
-    /// leading), in which case lines are allowed to overlap.
-    text_line_height: f32,
-    /// Of the inline boxes on the line currently being built, the maximum ascent (distance above
-    /// the baseline) of any box seen so far.
+    /// The extents from the line box's baseline.
     ///
-    /// Box extents are tracked separately from text so that an inline box only grows the line when
-    /// it extends beyond the text (including any positive half-leading). Crucially, this means a
-    /// box's descent never interacts with negative leading: a box that sits on or above the
-    /// baseline cannot "fill in" the negative leading that allows text lines to overlap.
-    box_ascent: f32,
-    /// Of the inline boxes on the line currently being built, the maximum descent (distance below
-    /// the baseline) of any box seen so far. See [`Self::box_ascent`].
-    box_descent: f32,
+    /// The extents are in block flow direction; i.e., for horizontal text, these are vertical, and
+    /// for vertical text, these are horizontal.
+    line_box: Extents,
+    /// The content extents from the line box's baseline.
+    ///
+    /// This covers, roughly, the glyphs and inline boxes. This does not take into account
+    /// typographic leading, but only the typographic ascent and descent. In case of negative
+    /// leading, this can be larger than [`Self::line_box`].
+    ///
+    /// Like [`Self::line_box`], these are in block flow direction.
+    content_box: Extents,
 }
 
-struct ResolvedLineBoxMetrics {
-    /// Height of the line box.
-    line_height: f32,
-    /// Distance from the top of the line box to the baseline.
-    above: f32,
-    /// Distance the line box content extends above the baseline (with negative leading clamped to 0, i.e., this can be larger than [`Self::above`]).
-    block_above: f32,
-    /// Distance the line box content extends below the baseline (with negative leading clamped to 0).
-    block_below: f32,
+#[derive(Clone, Copy, Debug)]
+struct Extents {
+    /// The space over the line box's baseline.
+    over: f32,
+    /// The space under the line box's baseline.
+    under: f32,
 }
 
-impl Default for LineBoxMetrics {
+impl Default for Extents {
     fn default() -> Self {
         Self {
-            // Text extents default to zero, so a line with no text contributes no ascent, descent
-            // or leading.
-            text_ascent: 0.0,
-            text_descent: 0.0,
-            text_line_height: 0.0,
-            // Box extents default to negative infinity so that a line with no inline boxes never
-            // grows the line via the box-overflow terms in `line_height`.
-            box_ascent: f32::NEG_INFINITY,
-            box_descent: f32::NEG_INFINITY,
+            // NOTE: these should be `f32::NEG_INFINITY`, but that's currently causing
+            // `tests::test_builders::builders_empty` to fail with a `NaN`.
+            //
+            // And even more ideally, a line's initial extents should be sourced from the primary
+            // font.
+            over: 0.,
+            under: 0.,
         }
     }
 }
 
 impl LineBoxMetrics {
     /// The line height seen so far.
-    ///
-    /// See [`Self::resolve`].
     #[inline(always)]
-    fn line_height(&self) -> f32 {
-        self.resolve(false).line_height
+    fn line_height(self) -> f32 {
+        self.line_box.over + self.line_box.under
     }
 
-    /// Resolve the line box metrics, mixing the text and inline box metrics.
-    ///
-    /// The baseline divides the line into an above-baseline and below-baseline part, each of which
-    /// is the larger of the text's contribution and any inline box's contribution:
-    ///
-    /// - The text contributes its ascent/descent plus its (possibly negative) half-leading. This
-    ///   is the text "strut", which may be smaller than the text's ink when the leading is negative
-    ///   (i.e. lines are allowed to overlap).
-    /// - An inline box contributes its raw ascent/descent. A box only enlarges a side when it
-    ///   extends beyond the text strut *including* any positive half-leading (so a box that fits
-    ///   within positive leading does not grow the line). Crucially, the box's extent is compared
-    ///   against the text padded only by *positive* leading, so an inline box never interacts with
-    ///   negative leading: it neither cancels the line overlap that negative leading produces, nor
-    ///   is its own extent shrunk by it.
-    fn resolve(&self, quantize: bool) -> ResolvedLineBoxMetrics {
-        // We mimic Chrome in rounding ascent and descent separately,
-        // before calculating the rest.
-        // See lines_integral_line_height_ascent_descent_rounding() for more details.
-        let (ascent, descent, box_ascent, box_descent) = if quantize {
-            (
-                self.text_ascent.round(),
-                self.text_descent.round(),
-                self.box_ascent.round(),
-                self.box_descent.round(),
-            )
+    fn add_text(&mut self, metrics: &RunMetrics, quantize: bool) {
+        // TODO: perhaps precompute these run metrics and store in `RunMetrics`.
+        let (ascent, descent) = if quantize {
+            (metrics.ascent.round(), metrics.descent.round())
         } else {
-            (
-                self.text_ascent,
-                self.text_descent,
-                self.box_ascent,
-                self.box_descent,
-            )
+            (metrics.ascent, metrics.descent)
         };
-
-        let leading = self.text_line_height - (ascent + descent);
-
-        // The leading is distributed around the baseline using the text's *intrinsic* line height,
-        // never the (possibly larger) line height caused by inline boxes. This is what keeps
-        // consecutive baselines on a consistent grid: an inline box that fits within the line does
-        // not perturb the text strut, and therefore does not move the baseline.
-        let (leading_above, leading_below) = if quantize {
-            // We mimic Chrome in giving 'below' the larger leading half.
-            // Although the comment in Chromium's NGLineHeightMetrics::AddLeading function
-            // in ng_line_height_metrics.cc claims it's for legacy test compatibility.
-            // So we might want to think about giving 'above' the larger half instead.
-            let above = (leading * 0.5).floor();
-            let below = leading.round() - above;
-            (above, below)
+        let half_leading = (metrics.line_height - (ascent + descent)) / 2.;
+        let over = if quantize {
+            ascent + half_leading.floor()
         } else {
-            let above = leading * 0.5;
-            // We calculate like this to limit floating point error.
-            (above, leading - above)
+            ascent + half_leading
         };
+        // Note the `under` part is *not* quantized. This is such that the exact line height is
+        // reached. For determining the line box block, add this to the baseline and then quantize
+        // by rounding.
+        let under = metrics.line_height - over;
 
-        // The text strut extends `ascent + positive-half-leading` above the baseline and
-        // `descent + positive-half-leading` below it. An inline box only grows a side of the line
-        // (and, for the ascent side, pushes the baseline down) when it extends beyond this strut.
-        // A box sitting below the baseline therefore grows the line downwards without disturbing
-        // the baseline.
-        let threshold_above = ascent + leading_above.max(0.);
-        let threshold_below = descent + leading_below.max(0.);
+        self.line_box.over = self.line_box.over.max(over);
+        self.line_box.under = self.line_box.under.max(under);
+        self.content_box.over = self.content_box.over.max(ascent);
+        self.content_box.under = self.content_box.under.max(descent);
+    }
 
-        if box_ascent <= threshold_above && box_descent <= threshold_below {
-            // No inline box extends beyond the text, so the line is exactly the text's intrinsic
-            // line height (preserving negative leading and floating-point exactness when not
-            // quantizing).
-            ResolvedLineBoxMetrics {
-                line_height: if quantize {
-                    self.text_line_height.round()
-                } else {
-                    self.text_line_height
-                },
-                above: ascent + leading_above,
-                block_above: threshold_above,
-                block_below: threshold_below,
-            }
+    fn add_inline_box(&mut self, ascent: f32, descent: f32, quantize: bool) {
+        if quantize {
+            self.line_box.over = self.line_box.over.max(ascent.round());
+            self.line_box.under = self.line_box.under.max(descent.round());
+            self.content_box.over = self.content_box.over.max(ascent.round());
+            self.content_box.under = self.content_box.under.max(descent.round());
         } else {
-            // Distance from the top of the line down to the baseline. Note the unclamped
-            // `leading_above` here (as opposed to the clamped value used for the min coord below):
-            // negative leading is correct for baseline placement but must not shrink the min/max
-            // coords.
-            let above = if box_ascent > threshold_above {
-                box_ascent
-            } else {
-                ascent + leading_above
-            };
-            let below = if box_descent > threshold_below {
-                box_descent
-            } else {
-                descent + leading_below
-            };
-
-            ResolvedLineBoxMetrics {
-                line_height: above + below,
-                above,
-                block_above: threshold_above.max(box_ascent),
-                block_below: threshold_below.max(box_descent),
-            }
+            self.line_box.over = self.line_box.over.max(ascent);
+            self.line_box.under = self.line_box.under.max(descent);
+            self.content_box.over = self.content_box.over.max(ascent);
+            self.content_box.under = self.content_box.under.max(descent);
         }
-    }
-
-    fn add_text(&mut self, metrics: &RunMetrics) {
-        self.text_ascent = self.text_ascent.max(metrics.ascent);
-        self.text_descent = self.text_descent.max(metrics.descent);
-        self.text_line_height = self.text_line_height.max(metrics.line_height);
-    }
-
-    fn add_inline_box(&mut self, ascent: f32, descent: f32) {
-        self.box_ascent = self.box_ascent.max(ascent);
-        self.box_descent = self.box_descent.max(descent);
     }
 }
 
@@ -382,12 +296,12 @@ impl BreakerState {
     /// they extend above and below the baseline, *not* including leading) as well as the intrinsic
     /// line height of the cluster(s) (i.e. including the full leading), which may be smaller than
     /// `ascent + descent` when the leading is negative.
-    pub fn append_cluster_to_line(&mut self, next_x: f32, metrics: &RunMetrics) {
+    pub fn append_cluster_to_line(&mut self, next_x: f32, metrics: &RunMetrics, quantize: bool) {
         self.line.items.end = self.item_idx + 1;
         self.line.clusters.end = self.cluster_idx + 1;
         self.cluster_idx += 1;
         self.line.x = next_x;
-        self.line.box_metrics.add_text(metrics);
+        self.line.box_metrics.add_text(metrics, quantize);
         self.update_max_height_exceeded();
     }
 
@@ -396,11 +310,19 @@ impl BreakerState {
     /// `ascent` and `descent` are the distances the box extends above and below the text baseline
     /// respectively. A box with its bottom aligned to the baseline is simply one with a zero
     /// descent. The box grows the line only insofar as it extends beyond the text.
-    pub fn append_inline_box_to_line(&mut self, next_x: f32, ascent: f32, descent: f32) {
+    pub fn append_inline_box_to_line(
+        &mut self,
+        next_x: f32,
+        ascent: f32,
+        descent: f32,
+        quantize: bool,
+    ) {
         self.item_idx += 1;
         self.line.items.end += 1;
         self.line.x = next_x;
-        self.line.box_metrics.add_inline_box(ascent, descent);
+        self.line
+            .box_metrics
+            .add_inline_box(ascent, descent, quantize);
         self.update_max_height_exceeded();
     }
 
@@ -736,6 +658,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             next_x,
                             ascent_contribution,
                             descent_contribution,
+                            self.layout.data.quantize,
                         );
 
                         // We can always line break after an inline box
@@ -748,6 +671,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 next_x,
                                 ascent_contribution,
                                 descent_contribution,
+                                self.layout.data.quantize,
                             );
                             BreakReason::Emergency
                         } else {
@@ -831,8 +755,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                             && next.info.source_char() == '\n'
                                     });
 
-                            self.state
-                                .append_cluster_to_line(self.state.line.x, metrics);
+                            self.state.append_cluster_to_line(
+                                self.state.line.x,
+                                metrics,
+                                self.layout.data.quantize,
+                            );
 
                             if is_cr_before_lf {
                                 continue;
@@ -879,7 +806,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             if max_height_exceeded {
                                 return self.max_height_break_data(line_height);
                             }
-                            self.state.append_cluster_to_line(next_x, metrics);
+                            self.state.append_cluster_to_line(
+                                next_x,
+                                metrics,
+                                self.layout.data.quantize,
+                            );
                             if is_space {
                                 self.state.line.num_spaces += 1;
                             }
@@ -897,7 +828,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
-                                self.state.append_cluster_to_line(next_x, metrics);
+                                self.state.append_cluster_to_line(
+                                    next_x,
+                                    metrics,
+                                    self.layout.data.quantize,
+                                );
                                 return self.start_new_line(
                                     BreakReason::Regular,
                                     max_advance,
@@ -940,7 +875,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
-                                self.state.append_cluster_to_line(next_x, metrics);
+                                self.state.append_cluster_to_line(
+                                    next_x,
+                                    metrics,
+                                    self.layout.data.quantize,
+                                );
                             }
                         }
                     }
@@ -987,8 +926,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let inline_box = &self.layout.data.inline_boxes[item.index];
 
                     if inline_box.kind != InlineBoxKind::InFlow {
-                        self.state
-                            .append_inline_box_to_line(self.state.line.x, 0.0, 0.0);
+                        self.state.append_inline_box_to_line(
+                            self.state.line.x,
+                            0.0,
+                            0.0,
+                            self.layout.data.quantize,
+                        );
                         continue;
                     }
 
@@ -1008,6 +951,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         next_x,
                         baseline,
                         inline_box.height - baseline,
+                        self.layout.data.quantize,
                     );
                     char_count += 1;
 
@@ -1057,7 +1001,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.state.line.x + advance
                         };
                         let metrics = run.metrics();
-                        self.state.append_cluster_to_line(next_x, metrics);
+                        self.state.append_cluster_to_line(
+                            next_x,
+                            metrics,
+                            self.layout.data.quantize,
+                        );
                         char_count += 1;
 
                         if is_space {
@@ -1257,7 +1205,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             })
             .unwrap_or(0.0);
 
-        let mut box_metrics = self.state.line.box_metrics;
+        // Whether metrics should be quantized to pixel boundaries
+        let quantize = self.layout.data.quantize;
+
+        let mut line_box_extents = self.state.line.box_metrics.line_box;
+        let mut content_box_extents = self.state.line.box_metrics.content_box;
         if !have_metrics
             && line.item_range.is_empty()
             && let Some(metrics) = prev_line_metrics
@@ -1266,11 +1218,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             // any; this should only occur for an empty line following
             // a newline at the end of a layout
             line.metrics = metrics;
-            box_metrics = LineBoxMetrics {
-                text_ascent: metrics.ascent,
-                text_descent: metrics.descent,
-                text_line_height: metrics.line_height,
-                ..LineBoxMetrics::default()
+            line_box_extents = Extents {
+                over: metrics.baseline - metrics.block_min_coord,
+                under: metrics.block_max_coord - metrics.baseline,
+            };
+            content_box_extents = Extents {
+                over: metrics.baseline - metrics.content_block_min_coord,
+                under: metrics.content_block_max_coord - metrics.baseline,
             };
             // If we have no items on this line, it must be the last (empty)
             // line in a layout following a newline. Commit an empty run so
@@ -1301,29 +1255,26 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
         }
 
-        // Read the line's vertical extents from the running line state, which accumulated the
-        // maximum text ascent/descent/line-height and inline box ascent/descent as content was
-        // added (see `append_cluster_to_line` / `append_inline_box_to_line`). This runs before the
-        // caller resets the state, and keeps `finish_line` consistent with the line height
-        // computed by `LineBoxMetrics::line_height`. Whitespace-only lines still get their metrics from
-        // the (whitespace) clusters that were appended to the state.
-        line.metrics.ascent = box_metrics.text_ascent;
-        line.metrics.descent = box_metrics.text_descent;
-
-        // Like `ascent` and `descent`, the reported leading ignores inline boxes: it is derived
-        // from the text's *intrinsic* line height, not the (possibly larger) `line_height` that an
-        // inline box may have grown the line to.
-        line.metrics.leading =
-            box_metrics.text_line_height - (box_metrics.text_ascent + box_metrics.text_descent);
-
-        // Whether metrics should be quantized to pixel boundaries
-        let quantize = self.layout.data.quantize;
-
-        let resolved = box_metrics.resolve(quantize);
-        let y = self.state.line_y;
-        line.metrics.baseline = resolved.above + if quantize { y.round() as f32 } else { y as f32 };
-        line.metrics.block_min_coord = line.metrics.baseline - resolved.block_above;
-        line.metrics.block_max_coord = line.metrics.baseline + resolved.block_below;
+        let top = if quantize {
+            self.state.line_y.round() as f32
+        } else {
+            self.state.line_y as f32
+        };
+        line.metrics.baseline = top + line_box_extents.over;
+        line.metrics.block_min_coord = top;
+        line.metrics.block_max_coord = if quantize {
+            // TODO: perhaps this should be something like the following, to ensure quantized line
+            // boxes tile exactly without gaps or overlap. However, that would cause some
+            // line height asserts to fail in the tests.
+            // ```
+            // (self.state.line_y as f32 + self.state.line.box_metrics.line_height()).round()
+            // ```
+            (line.metrics.baseline + line_box_extents.under).round()
+        } else {
+            line.metrics.baseline + line_box_extents.under
+        };
+        line.metrics.content_block_min_coord = line.metrics.baseline - content_box_extents.over;
+        line.metrics.content_block_max_coord = line.metrics.baseline + content_box_extents.under;
 
         line.metrics.inline_min_coord = self.state.line_x;
         line.metrics.inline_max_coord = self.state.line_x + self.state.line_max_advance;

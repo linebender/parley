@@ -384,8 +384,10 @@ impl Cursor {
     }
 
     pub(crate) fn line<B: Brush>(self, layout: &Layout<B>) -> Option<(usize, Line<'_, B>)> {
+        // TODO: we're determining the line for the cursor through its rendered position. In case of
+        // extreme geometry (like zero line height), this won't work.
         let geometry = self.geometry(layout, 0.0);
-        layout.line_for_offset(geometry.y0 as f32)
+        layout.line_for_offset(((geometry.y0 + geometry.y1) / 2.) as f32)
     }
 
     pub(crate) fn upstream_cluster<B: Brush>(self, layout: &Layout<B>) -> Option<Cluster<'_, B>> {
@@ -469,9 +471,9 @@ fn cursor_rect<B: Brush>(cluster: &Cluster<'_, B>, at_end: bool, size: f32) -> B
     let metrics = line.metrics();
     BoundingBox::new(
         line_x as f64,
-        metrics.block_min_coord as f64,
+        f32::min(metrics.block_min_coord, metrics.content_block_min_coord) as f64,
         (line_x + size) as f64,
-        metrics.block_max_coord as f64,
+        f32::max(metrics.block_max_coord, metrics.content_block_max_coord) as f64,
     )
 }
 
@@ -480,9 +482,9 @@ fn last_line_cursor_rect<B: Brush>(layout: &Layout<B>, size: f32) -> BoundingBox
         let metrics = line.metrics();
         BoundingBox::new(
             metrics.offset as f64,
-            metrics.block_min_coord as f64,
+            f32::min(metrics.block_min_coord, metrics.content_block_min_coord) as f64,
             (metrics.offset + size) as f64,
-            metrics.block_max_coord as f64,
+            f32::max(metrics.block_max_coord, metrics.content_block_max_coord) as f64,
         )
     } else {
         BoundingBox::default()
