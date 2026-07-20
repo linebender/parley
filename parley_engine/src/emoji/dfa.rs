@@ -10,7 +10,7 @@ static DFA_TRANS: [[u8; 13]; 13] = {
     use EmojiSegmentationCategory as Category;
     use EmojiState as State;
 
-    let mut t = [[0; 13]; 13];
+    let mut t = [[State::Reject.as_u8(); 13]; 13];
 
     /// Adds a state transition to the DFA transition table.
     macro_rules! add {
