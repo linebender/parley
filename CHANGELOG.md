@@ -17,6 +17,12 @@ This release has an [MSRV] of 1.88.
 #### Parley
 
 - Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. ([#661][] by [@tomcur][])
+- Breaking change: lines with mixed inline content, like different fonts or sizes, or inline boxes, are now sized more closely to the CSS line-box model. ([#697][] by [@tomcur][])  
+  The `LineMetrics::{ascent,descent,leading}` fields were removed, and `LineMetrics::block_{min,max}_coord` now describe the block-axis layout bounds of each line box.
+  Glyphs may overflow these layout bounds, especially when a small line height is used.
+  `LineMetrics::content_block_{min,max}_coord` provide the typographic content bounds, covering typographic ascent and descent as well as inline boxes, ignoring the specified line height.
+  Note glyphs overflow these content bounds as well, for example when many combining marks are stacked.
+  The union of the line-box and content bounds is close to the old `LineMetrics::block_{min,max}_coord` fields.
 - `parley::editing::Cursor::{previous,next}_logical_word` now land at the previous/next logical start of a word and skip over whitespace. ([#215][] by [@tomcur][])
 
 ### Fixed
@@ -697,6 +703,7 @@ This release has an [MSRV][] of 1.70.
 [#650]: https://github.com/linebender/parley/pull/650
 [#661]: https://github.com/linebender/parley/pull/661
 [#671]: https://github.com/linebender/parley/pull/671
+[#697]: https://github.com/linebender/parley/pull/697
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.11.0...HEAD
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0
