@@ -300,7 +300,7 @@ impl Strategy {
                 }
                 // Quoted string: `"word"` or `'word'`.
                 7 => {
-                    let quote = char::from(*b"\"'".choose(rng).unwrap());
+                    let quote = char::from(*br#""'"#.choose(rng).unwrap());
                     out.push(quote);
                     fill(rng, ALPHANUMERIC, out, 1, 6);
                     out.push(quote);
@@ -316,7 +316,7 @@ impl Strategy {
                 // Question followed by a quote: `?"word"` (no break after `?` here).
                 9 => {
                     out.push('?');
-                    let quote = char::from(*b"\"'".choose(rng).unwrap());
+                    let quote = char::from(*br#""'"#.choose(rng).unwrap());
                     out.push(quote);
                     fill(rng, ALPHANUMERIC, out, 1, 6);
                     out.push(quote);
@@ -381,7 +381,7 @@ impl Strategy {
                 6 => {
                     fill(rng, ALPHA, out, 1, 5);
                     out.push('?');
-                    let quote = char::from(*b"\"'".choose(rng).unwrap());
+                    let quote = char::from(*br#""'"#.choose(rng).unwrap());
                     out.push(quote);
                     fill(rng, ALPHANUMERIC, out, 1, 4);
                     out.push(quote);
