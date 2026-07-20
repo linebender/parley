@@ -110,42 +110,54 @@ impl<'a, B: Brush> Line<'a, B> {
 }
 
 /// Metrics information for a line.
+///
+/// A line has an inline axis and a block axis. The inline axis runs along a line of a text; the
+/// block axis is perpendicular to it. Lines are stacked along the block axis.
 #[derive(Copy, Clone, Default, Debug, PartialEq)]
 pub struct LineMetrics {
     /// The absolute line height (in layout units).
     pub line_height: f32,
-    /// Offset to the baseline.
+
+    /// The block-axis coordinate of the line's baseline.
+    ///
+    /// For horizontal text, this is the baseline's y-coordinate within the layout.
     pub baseline: f32,
+
     /// Offset for alignment.
     pub offset: f32,
-    /// Full advance of the line, including trailing whitespace.
+
+    /// Full inline advance of the line, including trailing whitespace.
     pub advance: f32,
-    /// Advance of trailing whitespace.
+
+    /// The portion of [`Self::advance`] contributed by trailing whitespace.
     pub trailing_whitespace: f32,
-    /// Minimum coordinate in the line direction.
+
+    /// The minimum inline-axis coordinate of the line.
     ///
     /// For horizontal text, this would be the left of the line.
     pub inline_min_coord: f32,
-    /// Maximum coordinate in the line direction.
+
+    /// The maximum inline-axis coordinate of the line.
     ///
     /// For horizontal text, this would be the right of the line.
     pub inline_max_coord: f32,
-    /// Minimum coordinate in the direction orthogonal to line
-    /// direction.
+
+    /// The minimum block-axis coordinate of the line box.
     ///
-    /// In CSS parlance, this is the start of the "line box." See, e.g., CSS 2.2 § 9.4.2
-    /// <https://www.w3.org/TR/CSS22/visuren.html#line-box>. The line box is tall enough to cover
-    /// all its inline boxes, but note glyphs may overflow their box height, especially when the
-    /// typographic line height is small. See also [`Self::content_block_min_coord`].
+    /// "Line box" is used as in
+    /// [CSS 2.2 § 9.4.2](https://www.w3.org/TR/CSS22/visuren.html#line-box). The line box is tall
+    /// enough to cover all its inline boxes, but note glyphs may overflow their box, especially
+    /// when the typographic line height is small. See also [`Self::content_block_min_coord`].
     ///
-    /// For horizontal text, this would be the top of the line.
+    /// For horizontal text, this is the top of the line box.
     pub block_min_coord: f32,
-    /// Maximum coordinate in the direction orthogonal to line
-    /// direction.
+
+    /// The maximum block-axis coordinate of the line box.
     ///
-    /// For horizontal text, this would be the bottom of the line.
+    /// For horizontal text, this is the bottom of the line box.
     pub block_max_coord: f32,
-    /// Minimum coordinate of the line's content in the direction orthogonal to line direction.
+
+    /// The minimum block-axis coordinate of the line's content.
     ///
     /// This covers, roughly, the line's glyphs and inline boxes. This does not take into account
     /// typographic leading, but only the typographic ascent and descent. In case of negative
@@ -155,7 +167,8 @@ pub struct LineMetrics {
     ///
     /// For horizontal text, this would be the top of the line's content.
     pub content_block_min_coord: f32,
-    /// Maximum coordinate of the line's content in the direction orthogonal to line direction.
+
+    /// The maximum block-axis coordinate of the line's content.
     ///
     /// See [`LineMetrics::content_block_min_coord`] for a caveat about glyphs overflowing the
     /// content area.
