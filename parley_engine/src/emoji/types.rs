@@ -15,8 +15,7 @@ pub(crate) enum EmojiState {
     OptionalZwj,
     KeycapVs,
     TagBase,
-    /// `RegionalIndicator`
-    Ri,
+    RegionalIndicator,
 
     TagSpec,
     TagEmpty,
@@ -35,7 +34,7 @@ impl EmojiState {
             5 => Self::OptionalZwj,
             6 => Self::KeycapVs,
             7 => Self::TagBase,
-            8 => Self::Ri,
+            8 => Self::RegionalIndicator,
             9 => Self::TagSpec,
             10 => Self::TagEmpty,
             11 => Self::KeycapBase,
@@ -89,8 +88,7 @@ pub enum EmojiSegmentationCategory {
     TagBase,
     TagSpec,
     TagEnd,
-    /// `RegionalIndicator`
-    Ri,
+    RegionalIndicator,
     Vs15,
     Vs16,
     Zwj,
@@ -115,7 +113,7 @@ impl EmojiSegmentationCategory {
             0xE007F => Self::TagEnd,
             _ => {
                 if properties.is_regional_indicator() {
-                    return Self::Ri;
+                    return Self::RegionalIndicator;
                 }
 
                 if properties.is_emoji_modifier_base() {
