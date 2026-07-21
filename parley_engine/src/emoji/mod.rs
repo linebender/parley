@@ -1,11 +1,13 @@
+// Copyright 2026 Christian Hansen
+// SPDX-License-Identifier: MIT
+// <https://github.com/chansen/c-emoji>
+//
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! This implementation is based on [emoji segmenter]'s Ragel grammar (Apache-2.0).
+//! Port of [c-emoji] (MIT) and follow the [UTS51](Unicode Technical Standard #51).
 //!
-//! And follow the [UTS51](Unicode Technical Standard #51).
-//!
-//! [emoji segmenter]: <https://github.com/google/emoji-segmenter>
+//! [c-emoji]: <https://github.com/chansen/c-emoji>
 //! [UTS51]: <https://www.unicode.org/reports/tr51/>
 
 mod dfa;

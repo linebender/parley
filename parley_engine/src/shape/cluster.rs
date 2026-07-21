@@ -14,7 +14,6 @@ use crate::{CharInfo, analysis::AnalysisDataSources, emoji::EmojiPresentationSty
 #[derive(Debug, Default)]
 pub struct CharCluster {
     chars: Vec<Char>,
-    is_emoji: bool,
     map_len: u8,
     start: u32,
     end: u32,
@@ -392,7 +391,6 @@ impl CharCluster {
 
         // Finalize cluster metadata
         let end = *code_unit_offset_in_string as u32;
-        self.is_emoji = is_emoji_or_pictograph;
         self.map_len = map_len;
         self.start = start;
         self.end = end;

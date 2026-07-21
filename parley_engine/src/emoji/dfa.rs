@@ -1,3 +1,7 @@
+// Copyright 2026 Christian Hansen
+// SPDX-License-Identifier: MIT
+// <https://github.com/chansen/c-emoji>
+//
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
@@ -127,6 +131,7 @@ static DFA_TRANS: [[u8; 13]; 13] = {
     t
 };
 
+/// Recognizes Unicode emoji sequence.
 #[derive(Clone, Copy, Debug)]
 pub struct EmojiDFA {
     state: EmojiState,
@@ -135,22 +140,26 @@ pub struct EmojiDFA {
 }
 
 impl EmojiDFA {
+    /// A default value for [`EmojiDFA`].
     const DEFAULT: Self = Self {
         state: EmojiState::Start,
         recorded: (0, 0),
     };
 
+    /// Creates a new [`EmojiDFA`].
     #[inline]
     pub const fn new() -> Self {
         Self::DEFAULT
     }
 
+    /// Updates the emoji state with [`EmojiSegmentationCategory`].
     #[inline]
-    pub(crate) const fn step(&mut self, category: EmojiSegmentationCategory) {
+    pub const fn step(&mut self, category: EmojiSegmentationCategory) {
         self.state = EmojiState::from_u8(DFA_TRANS[self.state.as_usize()][category.as_usize()]);
     }
 
-    // pub(crate) const fn step_record(&mut self, category: EmojiSegmentationCategory) {
+    /// Records the emoji state and segmentation category with [`EmojiSegmentationCategory`].
+    #[inline]
     pub const fn step_record(&mut self, category: EmojiSegmentationCategory) {
         self.step(category);
 
@@ -162,16 +171,19 @@ impl EmojiDFA {
         self.recorded.1 |= 1 << category.as_u8();
     }
 
+    /// Retures true if the emoji state is rejected.
     #[inline]
     pub(crate) const fn is_rejected(self) -> bool {
         self.state.eq(EmojiState::Reject)
     }
 
+    /// Retures true if the emoji state is started.
     #[inline]
     pub(crate) const fn is_started(self) -> bool {
         self.state.eq(EmojiState::Start)
     }
 
+    /// Retures true if the emoji state is accepting.
     #[allow(unused)]
     #[inline]
     pub(crate) const fn is_accepting(self) -> bool {
@@ -234,7 +246,9 @@ impl EmojiDFA {
         EmojiSequence::Basic
     }
 
-    pub const fn presentation_style(&self) -> EmojiPresentationStyle {
+    /// Retures the emoji presentation style.
+    #[inline]
+    pub const fn presentation_style(self) -> EmojiPresentationStyle {
         if self.contains_category(EmojiSegmentationCategory::Vs15) {
             return EmojiPresentationStyle::Text;
         }
