@@ -167,8 +167,8 @@ impl EmojiDFA {
             return;
         }
 
-        self.recorded.0 |= 1 << self.state as u8;
-        self.recorded.1 |= 1 << category as u8;
+        self.recorded.0 |= 1 << (self.state as u8);
+        self.recorded.1 |= 1 << (category as u8);
     }
 
     /// Returns true if the emoji state is rejected.
@@ -275,5 +275,11 @@ impl EmojiDFA {
         }
 
         EmojiPresentationStyle::Default
+    }
+}
+
+impl Default for EmojiDFA {
+    fn default() -> Self {
+        Self::DEFAULT
     }
 }
