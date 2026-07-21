@@ -100,6 +100,15 @@ impl ShapedText {
         Self::default()
     }
 
+    /// Reserve capacity for at least `additional_chars` more characters.
+    ///
+    /// This speculatively reserves capacity for `additional_chars` more glyphs.
+    #[inline]
+    pub(crate) fn reserve(&mut self, additional_chars: usize) {
+        self.clusters.reserve(additional_chars);
+        self.glyphs.reserve(additional_chars);
+    }
+
     /// Clear the result while retaining capacity.
     #[inline]
     pub fn clear(&mut self) {

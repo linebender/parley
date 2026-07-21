@@ -116,6 +116,8 @@ impl Shaper {
         analysis_data_sources: &AnalysisDataSources,
         shaped_text: &mut ShapedText,
     ) -> Range<usize> {
+        shaped_text.reserve(item.range.char_range.len());
+
         let start = shaped_text.runs().len();
         shape_item(
             self,
