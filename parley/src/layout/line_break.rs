@@ -1255,7 +1255,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 .rfind(|(_, run)| !run.range.byte_range.is_empty())
             {
                 let run_index = self.lines.line_items.len();
-                let cluster = run.range.char_range.end;
+                let cluster = run.clusters_range.end;
                 let text = run.range.byte_range.end;
                 self.lines.line_items.push(LineItemData {
                     kind: LayoutItemKind::TextRun,
