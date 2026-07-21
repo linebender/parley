@@ -130,6 +130,8 @@ impl EmojiSegmentationCategory {
 }
 
 /// Represents the category of an emoji sequence.
+///
+/// <https://www.unicode.org/reports/tr51/#Emoji_Sequences>
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(crate) enum EmojiSequence {
