@@ -233,6 +233,7 @@ impl<B: Brush> LayoutData<B> {
         self.styles.clear();
         self.inline_boxes.clear();
         self.shaped_text.clear();
+        self.runs.clear();
         self.items.clear();
         self.lines.clear();
         self.line_items.clear();
