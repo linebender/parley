@@ -545,6 +545,41 @@ fn builders_mixed_styles() {
     );
 }
 
+/// Check that reusing a [`Layout`] works, by overwriting a layout with
+/// [`RangedBuilder::build_into`].
+#[test]
+fn ranged_builder_reuse_layout() {
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+
+    static FIRST_TEXT: &str = "Some first text.";
+    static SECOND_TEXT: &str = "Some second text.";
+    const MAX_ADVANCE: f32 = 50.;
+
+    let mut layout = Layout::new();
+
+    let mut builder = lcx.ranged_builder(&mut fcx, FIRST_TEXT, 1., false);
+    builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+    builder.build_into(&mut layout, FIRST_TEXT);
+    layout.break_all_lines(Some(MAX_ADVANCE));
+
+    let mut builder = lcx.ranged_builder(&mut fcx, SECOND_TEXT, 1., false);
+    builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+    builder.build_into(&mut layout, SECOND_TEXT);
+    layout.break_all_lines(Some(MAX_ADVANCE));
+
+    let mut builder = lcx.ranged_builder(&mut fcx, SECOND_TEXT, 1., false);
+    builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+    let mut expected = builder.build(SECOND_TEXT);
+    expected.break_all_lines(Some(MAX_ADVANCE));
+
+    assert_eq_layout_data(
+        &expected.data,
+        &layout.data,
+        "Expected reused layout to be identical to fresh layout",
+    );
+}
+
 #[test]
 fn builders_crlf_counts_as_single_line_break() {
     let mut fcx = create_font_context();
