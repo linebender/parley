@@ -11,14 +11,14 @@ use core_maths::CoreFloat;
 
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
-    LineMetrics, Run, RunMetrics,
+    LineMetrics, Run,
 };
 use crate::style::Brush;
 use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
 
 use core::ops::Range;
-use parley_core::Boundary;
 use parley_core::shape::{ClusterData, Whitespace};
+use parley_core::{Boundary, FontMetrics};
 
 #[derive(Default)]
 struct LineLayout {
@@ -116,14 +116,14 @@ impl LineBoxMetrics {
         self.line_box.over + self.line_box.under
     }
 
-    fn add_text(&mut self, metrics: &RunMetrics, quantize: bool) {
+    fn add_text(&mut self, metrics: &FontMetrics, line_height: f32, quantize: bool) {
         // TODO: perhaps precompute these run metrics and store in `RunMetrics`.
         let (ascent, descent) = if quantize {
             (metrics.ascent.round(), metrics.descent.round())
         } else {
             (metrics.ascent, metrics.descent)
         };
-        let half_leading = (metrics.line_height - (ascent + descent)) / 2.;
+        let half_leading = (line_height - (ascent + descent)) / 2.;
         let over = if quantize {
             ascent + half_leading.floor()
         } else {
@@ -132,7 +132,7 @@ impl LineBoxMetrics {
         // Note the `under` part is *not* quantized. This is such that the exact line height is
         // reached. For determining the line box block, add this to the baseline and then quantize
         // by rounding.
-        let under = metrics.line_height - over;
+        let under = line_height - over;
 
         self.line_box.over = self.line_box.over.max(over);
         self.line_box.under = self.line_box.under.max(under);
@@ -296,12 +296,20 @@ impl BreakerState {
     /// they extend above and below the baseline, *not* including leading) as well as the intrinsic
     /// line height of the cluster(s) (i.e. including the full leading), which may be smaller than
     /// `ascent + descent` when the leading is negative.
-    pub fn append_cluster_to_line(&mut self, next_x: f32, metrics: &RunMetrics, quantize: bool) {
+    pub fn append_cluster_to_line(
+        &mut self,
+        next_x: f32,
+        font_metrics: &FontMetrics,
+        line_height: f32,
+        quantize: bool,
+    ) {
         self.line.items.end = self.item_idx + 1;
         self.line.clusters.end = self.cluster_idx + 1;
         self.cluster_idx += 1;
         self.line.x = next_x;
-        self.line.box_metrics.add_text(metrics, quantize);
+        self.line
+            .box_metrics
+            .add_text(font_metrics, line_height, quantize);
         self.update_max_height_exceeded();
     }
 
@@ -683,11 +691,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 }
                 LayoutItemKind::TextRun => {
                     let run_idx = item.index;
-                    let run_data = &self.layout.data.runs[run_idx];
+                    let shaped_run = &self.layout.data.shaped_text.runs()[run_idx];
 
-                    let run = Run::new(self.layout, 0, 0, run_data, None);
-                    let cluster_start = run_data.cluster_range.start;
-                    let cluster_end = run_data.cluster_range.end;
+                    let run = Run::new(self.layout, 0, 0, run_idx, None);
+                    let cluster_start = shaped_run.clusters_range.start;
+                    let cluster_end = shaped_run.clusters_range.end;
 
                     // println!("TextRun ({:?})", &run_data.text_range);
 
@@ -701,8 +709,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let is_newline = whitespace == Whitespace::Newline;
                         let is_space = whitespace.is_space_or_nbsp();
                         let boundary = cluster.info().boundary();
-                        let metrics = run.metrics();
-                        let line_height = metrics.line_height;
+                        let metrics = run.font_metrics();
+                        let line_height = run.data.line_height;
                         let max_height_exceeded = self.state.line.max_height_exceeded;
                         let style = &self.layout.data.styles[cluster.data.style_index as usize];
 
@@ -748,7 +756,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 && self
                                     .layout
                                     .data
-                                    .clusters
+                                    .shaped_text
+                                    .clusters()
                                     .get(self.state.cluster_idx + 1)
                                     .is_some_and(|next| {
                                         next.info.whitespace() == Whitespace::Newline
@@ -758,6 +767,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.state.append_cluster_to_line(
                                 self.state.line.x,
                                 metrics,
+                                line_height,
                                 self.layout.data.quantize,
                             );
 
@@ -809,6 +819,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.state.append_cluster_to_line(
                                 next_x,
                                 metrics,
+                                line_height,
                                 self.layout.data.quantize,
                             );
                             if is_space {
@@ -831,6 +842,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 self.state.append_cluster_to_line(
                                     next_x,
                                     metrics,
+                                    line_height,
                                     self.layout.data.quantize,
                                 );
                                 return self.start_new_line(
@@ -878,6 +890,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 self.state.append_cluster_to_line(
                                     next_x,
                                     metrics,
+                                    line_height,
                                     self.layout.data.quantize,
                                 );
                             }
@@ -974,10 +987,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 }
                 LayoutItemKind::TextRun => {
                     let run_idx = item.index;
-                    let run_data = &self.layout.data.runs[run_idx];
-                    let run = Run::new(self.layout, 0, 0, run_data, None);
-                    let cluster_start = run_data.cluster_range.start;
-                    let cluster_end = run_data.cluster_range.end;
+                    let shaped_run = &self.layout.data.shaped_text.runs()[run_idx];
+                    let run = Run::new(self.layout, 0, 0, run_idx, None);
+                    let cluster_start = shaped_run.clusters_range.start;
+                    let cluster_end = shaped_run.clusters_range.end;
 
                     while self.state.cluster_idx < cluster_end {
                         let cluster = run.get(self.state.cluster_idx - cluster_start).unwrap();
@@ -1000,10 +1013,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         } else {
                             self.state.line.x + advance
                         };
-                        let metrics = run.metrics();
+                        let metrics = run.font_metrics();
                         self.state.append_cluster_to_line(
                             next_x,
                             metrics,
+                            run.data.line_height,
                             self.layout.data.quantize,
                         );
                         char_count += 1;
@@ -1155,10 +1169,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     }
 
                     // Compute the run's advance by summing the advances of its constituent clusters
-                    line_item.advance = self.layout.data.clusters[line_item.cluster_range.clone()]
-                        .iter()
-                        .map(|c| c.advance)
-                        .sum();
+                    line_item.advance = self.layout.data.shaped_text.clusters()
+                        [line_item.cluster_range.clone()]
+                    .iter()
+                    .map(|c| c.advance)
+                    .sum();
 
                     // Ignore trailing whitespace when deciding whether the line has content
                     // (we are iterating backwards so trailing whitespace comes first)
@@ -1196,7 +1211,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         .sum()
                 }
 
-                let clusters = &self.layout.data.clusters[run.cluster_range.clone()];
+                let clusters = &self.layout.data.shaped_text.clusters()[run.cluster_range.clone()];
                 if run.is_rtl() {
                     whitespace_advance(clusters.iter())
                 } else {
@@ -1233,14 +1248,15 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             if let Some((index, run)) = self
                 .layout
                 .data
-                .runs
+                .shaped_text
+                .runs()
                 .iter()
                 .enumerate()
-                .rfind(|(_, run)| !run.text_range.is_empty())
+                .rfind(|(_, run)| !run.range.byte_range.is_empty())
             {
                 let run_index = self.lines.line_items.len();
-                let cluster = run.cluster_range.end;
-                let text = run.text_range.end;
+                let cluster = run.clusters_range.end;
+                let text = run.range.byte_range.end;
                 self.lines.line_items.push(LineItemData {
                     kind: LayoutItemKind::TextRun,
                     index,
@@ -1341,7 +1357,10 @@ fn commit_line<B: Brush>(
     line_indent: f32,
 ) -> bool {
     // Ensure that the cluster and item endpoints are within range
-    state.clusters.end = state.clusters.end.min(layout.data.clusters.len());
+    state.clusters.end = state
+        .clusters
+        .end
+        .min(layout.data.shaped_text.clusters().len());
     state.items.end = state.items.end.min(layout.data.items.len());
 
     let start_item_idx = lines.line_items.len();
@@ -1381,11 +1400,11 @@ fn commit_line<B: Brush>(
                 last_item_kind = item.kind;
             }
             LayoutItemKind::TextRun => {
-                let run_data = &layout.data.runs[item.index];
+                let shaped_run = &layout.data.shaped_text.runs()[item.index];
 
                 // Compute cluster range
                 // The first and last ranges have overrides to account for line-breaks within runs
-                let mut cluster_range = run_data.cluster_range.clone();
+                let mut cluster_range = shaped_run.clusters_range.clone();
                 if i == first_run_pos {
                     cluster_range.start = state.clusters.start;
                 }
@@ -1393,7 +1412,7 @@ fn commit_line<B: Brush>(
                     cluster_range.end = state.clusters.end;
                 }
 
-                if cluster_range.start >= run_data.cluster_range.end {
+                if cluster_range.start >= shaped_run.clusters_range.end {
                     // println!("INVALID CLUSTER");
                     // dbg!(&run_data.text_range);
                     // dbg!(cluster_range);
@@ -1404,15 +1423,17 @@ fn commit_line<B: Brush>(
                 committed_text_run = true;
 
                 // Push run to line
-                let run = Run::new(layout, 0, 0, run_data, None);
-                let text_range = if run_data.cluster_range.is_empty() {
+                let run = Run::new(layout, 0, 0, item.index, None);
+                let text_range = if shaped_run.clusters_range.is_empty() {
                     0..0
                 } else {
                     let first_cluster = run
-                        .get(cluster_range.start - run_data.cluster_range.start)
+                        .get(cluster_range.start - shaped_run.clusters_range.start)
                         .unwrap();
                     let last_cluster = run
-                        .get((cluster_range.end - run_data.cluster_range.start).saturating_sub(1))
+                        .get(
+                            (cluster_range.end - shaped_run.clusters_range.start).saturating_sub(1),
+                        )
                         .unwrap();
                     first_cluster.text_range().start..last_cluster.text_range().end
                 };
@@ -1420,7 +1441,7 @@ fn commit_line<B: Brush>(
                 lines.line_items.push(LineItemData {
                     kind: LayoutItemKind::TextRun,
                     index: item.index,
-                    bidi_level: run_data.bidi_level,
+                    bidi_level: shaped_run.bidi_level,
                     advance: 0.,
                     is_whitespace: false,
                     has_trailing_whitespace: false,
@@ -1440,7 +1461,7 @@ fn commit_line<B: Brush>(
     let mut num_spaces = state.num_spaces;
     if break_reason == BreakReason::Regular
         && state.clusters.start < state.clusters.end
-        && layout.data.clusters[state.clusters.end - 1]
+        && layout.data.shaped_text.clusters()[state.clusters.end - 1]
             .info
             .whitespace()
             .is_space_or_nbsp()

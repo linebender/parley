@@ -168,7 +168,8 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
                 line_items
                     .filter(|item| item.is_text_run())
                     .for_each(|line_item| {
-                        let clusters = &mut layout.clusters[line_item.cluster_range.clone()];
+                        let clusters =
+                            &mut layout.shaped_text.clusters_mut()[line_item.cluster_range.clone()];
                         let line_item_is_rtl = line_item.bidi_level & 1 != 0;
                         let clusters: &mut dyn Iterator<Item = &mut ClusterData> =
                             if line_item_is_rtl {

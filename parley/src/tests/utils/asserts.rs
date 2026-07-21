@@ -25,7 +25,7 @@ fn canonicalize_layout_data<B: Brush>(layout_data: &LayoutData<B>) -> LayoutData
         }
     }
 
-    for cluster in &mut normalized.clusters {
+    for cluster in normalized.shaped_text.clusters_mut() {
         cluster.style_index = remap[cluster.style_index as usize];
     }
     normalized.styles = canonical_styles;
@@ -44,8 +44,16 @@ pub(crate) fn assert_eq_layout_data<B: Brush>(a: &LayoutData<B>, b: &LayoutData<
     assert_eq!(a.width, b.width, "{case} width mismatch");
     assert_eq!(a.full_width, b.full_width, "{case} full_width mismatch");
     assert_eq!(a.height, b.height, "{case} height mismatch");
-    assert_eq!(a.fonts, b.fonts, "{case} fonts mismatch");
-    assert_eq!(a.coords, b.coords, "{case} coords mismatch");
+    assert_eq!(
+        a.shaped_text.fonts(),
+        b.shaped_text.fonts(),
+        "{case} fonts mismatch"
+    );
+    assert_eq!(
+        a.shaped_text.normalized_coords(),
+        b.shaped_text.normalized_coords(),
+        "{case} coords mismatch"
+    );
 
     // Input (/ output of style resolution)
     assert_eq!(a.styles, b.styles, "{case} styles mismatch");
@@ -57,8 +65,16 @@ pub(crate) fn assert_eq_layout_data<B: Brush>(a: &LayoutData<B>, b: &LayoutData<
     // Output of shaping
     assert_eq!(a.runs, b.runs, "{case} runs mismatch");
     assert_eq!(a.items, b.items, "{case} items mismatch");
-    assert_eq!(a.clusters, b.clusters, "{case} clusters mismatch");
-    assert_eq!(a.glyphs, b.glyphs, "{case} glyphs mismatch");
+    assert_eq!(
+        a.shaped_text.clusters(),
+        b.shaped_text.clusters(),
+        "{case} clusters mismatch"
+    );
+    assert_eq!(
+        a.shaped_text.glyphs(),
+        b.shaped_text.glyphs(),
+        "{case} glyphs mismatch"
+    );
 
     // Output of line breaking
     assert_eq!(a.lines, b.lines, "{case} lines mismatch");

@@ -406,7 +406,7 @@ impl Editor {
                 // https://drafts.csswg.org/css-text-decor/#painting-order
                 if let Some(underline) = &style.underline {
                     let underline_brush = &style.brush;
-                    let run_metrics = glyph_run.run().metrics();
+                    let run_metrics = glyph_run.run().font_metrics();
                     let offset = match underline.offset {
                         Some(offset) => offset,
                         None => run_metrics.underline_offset,
@@ -444,13 +444,15 @@ impl Editor {
                     .skew()
                     .map(|angle| Affine::skew(angle.to_radians().tan() as f64, 0.0));
                 scene
-                    .draw_glyphs(font)
+                    .draw_glyphs(&font.font)
                     .brush(&style.brush)
                     .hint(true)
                     .transform(transform)
                     .glyph_transform(glyph_xform)
                     .font_size(font_size)
-                    .normalized_coords(run.normalized_coords())
+                    .normalized_coords(&Vec::from_iter(
+                        run.normalized_coords().iter().map(|c| c.to_bits()),
+                    ))
                     .draw(
                         Fill::NonZero,
                         glyph_run.glyphs().map(|glyph| {
@@ -466,7 +468,7 @@ impl Editor {
                     );
                 if let Some(strikethrough) = &style.strikethrough {
                     let strikethrough_brush = &style.brush;
-                    let run_metrics = glyph_run.run().metrics();
+                    let run_metrics = glyph_run.run().font_metrics();
                     let offset = match strikethrough.offset {
                         Some(offset) => offset,
                         None => run_metrics.strikethrough_offset,

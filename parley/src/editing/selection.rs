@@ -562,8 +562,8 @@ impl Selection {
                             "Expected the line's last logical run to be a newline cluster."
                         );
                         let run = newline_cluster.run();
-                        let run_metrics = run.metrics();
-                        (run_metrics.ascent as f64 + run_metrics.descent as f64)
+                        let font_metrics = run.font_metrics();
+                        (font_metrics.ascent as f64 + font_metrics.descent as f64)
                             * NEWLINE_WHITESPACE_WIDTH_RATIO
                     }
                     None => 0.0,

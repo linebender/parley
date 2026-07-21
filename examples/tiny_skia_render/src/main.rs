@@ -163,12 +163,12 @@ fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<
     let normalized_coords = run
         .normalized_coords()
         .iter()
-        .map(|coord| NormalizedCoord::from_bits(*coord))
+        .map(|coord| NormalizedCoord::from_bits(coord.to_bits()))
         .collect::<Vec<_>>();
 
     // Get glyph outlines using Skrifa. This can be cached in production code.
-    let font_collection_ref = font.data.as_ref();
-    let font_ref = ReadFontsRef::from_index(font_collection_ref, font.index).unwrap();
+    let font_collection_ref = font.font.data.as_ref();
+    let font_ref = ReadFontsRef::from_index(font_collection_ref, font.font.index).unwrap();
     let outlines = font_ref.outline_glyphs();
 
     // Iterates over the glyphs in the GlyphRun
@@ -187,7 +187,7 @@ fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<
 
     // Draw decorations: underline & strikethrough
     let style = glyph_run.style();
-    let run_metrics = run.metrics();
+    let run_metrics = run.font_metrics();
     if let Some(decoration) = &style.underline {
         let offset = decoration.offset.unwrap_or(run_metrics.underline_offset);
         let size = decoration.size.unwrap_or(run_metrics.underline_size);

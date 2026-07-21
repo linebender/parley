@@ -245,7 +245,7 @@ fn render_glyph_run(
     let normalized_coords = run.normalized_coords();
 
     // Convert from parley::Font to swash::FontRef
-    let font_ref = FontRef::from_index(font.data.as_ref(), font.index as usize).unwrap();
+    let font_ref = FontRef::from_index(font.font.data.as_ref(), font.font.index as usize).unwrap();
 
     // Build a scaler. As the font properties are constant across an entire run of glyphs
     // we can build one scaler for the run and reuse it for each glyph.
@@ -253,7 +253,7 @@ fn render_glyph_run(
         .builder(font_ref)
         .size(font_size)
         .hint(true)
-        .normalized_coords(normalized_coords)
+        .normalized_coords(normalized_coords.iter().map(|c| c.to_bits()))
         .build();
 
     // Iterates over the glyphs in the GlyphRun
@@ -267,7 +267,7 @@ fn render_glyph_run(
 
     // Draw decorations: underline & strikethrough
     let style = glyph_run.style();
-    let run_metrics = run.metrics();
+    let run_metrics = run.font_metrics();
     if let Some(decoration) = &style.underline {
         let offset = decoration.offset.unwrap_or(run_metrics.underline_offset);
         let size = decoration.size.unwrap_or(run_metrics.underline_size);

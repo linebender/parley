@@ -145,7 +145,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
 
     /// Returns the range of text that defines the cluster.
     pub fn text_range(&self) -> Range<usize> {
-        let start = self.run.data.text_range.start + self.data.text_offset as usize;
+        let start = self.run.shaped.range.byte_range.start + self.data.text_offset as usize;
         start..start + self.data.text_len as usize
     }
 
@@ -226,9 +226,11 @@ impl<'a, B: Brush> Cluster<'a, B> {
                 advance: self.data.advance,
             }))
         } else {
-            let start = self.run.data.glyph_start + self.data.glyph_offset as usize;
+            let start = self.run.shaped.glyphs_range.start + self.data.glyph_offset as usize;
             GlyphIter::Slice(
-                self.run.layout.data.glyphs[start..start + self.data.glyph_len as usize].iter(),
+                self.run.layout.data.shaped_text.glyphs()
+                    [start..start + self.data.glyph_len as usize]
+                    .iter(),
             )
         }
     }

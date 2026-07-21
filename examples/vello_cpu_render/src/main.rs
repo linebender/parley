@@ -89,12 +89,14 @@ fn render_frame(
                     let run = glyph_run.run();
 
                     stats.start("fill_glyphs");
+                    let normalized_coords =
+                        &Vec::from_iter(run.normalized_coords().iter().map(|c| c.to_bits()));
                     renderer.set_paint(glyph_run.style().brush.color);
                     renderer
-                        .glyph_run(run.font())
+                        .glyph_run(&run.font().font)
                         .font_size(run.font_size())
                         .hint(config.hint)
-                        .normalized_coords(run.normalized_coords())
+                        .normalized_coords(normalized_coords)
                         .fill_glyphs(glyph_run.positioned_glyphs().map(|glyph| Glyph {
                             id: glyph.id,
                             x: glyph.x,
@@ -104,8 +106,10 @@ fn render_frame(
 
                     let style = glyph_run.style();
                     if let Some(decoration) = &style.underline {
-                        let offset = decoration.offset.unwrap_or(run.metrics().underline_offset);
-                        let size = decoration.size.unwrap_or(run.metrics().underline_size);
+                        let offset = decoration
+                            .offset
+                            .unwrap_or(run.font_metrics().underline_offset);
+                        let size = decoration.size.unwrap_or(run.font_metrics().underline_size);
 
                         stats.start("render_underline");
                         render_decoration(renderer, &decoration.brush, &glyph_run, offset, size);
@@ -114,8 +118,10 @@ fn render_frame(
                     if let Some(decoration) = &style.strikethrough {
                         let offset = decoration
                             .offset
-                            .unwrap_or(run.metrics().strikethrough_offset);
-                        let size = decoration.size.unwrap_or(run.metrics().strikethrough_size);
+                            .unwrap_or(run.font_metrics().strikethrough_offset);
+                        let size = decoration
+                            .size
+                            .unwrap_or(run.font_metrics().strikethrough_size);
 
                         stats.start("render_strikethrough");
                         render_decoration(renderer, &decoration.brush, &glyph_run, offset, size);

@@ -18,7 +18,7 @@ mod run;
 )]
 mod layout;
 
-pub use parley_core::Glyph;
+pub use parley_core::{FontMetrics, Glyph};
 
 pub(crate) mod data;
 
@@ -32,7 +32,7 @@ pub use line::{GlyphRun, Line, LineMetrics, PositionedInlineBox, PositionedLayou
 pub use line_break::{
     BoxBreakData, BreakLines, BreakerState, LineBreakData, MaxHeightBreakData, YieldData,
 };
-pub use run::{Run, RunMetrics};
+pub use run::Run;
 
 pub(crate) use data::{LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData};
 pub(crate) use line::LineItem;
