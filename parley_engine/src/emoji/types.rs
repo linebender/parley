@@ -10,9 +10,12 @@ use parley_data::emoji::EmojiProperties;
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum EmojiState {
+    /// No valid transition
     Reject = 0,
+    /// Not inside any sequence
     Start,
 
+    /// Accepting — a complete sequence ends here (may be extended)
     Terminal,
     Emoji,
     EmojiModifierBase,
@@ -21,6 +24,7 @@ pub(crate) enum EmojiState {
     TagBase,
     RegionalIndicator,
 
+    /// Pending — inside a valid prefix, no complete sequence yet
     TagSpec,
     TagEmpty,
     KeycapBase,
@@ -90,7 +94,7 @@ pub enum EmojiSegmentationCategory {
 }
 
 impl EmojiSegmentationCategory {
-    /// Returns the category of the given codepoint and flags.
+    /// Returns the category of the given codepoint and properties.
     #[inline]
     pub fn from_codepoint(cp: u32, properties: EmojiProperties) -> Self {
         match cp {
