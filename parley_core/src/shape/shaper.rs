@@ -10,7 +10,7 @@ use linebender_resource_handle::FontData;
 use parlance::{FontFeature, FontVariation, Language};
 
 use crate::{
-    Analysis, AnalysisDataSources, CharInfo, ShapedText,
+    Analysis, CharInfo, ShapedText,
     itemize::{Item, TextRange},
     lru_cache::LruCache,
     shape::{CharCluster, cache},
@@ -113,7 +113,6 @@ impl Shaper {
         item: &Item,
         options: &ShapeOptions<'_>,
         select_font: impl FnMut(&mut CharCluster) -> Option<FontInstance>,
-        analysis_data_sources: &AnalysisDataSources,
         shaped_text: &mut ShapedText,
     ) -> Range<usize> {
         shaped_text.reserve(item.range.char_range.len());
@@ -126,7 +125,6 @@ impl Shaper {
             options,
             select_font,
             analysis.char_info(),
-            analysis_data_sources,
             shaped_text,
         );
         start..shaped_text.runs().len()
@@ -140,7 +138,6 @@ fn shape_item(
     options: &ShapeOptions<'_>,
     mut select_font: impl FnMut(&mut CharCluster) -> Option<FontInstance>,
     char_info: &[CharInfo],
-    analysis_data_sources: &AnalysisDataSources,
     shaped_text: &mut ShapedText,
 ) {
     let text_range = &item.range.byte_range;
@@ -152,9 +149,10 @@ fn shape_item(
     let item_char_info = &char_info[char_range.start..char_range.end];
     let item_char_style_indices = &options.char_style_indices[char_range.start..char_range.end];
 
-    let grapheme_cluster_boundaries = analysis_data_sources
-        .grapheme_segmenter()
-        .segment_str(item_text);
+    if item_text.is_empty() {
+        return; // No clusters
+    }
+
     let mut item_infos_iter = item_char_info
         .iter()
         .copied()
@@ -162,12 +160,20 @@ fn shape_item(
     let mut code_unit_offset_in_string = text_range.start;
     let char_cluster = &mut scx.char_cluster;
 
-    // Build an iterator of boundaries and consume the first segment to seed the loop
-    let mut boundaries_iter = grapheme_cluster_boundaries.skip(1);
+    // Build an iterator of grapheme-cluster end boundaries (byte offsets into `item_text`) from
+    // the per-character grapheme-start flags computed during analysis. The item start is treated
+    // as a grapheme start regardless of its flag (an item boundary never extends a preceding
+    // grapheme for shaping purposes), hence `skip(1)`.
+    let mut boundaries_iter = item_text
+        .char_indices()
+        .zip(item_char_info.iter())
+        .skip(1)
+        .filter_map(|((byte_pos, _), info)| info.is_grapheme_start().then_some(byte_pos))
+        .chain(core::iter::once(item_text.len()));
     let mut last_boundary = 0_usize;
-    let Some(mut current_boundary) = boundaries_iter.next() else {
-        return; // No clusters
-    };
+    // Consume the first segment to seed the loop. `boundaries_iter` always yields at least
+    // `item_text.len()` for non-empty text.
+    let mut current_boundary = boundaries_iter.next().unwrap();
 
     char_cluster.fill(
         &item_text[last_boundary..current_boundary],

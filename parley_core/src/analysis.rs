@@ -192,6 +192,7 @@ impl CharInfo {
     const EMOJI_OR_PICTOGRAPH_SHIFT: u8 = 3;
     const CONTRIBUTES_TO_SHAPING_SHIFT: u8 = 4;
     const FORCE_NORMALIZE_SHIFT: u8 = 5;
+    const GRAPHEME_START_SHIFT: u8 = 6;
 
     #[allow(
         dead_code,
@@ -207,6 +208,7 @@ impl CharInfo {
     const EMOJI_OR_PICTOGRAPH_MASK: u8 = 1 << Self::EMOJI_OR_PICTOGRAPH_SHIFT;
     const CONTRIBUTES_TO_SHAPING_MASK: u8 = 1 << Self::CONTRIBUTES_TO_SHAPING_SHIFT;
     const FORCE_NORMALIZE_MASK: u8 = 1 << Self::FORCE_NORMALIZE_SHIFT;
+    const GRAPHEME_START_MASK: u8 = 1 << Self::GRAPHEME_START_SHIFT;
 
     fn new(
         boundary: Boundary,
@@ -220,6 +222,7 @@ impl CharInfo {
         is_emoji_or_pictograph: bool,
         contributes_to_shaping: bool,
         force_normalize: bool,
+        is_grapheme_start: bool,
     ) -> Self {
         Self {
             boundary,
@@ -232,7 +235,8 @@ impl CharInfo {
                 | (is_control as u8) << Self::CONTROL_SHIFT
                 | (is_emoji_or_pictograph as u8) << Self::EMOJI_OR_PICTOGRAPH_SHIFT
                 | (contributes_to_shaping as u8) << Self::CONTRIBUTES_TO_SHAPING_SHIFT
-                | (force_normalize as u8) << Self::FORCE_NORMALIZE_SHIFT,
+                | (force_normalize as u8) << Self::FORCE_NORMALIZE_SHIFT
+                | (is_grapheme_start as u8) << Self::GRAPHEME_START_SHIFT,
         }
     }
 
@@ -271,6 +275,12 @@ impl CharInfo {
     #[inline(always)]
     pub fn force_normalize(self) -> bool {
         self.flags & Self::FORCE_NORMALIZE_MASK != 0
+    }
+
+    /// Whether this character begins an extended grapheme cluster (UAX #29).
+    #[inline(always)]
+    pub fn is_grapheme_start(self) -> bool {
+        self.flags & Self::GRAPHEME_START_MASK != 0
     }
 }
 
@@ -506,6 +516,10 @@ pub(crate) fn analyze_text(
 
     // Collect boundary byte positions compactly
     let mut wb_iter = data_sources.word_segmenter().segment_str(text).peekable();
+    let mut gb_iter = data_sources
+        .grapheme_segmenter()
+        .segment_str(text)
+        .peekable();
 
     // Merge boundaries - line takes precedence over word
     let mut lb_iter = line_boundary_positions.iter().peekable();
@@ -516,6 +530,14 @@ pub(crate) fn analyze_text(
         while let Some(&w) = wb_iter.peek() {
             if w < byte_pos {
                 _ = wb_iter.next();
+            } else {
+                break;
+            }
+        }
+        // advance any stale grapheme boundary positions
+        while let Some(&g) = gb_iter.peek() {
+            if g < byte_pos {
+                _ = gb_iter.next();
             } else {
                 break;
             }
@@ -535,6 +557,13 @@ pub(crate) fn analyze_text(
         {
             is_word = true;
             _ = wb_iter.next();
+        }
+        let mut is_grapheme_start = false;
+        if let Some(&g) = gb_iter.peek()
+            && g == byte_pos
+        {
+            is_grapheme_start = true;
+            _ = gb_iter.next();
         }
         let mut is_line = false;
         if let Some(&l) = lb_iter.peek()
@@ -566,7 +595,7 @@ pub(crate) fn analyze_text(
             Boundary::None
         };
 
-        (boundary, ch)
+        (boundary, is_grapheme_start, ch)
     });
 
     let properties = |c| data_sources.properties(c);
@@ -579,56 +608,60 @@ pub(crate) fn analyze_text(
         // characters (like '\n') exist at an index position one higher than the respective
         // character's index, but we need our iterators to align, and the rest are simply
         // character-indexed.
-        .fold(false, |is_mandatory_linebreak, (boundary, ch)| {
-            let properties = properties(ch);
-            let script = properties.script();
-            let grapheme_cluster_break = properties.grapheme_cluster_break();
-            let bidi_class = properties.bidi_class();
-            let general_category = properties.general_category();
-            let is_emoji_or_pictograph = properties.is_emoji_or_pictograph();
-            let is_variation_selector = properties.is_variation_selector();
-            let is_region_indicator = properties.is_region_indicator();
-            let next_mandatory_linebreak = properties.is_mandatory_linebreak();
+        .fold(
+            false,
+            |is_mandatory_linebreak, (boundary, is_grapheme_start, ch)| {
+                let properties = properties(ch);
+                let script = properties.script();
+                let grapheme_cluster_break = properties.grapheme_cluster_break();
+                let bidi_class = properties.bidi_class();
+                let general_category = properties.general_category();
+                let is_emoji_or_pictograph = properties.is_emoji_or_pictograph();
+                let is_variation_selector = properties.is_variation_selector();
+                let is_region_indicator = properties.is_region_indicator();
+                let next_mandatory_linebreak = properties.is_mandatory_linebreak();
 
-            let boundary = if is_mandatory_linebreak {
-                Boundary::Mandatory
-            } else {
-                boundary
-            };
+                let boundary = if is_mandatory_linebreak {
+                    Boundary::Mandatory
+                } else {
+                    boundary
+                };
 
-            let force_normalize = {
-                // "Extend" break chars should be normalized first, with two exceptions
-                if matches!(grapheme_cluster_break, GraphemeClusterBreak::Extend) &&
+                let force_normalize = {
+                    // "Extend" break chars should be normalized first, with two exceptions
+                    if matches!(grapheme_cluster_break, GraphemeClusterBreak::Extend) &&
                     ch as u32 != 0x200C && // Is not a Zero Width Non-Joiner &&
                     !is_variation_selector
-                {
-                    true
-                } else {
-                    // All spacing mark break chars should be normalized first.
-                    matches!(grapheme_cluster_break, GraphemeClusterBreak::SpacingMark)
-                }
-            };
+                    {
+                        true
+                    } else {
+                        // All spacing mark break chars should be normalized first.
+                        matches!(grapheme_cluster_break, GraphemeClusterBreak::SpacingMark)
+                    }
+                };
 
-            needs_bidi_resolution |= bidi::needs_bidi_resolution(bidi_class);
-            // TODO: maybe extend Properties to u64 to fit BidiMirroringGlyph
-            let bracket = data_sources.brackets().get(ch);
+                needs_bidi_resolution |= bidi::needs_bidi_resolution(bidi_class);
+                // TODO: maybe extend Properties to u64 to fit BidiMirroringGlyph
+                let bracket = data_sources.brackets().get(ch);
 
-            analysis.info.push(CharInfo::new(
-                boundary,
-                script,
-                grapheme_cluster_break,
-                bidi_class,
-                bracket,
-                is_variation_selector,
-                is_region_indicator,
-                general_category == GeneralCategory::Control,
-                is_emoji_or_pictograph,
-                contributes_to_shaping(general_category, script),
-                force_normalize,
-            ));
+                analysis.info.push(CharInfo::new(
+                    boundary,
+                    script,
+                    grapheme_cluster_break,
+                    bidi_class,
+                    bracket,
+                    is_variation_selector,
+                    is_region_indicator,
+                    general_category == GeneralCategory::Control,
+                    is_emoji_or_pictograph,
+                    contributes_to_shaping(general_category, script),
+                    force_normalize,
+                    is_grapheme_start,
+                ));
 
-            next_mandatory_linebreak
-        });
+                next_mandatory_linebreak
+            },
+        );
 
     if needs_bidi_resolution {
         analyzer.bidi.resolve(

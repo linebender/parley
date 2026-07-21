@@ -127,7 +127,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
                         synthesis: selected.font.synthesis,
                     })
             },
-            analysis_data_sources,
             &mut layout.data.shaped_text,
         );
         for shaped_run_idx in shaped_runs_range {
