@@ -81,8 +81,8 @@ impl Shaper {
     /// Shape an [`Item`] produced by [`Analysis::itemize`] into glyphs.
     ///
     /// The item is broken into runs of maximal sequences of character clusters for which
-    /// `select_font` returns the same font. The `shaped_runs` callback is called with each shaped
-    /// run.
+    /// `select_font` returns the same font. The resulting shaped runs are appended to
+    /// `shaped_text`.
     ///
     /// `text` must be the same text as originally passed to create [`Analysis`]. `item` must be an
     /// [`Item`] produced by [`Analysis::itemize`] on this text's analysis.
@@ -106,8 +106,6 @@ impl Shaper {
     // /// omitted from the shaped result. Instead, you probably want to render a `.notdef` glyph from a
     // /// font you do have available, in which case you can return the previous font or some
     // /// last-resort fallback font instead.
-    //
-    // TODO: Once we have a `ShapedText`, this will probably take a `&mut ShapedText` instead.
     pub fn shape_item(
         &mut self,
         text: &str,
