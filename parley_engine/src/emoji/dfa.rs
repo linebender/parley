@@ -14,12 +14,12 @@ static DFA_TRANS: [[u8; 13]; 13] = {
     use EmojiSegmentationCategory as Category;
     use EmojiState as State;
 
-    let mut t = [[State::Reject.as_u8(); 13]; 13];
+    let mut t = [[State::Reject as u8; 13]; 13];
 
     /// Adds a state transition to the DFA transition table.
     macro_rules! add {
         ($state:expr, $category:expr, $next_state:expr) => {
-            t[$state.as_usize()][$category.as_usize()] = $next_state.as_u8()
+            t[$state as usize][$category as usize] = $next_state as u8
         };
     }
 
@@ -155,7 +155,7 @@ impl EmojiDFA {
     /// Updates the emoji state with [`EmojiSegmentationCategory`].
     #[inline]
     pub const fn step(&mut self, category: EmojiSegmentationCategory) {
-        self.state = EmojiState::from_u8(DFA_TRANS[self.state.as_usize()][category.as_usize()]);
+        self.state = EmojiState::from_u8(DFA_TRANS[self.state as usize][category as usize]);
     }
 
     /// Records the emoji state and segmentation category with [`EmojiSegmentationCategory`].
@@ -167,42 +167,42 @@ impl EmojiDFA {
             return;
         }
 
-        self.recorded.0 |= 1 << self.state.as_u8();
-        self.recorded.1 |= 1 << category.as_u8();
+        self.recorded.0 |= 1 << self.state as u8;
+        self.recorded.1 |= 1 << category as u8;
     }
 
-    /// Retures true if the emoji state is rejected.
+    /// Returns true if the emoji state is rejected.
     #[inline]
     pub(crate) const fn is_rejected(self) -> bool {
         self.state.eq(EmojiState::Reject)
     }
 
-    /// Retures true if the emoji state is started.
+    /// Returns true if the emoji state is started.
     #[inline]
     pub(crate) const fn is_started(self) -> bool {
         self.state.eq(EmojiState::Start)
     }
 
-    /// Retures true if the emoji state is accepting.
+    /// Returns true if the emoji state is accepting.
     #[allow(unused)]
     #[inline]
     pub(crate) const fn is_accepting(self) -> bool {
-        const START: u8 = EmojiState::Terminal.as_u8();
-        const END: u8 = EmojiState::RegionalIndicator.as_u8();
+        const START: u8 = EmojiState::Terminal as u8;
+        const END: u8 = EmojiState::RegionalIndicator as u8;
 
-        let cur = self.state.as_u8();
+        let cur = self.state as u8;
 
         START <= cur && cur <= END
     }
 
     #[inline]
     pub(crate) const fn contains_state(self, state: EmojiState) -> bool {
-        self.recorded.0 & (1 << state.as_u8()) != 0
+        self.recorded.0 & (1 << (state as u8)) != 0
     }
 
     #[inline]
     pub(crate) const fn contains_category(self, category: EmojiSegmentationCategory) -> bool {
-        self.recorded.1 & (1 << category.as_u8()) != 0
+        self.recorded.1 & (1 << (category as u8)) != 0
     }
 
     #[inline]
@@ -246,7 +246,7 @@ impl EmojiDFA {
         EmojiSequence::Basic
     }
 
-    /// Retures the emoji presentation style.
+    /// Returns the emoji presentation style.
     #[inline]
     pub const fn presentation_style(self) -> EmojiPresentationStyle {
         if self.contains_category(EmojiSegmentationCategory::Vs15) {
