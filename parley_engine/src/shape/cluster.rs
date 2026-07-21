@@ -12,22 +12,14 @@ use crate::{CharInfo, analysis::AnalysisDataSources, emoji::EmojiPresentationSty
 #[derive(Debug, Default)]
 pub struct CharCluster {
     chars: Vec<Char>,
-    is_emoji: bool,
     map_len: u8,
     start: u32,
     end: u32,
     force_normalize: bool,
-    emoji_presentation_style: EmojiPresentationStyle,
     comp: Form,
     decomp: Form,
     best_ratio: f32,
-<<<<<<< HEAD
-||||||| parent of 79a3774 (remove is_emoji)
-    is_emoji: bool,
     emoji_presentation_style: EmojiPresentationStyle,
-=======
-    emoji_presentation_style: EmojiPresentationStyle,
->>>>>>> 79a3774 (remove is_emoji)
 }
 
 impl CharCluster {
@@ -46,14 +38,7 @@ impl CharCluster {
 
     #[inline(always)]
     pub fn is_emoji(&self) -> bool {
-<<<<<<< HEAD
-        self.is_emoji
-||||||| parent of 79a3774 (remove is_emoji)
-        // self.is_emoji
         self.emoji_presentation_style.is_emoji()
-=======
-        self.emoji_presentation_style.is_emoji()
->>>>>>> 79a3774 (remove is_emoji)
     }
 }
 
@@ -348,7 +333,6 @@ impl CharCluster {
 
         // Finalize cluster metadata
         let end = *code_unit_offset_in_string as u32;
-        self.is_emoji = is_emoji_or_pictograph;
         self.map_len = map_len;
         self.start = start;
         self.end = end;

@@ -1,3 +1,7 @@
+// Copyright 2026 Christian Hansen
+// SPDX-License-Identifier: MIT
+// <https://github.com/chansen/c-emoji>
+//
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
@@ -59,50 +63,47 @@ impl EmojiState {
     }
 }
 
-impl<T> core::ops::Index<EmojiState> for [T] {
-    type Output = T;
-
-    #[inline]
-    fn index(&self, index: EmojiState) -> &T {
-        &self[index.as_usize()]
-    }
-}
-
-impl<T> core::ops::IndexMut<EmojiState> for [T] {
-    #[inline]
-    fn index_mut(&mut self, index: EmojiState) -> &mut T {
-        &mut self[index.as_usize()]
-    }
-}
-
 /// Represents the category of an emoji segmentation.
+///
+/// <https://unicode.org/reports/tr51/#Definitions>
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum EmojiSegmentationCategory {
+    /// Emoji property
     Emoji = 0,
+    /// Emoji presentation property
     EmojiPresentation,
+    /// Emoji modifier property
     EmojiModifier,
+    /// Emoji modifier base property
     EmojiModifierBase,
+    /// `[0-9]` `#` `*`
     KeycapBase,
+    /// `0x20E3`
     KeycapEnd,
+    /// `0x1F3F4`
     TagBase,
+    /// `[0xE0030-0xE0039]` or `[0xE0061-0xE007A]`
     TagSpec,
+    /// `0xE007F`
     TagEnd,
+    /// Regional Indicator character
     RegionalIndicator,
+    /// `0xFE0E`
     Vs15,
+    /// `0xFE0F`
     Vs16,
+    /// `0x200D`
     Zwj,
+    /// No value
     None,
 }
 
 impl EmojiSegmentationCategory {
     /// Returns the category of the given codepoint and flags.
-    ///
-    /// <https://unicode.org/reports/tr51/#Definitions>
     #[inline]
     pub fn from_codepoint(cp: u32, properties: EmojiProperties) -> Self {
         match cp {
-            // '0'..'9', '#', '*'
             0x30..=0x39 | 0x23 | 0x2A => Self::KeycapBase,
             0x200D => Self::Zwj,
             0x20E3 => Self::KeycapEnd,
@@ -153,22 +154,7 @@ impl EmojiSegmentationCategory {
     }
 }
 
-impl<T> core::ops::Index<EmojiSegmentationCategory> for [T] {
-    type Output = T;
-
-    #[inline]
-    fn index(&self, index: EmojiSegmentationCategory) -> &T {
-        &self[index.as_usize()]
-    }
-}
-
-impl<T> core::ops::IndexMut<EmojiSegmentationCategory> for [T] {
-    #[inline]
-    fn index_mut(&mut self, index: EmojiSegmentationCategory) -> &mut T {
-        &mut self[index.as_usize()]
-    }
-}
-
+/// Represents the category of an emoji sequence.
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(crate) enum EmojiSequence {
@@ -192,13 +178,19 @@ impl EmojiSequence {
     }
 }
 
+/// Represents presentation style for displaying emojis.
+///
+/// <https://www.unicode.org/reports/tr51/tr51-30.html#Presentation_Style>
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Default, Debug)]
 pub enum EmojiPresentationStyle {
-    Emoji,
-    Text,
+    /// Represents default presentation.
     #[default]
     Default,
+    /// Represents a text presentation.
+    Text,
+    /// Represents an emoji presentation.
+    Emoji,
 }
 
 impl EmojiPresentationStyle {
