@@ -277,7 +277,7 @@ impl CharInfo {
         self.flags & Self::FORCE_NORMALIZE_MASK != 0
     }
 
-    /// Whether this character begins an extended grapheme cluster (UAX #29).
+    /// Whether this character begins a grapheme cluster (UAX #29).
     #[inline(always)]
     pub fn is_grapheme_start(self) -> bool {
         self.flags & Self::GRAPHEME_START_MASK != 0
