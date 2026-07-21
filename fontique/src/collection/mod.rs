@@ -318,19 +318,22 @@ impl Inner {
     /// Returns the family object for the given family identifier.
     pub fn family(&mut self, id: FamilyId) -> Option<FamilyInfo> {
         self.sync_shared();
-
         if let Some(family) = self.data.families.get(&id) {
-            return family.as_ref().cloned();
+            family.as_ref().cloned()
+        } else {
+            #[cfg(feature = "system")]
+            if let Some(system) = &self.system {
+                let family = system.fonts.lock().unwrap().family(id);
+                self.data.families.insert(id, family.clone());
+                family
+            } else {
+                None
+            }
+            #[cfg(not(feature = "system"))]
+            {
+                None
+            }
         }
-
-        #[cfg(feature = "system")]
-        if let Some(system) = &self.system {
-            let family = system.fonts.lock().unwrap().family(id);
-            self.data.families.insert(id, family.clone());
-            return family;
-        }
-
-        None
     }
 
     /// Returns the family object for the given name.
