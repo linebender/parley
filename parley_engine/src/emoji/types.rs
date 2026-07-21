@@ -127,6 +127,15 @@ impl EmojiSegmentationCategory {
             }
         }
     }
+
+    /// Returns true if it a presentation selector, VS15 or VS16.
+    ///
+    /// e.g.
+    ///  - `U+270C + U+FE0E`: `✌`, force text presentation
+    ///  - `U+270C + U+FE0F`: `✌️`, force emoji presentation
+    pub fn is_presentation_selector(self) -> bool {
+        self == Self::Vs15 || self == Self::Vs16
+    }
 }
 
 /// Represents the category of an emoji sequence.
