@@ -6,7 +6,6 @@
 use core::ops::Range;
 
 use alloc::vec::Vec;
-use parlance::FontFeature;
 
 use crate::{
     CharInfo, FontInstance, Glyph, ShapeOptions,
@@ -93,7 +92,6 @@ pub struct ShapedText {
     glyphs: Vec<Glyph>,
     fonts: Vec<FontInstance>,
     normalized_coords: Vec<NormalizedCoord>,
-    features: Vec<FontFeature>,
 }
 
 impl ShapedText {
@@ -110,7 +108,6 @@ impl ShapedText {
         self.glyphs.clear();
         self.fonts.clear();
         self.normalized_coords.clear();
-        self.features.clear();
     }
 
     /// The shaped runs.
@@ -171,14 +168,6 @@ impl ShapedText {
     #[inline(always)]
     pub fn normalized_coords(&self) -> &[NormalizedCoord] {
         &self.normalized_coords
-    }
-
-    /// The font features used by runs in this shaped text.
-    ///
-    /// [`ShapedRun::normalized_coords_range`] splits this into per-run slices.
-    #[inline(always)]
-    pub fn features(&self) -> &[FontFeature] {
-        &self.features
     }
 
     pub(crate) fn push_run(
