@@ -160,10 +160,7 @@ fn shape_item(
     let mut code_unit_offset_in_string = text_range.start;
     let char_cluster = &mut scx.char_cluster;
 
-    // Build an iterator of grapheme-cluster end boundaries (byte offsets into `item_text`) from
-    // the per-character grapheme-start flags computed during analysis. The item start is treated
-    // as a grapheme start regardless of its flag (an item boundary never extends a preceding
-    // grapheme for shaping purposes), hence `skip(1)`.
+    // Build an iterator of boundaries and consume the first segment to seed the loop
     let mut boundaries_iter = item_text
         .char_indices()
         .zip(item_char_info.iter())
@@ -171,8 +168,6 @@ fn shape_item(
         .filter_map(|((byte_pos, _), info)| info.is_grapheme_start().then_some(byte_pos))
         .chain(core::iter::once(item_text.len()));
     let mut last_boundary = 0_usize;
-    // Consume the first segment to seed the loop. `boundaries_iter` always yields at least
-    // `item_text.len()` for non-empty text.
     let mut current_boundary = boundaries_iter.next().unwrap();
 
     char_cluster.fill(
