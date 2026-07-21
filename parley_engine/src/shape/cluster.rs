@@ -299,9 +299,6 @@ impl CharCluster {
             *code_unit_offset_in_string += ch.len_utf8();
             force_normalize |= info.force_normalize();
 
-            // TODO - make emoji detection more complete, as per (except using composite Trie tables as
-            //  much as possible:
-            //  https://github.com/conor-93/parley/blob/4637d826732a1a82bbb3c904c7f47a16a21cceec/parley/src/shape/mod.rs#L221-L269
             is_emoji |= info.is_emoji_or_pictograph();
 
             let mut is_emoji_presentation_selector = false;
