@@ -704,6 +704,9 @@ impl CommonData {
         data: Blob<u8>,
         info_override: Option<FontInfoOverride<'_>>,
     ) -> Vec<(FamilyId, Vec<FontInfo>)> {
+        #[cfg(feature = "woff")]
+        let data = maybe_decode_woff(data);
+
         let mut families: HashMap<FamilyId, (FamilyName, Vec<FontInfo>)> = HashMap::default();
         let mut scratch_family_name = String::default();
 
@@ -808,6 +811,22 @@ impl CommonData {
 
     fn clear(&mut self) {
         *self = Self::default();
+    }
+}
+
+/// If the given data is a WOFF or WOFF2 file, decode it into an OpenType/TrueType
+/// (sfnt) blob. Otherwise (or if decoding fails), the original blob is returned unchanged.
+#[cfg(feature = "woff")]
+fn maybe_decode_woff(data: Blob<u8>) -> Blob<u8> {
+    // WOFF and WOFF2 files start with the signatures `wOFF` and `wOF2` respectively.
+    let decoded = match data.as_ref().first_chunk::<4>() {
+        Some(b"wOFF") => wuff::decompress_woff1(data.as_ref()).ok(),
+        Some(b"wOF2") => wuff::decompress_woff2(data.as_ref()).ok(),
+        _ => None,
+    };
+    match decoded {
+        Some(decoded) => Blob::from(decoded),
+        None => data,
     }
 }
 
