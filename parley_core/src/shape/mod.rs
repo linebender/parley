@@ -9,5 +9,5 @@ mod data;
 pub(crate) mod shaped_text;
 pub(crate) mod shaper;
 
-pub use cluster::{Char, CharCluster, SourceRange, Status, Whitespace};
+pub use cluster::{Char, CharCluster, Coverage, SourceRange, Whitespace};
 pub use data::{ClusterData, ClusterInfo, to_whitespace};
