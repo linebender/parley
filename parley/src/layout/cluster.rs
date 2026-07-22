@@ -9,8 +9,8 @@ use crate::layout::run::Run;
 use crate::style::Brush;
 
 use core::ops::Range;
-use parley_core::Glyph;
-use parley_core::shape::{ClusterData, ClusterInfo, Whitespace};
+use parley_engine::Glyph;
+use parley_engine::shape::{ClusterData, ClusterInfo, Whitespace};
 
 /// Atomic unit of text.
 #[derive(Copy, Clone)]

@@ -4,8 +4,8 @@
 //! Text shaping implementation using `harfrust`for shaping
 //! and `icu` for text analysis.
 
-use parley_core::shape::{CharCluster, Status};
-use parley_core::{Analysis, AnalysisDataSources, FontInstance, ShapeOptions, Shaper};
+use parley_engine::shape::{CharCluster, Status};
+use parley_engine::{Analysis, AnalysisDataSources, FontInstance, ShapeOptions, Shaper};
 
 use super::layout::Layout;
 use super::resolve::{ResolveContext, ResolvedStyle};
@@ -47,7 +47,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 
     let mut inline_box_iter = inline_boxes.iter().peekable();
-    let split_after = |item_range: parley_core::itemize::TextRange| {
+    let split_after = |item_range: parley_engine::itemize::TextRange| {
         // Split at inlines boxes, so each box falls on a shaping boundary.
         {
             let mut split = false;

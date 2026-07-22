@@ -10,8 +10,8 @@ use crate::{IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode
 use core::ops::Range;
 
 use alloc::vec::Vec;
-use parley_core::shape::ClusterData;
-use parley_core::{Boundary, ShapedText};
+use parley_engine::shape::ClusterData;
+use parley_engine::{Boundary, ShapedText};
 
 /// `HarfRust`-based run data
 #[derive(Clone, Debug, PartialEq)]
@@ -267,7 +267,7 @@ impl<B: Brush> LayoutData<B> {
         let shaped_run = &self.shaped_text.runs()[shaped_run_idx];
         debug_assert!(
             !shaped_run.clusters_range.is_empty(),
-            "Shaped runs return by `parley_core` must be non-empty"
+            "Shaped runs return by `parley_engine` must be non-empty"
         );
         let style_index = self.shaped_text.clusters()[shaped_run.clusters_range.start].style_index;
 

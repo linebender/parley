@@ -5,7 +5,7 @@ use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty, WordBreak}
 use alloc::{vec, vec::Vec};
 use fontique::FontWeight;
 use icu_properties::props::{GraphemeClusterBreak, Script};
-use parley_core::Boundary;
+use parley_engine::Boundary;
 
 #[derive(Default)]
 struct TestContext {

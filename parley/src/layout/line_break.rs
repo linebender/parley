@@ -17,8 +17,8 @@ use crate::style::Brush;
 use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
 
 use core::ops::Range;
-use parley_core::shape::{ClusterData, Whitespace};
-use parley_core::{Boundary, FontMetrics};
+use parley_engine::shape::{ClusterData, Whitespace};
+use parley_engine::{Boundary, FontMetrics};
 
 #[derive(Default)]
 struct LineLayout {

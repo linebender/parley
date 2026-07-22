@@ -3,9 +3,9 @@
 
 use crate::{Brush, LayoutContext};
 
-use parley_core::break_overrides::LineBreakOverrideFn;
+use parley_engine::break_overrides::LineBreakOverrideFn;
 
-use parley_core::AnalysisOptions;
+use parley_engine::AnalysisOptions;
 
 use parlance::WordBreak;
 

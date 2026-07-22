@@ -126,7 +126,7 @@ pub mod style;
 mod tests;
 
 pub use linebender_resource_handle::FontData;
-pub use parley_core::break_overrides::{
+pub use parley_engine::break_overrides::{
     AsciiLineBreakTable, AsciiLineBreakTableBuilder, CHROMIUM_LINE_BREAK_OVERRIDE,
     LineBreakContext, LineBreakOverrideFn,
 };
