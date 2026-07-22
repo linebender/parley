@@ -8,7 +8,7 @@ use core::ops::Range;
 use alloc::{vec, vec::Vec};
 
 use parlance::WordBreak;
-use parley_core::{Analysis, AnalysisDataSources, Analyzer, Shaper};
+use parley_engine::{Analysis, AnalysisDataSources, Analyzer, Shaper};
 
 use super::FontContext;
 use super::builder::{RangedBuilder, StyleRunBuilder};

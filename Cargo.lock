@@ -2901,8 +2901,8 @@ dependencies = [
  "linebender_resource_handle",
  "oxipng",
  "parlance",
- "parley_core",
  "parley_dev",
+ "parley_engine",
  "peniko",
  "skrifa 0.43.2",
 ]
@@ -2914,22 +2914,6 @@ dependencies = [
  "parley",
  "parley_dev",
  "tango-bench",
-]
-
-[[package]]
-name = "parley_core"
-version = "0.11.0"
-dependencies = [
- "fontique",
- "harfrust",
- "hashbrown 0.17.1",
- "icu_normalizer",
- "icu_properties",
- "icu_segmenter",
- "linebender_resource_handle",
- "parlance",
- "parley_data",
- "skrifa 0.43.2",
 ]
 
 [[package]]
@@ -2951,6 +2935,22 @@ dependencies = [
 [[package]]
 name = "parley_dev"
 version = "0.0.0"
+
+[[package]]
+name = "parley_engine"
+version = "0.11.0"
+dependencies = [
+ "fontique",
+ "harfrust",
+ "hashbrown 0.17.1",
+ "icu_normalizer",
+ "icu_properties",
+ "icu_segmenter",
+ "linebender_resource_handle",
+ "parlance",
+ "parley_data",
+ "skrifa 0.43.2",
+]
 
 [[package]]
 name = "parley_examples_common"

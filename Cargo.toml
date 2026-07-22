@@ -6,10 +6,10 @@ members = [
     "parlance",
     "parley",
     "parley_bench",
-    "parley_core",
     "parley_data",
     "parley_data_gen",
     "parley_dev",
+    "parley_engine",
     "parley_tests",
     "parley_tests/linebreaking_cases",
     "parley_tests/linebreaking_browser_recorder",
@@ -36,10 +36,10 @@ repository = "https://github.com/linebender/parley"
 parlance = { version = "0.1.0", default-features = false, path = "parlance" }
 fontique = { version = "0.11.0", default-features = false, path = "fontique" }
 parley = { version = "0.11.0", default-features = false, path = "parley" }
-parley_core = { version = "0.11.0", default-features = false, path = "parley_core" }
 parley_data = { version = "0.11.0", path = "parley_data", default-features = false }
 parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
+parley_engine = { version = "0.11.0", default-features = false, path = "parley_engine" }
 parley_linebreaking_cases = { path = "parley_tests/linebreaking_cases" }
 
 # External dependencies

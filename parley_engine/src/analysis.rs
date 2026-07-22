@@ -81,7 +81,7 @@ impl Analysis {
     }
 }
 
-// TODO: Make `pub(crate)` once `parley_core` owns shaping.
+// TODO: Make `pub(crate)` once `parley_engine` owns shaping.
 #[doc(hidden)]
 #[expect(missing_debug_implementations, reason = "Will become private")]
 pub struct AnalysisDataSources;

@@ -5,7 +5,7 @@ use super::{BreakReason, data::LineItemData};
 use crate::data::LayoutData;
 use crate::style::Brush;
 
-use parley_core::shape::ClusterData;
+use parley_engine::shape::ClusterData;
 
 /// Alignment of a layout.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]

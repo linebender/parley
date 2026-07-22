@@ -8,7 +8,7 @@ use crate::style::Brush;
 
 use core::ops::Range;
 use fontique::Synthesis;
-use parley_core::{FontInstance, FontMetrics, NormalizedCoord, ShapedRun};
+use parley_engine::{FontInstance, FontMetrics, NormalizedCoord, ShapedRun};
 
 /// Sequence of clusters with a single font and style.
 #[derive(Copy, Clone)]
