@@ -265,7 +265,7 @@ impl ShapedText {
         let is_rtl = !item.bidi_level.is_multiple_of(2);
 
         let glyphs_start = self.glyphs.len();
-        let run_advance = if !is_rtl {
+        if !is_rtl {
             process_clusters(
                 Direction::Ltr,
                 &mut self.clusters,
@@ -276,9 +276,9 @@ impl ShapedText {
                 &char_info[range.char_range.clone()],
                 &options.char_style_indices[range.char_range.clone()],
                 text[range.byte_range.clone()].char_indices(),
-            )
+            );
         } else {
-            let run_advance = process_clusters(
+            process_clusters(
                 Direction::Rtl,
                 &mut self.clusters,
                 &mut self.glyphs,
@@ -292,14 +292,19 @@ impl ShapedText {
             // Reverse clusters into logical order for RTL
             let clusters_len = self.clusters.len();
             self.clusters[clusters_start..clusters_len].reverse();
-            run_advance
-        };
+        }
+
+        let clusters_range = clusters_start..self.clusters.len();
+        let run_advance = self.clusters[clusters_range.clone()]
+            .iter()
+            .map(|cluster| cluster.advance)
+            .sum();
 
         self.runs.push(ShapedRun {
             range,
             font_size: options.font_size,
             font_index,
-            clusters_range: clusters_start..self.clusters.len(),
+            clusters_range,
             glyphs_range: glyphs_start..self.glyphs.len(),
             normalized_coords_range,
             bidi_level: item.bidi_level,
@@ -364,7 +369,7 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
     char_infos: &[CharInfo],
     char_style_indices: &[u16],
     char_indices_iter: I,
-) -> f32 {
+) {
     let char_info_at = |i: usize| (char_infos[i], char_style_indices[i]);
     let mut char_indices_iter = char_indices_iter.peekable();
     let mut cluster_start_char = char_indices_iter.next().unwrap();
@@ -373,7 +378,6 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
     let start_cluster_id = glyph_infos.first().unwrap().cluster;
     let mut cluster_id = start_cluster_id;
     let mut char_info = char_info_at(cluster_id as usize);
-    let mut run_advance = 0.0;
     let mut cluster_advance = 0.0;
     // If the current cluster might be a single-glyph, zero-offset cluster, we defer
     // pushing the first glyph to `glyphs` because it might be inlined into `ClusterData`.
@@ -418,7 +422,6 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
     for (glyph_info, glyph_pos) in glyph_infos.iter().zip(glyph_positions.iter()) {
         // Flush previous cluster if we've reached a new cluster
         if cluster_id != glyph_info.cluster {
-            run_advance += cluster_advance;
             let num_components = num_components(glyph_info.cluster, cluster_id, last_cluster_id);
             cluster_advance /= num_components as f32;
             let is_newline = to_whitespace(cluster_start_char.1) == Whitespace::Newline;
@@ -594,8 +597,6 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
             );
         }
     }
-
-    run_advance
 }
 
 #[derive(PartialEq)]
@@ -668,4 +669,65 @@ fn push_cluster(
         text_offset: cluster_start_char.0 as u16,
         advance: final_advance,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::{sync::Arc, vec};
+
+    use fontique::Synthesis;
+    use linebender_resource_handle::{Blob, FontData};
+
+    use crate::{Analysis, AnalysisOptions, Analyzer, FontInstance, ShapeOptions, Shaper};
+
+    use super::ShapedText;
+
+    const ROBOTO: &[u8] =
+        include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
+
+    fn shape(text: &str) -> ShapedText {
+        let mut analysis = Analysis::new();
+        Analyzer::new().analyze(
+            text,
+            &AnalysisOptions {
+                word_break: &[],
+                line_break_override: None,
+            },
+            &mut analysis,
+        );
+        let font = FontInstance {
+            font: FontData::new(Blob::new(Arc::new(ROBOTO)), 0),
+            synthesis: Synthesis::default(),
+        };
+        let char_style_indices = vec![0; text.chars().count()];
+        let mut shaper = Shaper::default();
+        let mut shaped = ShapedText::new();
+        for item in analysis.itemize(text, |_| false) {
+            shaper.shape_item(
+                text,
+                &analysis,
+                &item,
+                &ShapeOptions {
+                    font_size: 32.0,
+                    language: None,
+                    features: &[],
+                    variations: &[],
+                    char_style_indices: &char_style_indices,
+                },
+                |_| Some(font.clone()),
+                &mut shaped,
+            );
+        }
+        shaped
+    }
+
+    #[test]
+    fn single_cluster_run_advance_matches_its_cluster() {
+        let shaped = shape("A");
+        let run = &shaped.runs()[0];
+        let cluster = &shaped.clusters()[run.clusters_range.clone()][0];
+
+        assert!(cluster.advance > 0.0);
+        assert_eq!(run.advance, cluster.advance);
+    }
 }
