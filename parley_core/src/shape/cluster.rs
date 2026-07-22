@@ -111,7 +111,7 @@ impl Coverage {
     /// best-covering font.
     pub const NONE: Self = Self {
         covered: 0,
-        total: 1,
+        total: u8::MAX,
     };
 
     /// Complete coverage, meaning all characters contributing to shaping are covered.
@@ -119,8 +119,8 @@ impl Coverage {
     /// A coverage compares equal to `COMPLETE` exactly when it is complete, see also
     /// [`Self::is_complete`].
     pub const COMPLETE: Self = Self {
-        covered: 1,
-        total: 1,
+        covered: u8::MAX,
+        total: u8::MAX,
     };
 
     /// Returns `true` iff all characters are covered.
