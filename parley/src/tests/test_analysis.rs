@@ -56,6 +56,18 @@ impl TestContext {
         self
     }
 
+    fn expect_grapheme_start_list(self, expected: Vec<bool>) -> Self {
+        let actual: Vec<_> = self
+            .layout_context
+            .analysis
+            .char_info()
+            .iter()
+            .map(|info| info.is_grapheme_start())
+            .collect();
+        assert_eq!(actual, expected, "Grapheme start list mismatch");
+        self
+    }
+
     fn expect_is_control_list(self, expected: Vec<bool>) -> Self {
         let actual: Vec<_> = self
             .layout_context
@@ -430,7 +442,31 @@ fn test_multi_char_grapheme() {
         ])
         .expect_is_control_list(vec![false, false, false, false, false, false])
         .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
-        .expect_force_normalize_list(vec![false, false, false, true, false, false]);
+        .expect_force_normalize_list(vec![false, false, false, true, false, false])
+        .expect_grapheme_start_list(vec![true, true, true, false, true, true]);
+}
+
+#[test]
+fn test_grapheme_start_multi_char_graphemes() {
+    // CRLF (GB3), emoji ZWJ sequence 👨‍👩‍👧 (GB9/GB11), and regional indicator
+    // pair 🇦🇺 (GB12) are each a single extended grapheme cluster.
+    verify_analysis(
+        "a\r\n\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{1F1E6}\u{1F1FA}b",
+        |_| {},
+    )
+    .expect_grapheme_start_list(vec![
+        true,  // 'a'
+        true,  // '\r'
+        false, // '\n' (CR x LF)
+        true,  // 👨
+        false, // ZWJ
+        false, // 👩
+        false, // ZWJ
+        false, // 👧
+        true,  // 🇦 (regional indicator A)
+        false, // 🇺 (regional indicator U)
+        true,  // 'b'
+    ]);
 }
 
 #[test]
