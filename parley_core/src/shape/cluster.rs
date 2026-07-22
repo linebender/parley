@@ -119,8 +119,8 @@ impl Coverage {
     /// A coverage compares equal to `COMPLETE` exactly when it is complete, see also
     /// [`Self::is_complete`].
     pub const COMPLETE: Self = Self {
-        covered: 0,
-        total: 0,
+        covered: 1,
+        total: 1,
     };
 
     /// Returns `true` iff all characters are covered.
@@ -485,5 +485,72 @@ impl<'a> Mapper<'a> {
             covered: mapped,
             total: self.map_len,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Coverage;
+
+    #[test]
+    fn ordering() {
+        assert!(Coverage::NONE < Coverage::COMPLETE);
+
+        assert_eq!(
+            Coverage {
+                covered: 0,
+                total: 0,
+            },
+            Coverage::COMPLETE
+        );
+        assert_eq!(
+            Coverage {
+                covered: 5,
+                total: 5,
+            },
+            Coverage::COMPLETE
+        );
+        assert_eq!(
+            Coverage {
+                // `covered` is greater than `total`, which shouldn't be produced by us, but is
+                // possible because `Coverage`'s fields are `pub`.
+                covered: 3,
+                total: 2,
+            },
+            Coverage::COMPLETE
+        );
+        assert_eq!(
+            Coverage {
+                covered: 255,
+                total: 255,
+            },
+            Coverage::COMPLETE
+        );
+
+        assert!(
+            Coverage {
+                covered: 4,
+                total: 5,
+            } > Coverage::NONE
+        );
+        assert!(
+            Coverage {
+                covered: 4,
+                total: 5,
+            } < Coverage::COMPLETE
+        );
+
+        assert!(
+            Coverage {
+                covered: 254,
+                total: 255,
+            } > Coverage::NONE
+        );
+        assert!(
+            Coverage {
+                covered: 254,
+                total: 255,
+            } < Coverage::COMPLETE
+        );
     }
 }
