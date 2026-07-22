@@ -13,6 +13,7 @@ members = [
     "parley_tests",
     "parley_tests/linebreaking_cases",
     "parley_tests/linebreaking_browser_recorder",
+    "styled_text",
     "examples/common",
     "examples/swash_render",
     "examples/tiny_skia_render",
