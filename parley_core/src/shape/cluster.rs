@@ -92,6 +92,9 @@ impl Whitespace {
 /// This is the fraction `covered / total` of characters covered by a font. Coverages are ordered by
 /// the value of the fraction (with `0 / 0` considered to be completely covered). Use, e.g.,
 /// [`Self::cmp`] to compare coverages.
+///
+/// In the unlikely event there are more characters than this in the character cluster, the counts
+/// are saturated to [`u8::MAX`].
 #[derive(Copy, Clone, Eq, Debug)]
 pub struct Coverage {
     /// The number of characters covered by the font.
