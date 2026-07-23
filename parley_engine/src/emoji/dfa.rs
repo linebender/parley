@@ -134,9 +134,9 @@ static DFA_TRANS: [[u8; 13]; 13] = {
 /// Recognizes Unicode emoji sequence.
 #[derive(Clone, Copy, Debug)]
 pub struct EmojiDFA {
-    /// The current emoji state
+    /// The current emoji state.
     state: EmojiState,
-    /// Stores the visited state and category
+    /// Stores the visited state and category.
     recorded: (u16, u16),
 }
 
