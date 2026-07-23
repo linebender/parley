@@ -170,6 +170,11 @@ impl<'a, B: Brush> Cluster<'a, B> {
     /// Returns the advance of the cluster.
     pub fn advance(&self) -> f32 {
         self.data.advance
+            + self
+                .run
+                .layout
+                .data
+                .justification_adjustment(self.data_index())
     }
 
     /// Returns `true` if this is a right-to-left cluster.
@@ -218,20 +223,26 @@ impl<'a, B: Brush> Cluster<'a, B> {
 
     /// Returns an iterator over the glyphs in the cluster.
     pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + 'a + Clone + use<'a, B> {
+        let advance_adjustment = self
+            .run
+            .layout
+            .data
+            .justification_adjustment(self.data_index());
         if self.data.glyph_len == 0xFF {
             GlyphIter::Single(Some(Glyph {
                 id: self.data.glyph_offset,
                 x: 0.,
                 y: 0.,
-                advance: self.data.advance,
+                advance: self.data.advance + advance_adjustment,
             }))
         } else {
             let start = self.run.shaped.glyphs_range.start + self.data.glyph_offset as usize;
-            GlyphIter::Slice(
-                self.run.layout.data.shaped_text.glyphs()
+            GlyphIter::Slice {
+                iter: self.run.layout.data.shaped_text.glyphs()
                     [start..start + self.data.glyph_len as usize]
                     .iter(),
-            )
+                advance_adjustment,
+            }
         }
     }
 
@@ -446,6 +457,17 @@ impl<'a, B: Brush> Cluster<'a, B> {
         &self.data.info
     }
 
+    #[inline]
+    fn data_index(&self) -> usize {
+        let range_start = self
+            .run
+            .line_data
+            .map_or(self.run.shaped.clusters_range.start, |line_data| {
+                line_data.cluster_range.start
+            });
+        range_start + self.path.logical_index()
+    }
+
     /// Returns the text length of the cluster in bytes.
     ///
     /// This is only used for tests, and is *not* part of the public API.
@@ -537,7 +559,10 @@ impl ClusterPath {
 #[derive(Clone)]
 enum GlyphIter<'a> {
     Single(Option<Glyph>),
-    Slice(core::slice::Iter<'a, Glyph>),
+    Slice {
+        iter: core::slice::Iter<'a, Glyph>,
+        advance_adjustment: f32,
+    },
 }
 
 impl Iterator for GlyphIter<'_> {
@@ -546,8 +571,14 @@ impl Iterator for GlyphIter<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Single(glyph) => glyph.take(),
-            Self::Slice(iter) => {
-                let glyph = *iter.next()?;
+            Self::Slice {
+                iter,
+                advance_adjustment,
+            } => {
+                let mut glyph = *iter.next()?;
+                if iter.len() == 0 {
+                    glyph.advance += *advance_adjustment;
+                }
                 Some(glyph)
             }
         }

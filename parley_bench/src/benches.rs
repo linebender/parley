@@ -47,6 +47,68 @@ pub fn defaults() -> Vec<Benchmark> {
         .collect()
 }
 
+/// Benchmark default-styled text with justified alignment.
+pub fn justified() -> Vec<Benchmark> {
+    const DISPLAY_SCALE: f32 = 1.0;
+    const QUANTIZE: bool = true;
+    const MAX_ADVANCE: f32 = 200.0 * DISPLAY_SCALE;
+
+    get_samples()
+        .iter()
+        .map(|sample| {
+            benchmark_fn(
+                format!("Justified - {} {}", sample.name, sample.modification),
+                |b| {
+                    b.iter(|| {
+                        let text = &sample.text;
+                        with_contexts(|font_cx, layout_cx| {
+                            let mut builder =
+                                layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
+                            builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+
+                            let mut layout: Layout<ColorBrush> = builder.build(text);
+                            layout.break_all_lines(Some(MAX_ADVANCE));
+                            layout.align(Alignment::Justify, AlignmentOptions::default());
+
+                            black_box(layout);
+                        });
+                    })
+                },
+            )
+        })
+        .collect()
+}
+
+/// Benchmark realigning an already line-broken paragraph.
+pub fn realign() -> Vec<Benchmark> {
+    const DISPLAY_SCALE: f32 = 1.0;
+    const QUANTIZE: bool = true;
+    const MAX_ADVANCE: f32 = 200.0 * DISPLAY_SCALE;
+
+    get_samples()
+        .iter()
+        .filter(|sample| sample.modification == "1 paragraph" && sample.name != "japanese")
+        .map(|sample| {
+            benchmark_fn(format!("Realign - {}", sample.name), |b| {
+                let mut layout = with_contexts(|font_cx, layout_cx| {
+                    let mut builder =
+                        layout_cx.ranged_builder(font_cx, &sample.text, DISPLAY_SCALE, QUANTIZE);
+                    builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+                    let mut layout: Layout<ColorBrush> = builder.build(&sample.text);
+                    layout.break_all_lines(Some(MAX_ADVANCE));
+                    layout
+                });
+
+                b.iter(move || {
+                    layout.align(Alignment::Justify, AlignmentOptions::default());
+                    layout.align(Alignment::Start, AlignmentOptions::default());
+                    black_box(&layout);
+                })
+            })
+        })
+        .collect()
+}
+
 /// Benchmark for styled text.
 pub fn styled() -> Vec<Benchmark> {
     const DISPLAY_SCALE: f32 = 1.0;
