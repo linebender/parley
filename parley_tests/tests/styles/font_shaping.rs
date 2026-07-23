@@ -233,8 +233,6 @@ fn style_features_ligatures_rtl_cluster_details() {
             // the ligature start.
             2 => {
                 assert!(c.is_ligature_continuation());
-                assert_eq!(c.glyphs().count(), 0);
-                assert!(c.is_ligature_continuation());
                 assert_eq!(c.text_range().len(), 2);
                 assert_eq!(c.glyphs().count(), 0);
             }
