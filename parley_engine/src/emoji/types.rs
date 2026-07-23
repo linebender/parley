@@ -148,19 +148,28 @@ impl EmojiSegmentationCategory {
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(crate) enum EmojiSequence {
+    /// A single character
     Basic,
-    Keycap,
+    /// Emoji modifier sequence
+    ///
+    /// <https://www.unicode.org/reports/tr51/#def_emoji_modifier_sequence>
     Modifier,
+    /// Emoji flag sequence
+    ///
+    /// <https://www.unicode.org/reports/tr51/#def_emoji_flag_sequence>
     Flag,
-    Zwj,
+    /// Emoji tag sequence
+    ///
+    /// <https://www.unicode.org/reports/tr51/#def_emoji_tag_sequence>
     Tag,
-}
-
-impl EmojiSequence {
-    #[inline]
-    pub(crate) const fn eq(self, other: Self) -> bool {
-        (self as u8) == (other as u8)
-    }
+    /// Emoji keycap sequence
+    ///
+    /// <https://www.unicode.org/reports/tr51/#def_emoji_keycap_sequence>
+    Keycap,
+    /// Emoji ZWJ sequence
+    ///
+    /// <https://www.unicode.org/reports/tr51/#def_emoji_zwj_sequence>
+    Zwj,
 }
 
 /// Represents presentation style for displaying emojis.
@@ -179,8 +188,9 @@ pub enum EmojiPresentationStyle {
 }
 
 impl EmojiPresentationStyle {
+    /// Returns true if it is an emoji presentation.
     #[inline]
-    pub(crate) const fn is_emoji(self) -> bool {
+    pub const fn is_emoji(self) -> bool {
         matches!(self, Self::Emoji)
     }
 }

@@ -155,7 +155,7 @@ impl EmojiDFA {
 
     /// Updates the emoji state with [`EmojiSegmentationCategory`].
     #[inline]
-    pub const fn step(&mut self, category: EmojiSegmentationCategory) {
+    const fn step(&mut self, category: EmojiSegmentationCategory) {
         self.state = EmojiState::from_u8(DFA_TRANS[self.state as usize][category as usize]);
     }
 
@@ -197,25 +197,22 @@ impl EmojiDFA {
     }
 
     #[inline]
-    pub(crate) const fn contains_state(self, state: EmojiState) -> bool {
+    const fn contains_state(self, state: EmojiState) -> bool {
         self.recorded.0 & (1 << (state as u8)) != 0
     }
 
     #[inline]
-    pub(crate) const fn contains_category(self, category: EmojiSegmentationCategory) -> bool {
+    const fn contains_category(self, category: EmojiSegmentationCategory) -> bool {
         self.recorded.1 & (1 << (category as u8)) != 0
     }
 
     #[inline]
-    pub(crate) const fn sequence(self) -> EmojiSequence {
+    const fn sequence(self) -> EmojiSequence {
         if self.contains_category(EmojiSegmentationCategory::Zwj) {
             return EmojiSequence::Zwj;
         }
 
-        if self.contains_state(EmojiState::TagBase)
-            && self.contains_state(EmojiState::Terminal)
-            && !self.contains_category(EmojiSegmentationCategory::Vs15)
-        {
+        if self.contains_state(EmojiState::TagBase) && self.contains_state(EmojiState::Terminal) {
             return EmojiSequence::Tag;
         }
 
@@ -231,16 +228,7 @@ impl EmojiDFA {
             return EmojiSequence::Modifier;
         }
 
-        if self.contains_category(EmojiSegmentationCategory::KeycapBase)
-            && self.contains_category(EmojiSegmentationCategory::Vs16)
-            && self.contains_category(EmojiSegmentationCategory::KeycapEnd)
-        {
-            return EmojiSequence::Keycap;
-        }
-
-        if self.contains_category(EmojiSegmentationCategory::KeycapEnd)
-            && self.contains_category(EmojiSegmentationCategory::Vs16)
-        {
+        if self.contains_category(EmojiSegmentationCategory::KeycapBase) {
             return EmojiSequence::Keycap;
         }
 
@@ -250,6 +238,7 @@ impl EmojiDFA {
     /// Returns the emoji presentation style.
     #[inline]
     pub const fn presentation_style(self) -> EmojiPresentationStyle {
+        // Emoji presentation selectors
         if self.contains_category(EmojiSegmentationCategory::Vs15) {
             return EmojiPresentationStyle::Text;
         }
@@ -257,25 +246,30 @@ impl EmojiDFA {
             return EmojiPresentationStyle::Emoji;
         }
 
+        // `Emoji_Presentation=Yes`
         if self.contains_category(EmojiSegmentationCategory::EmojiPresentation) {
             return EmojiPresentationStyle::Emoji;
         }
 
-        if !self.sequence().eq(EmojiSequence::Basic) {
-            return EmojiPresentationStyle::Emoji;
+        // Resolves presentation
+        match self.sequence() {
+            // unqualified keycap, e.g. #⃣
+            EmojiSequence::Keycap => EmojiPresentationStyle::Default,
+            EmojiSequence::Basic => {
+                // single emoji modifier, e.g. 🏻
+                if self.contains_category(EmojiSegmentationCategory::EmojiModifier) {
+                    EmojiPresentationStyle::Emoji
+                } else {
+                    // single emoji modifier base, e.g ☝
+                    if self.contains_category(EmojiSegmentationCategory::EmojiModifierBase) {
+                        EmojiPresentationStyle::Text
+                    } else {
+                        EmojiPresentationStyle::Default
+                    }
+                }
+            }
+            _ => EmojiPresentationStyle::Emoji,
         }
-
-        // single emoji modifier; e.g. 🏻
-        if self.contains_category(EmojiSegmentationCategory::EmojiModifier) {
-            return EmojiPresentationStyle::Emoji;
-        }
-
-        // single emoji modifier base; e.g ☝
-        if self.contains_category(EmojiSegmentationCategory::EmojiModifierBase) {
-            return EmojiPresentationStyle::Text;
-        }
-
-        EmojiPresentationStyle::Default
     }
 }
 
