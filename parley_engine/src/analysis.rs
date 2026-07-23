@@ -22,7 +22,7 @@ use icu_segmenter::{
     GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter,
     LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed,
 };
-use parlance::WordBreak;
+use parlance::{BaseDirection, WordBreak};
 use parley_data::Properties;
 
 use crate::bidi;
@@ -78,6 +78,12 @@ impl Analysis {
     #[inline(always)]
     pub fn paragraph_level(&self) -> u8 {
         self.paragraph_level
+    }
+
+    /// Whether the paragraph's resolved base direction is right-to-left.
+    #[inline(always)]
+    pub fn is_rtl(&self) -> bool {
+        !self.paragraph_level.is_multiple_of(2)
     }
 }
 
@@ -439,6 +445,10 @@ pub(crate) fn analyze_text(
     }
 
     if text.is_empty() {
+        analyzer
+            .bidi
+            .resolve(core::iter::empty(), options.base_direction);
+        analysis.paragraph_level = analyzer.bidi.base_level();
         return;
     }
 
@@ -665,7 +675,7 @@ pub(crate) fn analyze_text(
             },
         );
 
-    if needs_bidi_resolution {
+    if needs_bidi_resolution || options.base_direction == BaseDirection::Rtl {
         analyzer.bidi.resolve(
             text.chars().zip(
                 analysis
@@ -673,7 +683,7 @@ pub(crate) fn analyze_text(
                     .iter()
                     .map(|info| (info.bidi_class, info.bracket)),
             ),
-            None,
+            options.base_direction,
         );
         core::mem::swap(&mut analysis.levels, &mut analyzer.bidi.levels);
         analysis.paragraph_level = analyzer.bidi.base_level();

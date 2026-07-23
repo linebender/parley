@@ -3,7 +3,7 @@
 
 //! Test that the various builders produce the same results.
 
-use std::{borrow::Cow, path::PathBuf, sync::Arc};
+use std::{borrow::Cow, path::PathBuf, sync::Arc, vec::Vec};
 
 use fontique::{Collection, CollectionOptions, FontStyle, FontWeight, FontWidth, SourceCache};
 use parlance::FontFamilyName;
@@ -11,9 +11,9 @@ use peniko::{Blob, color::palette};
 
 use super::utils::{ColorBrush, asserts::assert_eq_layout_data};
 use crate::{
-    FontContext, FontFamily, FontFeatures, FontVariations, Layout, LayoutContext, LineHeight,
-    OverflowWrap, RangedBuilder, StyleProperty, StyleRunBuilder, TextStyle, TextWrapMode,
-    TreeBuilder, WordBreak,
+    BaseDirection, FontContext, FontFamily, FontFeatures, FontVariations, Layout, LayoutContext,
+    LineHeight, OverflowWrap, RangedBuilder, StyleProperty, StyleRunBuilder, TextStyle,
+    TextWrapMode, TreeBuilder, WordBreak,
 };
 
 // TODO: `FONT_FAMILY_LIST`, `load_fonts`, and `create_font_context` are
@@ -126,6 +126,57 @@ fn build_layout_with_style_runs(
     let mut layout = rb.build(opts.text);
     layout.break_all_lines(opts.max_advance);
     layout
+}
+
+#[test]
+fn builders_apply_base_direction() {
+    let text = "123 / 456";
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+
+    let mut ranged = lcx.ranged_builder(&mut fcx, text, 1.0, true);
+    ranged.push_default(FontFamily::from(FONT_FAMILY_LIST));
+    ranged.set_base_direction(BaseDirection::Rtl);
+    let mut ranged_layout = ranged.build(text);
+    ranged_layout.break_all_lines(None);
+    assert!(ranged_layout.is_rtl());
+    assert_eq!(
+        ranged_layout
+            .lines()
+            .flat_map(|line| line.runs())
+            .map(|run| run.text_range())
+            .collect::<Vec<_>>(),
+        [6..9, 3..6, 0..3]
+    );
+
+    let root_style = TextStyle {
+        font_family: FontFamily::from(FONT_FAMILY_LIST),
+        ..TextStyle::default()
+    };
+    let mut tree = lcx.tree_builder(&mut fcx, 1.0, true, &root_style);
+    tree.set_base_direction(BaseDirection::Rtl);
+    tree.push_text(text);
+    let (mut tree_layout, _) = tree.build();
+    tree_layout.break_all_lines(None);
+    assert!(tree_layout.is_rtl());
+    assert_eq_layout_data(
+        &ranged_layout.data,
+        &tree_layout.data,
+        "tree base direction",
+    );
+
+    let mut style_runs = lcx.style_run_builder(&mut fcx, text, 1.0, true);
+    style_runs.set_base_direction(BaseDirection::Rtl);
+    let style = style_runs.push_style(root_style);
+    style_runs.push_style_run(style, ..);
+    let mut style_run_layout = style_runs.build(text);
+    style_run_layout.break_all_lines(None);
+    assert!(style_run_layout.is_rtl());
+    assert_eq_layout_data(
+        &ranged_layout.data,
+        &style_run_layout.data,
+        "style-run base direction",
+    );
 }
 
 /// Computes layout in various ways to ensure they all produce the same result.

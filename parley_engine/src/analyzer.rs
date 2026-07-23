@@ -5,7 +5,7 @@
 
 use core::ops::Range;
 
-use parlance::WordBreak;
+use parlance::{BaseDirection, WordBreak};
 
 use crate::{bidi::BidiResolver, break_overrides::LineBreakOverrideFn};
 
@@ -39,8 +39,13 @@ impl Analyzer {
 }
 
 /// Options controlling [`Analyzer::analyze`].
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct AnalysisOptions<'a> {
+    /// The paragraph's base direction.
+    ///
+    /// Defaults to [`BaseDirection::Auto`], which infers the direction from the text.
+    pub base_direction: BaseDirection,
+
     /// Word break configuration for ranges of the source text.
     ///
     /// Ranges must be sorted and non-overlapping. Gaps use [`WordBreak::Normal`].
@@ -54,6 +59,86 @@ pub struct AnalysisOptions<'a> {
 
 impl core::fmt::Debug for AnalysisOptions<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("AnalysisOptions").finish_non_exhaustive()
+        f.debug_struct("AnalysisOptions")
+            .field("base_direction", &self.base_direction)
+            .field("word_break", &self.word_break)
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AnalysisOptions, Analyzer};
+    use crate::{Analysis, BaseDirection};
+
+    fn analyze(text: &str, base_direction: BaseDirection) -> Analysis {
+        let mut analyzer = Analyzer::new();
+        let mut analysis = Analysis::new();
+        analyzer.analyze(
+            text,
+            &AnalysisOptions {
+                base_direction,
+                ..AnalysisOptions::default()
+            },
+            &mut analysis,
+        );
+        analysis
+    }
+
+    #[test]
+    fn explicit_rtl_resolves_numeric_and_neutral_text() {
+        let text = "123 / 456";
+        let auto = analyze(text, BaseDirection::Auto);
+        let rtl = analyze(text, BaseDirection::Rtl);
+
+        assert_eq!(auto.paragraph_level(), 0);
+        assert!(!auto.is_rtl());
+        assert!(auto.bidi_levels().is_empty());
+
+        assert_eq!(rtl.paragraph_level(), 1);
+        assert!(rtl.is_rtl());
+        assert_eq!(rtl.bidi_levels().len(), text.chars().count());
+        for (ch, level) in text.chars().zip(rtl.bidi_levels()) {
+            if ch.is_ascii_digit() {
+                assert!(level.is_multiple_of(2));
+            }
+        }
+        assert!(
+            rtl.bidi_levels()
+                .iter()
+                .any(|level| !level.is_multiple_of(2))
+        );
+    }
+
+    #[test]
+    fn explicit_ltr_takes_precedence_over_first_strong_direction() {
+        let text = "مرحبا hello";
+        let auto = analyze(text, BaseDirection::Auto);
+        let ltr = analyze(text, BaseDirection::Ltr);
+
+        assert!(auto.is_rtl());
+        assert!(!ltr.is_rtl());
+        assert_ne!(auto.bidi_levels(), ltr.bidi_levels());
+    }
+
+    #[test]
+    fn explicit_rtl_preserves_ltr_run_direction() {
+        let analysis = analyze("hello", BaseDirection::Rtl);
+
+        assert!(analysis.is_rtl());
+        assert!(
+            analysis
+                .bidi_levels()
+                .iter()
+                .all(|level| level.is_multiple_of(2))
+        );
+    }
+
+    #[test]
+    fn explicit_direction_applies_to_empty_text() {
+        let analysis = analyze("", BaseDirection::Rtl);
+
+        assert!(analysis.is_rtl());
+        assert!(analysis.bidi_levels().is_empty());
     }
 }

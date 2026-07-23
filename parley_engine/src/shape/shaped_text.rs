@@ -692,6 +692,7 @@ mod tests {
             &AnalysisOptions {
                 word_break: &[],
                 line_break_override: None,
+                ..AnalysisOptions::default()
             },
             &mut analysis,
         );

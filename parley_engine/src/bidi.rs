@@ -5,6 +5,7 @@
 
 use alloc::vec::Vec;
 use icu_properties::props::{BidiClass, BidiMirroringGlyph, BidiPairedBracketType};
+use parlance::BaseDirection;
 
 /// Type alias for a bidirectional level.
 pub type BidiLevel = u8;
@@ -75,7 +76,7 @@ impl BidiResolver {
     pub fn resolve(
         &mut self,
         chars: impl Iterator<Item = (char, (BidiClass, BidiMirroringGlyph))>,
-        base_level: Option<u8>,
+        base_direction: BaseDirection,
     ) {
         self.clear();
         let mut needs_bidi = false;
@@ -90,9 +91,10 @@ impl BidiResolver {
             needs_bidi = needs_bidi || mask(t) & BIDI_MASK != 0;
             len += 1;
         }
-        self.base_level = match base_level {
-            Some(level) => level & 1,
-            _ => Self::default_level(&self.initial_types),
+        self.base_level = match base_direction {
+            BaseDirection::Auto => Self::default_level(&self.initial_types),
+            BaseDirection::Ltr => 0,
+            BaseDirection::Rtl => 1,
         };
         if !needs_bidi && self.base_level == 0 {
             self.flags |= 1;
