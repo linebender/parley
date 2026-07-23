@@ -437,10 +437,6 @@ impl<'a> Mapper<'a> {
                     mapped += 1;
                 }
             }
-
-            if self.map_len == 1 {
-                mapped += 1;
-            }
         }
         mapped as f32 / self.map_len as f32
     }
