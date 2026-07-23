@@ -212,7 +212,7 @@ fn style_features_ligatures_ltr_cluster_details() {
 fn style_features_ligatures_rtl_cluster_details() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    let text = "احدً";
+    let text = "نصٍّ";
     let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(100.0));
@@ -227,25 +227,25 @@ fn style_features_ligatures_rtl_cluster_details() {
     let mut last_advance = f32::MAX;
     glyph_run.run().clusters().enumerate().for_each(|(i, c)| {
         match i % 4 {
-            // "ح" and "د" are not ligatures.
+            // "ن" and "ص" are not ligatures.
             0 | 1 => assert!(!c.is_ligature_start() && !c.is_ligature_continuation()),
-            // "د" is the ligature continuation whose cluster shares the advance with
+            // "ّ" is the ligature continuation whose cluster shares the advance with
             // the ligature start.
             2 => {
                 assert!(c.is_ligature_continuation());
                 assert_eq!(c.text_range().len(), 2);
                 assert_eq!(c.glyphs().count(), 0);
             }
-            // The last visual character (i.e. the first logical character) is the ligature start.
+            // The first visual character (i.e. the last logical character) is the ligature start.
             3 => {
                 assert!(c.is_ligature_start());
-                assert_eq!(c.glyphs().count(), 2);
+                assert_eq!(c.glyphs().count(), 1);
                 assert_eq!(c.text_range().len(), 2);
                 // The advance should be shared with the previous cluster of the ligature.
                 assert_eq!(c.advance(), last_advance);
                 // This cluster should contain the one glyph of the ligature whose advance
                 // is the sum of the advances of the component clusters.
-                assert_eq!(c.glyphs().nth(1).unwrap().advance, c.advance() * 2.0);
+                assert_eq!(c.glyphs().nth(0).unwrap().advance, c.advance() * 2.0);
             }
             _ => unreachable!(),
         }
