@@ -280,6 +280,7 @@ fn shape_item(
         // Prepare harfrust buffer
         let mut buffer = mem::take(&mut scx.unicode_buffer).unwrap();
         buffer.clear();
+        buffer.set_cluster_level(harfrust::BufferClusterLevel::MonotoneCharacters);
 
         // Use the entire segment text including newlines
         buffer.reserve(segment_text.len());
