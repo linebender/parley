@@ -23,7 +23,7 @@ use icu_segmenter::{
     LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed,
 };
 use parlance::WordBreak;
-use parley_data::Properties;
+use parley_data::{Properties, emoji::EmojiProperties};
 
 use crate::bidi;
 use crate::break_overrides::LineBreakContext;
@@ -154,6 +154,11 @@ impl AnalysisDataSources {
     fn brackets(&self) -> CodePointMapDataBorrowed<'_, BidiMirroringGlyph> {
         const { CodePointMapData::new() }
     }
+
+    #[inline(always)]
+    pub const fn emoji_properties(&self, c: char) -> EmojiProperties {
+        EmojiProperties::get(c)
+    }
 }
 
 #[cfg(feature = "complex-scripts")]
@@ -181,6 +186,8 @@ pub struct CharInfo {
     pub bidi_class: icu_properties::props::BidiClass,
     /// Whether or not the character is a bracket, plus mirror data if so.
     pub bracket: BidiMirroringGlyph,
+    /// The emoji properties of this character.
+    pub emoji_properties: EmojiProperties,
 
     flags: u8,
 }
@@ -216,6 +223,7 @@ impl CharInfo {
         grapheme_cluster_break: GraphemeClusterBreak,
         bidi_class: icu_properties::props::BidiClass,
         bracket: BidiMirroringGlyph,
+        emoji_properties: EmojiProperties,
         is_variation_selector: bool,
         is_region_indicator: bool,
         is_control: bool,
@@ -230,6 +238,7 @@ impl CharInfo {
             grapheme_cluster_break,
             bidi_class,
             bracket,
+            emoji_properties,
             flags: (is_variation_selector as u8) << Self::VARIATION_SELECTOR_SHIFT
                 | (is_region_indicator as u8) << Self::REGION_INDICATOR_SHIFT
                 | (is_control as u8) << Self::CONTROL_SHIFT
@@ -601,6 +610,7 @@ pub(crate) fn analyze_text(
     });
 
     let properties = |c| data_sources.properties(c);
+    let emoji_properties = |c| data_sources.emoji_properties(c);
 
     let mut needs_bidi_resolution = false;
 
@@ -622,6 +632,12 @@ pub(crate) fn analyze_text(
                 let is_variation_selector = properties.is_variation_selector();
                 let is_region_indicator = properties.is_region_indicator();
                 let next_mandatory_linebreak = properties.is_mandatory_linebreak();
+
+                let emoji_properties = if is_emoji_or_pictograph {
+                    emoji_properties(ch)
+                } else {
+                    EmojiProperties::ZERO
+                };
 
                 let boundary = if is_mandatory_linebreak {
                     Boundary::Mandatory
@@ -652,6 +668,7 @@ pub(crate) fn analyze_text(
                     grapheme_cluster_break,
                     bidi_class,
                     bracket,
+                    emoji_properties,
                     is_variation_selector,
                     is_region_indicator,
                     general_category == GeneralCategory::Control,
