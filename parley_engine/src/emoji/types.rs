@@ -96,7 +96,7 @@ pub enum EmojiSegmentationCategory {
 impl EmojiSegmentationCategory {
     /// Returns the category of the given codepoint and properties.
     #[inline]
-    pub fn from_codepoint(cp: u32, properties: EmojiProperties) -> Self {
+    pub const fn from_codepoint(cp: u32, properties: EmojiProperties) -> Self {
         match cp {
             0x30..=0x39 | 0x23 | 0x2A => Self::KeycapBase,
             0x200D => Self::Zwj,
@@ -137,8 +137,8 @@ impl EmojiSegmentationCategory {
     /// e.g.
     ///  - `U+270C + U+FE0E`: `✌`, force text presentation
     ///  - `U+270C + U+FE0F`: `✌️`, force emoji presentation
-    pub fn is_presentation_selector(self) -> bool {
-        self == Self::Vs15 || self == Self::Vs16
+    pub const fn is_presentation_selector(self) -> bool {
+        matches!(self, Self::Vs15 | Self::Vs16)
     }
 }
 
@@ -180,12 +180,7 @@ pub enum EmojiPresentationStyle {
 
 impl EmojiPresentationStyle {
     #[inline]
-    pub(crate) const fn eq(self, other: Self) -> bool {
-        (self as u8) == (other as u8)
-    }
-
-    #[inline]
     pub(crate) const fn is_emoji(self) -> bool {
-        self.eq(Self::Emoji)
+        matches!(self, Self::Emoji)
     }
 }
