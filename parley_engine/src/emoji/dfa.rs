@@ -206,6 +206,9 @@ impl EmojiDFA {
         self.recorded.1 & (1 << (category as u8)) != 0
     }
 
+    /// Return the [`EmojiSequence`].
+    ///
+    /// <https://www.unicode.org/reports/tr51/#Emoji_Sequences>
     #[inline]
     const fn sequence(self) -> EmojiSequence {
         if self.contains_category(EmojiSegmentationCategory::Zwj) {
