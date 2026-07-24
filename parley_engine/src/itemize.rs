@@ -6,9 +6,9 @@
 use core::{ops::Range, str::CharIndices};
 
 use icu_properties::props::Script as IcuScript;
-use parlance::Script;
+use parlance::{BidiLevel, Script};
 
-use crate::{Analysis, CharInfo, bidi::BidiLevel};
+use crate::{Analysis, CharInfo};
 
 /// A range of text.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -134,7 +134,7 @@ impl<F: FnMut(TextRange) -> bool> Iterator for Itemizer<'_, F> {
             return None;
         }
 
-        let mut item_bidi_level = 0; // Initialized in the loop.
+        let mut item_bidi_level = BidiLevel::new(0); // Initialized in the loop.
 
         let start_byte_offset = self.char_indices.offset();
         let mut item_char_len = 0;
@@ -257,11 +257,11 @@ mod tests {
         let items = items(text);
         assert!(items.len() >= 2);
         assert_eq!(items[0].script, LATN);
-        assert!(items[0].bidi_level.is_multiple_of(2));
+        assert!(items[0].bidi_level.is_ltr());
         assert!(
             items
                 .iter()
-                .any(|item| item.script == ARAB && !item.bidi_level.is_multiple_of(2))
+                .any(|item| item.script == ARAB && item.bidi_level.is_rtl())
         );
 
         // Items tile the text contiguously.

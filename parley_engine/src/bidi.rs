@@ -5,10 +5,7 @@
 
 use alloc::vec::Vec;
 use icu_properties::props::{BidiClass, BidiMirroringGlyph, BidiPairedBracketType};
-use parlance::BaseDirection;
-
-/// Type alias for a bidirectional level.
-pub type BidiLevel = u8;
+use parlance::{BaseDirection, BidiLevel};
 
 /// Resolver for the Unicode bidirectional algorithm.
 #[derive(Clone, Default)]
@@ -37,7 +34,7 @@ impl BidiResolver {
     /// Creates a new resolver.
     pub fn new() -> Self {
         Self {
-            base_level: 0,
+            base_level: BidiLevel::new(0),
             levels: Vec::new(),
             initial_types: Vec::new(),
             types: Vec::new(),
@@ -50,7 +47,7 @@ impl BidiResolver {
     }
 
     /// Returns the base level of the text.
-    pub fn base_level(&self) -> u8 {
+    pub fn base_level(&self) -> BidiLevel {
         self.base_level
     }
 
@@ -68,7 +65,7 @@ impl BidiResolver {
         self.brackets.clear();
         self.bracket_pairs.clear();
         self.flags = 0;
-        self.base_level = 0;
+        self.base_level = BidiLevel::new(0);
     }
 
     /// Resolves a paragraph with the specified base direction and
@@ -92,11 +89,11 @@ impl BidiResolver {
             len += 1;
         }
         self.base_level = match base_direction {
-            BaseDirection::Auto => Self::default_level(&self.initial_types),
-            BaseDirection::Ltr => 0,
-            BaseDirection::Rtl => 1,
+            BaseDirection::Auto => BidiLevel::new(Self::default_level(&self.initial_types)),
+            BaseDirection::Ltr => BidiLevel::new(0),
+            BaseDirection::Rtl => BidiLevel::new(1),
         };
-        if !needs_bidi && self.base_level == 0 {
+        if !needs_bidi && self.base_level == BidiLevel::new(0) {
             self.flags |= 1;
             self.levels.resize(len, self.base_level);
             return;
@@ -130,7 +127,7 @@ impl BidiResolver {
                     None => break,
                 };
             }
-            self.resolve_sequence(level, sos, eos, self.indices.len());
+            self.resolve_sequence(level.to_u8(), sos, eos, self.indices.len());
         }
         for i in 0..len {
             let t = self.initial_types[i];
@@ -223,7 +220,7 @@ impl BidiResolver {
         let base = self.base_level;
         let len = self.types.len();
         self.levels.clear();
-        self.levels.resize(len, 0);
+        self.levels.resize(len, BidiLevel::new(0));
         let mut stack = Stack::new();
         let mut overflow_isolates = 0;
         let mut overflow_embedding = 0;
@@ -247,11 +244,14 @@ impl BidiResolver {
                     }
                 }
                 let new_level = if is_rtl {
-                    (stack.embedding_level() + 1) | 1
+                    next_odd(stack.embedding_level())
                 } else {
-                    (stack.embedding_level() + 2) & !1
+                    next_even(stack.embedding_level())
                 };
-                if new_level <= MAX_STACK && overflow_isolates == 0 && overflow_embedding == 0 {
+                if new_level <= BidiLevel::new(MAX_STACK)
+                    && overflow_isolates == 0
+                    && overflow_embedding == 0
+                {
                     if is_isolate {
                         valid_isolates += 1;
                     }
@@ -655,11 +655,11 @@ impl BidiResolver {
                 let index = self.indices[i];
                 let t = types[i];
                 if t == BidiClass::RightToLeft {
-                    self.levels[index] = level + 1;
+                    self.levels[index] = BidiLevel::new(level + 1);
                 } else if t != BidiClass::LeftToRight {
-                    self.levels[index] = level + 2;
+                    self.levels[index] = BidiLevel::new(level + 2);
                 } else {
-                    self.levels[index] = level;
+                    self.levels[index] = BidiLevel::new(level);
                 }
             }
         } else {
@@ -668,9 +668,9 @@ impl BidiResolver {
                 let index = self.indices[i];
                 let t = types[i];
                 if t != BidiClass::RightToLeft {
-                    self.levels[index] = level + 1;
+                    self.levels[index] = BidiLevel::new(level + 1);
                 } else {
-                    self.levels[index] = level;
+                    self.levels[index] = BidiLevel::new(level);
                 }
             }
         }
@@ -679,7 +679,7 @@ impl BidiResolver {
 
 /// Returns a default bidi type for a level.
 pub(crate) fn type_from_level(level: BidiLevel) -> BidiClass {
-    if level & 1 == 0 {
+    if level.is_ltr() {
         BidiClass::LeftToRight
     } else {
         BidiClass::RightToLeft
@@ -689,7 +689,7 @@ pub(crate) fn type_from_level(level: BidiLevel) -> BidiClass {
 /// Computes an ordering for a sequence of bidi runs based on levels.
 pub(crate) fn _reorder<F>(order: &mut [usize], levels: F)
 where
-    F: Fn(usize) -> BidiLevel,
+    F: Fn(usize) -> u8,
 {
     let mut max_level = 0;
     let mut lowest_odd_level = 255;
@@ -788,7 +788,7 @@ fn find_limit_by_mask(types: &[BidiClass], offset: usize, mask: u32) -> usize {
 
 #[derive(Clone)]
 struct Run {
-    level: u8,
+    level: BidiLevel,
     ends_with_isolate: bool,
     starts_with_pdi: bool,
     sos: BidiClass,
@@ -800,7 +800,7 @@ struct Run {
 }
 
 impl Run {
-    fn new(level: u8, start: usize, end: usize) -> Self {
+    fn new(level: BidiLevel, start: usize, end: usize) -> Self {
         Self {
             level,
             ends_with_isolate: false,
@@ -818,7 +818,7 @@ impl Run {
 const MAX_STACK: u8 = 125;
 
 struct Stack {
-    embedding_level: [u8; MAX_STACK as usize + 1],
+    embedding_level: [BidiLevel; MAX_STACK as usize + 1],
     override_status: [BidiClass; MAX_STACK as usize + 1],
     isolate_status: [bool; MAX_STACK as usize + 1],
     depth: usize,
@@ -828,13 +828,13 @@ impl Stack {
     fn new() -> Self {
         Self {
             depth: 0,
-            embedding_level: [0; MAX_STACK as usize + 1],
+            embedding_level: [BidiLevel::new(0); MAX_STACK as usize + 1],
             override_status: [BidiClass::OtherNeutral; MAX_STACK as usize + 1],
             isolate_status: [false; MAX_STACK as usize + 1],
         }
     }
 
-    fn push(&mut self, level: u8, override_status: BidiClass, isolate_status: bool) {
+    fn push(&mut self, level: BidiLevel, override_status: BidiClass, isolate_status: bool) {
         let d = self.depth;
         self.embedding_level[d] = level;
         self.override_status[d] = override_status;
@@ -848,7 +848,7 @@ impl Stack {
         }
     }
 
-    fn embedding_level(&self) -> u8 {
+    fn embedding_level(&self) -> BidiLevel {
         self.embedding_level[self.depth - 1]
     }
 
@@ -901,4 +901,14 @@ impl BracketStack {
 
 const fn mask(t: BidiClass) -> u32 {
     1 << (t.to_icu4c_value() as u32)
+}
+
+#[inline(always)]
+const fn next_odd(level: BidiLevel) -> BidiLevel {
+    BidiLevel::new((level.to_u8() + 1) | 1)
+}
+
+#[inline(always)]
+const fn next_even(level: BidiLevel) -> BidiLevel {
+    BidiLevel::new((level.to_u8() + 2) & !1)
 }

@@ -22,7 +22,7 @@ use icu_segmenter::{
     GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter,
     LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed,
 };
-use parlance::{BaseDirection, WordBreak};
+use parlance::{BaseDirection, BidiLevel, WordBreak};
 use parley_data::Properties;
 
 use crate::bidi;
@@ -38,10 +38,10 @@ pub struct Analysis {
     /// Bidi level for each character, parallel to `info`.
     ///
     /// Empty if the text is all LTR.
-    pub(crate) levels: Vec<u8>,
+    pub(crate) levels: Vec<BidiLevel>,
 
     /// The base bidi level of the paragraph of text.
-    pub(crate) paragraph_level: u8,
+    pub(crate) paragraph_level: BidiLevel,
 }
 
 impl Analysis {
@@ -57,7 +57,7 @@ impl Analysis {
     pub(crate) fn clear(&mut self) {
         self.info.clear();
         self.levels.clear();
-        self.paragraph_level = 0;
+        self.paragraph_level = BidiLevel::new(0);
     }
 
     /// The per-character info in source order.
@@ -70,20 +70,14 @@ impl Analysis {
     ///
     /// Empty when the whole paragraph is left-to-right.
     #[inline(always)]
-    pub fn bidi_levels(&self) -> &[u8] {
+    pub fn bidi_levels(&self) -> &[BidiLevel] {
         &self.levels
     }
 
     /// The base bidi level of the paragraph of text.
     #[inline(always)]
-    pub fn paragraph_level(&self) -> u8 {
+    pub fn paragraph_level(&self) -> BidiLevel {
         self.paragraph_level
-    }
-
-    /// Whether the paragraph's resolved base direction is right-to-left.
-    #[inline(always)]
-    pub fn is_rtl(&self) -> bool {
-        !self.paragraph_level.is_multiple_of(2)
     }
 }
 

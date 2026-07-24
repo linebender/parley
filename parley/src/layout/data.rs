@@ -10,6 +10,7 @@ use crate::{IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode
 use core::ops::Range;
 
 use alloc::vec::Vec;
+use parlance::BidiLevel;
 use parley_engine::shape::ClusterData;
 use parley_engine::{Boundary, ShapedText};
 
@@ -68,7 +69,7 @@ pub(crate) struct LineItemData {
     /// The index of the run or inline box in the runs or `inline_boxes` vec
     pub(crate) index: usize,
     /// Bidi level for the item (used for reordering)
-    pub(crate) bidi_level: u8,
+    pub(crate) bidi_level: BidiLevel,
     /// Advance (size in direction of text flow) for the run.
     pub(crate) advance: f32,
 
@@ -91,7 +92,7 @@ impl LineItemData {
 
     #[inline(always)]
     pub(crate) fn is_rtl(&self) -> bool {
-        self.bidi_level & 1 != 0
+        self.bidi_level.is_rtl()
     }
 
     /// If the item is a text run
@@ -143,7 +144,7 @@ pub(crate) struct LayoutItem {
     /// The index of the run or inline box in the runs or `inline_boxes` vec
     pub(crate) index: usize,
     /// Bidi level for the item (used for reordering)
-    pub(crate) bidi_level: u8,
+    pub(crate) bidi_level: BidiLevel,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -154,7 +155,7 @@ pub(crate) struct LayoutData<B: Brush> {
     /// Whether metrics should be quantized to pixel boundaries
     pub(crate) quantize: bool,
     /// The `BiDi` base level
-    pub(crate) base_level: u8,
+    pub(crate) base_level: BidiLevel,
     /// The length of the text in the layout
     pub(crate) text_len: usize,
 
@@ -199,7 +200,7 @@ impl<B: Brush> Default for LayoutData<B> {
         Self {
             scale: 1.,
             quantize: true,
-            base_level: 0,
+            base_level: BidiLevel::new(0),
             text_len: 0,
             width: 0.,
             full_width: 0.,
@@ -225,7 +226,7 @@ impl<B: Brush> LayoutData<B> {
     pub(crate) fn clear(&mut self) {
         self.scale = 1.;
         self.quantize = true;
-        self.base_level = 0;
+        self.base_level = BidiLevel::new(0);
         self.text_len = 0;
         self.width = 0.;
         self.full_width = 0.;
@@ -248,7 +249,7 @@ impl<B: Brush> LayoutData<B> {
             .runs()
             .last()
             .map(|r| r.bidi_level)
-            .unwrap_or(0);
+            .unwrap_or(BidiLevel::new(0));
 
         self.items.push(LayoutItem {
             kind: LayoutItemKind::InlineBox,
@@ -353,7 +354,7 @@ impl<B: Brush> LayoutData<B> {
         let mut running_max_width = 0.0;
         let mut text_wrap_mode = TextWrapMode::Wrap;
         let mut prev_cluster: Option<&ClusterData> = None;
-        let is_rtl = self.base_level & 1 == 1;
+        let is_rtl = self.base_level.is_rtl();
         for item in &self.items {
             match item.kind {
                 LayoutItemKind::TextRun => {

@@ -5,6 +5,7 @@ use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty, WordBreak}
 use alloc::{vec, vec::Vec};
 use fontique::FontWeight;
 use icu_properties::props::{GraphemeClusterBreak, Script};
+use parlance::BidiLevel;
 use parley_engine::Boundary;
 
 #[derive(Default)]
@@ -26,8 +27,11 @@ impl TestContext {
         self
     }
 
-    fn expect_bidi_embed_level_list(self, expected: Vec<u8>) -> Self {
+    fn expect_bidi_embed_level_list(self, expected: &[u8]) -> Self {
         let actual = self.layout_context.analysis.bidi_levels();
+        // For ergonomics, we allow tests to pass in levels like `[0, 1, 2, 2, 1, 1, 1]`, and
+        // convert here. (Could also bytemuck... but that'd require pulling in the dependency here).
+        let expected = Vec::from_iter(expected.iter().map(|level| BidiLevel::new(*level)));
         assert_eq!(actual, expected, "Bidi embed level list mismatch");
         self
     }
@@ -231,7 +235,7 @@ fn test_latin_mixed_keep_all_last() {
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 1..2);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![Script::Latin, Script::Latin])
     .expect_grapheme_cluster_break_list(vec![
         GraphemeClusterBreak::Other,
@@ -256,7 +260,7 @@ fn test_mandatory_break_in_text() {
             Boundary::Word,
             Boundary::Mandatory,
         ])
-        .expect_bidi_embed_level_list(vec![])
+        .expect_bidi_embed_level_list(&[])
         .expect_script_list(vec![
             Script::Latin,
             Script::Latin,
@@ -308,7 +312,7 @@ fn test_paragraph_separator_is_hard_break() {
 fn test_blank() {
     verify_analysis("", |_| {})
         .expect_boundary_list(vec![Boundary::Word])
-        .expect_bidi_embed_level_list(vec![])
+        .expect_bidi_embed_level_list(&[])
         .expect_script_list(vec![Script::Common])
         .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::Other])
         .expect_is_control_list(vec![false])
@@ -372,7 +376,7 @@ fn test_latin_trailing_space_mixed() {
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..3);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::Word])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![Script::Latin, Script::Latin, Script::Common]);
 }
 
@@ -383,7 +387,7 @@ fn test_latin_leading_space_mixed() {
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..3);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::Line, Boundary::None])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![Script::Common, Script::Latin, Script::Latin]);
 }
 
@@ -409,7 +413,7 @@ fn test_latin_mixed_break_all_first() {
 fn test_all_whitespace() {
     verify_analysis("   ", |_| {})
         .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::None])
-        .expect_bidi_embed_level_list(vec![])
+        .expect_bidi_embed_level_list(&[])
         .expect_script_list(vec![Script::Common, Script::Common, Script::Common]);
 }
 
@@ -549,7 +553,7 @@ fn test_mixed_ltr_rtl() {
             Boundary::None,
             Boundary::None,
         ])
-        .expect_bidi_embed_level_list(vec![0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
+        .expect_bidi_embed_level_list(&[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
         .expect_script_list(vec![
             Script::Latin,
             Script::Latin,
@@ -682,7 +686,7 @@ fn test_mixed_ltr_rtl_nested_embedding() {
             Boundary::Word,
             Boundary::Word,
         ])
-        .expect_bidi_embed_level_list(vec![
+        .expect_bidi_embed_level_list(&[
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0,
         ])
         .expect_script_list(vec![
@@ -760,7 +764,7 @@ fn test_multi_char_grapheme_mixed_break_all() {
         Boundary::Word,
         Boundary::Line,
     ])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![
         Script::Latin,
         Script::Common,
@@ -849,7 +853,7 @@ fn test_mixed_ltr_rtl_multiple_segments() {
             Boundary::None,
             Boundary::None,
         ])
-        .expect_bidi_embed_level_list(vec![
+        .expect_bidi_embed_level_list(&[
             0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1,
             1, 1, 1, 1, 1,
         ])
@@ -944,7 +948,7 @@ fn test_multi_char_grapheme_mixed_break_and_keep_all() {
         Boundary::Word,
         Boundary::Line,
     ])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![
         Script::Latin,
         Script::Common,
@@ -983,7 +987,7 @@ fn test_multi_char_grapheme_mixed_keep_all() {
         Boundary::Word,
         Boundary::Line,
     ])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![
         Script::Latin,
         Script::Common,
@@ -1034,7 +1038,7 @@ fn test_multi_paragraph_bidi() {
             Boundary::None,
             Boundary::None,
         ])
-        .expect_bidi_embed_level_list(vec![
+        .expect_bidi_embed_level_list(&[
             0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
         ])
         .expect_script_list(vec![
@@ -1120,7 +1124,7 @@ fn test_rtl_paragraph_with_non_authoritative_logical_first_char_two_paragraphs()
             Boundary::None,
             Boundary::Word,
         ])
-        .expect_bidi_embed_level_list(vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+        .expect_bidi_embed_level_list(&[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
         .expect_script_list(vec![
             Script::Arabic,
             Script::Arabic,
@@ -1172,7 +1176,7 @@ fn test_single_char_multi_byte() {
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..3);
     })
     .expect_boundary_list(vec![Boundary::Word])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![Script::Common])
     .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::Other]);
 }
@@ -1187,7 +1191,7 @@ fn test_rtl_paragraph_with_non_authoritative_logical_first_character() {
             Boundary::None,
             Boundary::Word,
         ])
-        .expect_bidi_embed_level_list(vec![1, 1, 1, 1, 1])
+        .expect_bidi_embed_level_list(&[1, 1, 1, 1, 1])
         .expect_script_list(vec![
             Script::Arabic,
             Script::Arabic,
@@ -1211,7 +1215,7 @@ fn test_rtl_paragraph_with_non_authoritative_logical_first_character() {
 fn test_two_newlines() {
     verify_analysis("\n\n", |_| {})
         .expect_boundary_list(vec![Boundary::Word, Boundary::Mandatory])
-        .expect_bidi_embed_level_list(vec![])
+        .expect_bidi_embed_level_list(&[])
         .expect_script_list(vec![Script::Common, Script::Common])
         .expect_grapheme_cluster_break_list(vec![
             GraphemeClusterBreak::LF,
@@ -1223,7 +1227,7 @@ fn test_two_newlines() {
 fn test_newline() {
     verify_analysis("\n", |_| {})
         .expect_boundary_list(vec![Boundary::Word])
-        .expect_bidi_embed_level_list(vec![])
+        .expect_bidi_embed_level_list(&[])
         .expect_script_list(vec![Script::Common])
         .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::LF]);
 }
@@ -1234,7 +1238,7 @@ fn test_two_chars_keep_all() {
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..2);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![Script::Latin, Script::Latin]);
 }
 

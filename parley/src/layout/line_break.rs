@@ -8,6 +8,7 @@ use alloc::vec::Vec;
 #[cfg(feature = "libm")]
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
+use parlance::BidiLevel;
 
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
@@ -1164,7 +1165,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                     // Mark line as needing bidi re-ordering if it contains any runs with non-zero bidi level
                     // (zero is the default level, so this is equivalent to marking lines that have multiple levels)
-                    if line_item.bidi_level != 0 {
+                    if line_item.bidi_level != BidiLevel::new(0) {
                         needs_reorder = true;
                     }
 
@@ -1260,7 +1261,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 self.lines.line_items.push(LineItemData {
                     kind: LayoutItemKind::TextRun,
                     index,
-                    bidi_level: 0,
+                    bidi_level: BidiLevel::new(0),
                     advance: 0.,
                     is_whitespace: false,
                     has_trailing_whitespace: false,
@@ -1512,16 +1513,16 @@ fn reorder_line_items(runs: &mut [LineItemData]) {
     let mut lowest_odd_level = 255;
     for run in runs.iter() {
         let level = run.bidi_level;
-        let is_odd = level & 1 != 0;
+        let is_odd = level.to_u8() & 1 != 0;
 
         // Update max level
-        if level > max_level {
-            max_level = level;
+        if level.to_u8() > max_level {
+            max_level = level.to_u8();
         }
 
         // Update min odd level
-        if is_odd && level < lowest_odd_level {
-            lowest_odd_level = level;
+        if is_odd && level.to_u8() < lowest_odd_level {
+            lowest_odd_level = level.to_u8();
         }
     }
 
@@ -1530,9 +1531,9 @@ fn reorder_line_items(runs: &mut [LineItemData]) {
         // Iterate over text runs
         let mut i = 0;
         while i < run_count {
-            if runs[i].bidi_level >= level {
+            if runs[i].bidi_level.to_u8() >= level {
                 let mut end = i + 1;
-                while end < run_count && runs[end].bidi_level >= level {
+                while end < run_count && runs[end].bidi_level.to_u8() >= level {
                     end += 1;
                 }
 
