@@ -3,6 +3,8 @@
 
 #![expect(missing_docs, reason = "Deferred")]
 
+use core::ops::Range;
+
 use crate::{Boundary, shape::Whitespace};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -38,6 +40,45 @@ impl ClusterData {
     #[inline(always)]
     pub fn is_ligature_component(self) -> bool {
         self.flags & Self::LIGATURE_COMPONENT != 0
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Character {
+    pub text_byte_start: u32,
+    pub info: ClusterInfo,
+    pub grapheme_start: bool,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct ShapedCluster {
+    pub text_char_start: u32,
+    pub text_char_end: u32,
+
+    /// Style index for this cluster.
+    pub style_index: u16,
+
+    /// Cluster flags (see impl methods for details).
+    pub flags: u16,
+
+    /// If `glyph_len == 0xFF`, then `glyph_offset` is a glyph identifier, otherwise, it's an index
+    /// into the glyph array.
+    pub glyph_offset: u32,
+
+    /// Number of glyphs in this cluster (0xFF = single glyph stored inline)
+    pub glyph_len: u8,
+
+    /// Advance width for this cluster
+    pub advance: f32,
+}
+
+impl ShapedCluster {
+    pub(crate) const GRAPHEME_START: u16 = 1;
+
+    /// Whether the logical start of this shaped cluster is also the start of a grapheme.
+    #[inline(always)]
+    pub fn is_grapheme_start(self) -> bool {
+        self.flags & Self::GRAPHEME_START != 0
     }
 }
 

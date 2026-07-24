@@ -11,7 +11,11 @@ use parlance::BidiLevel;
 use crate::{
     CharInfo, FontInstance, Glyph, ShapeOptions,
     itemize::{Item, TextRange},
-    shape::{ClusterData, ClusterInfo, Whitespace, to_whitespace},
+    shape::{
+        ClusterData, ClusterInfo, Whitespace,
+        data::{Character, ShapedCluster},
+        to_whitespace,
+    },
 };
 
 /// A normalized font coordinate.
@@ -90,6 +94,8 @@ pub struct FontMetrics {
 pub struct ShapedText {
     runs: Vec<ShapedRun>,
     clusters: Vec<ClusterData>,
+    characters: Vec<Character>,
+    shaped_clusters: Vec<ShapedCluster>,
     glyphs: Vec<Glyph>,
     fonts: Vec<FontInstance>,
     normalized_coords: Vec<NormalizedCoord>,
@@ -114,6 +120,8 @@ impl ShapedText {
     #[inline]
     pub fn clear(&mut self) {
         self.runs.clear();
+        self.characters.clear();
+        self.shaped_clusters.clear();
         self.clusters.clear();
         self.glyphs.clear();
         self.fonts.clear();
@@ -154,6 +162,19 @@ impl ShapedText {
     #[inline(always)]
     pub fn clusters_and_glyphs_mut(&mut self) -> (&mut [ClusterData], &mut [Glyph]) {
         (&mut self.clusters, &mut self.glyphs)
+    }
+
+    /// Escape hatch for `parley` tests that remap style indices to check whether layouts are
+    /// otherwise identical. This is not for public consumption!
+    #[doc(hidden)]
+    #[inline(always)]
+    pub fn remap_styles(&mut self, remap: &[u16]) {
+        for cluster in self.clusters.iter_mut() {
+            cluster.style_index = remap[cluster.style_index as usize];
+        }
+        for shaped_cluster in self.shaped_clusters.iter_mut() {
+            shaped_cluster.style_index = remap[shaped_cluster.style_index as usize];
+        }
     }
 
     /// The shaped glyphs.
@@ -263,6 +284,7 @@ impl ShapedText {
         let glyph_positions = glyph_buffer.glyph_positions();
         let scale_factor = options.font_size / units_per_em;
         let clusters_start = self.clusters.len();
+        let shaped_clusters_start = self.shaped_clusters.len();
 
         let glyphs_start = self.glyphs.len();
         if item.bidi_level.is_ltr() {
@@ -276,6 +298,22 @@ impl ShapedText {
                 &char_info[range.char_range.clone()],
                 &options.char_style_indices[range.char_range.clone()],
                 text[range.byte_range.clone()].char_indices(),
+            );
+
+            process_shaped_clusters(
+                &mut self.characters,
+                &mut self.shaped_clusters,
+                &mut self.glyphs,
+                scale_factor,
+                glyph_infos.iter(),
+                glyph_positions.iter(),
+                // &char_info[range.char_range.clone()],
+                char_info,
+                // &options.char_style_indices[range.char_range.clone()],
+                &options.char_style_indices,
+                // text[range.byte_range.clone()].char_indices(),
+                text,
+                &range,
             );
         } else {
             process_clusters(
@@ -292,6 +330,31 @@ impl ShapedText {
             // Reverse clusters into logical order for RTL
             let clusters_len = self.clusters.len();
             self.clusters[clusters_start..clusters_len].reverse();
+
+            process_shaped_clusters(
+                &mut self.characters,
+                &mut self.shaped_clusters,
+                &mut self.glyphs,
+                scale_factor,
+                glyph_infos.iter().rev(),
+                glyph_positions.iter().rev(),
+                // &char_info[range.char_range.clone()],
+                char_info,
+                // &options.char_style_indices[range.char_range.clone()],
+                &options.char_style_indices,
+                // text[range.byte_range.clone()].char_indices().rev(),
+                text,
+                &range,
+            );
+            // Reverse each cluster's glyphs, such that they are in paint order.
+            //
+            // TODO: could this become a single `reverse` over the range?
+            for cluster in &self.shaped_clusters[shaped_clusters_start..] {
+                if cluster.glyph_len != 0xFF && cluster.glyph_len > 1 {
+                    let start = cluster.glyph_offset as usize;
+                    self.glyphs[start..start + cluster.glyph_len as usize].reverse();
+                }
+            }
         }
 
         let clusters_range = clusters_start..self.clusters.len();
@@ -599,6 +662,151 @@ fn process_clusters<I: Iterator<Item = (usize, char)>>(
     }
 }
 
+/// Processes shaped glyphs from `HarfRust` and converts them into `ClusterData` and `Glyph`.
+#[expect(clippy::missing_assert_message, reason = "Deferred")]
+#[expect(clippy::cast_possible_truncation, reason = "Deferred")]
+fn process_shaped_clusters<'a>(
+    characters: &mut Vec<Character>,
+    shaped_clusters: &mut Vec<ShapedCluster>,
+    glyphs: &mut Vec<Glyph>,
+    scale_factor: f32,
+    // glyph_infos: &[harfrust::GlyphInfo],
+    glyph_infos: impl Iterator<Item = &'a harfrust::GlyphInfo>,
+    // glyph_positions: &[harfrust::GlyphPosition],
+    glyph_positions: impl Iterator<Item = &'a harfrust::GlyphPosition>,
+    char_infos: &[CharInfo],
+    char_style_indices: &[u16],
+    text: &str,
+    text_range: &TextRange,
+) {
+    // TODO: we're conflating indices into `char_infos` and `characters` here at the moment.
+    //
+    // If not all items or runs are pushed, the two arrays don't necessarily agree.
+
+    struct Cluster {
+        id: u32,
+        characters_start: usize,
+        glyphs_start: usize,
+        glyphs: u32,
+        inline_glyph: Option<Glyph>,
+        advance: f32,
+    }
+
+    let mut cluster = Cluster {
+        id: 0,
+        characters_start: text_range.char_range.start,
+        glyphs_start: glyphs.len(),
+        glyphs: 0,
+        inline_glyph: None,
+        advance: 0.,
+    };
+
+    let mut char_indices = text[text_range.byte_range.clone()].char_indices();
+
+    for (glyph_info, glyph_pos) in glyph_infos.zip(glyph_positions) {
+        if glyph_info.cluster != cluster.id {
+            let num_characters = glyph_info.cluster - cluster.id;
+
+            for c in cluster.characters_start..cluster.characters_start + num_characters as usize {
+                let char_info_ = char_infos[c];
+                let (char_byte_offset, char_) = char_indices.next().unwrap();
+                let character = Character {
+                    text_byte_start: (text_range.byte_range.start + char_byte_offset) as u32,
+                    info: ClusterInfo::new(char_info_.boundary, char_),
+                    grapheme_start: char_info_.is_grapheme_start(),
+                };
+                characters.push(character);
+            }
+
+            let (glyph_offset, glyph_len) = if let Some(inline_glyph) = cluster.inline_glyph.take()
+            {
+                (inline_glyph.id, 0xFF)
+            } else {
+                (cluster.glyphs_start as u32, cluster.glyphs as u8)
+            };
+
+            shaped_clusters.push(ShapedCluster {
+                text_char_start: cluster.characters_start as u32,
+                text_char_end: cluster.characters_start as u32 + num_characters,
+                style_index: char_style_indices[cluster.characters_start],
+                flags: if characters[cluster.characters_start].grapheme_start {
+                    ShapedCluster::GRAPHEME_START
+                } else {
+                    0
+                },
+                glyph_offset,
+                glyph_len,
+                advance: cluster.advance,
+            });
+
+            cluster = Cluster {
+                id: glyph_info.cluster,
+                characters_start: text_range.char_range.start + glyph_info.cluster as usize,
+                glyphs_start: glyphs.len(),
+                glyphs: 0,
+                inline_glyph: None,
+                advance: 0.,
+            };
+        }
+
+        {
+            let glyph = Glyph {
+                id: glyph_info.glyph_id,
+                x: (glyph_pos.x_offset as f32) * scale_factor,
+                // Convert from font space (Y-up) to layout space (Y-down)
+                y: -(glyph_pos.y_offset as f32) * scale_factor,
+                advance: (glyph_pos.x_advance as f32) * scale_factor,
+            };
+            if cluster.glyphs == 0 && glyph.x == 0. && glyph.y == 0. {
+                // Defer this potential zero-offset, single glyph cluster
+                cluster.inline_glyph = Some(glyph);
+            } else {
+                if let Some(pending_glyph) = cluster.inline_glyph.take() {
+                    glyphs.push(pending_glyph);
+                }
+                glyphs.push(glyph);
+            }
+            cluster.advance += glyph.advance;
+        }
+
+        cluster.glyphs += 1;
+    }
+
+    // Push final
+    let num_characters = text_range.char_range.len() as u32 - cluster.id;
+
+    for c in cluster.characters_start..cluster.characters_start + num_characters as usize {
+        let char_info_ = char_infos[c];
+        let (char_byte_offset, char_) = char_indices.next().unwrap();
+        let character = Character {
+            text_byte_start: (text_range.byte_range.start + char_byte_offset) as u32,
+            info: ClusterInfo::new(char_info_.boundary, char_),
+            grapheme_start: char_info_.is_grapheme_start(),
+        };
+        characters.push(character);
+    }
+
+    let (glyph_offset, glyph_len) = if let Some(inline_glyph) = cluster.inline_glyph.take() {
+        (inline_glyph.id, 0xFF)
+    } else {
+        (cluster.glyphs_start as u32, cluster.glyphs as u8)
+    };
+
+    shaped_clusters.push(ShapedCluster {
+        text_char_start: cluster.characters_start as u32,
+        text_char_end: cluster.characters_start as u32 + num_characters,
+        style_index: char_style_indices[cluster.characters_start],
+        flags: if characters[cluster.characters_start].grapheme_start {
+            ShapedCluster::GRAPHEME_START
+        } else {
+            0
+        },
+        glyph_offset,
+        glyph_len,
+        advance: cluster.advance,
+    });
+}
+
 #[derive(PartialEq)]
 enum Direction {
     Ltr,
@@ -673,7 +881,7 @@ fn push_cluster(
 
 #[cfg(test)]
 mod tests {
-    use alloc::{sync::Arc, vec};
+    use alloc::{sync::Arc, vec, vec::Vec};
 
     use fontique::Synthesis;
     use linebender_resource_handle::{Blob, FontData};
@@ -684,8 +892,10 @@ mod tests {
 
     const ROBOTO: &[u8] =
         include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
+    const NOTO_KUFI_ARABIC: &[u8] =
+        include_bytes!("../../../parley_dev/assets/fonts/noto_fonts/NotoKufiArabic-Regular.otf");
 
-    fn shape(text: &str) -> ShapedText {
+    fn shape_with_font(text: &str, font_data: &'static [u8]) -> ShapedText {
         let mut analysis = Analysis::new();
         Analyzer::new().analyze(
             text,
@@ -697,7 +907,7 @@ mod tests {
             &mut analysis,
         );
         let font = FontInstance {
-            font: FontData::new(Blob::new(Arc::new(ROBOTO)), 0),
+            font: FontData::new(Blob::new(Arc::new(font_data)), 0),
             synthesis: Synthesis::default(),
         };
         let char_style_indices = vec![0; text.chars().count()];
@@ -724,11 +934,45 @@ mod tests {
 
     #[test]
     fn single_cluster_run_advance_matches_its_cluster() {
-        let shaped = shape("A");
+        let shaped = shape_with_font("A", ROBOTO);
         let run = &shaped.runs()[0];
         let cluster = &shaped.clusters()[run.clusters_range.clone()][0];
 
         assert!(cluster.advance > 0.0);
         assert_eq!(run.advance, cluster.advance);
+    }
+
+    /// [U+0600 U+0623 U+064F] is a single grapheme but shapes into the clusters [c0] [c1 c2].
+    #[test]
+    fn one_graphemes_two_clusters() {
+        let shaped = shape_with_font("\u{0600}\u{0623}\u{064F}", NOTO_KUFI_ARABIC);
+
+        let grapheme_starts: Vec<bool> =
+            shaped.characters.iter().map(|c| c.grapheme_start).collect();
+        assert_eq!(grapheme_starts, [true, false, false]);
+
+        let clusters: Vec<(u32, u32, bool)> = shaped
+            .shaped_clusters
+            .iter()
+            .map(|c| (c.text_char_start, c.text_char_end, c.is_grapheme_start()))
+            .collect();
+        assert_eq!(clusters, [(0, 1, true), (1, 3, false)]);
+    }
+
+    /// "ffi" is three graphemes but shapes into one cluster.
+    #[test]
+    fn three_graphemes_one_cluster() {
+        let shaped = shape_with_font("ffi", ROBOTO);
+
+        let grapheme_starts: Vec<bool> =
+            shaped.characters.iter().map(|c| c.grapheme_start).collect();
+        assert_eq!(grapheme_starts, [true, true, true]);
+
+        let clusters: Vec<(u32, u32, bool)> = shaped
+            .shaped_clusters
+            .iter()
+            .map(|c| (c.text_char_start, c.text_char_end, c.is_grapheme_start()))
+            .collect();
+        assert_eq!(clusters, [(0, 3, true)]);
     }
 }

@@ -25,9 +25,7 @@ fn canonicalize_layout_data<B: Brush>(layout_data: &LayoutData<B>) -> LayoutData
         }
     }
 
-    for cluster in normalized.shaped_text.clusters_mut() {
-        cluster.style_index = remap[cluster.style_index as usize];
-    }
+    normalized.shaped_text.remap_styles(&remap);
     normalized.styles = canonical_styles;
     normalized
 }
