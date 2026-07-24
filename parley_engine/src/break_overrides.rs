@@ -120,9 +120,9 @@ static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable<5> =
 /// # let mut analysis = Analysis::new();
 /// let text = "Hello there!";
 /// let options = AnalysisOptions {
-///     word_break: &[],
 ///     // Emulate Chromium:
 ///     line_break_override: Some(CHROMIUM_LINE_BREAK_OVERRIDE),
+///     ..AnalysisOptions::default()
 /// };
 /// analyzer.analyze(text, &options, &mut analysis);
 /// ```

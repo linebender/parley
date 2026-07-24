@@ -33,6 +33,7 @@ mod lru_cache;
 pub mod shape;
 
 pub use linebender_resource_handle::FontData;
+pub use parlance::BaseDirection;
 
 pub use analysis::{Analysis, AnalysisDataSources, Boundary, CharInfo};
 pub use analyzer::{AnalysisOptions, Analyzer};

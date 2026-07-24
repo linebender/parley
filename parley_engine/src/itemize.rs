@@ -237,10 +237,7 @@ mod tests {
     fn analyze(text: &str) -> Analysis {
         let mut analyzer = Analyzer::new();
         let mut analysis = Analysis::new();
-        let options = AnalysisOptions {
-            word_break: &[],
-            line_break_override: None,
-        };
+        let options = AnalysisOptions::default();
         analyzer.analyze(text, &options, &mut analysis);
         analysis
     }
