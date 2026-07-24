@@ -20,7 +20,7 @@ use crate::{
 // duplicated between this crate and `parley_test`. We can't move the builder
 // tests into `parley_test` because they use private APIs, but should eventually
 // figure out some way to reduce the duplication.
-const FONT_FAMILY_LIST: &[FontFamilyName<'_>] = &[
+pub(crate) const FONT_FAMILY_LIST: &[FontFamilyName<'_>] = &[
     FontFamilyName::Named(Cow::Borrowed("Roboto")),
     FontFamilyName::Named(Cow::Borrowed("Noto Kufi Arabic")),
 ];
@@ -51,7 +51,7 @@ pub(crate) fn load_fonts(
     Ok(())
 }
 
-fn create_font_context() -> FontContext {
+pub(crate) fn create_font_context() -> FontContext {
     let mut collection = Collection::new(CollectionOptions {
         shared: false,
         system_fonts: false,

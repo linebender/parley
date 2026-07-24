@@ -45,6 +45,8 @@ pub(crate) struct LineData {
     pub(crate) item_range: Range<usize>,
     /// Metrics for the line.
     pub(crate) metrics: LineMetrics,
+    /// Full inline advance before alignment.
+    pub(crate) natural_advance: f32,
     /// The cause of the line break.
     pub(crate) break_reason: BreakReason,
     /// Maximum advance for the line.
@@ -186,8 +188,10 @@ pub(crate) struct LayoutData<B: Brush> {
     /// Directly store the alignment if accessibility is enabled so we can
     /// set the corresponding AccessKit property.
     pub(crate) alignment: Option<super::Alignment>,
-    /// Whether the layout is aligned with [`crate::Alignment::Justify`].
-    pub(crate) is_aligned_justified: bool,
+    /// Per-cluster advance adjustments produced by justification.
+    ///
+    /// An empty vector means that justification has not adjusted any clusters.
+    pub(crate) justification_adjustments: Vec<f32>,
     /// The text-indent amount in layout units.
     pub(crate) indent_amount: f32,
     /// Options controlling text-indent behavior (each-line, hanging).
@@ -213,7 +217,7 @@ impl<B: Brush> Default for LayoutData<B> {
             line_items: Vec::new(),
             #[cfg(feature = "accesskit")]
             alignment: None,
-            is_aligned_justified: false,
+            justification_adjustments: Vec::new(),
             layout_max_advance: 0.0,
             indent_amount: 0.0,
             indent_options: IndentOptions::default(),
@@ -237,6 +241,42 @@ impl<B: Brush> LayoutData<B> {
         self.items.clear();
         self.lines.clear();
         self.line_items.clear();
+        self.justification_adjustments.clear();
+    }
+
+    /// Returns the layout-time adjustment for a shaped cluster.
+    #[inline]
+    pub(crate) fn justification_adjustment(&self, cluster_index: usize) -> f32 {
+        if self.justification_adjustments.is_empty() {
+            0.0
+        } else {
+            debug_assert_eq!(
+                self.justification_adjustments.len(),
+                self.shaped_text.clusters().len()
+            );
+            self.justification_adjustments[cluster_index]
+        }
+    }
+
+    /// Discards justification and restores cached natural advances.
+    pub(crate) fn clear_justification(&mut self) {
+        if self.justification_adjustments.is_empty() {
+            return;
+        }
+        self.justification_adjustments.clear();
+
+        let clusters = self.shaped_text.clusters();
+        for item in &mut self.line_items {
+            if item.is_text_run() {
+                item.advance = clusters[item.cluster_range.clone()]
+                    .iter()
+                    .map(|cluster| cluster.advance)
+                    .sum();
+            }
+        }
+        for line in &mut self.lines {
+            line.metrics.advance = line.natural_advance;
+        }
     }
 
     /// Push an inline box to the list of items

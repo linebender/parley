@@ -3,7 +3,6 @@
 
 use crate::InlineBox;
 use crate::layout::alignment::align;
-use crate::layout::alignment::unjustify;
 use crate::layout::data::LayoutData;
 use crate::style::Brush;
 use core::cmp::Ordering;
@@ -165,7 +164,7 @@ impl<B: Brush> Layout<B> {
 
     /// Returns line breaker to compute lines for the layout.
     pub fn break_lines(&mut self) -> BreakLines<'_, B> {
-        unjustify(&mut self.data);
+        self.data.clear_justification();
         BreakLines::new(self)
     }
 
@@ -187,7 +186,6 @@ impl<B: Brush> Layout<B> {
     /// If line-specific `offset` and `max_advance` are set using the advanced methods on the `BreakLines`
     /// struct then each line will be aligned individually within its line box.
     pub fn align(&mut self, alignment: Alignment, options: AlignmentOptions) {
-        unjustify(&mut self.data);
         align(&mut self.data, alignment, options);
     }
 

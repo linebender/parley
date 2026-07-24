@@ -792,13 +792,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         // If current cluster is the start of a ligature, then advance state to include
                         // the remaining clusters that make up the ligature
-                        let mut advance = cluster.advance();
+                        let mut advance = cluster.data.advance;
                         if cluster.is_ligature_start() {
                             while let Some(cluster) = run.get(self.state.cluster_idx + 1) {
                                 if !cluster.is_ligature_continuation() {
                                     break;
                                 } else {
-                                    advance += cluster.advance();
+                                    advance += cluster.data.advance;
                                     self.state.cluster_idx += 1;
                                 }
                             }
@@ -1004,7 +1004,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let whitespace = cluster.info().whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
                         let is_space = whitespace.is_space_or_nbsp();
-                        let advance = cluster.advance();
+                        let advance = cluster.data.advance;
 
                         // Compute the x position.
                         // Newlines don't contribute to line width (matching break_next behavior).
@@ -1294,6 +1294,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         line.metrics.inline_min_coord = self.state.line_x;
         line.metrics.inline_max_coord = self.state.line_x + self.state.line_max_advance;
+        line.natural_advance = line.metrics.advance;
     }
 }
 

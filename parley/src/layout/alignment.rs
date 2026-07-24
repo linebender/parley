@@ -5,8 +5,6 @@ use super::{BreakReason, data::LineItemData};
 use crate::data::LayoutData;
 use crate::style::Brush;
 
-use parley_engine::shape::ClusterData;
-
 /// Alignment of a layout.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
 #[repr(u8)]
@@ -54,53 +52,31 @@ impl Default for AlignmentOptions {
 }
 
 /// Align the layout.
-///
-/// If [`Alignment::Justify`] is requested, clusters' [`ClusterData::advance`] will be adjusted.
-/// Prior to re-line-breaking or re-aligning, [`unjustify`] has to be called.
 pub(crate) fn align<B: Brush>(
     layout: &mut LayoutData<B>,
     alignment: Alignment,
     options: AlignmentOptions,
 ) {
+    layout.clear_justification();
     #[cfg(feature = "accesskit")]
     {
         layout.alignment = Some(alignment);
     }
-    layout.is_aligned_justified = alignment == Alignment::Justify;
 
-    align_impl::<_, false>(layout, alignment, options);
-}
-
-/// Removes previous justification applied to clusters.
-///
-/// This is part of resetting state in preparation for re-line-breaking or re-aligning the same
-/// layout.
-pub(crate) fn unjustify<B: Brush>(layout: &mut LayoutData<B>) {
-    if layout.is_aligned_justified {
-        align_impl::<_, true>(layout, Alignment::Justify, AlignmentOptions::default());
-        layout.is_aligned_justified = false;
-    }
-}
-
-/// The actual alignment implementation.
-///
-/// This is const-generic over `UNDO_JUSTIFICATION`: justified alignment adjusts clusters'
-/// [`ClusterData::advance`], and this mutation has to be undone for re-line-breaking or
-/// re-aligning. `UNDO_JUSTIFICATION` indicates whether the adjustment has to be applied, or
-/// undone.
-///
-/// Writing a separate function for undoing justification would be faster, but not by much, and
-/// doing it this way we are sure the calculations performed are equivalent.
-fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
-    layout: &mut LayoutData<B>,
-    alignment: Alignment,
-    options: AlignmentOptions,
-) {
     // Whether the text base direction is right-to-left.
     let is_rtl = layout.base_level & 1 == 1;
+    let cluster_count = layout.shaped_text.clusters().len();
+    let LayoutData {
+        lines,
+        line_items,
+        shaped_text,
+        justification_adjustments,
+        ..
+    } = layout;
+    let clusters = shaped_text.clusters();
 
     // Apply alignment to line items
-    for line in &mut layout.lines {
+    for line in lines {
         let indent = line.indent;
 
         if is_rtl {
@@ -154,39 +130,136 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
                     continue;
                 }
 
-                let adjustment =
-                    free_space / line.num_spaces as f32 * if UNDO_JUSTIFICATION { -1. } else { 1. };
+                let adjustment = free_space / line.num_spaces as f32;
                 let mut applied = 0;
                 // Iterate over text runs in the line and clusters in the text run
                 //   - Iterate forwards for even bidi levels (which represent LTR runs)
                 //   - Iterate backwards for odd bidi levels (which represent RTL runs)
-                let line_items: &mut dyn Iterator<Item = &LineItemData> = if is_rtl {
-                    &mut layout.line_items[line.item_range.clone()].iter().rev()
+                let line_items: &mut dyn Iterator<Item = &mut LineItemData> = if is_rtl {
+                    &mut line_items[line.item_range.clone()].iter_mut().rev()
                 } else {
-                    &mut layout.line_items[line.item_range.clone()].iter()
+                    &mut line_items[line.item_range.clone()].iter_mut()
                 };
-                line_items
-                    .filter(|item| item.is_text_run())
-                    .for_each(|line_item| {
-                        let clusters =
-                            &mut layout.shaped_text.clusters_mut()[line_item.cluster_range.clone()];
-                        let line_item_is_rtl = line_item.bidi_level & 1 != 0;
-                        let clusters: &mut dyn Iterator<Item = &mut ClusterData> =
-                            if line_item_is_rtl {
-                                &mut clusters.iter_mut().rev()
-                            } else {
-                                &mut clusters.iter_mut()
-                            };
-                        clusters.for_each(|cluster| {
-                            if applied == line.num_spaces {
-                                return;
+                for line_item in line_items.filter(|item| item.is_text_run()) {
+                    let cluster_range = line_item.cluster_range.clone();
+                    let line_item_is_rtl = line_item.bidi_level & 1 != 0;
+                    let cluster_indices: &mut dyn Iterator<Item = usize> = if line_item_is_rtl {
+                        &mut cluster_range.rev()
+                    } else {
+                        &mut cluster_range.into_iter()
+                    };
+                    for cluster_index in cluster_indices {
+                        if applied == line.num_spaces {
+                            break;
+                        }
+                        if clusters[cluster_index].info.whitespace().is_space_or_nbsp() {
+                            if justification_adjustments.is_empty() {
+                                justification_adjustments.resize(cluster_count, 0.0);
                             }
-                            if cluster.info.whitespace().is_space_or_nbsp() {
-                                cluster.advance += adjustment;
-                                applied += 1;
-                            }
-                        });
-                    });
+                            justification_adjustments[cluster_index] = adjustment;
+                            line_item.advance += adjustment;
+                            applied += 1;
+                        }
+                    }
+                    if applied == line.num_spaces {
+                        break;
+                    }
+                }
+                debug_assert_eq!(applied, line.num_spaces);
+                line.metrics.advance += adjustment * applied as f32;
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec::Vec;
+
+    use super::{Alignment, AlignmentOptions};
+    use crate::tests::test_builders::{FONT_FAMILY_LIST, create_font_context};
+    use crate::{FontFamily, Layout, LayoutContext, PositionedLayoutItem};
+
+    fn build_layout(text: &str) -> Layout<()> {
+        let mut fcx = create_font_context();
+        let mut lcx = LayoutContext::new();
+        let mut builder = lcx.ranged_builder(&mut fcx, text, 1.0, true);
+        builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(150.0));
+        layout
+    }
+
+    #[test]
+    fn justification_does_not_mutate_shaped_text() {
+        let mut layout = build_layout("Lorem ipsum dolor sit amet, consectetur adipiscing elit.");
+        let shaped_text = layout.data.shaped_text.clone();
+
+        layout.align(Alignment::Justify, AlignmentOptions::default());
+        assert_eq!(layout.data.shaped_text, shaped_text);
+
+        layout.align(Alignment::Justify, AlignmentOptions::default());
+        assert_eq!(layout.data.shaped_text, shaped_text);
+
+        layout.break_all_lines(Some(150.0));
+        assert_eq!(layout.data.shaped_text, shaped_text);
+    }
+
+    #[test]
+    fn realignment_restores_empty_final_line_advance() {
+        let mut layout = build_layout("Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n");
+        let natural_advances = layout
+            .lines()
+            .map(|line| line.metrics().advance)
+            .collect::<Vec<_>>();
+
+        layout.align(Alignment::Justify, AlignmentOptions::default());
+        layout.align(Alignment::Start, AlignmentOptions::default());
+
+        assert_eq!(
+            layout
+                .lines()
+                .map(|line| line.metrics().advance)
+                .collect::<Vec<_>>(),
+            natural_advances
+        );
+    }
+
+    #[test]
+    fn justified_advances_are_consistent() {
+        for text in [
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
+            "عند برمجة أجهزة الكمبيوتر، قد تجد نفسك فجأة في مواقف غريبة.",
+        ] {
+            let mut layout = build_layout(text);
+            layout.align(Alignment::Justify, AlignmentOptions::default());
+
+            for line in layout.lines() {
+                let mut run_advance = 0.0;
+                let mut cluster_advance = 0.0;
+                for run in line.runs() {
+                    run_advance += run.advance();
+                    cluster_advance += run.clusters().map(|cluster| cluster.advance()).sum::<f32>();
+                }
+                let glyph_advance = line
+                    .items()
+                    .filter_map(|item| match item {
+                        PositionedLayoutItem::GlyphRun(run) => Some(run.advance()),
+                        PositionedLayoutItem::InlineBox(_) => None,
+                    })
+                    .sum::<f32>();
+
+                for (name, advance) in [
+                    ("runs", run_advance),
+                    ("clusters", cluster_advance),
+                    ("glyphs", glyph_advance),
+                ] {
+                    assert!(
+                        (advance - line.metrics().advance).abs() < 0.001,
+                        "{name} advance {advance} did not match line advance {}",
+                        line.metrics().advance
+                    );
+                }
             }
         }
     }
