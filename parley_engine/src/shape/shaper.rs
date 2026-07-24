@@ -238,7 +238,7 @@ fn shape_item(
             },
         );
 
-        let direction = if item.bidi_level & 1 != 0 {
+        let direction = if item.bidi_level.is_rtl() {
             harfrust::Direction::RightToLeft
         } else {
             harfrust::Direction::LeftToRight

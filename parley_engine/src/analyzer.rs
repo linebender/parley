@@ -68,6 +68,8 @@ impl core::fmt::Debug for AnalysisOptions<'_> {
 
 #[cfg(test)]
 mod tests {
+    use parlance::BidiLevel;
+
     use super::{AnalysisOptions, Analyzer};
     use crate::{Analysis, BaseDirection};
 
@@ -91,23 +93,19 @@ mod tests {
         let auto = analyze(text, BaseDirection::Auto);
         let rtl = analyze(text, BaseDirection::Rtl);
 
-        assert_eq!(auto.paragraph_level(), 0);
-        assert!(!auto.is_rtl());
+        assert_eq!(auto.paragraph_level(), BidiLevel::new(0));
+        assert!(auto.paragraph_level().is_ltr());
         assert!(auto.bidi_levels().is_empty());
 
-        assert_eq!(rtl.paragraph_level(), 1);
-        assert!(rtl.is_rtl());
+        assert_eq!(rtl.paragraph_level(), BidiLevel::new(1));
+        assert!(rtl.paragraph_level().is_rtl());
         assert_eq!(rtl.bidi_levels().len(), text.chars().count());
         for (ch, level) in text.chars().zip(rtl.bidi_levels()) {
             if ch.is_ascii_digit() {
-                assert!(level.is_multiple_of(2));
+                assert!(level.is_ltr());
             }
         }
-        assert!(
-            rtl.bidi_levels()
-                .iter()
-                .any(|level| !level.is_multiple_of(2))
-        );
+        assert!(rtl.bidi_levels().iter().any(|level| level.is_rtl()));
     }
 
     #[test]
@@ -116,8 +114,8 @@ mod tests {
         let auto = analyze(text, BaseDirection::Auto);
         let ltr = analyze(text, BaseDirection::Ltr);
 
-        assert!(auto.is_rtl());
-        assert!(!ltr.is_rtl());
+        assert!(auto.paragraph_level().is_rtl());
+        assert!(ltr.paragraph_level().is_ltr());
         assert_ne!(auto.bidi_levels(), ltr.bidi_levels());
     }
 
@@ -125,20 +123,15 @@ mod tests {
     fn explicit_rtl_preserves_ltr_run_direction() {
         let analysis = analyze("hello", BaseDirection::Rtl);
 
-        assert!(analysis.is_rtl());
-        assert!(
-            analysis
-                .bidi_levels()
-                .iter()
-                .all(|level| level.is_multiple_of(2))
-        );
+        assert!(analysis.paragraph_level().is_rtl());
+        assert!(analysis.bidi_levels().iter().all(|level| level.is_ltr()));
     }
 
     #[test]
     fn explicit_direction_applies_to_empty_text() {
         let analysis = analyze("", BaseDirection::Rtl);
 
-        assert!(analysis.is_rtl());
+        assert!(analysis.paragraph_level().is_rtl());
         assert!(analysis.bidi_levels().is_empty());
     }
 }
