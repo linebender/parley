@@ -22,7 +22,7 @@ use icu_segmenter::{
     GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter,
     LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed,
 };
-use parlance::WordBreak;
+use parlance::{BaseDirection, WordBreak};
 use parley_data::Properties;
 
 use crate::bidi;
@@ -630,7 +630,16 @@ pub(crate) fn analyze_text(
             next_mandatory_linebreak
         });
 
+    // An explicit RTL base direction needs bidi resolution even for text that is otherwise
+    // entirely left-to-right (an explicit LTR base changes nothing about such text).
+    needs_bidi_resolution |= options.base_direction == BaseDirection::Rtl;
+
     if needs_bidi_resolution {
+        let base_level = match options.base_direction {
+            BaseDirection::Auto => None,
+            BaseDirection::Ltr => Some(0),
+            BaseDirection::Rtl => Some(1),
+        };
         analyzer.bidi.resolve(
             text.chars().zip(
                 analysis
@@ -638,7 +647,7 @@ pub(crate) fn analyze_text(
                     .iter()
                     .map(|info| (info.bidi_class, info.bracket)),
             ),
-            None,
+            base_level,
         );
         core::mem::swap(&mut analysis.levels, &mut analyzer.bidi.levels);
         analysis.paragraph_level = analyzer.bidi.base_level();

@@ -43,7 +43,7 @@ pub use crate::editing::{Cursor, Selection};
 
 // TODO - Move the following to `style` module and submodules.
 
-use crate::style::{Brush, WhiteSpaceCollapse};
+use crate::style::{Brush, WhiteSpaceCollapse, WordBreak};
 use crate::{LineHeight, OverflowWrap, TextWrapMode};
 
 #[allow(clippy::partial_pub_fields)]
@@ -58,6 +58,8 @@ pub struct Style<B: Brush> {
     pub strikethrough: Option<Decoration<B>>,
     /// Partially resolved line height, either in in layout units or dependent on metrics
     pub(crate) line_height: LineHeight,
+    /// Per-cluster word-break setting
+    pub(crate) word_break: WordBreak,
     /// Per-cluster overflow-wrap setting
     pub(crate) overflow_wrap: OverflowWrap,
     /// Per-cluster text-wrap-mode setting

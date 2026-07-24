@@ -5,7 +5,7 @@
 
 use core::ops::Range;
 
-use parlance::WordBreak;
+use parlance::{BaseDirection, WordBreak};
 
 use crate::{bidi::BidiResolver, break_overrides::LineBreakOverrideFn};
 
@@ -50,6 +50,12 @@ pub struct AnalysisOptions<'a> {
     ///
     /// See [`LineBreakOverrideFn`] for more details.
     pub line_break_override: Option<&'a LineBreakOverrideFn>,
+
+    /// The base (paragraph) direction of the text.
+    ///
+    /// [`BaseDirection::Auto`] detects it from the text contents ("first-strong"); `Ltr`/`Rtl`
+    /// force it (e.g. from the CSS `direction` property).
+    pub base_direction: BaseDirection,
 }
 
 impl core::fmt::Debug for AnalysisOptions<'_> {

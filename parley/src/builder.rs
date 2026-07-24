@@ -6,6 +6,7 @@
 use super::FontContext;
 use super::context::LayoutContext;
 use super::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
+use parlance::BaseDirection;
 
 use super::layout::Layout;
 
@@ -227,7 +228,6 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
     pub fn push_inline_box(&mut self, mut inline_box: InlineBox) {
         if inline_box.kind == InlineBoxKind::InFlow {
             self.lcx.tree_style_builder.push_uncommitted_text(false);
-            self.lcx.tree_style_builder.set_is_span_first(false);
             self.lcx
                 .tree_style_builder
                 .set_last_item_kind(ItemKind::InlineBox);
@@ -242,6 +242,14 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
         self.lcx
             .tree_style_builder
             .set_white_space_mode(white_space_collapse);
+    }
+
+    /// Set the base (paragraph) direction of the text.
+    ///
+    /// [`BaseDirection::Auto`] (the default) detects it from the text contents
+    /// ("first-strong"); `Ltr`/`Rtl` force it (e.g. from the CSS `direction` property).
+    pub fn set_base_direction(&mut self, base_direction: BaseDirection) {
+        self.lcx.base_direction = base_direction;
     }
 
     /// Set the callback which will be called as a first provider of line breaking decisions.

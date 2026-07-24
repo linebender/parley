@@ -32,7 +32,6 @@ pub(crate) struct TreeStyleBuilder<B: Brush> {
     text: String,
     uncommitted_text: String,
     current_span: usize,
-    is_span_first: bool,
     last_item_kind: ItemKind,
 }
 
@@ -52,7 +51,6 @@ impl<B: Brush> Default for TreeStyleBuilder<B> {
             text: String::new(),
             uncommitted_text: String::new(),
             current_span: usize::MAX,
-            is_span_first: false,
             last_item_kind: ItemKind::None,
         }
     }
@@ -76,22 +74,18 @@ impl<B: Brush> TreeStyleBuilder<B> {
             style_id: None,
         });
         self.current_span = 0;
-        self.is_span_first = true;
+        self.last_item_kind = ItemKind::None;
     }
 
     pub(crate) fn set_white_space_mode(&mut self, white_space_collapse: WhiteSpaceCollapse) {
         self.white_space_collapse = white_space_collapse;
     }
 
-    pub(crate) fn set_is_span_first(&mut self, is_span_first: bool) {
-        self.is_span_first = is_span_first;
-    }
-
     pub(crate) fn set_last_item_kind(&mut self, item_kind: ItemKind) {
         self.last_item_kind = item_kind;
     }
 
-    pub(crate) fn push_uncommitted_text(&mut self, is_span_last: bool) {
+    pub(crate) fn push_uncommitted_text(&mut self, is_text_end: bool) {
         // The white space collapsing is performed in place within `self.uncommitted_text` (all
         // modes only ever shrink the text), whose allocation is also retained across commits.
         match self.white_space_collapse {
@@ -104,19 +98,26 @@ impl<B: Brush> TreeStyleBuilder<B> {
                     self.white_space_collapse,
                     WhiteSpaceCollapse::PreserveBreaks
                 );
-                let trim_start = self.is_span_first
-                    || (self.last_item_kind == ItemKind::TextRun
-                        && self
-                            .text
-                            .chars()
-                            .last()
-                            .is_some_and(|c| c.is_ascii_whitespace()));
+                // White space collapses across style span boundaries, so the start of this text
+                // chunk is only trimmed at the start of the paragraph or when the previously
+                // committed text ends in (collapsed) white space. It is never trimmed just after
+                // an inline box: white space adjacent to an inline box is preserved (collapsed to
+                // a single space). Similarly, the end is only trimmed at the end of the text.
+                let trim_start = match self.last_item_kind {
+                    ItemKind::None => true,
+                    ItemKind::InlineBox => false,
+                    ItemKind::TextRun => self
+                        .text
+                        .chars()
+                        .last()
+                        .is_some_and(|c| c.is_ascii_whitespace()),
+                };
 
                 collapse_white_space(
                     &mut self.uncommitted_text,
                     preserve_breaks,
                     trim_start,
-                    is_span_last,
+                    is_text_end,
                 );
             }
             // Preserve all white space, but convert tabs and segment breaks to spaces.
@@ -135,7 +136,6 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.style_runs.push(StyleRun { style_index, range });
         self.text.push_str(&self.uncommitted_text);
         self.uncommitted_text.clear();
-        self.is_span_first = false;
         self.last_item_kind = ItemKind::TextRun;
     }
 
@@ -170,7 +170,6 @@ impl<B: Brush> TreeStyleBuilder<B> {
             style_id: None,
         });
         self.current_span = self.tree.len() - 1;
-        self.is_span_first = true;
     }
 
     pub(crate) fn push_style_modification_span(
@@ -185,7 +184,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
     }
 
     pub(crate) fn pop_style_span(&mut self) {
-        self.push_uncommitted_text(true);
+        self.push_uncommitted_text(false);
 
         self.current_span = self.tree[self.current_span]
             .parent
@@ -237,17 +236,19 @@ fn collapse_white_space(
     trim_start: bool,
     trim_end: bool,
 ) {
-    // Compute the byte range that remains after trimming (`str::trim_start`/`str::trim_end` trim
-    // Unicode white space).
+    // Compute the byte range that remains after trimming. Only collapsible (ASCII) white space
+    // is trimmed: other white space characters (e.g. no-break spaces and ideographic spaces) are
+    // not collapsible and must be preserved.
+    let is_collapsible = |c: char| c.is_ascii_whitespace();
     let mut trimmed = text.as_str();
     if trim_start {
-        trimmed = trimmed.trim_start();
+        trimmed = trimmed.trim_start_matches(is_collapsible);
     }
     if trim_end {
-        trimmed = trimmed.trim_end();
+        trimmed = trimmed.trim_end_matches(is_collapsible);
     }
     let start = if trim_start {
-        text.len() - text.trim_start().len()
+        text.len() - text.trim_start_matches(is_collapsible).len()
     } else {
         0
     };

@@ -3,7 +3,7 @@
 
 use crate::inline_box::InlineBox;
 use crate::layout::{ContentWidths, Glyph, LineMetrics, RunMetrics, Style};
-use crate::style::{Brush, EndOfLineWhitespace};
+use crate::style::{Brush, EndOfLineWhitespace, WhiteSpaceCollapse};
 use crate::util::nearly_zero;
 use crate::{FontData, IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode};
 use core::ops::Range;
@@ -623,6 +623,21 @@ impl<B: Brush> LayoutData<B> {
                         }
                         running_min_width += cluster.advance;
                         running_max_width += cluster.advance;
+                        // In `break-spaces` mode, a soft-wrap opportunity exists after every
+                        // preserved space or tab (or ideographic space), so a min-content line
+                        // can end just after it (with the white space taking up space, not
+                        // hanging).
+                        if text_wrap_mode == TextWrapMode::Wrap
+                            && style.white_space_collapse == WhiteSpaceCollapse::BreakSpaces
+                            && (matches!(
+                                cluster.info.whitespace(),
+                                Whitespace::Space | Whitespace::Tab
+                            ) || cluster.info.source_char() == '\u{3000}')
+                        {
+                            min_width = min_width.max(running_min_width);
+                            running_min_width = 0.0;
+                            min_trailing_whitespace = 0.0;
+                        }
                         match cluster.info.whitespace() {
                             Whitespace::Space => {
                                 let eol = end_of_line(cluster);
@@ -641,6 +656,18 @@ impl<B: Brush> LayoutData<B> {
                             // run: spaces before a segment break are still at the end of their
                             // line.
                             Whitespace::Newline => {}
+                            // An ideographic space (U+3000) is preserved even when white space
+                            // is collapsed, but hangs unconditionally at the end of a line
+                            // (except in `break-spaces` mode, where it takes up space), so it is
+                            // excluded from both the min-content and max-content sizes.
+                            Whitespace::None
+                                if cluster.info.source_char() == '\u{3000}'
+                                    && end_of_line(cluster)
+                                        != EndOfLineWhitespace::TakesUpSpace =>
+                            {
+                                min_trailing_whitespace += cluster.advance;
+                                max_trailing_whitespace += cluster.advance;
+                            }
                             // Any other cluster (including tabs and no-break spaces, which are
                             // not treated as hangable here) ends the trailing white space run.
                             _ => {

@@ -15,7 +15,7 @@ pub use font::{
     FontVariations, FontWeight, FontWidth, GenericFamily,
 };
 pub use fontique::Language;
-pub use parlance::{OverflowWrap, TextWrapMode, WordBreak};
+pub use parlance::{BaseDirection, OverflowWrap, TextWrapMode, WordBreak};
 pub use styleset::StyleSet;
 
 use crate::util::nearly_eq;

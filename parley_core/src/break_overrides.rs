@@ -123,6 +123,7 @@ static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable<5> =
 ///     word_break: &[],
 ///     // Emulate Chromium:
 ///     line_break_override: Some(CHROMIUM_LINE_BREAK_OVERRIDE),
+///     base_direction: Default::default(),
 /// };
 /// analyzer.analyze(text, &options, &mut analysis);
 /// ```

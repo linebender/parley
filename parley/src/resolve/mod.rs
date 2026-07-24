@@ -504,6 +504,7 @@ impl<B: Brush> ResolvedStyle<B> {
             underline: self.underline.as_layout_decoration(&self.brush),
             strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
             line_height: self.line_height,
+            word_break: self.word_break,
             overflow_wrap: self.overflow_wrap,
             text_wrap_mode: self.text_wrap_mode,
             white_space_collapse: self.white_space_collapse,

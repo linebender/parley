@@ -224,7 +224,7 @@ fn icu_script_to_parlance_script(script: IcuScript) -> Script {
 #[cfg(test)]
 mod tests {
     use alloc::vec::Vec;
-    use parlance::Script;
+    use parlance::{BaseDirection, Script};
 
     use crate::{Analysis, AnalysisOptions, Analyzer};
 
@@ -240,6 +240,7 @@ mod tests {
         let options = AnalysisOptions {
             word_break: &[],
             line_break_override: None,
+            base_direction: BaseDirection::default(),
         };
         analyzer.analyze(text, &options, &mut analysis);
         analysis

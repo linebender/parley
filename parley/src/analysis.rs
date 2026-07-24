@@ -31,6 +31,7 @@ pub(crate) fn analyze_text<B: Brush>(
     let options = AnalysisOptions {
         word_break: &lcx.word_break,
         line_break_override,
+        base_direction: lcx.base_direction,
     };
     lcx.analyzer.analyze(text, &options, &mut lcx.analysis);
 }

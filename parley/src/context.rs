@@ -7,7 +7,7 @@ use core::ops::Range;
 
 use alloc::{vec, vec::Vec};
 
-use parlance::WordBreak;
+use parlance::{BaseDirection, WordBreak};
 use parley_core::{Analysis, AnalysisDataSources, Analyzer};
 
 use super::FontContext;
@@ -33,6 +33,7 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) analyzer: Analyzer,
     pub(crate) analysis: Analysis,
     pub(crate) word_break: Vec<(Range<usize>, WordBreak)>,
+    pub(crate) base_direction: BaseDirection,
 
     // Reusable style builders (to amortise allocations)
     pub(crate) ranged_style_builder: RangedStyleBuilder<B>,
@@ -56,6 +57,7 @@ impl<B: Brush> LayoutContext<B> {
             analyzer: Analyzer::new(),
             analysis: Analysis::new(),
             word_break: Vec::new(),
+            base_direction: BaseDirection::default(),
             ranged_style_builder: RangedStyleBuilder::default(),
             tree_style_builder: TreeStyleBuilder::default(),
             char_style_indices: vec![],
@@ -194,6 +196,7 @@ impl<B: Brush> LayoutContext<B> {
         self.style_table.clear();
         self.style_runs.clear();
         self.inline_boxes.clear();
+        self.base_direction = BaseDirection::default();
     }
 }
 
