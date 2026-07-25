@@ -43,6 +43,31 @@ fn build_with_word_spacing(env: &mut TestEnv, text: &str, spacing: f32) -> Layou
     layout
 }
 
+fn glyph_ids(layout: &Layout<ColorBrush>) -> Vec<u32> {
+    let mut ids = Vec::new();
+    for line in layout.lines() {
+        for run in line.runs() {
+            for cluster in run.clusters() {
+                ids.extend(cluster.glyphs().map(|glyph| glyph.id));
+            }
+        }
+    }
+    ids
+}
+
+fn ligature_cluster_count(layout: &Layout<ColorBrush>) -> usize {
+    let mut count = 0;
+    for line in layout.lines() {
+        for run in line.runs() {
+            count += run
+                .clusters()
+                .filter(|cluster| cluster.is_ligature_start() || cluster.is_ligature_continuation())
+                .count();
+        }
+    }
+    count
+}
+
 // ============================================================================
 // LineHeight Tests
 // ============================================================================
@@ -131,6 +156,61 @@ fn style_letter_spacing_with_ligatures() {
     let layout_with_spacing = build_with_letter_spacing(&mut env, text, 2.0);
     env.with_name("with_spacing")
         .check_layout_snapshot(&layout_with_spacing);
+}
+
+#[test]
+fn style_letter_spacing_disables_default_optional_ligatures() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "office";
+
+    let mut plain = env.ranged_builder(text).build(text);
+    plain.break_all_lines(None);
+
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::LetterSpacing(2.0));
+    let mut tracked = builder.build(text);
+    tracked.break_all_lines(None);
+
+    assert!(
+        ligature_cluster_count(&plain) > 0,
+        "the untracked text should use the font's default ligatures"
+    );
+    assert_eq!(
+        ligature_cluster_count(&tracked),
+        0,
+        "tracking should disable the font's default optional ligatures"
+    );
+}
+
+#[test]
+fn style_letter_spacing_preserves_cursive_words() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "سلام";
+    let plain = build_with_letter_spacing(&mut env, text, 0.0);
+    let tracked = build_with_letter_spacing(&mut env, text, 8.0);
+
+    assert_eq!(glyph_ids(&tracked), glyph_ids(&plain));
+    assert_eq!(tracked.full_width(), plain.full_width());
+}
+
+#[test]
+fn style_letter_spacing_tracks_spaces_between_cursive_words() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "سلام سلام";
+    let plain = build_with_letter_spacing(&mut env, text, 0.0);
+    let tracked = build_with_letter_spacing(&mut env, text, 8.0);
+
+    assert!((tracked.full_width() - plain.full_width() - 8.0).abs() < 0.001);
+}
+
+#[test]
+fn style_letter_spacing_tracks_latin_containing_zwj() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "A\u{200d}V";
+    let plain = build_with_letter_spacing(&mut env, text, 0.0);
+    let tracked = build_with_letter_spacing(&mut env, text, 8.0);
+
+    assert!(tracked.full_width() > plain.full_width());
 }
 
 // ============================================================================

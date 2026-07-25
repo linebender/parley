@@ -316,11 +316,18 @@ impl<B: Brush> LayoutData<B> {
             if nearly_zero(word) && nearly_zero(letter) {
                 continue;
             }
+            let script_has_joining_characters =
+                self.shaped_text.runs()[run_index].script_has_joining_characters();
             let (clusters, glyphs) = &mut self.shaped_text.clusters_and_glyphs_mut();
             let clusters = &mut clusters[cluster_range];
             for cluster in clusters {
-                let mut spacing = letter;
-                if !nearly_zero(word) && cluster.info.whitespace().is_space_or_nbsp() {
+                let is_space = cluster.info.whitespace().is_space_or_nbsp();
+                let mut spacing = if script_has_joining_characters && !is_space {
+                    0.0
+                } else {
+                    letter
+                };
+                if !nearly_zero(word) && is_space {
                     spacing += word;
                 }
                 if !nearly_zero(spacing) {

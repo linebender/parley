@@ -5,7 +5,7 @@
 
 use tango_bench::tango_benchmarks;
 
-use parley_bench::benches::{defaults, styled};
+use parley_bench::benches::{defaults, styled, tracked};
 use parley_bench::fontique_benches::system_fonts_init;
 
-tango_benchmarks!(defaults(), styled(), system_fonts_init());
+tango_benchmarks!(defaults(), tracked(), styled(), system_fonts_init());

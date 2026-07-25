@@ -47,6 +47,37 @@ pub fn defaults() -> Vec<Benchmark> {
         .collect()
 }
 
+/// Benchmark for nonzero letter spacing.
+pub fn tracked() -> Vec<Benchmark> {
+    const DISPLAY_SCALE: f32 = 1.0;
+    const QUANTIZE: bool = true;
+    const MAX_ADVANCE: f32 = 200.0 * DISPLAY_SCALE;
+
+    get_samples()
+        .iter()
+        .filter(|sample| sample.modification == "1 paragraph")
+        .map(|sample| {
+            benchmark_fn(format!("Letter Spacing - {}", sample.name), |b| {
+                b.iter(|| {
+                    let text = &sample.text;
+                    with_contexts(|font_cx, layout_cx| {
+                        let mut builder =
+                            layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
+                        builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+                        builder.push_default(StyleProperty::LetterSpacing(1.0));
+
+                        let mut layout: Layout<ColorBrush> = builder.build(text);
+                        layout.break_all_lines(Some(MAX_ADVANCE));
+                        layout.align(Alignment::Start, AlignmentOptions::default());
+
+                        black_box(layout);
+                    });
+                })
+            })
+        })
+        .collect()
+}
+
 /// Benchmark for styled text.
 pub fn styled() -> Vec<Benchmark> {
     const DISPLAY_SCALE: f32 = 1.0;

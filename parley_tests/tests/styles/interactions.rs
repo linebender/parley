@@ -70,7 +70,6 @@ fn interaction_font_size_line_height_absolute() {
 // ============================================================================
 
 #[test]
-// TODO: Ligatures should break with letter spacing. They currently do not.
 fn interaction_letter_spacing_ligatures() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LIGATURES;
@@ -98,6 +97,27 @@ fn interaction_letter_spacing_ligatures() {
     let mut layout_with_spacing = builder_with_spacing.build(text);
     layout_with_spacing.break_all_lines(None);
     layout_with_spacing.align(Alignment::Start, AlignmentOptions::default());
+
+    let ligature_cluster_count = |layout: &parley::Layout<_>| {
+        let mut count = 0;
+        for line in layout.lines() {
+            for run in line.runs() {
+                count += run
+                    .clusters()
+                    .filter(|cluster| {
+                        cluster.is_ligature_start() || cluster.is_ligature_continuation()
+                    })
+                    .count();
+            }
+        }
+        count
+    };
+    assert!(ligature_cluster_count(&layout_no_spacing) > 0);
+    assert_eq!(
+        ligature_cluster_count(&layout_with_spacing),
+        ligature_cluster_count(&layout_no_spacing),
+        "an explicit `liga` setting takes precedence over tracking"
+    );
 
     env.with_name("with_spacing")
         .check_layout_snapshot(&layout_with_spacing);

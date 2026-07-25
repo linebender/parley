@@ -4,6 +4,9 @@
 //! Text shaping implementation using `harfrust`for shaping
 //! and `icu` for text analysis.
 
+use alloc::borrow::Cow;
+use alloc::vec::Vec;
+
 use parley_engine::shape::{CharCluster, Status};
 use parley_engine::{Analysis, AnalysisDataSources, FontInstance, ShapeOptions, Shaper};
 
@@ -12,7 +15,8 @@ use super::resolve::{ResolveContext, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
 use crate::FontData;
 use crate::inline_box::InlineBox;
-use crate::util::nearly_eq;
+use crate::setting::Tag;
+use crate::util::{nearly_eq, nearly_zero};
 use fontique::Language;
 
 use fontique::{self, Query, QueryFamily, QueryFont};
@@ -103,6 +107,12 @@ pub(crate) fn shape_text<'a, B: Brush>(
         let style = &styles[usize::from(style_index)];
         let mut font_selector =
             FontSelector::new(&mut fq, rcx, styles, style_index, item.script, style.locale);
+        let authored_features = rcx.features(style.font_features).unwrap_or(&[]);
+        let features = if nearly_zero(style.letter_spacing) {
+            Cow::Borrowed(authored_features)
+        } else {
+            tracking_features(authored_features, item.script_has_joining_characters())
+        };
 
         let shaped_runs_range = scx.shape_item(
             text,
@@ -111,7 +121,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             &ShapeOptions {
                 language: style.locale,
                 font_size: style.font_size,
-                features: rcx.features(style.font_features).unwrap_or(&[]),
+                features: &features,
                 variations: rcx.variations(style.font_variations).unwrap_or(&[]),
                 char_style_indices,
             },
@@ -145,6 +155,40 @@ pub(crate) fn shape_text<'a, B: Brush>(
     // Process any remaining inline boxes whose index is greater than the length of the text
     for (box_idx, _inline_box) in inline_box_iter {
         layout.data.push_inline_box(box_idx);
+    }
+}
+
+fn tracking_features(
+    authored: &[FontFeature],
+    script_has_joining_characters: bool,
+) -> Cow<'_, [FontFeature]> {
+    if script_has_joining_characters {
+        return Cow::Borrowed(authored);
+    }
+
+    const LIGA: Tag = Tag::new(b"liga");
+    const CLIG: Tag = Tag::new(b"clig");
+    const DEFAULT_LIGATURES_OFF: [FontFeature; 2] =
+        [FontFeature::new(LIGA, 0), FontFeature::new(CLIG, 0)];
+
+    let needs_liga = !authored.iter().any(|feature| feature.tag == LIGA);
+    let needs_clig = !authored.iter().any(|feature| feature.tag == CLIG);
+    match (needs_liga, needs_clig) {
+        (false, false) => Cow::Borrowed(authored),
+        (true, true) if authored.is_empty() => Cow::Borrowed(&DEFAULT_LIGATURES_OFF),
+        _ => {
+            let mut features = Vec::with_capacity(
+                authored.len() + usize::from(needs_liga) + usize::from(needs_clig),
+            );
+            features.extend_from_slice(authored);
+            if needs_liga {
+                features.push(DEFAULT_LIGATURES_OFF[0]);
+            }
+            if needs_clig {
+                features.push(DEFAULT_LIGATURES_OFF[1]);
+            }
+            Cow::Owned(features)
+        }
     }
 }
 
@@ -278,5 +322,28 @@ struct SelectedFont {
 impl PartialEq for SelectedFont {
     fn eq(&self, other: &Self) -> bool {
         self.font.family == other.font.family && self.font.synthesis == other.font.synthesis
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::tracking_features;
+    use crate::setting::{FontFeature, Tag};
+
+    #[test]
+    fn tracking_disables_only_default_optional_ligatures() {
+        let liga = Tag::new(b"liga");
+        let clig = Tag::new(b"clig");
+        let kern = FontFeature::new(Tag::new(b"kern"), 1);
+
+        assert!(tracking_features(&[], true).is_empty());
+        assert_eq!(
+            tracking_features(&[], false).as_ref(),
+            [FontFeature::new(liga, 0), FontFeature::new(clig, 0)]
+        );
+        assert_eq!(
+            tracking_features(&[kern, FontFeature::new(liga, 1)], false).as_ref(),
+            [kern, FontFeature::new(liga, 1), FontFeature::new(clig, 0)]
+        );
     }
 }
