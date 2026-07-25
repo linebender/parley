@@ -35,8 +35,19 @@ pub mod shape;
 pub use linebender_resource_handle::FontData;
 pub use parlance::BaseDirection;
 
+pub use icu_properties::props::JoiningType;
+
 pub use analysis::{Analysis, AnalysisDataSources, Boundary, CharInfo};
 pub use analyzer::{AnalysisOptions, Analyzer};
 pub use glyph::Glyph;
 pub use shape::shaped_text::{FontMetrics, NormalizedCoord, ShapedRun, ShapedText};
 pub use shape::shaper::{FontInstance, ShapeOptions, Shaper};
+
+/// Returns whether Unicode assigns cursively joining characters to `script`.
+///
+/// This reports a property of the script, not of a particular string or text
+/// boundary. It does not determine whether letter spacing should be applied.
+#[inline]
+pub fn script_has_joining_characters(script: parlance::Script) -> bool {
+    parley_data::script_has_joining_characters(script.to_bytes())
+}

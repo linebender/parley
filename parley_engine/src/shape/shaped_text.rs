@@ -6,6 +6,7 @@
 use core::ops::Range;
 
 use alloc::vec::Vec;
+use parlance::Script;
 
 use crate::{
     CharInfo, FontInstance, Glyph, ShapeOptions,
@@ -302,6 +303,7 @@ impl ShapedText {
 
         self.runs.push(ShapedRun {
             range,
+            script: item.script,
             font_size: options.font_size,
             font_index,
             clusters_range,
@@ -319,6 +321,11 @@ impl ShapedText {
 pub struct ShapedRun {
     /// The range of text this run corresponds to.
     pub range: TextRange,
+    /// The resolved script of the run.
+    ///
+    /// Characters without a particular script inherit one from surrounding
+    /// context during itemization. See [`Item::script`].
+    pub script: Script,
     /// Font size.
     pub font_size: f32,
     /// This run's font, as an index into [`ShapedText::fonts`].
@@ -338,6 +345,18 @@ pub struct ShapedRun {
     pub advance: f32,
     /// The font metrics of this run.
     pub font_metrics: FontMetrics,
+}
+
+impl ShapedRun {
+    /// Returns whether this run's resolved script has cursively joining characters.
+    ///
+    /// This is a property of [`Self::script`]. It does not inspect the
+    /// particular characters in this run or determine whether letter spacing
+    /// should be applied.
+    #[inline]
+    pub fn script_has_joining_characters(&self) -> bool {
+        crate::script_has_joining_characters(self.script)
+    }
 }
 
 /// Processes shaped glyphs from `HarfRust` and converts them into `ClusterData` and `Glyph`.
@@ -677,6 +696,7 @@ mod tests {
 
     use fontique::Synthesis;
     use linebender_resource_handle::{Blob, FontData};
+    use parlance::Script;
 
     use crate::{Analysis, AnalysisOptions, Analyzer, FontInstance, ShapeOptions, Shaper};
 
@@ -730,5 +750,16 @@ mod tests {
 
         assert!(cluster.advance > 0.0);
         assert_eq!(run.advance, cluster.advance);
+    }
+
+    #[test]
+    fn shaped_runs_retain_resolved_script_properties() {
+        let latin = shape("A\u{200d}B");
+        assert_eq!(latin.runs()[0].script, Script::from_bytes(*b"Latn"));
+        assert!(!latin.runs()[0].script_has_joining_characters());
+
+        let arabic = shape("ب\u{200d}ب");
+        assert_eq!(arabic.runs()[0].script, Script::from_bytes(*b"Arab"));
+        assert!(arabic.runs()[0].script_has_joining_characters());
     }
 }

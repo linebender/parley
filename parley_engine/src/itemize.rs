@@ -40,6 +40,19 @@ pub struct Item {
     pub script: Script,
 }
 
+impl Item {
+    /// Returns whether this item's resolved script has cursively joining characters.
+    ///
+    /// This is a property of [`Self::script`], after resolving characters with
+    /// [`Script::COMMON`], [`Script::UNKNOWN`], or [`Script::INHERITED`] from
+    /// context. It does not inspect the particular characters in this item or
+    /// determine whether letter spacing should be applied.
+    #[inline]
+    pub fn script_has_joining_characters(&self) -> bool {
+        crate::script_has_joining_characters(self.script)
+    }
+}
+
 /// An iterator over items in text, produced by [`Analysis::itemize`].
 pub struct Itemizer<'a, F> {
     /// Our underlying iterator over the input text.
@@ -298,5 +311,18 @@ mod tests {
         assert_eq!(items[0].script, LATN);
         assert_eq!(&text[items[1].range.byte_range.clone()], "αβγ");
         assert_eq!(items[1].script, GREK);
+    }
+
+    #[test]
+    fn joining_classification_uses_resolved_script() {
+        let latin = items("A\u{200d}B");
+        assert_eq!(latin.len(), 1);
+        assert_eq!(latin[0].script, LATN);
+        assert!(!latin[0].script_has_joining_characters());
+
+        let arabic = items("ب\u{200d}ب");
+        assert_eq!(arabic.len(), 1);
+        assert_eq!(arabic[0].script, ARAB);
+        assert!(arabic[0].script_has_joining_characters());
     }
 }

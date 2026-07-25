@@ -69,7 +69,7 @@ impl core::fmt::Debug for AnalysisOptions<'_> {
 #[cfg(test)]
 mod tests {
     use super::{AnalysisOptions, Analyzer};
-    use crate::{Analysis, BaseDirection};
+    use crate::{Analysis, BaseDirection, JoiningType};
 
     fn analyze(text: &str, base_direction: BaseDirection) -> Analysis {
         let mut analyzer = Analyzer::new();
@@ -140,5 +140,21 @@ mod tests {
 
         assert!(analysis.is_rtl());
         assert!(analysis.bidi_levels().is_empty());
+    }
+
+    #[test]
+    fn analysis_retains_unicode_joining_type() {
+        let analysis = analyze("ب\u{64e}A", BaseDirection::Auto);
+        assert!(
+            analysis
+                .char_info()
+                .iter()
+                .map(|info| info.joining_type)
+                .eq([
+                    JoiningType::DualJoining,
+                    JoiningType::Transparent,
+                    JoiningType::NonJoining,
+                ])
+        );
     }
 }
