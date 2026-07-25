@@ -13,7 +13,9 @@ use icu_normalizer::properties::{
     CanonicalComposition, CanonicalCompositionBorrowed, CanonicalDecomposition,
     CanonicalDecompositionBorrowed,
 };
-use icu_properties::props::{BidiMirroringGlyph, GeneralCategory, GraphemeClusterBreak, Script};
+use icu_properties::props::{
+    BidiMirroringGlyph, GeneralCategory, GraphemeClusterBreak, JoiningType, Script,
+};
 use icu_properties::{
     CodePointMapData, CodePointMapDataBorrowed, PropertyNamesShort, PropertyNamesShortBorrowed,
 };
@@ -185,6 +187,8 @@ pub struct CharInfo {
     pub grapheme_cluster_break: GraphemeClusterBreak,
     /// The impact this character has on directionality.
     pub bidi_class: icu_properties::props::BidiClass,
+    /// The Unicode joining behavior of this character.
+    pub joining_type: JoiningType,
     /// Whether or not the character is a bracket, plus mirror data if so.
     pub bracket: BidiMirroringGlyph,
 
@@ -221,6 +225,7 @@ impl CharInfo {
         script: Script,
         grapheme_cluster_break: GraphemeClusterBreak,
         bidi_class: icu_properties::props::BidiClass,
+        joining_type: JoiningType,
         bracket: BidiMirroringGlyph,
         is_variation_selector: bool,
         is_region_indicator: bool,
@@ -235,6 +240,7 @@ impl CharInfo {
             script,
             grapheme_cluster_break,
             bidi_class,
+            joining_type,
             bracket,
             flags: (is_variation_selector as u8) << Self::VARIATION_SELECTOR_SHIFT
                 | (is_region_indicator as u8) << Self::REGION_INDICATOR_SHIFT
@@ -627,6 +633,7 @@ pub(crate) fn analyze_text(
                 let script = properties.script();
                 let grapheme_cluster_break = properties.grapheme_cluster_break();
                 let bidi_class = properties.bidi_class();
+                let joining_type = properties.joining_type();
                 let general_category = properties.general_category();
                 let is_emoji_or_pictograph = properties.is_emoji_or_pictograph();
                 let is_variation_selector = properties.is_variation_selector();
@@ -661,6 +668,7 @@ pub(crate) fn analyze_text(
                     script,
                     grapheme_cluster_break,
                     bidi_class,
+                    joining_type,
                     bracket,
                     is_variation_selector,
                     is_region_indicator,
