@@ -241,7 +241,7 @@ impl EmojiDFA {
     /// Returns the emoji presentation style.
     #[inline]
     pub const fn presentation_style(self) -> EmojiPresentationStyle {
-        // Emoji presentation selectors
+        // Emoji presentation with variation selectors
         if self.contains_category(EmojiSegmentationCategory::Vs15) {
             return EmojiPresentationStyle::Text;
         }
