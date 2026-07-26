@@ -3,8 +3,6 @@
 
 #![expect(missing_docs, reason = "Deferred")]
 
-use core::ops::Range;
-
 use crate::{Boundary, shape::Whitespace};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -52,8 +50,15 @@ pub struct Character {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ShapedCluster {
-    pub text_char_start: u32,
-    pub text_char_end: u32,
+    /// The first character of this cluster, as an index into [`ShapedText::characters`].
+    ///
+    /// Note this is not a character index into the source text: the shaped character array only
+    /// contains the characters of runs that were actually shaped. Mapping back to the source text
+    /// goes through [`Character::text_byte_start`].
+    pub char_start: u32,
+
+    /// One past the last character of this cluster, as an index into the shaped character array.
+    pub char_end: u32,
 
     /// Style index for this cluster.
     pub style_index: u16,
@@ -73,12 +78,30 @@ pub struct ShapedCluster {
 }
 
 impl ShapedCluster {
-    pub(crate) const GRAPHEME_START: u16 = 1;
+    pub(crate) const GRAPHEME_START: u16 = 1 << 0;
+    pub(crate) const SAFE_TO_BREAK: u16 = 1 << 1;
 
     /// Whether the logical start of this shaped cluster is also the start of a grapheme.
     #[inline(always)]
     pub fn is_grapheme_start(self) -> bool {
         self.flags & Self::GRAPHEME_START != 0
+    }
+
+    /// Whether the logical start of this shaped cluster is also the start of a grapheme.
+    #[inline(always)]
+    pub fn is_safe_to_break_before(self) -> bool {
+        self.flags & Self::SAFE_TO_BREAK != 0
+    }
+
+    /// The number of graphemes this cluster overlaps.
+    pub(crate) fn graphemes_overlapped(&self, characters: &[Character]) -> u32 {
+        let start = self.char_start as usize + 1;
+        let end = self.char_end as usize;
+        let mut graphemes = 1;
+        for character in &characters[start..end] {
+            graphemes += u32::from(character.grapheme_start);
+        }
+        graphemes
     }
 }
 

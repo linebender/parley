@@ -3,7 +3,7 @@
 
 //! Text shaping utilities.
 
-mod atom;
+pub(crate) mod atom;
 mod cache;
 mod cluster;
 mod data;
@@ -11,4 +11,4 @@ pub(crate) mod shaped_text;
 pub(crate) mod shaper;
 
 pub use cluster::{Char, CharCluster, Coverage, SourceRange, Whitespace};
-pub use data::{ClusterData, ClusterInfo, to_whitespace};
+pub use data::{Character, ClusterData, ClusterInfo, ShapedCluster, to_whitespace};
