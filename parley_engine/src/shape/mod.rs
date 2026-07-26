@@ -3,6 +3,7 @@
 
 //! Text shaping utilities.
 
+mod atom;
 mod cache;
 mod cluster;
 mod data;
