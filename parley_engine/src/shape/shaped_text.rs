@@ -358,6 +358,7 @@ impl ShapedText {
         }
 
         let clusters_range = clusters_start..self.clusters.len();
+        let shaped_clusters_range = shaped_clusters_start..self.shaped_clusters.len();
         let run_advance = self.clusters[clusters_range.clone()]
             .iter()
             .map(|cluster| cluster.advance)
@@ -368,6 +369,7 @@ impl ShapedText {
             font_size: options.font_size,
             font_index,
             clusters_range,
+            shaped_clusters_range,
             glyphs_range: glyphs_start..self.glyphs.len(),
             normalized_coords_range,
             bidi_level: item.bidi_level,
@@ -391,6 +393,8 @@ pub struct ShapedRun {
     pub font_index: usize,
     /// This run's clusters, as a range into [`ShapedText::clusters`].
     pub clusters_range: Range<usize>,
+    /// This run's shaped clusters, as a range into [`ShapedText::shaped_clusters`].
+    pub shaped_clusters_range: Range<usize>,
     /// This run's glyphs, as a range into [`ShapedText::glyphs`].
     pub glyphs_range: Range<usize>,
     /// The normalized variation coords of this run, as a range into [`ShapedText::normalized_coords`].
@@ -718,11 +722,19 @@ fn process_shaped_clusters<'a>(
                 characters.push(character);
             }
 
-            let (glyph_offset, glyph_len) = if let Some(inline_glyph) = cluster.inline_glyph.take()
-            {
-                (inline_glyph.id, 0xFF)
+            let is_newline =
+                characters[cluster.characters_start].info.whitespace() == Whitespace::Newline;
+            let (glyph_offset, glyph_len, advance) = if is_newline {
+                // Elide glyphs of newlines.
+                (cluster.glyphs_start as u32, 0, 0.)
+            } else if let Some(inline_glyph) = cluster.inline_glyph.take() {
+                (inline_glyph.id, 0xFF, cluster.advance)
             } else {
-                (cluster.glyphs_start as u32, cluster.glyphs as u8)
+                (
+                    cluster.glyphs_start as u32,
+                    cluster.glyphs as u8,
+                    cluster.advance,
+                )
             };
 
             shaped_clusters.push(ShapedCluster {
@@ -736,7 +748,7 @@ fn process_shaped_clusters<'a>(
                 },
                 glyph_offset,
                 glyph_len,
-                advance: cluster.advance,
+                advance,
             });
 
             cluster = Cluster {
@@ -786,10 +798,18 @@ fn process_shaped_clusters<'a>(
         characters.push(character);
     }
 
-    let (glyph_offset, glyph_len) = if let Some(inline_glyph) = cluster.inline_glyph.take() {
-        (inline_glyph.id, 0xFF)
+    let is_newline = characters[cluster.characters_start].info.whitespace() == Whitespace::Newline;
+    let (glyph_offset, glyph_len, advance) = if is_newline {
+        // Elide glyphs of newlines.
+        (cluster.glyphs_start as u32, 0, 0.)
+    } else if let Some(inline_glyph) = cluster.inline_glyph.take() {
+        (inline_glyph.id, 0xFF, cluster.advance)
     } else {
-        (cluster.glyphs_start as u32, cluster.glyphs as u8)
+        (
+            cluster.glyphs_start as u32,
+            cluster.glyphs as u8,
+            cluster.advance,
+        )
     };
 
     shaped_clusters.push(ShapedCluster {
@@ -803,7 +823,7 @@ fn process_shaped_clusters<'a>(
         },
         glyph_offset,
         glyph_len,
-        advance: cluster.advance,
+        advance,
     });
 }
 
@@ -974,5 +994,21 @@ mod tests {
             .map(|c| (c.text_char_start, c.text_char_end, c.is_grapheme_start()))
             .collect();
         assert_eq!(clusters, [(0, 3, true)]);
+    }
+
+    #[test]
+    fn newlines_removed() {
+        for newline in ["\n", "\r", "\u{2028}", "\u{2029}"] {
+            let shaped = shape_with_font(&alloc::format!("a{newline}b"), ROBOTO);
+
+            let index = shaped
+                .shaped_clusters
+                .iter()
+                .position(|cluster| cluster.text_char_start == 1)
+                .unwrap();
+            let newline_cluster = &shaped.shaped_clusters[index];
+            assert_eq!(newline_cluster.glyph_len, 0, "newline glyphss are removed");
+            assert_eq!(newline_cluster.advance, 0., "newline advance is set to 0");
+        }
     }
 }
