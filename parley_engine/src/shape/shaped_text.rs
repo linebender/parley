@@ -193,6 +193,9 @@ impl ShapedText {
         for cluster in self.clusters.iter_mut() {
             cluster.style_index = remap[cluster.style_index as usize];
         }
+        for character in self.characters.iter_mut() {
+            character.style_index = remap[character.style_index as usize];
+        }
         for shaped_cluster in self.shaped_clusters.iter_mut() {
             shaped_cluster.style_index = remap[shaped_cluster.style_index as usize];
         }
@@ -329,13 +332,15 @@ impl ShapedText {
 
         // Push all characters.
         let characters_start = self.characters.len();
-        for ((byte_offset, ch), info) in text[range.byte_range.clone()]
+        for (((byte_offset, ch), info), style_index) in text[range.byte_range.clone()]
             .char_indices()
             .zip(&char_info[range.char_range.clone()])
+            .zip(&options.char_style_indices[range.char_range.clone()])
         {
             self.characters.push(Character {
                 text_byte_start: (range.byte_range.start + byte_offset) as u32,
                 info: ClusterInfo::new(info.boundary, ch),
+                style_index: *style_index,
                 grapheme_start: info.is_grapheme_start(),
             });
         }

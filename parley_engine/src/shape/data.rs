@@ -45,6 +45,8 @@ impl ClusterData {
 pub struct Character {
     pub text_byte_start: u32,
     pub info: ClusterInfo,
+    /// Style index for this character.
+    pub style_index: u16,
     pub grapheme_start: bool,
 }
 
