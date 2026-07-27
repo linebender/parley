@@ -119,10 +119,10 @@ pub struct ShapedCluster {
     /// Style index for this cluster.
     pub style_index: u16,
 
-    // /// Cluster flags (see impl methods for details).
-    // pub flags: u16,
-    /// If `glyph_len == 0xFF`, then `glyph_offset` is a glyph identifier, otherwise, it's an index
-    /// into the glyph array.
+    /// The index into the glyph array where this cluster's glyphs start.
+    ///
+    /// If [`Self::has_inline_glyph`] is `true`, this is a glyph identifier instead. For more, see
+    /// the documentation on that method.
     pub glyph_offset: u32,
 
     // /// Number of glyphs in this cluster (0xFF = single glyph stored inline)
@@ -134,15 +134,23 @@ pub struct ShapedCluster {
 }
 
 impl ShapedCluster {
-    /// Whether this shaped cluster's logical start also starts a grapheme.
+    /// The number of glyphs of this cluster.
     #[inline(always)]
-    pub(crate) fn glyph_len(self) -> u8 {
-        self.flags.glyph_len()
+    pub fn glyph_len(self) -> u8 {
+        if self.has_inline_glyph() {
+            1
+        } else {
+            self.flags.glyph_len()
+        }
     }
 
-    /// Whether this shaped cluster's logical start also starts a grapheme.
+    /// Whether this cluster's glyph is stored inline in [`Self::glyph_offset`].
+    ///
+    /// This is only possible if [`Self::glyph_len`] is one, and the glyph has no offset.
+    /// [`Self::glyph_offset`] then encodes the glyph identifier rather than an index into the glyph
+    /// array. The glyph's advance then is this cluster's advance.
     #[inline(always)]
-    pub(crate) fn has_inline_glyph(self) -> bool {
+    pub fn has_inline_glyph(self) -> bool {
         self.flags.has_inline_glyph()
     }
 
