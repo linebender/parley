@@ -102,19 +102,35 @@ impl<'a> ShapedSlice<'a> {
     /// Get a cursor to walk atoms from the logical start of this slice.
     #[inline(always)]
     pub fn atoms_start(&self) -> Atoms<'a> {
-        self.atoms_from_cluster(self.clusters.0)
+        self.atoms_from(self.clusters.0)
     }
 
     /// Get a cursor to walk atoms from the logical end of this slice.
     #[inline(always)]
     pub fn atoms_end(&self) -> Atoms<'a> {
-        self.atoms_from_cluster(self.clusters.1)
+        self.atoms_from(self.clusters.1)
     }
 
-    /// Get a cursor to walk atoms of this slice, starting before the logical start of the given
-    /// cluster.
+    /// Get a cursor to walk atoms of this slice, starting at the atom boundary at `cluster`.
+    ///
+    /// `cluster` indexes into [`Self::shaped_clusters`], must be either a cluster of this slice or
+    /// the end of the slice, and must be an atom boundary (i.e.,
+    /// [`ShapedCluster::is_grapheme_start`] must be `true`).
+    ///
+    /// To find the atom containing an arbitrary position, use [`Self::atom_at_char`] or
+    /// [`Self::atom_at_text_byte`] instead.
     #[inline(always)]
-    fn atoms_from_cluster(&self, cluster: u32) -> Atoms<'a> {
+    pub fn atoms_from(&self, cluster: u32) -> Atoms<'a> {
+        debug_assert!(
+            self.clusters.0 <= cluster && cluster <= self.clusters.1,
+            "cluster out of this slice's range"
+        );
+        debug_assert!(
+            cluster == self.clusters.0
+                || cluster == self.clusters.1
+                || self.shaped_clusters[cluster as usize].is_grapheme_start(),
+            "cluster is not an atom boundary"
+        );
         Atoms {
             slice: *self,
             cluster_idx: cluster,
@@ -146,7 +162,7 @@ impl<'a> ShapedSlice<'a> {
             idx -= 1;
         }
 
-        Some(self.atoms_from_cluster(idx).next().unwrap())
+        Some(self.atoms_from(idx).next().unwrap())
     }
 
     /// Get the atom containing the character at `text_byte`.
@@ -178,16 +194,31 @@ impl<'a> ShapedSlice<'a> {
             idx -= 1;
         }
 
-        Some(self.atoms_from_cluster(idx).next().unwrap())
+        Some(self.atoms_from(idx).next().unwrap())
     }
 
     /// Narrow the shaped slice to the given range of clusters.
+    ///
+    /// The range indexes into [`Self::shaped_clusters`], must be a subrange of
+    /// [`Self::shaped_clusters_range`], and both bounds must be an atom boundary (i.e.,
+    /// [`ShapedCluster::is_grapheme_start`] must be `true`).
     #[inline(always)]
     pub fn narrow(&self, clusters: Range<u32>) -> Self {
         debug_assert!(
-            clusters.is_empty()
-                || (self.clusters.0 <= clusters.start && clusters.end <= self.clusters.1),
+            clusters.start <= clusters.end,
+            "narrowed cluster range is inverted"
+        );
+        debug_assert!(
+            self.clusters.0 <= clusters.start && clusters.end <= self.clusters.1,
             "narrowed cluster range out of this slice's range"
+        );
+        debug_assert!(
+            clusters.is_empty()
+                || ((clusters.start == self.clusters.0
+                    || self.shaped_clusters[clusters.start as usize].is_grapheme_start())
+                    && (clusters.end == self.clusters.1
+                        || self.shaped_clusters[clusters.end as usize].is_grapheme_start())),
+            "narrowed cluster range is not atom-aligned"
         );
         Self {
             clusters: (clusters.start, clusters.end),
@@ -383,20 +414,25 @@ impl<'a> Atom<'a> {
             })
     }
 
+    /// This atom as a [`ShapedSlice`].
+    #[inline(always)]
+    pub fn slice(&self) -> ShapedSlice<'a> {
+        ShapedSlice {
+            clusters: self.clusters,
+            ..self.slice
+        }
+    }
+
     /// Get a cursor to walk graphemes from the logical start of this atom.
     #[inline(always)]
     pub fn graphemes_start(&self) -> Graphemes<'a> {
-        self.slice
-            .narrow(self.clusters.0..self.clusters.1)
-            .graphemes_start()
+        self.slice().graphemes_start()
     }
 
     /// Get a cursor to walk graphemes from the logical end of this atom.
     #[inline(always)]
     pub fn graphemes_end(&self) -> Graphemes<'a> {
-        self.slice
-            .narrow(self.clusters.0..self.clusters.1)
-            .graphemes_end()
+        self.slice().graphemes_end()
     }
 
     /// Whether the atom can be broken
