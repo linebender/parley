@@ -39,6 +39,30 @@ impl<'a> ShapedSlice<'a> {
         }
     }
 
+    /// The [`Character`]s of this slice.
+    ///
+    /// Note this is the whole underlying character array; see [`Self::char_range`] for the range
+    /// this slice covers.
+    #[inline(always)]
+    pub fn characters(&self) -> &'a [Character] {
+        self.characters
+    }
+
+    /// The range of [`Self::shaped_clusters`] of this slice.
+    #[inline(always)]
+    pub fn shaped_clusters_range(&self) -> Range<u32> {
+        self.clusters.0..self.clusters.1
+    }
+
+    /// The [`ShapedCluster`]s of this slice.
+    ///
+    /// Note this is the whole underlying shaped clusters array; see [`Self::shaped_clusters_range`]
+    /// for the range this slice covers.
+    #[inline(always)]
+    pub fn shaped_clusters(&self) -> &'a [ShapedCluster] {
+        self.shaped_clusters
+    }
+
     /// The byte range in the source text of the given range of [`Self::characters`].
     pub fn text_byte_range(&self, chars: Range<u32>) -> Range<usize> {
         let first = &self.characters[chars.start as usize];
@@ -283,6 +307,12 @@ impl<'a> Atom<'a> {
         self.chars.0..self.chars.1
     }
 
+    /// The [`Character`]s from the underlying [`ShapedSlice`] this atom spans.
+    #[inline(always)]
+    pub fn characters(&self) -> &'a [Character] {
+        &self.slice.characters[self.chars.0 as usize..self.chars.1 as usize]
+    }
+
     /// The range of [`ShapedCluster`] into the underlying [`ShapedSlice`] this atom spans.
     #[inline(always)]
     pub fn clusters_range(&self) -> Range<u32> {
@@ -291,7 +321,7 @@ impl<'a> Atom<'a> {
 
     /// The [`ShapedCluster`]s from the underlying [`ShapedSlice`] this atom spans.
     #[inline(always)]
-    pub fn clusters(&self) -> &[ShapedCluster] {
+    pub fn clusters(&self) -> &'a [ShapedCluster] {
         &self.slice.shaped_clusters[self.clusters.0 as usize..self.clusters.1 as usize]
     }
 

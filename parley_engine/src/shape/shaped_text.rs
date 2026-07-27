@@ -132,7 +132,7 @@ impl ShapedText {
     }
 
     /// Get a [`ShapedSlice`] of the run at `run_index`.
-    pub fn run_slice(&self, run_index: u32) -> ShapedSlice {
+    pub fn run_slice(&self, run_index: u32) -> ShapedSlice<'_> {
         let run = &self.runs[run_index as usize];
         ShapedSlice {
             characters: &self.characters,
