@@ -374,15 +374,6 @@ impl<'a> Atom<'a> {
             .graphemes_end()
     }
 
-    /// The number of graphemes in this atom.
-    #[inline]
-    pub fn grapheme_count(&self) -> u32 {
-        self.slice.characters[self.chars.0 as usize..self.chars.1 as usize]
-            .iter()
-            .filter(|c| c.grapheme_start)
-            .count() as u32
-    }
-
     /// Whether the atom can be broken
     #[inline(always)]
     pub fn boundary_before(&self) -> Boundary {
