@@ -248,9 +248,7 @@ impl BidiResolver {
                 } else {
                     next_even(stack.embedding_level())
                 };
-                if new_level <= BidiLevel::new(MAX_STACK)
-                    && overflow_isolates == 0
-                    && overflow_embedding == 0
+                if new_level <= BidiLevel::MAX && overflow_isolates == 0 && overflow_embedding == 0
                 {
                     if is_isolate {
                         valid_isolates += 1;
@@ -815,12 +813,12 @@ impl Run {
     }
 }
 
-const MAX_STACK: u8 = 125;
+const MAX_STACK: usize = BidiLevel::MAX.to_u8() as usize;
 
 struct Stack {
-    embedding_level: [BidiLevel; MAX_STACK as usize + 1],
-    override_status: [BidiClass; MAX_STACK as usize + 1],
-    isolate_status: [bool; MAX_STACK as usize + 1],
+    embedding_level: [BidiLevel; MAX_STACK + 1],
+    override_status: [BidiClass; MAX_STACK + 1],
+    isolate_status: [bool; MAX_STACK + 1],
     depth: usize,
 }
 
@@ -828,9 +826,9 @@ impl Stack {
     fn new() -> Self {
         Self {
             depth: 0,
-            embedding_level: [BidiLevel::new(0); MAX_STACK as usize + 1],
-            override_status: [BidiClass::OtherNeutral; MAX_STACK as usize + 1],
-            isolate_status: [false; MAX_STACK as usize + 1],
+            embedding_level: [BidiLevel::new(0); MAX_STACK + 1],
+            override_status: [BidiClass::OtherNeutral; MAX_STACK + 1],
+            isolate_status: [false; MAX_STACK + 1],
         }
     }
 

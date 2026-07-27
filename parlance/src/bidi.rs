@@ -61,6 +61,14 @@ pub enum BidiOverride {
 pub struct BidiLevel(u8);
 
 impl BidiLevel {
+    /// The maximum bidirectional text embedding level, according to [UAX #9 § 3.1.1 BD2][uax-bd2].
+    ///
+    /// It is possible for `BidiLevel` to encode greater values; in particular, `unsafe` code **must
+    /// not** rely on `BidiLevel` never being greater than this.
+    ///
+    /// [uax-bd2]: https://unicode.org/reports/tr9/#BD2
+    pub const MAX: Self = Self(125);
+
     /// Construct a new bidi level.
     #[inline(always)]
     pub const fn new(level: u8) -> Self {
