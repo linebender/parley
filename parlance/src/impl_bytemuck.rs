@@ -49,9 +49,10 @@ unsafe impl Zeroable for BidiLevel {}
 
 #[cfg(test)]
 mod tests {
-    use super::GenericFamily;
     use bytemuck::{Contiguous, Zeroable, checked::try_from_bytes};
     use core::ptr;
+
+    use super::{BidiLevel, GenericFamily};
 
     #[test]
     fn checked_bit_pattern() {
@@ -92,6 +93,16 @@ mod tests {
                 unreachable!();
             }
             value += 1;
+        }
+    };
+
+    /// Tests that [`BidiLevel`] is one byte.
+    ///
+    /// That may catch its representation changing, in which case the implementations here
+    /// definitely need revisiting.
+    const _: () = {
+        if size_of::<BidiLevel>() != 1 {
+            panic!("`BidiLevel` is not one byte");
         }
     };
 }
