@@ -6,6 +6,7 @@
 use core::ops::Range;
 
 use alloc::vec::Vec;
+use parlance::BidiLevel;
 
 use crate::{
     CharInfo, FontInstance, Glyph, ShapeOptions,
@@ -262,10 +263,9 @@ impl ShapedText {
         let glyph_positions = glyph_buffer.glyph_positions();
         let scale_factor = options.font_size / units_per_em;
         let clusters_start = self.clusters.len();
-        let is_rtl = !item.bidi_level.is_multiple_of(2);
 
         let glyphs_start = self.glyphs.len();
-        if !is_rtl {
+        if item.bidi_level.is_ltr() {
             process_clusters(
                 Direction::Ltr,
                 &mut self.clusters,
@@ -333,7 +333,7 @@ pub struct ShapedRun {
     /// The normalized variation coords of this run, as a range into [`ShapedText::normalized_coords`].
     pub normalized_coords_range: Range<usize>,
     /// The bidi level of the run.
-    pub bidi_level: u8,
+    pub bidi_level: BidiLevel,
     /// Total advance of the run.
     pub advance: f32,
     /// The font metrics of this run.

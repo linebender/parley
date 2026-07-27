@@ -110,7 +110,7 @@ impl<'a, B: Brush> Run<'a, B> {
 
     /// Returns `true` if the run has right-to-left directionality.
     pub fn is_rtl(&self) -> bool {
-        self.shaped.bidi_level & 1 != 0
+        self.shaped.bidi_level.is_rtl()
     }
 
     /// Returns the cluster range for the run.

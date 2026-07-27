@@ -8,8 +8,8 @@
     reason = "The `bytemuck` marker traits are `unsafe` and require `unsafe impl`."
 )]
 
-use crate::GenericFamily;
-use bytemuck::{Contiguous, NoUninit, Zeroable, checked::CheckedBitPattern};
+use crate::{BidiLevel, GenericFamily};
+use bytemuck::{Contiguous, NoUninit, Pod, Zeroable, checked::CheckedBitPattern};
 
 // Safety: The enum is `repr(u8)` and has only fieldless variants.
 unsafe impl NoUninit for GenericFamily {}
@@ -39,11 +39,20 @@ unsafe impl Contiguous for GenericFamily {
     const MAX_VALUE: u8 = GenericFamily::MAX_VALUE;
 }
 
+// Safety: The struct is `repr(transparent)`, wrapping a `u8`.
+//
+// While generally BidiLevels have a maximum of 125, no value is unsound.
+unsafe impl Pod for BidiLevel {}
+
+// Safety: The struct is `repr(transparent)`, wrapping a `u8`.
+unsafe impl Zeroable for BidiLevel {}
+
 #[cfg(test)]
 mod tests {
-    use super::GenericFamily;
     use bytemuck::{Contiguous, Zeroable, checked::try_from_bytes};
     use core::ptr;
+
+    use super::{BidiLevel, GenericFamily};
 
     #[test]
     fn checked_bit_pattern() {
@@ -84,6 +93,16 @@ mod tests {
                 unreachable!();
             }
             value += 1;
+        }
+    };
+
+    /// Tests that [`BidiLevel`] is one byte.
+    ///
+    /// That may catch its representation changing, in which case the implementations here
+    /// definitely need revisiting.
+    const _: () = {
+        if size_of::<BidiLevel>() != 1 {
+            panic!("`BidiLevel` is not one byte");
         }
     };
 }
