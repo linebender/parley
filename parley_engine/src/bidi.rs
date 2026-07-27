@@ -248,9 +248,9 @@ impl BidiResolver {
                     }
                 }
                 let new_level = if is_rtl {
-                    next_odd(stack.embedding_level())
+                    stack.embedding_level().next_odd()
                 } else {
-                    next_even(stack.embedding_level())
+                    stack.embedding_level().next_even()
                 };
                 if new_level <= BidiLevel::MAX && overflow_isolates == 0 && overflow_embedding == 0
                 {
@@ -903,14 +903,4 @@ impl BracketStack {
 
 const fn mask(t: BidiClass) -> u32 {
     1 << (t.to_icu4c_value() as u32)
-}
-
-#[inline(always)]
-const fn next_odd(level: BidiLevel) -> BidiLevel {
-    BidiLevel::new((level.to_u8() + 1) | 1)
-}
-
-#[inline(always)]
-const fn next_even(level: BidiLevel) -> BidiLevel {
-    BidiLevel::new((level.to_u8() + 2) & !1)
 }

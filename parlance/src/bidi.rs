@@ -92,4 +92,22 @@ impl BidiLevel {
     pub const fn is_rtl(self) -> bool {
         !self.is_ltr()
     }
+
+    /// Get the next odd bidi level.
+    ///
+    /// When the return value overflows (`self.to_u8() >= 255`) this panics in debug mode. The
+    /// return value wraps in release mode.
+    #[inline(always)]
+    pub const fn next_odd(self) -> BidiLevel {
+        BidiLevel::new((self.to_u8() + 1) | 1)
+    }
+
+    /// Get the next even bidi level.
+    ///
+    /// When the return value overflows (`self.to_u8() >= 254`) this panics in debug mode. The
+    /// return value wraps in release mode.
+    #[inline(always)]
+    pub const fn next_even(self) -> BidiLevel {
+        BidiLevel::new((self.to_u8() + 2) & !1)
+    }
 }
