@@ -616,15 +616,21 @@ impl GraphemeFlags {
     }
 }
 
+/// A grapheme of shaped text.
+///
+/// This encodes extended grapheme clusters as in [UAX #29 § 3][uax-grapheme].
+///
+/// Graphemes usually are the units of caret movement, selection, and hit testing. A grapheme's
+/// edges are not necessarily [`ShapedCluster`] edges: a cluster can span multiple graphemes (e.g. a
+/// ligature), in which case its advance is split evenly over the graphemes it overlaps; see
+/// [`Self::advance`]. A grapheme can also span multiple shaped clusters.
+///
+/// [uax-grapheme]: https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Grapheme {
     /// The characters this grapheme spans inside [`ShapedSlice::characters`].
     chars: (u32, u32),
 
-    /// The advance of the grapheme.
-    ///
-    /// This is the sum of the grapheme's clusters advances. If clusters cross the boundaries of
-    /// this grapheme, this includes partial cluster advances.
     advance: f32,
     flags: GraphemeFlags,
 }
@@ -633,6 +639,16 @@ impl Grapheme {
     /// The range of characters into the underlying [`ShapedSlice`] this grapheme spans.
     pub fn char_range(&self) -> Range<u32> {
         self.chars.0..self.chars.1
+    }
+
+    /// The advance of the grapheme.
+    ///
+    /// This is the sum of the grapheme's clusters advances. If clusters cross the boundaries of
+    /// this grapheme, this includes partial cluster advances. A cluster's advance is split evenly
+    /// over the graphemes it overlaps.
+    #[inline(always)]
+    pub fn advance(&self) -> f32 {
+        self.advance
     }
 
     /// The boundary at the logical start of this grapheme.
