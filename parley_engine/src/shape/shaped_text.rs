@@ -775,8 +775,7 @@ fn process_shaped_clusters<'a>(
         };
 
         shaped_clusters.push(ShapedCluster {
-            char_start: cluster.characters_start as u32,
-            char_end: char_end as u32,
+            chars_range: (cluster.characters_start as u32, char_end as u32),
             style_index,
             flags: ShapedClusterFlags::new(glyph_len)
                 .with_grapheme_start(first_character.grapheme_start)
@@ -1020,7 +1019,13 @@ mod tests {
         let clusters: Vec<(u32, u32, bool)> = shaped
             .shaped_clusters
             .iter()
-            .map(|c| (c.char_start, c.char_end, c.is_grapheme_start()))
+            .map(|c| {
+                (
+                    c.chars_range().start,
+                    c.chars_range().end,
+                    c.is_grapheme_start(),
+                )
+            })
             .collect();
         assert_eq!(clusters, [(0, 1, true), (1, 3, true)]);
     }
@@ -1037,7 +1042,13 @@ mod tests {
         let clusters: Vec<(u32, u32, bool)> = shaped
             .shaped_clusters
             .iter()
-            .map(|c| (c.char_start, c.char_end, c.is_grapheme_start()))
+            .map(|c| {
+                (
+                    c.chars_range().start,
+                    c.chars_range().end,
+                    c.is_grapheme_start(),
+                )
+            })
             .collect();
         assert_eq!(clusters, [(0, 3, true)]);
     }
@@ -1050,7 +1061,7 @@ mod tests {
             let index = shaped
                 .shaped_clusters
                 .iter()
-                .position(|cluster| cluster.char_start == 1)
+                .position(|cluster| cluster.chars_range().start == 1)
                 .unwrap();
             let newline_cluster = &shaped.shaped_clusters[index];
             assert_eq!(

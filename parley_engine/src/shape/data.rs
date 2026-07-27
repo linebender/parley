@@ -3,6 +3,8 @@
 
 #![expect(missing_docs, reason = "Deferred")]
 
+use core::ops::Range;
+
 use crate::{Boundary, shape::Whitespace};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -124,10 +126,7 @@ pub struct ShapedCluster {
     /// Note this is not a character index into the source text: the shaped character array only
     /// contains the characters of runs that were actually shaped. Mapping back to the source text
     /// goes through [`Character::text_byte_start`].
-    pub char_start: u32,
-
-    /// One past the last character of this cluster, as an index into the shaped character array.
-    pub char_end: u32,
+    pub(crate) chars_range: (u32, u32),
 
     /// Style index for this cluster.
     pub style_index: u16,
@@ -147,6 +146,14 @@ pub struct ShapedCluster {
 }
 
 impl ShapedCluster {
+    /// The character range of this slice.
+    ///
+    /// This indexes into [`Self::characters`].
+    #[inline(always)]
+    pub fn chars_range(&self) -> Range<u32> {
+        self.chars_range.0..self.chars_range.1
+    }
+
     /// The number of glyphs of this cluster.
     #[inline(always)]
     pub fn glyph_len(self) -> u8 {
@@ -184,8 +191,8 @@ impl ShapedCluster {
 
     /// The number of graphemes this cluster overlaps.
     pub(crate) fn graphemes_overlapped(&self, characters: &[Character]) -> u32 {
-        let start = self.char_start as usize + 1;
-        let end = self.char_end as usize;
+        let start = self.chars_range().start as usize + 1;
+        let end = self.chars_range().end as usize;
         let mut graphemes = 1;
         for character in &characters[start..end] {
             graphemes += u32::from(character.grapheme_start);

@@ -42,8 +42,12 @@ impl<'a> ShapedSlice<'a> {
         if self.clusters.0 == self.clusters.1 {
             0..0
         } else {
-            self.shaped_clusters[self.clusters.0 as usize].char_start
-                ..self.shaped_clusters[self.clusters.1 as usize - 1].char_end
+            self.shaped_clusters[self.clusters.0 as usize]
+                .chars_range()
+                .start
+                ..self.shaped_clusters[self.clusters.1 as usize - 1]
+                    .chars_range()
+                    .end
         }
     }
 
@@ -150,9 +154,9 @@ impl<'a> ShapedSlice<'a> {
             &self.shaped_clusters[self.clusters.0 as usize..self.clusters.1 as usize];
 
         let idx = shaped_clusters
-            .partition_point(|cluster| cluster.char_start <= char_index)
+            .partition_point(|cluster| cluster.chars_range().start <= char_index)
             .checked_sub(1)?;
-        if shaped_clusters[idx].char_end <= char_index {
+        if shaped_clusters[idx].chars_range().end <= char_index {
             return None;
         }
 
@@ -178,10 +182,10 @@ impl<'a> ShapedSlice<'a> {
 
         let idx = shaped_clusters
             .partition_point(|cluster| {
-                self.characters[cluster.char_start as usize].text_byte_start <= text_byte
+                self.characters[cluster.chars_range().start as usize].text_byte_start <= text_byte
             })
             .checked_sub(1)?;
-        let last_character = self.characters[shaped_clusters[idx].char_end as usize - 1];
+        let last_character = self.characters[shaped_clusters[idx].chars_range().end as usize - 1];
         if last_character.text_byte_start + last_character.info.source_char().len_utf8() as u32
             <= text_byte
         {
@@ -297,8 +301,10 @@ impl<'a> Atoms<'a> {
             slice: self.slice,
             clusters: (idx, end),
             chars: (
-                self.slice.shaped_clusters[idx as usize].char_start,
-                self.slice.shaped_clusters[end as usize - 1].char_end,
+                self.slice.shaped_clusters[idx as usize].chars_range().start,
+                self.slice.shaped_clusters[end as usize - 1]
+                    .chars_range()
+                    .end,
             ),
             advance,
         })
@@ -330,8 +336,12 @@ impl<'a> Iterator for Atoms<'a> {
             slice: self.slice,
             clusters: (start, idx),
             chars: (
-                self.slice.shaped_clusters[start as usize].char_start,
-                self.slice.shaped_clusters[idx as usize - 1].char_end,
+                self.slice.shaped_clusters[start as usize]
+                    .chars_range()
+                    .start,
+                self.slice.shaped_clusters[idx as usize - 1]
+                    .chars_range()
+                    .end,
             ),
             advance,
         })
@@ -503,16 +513,26 @@ impl<'a> Graphemes<'a> {
         }
         let grapheme_end = self.char_idx;
         let mut idx = grapheme_end - 1;
-        if idx < self.slice.shaped_clusters[self.cluster_idx as usize].char_start {
+        if idx
+            < self.slice.shaped_clusters[self.cluster_idx as usize]
+                .chars_range()
+                .start
+        {
             self.cluster_idx -= 1;
             self.partial_advance = self.slice.partial_advance_at(self.cluster_idx);
         }
-        let is_atom_end =
-            grapheme_end == self.slice.shaped_clusters[self.cluster_idx as usize].char_end;
+        let is_atom_end = grapheme_end
+            == self.slice.shaped_clusters[self.cluster_idx as usize]
+                .chars_range()
+                .end;
         let mut advance = self.partial_advance;
         while idx > char_start && !self.slice.characters[idx as usize].grapheme_start {
             idx -= 1;
-            if idx < self.slice.shaped_clusters[self.cluster_idx as usize].char_start {
+            if idx
+                < self.slice.shaped_clusters[self.cluster_idx as usize]
+                    .chars_range()
+                    .start
+            {
                 // The grapheme continues into the preceding cluster.
                 self.cluster_idx -= 1;
                 self.partial_advance = self.slice.partial_advance_at(self.cluster_idx);
@@ -520,7 +540,10 @@ impl<'a> Graphemes<'a> {
             }
         }
         let is_atom_start = idx == char_start
-            || idx == self.slice.shaped_clusters[self.cluster_idx as usize].char_start;
+            || idx
+                == self.slice.shaped_clusters[self.cluster_idx as usize]
+                    .chars_range()
+                    .start;
         let first_char = self.slice.characters[idx as usize];
         self.char_idx = idx;
         Some(Grapheme {
@@ -548,13 +571,19 @@ impl<'a> Iterator for Graphemes<'a> {
             return None;
         }
         let grapheme_start = self.char_idx;
-        let is_atom_start =
-            grapheme_start == self.slice.shaped_clusters[self.cluster_idx as usize].char_start;
+        let is_atom_start = grapheme_start
+            == self.slice.shaped_clusters[self.cluster_idx as usize]
+                .chars_range()
+                .start;
 
         let mut advance = self.partial_advance;
         let mut idx = grapheme_start + 1;
         while idx < char_end && !self.slice.characters[idx as usize].grapheme_start {
-            if idx == self.slice.shaped_clusters[self.cluster_idx as usize].char_end {
+            if idx
+                == self.slice.shaped_clusters[self.cluster_idx as usize]
+                    .chars_range()
+                    .end
+            {
                 // The grapheme continues into the next cluster.
                 self.cluster_idx += 1;
                 self.partial_advance = self.slice.partial_advance_at(self.cluster_idx);
@@ -565,8 +594,16 @@ impl<'a> Iterator for Graphemes<'a> {
         // If we stopped exactly on a cluster edge, the next cluster's share
         // belongs to the *next* grapheme: advance the lockstep without taking it.
         let is_atom_end = idx == char_end
-            || idx == self.slice.shaped_clusters[self.cluster_idx as usize].char_end;
-        if idx < char_end && idx == self.slice.shaped_clusters[self.cluster_idx as usize].char_end {
+            || idx
+                == self.slice.shaped_clusters[self.cluster_idx as usize]
+                    .chars_range()
+                    .end;
+        if idx < char_end
+            && idx
+                == self.slice.shaped_clusters[self.cluster_idx as usize]
+                    .chars_range()
+                    .end
+        {
             self.cluster_idx += 1;
             self.partial_advance = self.slice.partial_advance_at(self.cluster_idx);
         }
