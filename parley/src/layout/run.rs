@@ -2,43 +2,75 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::layout::cluster::{Cluster, ClusterPath};
-use crate::layout::data::{LineItemData, RunData};
+use crate::layout::data::{LineItemData, RunData, count_graphemes};
 use crate::layout::layout::Layout;
 use crate::style::Brush;
 
 use core::ops::Range;
 use fontique::Synthesis;
-use parley_engine::{FontInstance, FontMetrics, NormalizedCoord, ShapedRun};
+use parley_engine::{
+    Atom, Atoms, FontInstance, FontMetrics, Graphemes, NormalizedCoord, ShapedRun, ShapedSlice,
+};
 
 /// Sequence of clusters with a single font and style.
-#[derive(Copy, Clone)]
 pub struct Run<'a, B: Brush> {
     pub(crate) layout: &'a Layout<B>,
     /// The index of the line this run is part of.
     pub(crate) line_index: u32,
     /// The index of the run within the line it is part of.
     pub(crate) index: u32,
+    /// The index of the shaped run within [`parley_engine::ShapedText`].
+    pub(crate) shaped_text_run_index: u32,
     pub(crate) shaped: &'a ShapedRun,
     pub(crate) data: &'a RunData,
     pub(crate) line_data: Option<&'a LineItemData>,
 }
 
+// `Run` is `Copy` and `Clone` regardless of `B`.
+impl<B: Brush> Copy for Run<'_, B> {}
+impl<B: Brush> Clone for Run<'_, B> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
 impl<'a, B: Brush> Run<'a, B> {
+    #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub(crate) fn new(
         layout: &'a Layout<B>,
         line_index: u32,
         index: u32,
         run_index: usize,
-        // data: &'a RunData,
         line_data: Option<&'a LineItemData>,
     ) -> Self {
         Self {
             layout,
             line_index,
             index,
+            shaped_text_run_index: run_index as u32,
             shaped: &layout.data.shaped_text.runs()[run_index],
             data: &layout.data.runs[run_index],
             line_data,
+        }
+    }
+
+    /// Borrow the shaped content of this run as a slice.
+    ///
+    /// Note this covers the whole shaped run even when this [`Run`] is scoped to a line. Also see
+    /// [`Self::line_slice`].
+    pub(crate) fn full_slice(&self) -> ShapedSlice<'a> {
+        self.layout
+            .data
+            .shaped_text
+            .run_slice(self.shaped_text_run_index)
+    }
+
+    /// Borrow the shaped content of this run as a slice, narrowed to this [`Run`]'s line.
+    pub(crate) fn line_slice(&self) -> ShapedSlice<'a> {
+        let slice = self.full_slice();
+        match self.line_data {
+            Some(line_data) => slice.narrow(line_data.shaped_cluster_range.clone()),
+            None => slice,
         }
     }
 
@@ -114,11 +146,14 @@ impl<'a, B: Brush> Run<'a, B> {
     }
 
     /// Returns the cluster range for the run.
+    ///
+    /// The indices are grapheme cluster indices, relative to the shaped run this [`Run`] belongs
+    /// to: for a run scoped to a line, this is the sub-range of the shaped run's clusters that fall
+    /// on that line; otherwise it covers all of the shaped run's clusters.
     pub fn cluster_range(&self) -> Range<usize> {
         self.line_data
-            .map(|d| &d.cluster_range)
-            .unwrap_or(&self.shaped.clusters_range)
-            .clone()
+            .map(|d| d.grapheme_range.clone())
+            .unwrap_or_else(|| 0..count_graphemes(self.full_slice()))
     }
 
     /// Returns the number of clusters in the run.
@@ -132,28 +167,15 @@ impl<'a, B: Brush> Run<'a, B> {
     }
 
     /// Returns the cluster at the specified index.
+    ///
+    /// Note this walks the run's clusters, so the cost is `O(index)`.
     pub fn get(&self, index: usize) -> Option<Cluster<'a, B>> {
-        let range = self
-            .line_data
-            .map(|d| &d.cluster_range)
-            .unwrap_or(&self.shaped.clusters_range);
-        let original_index = index;
-        let index = range.start + index;
-        Some(Cluster {
-            path: ClusterPath::new(self.line_index, self.index, original_index as u32),
-            run: self.clone(),
-            data: self.layout.data.shaped_text.clusters().get(index)?,
-        })
+        Clusters::new(*self, false).nth(index)
     }
 
     /// Returns an iterator over the clusters in logical order.
-    pub fn clusters(&'a self) -> impl Iterator<Item = Cluster<'a, B>> + 'a + Clone {
-        let range = self.cluster_range();
-        Clusters {
-            run: self,
-            range,
-            rev: false,
-        }
+    pub fn clusters(&self) -> impl Iterator<Item = Cluster<'a, B>> + Clone + use<'a, B> {
+        Clusters::new(*self, false)
     }
 
     /// Returns the visual cluster index for the specified logical cluster index.
@@ -189,27 +211,59 @@ impl<'a, B: Brush> Run<'a, B> {
     }
 
     /// Returns an iterator over the clusters in visual order.
-    pub fn visual_clusters(&'a self) -> impl Iterator<Item = Cluster<'a, B>> + 'a + Clone {
-        let range = self.cluster_range();
-        Clusters {
-            run: self,
-            range,
-            rev: self.is_rtl(),
-        }
+    pub fn visual_clusters(&self) -> impl Iterator<Item = Cluster<'a, B>> + Clone + use<'a, B> {
+        Clusters::new(*self, self.is_rtl())
     }
 }
 
+/// An iterator over a [`Run`]'s clusters.
+///
+/// This walks the run's graphemes. Each grapheme is one [`Cluster`].
 struct Clusters<'a, B: Brush> {
-    run: &'a Run<'a, B>,
-    range: Range<usize>,
+    run: Run<'a, B>,
+    /// Cursor over the run's (line-scoped) atoms.
+    atoms: Atoms<'a>,
+    /// Grapheme cursor over the run's (line-scoped) slice.
+    graphemes: Graphemes<'a>,
+    /// The atom containing the most recently yielded grapheme; `None` before the first grapheme.
+    atom: Option<Atom<'a>>,
+    /// In forward iteration, the logical index of the cluster yielded next; in reverse
+    /// iteration, one past that index.
+    logical_index: usize,
+    /// Whether iteration is in reverse logical order.
     rev: bool,
+}
+
+impl<'a, B: Brush> Clusters<'a, B> {
+    fn new(run: Run<'a, B>, rev: bool) -> Self {
+        let slice = run.line_slice();
+        Self {
+            run,
+            atoms: if rev {
+                slice.atoms_end()
+            } else {
+                slice.atoms_start()
+            },
+            graphemes: if rev {
+                slice.graphemes_end()
+            } else {
+                slice.graphemes_start()
+            },
+            atom: None,
+            logical_index: if rev { run.len() } else { 0 },
+            rev,
+        }
+    }
 }
 
 impl<B: Brush> Clone for Clusters<'_, B> {
     fn clone(&self) -> Self {
         Self {
             run: self.run,
-            range: self.range.clone(),
+            atoms: self.atoms,
+            graphemes: self.graphemes,
+            atom: self.atom,
+            logical_index: self.logical_index,
             rev: self.rev,
         }
     }
@@ -218,20 +272,41 @@ impl<B: Brush> Clone for Clusters<'_, B> {
 impl<'a, B: Brush> Iterator for Clusters<'a, B> {
     type Item = Cluster<'a, B>;
 
+    #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     fn next(&mut self) -> Option<Self::Item> {
-        let index = if self.rev {
-            self.range.next_back()?
+        let grapheme = if self.rev {
+            self.graphemes.prev()?
         } else {
-            self.range.next()?
+            self.graphemes.next()?
+        };
+        let entered_new_atom = if self.rev {
+            grapheme.is_atom_end()
+        } else {
+            grapheme.is_atom_start()
+        };
+        if entered_new_atom {
+            self.atom = if self.rev {
+                self.atoms.prev()
+            } else {
+                self.atoms.next()
+            };
+        }
+        let atom = self.atom.expect(
+            "The first call to `next` should always be an atom edge, so this should always be set at this point.",
+        );
+        let logical_index = if self.rev {
+            self.logical_index -= 1;
+            self.logical_index
+        } else {
+            let index = self.logical_index;
+            self.logical_index += 1;
+            index
         };
         Some(Cluster {
-            path: ClusterPath::new(
-                self.run.line_index,
-                self.run.index,
-                (index - self.run.cluster_range().start) as u32,
-            ),
-            run: self.run.clone(),
-            data: self.run.layout.data.shaped_text.clusters().get(index)?,
+            path: ClusterPath::new(self.run.line_index, self.run.index, logical_index as u32),
+            run: self.run,
+            atom,
+            grapheme,
         })
     }
 }

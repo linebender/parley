@@ -291,7 +291,6 @@ where
                 .selection
                 .focus()
                 .logical_clusters(&self.editor.layout)[0]
-                .clone()
             {
                 let range = cluster.text_range();
                 let end = range.end;

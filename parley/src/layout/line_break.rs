@@ -10,6 +10,7 @@ use alloc::vec::Vec;
 use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
+use crate::layout::data::count_graphemes;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -18,8 +19,8 @@ use crate::style::Brush;
 use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
 
 use core::ops::Range;
-use parley_engine::shape::{ClusterData, Whitespace};
-use parley_engine::{Boundary, FontMetrics};
+use parley_engine::shape::{Character, ShapedCluster, Whitespace};
+use parley_engine::{Atom, Boundary, FontMetrics};
 
 #[derive(Default)]
 struct LineLayout {
@@ -38,7 +39,9 @@ impl LineLayout {
 struct LineState {
     x: f32,
     items: Range<usize>,
-    clusters: Range<usize>,
+    /// The line's shaped clusters, as a range into [parley_engine::ShapedText::shaped_clusters].
+    /// The bounds are atom-aligned.
+    clusters: Range<u32>,
     num_spaces: usize,
     box_metrics: LineBoxMetrics,
     /// This is set to true if we encounter something on the line (either a glyph or an inline box)
@@ -160,7 +163,7 @@ impl LineBoxMetrics {
 struct PrevBoundaryState {
     item_idx: usize,
     run_idx: usize,
-    cluster_idx: usize,
+    cluster_idx: u32,
     state: LineState,
 }
 
@@ -244,8 +247,13 @@ pub struct BreakerState {
     item_idx: usize,
     /// Iteration state: the current run (within the layout)
     run_idx: usize,
-    /// Iteration state: the current cluster (within the layout)
-    cluster_idx: usize,
+    /// Iteration state: the current shaped cluster.
+    ///
+    /// This indexes into [parley_engine::ShapedText::shaped_clusters]. It's atom-aligned, pointing
+    /// at the start of the next atom to consume.
+    //
+    // TODO: rename this `shaped_cluster_idx`
+    cluster_idx: u32,
 
     /// The x coordinate of the left/start of the current line
     line_x: f32,
@@ -291,22 +299,23 @@ impl Default for BreakerState {
 }
 
 impl BreakerState {
-    /// Add the cluster(s) currently being evaluated to the current line.
+    /// Add the atom currently being evaluated to the current line.
     ///
-    /// `metrics` provides the raw font ascent and descent of the cluster(s) (i.e. the distances
-    /// they extend above and below the baseline, *not* including leading) as well as the intrinsic
-    /// line height of the cluster(s) (i.e. including the full leading), which may be smaller than
+    /// `font_metrics` provides the raw font ascent and descent of the atom (i.e. the distances
+    /// it extends above and below the baseline, *not* including leading) as well as the intrinsic
+    /// line height of the atom (i.e. including the full leading), which may be smaller than
     /// `ascent + descent` when the leading is negative.
-    pub fn append_cluster_to_line(
+    pub fn append_atom_to_line(
         &mut self,
+        atom: &Atom<'_>,
         next_x: f32,
         font_metrics: &FontMetrics,
         line_height: f32,
         quantize: bool,
     ) {
         self.line.items.end = self.item_idx + 1;
-        self.line.clusters.end = self.cluster_idx + 1;
-        self.cluster_idx += 1;
+        self.line.clusters.end = atom.shaped_clusters_range().end;
+        self.cluster_idx = atom.shaped_clusters_range().end;
         self.line.x = next_x;
         self.line
             .box_metrics
@@ -695,36 +704,32 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let shaped_run = &self.layout.data.shaped_text.runs()[run_idx];
 
                     let run = Run::new(self.layout, 0, 0, run_idx, None);
-                    let cluster_start = shaped_run.clusters_range.start;
-                    let cluster_end = shaped_run.clusters_range.end;
+                    let slice = run.full_slice();
+                    let cluster_end = shaped_run.shaped_clusters_range.end;
 
                     // println!("TextRun ({:?})", &run_data.text_range);
 
-                    // Iterate over remaining clusters in the Run
-                    while self.state.cluster_idx < cluster_end {
-                        let cluster = run.get(self.state.cluster_idx - cluster_start).unwrap();
-
-                        // Retrieve metadata about the cluster
-                        let is_ligature_continuation = cluster.is_ligature_continuation();
-                        let whitespace = cluster.info().whitespace();
+                    // Iterate over the remaining atoms in the Run
+                    while let Some(atom) = slice.atoms_from(self.state.cluster_idx).next() {
+                        // Retrieve metadata about the atom
+                        let first_character = &atom.characters()[0];
+                        let whitespace = first_character.info.whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
                         let is_space = whitespace.is_space_or_nbsp();
-                        let boundary = cluster.info().boundary();
+                        let boundary = first_character.info.boundary();
                         let metrics = run.font_metrics();
                         let line_height = run.data.line_height;
                         let max_height_exceeded = self.state.line.max_height_exceeded;
-                        let style = &self.layout.data.styles[cluster.data.style_index as usize];
+                        let style = &self.layout.data.styles[first_character.style_index as usize];
 
-                        // Lag text_wrap_mode style by one cluster
+                        // Lag text_wrap_mode style by one atom
                         let text_wrap_mode = self.state.line.text_wrap_mode;
                         self.state.line.text_wrap_mode = style.text_wrap_mode;
 
                         if boundary == Boundary::Line && text_wrap_mode == TextWrapMode::Wrap {
-                            // We do not currently handle breaking within a ligature, so we ignore boundaries in such a position.
-                            //
-                            // We also don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
+                            // We don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
                             // line breaks. We should accept the overflowing fragment in that scenario.
-                            if !is_ligature_continuation && self.state.line.x != 0.0 {
+                            if self.state.line.x != 0.0 {
                                 self.state.mark_line_break_opportunity();
                                 // break_opportunity = true;
                             }
@@ -735,37 +740,38 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                             // A CRLF sequence is a single grapheme cluster and must produce
                             // exactly one hard line break (UAX#14: CR × LF, do not break
-                            // between). When this newline is a CR immediately followed by an
-                            // LF, append the CR to the current line but suppress the break
-                            // here and let the LF emit the single break, so CR and LF share
-                            // one line. The lookahead reads the global cluster list so a CRLF
-                            // that shaping split across two runs (e.g. a style boundary at the
-                            // LF) is still coalesced. The LF must be item-adjacent to the CR:
-                            // if it lands in a later run it only coalesces when the next item
-                            // is that run (not an inline box sitting between the two), so an
-                            // inline box at the LF offset keeps the CR's break. Lone CR, lone
-                            // LF, LS, and PS are unaffected.
-                            let lf_is_item_adjacent = self.state.cluster_idx + 1 < cluster_end
+                            // between). Normally, this will be a single atom. However, if
+                            // itemization splits the CR and LF into separate runs (e.g. a
+                            // style boundary at the LF), the characters each form an atom of
+                            // their own. In that case, append the CR to the current line but
+                            // suppress the break here and let the LF emit the single break, so CR
+                            // and LF share one line. The lookahead reads the global character list.
+                            // The LF must be item-adjacent to the CR: if it lands in a later run it
+                            // only coalesces when the next item is that run (not an inline box
+                            // sitting between the two), so an inline box at the LF offset keeps the
+                            // CR's break. Lone CR, lone LF, LS, and PS are unaffected.
+                            let atom_chars = atom.char_range();
+                            let lf_is_item_adjacent = atom.shaped_clusters_range().end
+                                < cluster_end
                                 || self
                                     .layout
                                     .data
                                     .items
                                     .get(self.state.item_idx + 1)
                                     .is_some_and(|item| item.kind == LayoutItemKind::TextRun);
-                            let is_cr_before_lf = cluster.info().source_char() == '\r'
+                            let characters = self.layout.data.shaped_text.characters();
+                            let is_cr_before_lf = characters[atom_chars.end as usize - 1]
+                                .info
+                                .source_char()
+                                == '\r'
                                 && lf_is_item_adjacent
-                                && self
-                                    .layout
-                                    .data
-                                    .shaped_text
-                                    .clusters()
-                                    .get(self.state.cluster_idx + 1)
-                                    .is_some_and(|next| {
-                                        next.info.whitespace() == Whitespace::Newline
-                                            && next.info.source_char() == '\n'
-                                    });
+                                && characters.get(atom_chars.end as usize).is_some_and(|next| {
+                                    next.info.whitespace() == Whitespace::Newline
+                                        && next.info.source_char() == '\n'
+                                });
 
-                            self.state.append_cluster_to_line(
+                            self.state.append_atom_to_line(
+                                &atom,
                                 self.state.line.x,
                                 metrics,
                                 line_height,
@@ -783,27 +789,17 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             );
                         } else if
                         // This text can contribute "emergency" line breaks.
-                        style.overflow_wrap != OverflowWrap::Normal && !is_ligature_continuation
+                        style.overflow_wrap != OverflowWrap::Normal
                         && text_wrap_mode == TextWrapMode::Wrap
-                        // If we're at the start of the line, this particular cluster will never fit, so it's not a valid emergency break opportunity.
+                        // If we're at the start of the line, this particular atom will never fit, so it's not a valid emergency break opportunity.
                         && self.state.line.x != 0.0
                         {
                             self.state.mark_emergency_break_opportunity();
                         }
 
-                        // If current cluster is the start of a ligature, then advance state to include
-                        // the remaining clusters that make up the ligature
-                        let mut advance = cluster.advance();
-                        if cluster.is_ligature_start() {
-                            while let Some(cluster) = run.get(self.state.cluster_idx + 1) {
-                                if !cluster.is_ligature_continuation() {
-                                    break;
-                                } else {
-                                    advance += cluster.advance();
-                                    self.state.cluster_idx += 1;
-                                }
-                            }
-                        }
+                        // Breaking an atom requires reshaping, which we don't do here, so it is
+                        // consumed as a whole (this includes all clusters of a ligature).
+                        let advance = atom.advance();
 
                         // Compute the x position of the content being currently processed
                         let next_x = self.state.line.x + advance;
@@ -812,12 +808,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         // If the content fits (the x position does NOT exceed max_advance)
                         //
-                        // We simply append the cluster(s) to the current line
+                        // We simply append the atom to the current line
                         if next_x <= max_advance {
                             if max_height_exceeded {
                                 return self.max_height_break_data(line_height);
                             }
-                            self.state.append_cluster_to_line(
+                            self.state.append_atom_to_line(
+                                &atom,
                                 next_x,
                                 metrics,
                                 line_height,
@@ -833,14 +830,15 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // in the line. If there is no such line-breaking opportunity (such as if wrapping is disabled), then
                         // we fall back to appending the content to the line anyway.
                         else {
-                            // Case: cluster is a space character (and wrapping is enabled)
+                            // Case: the atom is a space character (and wrapping is enabled)
                             //
                             // We hang any overflowing whitespace and then line-break.
                             if is_space && text_wrap_mode == TextWrapMode::Wrap {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
-                                self.state.append_cluster_to_line(
+                                self.state.append_atom_to_line(
+                                    &atom,
                                     next_x,
                                     metrics,
                                     line_height,
@@ -888,7 +886,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
-                                self.state.append_cluster_to_line(
+                                self.state.append_atom_to_line(
+                                    &atom,
                                     next_x,
                                     metrics,
                                     line_height,
@@ -913,14 +912,15 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     /// Computes the next line in the paragraph by character count.
     ///
     /// This method breaks lines based on the number of characters rather than advance width.
-    /// Each text cluster (including whitespace and newlines) counts as 1 character.
+    /// Each character of text (including whitespace and newlines) counts as 1.
     /// Each inline box also counts as 1 character.
-    /// Ligature components each count separately (matching character count).
     ///
     /// Unlike `break_next`, this method does not respect normal line break opportunities and
-    /// will break exactly when the character limit is reached. It does not break on newlines, for example.
+    /// will break when the character limit is reached. It does not break on newlines, for example.
     ///
-    /// Inline boxes are supported and each contributes as 1 character.
+    /// Breaks do fall on atom boundaries, however: when the limit is reached inside an atom (e.g. a
+    /// ligature or a multi-character grapheme), the whole atom is placed on the line before
+    /// breaking.
     pub fn break_next_with_length(&mut self, max_chars: u32) -> Option<()> {
         if self.done {
             return None;
@@ -990,22 +990,21 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let run_idx = item.index;
                     let shaped_run = &self.layout.data.shaped_text.runs()[run_idx];
                     let run = Run::new(self.layout, 0, 0, run_idx, None);
-                    let cluster_start = shaped_run.clusters_range.start;
-                    let cluster_end = shaped_run.clusters_range.end;
+                    let slice = run.full_slice();
+                    let cluster_end = shaped_run.shaped_clusters_range.end;
 
-                    while self.state.cluster_idx < cluster_end {
-                        let cluster = run.get(self.state.cluster_idx - cluster_start).unwrap();
-
-                        // Check if we should break before this cluster
+                    while let Some(atom) = slice.atoms_from(self.state.cluster_idx).next() {
+                        // Check if we should break before this atom
                         if char_count >= max_chars && max_chars != 0 {
                             self.start_new_line(BreakReason::Regular, f32::MAX, line_indent);
                             return Some(());
                         }
 
-                        let whitespace = cluster.info().whitespace();
+                        let first_character = &atom.characters()[0];
+                        let whitespace = first_character.info.whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
                         let is_space = whitespace.is_space_or_nbsp();
-                        let advance = cluster.advance();
+                        let advance = atom.advance();
 
                         // Compute the x position.
                         // Newlines don't contribute to line width (matching break_next behavior).
@@ -1015,19 +1014,20 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.state.line.x + advance
                         };
                         let metrics = run.font_metrics();
-                        self.state.append_cluster_to_line(
+                        self.state.append_atom_to_line(
+                            &atom,
                             next_x,
                             metrics,
                             run.data.line_height,
                             self.layout.data.quantize,
                         );
-                        char_count += 1;
+                        char_count += atom.char_range().len() as u32;
 
                         if is_space {
                             self.state.line.num_spaces += 1;
                         }
 
-                        // Check if we've reached the limit after adding this cluster
+                        // Check if we've reached the limit after adding this atom
                         if char_count >= max_chars {
                             // Determine the break reason:
                             // - BreakReason::None for the last line (end of content)
@@ -1093,7 +1093,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             && let Some(line) = self.lines.line_items.first_mut()
         {
             line.text_range = 0..0;
-            line.cluster_range = 0..0;
+            line.shaped_cluster_range = 0..0;
+            line.grapheme_range = 0..0;
         }
     }
 
@@ -1170,11 +1171,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     }
 
                     // Compute the run's advance by summing the advances of its constituent clusters
-                    line_item.advance = self.layout.data.shaped_text.clusters()
-                        [line_item.cluster_range.clone()]
-                    .iter()
-                    .map(|c| c.advance)
-                    .sum();
+                    line_item.advance = {
+                        let range = line_item.shaped_cluster_range.start as usize
+                            ..line_item.shaped_cluster_range.end as usize;
+                        self.layout.data.shaped_text.shaped_clusters()[range]
+                            .iter()
+                            .map(|c| c.advance)
+                            .sum()
+                    };
 
                     // Ignore trailing whitespace when deciding whether the line has content
                     // (we are iterating backwards so trailing whitespace comes first)
@@ -1205,18 +1209,30 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.trailing_whitespace = run
             .filter(|item| item.is_text_run() && item.has_trailing_whitespace)
             .map(|run| {
-                fn whitespace_advance<'c, I: Iterator<Item = &'c ClusterData>>(clusters: I) -> f32 {
+                fn whitespace_advance<'c, I: Iterator<Item = &'c ShapedCluster>>(
+                    characters: &[Character],
+                    clusters: I,
+                ) -> f32 {
                     clusters
-                        .take_while(|cluster| cluster.info.whitespace() != Whitespace::None)
+                        .take_while(|cluster| {
+                            characters[cluster.chars_range().start as usize
+                                ..cluster.chars_range().end as usize]
+                                .iter()
+                                .all(|c| c.info.whitespace() != Whitespace::None)
+                        })
                         .map(|cluster| cluster.advance)
                         .sum()
                 }
 
-                let clusters = &self.layout.data.shaped_text.clusters()[run.cluster_range.clone()];
+                let characters = self.layout.data.shaped_text.characters();
+                let clusters =
+                    &self.layout.data.shaped_text.shaped_clusters()[run.shaped_cluster_range.start
+                        as usize
+                        ..run.shaped_cluster_range.end as usize];
                 if run.is_rtl() {
-                    whitespace_advance(clusters.iter())
+                    whitespace_advance(characters, clusters.iter())
                 } else {
-                    whitespace_advance(clusters.iter().rev())
+                    whitespace_advance(characters, clusters.iter().rev())
                 }
             })
             .unwrap_or(0.0);
@@ -1256,7 +1272,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 .rfind(|(_, run)| !run.range.byte_range.is_empty())
             {
                 let run_index = self.lines.line_items.len();
-                let cluster = run.clusters_range.end;
+                let cluster = run.shaped_clusters_range.end;
+                let grapheme =
+                    count_graphemes(self.layout.data.shaped_text.run_slice(index as u32));
                 let text = run.range.byte_range.end;
                 self.lines.line_items.push(LineItemData {
                     kind: LayoutItemKind::TextRun,
@@ -1265,7 +1283,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     advance: 0.,
                     is_whitespace: false,
                     has_trailing_whitespace: false,
-                    cluster_range: cluster..cluster,
+                    shaped_cluster_range: cluster..cluster,
+                    grapheme_range: grapheme..grapheme,
                     text_range: text..text,
                 });
                 line.item_range = run_index..run_index + 1;
@@ -1349,6 +1368,7 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
     }
 }
 
+#[expect(clippy::cast_possible_truncation, reason = "deferred")]
 fn commit_line<B: Brush>(
     layout: &Layout<B>,
     lines: &mut LineLayout,
@@ -1357,11 +1377,11 @@ fn commit_line<B: Brush>(
     break_reason: BreakReason,
     line_indent: f32,
 ) -> bool {
+    let shaped_text = &layout.data.shaped_text;
+    let shaped_clusters = shaped_text.shaped_clusters();
+
     // Ensure that the cluster and item endpoints are within range
-    state.clusters.end = state
-        .clusters
-        .end
-        .min(layout.data.shaped_text.clusters().len());
+    state.clusters.end = state.clusters.end.min(shaped_clusters.len() as u32);
     state.items.end = state.items.end.min(layout.data.items.len());
 
     let start_item_idx = lines.line_items.len();
@@ -1394,18 +1414,19 @@ fn commit_line<B: Brush>(
                     // These properties are ignored for inline boxes. So we just put a dummy value.
                     is_whitespace: false,
                     has_trailing_whitespace: false,
-                    cluster_range: 0..0,
+                    shaped_cluster_range: 0..0,
+                    grapheme_range: 0..0,
                     text_range: 0..0,
                 });
 
                 last_item_kind = item.kind;
             }
             LayoutItemKind::TextRun => {
-                let shaped_run = &layout.data.shaped_text.runs()[item.index];
+                let shaped_run = &shaped_text.runs()[item.index];
 
                 // Compute cluster range
                 // The first and last ranges have overrides to account for line-breaks within runs
-                let mut cluster_range = shaped_run.clusters_range.clone();
+                let mut cluster_range = shaped_run.shaped_clusters_range.clone();
                 if i == first_run_pos {
                     cluster_range.start = state.clusters.start;
                 }
@@ -1413,7 +1434,7 @@ fn commit_line<B: Brush>(
                     cluster_range.end = state.clusters.end;
                 }
 
-                if cluster_range.start >= shaped_run.clusters_range.end {
+                if cluster_range.start >= shaped_run.shaped_clusters_range.end {
                     // println!("INVALID CLUSTER");
                     // dbg!(&run_data.text_range);
                     // dbg!(cluster_range);
@@ -1423,20 +1444,48 @@ fn commit_line<B: Brush>(
                 last_item_kind = item.kind;
                 committed_text_run = true;
 
-                // Push run to line
-                let run = Run::new(layout, 0, 0, item.index, None);
-                let text_range = if shaped_run.clusters_range.is_empty() {
-                    0..0
+                // Map the cluster range to source-text and grapheme ranges. Line boundaries are
+                // always aligned to `Atom`s, i.e., line bounds are always grapheme bounds.
+                //
+                // Because counting graphemes is `O(n)`, and for runs that are split across lines we
+                // would recount the prefix every time, we first check whether this line continues
+                // the run committed to the previous line. In that case, use its grapheme range end
+                // as our start.
+                //
+                // Perhaps this can be improved...
+                let slice = shaped_text.run_slice(item.index as u32);
+                let grapheme_start =
+                    lines
+                        .line_items
+                        .iter()
+                        .rev()
+                        .find(|prev| prev.is_text_run())
+                        .filter(|prev| {
+                            prev.index == item.index
+                                && prev.shaped_cluster_range.end == cluster_range.start
+                        })
+                        .map(|prev| prev.grapheme_range.end)
+                        .unwrap_or_else(|| {
+                            count_graphemes(slice.narrow(
+                                shaped_run.shaped_clusters_range.start..cluster_range.start,
+                            ))
+                        });
+                let (text_range, grapheme_range) = if cluster_range.is_empty() {
+                    let char_pos = shaped_clusters[cluster_range.start as usize]
+                        .chars_range()
+                        .start as usize;
+                    let text_pos = shaped_text.characters()[char_pos].text_byte_start as usize;
+                    (text_pos..text_pos, grapheme_start..grapheme_start)
                 } else {
-                    let first_cluster = run
-                        .get(cluster_range.start - shaped_run.clusters_range.start)
-                        .unwrap();
-                    let last_cluster = run
-                        .get(
-                            (cluster_range.end - shaped_run.clusters_range.start).saturating_sub(1),
-                        )
-                        .unwrap();
-                    first_cluster.text_range().start..last_cluster.text_range().end
+                    let char_range = shaped_clusters[cluster_range.start as usize]
+                        .chars_range()
+                        .start
+                        ..shaped_clusters[cluster_range.end as usize - 1]
+                            .chars_range()
+                            .end;
+                    let text_range = slice.text_byte_range(char_range.clone());
+                    let grapheme_len = count_graphemes(slice.narrow(cluster_range.clone()));
+                    (text_range, grapheme_start..grapheme_start + grapheme_len)
                 };
 
                 lines.line_items.push(LineItemData {
@@ -1446,7 +1495,8 @@ fn commit_line<B: Brush>(
                     advance: 0.,
                     is_whitespace: false,
                     has_trailing_whitespace: false,
-                    cluster_range,
+                    shaped_cluster_range: cluster_range,
+                    grapheme_range,
                     text_range,
                 });
             }
@@ -1460,13 +1510,13 @@ fn commit_line<B: Brush>(
     // WordBreak::BreakAll, regular breaks can land between non-space
     // characters, in which case there is no trailing space to exclude.
     let mut num_spaces = state.num_spaces;
-    if break_reason == BreakReason::Regular
-        && state.clusters.start < state.clusters.end
-        && layout.data.shaped_text.clusters()[state.clusters.end - 1]
+    if break_reason == BreakReason::Regular && state.clusters.start < state.clusters.end && {
+        let last_cluster = &shaped_clusters[state.clusters.end as usize - 1];
+        shaped_text.characters()[last_cluster.chars_range().end as usize - 1]
             .info
             .whitespace()
             .is_space_or_nbsp()
-    {
+    } {
         num_spaces = num_spaces.saturating_sub(1);
     }
 

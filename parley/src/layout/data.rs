@@ -11,8 +11,8 @@ use core::ops::Range;
 
 use alloc::vec::Vec;
 use parlance::BidiLevel;
-use parley_engine::shape::ClusterData;
-use parley_engine::{Boundary, ShapedText};
+use parley_engine::shape::Whitespace;
+use parley_engine::{Boundary, ShapedSlice, ShapedText};
 
 /// `HarfRust`-based run data
 #[derive(Clone, Debug, PartialEq)]
@@ -81,8 +81,13 @@ pub(crate) struct LineItemData {
     pub(crate) has_trailing_whitespace: bool,
     /// Range of the source text.
     pub(crate) text_range: Range<usize>,
-    /// Range of clusters.
-    pub(crate) cluster_range: Range<usize>,
+    /// This run's shaped clusters on this line, as a range into [`ShapedText::shaped_clusters`].
+    ///
+    /// The bounds are atom-aligned.
+    pub(crate) shaped_cluster_range: Range<u32>,
+    /// This run's grapheme clusters on this line, as a range of grapheme indices relative to the
+    /// owning [`parley_engine::ShapedRun`].
+    pub(crate) grapheme_range: Range<usize>,
 }
 
 impl LineItemData {
@@ -104,11 +109,21 @@ impl LineItemData {
             return;
         }
 
+        let clusters = layout_data.shaped_text.shaped_clusters();
+        let range = self.shaped_cluster_range.clone();
+        let char_range = if range.is_empty() {
+            0..0
+        } else {
+            clusters[range.start as usize].chars_range().start as usize
+                ..clusters[range.end as usize - 1].chars_range().end as usize
+        };
+        let characters = &layout_data.shaped_text.characters()[char_range];
+
         self.is_whitespace = true;
         if self.is_rtl() {
             // RTL runs check for "trailing" whitespace at the front.
-            for cluster in layout_data.shaped_text.clusters()[self.cluster_range.clone()].iter() {
-                if cluster.info.is_whitespace() {
+            for character in characters {
+                if character.info.is_whitespace() {
                     self.has_trailing_whitespace = true;
                 } else {
                     self.is_whitespace = false;
@@ -116,11 +131,8 @@ impl LineItemData {
                 }
             }
         } else {
-            for cluster in layout_data.shaped_text.clusters()[self.cluster_range.clone()]
-                .iter()
-                .rev()
-            {
-                if cluster.info.is_whitespace() {
+            for character in characters.iter().rev() {
+                if character.info.is_whitespace() {
                     self.has_trailing_whitespace = true;
                 } else {
                     self.is_whitespace = false;
@@ -129,6 +141,17 @@ impl LineItemData {
             }
         }
     }
+}
+
+/// The number of graphemes in `slice`.
+///
+/// This is `O(n)` in the slice's characters.
+pub(crate) fn count_graphemes(slice: ShapedSlice<'_>) -> usize {
+    slice
+        .characters_in(slice.char_range())
+        .iter()
+        .filter(|character| character.grapheme_start)
+        .count()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -267,10 +290,11 @@ impl<B: Brush> LayoutData<B> {
     ) {
         let shaped_run = &self.shaped_text.runs()[shaped_run_idx];
         debug_assert!(
-            !shaped_run.clusters_range.is_empty(),
-            "Shaped runs return by `parley_engine` must be non-empty"
+            !shaped_run.shaped_clusters_range.is_empty(),
+            "Shaped runs returned by `parley_engine` must be non-empty"
         );
-        let style_index = self.shaped_text.clusters()[shaped_run.clusters_range.start].style_index;
+        let style_index =
+            self.shaped_text.characters()[shaped_run.characters_range.start].style_index;
 
         let line_height = {
             // Compute line height
@@ -310,27 +334,30 @@ impl<B: Brush> LayoutData<B> {
 
     pub(crate) fn finish(&mut self) {
         for (run_index, run_data) in self.runs.iter().enumerate() {
-            let cluster_range = self.shaped_text.runs()[run_index].clusters_range.clone();
-            let glyph_range = self.shaped_text.runs()[run_index].glyphs_range.clone();
             let word = run_data.word_spacing;
             let letter = run_data.letter_spacing;
             if nearly_zero(word) && nearly_zero(letter) {
                 continue;
             }
-            let (clusters, glyphs) = &mut self.shaped_text.clusters_and_glyphs_mut();
-            let clusters = &mut clusters[cluster_range];
-            for cluster in clusters {
+            let cluster_range = self.shaped_text.runs()[run_index]
+                .shaped_clusters_range
+                .clone();
+            let (characters, clusters, glyphs) =
+                self.shaped_text.characters_shaped_clusters_and_glyphs_mut();
+            for cluster in &mut clusters[cluster_range.start as usize..cluster_range.end as usize] {
+                let first_character = &characters[cluster.chars_range().start as usize];
                 let mut spacing = letter;
-                if !nearly_zero(word) && cluster.info.whitespace().is_space_or_nbsp() {
+                if !nearly_zero(word) && first_character.info.whitespace().is_space_or_nbsp() {
                     spacing += word;
                 }
                 if !nearly_zero(spacing) {
                     cluster.advance += spacing;
-                    if cluster.glyph_len != 0xFF {
-                        let start = glyph_range.start + cluster.glyph_offset as usize;
-                        let end = start + cluster.glyph_len as usize;
-                        let glyphs = &mut glyphs[start..end];
-                        if let Some(last) = glyphs.last_mut() {
+                    // An inline glyph's advance is the cluster's advance, so it needs no separate
+                    // adjustment.
+                    if !cluster.has_inline_glyph() && cluster.glyph_len() > 0 {
+                        let start = cluster.glyph_offset as usize;
+                        let end = start + cluster.glyph_len() as usize;
+                        if let Some(last) = glyphs[start..end].last_mut() {
                             last.advance += spacing;
                         }
                     }
@@ -340,11 +367,11 @@ impl<B: Brush> LayoutData<B> {
     }
 
     // TODO: this method does not handle mixed direction text at all.
+    #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
-        fn whitespace_advance(cluster: Option<&ClusterData>) -> f32 {
-            cluster
-                .filter(|cluster| cluster.info.whitespace().is_space_or_nbsp())
-                .map_or(0.0, |cluster| cluster.advance)
+        fn whitespace_advance(atom: Option<(Whitespace, f32)>) -> f32 {
+            atom.filter(|(whitespace, _)| whitespace.is_space_or_nbsp())
+                .map_or(0.0, |(_, advance)| advance)
         }
 
         let mut min_width = 0.0_f32;
@@ -353,19 +380,23 @@ impl<B: Brush> LayoutData<B> {
         let mut running_min_width = 0.0;
         let mut running_max_width = 0.0;
         let mut text_wrap_mode = TextWrapMode::Wrap;
-        let mut prev_cluster: Option<&ClusterData> = None;
+        // The whitespace class of the previous atom's first character, and the atom's advance.
+        let mut prev_atom: Option<(Whitespace, f32)> = None;
         let is_rtl = self.base_level.is_rtl();
         for item in &self.items {
             match item.kind {
                 LayoutItemKind::TextRun => {
-                    let run = &self.shaped_text.runs()[item.index];
-                    let clusters = &self.shaped_text.clusters()[run.clusters_range.clone()];
+                    let slice = self.shaped_text.run_slice(item.index as u32);
                     if is_rtl {
-                        prev_cluster = clusters.first();
+                        prev_atom = slice.atoms_start().next().map(|atom| {
+                            let character = &atom.characters()[0];
+                            (character.info.whitespace(), atom.advance())
+                        });
                     }
-                    for cluster in clusters {
-                        let boundary = cluster.info.boundary();
-                        let style = &self.styles[cluster.style_index as usize];
+                    for atom in slice.atoms_start() {
+                        let character = &atom.characters()[0];
+                        let boundary = character.info.boundary();
+                        let style = &self.styles[character.style_index as usize];
                         let prev_text_wrap_mode = text_wrap_mode;
                         text_wrap_mode = style.text_wrap_mode;
                         if boundary == Boundary::Mandatory
@@ -373,7 +404,7 @@ impl<B: Brush> LayoutData<B> {
                                 && (boundary == Boundary::Line
                                     || style.overflow_wrap == OverflowWrap::Anywhere))
                         {
-                            let trailing_whitespace = whitespace_advance(prev_cluster);
+                            let trailing_whitespace = whitespace_advance(prev_atom);
                             min_width = min_width.max(running_min_width - trailing_whitespace);
                             running_min_width = 0.0;
                             if boundary == Boundary::Mandatory {
@@ -381,13 +412,13 @@ impl<B: Brush> LayoutData<B> {
                                 running_max_width = 0.0;
                             }
                         }
-                        running_min_width += cluster.advance;
-                        running_max_width += cluster.advance;
+                        running_min_width += atom.advance();
+                        running_max_width += atom.advance();
                         if !is_rtl {
-                            prev_cluster = Some(cluster);
+                            prev_atom = Some((character.info.whitespace(), atom.advance()));
                         }
                     }
-                    let trailing_whitespace = whitespace_advance(prev_cluster);
+                    let trailing_whitespace = whitespace_advance(prev_atom);
                     min_width = min_width.max(running_min_width - trailing_whitespace);
                 }
                 LayoutItemKind::InlineBox => {
@@ -395,7 +426,7 @@ impl<B: Brush> LayoutData<B> {
                     if ibox.kind == InlineBoxKind::InFlow {
                         running_max_width += ibox.width;
                         if text_wrap_mode == TextWrapMode::Wrap {
-                            let trailing_whitespace = whitespace_advance(prev_cluster);
+                            let trailing_whitespace = whitespace_advance(prev_atom);
                             min_width = min_width.max(running_min_width - trailing_whitespace);
                             min_width = min_width.max(ibox.width);
                             running_min_width = 0.0;
@@ -403,14 +434,14 @@ impl<B: Brush> LayoutData<B> {
                             running_min_width += ibox.width;
                         }
                     }
-                    prev_cluster = None;
+                    prev_atom = None;
                 }
             }
-            let trailing_whitespace = whitespace_advance(prev_cluster);
+            let trailing_whitespace = whitespace_advance(prev_atom);
             max_width = max_width.max(running_max_width - trailing_whitespace);
         }
 
-        let trailing_whitespace = whitespace_advance(prev_cluster);
+        let trailing_whitespace = whitespace_advance(prev_atom);
         min_width = min_width.max(running_min_width - trailing_whitespace);
 
         ContentWidths {

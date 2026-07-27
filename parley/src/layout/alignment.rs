@@ -5,7 +5,7 @@ use super::{BreakReason, data::LineItemData};
 use crate::data::LayoutData;
 use crate::style::Brush;
 
-use parley_engine::shape::ClusterData;
+use parley_engine::shape::ShapedCluster;
 
 /// Alignment of a layout.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
@@ -55,7 +55,7 @@ impl Default for AlignmentOptions {
 
 /// Align the layout.
 ///
-/// If [`Alignment::Justify`] is requested, clusters' [`ClusterData::advance`] will be adjusted.
+/// If [`Alignment::Justify`] is requested, clusters' [`ShapedCluster::advance`] will be adjusted.
 /// Prior to re-line-breaking or re-aligning, [`unjustify`] has to be called.
 pub(crate) fn align<B: Brush>(
     layout: &mut LayoutData<B>,
@@ -85,7 +85,7 @@ pub(crate) fn unjustify<B: Brush>(layout: &mut LayoutData<B>) {
 /// The actual alignment implementation.
 ///
 /// This is const-generic over `UNDO_JUSTIFICATION`: justified alignment adjusts clusters'
-/// [`ClusterData::advance`], and this mutation has to be undone for re-line-breaking or
+/// [`ShapedCluster::advance`], and this mutation has to be undone for re-line-breaking or
 /// re-aligning. `UNDO_JUSTIFICATION` indicates whether the adjustment has to be applied, or
 /// undone.
 ///
@@ -167,9 +167,13 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
                 line_items
                     .filter(|item| item.is_text_run())
                     .for_each(|line_item| {
-                        let clusters =
-                            &mut layout.shaped_text.clusters_mut()[line_item.cluster_range.clone()];
-                        let clusters: &mut dyn Iterator<Item = &mut ClusterData> =
+                        let (characters, shaped_clusters, _) = layout
+                            .shaped_text
+                            .characters_shaped_clusters_and_glyphs_mut();
+                        let clusters = &mut shaped_clusters[line_item.shaped_cluster_range.start
+                            as usize
+                            ..line_item.shaped_cluster_range.end as usize];
+                        let clusters: &mut dyn Iterator<Item = &mut ShapedCluster> =
                             if line_item.bidi_level.is_rtl() {
                                 &mut clusters.iter_mut().rev()
                             } else {
@@ -179,7 +183,12 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
                             if applied == line.num_spaces {
                                 return;
                             }
-                            if cluster.info.whitespace().is_space_or_nbsp() {
+                            if cluster.is_grapheme_start()
+                                && characters[cluster.chars_range().start as usize]
+                                    .info
+                                    .whitespace()
+                                    .is_space_or_nbsp()
+                            {
                                 cluster.advance += adjustment;
                                 applied += 1;
                             }

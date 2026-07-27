@@ -11,7 +11,8 @@ use std::sync::Arc;
 use fontique::{Blob, Collection, CollectionOptions, SourceCache};
 use parley::{
     BoundingBox, FontContext, FontFamily, FontFamilyName, Layout, LayoutContext, LineHeight,
-    PlainEditor, PlainEditorDriver, RangedBuilder, StyleProperty, TextStyle, TreeBuilder,
+    PlainEditor, PlainEditorDriver, PositionedLayoutItem, RangedBuilder, StyleProperty, TextStyle,
+    TreeBuilder,
 };
 use peniko::{Color, kurbo::Size};
 use vello_cpu::Pixmap;
@@ -317,20 +318,31 @@ impl TestEnv {
         text: &str,
         char_info_font_size: f32,
     ) {
-        let mut char_layouts = HashMap::new();
-        for char in text.chars() {
-            char_layouts.entry(char).or_insert_with(|| {
-                let char_text = char.to_string();
-                let mut builder = self.ranged_builder(&char_text);
-                builder.push_default(StyleProperty::FontSize(char_info_font_size));
-                builder.push_default(StyleProperty::Brush(ColorBrush::new(CLUSTER_INFO_COLOR)));
-                let mut layout = builder.build(&char_text);
-                layout.break_all_lines(Some(400.0));
-                layout
-            });
+        // Clusters span graphemes, which can be multiple characters of source text (e.g. a base
+        // letter plus combining marks). Build a reference layout per unique grapheme.
+        let mut grapheme_layouts = HashMap::new();
+        for line in layout.lines() {
+            for item in line.items() {
+                let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
+                    continue;
+                };
+                for cluster in glyph_run.run().clusters() {
+                    let grapheme = &text[cluster.text_range()];
+                    if grapheme_layouts.contains_key(grapheme) {
+                        continue;
+                    }
+                    let mut builder = self.ranged_builder(grapheme);
+                    builder.push_default(StyleProperty::FontSize(char_info_font_size));
+                    builder.push_default(StyleProperty::Brush(ColorBrush::new(CLUSTER_INFO_COLOR)));
+                    let mut grapheme_layout = builder.build(grapheme);
+                    grapheme_layout.break_all_lines(Some(400.0));
+                    grapheme_layouts.insert(grapheme.to_string(), grapheme_layout);
+                }
+            }
         }
 
-        let renderer = draw_layout_with_clusters(&self.rendering_config, layout, &char_layouts);
+        let renderer =
+            draw_layout_with_clusters(&self.rendering_config, layout, text, &grapheme_layouts);
         let current_img = render_to_pixmap(renderer);
         self.check_image(&current_img);
     }

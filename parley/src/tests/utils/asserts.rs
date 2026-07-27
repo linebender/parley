@@ -64,8 +64,13 @@ pub(crate) fn assert_eq_layout_data<B: Brush>(a: &LayoutData<B>, b: &LayoutData<
     assert_eq!(a.runs, b.runs, "{case} runs mismatch");
     assert_eq!(a.items, b.items, "{case} items mismatch");
     assert_eq!(
-        a.shaped_text.clusters(),
-        b.shaped_text.clusters(),
+        a.shaped_text.characters(),
+        b.shaped_text.characters(),
+        "{case} characters mismatch"
+    );
+    assert_eq!(
+        a.shaped_text.shaped_clusters(),
+        b.shaped_text.shaped_clusters(),
         "{case} clusters mismatch"
     );
     assert_eq!(

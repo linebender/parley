@@ -212,16 +212,17 @@ pub(crate) fn render_to_pixmap(mut renderer: RenderContext) -> Pixmap {
     img
 }
 
-/// Render the layout with cluster information including measurement lines and source characters.
+/// Render the layout with cluster information including measurement lines and source graphemes.
 pub(crate) fn draw_layout_with_clusters(
     config: &RenderingConfig,
     layout: &Layout<ColorBrush>,
-    char_layouts: &HashMap<char, Layout<ColorBrush>>,
+    text: &str,
+    grapheme_layouts: &HashMap<String, Layout<ColorBrush>>,
 ) -> RenderContext {
     let padding = 20;
     let line_extra_spacing = 60.0; // Extra space between lines for cluster info
     let measurement_line_height = 5.0; // Height below baseline for measurement line
-    let char_display_offset = 18.0; // Offset below measurement line for character display
+    let grapheme_display_offset = 18.0; // Offset below measurement line for grapheme display
 
     // Calculate dimensions with extra spacing
     let width = config
@@ -291,16 +292,9 @@ pub(crate) fn draw_layout_with_clusters(
                 for cluster in run.visual_clusters() {
                     let cluster_width = cluster.advance();
 
-                    // Use the test-specific methods we added to Cluster
-                    let source_char = cluster.source_char();
-                    let expected_len = source_char.len_utf8() as u8;
-                    let actual_len = cluster.text_len();
-
-                    assert_eq!(
-                        expected_len, actual_len,
-                        "Cluster text_len mismatch for '{}': expected {}, got {}",
-                        source_char, expected_len, actual_len
-                    );
+                    // A cluster spans a grapheme, which can be multiple characters of source
+                    // text (e.g. a base letter plus combining marks).
+                    let grapheme = &text[cluster.text_range()];
 
                     // Draw measurement line
                     let measure_y = line_y as f64 + measurement_line_height + fpadding;
@@ -334,41 +328,36 @@ pub(crate) fn draw_layout_with_clusters(
                         measure_y + TICK_HEIGHT,
                     );
 
-                    // Render the character (skip whitespace and control characters)
-                    match source_char {
-                        ' ' | '\n' | '\t' => {
-                            // Skip rendering whitespace
-                        }
-                        _ => {
-                            // Draw the cluster's character glyphs under the measurement line (these
-                            // should appear to be the same as the character in the source text).
-                            let char_layout = char_layouts.get(&source_char).unwrap();
-                            let line = char_layout.lines().next().unwrap();
-                            let item = line.items().next().unwrap();
-                            let glyph_run = match item {
-                                PositionedLayoutItem::GlyphRun(glyph_run) => glyph_run,
-                                PositionedLayoutItem::InlineBox(_) => {
-                                    panic!("Inline boxes are not supported in cluster rendering");
-                                }
-                            };
+                    // Render the grapheme, skipping whitespace.
+                    if !matches!(grapheme, " " | "\n" | "\t") {
+                        // Draw the cluster's grapheme glyphs under the measurement line (these
+                        // should appear to be the same as the grapheme in the source text).
+                        let grapheme_layout = grapheme_layouts.get(grapheme).unwrap();
+                        let line = grapheme_layout.lines().next().unwrap();
+                        let item = line.items().next().unwrap();
+                        let glyph_run = match item {
+                            PositionedLayoutItem::GlyphRun(glyph_run) => glyph_run,
+                            PositionedLayoutItem::InlineBox(_) => {
+                                panic!("Inline boxes are not supported in cluster rendering");
+                            }
+                        };
 
-                            // Center each "reference" glyph within the tick marks
-                            let char_x_offset =
-                                x_offset + ((cluster_width - line.metrics().advance) / 2.0);
-                            let char_y_offset = line_y + measurement_line_height as f32
-                                - line.metrics().baseline
-                                + char_display_offset;
-                            render_glyph_run_with_offset(
-                                &glyph_run,
-                                &mut renderer,
-                                &mut caches,
-                                &mut image_cache,
-                                padding,
-                                (char_x_offset, char_y_offset),
-                                config,
-                            );
-                        }
-                    };
+                        // Center each "reference" grapheme within the tick marks
+                        let grapheme_x_offset =
+                            x_offset + ((cluster_width - line.metrics().advance) / 2.0);
+                        let grapheme_y_offset = line_y + measurement_line_height as f32
+                            - line.metrics().baseline
+                            + grapheme_display_offset;
+                        render_glyph_run_with_offset(
+                            &glyph_run,
+                            &mut renderer,
+                            &mut caches,
+                            &mut image_cache,
+                            padding,
+                            (grapheme_x_offset, grapheme_y_offset),
+                            config,
+                        );
+                    }
                     x_offset += cluster_width;
                 }
             }

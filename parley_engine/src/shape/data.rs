@@ -8,42 +8,6 @@ use core::ops::Range;
 use crate::{Boundary, shape::Whitespace};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct ClusterData {
-    pub info: ClusterInfo,
-    /// Cluster flags (see impl methods for details).
-    pub flags: u16,
-    /// Style index for this cluster.
-    pub style_index: u16,
-    /// Number of glyphs in this cluster (0xFF = single glyph stored inline)
-    pub glyph_len: u8,
-    /// Number of text bytes in this cluster
-    pub text_len: u8,
-    /// If `glyph_len == 0xFF`, then `glyph_offset` is a glyph identifier,
-    /// otherwise, it's an offset into the glyph array with the base
-    /// taken from the owning run.
-    pub glyph_offset: u32,
-    /// Offset into the text for this cluster
-    pub text_offset: u16,
-    /// Advance width for this cluster
-    pub advance: f32,
-}
-
-impl ClusterData {
-    pub const LIGATURE_START: u16 = 1;
-    pub const LIGATURE_COMPONENT: u16 = 2;
-
-    #[inline(always)]
-    pub fn is_ligature_start(self) -> bool {
-        self.flags & Self::LIGATURE_START != 0
-    }
-
-    #[inline(always)]
-    pub fn is_ligature_component(self) -> bool {
-        self.flags & Self::LIGATURE_COMPONENT != 0
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Character {
     pub text_byte_start: u32,
     pub info: ClusterInfo,

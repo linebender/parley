@@ -59,6 +59,7 @@ impl<'a, B: Brush> Line<'a, B> {
                 layout: self.layout,
                 line_index: self.index,
                 index: original_index as u32,
+                shaped_text_run_index: item.index as u32,
                 shaped: self.layout.data.shaped_text.runs().get(item.index)?,
                 data: self.layout.data.runs.get(item.index)?,
                 line_data: Some(item),
@@ -88,6 +89,7 @@ impl<'a, B: Brush> Line<'a, B> {
                     layout: copy.layout,
                     line_index: copy.index,
                     index: item_index as u32,
+                    shaped_text_run_index: line_data.index as u32,
                     shaped: &copy.layout.data.shaped_text.runs()[line_data.index],
                     data: &copy.layout.data.runs[line_data.index],
                     line_data: Some(line_data),
@@ -333,7 +335,10 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                 LineItem::Run(run) => {
                     let mut glyphs = run
                         .visual_clusters()
-                        .flat_map(|c| c.glyphs().map(|glyph| (glyph, c.data.style_index)))
+                        .flat_map(|c| {
+                            let style_index = c.style_index();
+                            c.glyphs().map(move |glyph| (glyph, style_index))
+                        })
                         .skip(self.glyph_start);
 
                     if let Some((first_glyph, first_style_index)) = glyphs.next() {

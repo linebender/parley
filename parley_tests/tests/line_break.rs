@@ -9,9 +9,7 @@
 use crate::test_name;
 use crate::util::TestEnv;
 use parley::style::FontFamily;
-use parley::{
-    Alignment, AlignmentOptions, InlineBox, InlineBoxKind, PositionedLayoutItem, StyleProperty,
-};
+use parley::{Alignment, AlignmentOptions, InlineBox, InlineBoxKind, StyleProperty};
 
 #[test]
 fn break_by_length_basic() {
@@ -29,6 +27,11 @@ fn break_by_length_basic() {
     breaker.finish();
 
     assert_eq!(layout.len(), 3, "Expected 3 lines");
+    let cluster_ranges: Vec<_> = layout
+        .lines()
+        .flat_map(|line| line.runs().map(|run| run.cluster_range()))
+        .collect();
+    assert_eq!(cluster_ranges, vec![0..2, 2..4, 4..6]);
     env.check_layout_snapshot(&layout);
 }
 
@@ -145,51 +148,39 @@ fn break_by_length_multiple_inline_boxes() {
     env.check_layout_snapshot(&layout);
 }
 
-/// This test verifies that breaking in the middle of a ligature does NOT produce valid glyphs.
+/// This test verifies that a ligature is never split across lines.
 ///
-/// When "abfi" is broken after 3 characters, the "fi" ligature is split with "f" on line 1
-/// and "i" on line 2. For proper rendering, the "i" cluster on line 2 should contain a
-/// valid glyph. However, parley does not currently support re-shaping after layout, so
-/// the ligature continuation cluster ("i") has no glyphs - they all belong to the ligature
-/// start cluster ("f") which is on the previous line.
+/// A ligature is a single unbreakable atom: splitting it would require re-shaping, which parley
+/// does not currently support. When the character limit is reached inside the "fi" ligature of
+/// "abfi", the whole ligature is placed on the line before breaking.
 #[test]
-#[should_panic(expected = "no item on line 2")]
 fn break_by_length_with_ligature() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    // "abfi" has ligature "fi" which should count as 2 clusters (matching character count)
+    // "abfi" has ligature "fi", which forms a single unbreakable atom
     let text = "abfi";
     let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
 
-    // Break at 3 clusters: "abf" on first line, "i" on second
+    // Attempt to break at 3 characters: "abf" on the first line", "i" on the second
     let mut breaker = layout.break_lines();
     breaker.break_next_with_length(3);
     breaker.break_next_with_length(10);
     breaker.finish();
 
-    assert_eq!(layout.len(), 2, "Expected 2 lines");
+    assert_eq!(layout.len(), 1, "Expected a single line");
 
-    // Get the second line and verify the "i" cluster has a valid glyph
-    let line2 = layout.get(1).expect("Expected line 2 to exist");
-
-    // Line 2 should have an item containing the "i" cluster
-    let item = line2.items().next();
-    let glyph_run = match item {
-        Some(PositionedLayoutItem::GlyphRun(glyph_run)) => glyph_run,
-        Some(PositionedLayoutItem::InlineBox(_)) => panic!("unexpected inline box"),
-        None => panic!("no item on line 2"),
-    };
-
-    // The "i" cluster should have at least one glyph for proper rendering.
-    // This assertion will fail because parley doesn't re-shape after breaking a ligature.
-    let cluster = glyph_run.run().clusters().next();
-    match cluster {
-        Some(c) if c.glyphs().count() > 0 => {
-            // Success - the ligature was properly broken and reshaped
-        }
-        _ => panic!("ligature was not properly broken"),
-    }
+    // The glyphs of the ligature stay together: "a", "b" and the "fi" all render on the first line
+    let line = layout.get(0).expect("Expected line 1 to exist");
+    let glyph_count: usize = line
+        .runs()
+        .flat_map(|run| run.clusters())
+        .map(|cluster| cluster.glyphs().count())
+        .sum();
+    assert!(
+        glyph_count >= 3,
+        "expected glyphs for 'a', 'b' and the 'fi' ligature"
+    );
 
     env.check_layout_snapshot(&layout);
 }
@@ -282,7 +273,7 @@ fn break_by_length_with_multi_codepoint_emoji() {
     // Family emoji (ZWJ sequence): 👨‍👩‍👧‍👦 = 7 codepoints
     // Flag emoji: 🇺🇸 = 2 codepoints
     // Simple emoji: ✅ = 1 codepoint (in the bundled subset)
-    // Total = 10 clusters
+    // Total = 10 characters, forming 3 grapheme clusters
     let text = "👨‍👩‍👧‍👦🇺🇸✅";
     let mut builder = env.ranged_builder(text);
     builder.push_default(StyleProperty::FontFamily(FontFamily::named(
@@ -290,7 +281,7 @@ fn break_by_length_with_multi_codepoint_emoji() {
     )));
     let mut layout = builder.build(text);
 
-    // Break at visual emoji boundaries: 7 (family), 2 (flag), 1 (simple)
+    // Break at visual emoji boundaries: 7 (family), 2 (flag), 1 (simple) characters
     let mut breaker = layout.break_lines();
     breaker.break_next_with_length(7); // 👨‍👩‍👧‍👦
     breaker.break_next_with_length(2); // 🇺🇸
@@ -299,12 +290,12 @@ fn break_by_length_with_multi_codepoint_emoji() {
 
     assert_eq!(layout.len(), 3, "Expected 3 lines");
 
-    // Verify cluster counts per line match codepoint counts
+    // Each emoji is a single grapheme cluster, i.e., each line holds exactly one cluster
     let clusters_per_line: Vec<usize> = layout
         .lines()
         .map(|line| line.runs().map(|run| run.clusters().count()).sum())
         .collect();
-    assert_eq!(clusters_per_line, vec![7, 2, 1]);
+    assert_eq!(clusters_per_line, vec![1, 1, 1]);
 }
 
 /// This test verifies that `break_next_with_length` produces the same layout metrics as
