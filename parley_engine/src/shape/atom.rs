@@ -11,6 +11,9 @@ use super::data::{Character, ShapedCluster};
 
 /// A slice of shaped text.
 ///
+/// Note that character and cluster indices (including those given out by [`Atom`] and [`Grapheme`])
+/// are absolute into the underlying storage.
+///
 // NOTE: The motivation for this type, is that once `parley_engine` supports reshaping, this can
 // hold reshaped slices that don't depend on `ShapedText`.
 #[derive(Copy, Clone, Debug)]
@@ -31,7 +34,9 @@ pub struct ShapedSlice<'a> {
 }
 
 impl<'a> ShapedSlice<'a> {
-    /// The range of [`Self::characters`] of this slice.
+    /// The character range of this slice.
+    ///
+    /// This indexes into [`Self::characters`].
     #[inline(always)]
     pub fn char_range(&self) -> Range<u32> {
         if self.clusters.0 == self.clusters.1 {
@@ -42,28 +47,48 @@ impl<'a> ShapedSlice<'a> {
         }
     }
 
-    /// The [`Character`]s of this slice.
-    ///
-    /// Note this is the whole underlying character array; see [`Self::char_range`] for the range
-    /// this slice covers.
+    /// The [`Character`]s spanned by this shaped slice.
     #[inline(always)]
     pub fn characters(&self) -> &'a [Character] {
-        self.characters
+        self.characters_in(self.char_range())
     }
 
-    /// The range of [`Self::shaped_clusters`] of this slice.
+    /// The [`Character`]s spanned by `chars_range`.
+    #[inline(always)]
+    pub fn characters_in(&self, chars_range: Range<u32>) -> &'a [Character] {
+        debug_assert!(
+            chars_range.is_empty()
+                || (self.char_range().start <= chars_range.start
+                    && chars_range.end <= self.char_range().end),
+            "character range out of this slice's range"
+        );
+        &self.characters[chars_range.start as usize..chars_range.end as usize]
+    }
+
+    /// The cluster range of this slice.
+    ///
+    /// This indexes into [`Self::shaped_clusters`].
     #[inline(always)]
     pub fn shaped_clusters_range(&self) -> Range<u32> {
         self.clusters.0..self.clusters.1
     }
 
-    /// The [`ShapedCluster`]s of this slice.
-    ///
-    /// Note this is the whole underlying shaped clusters array; see [`Self::shaped_clusters_range`]
-    /// for the range this slice covers.
+    /// The [`ShapedCluster`]s spanned by this shaped slice.
     #[inline(always)]
     pub fn shaped_clusters(&self) -> &'a [ShapedCluster] {
-        self.shaped_clusters
+        self.shaped_clusters_in(self.shaped_clusters_range())
+    }
+
+    /// The [`ShapedCluster`]s spanned by `clusters_range`.
+    #[inline(always)]
+    pub fn shaped_clusters_in(&self, clusters_range: Range<u32>) -> &'a [ShapedCluster] {
+        debug_assert!(
+            clusters_range.is_empty()
+                || (self.clusters.0 <= clusters_range.start
+                    && clusters_range.end <= self.clusters.1),
+            "cluster range out of this slice's range"
+        );
+        &self.shaped_clusters[clusters_range.start as usize..clusters_range.end as usize]
     }
 
     /// The byte range in the source text of the given range of [`Self::characters`].
@@ -313,24 +338,24 @@ impl<'a> Atom<'a> {
     /// The [`Character`]s from the underlying [`ShapedSlice`] this atom spans.
     #[inline(always)]
     pub fn characters(&self) -> &'a [Character] {
-        &self.slice.characters[self.chars.0 as usize..self.chars.1 as usize]
+        self.slice.characters_in(self.char_range())
     }
 
     /// The range of [`ShapedCluster`] into the underlying [`ShapedSlice`] this atom spans.
     #[inline(always)]
-    pub fn clusters_range(&self) -> Range<u32> {
+    pub fn shaped_clusters_range(&self) -> Range<u32> {
         self.clusters.0..self.clusters.1
     }
 
     /// The [`ShapedCluster`]s from the underlying [`ShapedSlice`] this atom spans.
     #[inline(always)]
-    pub fn clusters(&self) -> &'a [ShapedCluster] {
-        &self.slice.shaped_clusters[self.clusters.0 as usize..self.clusters.1 as usize]
+    pub fn shaped_clusters(&self) -> &'a [ShapedCluster] {
+        self.slice.shaped_clusters_in(self.shaped_clusters_range())
     }
 
     /// The atom's glyphs in visual left-to-right order.
     pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + Clone + use<'a> {
-        let clusters = self.clusters();
+        let clusters = self.shaped_clusters();
         let glyphs = self.slice.glyphs;
 
         let rtl = self.slice.bidi_level.is_rtl();
@@ -606,9 +631,6 @@ pub struct Grapheme {
 
 impl Grapheme {
     /// The range of characters into the underlying [`ShapedSlice`] this grapheme spans.
-    ///
-    /// You can use [`ShapedSlice::text_byte_range`] to turn this into a byte range of the source
-    /// text.
     pub fn char_range(&self) -> Range<u32> {
         self.chars.0..self.chars.1
     }
@@ -718,21 +740,48 @@ mod tests {
         // clusters:                  0001233     ..4
 
         let slice = shaped.run_slice(0);
-        assert_eq!(slice.atom_at_char(0).unwrap().clusters_range(), 0..1);
-        assert_eq!(slice.atom_at_char(1).unwrap().clusters_range(), 0..1);
-        assert_eq!(slice.atom_at_char(2).unwrap().clusters_range(), 0..1);
-        assert_eq!(slice.atom_at_char(3).unwrap().clusters_range(), 1..2);
+        assert_eq!(slice.atom_at_char(0).unwrap().shaped_clusters_range(), 0..1);
+        assert_eq!(slice.atom_at_char(1).unwrap().shaped_clusters_range(), 0..1);
+        assert_eq!(slice.atom_at_char(2).unwrap().shaped_clusters_range(), 0..1);
+        assert_eq!(slice.atom_at_char(3).unwrap().shaped_clusters_range(), 1..2);
         assert!(slice.atom_at_char(8).is_none());
 
-        assert_eq!(slice.atom_at_text_byte(0).unwrap().clusters_range(), 0..1);
-        assert_eq!(slice.atom_at_text_byte(1).unwrap().clusters_range(), 0..1);
-        assert_eq!(slice.atom_at_text_byte(2).unwrap().clusters_range(), 0..1);
-        assert_eq!(slice.atom_at_text_byte(3).unwrap().clusters_range(), 1..2);
-        assert_eq!(slice.atom_at_text_byte(4).unwrap().clusters_range(), 2..3);
-        assert_eq!(slice.atom_at_text_byte(5).unwrap().clusters_range(), 2..3);
-        assert_eq!(slice.atom_at_text_byte(6).unwrap().clusters_range(), 3..4);
-        assert_eq!(slice.atom_at_text_byte(7).unwrap().clusters_range(), 3..4);
-        assert_eq!(slice.atom_at_text_byte(8).unwrap().clusters_range(), 3..4);
+        assert_eq!(
+            slice.atom_at_text_byte(0).unwrap().shaped_clusters_range(),
+            0..1
+        );
+        assert_eq!(
+            slice.atom_at_text_byte(1).unwrap().shaped_clusters_range(),
+            0..1
+        );
+        assert_eq!(
+            slice.atom_at_text_byte(2).unwrap().shaped_clusters_range(),
+            0..1
+        );
+        assert_eq!(
+            slice.atom_at_text_byte(3).unwrap().shaped_clusters_range(),
+            1..2
+        );
+        assert_eq!(
+            slice.atom_at_text_byte(4).unwrap().shaped_clusters_range(),
+            2..3
+        );
+        assert_eq!(
+            slice.atom_at_text_byte(5).unwrap().shaped_clusters_range(),
+            2..3
+        );
+        assert_eq!(
+            slice.atom_at_text_byte(6).unwrap().shaped_clusters_range(),
+            3..4
+        );
+        assert_eq!(
+            slice.atom_at_text_byte(7).unwrap().shaped_clusters_range(),
+            3..4
+        );
+        assert_eq!(
+            slice.atom_at_text_byte(8).unwrap().shaped_clusters_range(),
+            3..4
+        );
         assert!(slice.atom_at_text_byte(9).is_none());
     }
 }

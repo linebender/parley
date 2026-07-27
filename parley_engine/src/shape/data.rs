@@ -104,7 +104,7 @@ impl ShapedClusterFlags {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ShapedCluster {
-    /// The first character of this cluster, as an index into [`ShapedText::characters`].
+    /// The first character of this cluster, as an index into [`ShapedText::characters`](crate::ShapedText::characters).
     ///
     /// Note this is not a character index into the source text: the shaped character array only
     /// contains the characters of runs that were actually shaped. Mapping back to the source text
