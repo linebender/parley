@@ -756,6 +756,18 @@ where
         }
     }
 
+    /// Replace the selection wholesale.
+    ///
+    /// This is a low-level escape hatch for selections computed externally, for example
+    /// from a platform accessibility API. The selection is refreshed against the
+    /// up-to-date layout, so it is safe to pass a selection that was computed against
+    /// a stale layout.
+    pub fn set_selection(&mut self, selection: Selection) {
+        self.refresh_layout();
+        self.editor
+            .set_selection(selection.refresh(&self.editor.layout));
+    }
+
     #[cfg(feature = "accesskit")]
     /// Select inside the editor based on the selection provided by accesskit.
     pub fn select_from_accesskit(&mut self, selection: &accesskit::TextSelection) {
@@ -871,6 +883,15 @@ where
         // We do not check `self.show_cursor` here, as the IME handling code collapses the
         // selection to a caret in that case.
         self.selection.geometry_with(&self.layout, f);
+    }
+
+    /// Returns `true` if the caret should be shown.
+    ///
+    /// There is not always a caret. For example, the IME may have indicated the caret should be
+    /// hidden. Consumers exposing the editor to assistive technologies should hide the text
+    /// selection when this returns `false`.
+    pub fn is_cursor_visible(&self) -> bool {
+        self.show_cursor
     }
 
     /// Get a rectangle representing the current caret cursor position.

@@ -59,6 +59,18 @@ impl<B: Brush> Layout<B> {
         &self.data.styles
     }
 
+    /// Returns the length of the source text, in bytes.
+    pub fn text_len(&self) -> usize {
+        self.data.text_len
+    }
+
+    /// Returns the alignment that was applied to the layout by [`Layout::align`].
+    ///
+    /// Returns `None` if the layout has not been aligned since it was last built.
+    pub fn alignment(&self) -> Option<Alignment> {
+        self.data.alignment
+    }
+
     /// The `max_advance` that was used to line break the `Layout`
     pub fn layout_max_advance(&self) -> f32 {
         self.data.layout_max_advance

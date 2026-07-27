@@ -390,13 +390,15 @@ impl Cursor {
         layout.line_for_offset(((geometry.y0 + geometry.y1) / 2.) as f32)
     }
 
-    pub(crate) fn upstream_cluster<B: Brush>(self, layout: &Layout<B>) -> Option<Cluster<'_, B>> {
+    /// Returns the cluster that logically precedes this cursor, if any.
+    pub fn upstream_cluster<B: Brush>(self, layout: &Layout<B>) -> Option<Cluster<'_, B>> {
         self.index
             .checked_sub(1)
             .and_then(|index| Cluster::from_byte_index(layout, index))
     }
 
-    pub(crate) fn downstream_cluster<B: Brush>(self, layout: &Layout<B>) -> Option<Cluster<'_, B>> {
+    /// Returns the cluster that logically follows this cursor, if any.
+    pub fn downstream_cluster<B: Brush>(self, layout: &Layout<B>) -> Option<Cluster<'_, B>> {
         Cluster::from_byte_index(layout, self.index)
     }
 

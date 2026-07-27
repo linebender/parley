@@ -183,9 +183,7 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) height: f32,
 
     // Output of alignment
-    #[cfg(feature = "accesskit")]
-    /// Directly store the alignment if accessibility is enabled so we can
-    /// set the corresponding AccessKit property.
+    /// The alignment that was applied to the layout, if any.
     pub(crate) alignment: Option<super::Alignment>,
     /// Whether the layout is aligned with [`crate::Alignment::Justify`].
     pub(crate) is_aligned_justified: bool,
@@ -212,7 +210,6 @@ impl<B: Brush> Default for LayoutData<B> {
             items: Vec::new(),
             lines: Vec::new(),
             line_items: Vec::new(),
-            #[cfg(feature = "accesskit")]
             alignment: None,
             is_aligned_justified: false,
             layout_max_advance: 0.0,
@@ -238,6 +235,7 @@ impl<B: Brush> LayoutData<B> {
         self.items.clear();
         self.lines.clear();
         self.line_items.clear();
+        self.alignment = None;
     }
 
     /// Push an inline box to the list of items

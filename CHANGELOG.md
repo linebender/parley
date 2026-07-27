@@ -18,6 +18,12 @@ This release has an [MSRV] of 1.88.
 
 - `BidiLevel` to encode bidirectional text embedding levels. ([#710][] by [@tomcur][])
 
+#### Parley
+
+- `Layout::text_len` and `Layout::alignment`, `Cursor::upstream_cluster` and `Cursor::downstream_cluster`, `PlainEditor::is_cursor_visible`, and `PlainEditorDriver::set_selection`. ([#716][] by [@DataTriny][])
+  `ClusterPath::new` and the `Style::locale` field are now public as well.
+  Together these make it possible to build an accessibility integration outside of Parley.
+
 ### Changed
 
 #### Parley
@@ -532,6 +538,7 @@ This release has an [MSRV][] of 1.70.
 
 [@areopagitics]: https://github.com/areopagitics
 [@conor-93]: https://github.com/conor-93
+[@DataTriny]: https://github.com/DataTriny
 [@devunt]: https://github.com/devunt
 [@dfrg]: https://github.com/dfrg
 [@dhardy]: https://github.com/dhardy
@@ -710,7 +717,7 @@ This release has an [MSRV][] of 1.70.
 [#661]: https://github.com/linebender/parley/pull/661
 [#671]: https://github.com/linebender/parley/pull/671
 [#697]: https://github.com/linebender/parley/pull/697
-[#710]: https://github.com/linebender/parley/pull/710
+[#716]: https://github.com/linebender/parley/pull/716
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.11.0...HEAD
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0

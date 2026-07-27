@@ -62,9 +62,11 @@ pub struct Style<B: Brush> {
     pub(crate) overflow_wrap: OverflowWrap,
     /// Per-cluster text-wrap-mode setting
     pub(crate) text_wrap_mode: TextWrapMode,
-    #[cfg(feature = "accesskit")]
-    /// Locale if any, so we can set the corresponding AccessKit property
-    pub(crate) locale: Option<fontique::Language>,
+    /// The locale of the text, if any.
+    ///
+    /// This is useful for consumers exposing the text to assistive technologies,
+    /// which use it to select an appropriate pronunciation.
+    pub locale: Option<fontique::Language>,
 }
 
 /// Underline or strikethrough decoration.
