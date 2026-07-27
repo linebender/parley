@@ -2893,7 +2893,6 @@ dependencies = [
 name = "parley"
 version = "0.11.0"
 dependencies = [
- "accesskit",
  "bytemuck",
  "core_maths",
  "fontique",
@@ -2905,7 +2904,6 @@ dependencies = [
  "parley_dev",
  "parley_engine",
  "peniko",
- "skrifa 0.43.2",
 ]
 
 [[package]]

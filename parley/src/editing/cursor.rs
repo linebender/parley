@@ -3,14 +3,7 @@
 
 use crate::BoundingBox;
 use crate::layout::{Affinity, BreakReason, Cluster, ClusterSide, Layout, Line};
-#[cfg(feature = "accesskit")]
-use crate::layout::{ClusterPath, LayoutAccessibility};
 use crate::style::Brush;
-
-#[cfg(feature = "accesskit")]
-use accesskit::TextPosition;
-#[cfg(feature = "accesskit")]
-use parley_engine::shape::Whitespace;
 
 /// Defines a position with a text layout.
 #[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
@@ -65,21 +58,6 @@ impl Cursor {
             (layout.data.text_len, Affinity::Downstream)
         };
         Self { index, affinity }
-    }
-
-    #[cfg(feature = "accesskit")]
-    pub fn from_access_position<B: Brush>(
-        pos: &TextPosition,
-        layout: &Layout<B>,
-        layout_access: &LayoutAccessibility,
-    ) -> Option<Self> {
-        let span_path = layout_access.span_paths_by_access_id.get(&pos.node)?;
-        let run = span_path.run(layout)?;
-        let index = run
-            .get(span_path.logical_index() + pos.character_index)
-            .map(|cluster| cluster.text_range().start)
-            .unwrap_or(layout.data.text_len);
-        Some(Self::from_byte_index(layout, index, Affinity::Downstream))
     }
 
     pub(crate) fn from_cluster<B: Brush>(
@@ -400,59 +378,6 @@ impl Cursor {
     /// Returns the cluster that logically follows this cursor, if any.
     pub fn downstream_cluster<B: Brush>(self, layout: &Layout<B>) -> Option<Cluster<'_, B>> {
         Cluster::from_byte_index(layout, self.index)
-    }
-
-    #[cfg(feature = "accesskit")]
-    pub fn to_access_position<B: Brush>(
-        &self,
-        layout: &Layout<B>,
-        layout_access: &LayoutAccessibility,
-    ) -> Option<TextPosition> {
-        if layout.data.text_len == 0 {
-            // If the text is empty, just return the first node with a
-            // character index of 0.
-            return Some(TextPosition {
-                node: *layout_access
-                    .access_ids_by_span_path
-                    .get(&ClusterPath::new(0, 0, 0))?,
-                character_index: 0,
-            });
-        }
-        // Prefer the downstream cluster except at the end of the text
-        // where we'll choose the upstream cluster and add 1 to the
-        // character index.
-        let (offset, path) = self
-            .downstream_cluster(layout)
-            .map(|cluster| (0, cluster.path))
-            .or_else(|| {
-                self.upstream_cluster(layout)
-                    .map(|cluster| (1, cluster.path))
-            })?;
-        // If we're at the end of the layout and the layout ends with a newline
-        // then make sure we use the "phantom" run at the end so that
-        // AccessKit has correct visual geometry for the cursor.
-        let (span_path, character_index) = if self.index == layout.data.text_len
-            && layout
-                .data
-                .shaped_text
-                .clusters()
-                .last()
-                .map(|cluster| cluster.info.whitespace() == Whitespace::Newline)
-                .unwrap_or_default()
-        {
-            (ClusterPath::new(path.line_index + 1, 0, 0), 0)
-        } else {
-            let span_path = layout_access.span_paths_by_cluster_path.get(&path).unwrap();
-            (
-                *span_path,
-                path.logical_index() - span_path.logical_index() + offset,
-            )
-        };
-        let id = layout_access.access_ids_by_span_path.get(&span_path)?;
-        Some(TextPosition {
-            node: *id,
-            character_index,
-        })
     }
 }
 

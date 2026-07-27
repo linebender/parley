@@ -1244,8 +1244,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             };
             // If we have no items on this line, it must be the last (empty)
             // line in a layout following a newline. Commit an empty run so
-            // that AccessKit has a node with which to identify the visual
-            // cursor position
+            // that consumers, such as accessibility integrations, have
+            // something with which to identify the visual cursor position.
             if let Some((index, run)) = self
                 .layout
                 .data

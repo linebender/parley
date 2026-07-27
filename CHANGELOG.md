@@ -28,6 +28,9 @@ This release has an [MSRV] of 1.88.
 
 #### Parley
 
+- Breaking change: the `accesskit` feature, and the AccessKit integration it enabled, were removed. ([#716][] by [@DataTriny][])
+  The integration now lives in the `vello_editor` example, where it is easier to evolve and can be copied and adapted by consumers.
+  This removed `LayoutAccessibility`, `PlainEditor::try_accessibility`, `PlainEditorDriver::accessibility`, `PlainEditorDriver::select_from_accesskit`, `Cursor::from_access_position`, `Cursor::to_access_position`, `Selection::from_access_selection`, and `Selection::to_access_selection`.
 - Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. ([#661][] by [@tomcur][])
 - Breaking change: lines with mixed inline content, like different fonts or sizes, or inline boxes, are now sized more closely to the CSS line-box model. ([#697][] by [@tomcur][])  
   The `LineMetrics::{ascent,descent,leading}` fields were removed, and `LineMetrics::block_{min,max}_coord` now describe the block-axis layout bounds of each line box.
