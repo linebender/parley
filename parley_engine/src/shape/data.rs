@@ -104,6 +104,19 @@ impl ShapedClusterFlags {
     }
 }
 
+/// A span of characters and the glyphs they shaped into.
+///
+/// Shaping may reorder, compose, decompose, etc.; there is no finer-grained correspondence between
+/// characters and glyphs. For example, a base letter with a combining mark may shape into a single
+/// glyph, a single character may shape into multiple glyphs, and a ligature may combine multiple
+/// characters into shared glyphs.
+///
+/// Shaped cluster boundaries are not necessarily [`Grapheme`][crate::Grapheme] boundaries. The
+/// shared boundaries are encoded by [`Atom`][crate::Atom]s.
+///
+/// For more information about clusters, see [HarfBuzz's documentation][harfbuzz].
+///
+/// [harfbuzz]: https://harfbuzz.github.io/working-with-harfbuzz-clusters.html
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ShapedCluster {
     /// The first character of this cluster, as an index into [`ShapedText::characters`](crate::ShapedText::characters).
