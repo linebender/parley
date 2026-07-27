@@ -89,7 +89,7 @@ impl BidiResolver {
             len += 1;
         }
         self.base_level = match base_direction {
-            BaseDirection::Auto => BidiLevel::new(Self::default_level(&self.initial_types)),
+            BaseDirection::Auto => Self::default_level(&self.initial_types),
             BaseDirection::Ltr => BidiLevel::new(0),
             BaseDirection::Rtl => BidiLevel::new(1),
         };
@@ -170,7 +170,7 @@ impl BidiResolver {
         }
     }
 
-    fn default_level(types: &[BidiClass]) -> u8 {
+    fn default_level(types: &[BidiClass]) -> BidiLevel {
         let mut isolates = 0;
         for ty in types {
             let ty = *ty;
@@ -182,12 +182,16 @@ impl BidiResolver {
                 BidiClass::LeftToRight | BidiClass::RightToLeft | BidiClass::ArabicLetter
                     if isolates == 0 =>
                 {
-                    return if ty == BidiClass::LeftToRight { 0 } else { 1 };
+                    return if ty == BidiClass::LeftToRight {
+                        BidiLevel::new(0)
+                    } else {
+                        BidiLevel::new(1)
+                    };
                 }
                 _ => {}
             }
         }
-        0
+        BidiLevel::new(0)
     }
 
     fn default_level_until_pdi(types: &[BidiClass]) -> u8 {
