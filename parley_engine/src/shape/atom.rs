@@ -30,15 +30,21 @@ pub struct ShapedSlice<'a> {
 impl<'a> ShapedSlice<'a> {
     /// The range of [`Self::characters`] of this slice.
     #[inline(always)]
-    fn char_range(&self) -> (u32, u32) {
+    pub fn char_range(&self) -> Range<u32> {
         if self.clusters.0 == self.clusters.1 {
-            (0, 0)
+            0..0
         } else {
-            (
-                self.shaped_clusters[self.clusters.0 as usize].char_start,
-                self.shaped_clusters[self.clusters.1 as usize - 1].char_end,
-            )
+            self.shaped_clusters[self.clusters.0 as usize].char_start
+                ..self.shaped_clusters[self.clusters.1 as usize - 1].char_end
         }
+    }
+
+    /// The byte range in the source text of the given range of [`Self::characters`].
+    pub fn text_byte_range(&self, chars: Range<u32>) -> Range<usize> {
+        let first = &self.characters[chars.start as usize];
+        let last = &self.characters[chars.end as usize - 1];
+        first.text_byte_start as usize
+            ..(last.text_byte_start as usize + last.info.source_char().len_utf8())
     }
 
     /// Get a cursor to walk atoms from the logical start of this slice.
@@ -144,8 +150,7 @@ impl<'a> ShapedSlice<'a> {
         let cluster_idx = self.clusters.0;
         Graphemes {
             slice: *self,
-            // char_range,
-            char_idx: char_range.0,
+            char_idx: char_range.start,
             cluster_idx,
             partial_advance: self.partial_advance_at(cluster_idx),
         }
@@ -159,7 +164,7 @@ impl<'a> ShapedSlice<'a> {
         Graphemes {
             slice: *self,
             // char_range,
-            char_idx: char_range.1,
+            char_idx: char_range.end,
             cluster_idx,
             partial_advance: self.partial_advance_at(cluster_idx),
         }
@@ -270,6 +275,14 @@ pub struct Atom<'a> {
     advance: f32,
 }
 impl<'a> Atom<'a> {
+    /// The range of characters into the underlying [`ShapedSlice`] this atom spans.
+    ///
+    /// You can use [`ShapedSlice::text_byte_range`] to turn this into a byte range of the source
+    /// text.
+    pub fn char_range(&self) -> Range<u32> {
+        self.chars.0..self.chars.1
+    }
+
     /// The range of [`ShapedCluster`] into the underlying [`ShapedSlice`] this atom spans.
     #[inline(always)]
     pub fn clusters_range(&self) -> Range<u32> {
@@ -369,7 +382,7 @@ impl<'a> Graphemes<'a> {
     /// See also [`Self::next`].
     #[inline]
     pub fn prev(&mut self) -> Option<Grapheme> {
-        let char_start = self.slice.char_range().0;
+        let char_start = self.slice.char_range().start;
         if self.char_idx == char_start {
             return None;
         }
@@ -415,7 +428,7 @@ impl<'a> Iterator for Graphemes<'a> {
     ///
     /// See also [`Self::prev`].
     fn next(&mut self) -> Option<Grapheme> {
-        let char_end = self.slice.char_range().1;
+        let char_end = self.slice.char_range().end;
         if self.char_idx == char_end {
             return None;
         }
@@ -538,6 +551,14 @@ pub struct Grapheme {
 }
 
 impl Grapheme {
+    /// The range of characters into the underlying [`ShapedSlice`] this grapheme spans.
+    ///
+    /// You can use [`ShapedSlice::text_byte_range`] to turn this into a byte range of the source
+    /// text.
+    pub fn char_range(&self) -> Range<u32> {
+        self.chars.0..self.chars.1
+    }
+
     /// The boundary at the logical start of this grapheme.
     #[inline(always)]
     pub fn boundary_before(&self) -> Boundary {
