@@ -3,7 +3,7 @@
 
 use core::ops::Range;
 
-use crate::Glyph;
+use crate::{Boundary, Glyph, shape::Whitespace};
 
 use super::data::{Character, ShapedCluster};
 
@@ -379,6 +379,8 @@ impl<'a> Graphemes<'a> {
             self.cluster_idx -= 1;
             self.partial_advance = self.slice.partial_advance_at(self.cluster_idx);
         }
+        let is_atom_end =
+            grapheme_end == self.slice.shaped_clusters[self.cluster_idx as usize].char_end;
         let mut advance = self.partial_advance;
         while idx > char_start && !self.slice.characters[idx as usize].grapheme_start {
             idx -= 1;
@@ -389,12 +391,19 @@ impl<'a> Graphemes<'a> {
                 advance += self.partial_advance;
             }
         }
-        // let first = self.slice.characters[idx as usize];
+        let is_atom_start = idx == char_start
+            || idx == self.slice.shaped_clusters[self.cluster_idx as usize].char_start;
+        let first_char = self.slice.characters[idx as usize];
         self.char_idx = idx;
         Some(Grapheme {
             chars: (idx, grapheme_end),
             advance,
-            flags: 0,
+            flags: GraphemeFlags::new(
+                first_char.info.boundary(),
+                first_char.info.whitespace(),
+                is_atom_start,
+                is_atom_end,
+            ),
         })
     }
 }
@@ -411,6 +420,9 @@ impl<'a> Iterator for Graphemes<'a> {
             return None;
         }
         let grapheme_start = self.char_idx;
+        let is_atom_start =
+            grapheme_start == self.slice.shaped_clusters[self.cluster_idx as usize].char_start;
+
         let mut advance = self.partial_advance;
         let mut idx = grapheme_start + 1;
         while idx < char_end && !self.slice.characters[idx as usize].grapheme_start {
@@ -424,18 +436,23 @@ impl<'a> Iterator for Graphemes<'a> {
         }
         // If we stopped exactly on a cluster edge, the next cluster's share
         // belongs to the *next* grapheme: advance the lockstep without taking it.
-        let atom_end = idx == char_end
+        let is_atom_end = idx == char_end
             || idx == self.slice.shaped_clusters[self.cluster_idx as usize].char_end;
         if idx < char_end && idx == self.slice.shaped_clusters[self.cluster_idx as usize].char_end {
             self.cluster_idx += 1;
             self.partial_advance = self.slice.partial_advance_at(self.cluster_idx);
         }
-        // let first = self.slice.characters[grapheme_start as usize];
+        let first_char = self.slice.characters[grapheme_start as usize];
         self.char_idx = idx;
         Some(Grapheme {
             chars: (grapheme_start, idx),
             advance,
-            flags: 0,
+            flags: GraphemeFlags::new(
+                first_char.info.boundary(),
+                first_char.info.whitespace(),
+                is_atom_start,
+                is_atom_end,
+            ),
         })
     }
 
@@ -449,20 +466,101 @@ impl<'a> Iterator for Graphemes<'a> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+struct GraphemeFlags(u16);
+
+impl GraphemeFlags {
+    const BOUNDARY_MASK: u16 = 0b11;
+    const WHITESPACE_SHIFT: u16 = 2;
+    const WHITESPACE_MASK: u16 = 0b111 << Self::WHITESPACE_SHIFT;
+    const ATOM_START: u16 = 1 << 5;
+    const ATOM_END: u16 = 1 << 6;
+
+    // TODO: do we want to expose safe to break?
+    // const SAFE_TO_BREAK_BEFORE: u16 = 1 << 7;
+}
+
+impl GraphemeFlags {
+    #[inline(always)]
+    fn new(boundary: Boundary, whitespace: Whitespace, atom_start: bool, atom_end: bool) -> Self {
+        Self(
+            boundary as u16
+                + ((whitespace as u16) << Self::WHITESPACE_SHIFT)
+                + if atom_start { Self::ATOM_START } else { 0 }
+                + if atom_end { Self::ATOM_END } else { 0 },
+        )
+    }
+
+    #[inline(always)]
+    fn boundary_before(&self) -> Boundary {
+        match self.0 & Self::BOUNDARY_MASK {
+            0 => Boundary::None,
+            1 => Boundary::Word,
+            2 => Boundary::Line,
+            3 => Boundary::Mandatory,
+            _ => unreachable!("0..4 are the only valid values"),
+        }
+    }
+
+    #[inline(always)]
+    fn whitespace(&self) -> Whitespace {
+        match (self.0 & Self::WHITESPACE_MASK) >> Self::WHITESPACE_SHIFT {
+            0 => Whitespace::None,
+            1 => Whitespace::Space,
+            2 => Whitespace::NoBreakSpace,
+            3 => Whitespace::Tab,
+            4 => Whitespace::Newline,
+            _ => unreachable!("0..5 are the only valid values"),
+        }
+    }
+
+    #[inline(always)]
+    fn is_atom_start(&self) -> bool {
+        self.0 & Self::ATOM_START != 0
+    }
+
+    #[inline(always)]
+    fn is_atom_end(&self) -> bool {
+        self.0 & Self::ATOM_END != 0
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Grapheme {
     /// The characters this grapheme spans inside [`ShapedSlice::characters`].
     chars: (u32, u32),
-    
+
     /// The advance of the grapheme.
     ///
     /// This is the sum of the grapheme's clusters advances. If clusters cross the boundaries of
     /// this grapheme, this includes partial cluster advances.
     advance: f32,
-    flags: u16,
+    flags: GraphemeFlags,
 }
 
 impl Grapheme {
-    const ATOM_START: u8 = 1;
+    /// The boundary at the logical start of this grapheme.
+    #[inline(always)]
+    pub fn boundary_before(&self) -> Boundary {
+        self.flags.boundary_before()
+    }
+
+    /// The whitespace class of this grapheme's first logical character.
+    #[inline(always)]
+    pub fn whitespace(&self) -> Whitespace {
+        self.flags.whitespace()
+    }
+
+    /// Whether this grapheme's logical start is also the logical start of an [`Atom`].
+    #[inline(always)]
+    pub fn is_atom_start(&self) -> bool {
+        self.flags.is_atom_start()
+    }
+
+    /// Whether this grapheme's logical end is also the logical end of an [`Atom`].
+    #[inline(always)]
+    pub fn is_atom_end(&self) -> bool {
+        self.flags.is_atom_end()
+    }
 }
 
 #[cfg(test)]
