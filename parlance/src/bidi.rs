@@ -99,7 +99,7 @@ impl BidiLevel {
     /// enabled. Otherwise, the return value wraps.
     #[inline(always)]
     pub const fn next_odd(self) -> Self {
-        BidiLevel::new((self.to_u8() + 1) | 1)
+        Self::new((self.to_u8() + 1) | 1)
     }
 
     /// Get the next even bidi level.
@@ -108,6 +108,6 @@ impl BidiLevel {
     /// enabled. Otherwise, the return value wraps.
     #[inline(always)]
     pub const fn next_even(self) -> Self {
-        BidiLevel::new((self.to_u8() + 2) & !1)
+        Self::new((self.to_u8() + 2) & !1)
     }
 }
