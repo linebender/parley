@@ -5,7 +5,6 @@ use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty, WordBreak}
 use alloc::{vec, vec::Vec};
 use fontique::FontWeight;
 use icu_properties::props::{GraphemeClusterBreak, Script};
-use parlance::BidiLevel;
 use parley_engine::Boundary;
 
 #[derive(Default)]
@@ -29,10 +28,11 @@ impl TestContext {
 
     fn expect_bidi_embed_level_list(self, expected: &[u8]) -> Self {
         let actual = self.layout_context.analysis.bidi_levels();
-        // For ergonomics, we allow tests to pass in levels like `[0, 1, 2, 2, 1, 1, 1]`, and
-        // convert here. (Could also bytemuck... but that'd require pulling in the dependency here).
-        let expected = Vec::from_iter(expected.iter().map(|level| BidiLevel::new(*level)));
-        assert_eq!(actual, expected, "Bidi embed level list mismatch");
+        assert_eq!(
+            bytemuck::cast_slice::<_, u8>(actual),
+            expected,
+            "Bidi embed level list mismatch"
+        );
         self
     }
 

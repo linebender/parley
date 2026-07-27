@@ -38,9 +38,11 @@ accesskit = { workspace = true, optional = true }
 hashbrown = { workspace = true }
 
 [dev-dependencies]
+parlance = { workspace = true, features = ["bytemuck"] }
 parley_dev = { workspace = true }
 peniko = { workspace = true }
 
+bytemuck = { workspace = true }
 icu_properties = { workspace = true, features = ["compiled_data"] }
 
 # We special-case android targets because oxipng doesn't build in Android CI.
