@@ -96,7 +96,6 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
     alignment: Alignment,
     options: AlignmentOptions,
 ) {
-    // Whether the text base direction is right-to-left.
     let is_rtl = layout.base_level.is_rtl();
 
     // Apply alignment to line items
