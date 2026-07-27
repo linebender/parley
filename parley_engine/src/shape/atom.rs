@@ -3,6 +3,8 @@
 
 use core::ops::Range;
 
+use parlance::BidiLevel;
+
 use crate::{Boundary, Glyph, shape::Whitespace};
 
 use super::data::{Character, ShapedCluster};
@@ -22,6 +24,7 @@ pub struct ShapedSlice<'a> {
 
     pub(crate) shaped_clusters: &'a [ShapedCluster],
     pub(crate) glyphs: &'a [Glyph],
+    pub(crate) bidi_level: BidiLevel,
 
     /// The range of [`Self::shaped_clusters`] this slice covers.
     pub(crate) clusters: (u32, u32),
@@ -323,6 +326,36 @@ impl<'a> Atom<'a> {
     #[inline(always)]
     pub fn clusters(&self) -> &'a [ShapedCluster] {
         &self.slice.shaped_clusters[self.clusters.0 as usize..self.clusters.1 as usize]
+    }
+
+    /// The atom's glyphs in visual left-to-right order.
+    pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + Clone + use<'a> {
+        let clusters = self.clusters();
+        let glyphs = self.slice.glyphs;
+
+        let rtl = self.slice.bidi_level.is_rtl();
+        rtl.then(|| clusters.iter().rev())
+            .into_iter()
+            .flatten()
+            // we chain because `reverse` wrap in `Rev`, which is a different type
+            .chain((!rtl).then(|| clusters.iter()).into_iter().flatten())
+            .flat_map(move |cluster| {
+                let inline = cluster.has_inline_glyph().then(|| Glyph {
+                    id: cluster.glyph_offset,
+                    x: 0.,
+                    y: 0.,
+                    advance: cluster.advance,
+                });
+
+                let stored: &'a [Glyph] = if cluster.has_inline_glyph() {
+                    &[]
+                } else {
+                    let start = cluster.glyph_offset as usize;
+                    &glyphs[start..start + cluster.glyph_len() as usize]
+                };
+
+                inline.into_iter().chain(stored.iter().copied())
+            })
     }
 
     /// Get a cursor to walk graphemes from the logical start of this atom.

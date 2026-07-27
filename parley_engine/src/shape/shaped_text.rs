@@ -139,6 +139,7 @@ impl ShapedText {
 
             shaped_clusters: &self.shaped_clusters,
             glyphs: &self.glyphs,
+            bidi_level: run.bidi_level,
 
             /// The range of [`Self::shaped_clusters`] this slice covers.
             clusters: (
