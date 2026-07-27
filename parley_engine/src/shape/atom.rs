@@ -56,22 +56,71 @@ impl<'a> ShapedSlice<'a> {
     /// Get a cursor to walk atoms of this slice, starting before the logical start of the given
     /// cluster.
     #[inline(always)]
-    pub fn atoms_from_cluster(&self, cluster: u32) -> Atoms<'a> {
+    fn atoms_from_cluster(&self, cluster: u32) -> Atoms<'a> {
         Atoms {
             slice: *self,
             cluster_idx: cluster,
         }
     }
 
+    /// Get the atom containing the character at `char_index`.
+    ///
+    /// Note: this is the index into this [`ShapedSlice`]'s character slice, which is not
+    /// necessarily the same as the underlying source text's characters.
+    ///
+    /// To start walking from the returned atom, call [`Atom::cursor_before`] or
+    /// [`Atom::cursor_after`].
+    #[inline]
+    pub fn atom_at_char(&self, char_index: u32) -> Option<Atom<'a>> {
+        let shaped_clusters =
+            &self.shaped_clusters[self.clusters.0 as usize..self.clusters.1 as usize];
+
+        let idx = shaped_clusters
+            .partition_point(|cluster| cluster.char_start <= char_index)
+            .checked_sub(1)?;
+        if shaped_clusters[idx].char_end <= char_index {
+            return None;
+        }
+
+        let mut idx = idx as u32;
+        idx += self.clusters.0;
+        while idx > self.clusters.0 && !self.shaped_clusters[idx as usize].is_grapheme_start() {
+            idx -= 1;
+        }
+
+        Some(self.atoms_from_cluster(idx).next().unwrap())
+    }
+
     /// Get the atom containing the character at `text_byte`.
     ///
     /// `text_byte` is a byte into the source text.
     ///
-    /// To start iterating from this atom, call [`Self::atoms_from_cluster`] with the atom's
-    /// starting cluster index.
+    /// To start walking from the returned atom, call [`Atom::cursor_before`] or
+    /// [`Atom::cursor_after`].
     #[inline]
-    pub fn atom_at_text_byte(&self, text_byte: u32) -> Atom<'a> {
-        todo!()
+    pub fn atom_at_text_byte(&self, text_byte: u32) -> Option<Atom<'a>> {
+        let shaped_clusters =
+            &self.shaped_clusters[self.clusters.0 as usize..self.clusters.1 as usize];
+
+        let idx = shaped_clusters
+            .partition_point(|cluster| {
+                self.characters[cluster.char_start as usize].text_byte_start <= text_byte
+            })
+            .checked_sub(1)?;
+        let last_character = self.characters[shaped_clusters[idx].char_end as usize - 1];
+        if last_character.text_byte_start + last_character.info.source_char().len_utf8() as u32
+            <= text_byte
+        {
+            return None;
+        }
+
+        let mut idx = idx as u32;
+        idx += self.clusters.0;
+        while idx > self.clusters.0 && !self.shaped_clusters[idx as usize].is_grapheme_start() {
+            idx -= 1;
+        }
+
+        Some(self.atoms_from_cluster(idx).next().unwrap())
     }
 
     /// Narrow the shaped slice to the given range of clusters.
@@ -277,6 +326,22 @@ impl<'a> Atom<'a> {
     pub fn advance(&self) -> f32 {
         self.advance
     }
+
+    /// Get a cursor to walk atoms, starting logically before this atom.
+    pub fn cursor_before(&self) -> Atoms<'a> {
+        Atoms {
+            slice: self.slice,
+            cluster_idx: self.clusters.0,
+        }
+    }
+
+    /// Get a cursor to walk atoms, starting logically after this atom.
+    pub fn cursor_after(&self) -> Atoms<'a> {
+        Atoms {
+            slice: self.slice,
+            cluster_idx: self.clusters.1,
+        }
+    }
 }
 
 /// A [`Grapheme`] cursor.
@@ -398,4 +463,103 @@ pub struct Grapheme {
 
 impl Grapheme {
     const ATOM_START: u8 = 1;
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::{sync::Arc, vec, vec::Vec};
+
+    use fontique::Synthesis;
+    use linebender_resource_handle::{Blob, FontData};
+
+    use crate::{
+        Analysis, AnalysisOptions, Analyzer, FontInstance, ShapeOptions, ShapedText, Shaper,
+        itemize::Item,
+    };
+
+    const ROBOTO: &[u8] =
+        include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
+
+    fn analyze(text: &str) -> Analysis {
+        let mut analysis = Analysis::new();
+        Analyzer::new().analyze(
+            text,
+            &AnalysisOptions {
+                word_break: &[],
+                line_break_override: None,
+                ..AnalysisOptions::default()
+            },
+            &mut analysis,
+        );
+        analysis
+    }
+
+    fn font_instance(font_data: &'static [u8]) -> FontInstance {
+        FontInstance {
+            font: FontData::new(Blob::new(Arc::new(font_data)), 0),
+            synthesis: Synthesis::default(),
+        }
+    }
+
+    fn shape_item_with_font(
+        text: &str,
+        analysis: &Analysis,
+        item: &Item,
+        font: &FontInstance,
+        shaper: &mut Shaper,
+        shaped: &mut ShapedText,
+    ) {
+        let char_style_indices = vec![0; text.chars().count()];
+        shaper.shape_item(
+            text,
+            analysis,
+            item,
+            &ShapeOptions {
+                font_size: 32.0,
+                language: None,
+                features: &[],
+                variations: &[],
+                char_style_indices: &char_style_indices,
+            },
+            |_| Some(font.clone()),
+            shaped,
+        );
+    }
+
+    fn shape_with_font(text: &str, font_data: &'static [u8]) -> ShapedText {
+        let analysis = analyze(text);
+        let font = font_instance(font_data);
+        let mut shaper = Shaper::default();
+        let mut shaped = ShapedText::new();
+        for item in analysis.itemize(text, |_| false) {
+            shape_item_with_font(text, &analysis, &item, &font, &mut shaper, &mut shaped);
+        }
+        shaped
+    }
+
+    #[test]
+    fn select_atom_at() {
+        let shaped = shape_with_font("ffi éa\u{0301}", ROBOTO);
+        // byte offsets:              0123467     ..9
+        // chars:                     0123456     ..7
+        // clusters:                  0001233     ..4
+
+        let slice = shaped.run_slice(0);
+        assert_eq!(slice.atom_at_char(0).unwrap().clusters_range(), 0..1);
+        assert_eq!(slice.atom_at_char(1).unwrap().clusters_range(), 0..1);
+        assert_eq!(slice.atom_at_char(2).unwrap().clusters_range(), 0..1);
+        assert_eq!(slice.atom_at_char(3).unwrap().clusters_range(), 1..2);
+        assert!(slice.atom_at_char(8).is_none());
+
+        assert_eq!(slice.atom_at_text_byte(0).unwrap().clusters_range(), 0..1);
+        assert_eq!(slice.atom_at_text_byte(1).unwrap().clusters_range(), 0..1);
+        assert_eq!(slice.atom_at_text_byte(2).unwrap().clusters_range(), 0..1);
+        assert_eq!(slice.atom_at_text_byte(3).unwrap().clusters_range(), 1..2);
+        assert_eq!(slice.atom_at_text_byte(4).unwrap().clusters_range(), 2..3);
+        assert_eq!(slice.atom_at_text_byte(5).unwrap().clusters_range(), 2..3);
+        assert_eq!(slice.atom_at_text_byte(6).unwrap().clusters_range(), 3..4);
+        assert_eq!(slice.atom_at_text_byte(7).unwrap().clusters_range(), 3..4);
+        assert_eq!(slice.atom_at_text_byte(8).unwrap().clusters_range(), 3..4);
+        assert!(slice.atom_at_text_byte(9).is_none());
+    }
 }
