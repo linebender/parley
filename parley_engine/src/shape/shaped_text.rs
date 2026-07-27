@@ -11,6 +11,7 @@ use parlance::BidiLevel;
 use crate::{
     CharInfo, FontInstance, Glyph, ShapeOptions,
     itemize::{Item, TextRange},
+    shape::ShapedClusterFlags,
 };
 
 use super::{
@@ -396,9 +397,9 @@ impl ShapedText {
             //
             // TODO: could this become a single `reverse` over the range?
             for cluster in &self.shaped_clusters[shaped_clusters_start..] {
-                if cluster.glyph_len != 0xFF && cluster.glyph_len > 1 {
+                if cluster.has_inline_glyph() && cluster.glyph_len() > 1 {
                     let start = cluster.glyph_offset as usize;
-                    self.glyphs[start..start + cluster.glyph_len as usize].reverse();
+                    self.glyphs[start..start + cluster.glyph_len() as usize].reverse();
                 }
             }
         }
@@ -753,15 +754,16 @@ fn process_shaped_clusters<'a>(
     ) {
         let first_character = &characters[cluster.characters_start];
         let is_newline = first_character.info.whitespace() == Whitespace::Newline;
-        let (glyph_offset, glyph_len, advance) = if is_newline {
+        let (glyph_offset, glyph_len, inline_glyph, advance) = if is_newline {
             // Elide glyphs of newlines.
-            (cluster.glyphs_start as u32, 0, 0.)
+            (cluster.glyphs_start as u32, 0, false, 0.)
         } else if let Some(inline_glyph) = cluster.inline_glyph.take() {
-            (inline_glyph.id, 0xFF, cluster.advance)
+            (inline_glyph.id, 1, true, cluster.advance)
         } else {
             (
                 cluster.glyphs_start as u32,
                 cluster.glyphs as u8,
+                false,
                 cluster.advance,
             )
         };
@@ -770,13 +772,12 @@ fn process_shaped_clusters<'a>(
             char_start: cluster.characters_start as u32,
             char_end: char_end as u32,
             style_index,
-            flags: if first_character.grapheme_start {
-                ShapedCluster::GRAPHEME_START
-            } else {
-                0
-            },
+            flags: ShapedClusterFlags::new(glyph_len)
+                .with_grapheme_start(first_character.grapheme_start)
+                // TODO: fill with actual shaping data (`parley` curently just ignores this)
+                .with_safe_to_break_before(false)
+                .with_inline_glyph(inline_glyph),
             glyph_offset,
-            glyph_len,
             advance,
         });
     }
@@ -1046,7 +1047,11 @@ mod tests {
                 .position(|cluster| cluster.char_start == 1)
                 .unwrap();
             let newline_cluster = &shaped.shaped_clusters[index];
-            assert_eq!(newline_cluster.glyph_len, 0, "newline glyphss are removed");
+            assert_eq!(
+                newline_cluster.glyph_len(),
+                0,
+                "newline glyphss are removed"
+            );
             assert_eq!(newline_cluster.advance, 0., "newline advance is set to 0");
         }
     }

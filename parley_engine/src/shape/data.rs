@@ -48,6 +48,60 @@ pub struct Character {
     pub grapheme_start: bool,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ShapedClusterFlags(u16);
+
+impl ShapedClusterFlags {
+    const GLYPH_LEN_MASK: u16 = 0x00FF;
+    const INLINE_GLYPH: u16 = 1 << 8;
+    const GRAPHEME_START: u16 = 1 << 9;
+    const SAFE_TO_BREAK_BEFORE: u16 = 1 << 10;
+
+    #[inline(always)]
+    pub(crate) const fn new(glyph_len: u8) -> Self {
+        Self(glyph_len as u16)
+    }
+
+    #[inline(always)]
+    pub(crate) const fn with_inline_glyph(mut self, set: bool) -> Self {
+        self.0 = self.0 & !Self::INLINE_GLYPH | if set { Self::INLINE_GLYPH } else { 0 };
+        self
+    }
+
+    #[inline(always)]
+    pub(crate) const fn with_grapheme_start(mut self, set: bool) -> Self {
+        self.0 = self.0 & !Self::GRAPHEME_START | if set { Self::GRAPHEME_START } else { 0 };
+        self
+    }
+
+    #[inline(always)]
+    pub(crate) const fn with_safe_to_break_before(mut self, set: bool) -> Self {
+        self.0 =
+            self.0 & !Self::SAFE_TO_BREAK_BEFORE | if set { Self::SAFE_TO_BREAK_BEFORE } else { 0 };
+        self
+    }
+
+    #[inline(always)]
+    const fn glyph_len(self) -> u8 {
+        (self.0 & Self::GLYPH_LEN_MASK) as u8
+    }
+
+    #[inline(always)]
+    const fn has_inline_glyph(self) -> bool {
+        self.0 & Self::INLINE_GLYPH != 0
+    }
+
+    #[inline(always)]
+    const fn is_grapheme_start(self) -> bool {
+        self.0 & Self::GRAPHEME_START != 0
+    }
+
+    #[inline(always)]
+    const fn is_safe_to_break_before(self) -> bool {
+        self.0 & Self::SAFE_TO_BREAK_BEFORE != 0
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ShapedCluster {
     /// The first character of this cluster, as an index into [`ShapedText::characters`].
@@ -63,34 +117,46 @@ pub struct ShapedCluster {
     /// Style index for this cluster.
     pub style_index: u16,
 
-    /// Cluster flags (see impl methods for details).
-    pub flags: u16,
-
+    // /// Cluster flags (see impl methods for details).
+    // pub flags: u16,
     /// If `glyph_len == 0xFF`, then `glyph_offset` is a glyph identifier, otherwise, it's an index
     /// into the glyph array.
     pub glyph_offset: u32,
 
-    /// Number of glyphs in this cluster (0xFF = single glyph stored inline)
-    pub glyph_len: u8,
+    // /// Number of glyphs in this cluster (0xFF = single glyph stored inline)
+    // pub glyph_len: u8,
+    pub(crate) flags: ShapedClusterFlags,
 
     /// Advance width for this cluster
     pub advance: f32,
 }
 
 impl ShapedCluster {
-    pub(crate) const GRAPHEME_START: u16 = 1 << 0;
-    pub(crate) const SAFE_TO_BREAK: u16 = 1 << 1;
-
-    /// Whether the logical start of this shaped cluster is also the start of a grapheme.
+    /// Whether this shaped cluster's logical start also starts a grapheme.
     #[inline(always)]
-    pub fn is_grapheme_start(self) -> bool {
-        self.flags & Self::GRAPHEME_START != 0
+    pub(crate) fn glyph_len(self) -> u8 {
+        self.flags.glyph_len()
     }
 
-    /// Whether the logical start of this shaped cluster is also the start of a grapheme.
+    /// Whether this shaped cluster's logical start also starts a grapheme.
+    #[inline(always)]
+    pub(crate) fn has_inline_glyph(self) -> bool {
+        self.flags.has_inline_glyph()
+    }
+
+    /// Whether this shaped cluster's logical start also starts a grapheme.
+    #[inline(always)]
+    pub fn is_grapheme_start(self) -> bool {
+        self.flags.is_grapheme_start()
+    }
+
+    /// Whether breaking logically before this shaped cluster requires reshaping.
+    ///
+    /// Note that if this shaped cluster does not start a grapheme (see
+    /// [`Self::is_grapheme_start`]), you have to reshape regardless of this value.
     #[inline(always)]
     pub fn is_safe_to_break_before(self) -> bool {
-        self.flags & Self::SAFE_TO_BREAK != 0
+        self.flags.is_safe_to_break_before()
     }
 
     /// The number of graphemes this cluster overlaps.
