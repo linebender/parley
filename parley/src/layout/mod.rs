@@ -67,9 +67,11 @@ pub struct Style<B: Brush> {
     pub(crate) text_wrap_mode: TextWrapMode,
     /// Per-cluster whitespace collapsing and hanging behavior.
     pub(crate) white_space_collapse: WhiteSpaceCollapse,
-    #[cfg(feature = "accesskit")]
-    /// Locale if any, so we can set the corresponding AccessKit property
-    pub(crate) locale: Option<fontique::Language>,
+    /// The locale of the text, if any.
+    ///
+    /// This is useful for consumers exposing the text to assistive technologies,
+    /// which use it to select an appropriate pronunciation.
+    pub locale: Option<fontique::Language>,
 }
 
 /// Underline or strikethrough decoration.

@@ -507,7 +507,12 @@ pub struct ClusterPath {
 }
 
 impl ClusterPath {
-    pub(crate) fn new(line_index: u32, run_index: u32, char_index: u32) -> Self {
+    /// Creates a path from the index of a line within a layout, the index of a
+    /// run within that line, and the index of a grapheme cluster within that run.
+    ///
+    /// The path is not validated against any layout: use [`Self::cluster`] to
+    /// resolve it.
+    pub fn new(line_index: u32, run_index: u32, char_index: u32) -> Self {
         Self {
             line_index,
             run_index,

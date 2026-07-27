@@ -153,9 +153,7 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) height: f32,
 
     // Output of alignment
-    #[cfg(feature = "accesskit")]
-    /// Directly store the alignment if accessibility is enabled so we can
-    /// set the corresponding AccessKit property.
+    /// The alignment that was applied to the layout, if any.
     pub(crate) alignment: Option<super::Alignment>,
     /// The text-indent amount in layout units.
     pub(crate) indent_amount: f32,
@@ -180,7 +178,6 @@ impl<B: Brush> Default for LayoutData<B> {
             items: Vec::new(),
             lines: Vec::new(),
             line_items: Vec::new(),
-            #[cfg(feature = "accesskit")]
             alignment: None,
             layout_max_advance: 0.0,
             indent_amount: 0.0,
@@ -201,10 +198,6 @@ impl<B: Brush> LayoutData<B> {
         self.layout_max_advance = 0.0;
         self.indent_amount = 0.0;
         self.indent_options = IndentOptions::default();
-        #[cfg(feature = "accesskit")]
-        {
-            self.alignment = None;
-        }
         self.styles.clear();
         self.inline_boxes.clear();
         self.shaped_text.clear();
@@ -212,6 +205,7 @@ impl<B: Brush> LayoutData<B> {
         self.items.clear();
         self.lines.clear();
         self.line_items.clear();
+        self.alignment = None;
     }
 
     /// Push an inline box to the list of items
