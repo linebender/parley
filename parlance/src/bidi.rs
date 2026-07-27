@@ -95,8 +95,8 @@ impl BidiLevel {
 
     /// Get the next odd bidi level.
     ///
-    /// When the return value overflows (`self.to_u8() >= 255`) this panics in debug mode. The
-    /// return value wraps in release mode.
+    /// When the return value overflows (`self.to_u8() >= 255`) this panics when overflow checks are
+    /// enabled. Otherwise, the return value wraps.
     #[inline(always)]
     pub const fn next_odd(self) -> Self {
         BidiLevel::new((self.to_u8() + 1) | 1)
@@ -104,8 +104,8 @@ impl BidiLevel {
 
     /// Get the next even bidi level.
     ///
-    /// When the return value overflows (`self.to_u8() >= 254`) this panics in debug mode. The
-    /// return value wraps in release mode.
+    /// When the return value overflows (`self.to_u8() >= 254`) this panics when overflow checks are
+    /// enabled. Otherwise, the return value wraps.
     #[inline(always)]
     pub const fn next_even(self) -> Self {
         BidiLevel::new((self.to_u8() + 2) & !1)
