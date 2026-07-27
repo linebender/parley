@@ -38,6 +38,9 @@ This release has an [MSRV] of 1.88.
 
 #### Parley
 
+- Breaking change: the `accesskit` feature, and the AccessKit integration it enabled, were removed. ([#716][] by [@DataTriny][])
+  The integration now lives in the `vello_editor` example, where it is easier to evolve and can be copied and adapted by consumers.
+  This removed `LayoutAccessibility`, `PlainEditor::try_accessibility`, `PlainEditorDriver::accessibility`, `PlainEditorDriver::select_from_accesskit`, `Cursor::from_access_position`, `Cursor::to_access_position`, `Selection::from_access_selection`, and `Selection::to_access_selection`.
 - Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. ([#661][] by [@tomcur][])
 - Breaking change: `Cluster` now spans a full grapheme cluster instead of a single character. ([#715][] by [@tomcur][])  
   Shaped clusters that cross grapheme boundaries are represented using the existing `Cluster::is_ligature_start` and `Cluster::is_ligature_continuation`; note these methods previously encoded graphemes as well.

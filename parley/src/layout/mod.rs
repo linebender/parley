@@ -3,8 +3,6 @@
 
 //! Layout types.
 
-#[cfg(feature = "accesskit")]
-pub(crate) mod accessibility;
 mod alignment;
 mod cluster;
 mod line;
@@ -24,8 +22,6 @@ pub use parley_engine::{FontMetrics, Glyph};
 
 pub(crate) mod data;
 
-#[cfg(feature = "accesskit")]
-pub use accessibility::LayoutAccessibility;
 pub use alignment::{Alignment, AlignmentOptions};
 pub use cluster::{Affinity, Cluster, ClusterPath, ClusterSide};
 pub use data::BreakReason;
