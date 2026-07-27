@@ -1027,6 +1027,7 @@ dependencies = [
  "clipboard-rs",
  "parley",
  "peniko",
+ "skrifa 0.44.0",
  "softbuffer",
  "ui-events",
  "ui-events-winit",

@@ -30,6 +30,7 @@ const BACKGROUND_COLOR: Color = Color::from_rgb8(30, 30, 30);
 type SoftbufferSurface = softbuffer::Surface<Arc<Window>, Arc<Window>>;
 
 mod access_ids;
+mod accessibility;
 use access_ids::{TEXT_INPUT_ID, WINDOW_ID};
 
 mod text;
