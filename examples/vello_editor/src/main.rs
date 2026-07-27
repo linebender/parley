@@ -26,6 +26,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy}
 use winit::window::Window;
 
 mod access_ids;
+mod accessibility;
 use access_ids::{TEXT_INPUT_ID, WINDOW_ID};
 
 mod text;
