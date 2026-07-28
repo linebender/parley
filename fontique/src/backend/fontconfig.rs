@@ -682,8 +682,13 @@ impl SystemFonts {
             config.substitute(&mut pattern, FcMatchPattern);
 
             // We enable the "trim" option here which ignores later fonts if
-            // they provide no new Unicode coverage.
-            let font_set = config.font_sort(&pattern, true).unwrap();
+            // they provide no new Unicode coverage. On error this generic
+            // family simply has no members; in particular `font_sort` errors
+            // with `NoMatch` when there are no fonts to sort at all (e.g. a
+            // fontconfig configuration exposing an empty system font set).
+            let Ok(font_set) = config.font_sort(&pattern, true) else {
+                continue;
+            };
 
             // There are a lot of duplicate font families in the substituted
             // pattern. Keep track of which ones have already been added to the
