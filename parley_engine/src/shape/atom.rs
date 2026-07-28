@@ -96,11 +96,43 @@ impl<'a> ShapedSlice<'a> {
     }
 
     /// The byte range in the source text of the given range of [`Self::characters`].
+    ///
+    /// If `chars` is empty, this is the empty range at the byte position of `chars.start`; see
+    /// [`Self::text_byte_at`].
     pub fn text_byte_range(&self, chars: Range<u32>) -> Range<usize> {
+        if chars.is_empty() {
+            let pos = self.text_byte_at(chars.start);
+            return pos..pos;
+        }
         let first = &self.characters[chars.start as usize];
         let last = &self.characters[chars.end as usize - 1];
-        first.text_byte_start as usize
-            ..(last.text_byte_start as usize + last.info.source_char().len_utf8())
+        first.text_byte_start as usize..last.text_byte_range().end
+    }
+
+    /// The byte position in the source text of the character boundary at `char_idx`.
+    ///
+    /// `char_idx` indexes into [`Self::characters`] and must be within this slice's
+    /// [`Self::char_range`].
+    #[inline]
+    pub fn text_byte_at(&self, char_idx: u32) -> usize {
+        let char_range = self.char_range();
+        debug_assert!(
+            !char_range.is_empty(),
+            "called `text_byte_at` on an empty slice"
+        );
+        debug_assert!(
+            char_range.start <= char_idx && char_idx <= char_range.end,
+            "called `text_byte_at` with a character index out of the slice's range"
+        );
+        if char_idx == char_range.end {
+            // The character after this boundary is outside this slice. Note that `Self::characters`
+            // is the full slice of characters that were shaped, so the character after
+            // `char_range.end` is not necessarily the next character in the source text. We use the
+            // boundary behind the last character of this slice instead.
+            self.characters[char_idx as usize - 1].text_byte_range().end
+        } else {
+            self.characters[char_idx as usize].text_byte_start as usize
+        }
     }
 
     /// Get a cursor to walk atoms from the logical start of this slice.
@@ -188,9 +220,7 @@ impl<'a> ShapedSlice<'a> {
             })
             .checked_sub(1)?;
         let last_character = self.characters[shaped_clusters[idx].chars_range().end as usize - 1];
-        if last_character.text_byte_start + last_character.info.source_char().len_utf8() as u32
-            <= text_byte
-        {
+        if last_character.text_byte_range().end <= text_byte as usize {
             return None;
         }
 
@@ -874,5 +904,25 @@ mod tests {
             3..4
         );
         assert!(slice.atom_at_text_byte(9).is_none());
+    }
+
+    #[test]
+    fn text_byte_positions() {
+        let shaped = shape_with_font("ffi éa\u{0301}", ROBOTO);
+        // byte offsets:              0123467     ..9
+        // chars:                     0123456     ..7
+
+        let slice = shaped.run_slice(0);
+        assert_eq!(slice.text_byte_range(0..3), 0..3);
+        assert_eq!(slice.text_byte_range(4..5), 4..6);
+        assert_eq!(slice.text_byte_range(0..7), 0..9);
+
+        assert_eq!(slice.text_byte_range(3..3), 3..3);
+        assert_eq!(slice.text_byte_range(7..7), 9..9);
+
+        assert_eq!(slice.text_byte_at(0), 0);
+        assert_eq!(slice.text_byte_at(4), 4);
+        assert_eq!(slice.text_byte_at(6), 7);
+        assert_eq!(slice.text_byte_at(7), 9);
     }
 }

@@ -16,6 +16,15 @@ pub struct Character {
     pub grapheme_start: bool,
 }
 
+impl Character {
+    /// The byte range of this character in the source text.
+    #[inline(always)]
+    pub fn text_byte_range(&self) -> Range<usize> {
+        self.text_byte_start as usize
+            ..self.text_byte_start as usize + self.info.source_char().len_utf8()
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ShapedClusterFlags(u16);
 

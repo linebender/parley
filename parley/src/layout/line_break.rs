@@ -1473,8 +1473,8 @@ fn commit_line<B: Brush>(
                 let (text_range, grapheme_range) = if cluster_range.is_empty() {
                     let char_pos = shaped_clusters[cluster_range.start as usize]
                         .chars_range()
-                        .start as usize;
-                    let text_pos = shaped_text.characters()[char_pos].text_byte_start as usize;
+                        .start;
+                    let text_pos = slice.text_byte_at(char_pos);
                     (text_pos..text_pos, grapheme_start..grapheme_start)
                 } else {
                     let char_range = shaped_clusters[cluster_range.start as usize]
