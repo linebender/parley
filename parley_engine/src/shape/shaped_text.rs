@@ -468,7 +468,7 @@ fn process_shaped_clusters<'a>(
             style_index,
             flags: ShapedClusterFlags::new(glyph_len)
                 .with_grapheme_start(first_character.grapheme_start)
-                // TODO: fill with actual shaping data (`parley` curently just ignores this)
+                // TODO: fill with actual shaping data (`parley` currently just ignores this)
                 .with_safe_to_break_before(false)
                 .with_inline_glyph(inline_glyph),
             glyph_offset,

@@ -39,7 +39,7 @@ impl LineLayout {
 struct LineState {
     x: f32,
     items: Range<usize>,
-    /// The line's shaped clusters, as a range into [parley_engine::ShapedText::shaped_clusters].
+    /// The line's shaped clusters, as a range into [`parley_engine::ShapedText::shaped_clusters`].
     /// The bounds are atom-aligned.
     clusters: Range<u32>,
     num_spaces: usize,
@@ -249,7 +249,7 @@ pub struct BreakerState {
     run_idx: usize,
     /// Iteration state: the current shaped cluster.
     ///
-    /// This indexes into [parley_engine::ShapedText::shaped_clusters]. It's atom-aligned, pointing
+    /// This indexes into [`parley_engine::ShapedText::shaped_clusters`]. It's atom-aligned, pointing
     /// at the start of the next atom to consume.
     //
     // TODO: rename this `shaped_cluster_idx`

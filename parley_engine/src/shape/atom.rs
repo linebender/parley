@@ -149,6 +149,7 @@ impl<'a> ShapedSlice<'a> {
     /// To start walking from the returned atom, call [`Atom::cursor_before`] or
     /// [`Atom::cursor_after`].
     #[inline]
+    #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub fn atom_at_char(&self, char_index: u32) -> Option<Atom<'a>> {
         let shaped_clusters =
             &self.shaped_clusters[self.clusters.0 as usize..self.clusters.1 as usize];
@@ -176,6 +177,7 @@ impl<'a> ShapedSlice<'a> {
     /// To start walking from the returned atom, call [`Atom::cursor_before`] or
     /// [`Atom::cursor_after`].
     #[inline]
+    #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub fn atom_at_text_byte(&self, text_byte: u32) -> Option<Atom<'a>> {
         let shaped_clusters =
             &self.shaped_clusters[self.clusters.0 as usize..self.clusters.1 as usize];
@@ -406,7 +408,7 @@ impl<'a> Atom<'a> {
             // we chain because `reverse` wrap in `Rev`, which is a different type
             .chain((!rtl).then(|| clusters.iter()).into_iter().flatten())
             .flat_map(move |cluster| {
-                let inline = cluster.has_inline_glyph().then(|| Glyph {
+                let inline = cluster.has_inline_glyph().then_some(Glyph {
                     id: cluster.glyph_offset,
                     x: 0.,
                     y: 0.,
@@ -656,7 +658,7 @@ impl GraphemeFlags {
     }
 
     #[inline(always)]
-    fn boundary_before(&self) -> Boundary {
+    fn boundary_before(self) -> Boundary {
         match self.0 & Self::BOUNDARY_MASK {
             0 => Boundary::None,
             1 => Boundary::Word,
@@ -667,7 +669,7 @@ impl GraphemeFlags {
     }
 
     #[inline(always)]
-    fn whitespace(&self) -> Whitespace {
+    fn whitespace(self) -> Whitespace {
         match (self.0 & Self::WHITESPACE_MASK) >> Self::WHITESPACE_SHIFT {
             0 => Whitespace::None,
             1 => Whitespace::Space,
@@ -679,12 +681,12 @@ impl GraphemeFlags {
     }
 
     #[inline(always)]
-    fn is_atom_start(&self) -> bool {
+    fn is_atom_start(self) -> bool {
         self.0 & Self::ATOM_START != 0
     }
 
     #[inline(always)]
-    fn is_atom_end(&self) -> bool {
+    fn is_atom_end(self) -> bool {
         self.0 & Self::ATOM_END != 0
     }
 }
@@ -751,7 +753,7 @@ impl Grapheme {
 
 #[cfg(test)]
 mod tests {
-    use alloc::{sync::Arc, vec, vec::Vec};
+    use alloc::{sync::Arc, vec};
 
     use fontique::Synthesis;
     use linebender_resource_handle::{Blob, FontData};

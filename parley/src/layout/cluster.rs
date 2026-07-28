@@ -14,7 +14,7 @@ use parley_engine::{Atom, Glyph, Grapheme, shape::Whitespace};
 
 /// Atomic unit of text.
 ///
-/// This spans a grapheme, which can be multiple characters of source text. See 
+/// This spans a grapheme, which can be multiple characters of source text. See
 /// [UAX #29 § 3][uax-grapheme]. Grapheme edges are caret/selection/hit-testing edges.
 ///
 /// [uax-grapheme]: https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries

@@ -245,7 +245,7 @@ fn style_features_ligatures_rtl_cluster_details() {
                 assert_eq!(c.advance(), last_advance);
                 // This cluster should contain the one glyph of the ligature whose advance
                 // is the sum of the advances of the component clusters.
-                assert_eq!(c.glyphs().nth(0).unwrap().advance, c.advance() * 2.0);
+                assert_eq!(c.glyphs().next().unwrap().advance, c.advance() * 2.0);
             }
             _ => unreachable!(),
         }
