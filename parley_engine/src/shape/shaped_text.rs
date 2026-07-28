@@ -92,6 +92,14 @@ pub struct FontMetrics {
 /// After [itemizing][crate::itemize::Item] your text,
 /// [shape each item][crate::Shaper::shape_item], appending the result into this
 /// [`ShapedText`]. This then holds your shaped paragraph of text.
+///
+/// This shaped text holds spans of the source text's characters that were shaped into
+/// [`ShapedCluster`]s. Note that the boundaries of shaped clusters and graphemes need not coincide;
+/// see [`ShapedCluster`]s documentation for more information.
+///
+/// Use [`Self::run_slice`] to get a run's [`ShapedSlice`]. From there, you can interact with slices
+/// of shaped text, such as walking [atoms](crate::Atom) (e.g., [`ShapedSlice::atoms_start`]) and
+/// [graphemes](crate::Grapheme) (e.g., [`ShapedSlice::graphemes_start`]).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ShapedText {
     runs: Vec<ShapedRun>,
