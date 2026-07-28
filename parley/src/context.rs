@@ -8,10 +8,10 @@ use core::ops::Range;
 use alloc::{vec, vec::Vec};
 
 use parlance::WordBreak;
-use parley_core::{Analysis, AnalysisDataSources, Analyzer, Shaper};
+use parley_engine::{Analysis, AnalysisDataSources, Analyzer, Shaper};
 
 use super::FontContext;
-use super::builder::{RangedBuilder, StyleRunBuilder};
+use super::builder::{BuilderOptions, RangedBuilder, StyleRunBuilder};
 use super::resolve::tree::TreeStyleBuilder;
 use super::resolve::{RangedStyleBuilder, ResolveContext, ResolvedStyle, StyleRun};
 use super::style::{Brush, TextStyle};
@@ -108,11 +108,9 @@ impl<B: Brush> LayoutContext<B> {
         fcx.source_cache.prune(128, false);
 
         RangedBuilder {
-            scale,
-            quantize,
+            options: BuilderOptions::new(scale, quantize),
             lcx: self,
             fcx,
-            line_break_override: None,
         }
     }
 
@@ -136,13 +134,11 @@ impl<B: Brush> LayoutContext<B> {
         fcx.source_cache.prune(128, false);
 
         StyleRunBuilder {
-            scale,
-            quantize,
+            options: BuilderOptions::new(scale, quantize),
             len: text.len(),
             lcx: self,
             fcx,
             cursor: 0,
-            line_break_override: None,
         }
     }
 
@@ -180,11 +176,9 @@ impl<B: Brush> LayoutContext<B> {
         fcx.source_cache.prune(128, false);
 
         TreeBuilder {
-            scale,
-            quantize,
+            options: BuilderOptions::new(scale, quantize),
             lcx: self,
             fcx,
-            line_break_override: None,
         }
     }
 

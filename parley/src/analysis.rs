@@ -3,15 +3,16 @@
 
 use crate::{Brush, LayoutContext};
 
-use parley_core::break_overrides::LineBreakOverrideFn;
+use parley_engine::break_overrides::LineBreakOverrideFn;
 
-use parley_core::AnalysisOptions;
+use parley_engine::AnalysisOptions;
 
-use parlance::WordBreak;
+use parlance::{BaseDirection, WordBreak};
 
 pub(crate) fn analyze_text<B: Brush>(
     lcx: &mut LayoutContext<B>,
     text: &str,
+    base_direction: BaseDirection,
     line_break_override: Option<&LineBreakOverrideFn>,
 ) {
     let text = if text.is_empty() { " " } else { text };
@@ -26,6 +27,7 @@ pub(crate) fn analyze_text<B: Brush>(
         }));
 
     let options = AnalysisOptions {
+        base_direction,
         word_break: &lcx.word_break,
         line_break_override,
     };

@@ -49,7 +49,7 @@ mod script;
 mod tag;
 mod text;
 
-pub use bidi::{BidiControl, BidiDirection, BidiOverride};
+pub use bidi::{BidiControl, BidiDirection, BidiLevel, BidiOverride};
 pub use font::{FontStyle, FontWeight, FontWidth};
 pub use font_family::{FontFamily, FontFamilyName, ParseFontFamilyError, ParseFontFamilyErrorKind};
 pub use generic_family::GenericFamily;

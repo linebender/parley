@@ -10,7 +10,7 @@ use crate::style::Brush;
 #[cfg(feature = "accesskit")]
 use accesskit::TextPosition;
 #[cfg(feature = "accesskit")]
-use parley_core::shape::Whitespace;
+use parley_engine::shape::Whitespace;
 
 /// Defines a position with a text layout.
 #[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]

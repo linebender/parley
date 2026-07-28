@@ -94,7 +94,7 @@ impl ClusterInfo {
     }
 }
 
-// TODO: should become private when more of `parley`'s shaping is in `parley_core`
+// TODO: should become private when more of `parley`'s shaping is in `parley_engine`
 #[inline]
 pub const fn to_whitespace(c: char) -> Whitespace {
     const LINE_SEPARATOR: char = '\u{2028}';

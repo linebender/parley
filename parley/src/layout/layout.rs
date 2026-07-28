@@ -124,7 +124,7 @@ impl<B: Brush> Layout<B> {
 
     /// Returns `true` if the dominant direction of the layout is right-to-left.
     pub fn is_rtl(&self) -> bool {
-        self.data.base_level & 1 != 0
+        self.data.base_level.is_rtl()
     }
 
     pub fn inline_boxes(&self) -> &[InlineBox] {

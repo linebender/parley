@@ -5,7 +5,7 @@ use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty, WordBreak}
 use alloc::{vec, vec::Vec};
 use fontique::FontWeight;
 use icu_properties::props::{GraphemeClusterBreak, Script};
-use parley_core::Boundary;
+use parley_engine::Boundary;
 
 #[derive(Default)]
 struct TestContext {
@@ -26,9 +26,13 @@ impl TestContext {
         self
     }
 
-    fn expect_bidi_embed_level_list(self, expected: Vec<u8>) -> Self {
+    fn expect_bidi_embed_level_list(self, expected: &[u8]) -> Self {
         let actual = self.layout_context.analysis.bidi_levels();
-        assert_eq!(actual, expected, "Bidi embed level list mismatch");
+        assert_eq!(
+            bytemuck::cast_slice::<_, u8>(actual),
+            expected,
+            "Bidi embed level list mismatch"
+        );
         self
     }
 
@@ -53,6 +57,18 @@ impl TestContext {
             .map(|info| info.grapheme_cluster_break)
             .collect();
         assert_eq!(actual, expected, "Grapheme cluster break list mismatch");
+        self
+    }
+
+    fn expect_grapheme_start_list(self, expected: Vec<bool>) -> Self {
+        let actual: Vec<_> = self
+            .layout_context
+            .analysis
+            .char_info()
+            .iter()
+            .map(|info| info.is_grapheme_start())
+            .collect();
+        assert_eq!(actual, expected, "Grapheme start list mismatch");
         self
     }
 
@@ -219,7 +235,7 @@ fn test_latin_mixed_keep_all_last() {
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 1..2);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![Script::Latin, Script::Latin])
     .expect_grapheme_cluster_break_list(vec![
         GraphemeClusterBreak::Other,
@@ -244,7 +260,7 @@ fn test_mandatory_break_in_text() {
             Boundary::Word,
             Boundary::Mandatory,
         ])
-        .expect_bidi_embed_level_list(vec![])
+        .expect_bidi_embed_level_list(&[])
         .expect_script_list(vec![
             Script::Latin,
             Script::Latin,
@@ -296,7 +312,7 @@ fn test_paragraph_separator_is_hard_break() {
 fn test_blank() {
     verify_analysis("", |_| {})
         .expect_boundary_list(vec![Boundary::Word])
-        .expect_bidi_embed_level_list(vec![])
+        .expect_bidi_embed_level_list(&[])
         .expect_script_list(vec![Script::Common])
         .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::Other])
         .expect_is_control_list(vec![false])
@@ -360,7 +376,7 @@ fn test_latin_trailing_space_mixed() {
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..3);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::Word])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![Script::Latin, Script::Latin, Script::Common]);
 }
 
@@ -371,7 +387,7 @@ fn test_latin_leading_space_mixed() {
         builder.push(StyleProperty::WordBreak(WordBreak::Normal), 1..3);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::Line, Boundary::None])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![Script::Common, Script::Latin, Script::Latin]);
 }
 
@@ -397,7 +413,7 @@ fn test_latin_mixed_break_all_first() {
 fn test_all_whitespace() {
     verify_analysis("   ", |_| {})
         .expect_boundary_list(vec![Boundary::Word, Boundary::None, Boundary::None])
-        .expect_bidi_embed_level_list(vec![])
+        .expect_bidi_embed_level_list(&[])
         .expect_script_list(vec![Script::Common, Script::Common, Script::Common]);
 }
 
@@ -430,7 +446,31 @@ fn test_multi_char_grapheme() {
         ])
         .expect_is_control_list(vec![false, false, false, false, false, false])
         .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
-        .expect_force_normalize_list(vec![false, false, false, true, false, false]);
+        .expect_force_normalize_list(vec![false, false, false, true, false, false])
+        .expect_grapheme_start_list(vec![true, true, true, false, true, true]);
+}
+
+#[test]
+fn test_grapheme_start_multi_char_graphemes() {
+    // CRLF (GB3), emoji ZWJ sequence 👨‍👩‍👧 (GB9/GB11), and regional indicator
+    // pair 🇦🇺 (GB12) are each a single extended grapheme cluster.
+    verify_analysis(
+        "a\r\n\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{1F1E6}\u{1F1FA}b",
+        |_| {},
+    )
+    .expect_grapheme_start_list(vec![
+        true,  // 'a'
+        true,  // '\r'
+        false, // '\n' (CR x LF)
+        true,  // 👨
+        false, // ZWJ
+        false, // 👩
+        false, // ZWJ
+        false, // 👧
+        true,  // 🇦 (regional indicator A)
+        false, // 🇺 (regional indicator U)
+        true,  // 'b'
+    ]);
 }
 
 #[test]
@@ -513,7 +553,7 @@ fn test_mixed_ltr_rtl() {
             Boundary::None,
             Boundary::None,
         ])
-        .expect_bidi_embed_level_list(vec![0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
+        .expect_bidi_embed_level_list(&[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1])
         .expect_script_list(vec![
             Script::Latin,
             Script::Latin,
@@ -646,7 +686,7 @@ fn test_mixed_ltr_rtl_nested_embedding() {
             Boundary::Word,
             Boundary::Word,
         ])
-        .expect_bidi_embed_level_list(vec![
+        .expect_bidi_embed_level_list(&[
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0,
         ])
         .expect_script_list(vec![
@@ -724,7 +764,7 @@ fn test_multi_char_grapheme_mixed_break_all() {
         Boundary::Word,
         Boundary::Line,
     ])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![
         Script::Latin,
         Script::Common,
@@ -813,7 +853,7 @@ fn test_mixed_ltr_rtl_multiple_segments() {
             Boundary::None,
             Boundary::None,
         ])
-        .expect_bidi_embed_level_list(vec![
+        .expect_bidi_embed_level_list(&[
             0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1,
             1, 1, 1, 1, 1,
         ])
@@ -908,7 +948,7 @@ fn test_multi_char_grapheme_mixed_break_and_keep_all() {
         Boundary::Word,
         Boundary::Line,
     ])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![
         Script::Latin,
         Script::Common,
@@ -947,7 +987,7 @@ fn test_multi_char_grapheme_mixed_keep_all() {
         Boundary::Word,
         Boundary::Line,
     ])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![
         Script::Latin,
         Script::Common,
@@ -998,7 +1038,7 @@ fn test_multi_paragraph_bidi() {
             Boundary::None,
             Boundary::None,
         ])
-        .expect_bidi_embed_level_list(vec![
+        .expect_bidi_embed_level_list(&[
             0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1,
         ])
         .expect_script_list(vec![
@@ -1084,7 +1124,7 @@ fn test_rtl_paragraph_with_non_authoritative_logical_first_char_two_paragraphs()
             Boundary::None,
             Boundary::Word,
         ])
-        .expect_bidi_embed_level_list(vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+        .expect_bidi_embed_level_list(&[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
         .expect_script_list(vec![
             Script::Arabic,
             Script::Arabic,
@@ -1136,7 +1176,7 @@ fn test_single_char_multi_byte() {
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..3);
     })
     .expect_boundary_list(vec![Boundary::Word])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![Script::Common])
     .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::Other]);
 }
@@ -1151,7 +1191,7 @@ fn test_rtl_paragraph_with_non_authoritative_logical_first_character() {
             Boundary::None,
             Boundary::Word,
         ])
-        .expect_bidi_embed_level_list(vec![1, 1, 1, 1, 1])
+        .expect_bidi_embed_level_list(&[1, 1, 1, 1, 1])
         .expect_script_list(vec![
             Script::Arabic,
             Script::Arabic,
@@ -1175,7 +1215,7 @@ fn test_rtl_paragraph_with_non_authoritative_logical_first_character() {
 fn test_two_newlines() {
     verify_analysis("\n\n", |_| {})
         .expect_boundary_list(vec![Boundary::Word, Boundary::Mandatory])
-        .expect_bidi_embed_level_list(vec![])
+        .expect_bidi_embed_level_list(&[])
         .expect_script_list(vec![Script::Common, Script::Common])
         .expect_grapheme_cluster_break_list(vec![
             GraphemeClusterBreak::LF,
@@ -1187,7 +1227,7 @@ fn test_two_newlines() {
 fn test_newline() {
     verify_analysis("\n", |_| {})
         .expect_boundary_list(vec![Boundary::Word])
-        .expect_bidi_embed_level_list(vec![])
+        .expect_bidi_embed_level_list(&[])
         .expect_script_list(vec![Script::Common])
         .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::LF]);
 }
@@ -1198,7 +1238,7 @@ fn test_two_chars_keep_all() {
         builder.push(StyleProperty::WordBreak(WordBreak::KeepAll), 0..2);
     })
     .expect_boundary_list(vec![Boundary::Word, Boundary::None])
-    .expect_bidi_embed_level_list(vec![])
+    .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![Script::Latin, Script::Latin]);
 }
 

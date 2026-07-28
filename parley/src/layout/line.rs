@@ -10,7 +10,7 @@ use crate::style::Brush;
 use crate::{InlineBox, InlineBoxKind};
 
 use core::ops::Range;
-use parley_core::Glyph;
+use parley_engine::Glyph;
 
 /// Line in a text layout.
 #[derive(Copy, Clone)]

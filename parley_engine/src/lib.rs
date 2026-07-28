@@ -1,7 +1,7 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Parley Core provides low level APIs for implementing text layout.
+//! Parley Engine provides low level APIs for implementing text layout.
 //!
 //! ## Features
 //!
@@ -33,6 +33,7 @@ mod lru_cache;
 pub mod shape;
 
 pub use linebender_resource_handle::FontData;
+pub use parlance::BaseDirection;
 
 pub use analysis::{Analysis, AnalysisDataSources, Boundary, CharInfo};
 pub use analyzer::{AnalysisOptions, Analyzer};
