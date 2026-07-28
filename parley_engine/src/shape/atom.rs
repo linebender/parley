@@ -20,9 +20,9 @@ use super::data::{Character, ShapedCluster};
 pub struct ShapedSlice<'a> {
     /// Character indices of shaped text.
     ///
-    /// Most character indices (like [`ShapedCluster::char_start`]) index into this array; note this
-    /// is not necessarily parallel to characters of the source text. Only shaped text gets these
-    /// characters.
+    /// Most character indices (like [`ShapedCluster::chars_range`]) index into this array; note
+    /// this is not necessarily parallel to characters of the source text. Only shaped text gets
+    /// these characters.
     pub(crate) characters: &'a [Character],
 
     pub(crate) shaped_clusters: &'a [ShapedCluster],

@@ -112,7 +112,7 @@ pub struct ShapedCluster {
 impl ShapedCluster {
     /// The character range of this slice.
     ///
-    /// This indexes into [`Self::characters`].
+    /// This indexes into [`ShapedText::characters`][crate::ShapedText::characters].
     #[inline(always)]
     pub fn chars_range(&self) -> Range<u32> {
         self.chars_range.0..self.chars_range.1
