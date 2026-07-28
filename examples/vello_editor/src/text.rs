@@ -25,10 +25,10 @@ use vello::{
 };
 use winit::event::{Ime, WindowEvent};
 
+use crate::access_ids::next_node_id;
+use crate::accessibility::PlainEditorAccessibility;
 pub use parley::editing::Generation;
 use parley::{FontContext, LayoutContext, PlainEditor, PlainEditorDriver};
-
-use crate::access_ids::next_node_id;
 
 pub const BACKGROUND_COLOR: AlphaColor<Srgb> = palette::css::STEEL_BLUE;
 pub const INSET: f32 = 32.0;
@@ -37,6 +37,7 @@ pub struct Editor {
     font_cx: FontContext,
     layout_cx: LayoutContext<Brush>,
     editor: PlainEditor<Brush>,
+    access: PlainEditorAccessibility,
     cursor_visible: bool,
     start_time: Option<Instant>,
     blink_period: Duration,
@@ -94,6 +95,7 @@ impl Editor {
             font_cx: FontContext::default(),
             layout_cx: LayoutContext::default(),
             editor,
+            access: PlainEditorAccessibility::default(),
             cursor_visible: false,
             start_time: None,
             // TODO: Why initialize to zero?
@@ -358,11 +360,8 @@ impl Editor {
     }
 
     pub fn handle_accesskit_action_request(&mut self, req: &accesskit::ActionRequest) {
-        if req.action == accesskit::Action::SetTextSelection
-            && let Some(accesskit::ActionData::SetTextSelection(selection)) = &req.data
-        {
-            self.driver().select_from_accesskit(selection);
-        }
+        let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
+        self.access.handle_action_request(&mut drv, req);
     }
 
     /// Return the current `Generation` of the layout.
@@ -502,7 +501,8 @@ impl Editor {
 
     pub fn accessibility(&mut self, update: &mut TreeUpdate, node: &mut Node) {
         let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
-        drv.accessibility(
+        self.access.build_nodes(
+            &mut drv,
             update,
             node,
             next_node_id,

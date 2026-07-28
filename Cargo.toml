@@ -43,7 +43,6 @@ parley_engine = { version = "0.11.0", default-features = false, path = "parley_e
 parley_linebreaking_cases = { path = "parley_tests/linebreaking_cases" }
 
 # External dependencies
-accesskit = "0.24.0"
 bytemuck = { version = "1.25.0", default-features = false }
 harfrust = { version = "0.10.0", default-features = false }
 hashbrown = { version = "0.17.0", default-features = false, features = [

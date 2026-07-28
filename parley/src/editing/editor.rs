@@ -17,11 +17,6 @@ use crate::layout::{Affinity, Alignment, AlignmentOptions, Layout};
 use crate::style::Brush;
 use crate::{BoundingBox, FontContext, LayoutContext, StyleProperty, StyleSet};
 
-#[cfg(feature = "accesskit")]
-use crate::layout::LayoutAccessibility;
-#[cfg(feature = "accesskit")]
-use accesskit::{Node, NodeId, TreeUpdate};
-
 /// Opaque representation of a generation.
 ///
 /// Obtained from [`PlainEditor::generation`].
@@ -96,8 +91,6 @@ where
     layout: Layout<T>,
     buffer: String,
     default_style: StyleSet<T>,
-    #[cfg(feature = "accesskit")]
-    layout_access: LayoutAccessibility,
     selection: Selection,
     /// Byte offsets of IME composing preedit text in the text buffer.
     /// `None` if the IME is not currently composing.
@@ -132,8 +125,6 @@ where
             default_style: StyleSet::new(font_size),
             buffer: String::default(),
             layout: Layout::default(),
-            #[cfg(feature = "accesskit")]
-            layout_access: LayoutAccessibility::default(),
             selection: Selection::default(),
             compose: None,
             show_cursor: true,
@@ -756,43 +747,19 @@ where
         }
     }
 
-    #[cfg(feature = "accesskit")]
-    /// Select inside the editor based on the selection provided by accesskit.
-    pub fn select_from_accesskit(&mut self, selection: &accesskit::TextSelection) {
+    /// Replace the selection wholesale.
+    ///
+    /// This is a low-level escape hatch for selections computed externally, for example
+    /// from a platform accessibility API. The selection is refreshed against the
+    /// up-to-date layout, so it is safe to pass a selection that was computed against
+    /// a stale layout.
+    pub fn set_selection(&mut self, selection: Selection) {
         self.refresh_layout();
-        if let Some(selection) = Selection::from_access_selection(
-            selection,
-            &self.editor.layout,
-            &self.editor.layout_access,
-        ) {
-            self.editor.set_selection(selection);
-        }
+        self.editor
+            .set_selection(selection.refresh(&self.editor.layout));
     }
 
     // --- MARK: Rendering ---
-    #[cfg(feature = "accesskit")]
-    /// Perform an accessibility update.
-    pub fn accessibility(
-        &mut self,
-        update: &mut TreeUpdate,
-        node: &mut Node,
-        next_node_id: impl FnMut() -> NodeId,
-        x_offset: f64,
-        y_offset: f64,
-        set_brush_properties: impl Fn(&mut Node, &crate::Style<T>),
-    ) -> Option<()> {
-        self.refresh_layout();
-        self.editor.accessibility_unchecked(
-            update,
-            node,
-            next_node_id,
-            x_offset,
-            y_offset,
-            set_brush_properties,
-        );
-        Some(())
-    }
-
     /// Get the up-to-date layout for this driver.
     pub fn layout(&mut self) -> &Layout<T> {
         self.editor.layout(self.font_cx, self.layout_cx)
@@ -871,6 +838,15 @@ where
         // We do not check `self.show_cursor` here, as the IME handling code collapses the
         // selection to a caret in that case.
         self.selection.geometry_with(&self.layout, f);
+    }
+
+    /// Returns `true` if the caret should be shown.
+    ///
+    /// There is not always a caret. For example, the IME may have indicated the caret should be
+    /// hidden. Consumers exposing the editor to assistive technologies should hide the text
+    /// selection when this returns `false`.
+    pub fn is_cursor_visible(&self) -> bool {
+        self.show_cursor
     }
 
     /// Get a rectangle representing the current caret cursor position.
@@ -1075,42 +1051,9 @@ where
         }
     }
 
-    #[cfg(feature = "accesskit")]
-    #[inline]
-    /// Perform an accessibility update if the layout is valid.
-    ///
-    /// Returns `None` if the layout is not up-to-date.
-    /// You can call [`refresh_layout`](Self::refresh_layout) before using this method,
-    /// to ensure that the layout is up-to-date.
-    /// The [`accessibility`](PlainEditorDriver::accessibility) method on the driver type
-    /// should be preferred if the contexts are available, which will do this automatically.
-    pub fn try_accessibility(
-        &mut self,
-        update: &mut TreeUpdate,
-        node: &mut Node,
-        next_node_id: impl FnMut() -> NodeId,
-        x_offset: f64,
-        y_offset: f64,
-        set_brush_properties: impl Fn(&mut Node, &crate::Style<T>),
-    ) -> Option<()> {
-        if self.layout_dirty {
-            return None;
-        }
-        self.accessibility_unchecked(
-            update,
-            node,
-            next_node_id,
-            x_offset,
-            y_offset,
-            set_brush_properties,
-        );
-        Some(())
-    }
-
     /// Update the layout if it is dirty.
     ///
-    /// This should only be used alongside [`try_layout`](Self::try_layout)
-    /// or [`try_accessibility`](Self::try_accessibility), if those will be
+    /// This should only be used alongside [`try_layout`](Self::try_layout), if that will be
     /// called in a scope where the contexts are not available.
     pub fn refresh_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
         if self.layout_dirty {
@@ -1242,45 +1185,5 @@ where
         self.selection = self.selection.refresh(&self.layout);
         self.layout_dirty = false;
         self.generation.nudge();
-    }
-
-    #[cfg(feature = "accesskit")]
-    /// Perform an accessibility update, assuming that the layout is valid.
-    ///
-    /// The wrapper [`accessibility`](PlainEditorDriver::accessibility) on the driver type should
-    /// be preferred.
-    ///
-    /// You should always call [`refresh_layout`](Self::refresh_layout) before using this method,
-    /// with no other modifying method calls in between.
-    fn accessibility_unchecked(
-        &mut self,
-        update: &mut TreeUpdate,
-        node: &mut Node,
-        next_node_id: impl FnMut() -> NodeId,
-        x_offset: f64,
-        y_offset: f64,
-        set_brush_properties: impl Fn(&mut Node, &crate::Style<T>),
-    ) {
-        self.layout_access.build_nodes(
-            &self.buffer,
-            &self.layout,
-            update,
-            node,
-            next_node_id,
-            x_offset,
-            y_offset,
-            set_brush_properties,
-        );
-        if self.show_cursor {
-            if let Some(selection) = self
-                .selection
-                .to_access_selection(&self.layout, &self.layout_access)
-            {
-                node.set_text_selection(selection);
-            }
-        } else {
-            node.clear_text_selection();
-        }
-        node.add_action(accesskit::Action::SetTextSelection);
     }
 }

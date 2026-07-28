@@ -14,9 +14,10 @@ pollster = "0.4.0"
 ui-events-winit = "0.3"
 ui-events = "0.3"
 winit = "0.30.13"
-parley = { workspace = true, default-features = true, features = ["accesskit"] }
+parley = { workspace = true, default-features = true }
 peniko = { workspace = true }
-accesskit = { workspace = true }
+skrifa = { workspace = true }
+accesskit = "0.24.0"
 accesskit_winit = "0.32.2"
 
 [lints]
