@@ -339,24 +339,24 @@ impl ShapedText {
         let glyphs_start = self.glyphs.len();
         if item.bidi_level.is_ltr() {
             process_shaped_clusters(
-                &self.characters,
                 &mut self.shaped_clusters,
                 &mut self.glyphs,
                 scale_factor,
                 glyph_infos.iter(),
                 glyph_positions.iter(),
                 &options.char_style_indices[range.char_range.clone()],
+                &self.characters,
                 characters_start,
             );
         } else {
             process_shaped_clusters(
-                &self.characters,
                 &mut self.shaped_clusters,
                 &mut self.glyphs,
                 scale_factor,
                 glyph_infos.iter().rev(),
                 glyph_positions.iter().rev(),
                 &options.char_style_indices[range.char_range.clone()],
+                &self.characters,
                 characters_start,
             );
             // Reverse each cluster's glyphs, such that they are in paint order.
@@ -421,20 +421,30 @@ pub struct ShapedRun {
 
 /// Processes shaped glyphs from `HarfRust` and converts them into `ShapedCluster` and `Glyph`.
 ///
-/// `characters` must contain the shaped characters whose clusters we're now processing, starting at
-/// index `characters_start`.
+/// # Parameters
 ///
-/// `glyph_infos` and `glyph_positions` must yield clusters in logical order (i.e. reversed for RTL
-/// runs). `char_style_indices` is the run's slice of per-character style indices, indexed by
-/// cluster ID.
+/// ## Output Parameters (mutated by this function):
+/// * `shaped_clusters` - Vector where new `ShapedCluster` entries will be pushed.
+/// * `glyphs` - Vector where new `Glyph` entries will be pushed. Note: single-glyph clusters
+///   with zero offsets are inlined directly into `ShapedCluster`.
+///
+/// ## Input Parameters:
+/// * `scale_factor` - Scaling factor used to convert font units to the target size.
+/// * `glyph_infos` - `HarfRust` glyph information in logical order (i.e., reversed for RTL runs).
+/// * `glyph_positions` - `HarfRust` glyph positioning data in logical order (i.e., reversed for RTL
+///   runs).
+/// * `char_style_indices` - The run's slice of per-character style indices, indexed by cluster ID.
+/// * `characters` must contain the shaped characters whose clusters we're now processing, starting at
+///   index `characters_start`.
+/// * `characters_start` - See `characters`.
 fn process_shaped_clusters<'a>(
-    characters: &[Character],
     shaped_clusters: &mut Vec<ShapedCluster>,
     glyphs: &mut Vec<Glyph>,
     scale_factor: f32,
     glyph_infos: impl Iterator<Item = &'a harfrust::GlyphInfo>,
     glyph_positions: impl Iterator<Item = &'a harfrust::GlyphPosition>,
     char_style_indices: &[u16],
+    characters: &[Character],
     characters_start: usize,
 ) {
     struct Cluster {
