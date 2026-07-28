@@ -305,6 +305,7 @@ impl BreakerState {
     /// it extends above and below the baseline, *not* including leading) as well as the intrinsic
     /// line height of the atom (i.e. including the full leading), which may be smaller than
     /// `ascent + descent` when the leading is negative.
+    #[inline]
     pub fn append_atom_to_line(
         &mut self,
         atom: &Atom<'_>,
@@ -710,7 +711,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // println!("TextRun ({:?})", &run_data.text_range);
 
                     // Iterate over the remaining atoms in the Run
-                    while let Some(atom) = slice.atoms_from(self.state.cluster_idx).next() {
+                    for atom in slice.atoms_from(self.state.cluster_idx) {
                         // Retrieve metadata about the atom
                         let first_character = &atom.characters()[0];
                         let whitespace = first_character.info.whitespace();
@@ -993,7 +994,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let slice = run.full_slice();
                     let cluster_end = shaped_run.shaped_clusters_range.end;
 
-                    while let Some(atom) = slice.atoms_from(self.state.cluster_idx).next() {
+                    for atom in slice.atoms_from(self.state.cluster_idx) {
                         // Check if we should break before this atom
                         if char_count >= max_chars && max_chars != 0 {
                             self.start_new_line(BreakReason::Regular, f32::MAX, line_indent);
