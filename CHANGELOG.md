@@ -36,6 +36,7 @@ This release has an [MSRV] of 1.88.
 #### Fontique
 
 - Fix compilation on 32-bit platforms without 64-bit atomics (e.g. `mipsel-unknown-linux-gnu`). ([#671][] by [@nicoburns][])
+- Don't panic when fontconfig exposes no fonts. ([#717][] by [@ogoffart][])
 
 ## [0.11.0] - 2026-06-24
 
@@ -711,6 +712,7 @@ This release has an [MSRV][] of 1.70.
 [#671]: https://github.com/linebender/parley/pull/671
 [#697]: https://github.com/linebender/parley/pull/697
 [#710]: https://github.com/linebender/parley/pull/710
+[#717]: https://github.com/linebender/parley/pull/717
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.11.0...HEAD
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0
