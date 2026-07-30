@@ -17,7 +17,7 @@ members = [
     "examples/swash_render",
     "examples/tiny_skia_render",
     "examples/vello_cpu_render",
-    "examples/vello_editor",
+    "examples/editor",
     "xtask",
 ]
 
