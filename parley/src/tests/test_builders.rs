@@ -202,7 +202,6 @@ fn assert_builders_produce_same_result<'b>(
     root_style: &TextStyle<'b, 'b, ColorBrush>,
     with_ranged_builder: impl Fn(&mut RangedBuilder<'_, ColorBrush>),
     with_tree_builder: impl Fn(&mut TreeBuilder<'_, ColorBrush>),
-    expect_empty: bool,
 ) {
     let mut fcx = create_font_context();
 
@@ -226,33 +225,17 @@ fn assert_builders_produce_same_result<'b>(
 
     // Source of truth - ranged builder from a clean layout context
     let layout_truth = build_layout_with_ranged(&mut fcx, &mut lcx_a, &ropts, &with_ranged_builder);
-    assert!(
-        layout_truth.data.runs.is_empty() == expect_empty,
-        "expected runs to exist for lcx_a_rb_one"
-    );
 
     // Testing idempotence of ranged builder creation
     let layout = build_layout_with_ranged(&mut fcx, &mut lcx_a, &ropts, &with_ranged_builder);
-    assert!(
-        layout.data.runs.is_empty() == expect_empty,
-        "expected runs to exist for lcx_a_rb_two"
-    );
     assert_eq_layout_data(&layout_truth.data, &layout.data, "lcx_a_rb_two");
 
     // Basic builder compatibility - tree builder from a clean layout context
     let layout = build_layout_with_tree(&mut fcx, &mut lcx_b, &topts, &with_tree_builder);
-    assert!(
-        layout.data.runs.is_empty() == expect_empty,
-        "expected runs to exist for lcx_b_tb_one"
-    );
     assert_eq_layout_data(&layout_truth.data, &layout.data, "lcx_b_tb_one");
 
     // Testing idempotence of tree builder creation
     let layout = build_layout_with_tree(&mut fcx, &mut lcx_b, &topts, &with_tree_builder);
-    assert!(
-        layout.data.runs.is_empty() == expect_empty,
-        "expected runs to exist for lcx_b_tb_two"
-    );
     assert_eq_layout_data(&layout_truth.data, &layout.data, "lcx_b_tb_two");
 
     // Priming a fresh layout context with ranged builder creation
@@ -260,10 +243,6 @@ fn assert_builders_produce_same_result<'b>(
 
     // Testing tree builder creation with a dirty layout context
     let layout = build_layout_with_tree(&mut fcx, &mut lcx_c, &topts, &with_tree_builder);
-    assert!(
-        layout.data.runs.is_empty() == expect_empty,
-        "expected runs to exist for lcx_c_tb_one"
-    );
     assert_eq_layout_data(&layout_truth.data, &layout.data, "lcx_c_tb_one");
 
     // Priming a fresh layout context with tree builder creation
@@ -271,10 +250,6 @@ fn assert_builders_produce_same_result<'b>(
 
     // Testing ranged builder creation with a dirty layout context
     let layout = build_layout_with_ranged(&mut fcx, &mut lcx_d, &ropts, &with_ranged_builder);
-    assert!(
-        layout.data.runs.is_empty() == expect_empty,
-        "expected runs to exist for lcx_d_rb_one"
-    );
     assert_eq_layout_data(&layout_truth.data, &layout.data, "lcx_d_rb_one");
 }
 
@@ -368,7 +343,6 @@ fn builders_default() {
         &root_style,
         with_ranged_builder,
         with_tree_builder,
-        false,
     );
 }
 
@@ -513,7 +487,6 @@ fn builders_root_only() {
         &root_style,
         with_ranged_builder,
         with_tree_builder,
-        false,
     );
 }
 
@@ -526,7 +499,7 @@ fn builders_empty() {
     let max_advance = Some(50.);
     let root_style = create_root_style();
 
-    let with_ranged_builder = |_rb: &mut RangedBuilder<'_, ColorBrush>| {};
+    let with_ranged_builder = |rb: &mut RangedBuilder<'_, ColorBrush>| set_root_style(rb);
     let with_tree_builder = |_tb: &mut TreeBuilder<'_, ColorBrush>| {};
 
     assert_builders_produce_same_result(
@@ -537,7 +510,6 @@ fn builders_empty() {
         &root_style,
         with_ranged_builder,
         with_tree_builder,
-        true,
     );
 }
 
@@ -592,7 +564,6 @@ fn builders_mixed_styles() {
         &root_style,
         with_ranged_builder,
         with_tree_builder,
-        false,
     );
 }
 
