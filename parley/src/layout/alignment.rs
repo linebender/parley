@@ -183,6 +183,13 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
                             if applied == line.num_spaces {
                                 return;
                             }
+                            // We check whether the cluster starts with a space or non-breaking
+                            // space, because we stretch that whitespace, *and* is a grapheme start,
+                            // i.e., an atom boundary.
+                            //
+                            // Not all spaces are grapheme boundaries (see
+                            // <https://www.unicode.org/reports/tr29/#GB9b>). Note the
+                            // `line.num_spaces` above was also counted over atoms.
                             if cluster.is_grapheme_start()
                                 && characters[cluster.chars_range().start as usize]
                                     .info
