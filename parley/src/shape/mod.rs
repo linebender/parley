@@ -4,16 +4,17 @@
 //! Text shaping implementation using `harfrust`for shaping
 //! and `icu` for text analysis.
 
+use alloc::borrow::ToOwned;
 use parley_engine::shape::{CharCluster, Coverage};
 use parley_engine::{Analysis, AnalysisDataSources, FontInstance, ShapeOptions, Shaper};
 
 use super::layout::Layout;
 use super::resolve::{ResolveContext, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
-use crate::FontData;
 use crate::inline_box::InlineBox;
 use crate::util::nearly_eq;
-use fontique::Language;
+use crate::{FontContext, FontData};
+use fontique::{Language, Synthesis};
 
 use fontique::{self, Query, QueryFamily, QueryFont};
 use parlance::Script;
@@ -21,7 +22,8 @@ use parlance::Script;
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn shape_text<'a, B: Brush>(
     rcx: &'a ResolveContext,
-    mut fq: Query<'a>,
+    fcx: &'a mut FontContext,
+    // mut fq: Query<'a>,
     styles: &'a [ResolvedStyle<B>],
     inline_boxes: &[InlineBox],
     analysis: &Analysis,
@@ -36,8 +38,17 @@ pub(crate) fn shape_text<'a, B: Brush>(
     if text.is_empty() && inline_boxes.is_empty() {
         text = " ";
     }
+
     // Do nothing if there is no text or styles (there should always be a default style)
-    if text.is_empty() || styles.is_empty() {
+    let fallback_font;
+    if text.is_empty() || styles.is_empty() || {
+        // Get any font (and only at this point, because if we returned due to empty text or styles,
+        // we don't need to build the font).
+        fallback_font = any_font(fcx);
+
+        // If `true`, there isn't even a single font we could use to shape.
+        fallback_font.is_none()
+    } {
         // Process any remaining inline boxes whose index is greater than the length of the text
         for box_idx in 0..inline_boxes.len() {
             // Push the box to the list of items
@@ -45,6 +56,9 @@ pub(crate) fn shape_text<'a, B: Brush>(
         }
         return;
     }
+    let fallback_font = fallback_font.unwrap();
+
+    let mut fq = fcx.collection.query(&mut fcx.source_cache);
 
     let mut inline_box_iter = inline_boxes.iter().peekable();
     let split_after = |item_range: parley_engine::itemize::TextRange| {
@@ -101,8 +115,15 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
         let style_index = char_style_indices[item.range.char_range.start];
         let style = &styles[usize::from(style_index)];
-        let mut font_selector =
-            FontSelector::new(&mut fq, rcx, styles, style_index, item.script, style.locale);
+        let mut font_selector = FontSelector::new(
+            &mut fq,
+            rcx,
+            styles,
+            style_index,
+            item.script,
+            style.locale,
+            &fallback_font,
+        );
 
         let shaped_runs_range = scx.shape_item(
             text,
@@ -116,17 +137,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 char_style_indices,
             },
             #[inline(always)]
-            |char_cluster| {
-                font_selector
-                    .select_font(char_cluster, analysis_data_sources)
-                    .map(|selected| FontInstance {
-                        font: FontData {
-                            data: selected.font.blob,
-                            index: selected.font.index,
-                        },
-                        synthesis: selected.font.synthesis,
-                    })
-            },
+            |char_cluster| font_selector.select_font(char_cluster, analysis_data_sources),
             &mut layout.data.shaped_text,
         );
         for shaped_run_idx in shaped_runs_range {
@@ -157,9 +168,16 @@ struct FontSelector<'a, 'b, B: Brush> {
     attrs: fontique::Attributes,
     variations: &'a [FontVariation],
     features: &'a [FontFeature],
+
+    /// The font to use if [`Self::query`] doesn't return any font.
+    fallback_font: &'b FontInstance,
 }
 
 impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
+    /// Construct a new `FontSelector`.
+    ///
+    /// If `query` ends up not returning a font for a query, the `fallback_font` is returned
+    /// instead.
     fn new(
         query: &'b mut Query<'a>,
         rcx: &'a ResolveContext,
@@ -167,6 +185,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         style_index: u16,
         script: Script,
         locale: Option<Language>,
+        fallback_font: &'b FontInstance,
     ) -> Self {
         let style = &styles[style_index as usize];
         let fonts_id = style.font_family.id();
@@ -192,6 +211,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             attrs,
             variations,
             features,
+            fallback_font,
         }
     }
 
@@ -199,7 +219,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         &mut self,
         cluster: &mut CharCluster,
         analysis_data_sources: &AnalysisDataSources,
-    ) -> Option<SelectedFont> {
+    ) -> FontInstance {
         let style_index = cluster.style_index();
         let is_emoji = cluster.is_emoji();
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
@@ -267,7 +287,32 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             }
         });
         selected_font
+            .map(|selected_font| FontInstance {
+                font: FontData {
+                    data: selected_font.font.blob,
+                    index: selected_font.font.index,
+                },
+                synthesis: selected_font.font.synthesis,
+            })
+            .unwrap_or(self.fallback_font.clone())
     }
+}
+
+/// Just select any font, that we can pass to [`FontSelector::new`] such that font selection becomes
+/// infallible.
+///
+/// All we need are some `.notdef`s. If this returns `None`, there are no fonts available at all.
+fn any_font(fcx: &mut FontContext) -> Option<FontInstance> {
+    let name = fcx.collection.family_names().next()?.to_owned();
+    let font = fcx
+        .collection
+        .family_by_name(&name)?
+        .default_font()?
+        .clone();
+    Some(FontInstance {
+        font: FontData::new(font.load(Some(&mut fcx.source_cache))?, font.index()),
+        synthesis: Synthesis::default(),
+    })
 }
 
 struct SelectedFont {

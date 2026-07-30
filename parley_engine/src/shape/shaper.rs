@@ -112,7 +112,7 @@ impl Shaper {
         analysis: &Analysis,
         item: &Item,
         options: &ShapeOptions<'_>,
-        select_font: impl FnMut(&mut CharCluster) -> Option<FontInstance>,
+        select_font: impl FnMut(&mut CharCluster) -> FontInstance,
         shaped_text: &mut ShapedText,
     ) -> Range<usize> {
         shaped_text.reserve(item.range.char_range.len());
@@ -136,7 +136,7 @@ fn shape_item(
     text: &str,
     item: &Item,
     options: &ShapeOptions<'_>,
-    mut select_font: impl FnMut(&mut CharCluster) -> Option<FontInstance>,
+    mut select_font: impl FnMut(&mut CharCluster) -> FontInstance,
     char_info: &[CharInfo],
     shaped_text: &mut ShapedText,
 ) {
@@ -176,7 +176,7 @@ fn shape_item(
         &mut code_unit_offset_in_string,
     );
 
-    let mut current_font = select_font(char_cluster);
+    let mut current_font = Some(select_font(char_cluster));
 
     // Main segmentation loop (based on swash shape_clusters) - only within current item
     while let Some(font) = current_font.take() {
@@ -195,17 +195,13 @@ fn shape_item(
                 &mut code_unit_offset_in_string,
             );
 
-            if let Some(next_font) = select_font(char_cluster) {
-                if next_font != font {
-                    current_font = Some(next_font);
-                    break;
-                } else {
-                    // Same font - add to current segment
-                    segment_end_offset = char_cluster.range().end as usize - text_range.start;
-                }
+            let next_font = select_font(char_cluster);
+            if next_font != font {
+                current_font = Some(next_font);
+                break;
             } else {
-                // No font determined, continue to next cluster
-                continue;
+                // Same font - add to current segment
+                segment_end_offset = char_cluster.range().end as usize - text_range.start;
             }
         }
 

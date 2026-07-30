@@ -363,10 +363,9 @@ fn build_into_layout<B: Brush>(
     lcx.inline_boxes.sort_by_key(|b| b.index);
 
     {
-        let query = fcx.collection.query(&mut fcx.source_cache);
         super::shape::shape_text(
             &lcx.rcx,
-            query,
+            fcx,
             &lcx.style_table,
             &lcx.inline_boxes,
             &lcx.analysis,
