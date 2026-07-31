@@ -7,9 +7,10 @@ use std::borrow::Cow;
 
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv, samples};
+use fontique::FontInfoOverride;
 use parley::layout::Alignment;
 use parley::style::StyleProperty;
-use parley::{AlignmentOptions, Layout};
+use parley::{AlignmentOptions, FontWeight, Layout};
 
 /// Helper to build a layout with a single font size applied
 fn build_with_font_size(env: &mut TestEnv, text: &str, size: f32) -> Layout<ColorBrush> {
@@ -70,6 +71,64 @@ fn style_font_weight_values() {
 
         env.with_name(name).check_layout_snapshot(&layout);
     }
+}
+
+#[test]
+fn style_font_weight_uses_variable_axis_default() {
+    use parley::setting::Tag;
+    use parley::style::{FontFamily, FontVariation, FontVariations};
+
+    const FAMILY: &str = "Roboto Flex Declared Thin";
+    const TEXT: &str = "Variable weight\nVariable weight";
+
+    let mut env = TestEnv::new(test_name!(), None);
+    let roboto_flex = env
+        .collection()
+        .family_by_name("Roboto Flex")
+        .unwrap()
+        .default_font()
+        .unwrap()
+        .load(None)
+        .unwrap();
+    // Re-register Roboto Flex with a user declared `weight` override.
+    let registered = env.collection().register_fonts(
+        roboto_flex,
+        Some(FontInfoOverride {
+            family_name: Some(FAMILY),
+            weight: Some(FontWeight::THIN),
+            ..Default::default()
+        }),
+    );
+    let font = &registered[0].1[0];
+    let weight_axis = font
+        .axes()
+        .iter()
+        .find(|axis| axis.tag.to_be_bytes() == *b"wght")
+        .unwrap();
+    assert_eq!(font.weight(), FontWeight::THIN);
+    assert_eq!(weight_axis.default, FontWeight::NORMAL.value());
+
+    let mut builder = env.ranged_builder(TEXT);
+    builder.push_default(StyleProperty::FontSize(48.0));
+    builder.push_default(StyleProperty::FontFamily(FontFamily::named(FAMILY)));
+    builder.push_default(StyleProperty::FontWeight(FontWeight::THIN));
+
+    // The first line relies on Fontique's synthesis. Give the second line the
+    // equivalent variation explicitly so the snapshot includes a reference.
+    let second_line = TEXT.find('\n').unwrap() + 1;
+    builder.push(
+        StyleProperty::FontVariations(FontVariations::List(Cow::Borrowed(&[FontVariation {
+            tag: Tag::new(b"wght"),
+            value: FontWeight::THIN.value(),
+        }]))),
+        second_line..,
+    );
+
+    let mut layout = builder.build(TEXT);
+    layout.break_all_lines(None);
+    layout.align(Alignment::Start, AlignmentOptions::default());
+
+    env.check_layout_snapshot(&layout);
 }
 
 // ============================================================================

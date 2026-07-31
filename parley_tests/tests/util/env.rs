@@ -164,6 +164,10 @@ impl TestEnv {
         &mut self.font_cx
     }
 
+    pub(crate) fn collection(&mut self) -> &mut Collection {
+        &mut self.font_cx.collection
+    }
+
     pub(crate) fn rendering_config(&mut self) -> &mut RenderingConfig {
         &mut self.rendering_config
     }
