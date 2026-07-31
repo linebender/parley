@@ -187,6 +187,22 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
             self.cursor == self.len,
             "StyleRunBuilder requires runs that cover the full text"
         );
+        if self.lcx.style_runs.is_empty() {
+            // This is reachable for empty text. In this case, the layout still needs a style and an
+            // empty style run, e.g. to size a cursor.
+            if self.lcx.style_table.is_empty() {
+                let style = self.lcx.rcx.resolve_entire_style_set(
+                    self.fcx,
+                    &TextStyle::default(),
+                    self.options.scale,
+                );
+                self.lcx.style_table.push(style);
+            }
+            self.lcx.style_runs.push(StyleRun {
+                style_index: 0,
+                range: 0..0,
+            });
+        }
         build_into_layout(layout, text.as_ref(), self.lcx, self.fcx, self.options);
     }
 

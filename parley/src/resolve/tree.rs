@@ -217,6 +217,15 @@ impl<B: Brush> TreeStyleBuilder<B> {
         style_table.extend_from_slice(&self.style_table);
         style_runs.extend_from_slice(&self.style_runs);
 
+        if style_runs.is_empty() {
+            // If there's no text, the layout still needs the root style, e.g., to size a cursor.
+            style_runs.push(StyleRun {
+                style_index: style_table.len() as u16,
+                range: 0..0,
+            });
+            style_table.push(self.current_style());
+        }
+
         core::mem::take(&mut self.text)
     }
 }
