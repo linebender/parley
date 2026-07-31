@@ -298,10 +298,10 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
     }
 }
 
-/// Just select any font, that we can pass to [`FontSelector::new`] such that font selection becomes
-/// infallible.
+/// Just select any font from the font collection.
 ///
-/// All we need are some `.notdef`s. If this returns `None`, there are no fonts available at all.
+/// If this returns `None`, there are no fonts available at all. This can be used to have a font at
+/// hand for shaping, in case more sophisticated font querying returns no fonts.
 fn any_font(fcx: &mut FontContext) -> Option<FontInstance> {
     let name = fcx.collection.family_names().next()?.to_owned();
     let font = fcx
