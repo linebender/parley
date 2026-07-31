@@ -337,6 +337,16 @@ pub(crate) fn analyze_text(
             if self.cursor >= self.text_len {
                 return None;
             }
+
+            // Ignore empty ranges.
+            while self
+                .word_break
+                .get(self.next)
+                .is_some_and(|(range, _)| range.is_empty())
+            {
+                self.next += 1;
+            }
+
             match self.word_break.get(self.next) {
                 // A gap before the next override: fill it with the default up to its start.
                 Some((range, _)) if self.cursor < range.start => {
@@ -407,7 +417,7 @@ pub(crate) fn analyze_text(
                 let style_start_index = range.start;
                 let mut prev_char_index = self.current_char;
 
-                // Find the character at the style boundary
+                // Find the character at the style boundary.
                 while self.current_char.0 < style_start_index {
                     prev_char_index = self.current_char;
                     self.current_char = self.char_indices.next().unwrap();

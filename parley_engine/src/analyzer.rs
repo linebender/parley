@@ -48,7 +48,8 @@ pub struct AnalysisOptions<'a> {
 
     /// Word break configuration for ranges of the source text.
     ///
-    /// Ranges must be sorted and non-overlapping. Gaps use [`WordBreak::Normal`].
+    /// Ranges must be sorted and non-overlapping, and must start and end on character boundaries of
+    /// the text. Empty ranges are ignored. Gaps use [`WordBreak::Normal`].
     pub word_break: &'a [(Range<usize>, WordBreak)],
 
     /// The callback which will be called as a first provider of line breaking decisions.
