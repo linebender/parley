@@ -4,14 +4,14 @@
 //! Shaping of text.
 
 use alloc::vec::Vec;
-use core::{mem, ops::Range};
+use core::mem;
 use harfrust::ShapeOptions as HarfShapeOptions;
 use linebender_resource_handle::FontData;
 use parlance::{FontFeature, FontVariation, Language};
 
 use crate::{
     Analysis, CharInfo, ShapedText,
-    itemize::{Item, TextRange},
+    itemize::{Item, Item_, TextRange},
     lru_cache::LruCache,
     shape::{CharCluster, cache},
 };
@@ -78,62 +78,83 @@ impl core::fmt::Debug for Shaper {
 }
 
 impl Shaper {
-    /// Shape an [`Item`] produced by [`Analysis::itemize`] into glyphs.
-    ///
-    /// The item is broken into runs of maximal sequences of character clusters for which
-    /// `select_font` returns the same font. The resulting shaped runs are appended to
-    /// `shaped_text`.
-    ///
-    /// `text` must be the same text as originally passed to create [`Analysis`]. `item` must be an
-    /// [`Item`] produced by [`Analysis::itemize`] on this text's analysis.
-    ///
-    /// The `select_font` callback should return the font to shape `char_cluster` with. If
-    /// consecutive character clusters select a different font, they become separately-shaped runs.
-    /// Shaping is aborted if `select_font` returns `None`; [`ShapedText`] then contains a partial
-    /// result.
-    ///
-    /// Returns the index range of runs appended to `shaped_text`.
     ///
     /// # Panics
     ///
-    /// Panics if the font returned by `select_font` isn't a parseable font.
-    pub fn shape_item(
+    /// Panics if `items` does not cover the entire source text.
+    pub fn shape_text<'options>(
         &mut self,
         text: &str,
         analysis: &Analysis,
-        item: &Item,
-        options: &ShapeOptions<'_>,
-        select_font: impl FnMut(&mut CharCluster) -> Option<FontInstance>,
+        items: impl IntoIterator<Item = Item_<'options>>,
+        // mut select_font: impl FnMut(&mut CharCluster) -> FontInstance,
+        mut select_font: impl FontSelector,
         shaped_text: &mut ShapedText,
-    ) -> Range<usize> {
-        shaped_text.reserve(item.range.char_range.len());
+    ) {
+        shaped_text.clear();
 
-        let start = shaped_text.runs().len();
-        let _ = shape_item(
-            self,
-            text,
-            item,
-            options,
-            select_font,
-            analysis.char_info(),
-            shaped_text,
-        );
-        start..shaped_text.runs().len()
+        let mut items = items.into_iter();
+
+        let mut current_item = items
+            .next()
+            .expect("`items` does not cover the entire source text");
+
+        let mut itemizer = analysis.itemize(text);
+
+        while let Some(item) = itemizer.next(
+            #[inline(always)]
+            |text_range| text_range.char_range.end == current_item.char_end as usize,
+        ) {
+            let item_char_end = item.range.char_range.end;
+
+            if shape_item(
+                self,
+                text,
+                &item,
+                &current_item.options,
+                &mut select_font,
+                analysis.char_info(),
+                shaped_text,
+            )
+            .is_err()
+            {
+                // Abort on error. This happens iff `FontSelector::select_font` failed to return a
+                // font. By aborting we ensure `ShapedText` covers the source text contiguously (as
+                // we need a font to construct `ShapedRun`).
+                return;
+            };
+
+            if item_char_end == current_item.char_end as usize {
+                let Some(next_item) = items.next() else {
+                    // The last item's end coincides with the end of the source text, so the
+                    // itemizer should be finished as well.
+                    assert!(
+                        itemizer.next(|_| false).is_none(),
+                        "`items` does not cover the entire source text"
+                    );
+                    break;
+                };
+                current_item = next_item;
+            }
+        }
     }
 }
 
 /// Shape one item.
 ///
-/// Returns `Err(())` if shaping should be aborted, which happens iff `select_font` returned `None`.
+/// Returns `Err(())` if shaping should be aborted, which happens iff [`FontSelector::select_font`]
+/// returned `None`.
 fn shape_item(
     scx: &mut Shaper,
     text: &str,
     item: &Item,
     options: &ShapeOptions<'_>,
-    mut select_font: impl FnMut(&mut CharCluster) -> Option<FontInstance>,
+    select_font: &mut impl FontSelector,
     char_info: &[CharInfo],
     shaped_text: &mut ShapedText,
 ) -> Result<(), ()> {
+    select_font.begin_item(item, options);
+
     let text_range = &item.range.byte_range;
     let char_range = &item.range.char_range;
 
@@ -170,7 +191,7 @@ fn shape_item(
         &mut code_unit_offset_in_string,
     );
 
-    let Some(next_font) = select_font(char_cluster) else {
+    let Some(next_font) = select_font.select_font(item, options, char_cluster) else {
         return Err(());
     };
     let mut current_font = Some(next_font);
@@ -192,7 +213,7 @@ fn shape_item(
                 &mut code_unit_offset_in_string,
             );
 
-            let Some(next_font) = select_font(char_cluster) else {
+            let Some(next_font) = select_font.select_font(item, options, char_cluster) else {
                 return Err(());
             };
             if next_font != font {
@@ -358,4 +379,23 @@ fn variations_iter<'a>(
 pub(crate) fn script_to_harfrust(script: fontique::Script) -> harfrust::Script {
     harfrust::Script::from_iso15924_tag(harfrust::Tag::new(&script.to_bytes()))
         .unwrap_or(harfrust::script::UNKNOWN)
+}
+
+pub trait FontSelector {
+    fn begin_item(&mut self, item: &Item, options: &ShapeOptions<'_>) {
+        let _ = (item, options);
+    }
+
+    /// Called once per character cluster within the current segment.
+    ///
+    /// A character cluster will usually be a grapheme, though if text direction or script changes
+    /// mid-grapheme, it will be split over segments.
+    ///
+    /// Shaping is aborted if this returns `None`; [`ShapedText`] then contains a partial result.
+    fn select_font(
+        &mut self,
+        item: &Item,
+        options: &ShapeOptions<'_>,
+        cluster: &mut CharCluster,
+    ) -> Option<FontInstance>;
 }
