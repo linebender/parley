@@ -18,7 +18,7 @@ use super::data::{Character, ShapedCluster};
 // hold reshaped slices that don't depend on `ShapedText`.
 #[derive(Copy, Clone, Debug)]
 pub struct ShapedSlice<'a> {
-    /// Character indices of shaped text.
+    /// Characters of shaped text.
     ///
     /// Most character indices (like [`ShapedCluster::chars_range`]) index into this array; note
     /// this is not necessarily parallel to characters of the source text. Only shaped text gets
@@ -57,7 +57,9 @@ impl<'a> ShapedSlice<'a> {
         self.characters_in(self.char_range())
     }
 
-    /// The [`Character`]s spanned by `chars_range`.
+    /// The [`Character`]s within this slice spanned by `chars_range`.
+    ///
+    /// Note that `chars_range` is an absolute range over the source text.
     #[inline(always)]
     pub fn characters_in(&self, chars_range: Range<u32>) -> &'a [Character] {
         debug_assert!(
@@ -111,8 +113,7 @@ impl<'a> ShapedSlice<'a> {
 
     /// The byte position in the source text of the character boundary at `char_idx`.
     ///
-    /// `char_idx` indexes into [`Self::characters`] and must be within this slice's
-    /// [`Self::char_range`].
+    /// `char_idx` must be within this slice's [`Self::char_range`].
     #[inline]
     pub fn text_byte_at(&self, char_idx: u32) -> usize {
         let char_range = self.char_range();
@@ -136,12 +137,18 @@ impl<'a> ShapedSlice<'a> {
     }
 
     /// Get a cursor to walk atoms from the logical start of this slice.
+    ///
+    /// The cursor cannot go outside this slice, so the first step can only be taken forwards.
+    /// Immediately going backwards will return `None`.
     #[inline(always)]
     pub fn atoms_start(&self) -> Atoms<'a> {
         self.atoms_from(self.clusters.0)
     }
 
     /// Get a cursor to walk atoms from the logical end of this slice.
+    ///
+    /// The cursor cannot go outside this slice, so the first step can only be taken backwards.
+    /// Immediately going forwards will return `None`.
     #[inline(always)]
     pub fn atoms_end(&self) -> Atoms<'a> {
         self.atoms_from(self.clusters.1)
@@ -175,8 +182,8 @@ impl<'a> ShapedSlice<'a> {
 
     /// Get the atom containing the character at `char_index`.
     ///
-    /// Note: this is the index into this [`ShapedSlice`]'s character slice, which is not
-    /// necessarily the same as the underlying source text's characters.
+    /// Note: this is the index into the [`ShapedSlice`]'s character slice, which is not necessarily
+    /// the same as the underlying source text's characters.
     ///
     /// To start walking from the returned atom, call [`Atom::cursor_before`] or
     /// [`Atom::cursor_after`].
@@ -435,7 +442,8 @@ impl<'a> Atom<'a> {
         rtl.then(|| clusters.iter().rev())
             .into_iter()
             .flatten()
-            // we chain because `reverse` wrap in `Rev`, which is a different type
+            // we chain because `.rev()` wraps the iterator in `Rev` - a different type than the LTR
+            // iterator.
             .chain((!rtl).then(|| clusters.iter()).into_iter().flatten())
             .flat_map(move |cluster| {
                 let inline = cluster.has_inline_glyph().then_some(Glyph {
@@ -726,11 +734,19 @@ impl GraphemeFlags {
 /// This encodes extended grapheme clusters as in [UAX #29 § 3][uax-grapheme].
 ///
 /// Graphemes usually are the units of caret movement, selection, and hit testing. A grapheme's
-/// edges are not necessarily [`ShapedCluster`] edges: a cluster can span multiple graphemes (e.g. a
-/// ligature), in which case its advance is split evenly over the graphemes it overlaps; see
-/// [`Self::advance`]. A grapheme can also span multiple shaped clusters.
+/// edges are not necessarily [`ShapedCluster`] edges: 
+///
+/// - a cluster can span multiple graphemes (e.g. a ligature)
+///   - where [`ShapedCluster::advance`] is split evenly over the graphemes it overlaps.
+/// - a grapheme can span multiple shaped clusters, due to shaping with `harfrust`'s [monotone
+/// characters cluster level][monotone-characters]
+///   - where [`Self::advance`] is the sum of shaped cluster advances.
+///
+/// A combination of these is also possible, e.g., a grapheme containing multiple shaped clusters
+/// and crossing a shaped cluster boundary on one or both sides.
 ///
 /// [uax-grapheme]: https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries
+/// [monotone-characters]: https://harfbuzz.github.io/working-with-harfbuzz-clusters.html
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Grapheme {
     /// The characters this grapheme spans inside [`ShapedSlice::characters`].
