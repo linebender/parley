@@ -7,6 +7,10 @@ use core::ops::Range;
 
 use crate::{Boundary, shape::Whitespace};
 
+/// Data for a single character of the source text.
+///
+/// This is a character in the Unicode scalar value sense, i.e., it corresponds to a single `char`
+/// of the source text.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Character {
     pub text_byte_start: u32,
