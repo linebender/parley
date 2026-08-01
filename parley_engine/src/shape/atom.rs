@@ -734,12 +734,12 @@ impl GraphemeFlags {
 /// This encodes extended grapheme clusters as in [UAX #29 § 3][uax-grapheme].
 ///
 /// Graphemes usually are the units of caret movement, selection, and hit testing. A grapheme's
-/// edges are not necessarily [`ShapedCluster`] edges: 
+/// edges are not necessarily [`ShapedCluster`] edges:
 ///
 /// - a cluster can span multiple graphemes (e.g. a ligature)
 ///   - where [`ShapedCluster::advance`] is split evenly over the graphemes it overlaps.
-/// - a grapheme can span multiple shaped clusters, due to shaping with `harfrust`'s [monotone
-/// characters cluster level][monotone-characters]
+/// - a grapheme can span multiple shaped clusters, due to shaping with `harfrust`'s
+///   [monotone characters cluster level][monotone-characters]
 ///   - where [`Self::advance`] is the sum of shaped cluster advances.
 ///
 /// A combination of these is also possible, e.g., a grapheme containing multiple shaped clusters
