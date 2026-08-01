@@ -529,8 +529,6 @@ impl<'a> Atom<'a> {
 pub struct Graphemes<'a> {
     slice: ShapedSlice<'a>,
 
-    // /// The characters these graphemes span inside [`ShapedSlice::characters`].
-    // char_range: (u32, u32),
     /// The gap we're pointing at into [`ShapedSlice::characters`].
     char_idx: u32,
 
