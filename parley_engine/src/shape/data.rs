@@ -99,6 +99,9 @@ pub struct ShapedCluster {
     /// Note this is not a character index into the source text: the shaped character array only
     /// contains the characters of runs that were actually shaped. Mapping back to the source text
     /// goes through [`Character::text_byte_start`].
+    //
+    // TODO: this currently stores the full range, but perhaps we could store only the start index.
+    // See <https://github.com/linebender/parley/pull/715#discussion_r3693794119>.
     pub(crate) chars_range: (u32, u32),
 
     /// Style index for this cluster.
