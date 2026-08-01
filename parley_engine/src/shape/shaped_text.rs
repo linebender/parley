@@ -380,7 +380,7 @@ impl ShapedText {
             range,
             font_size: options.font_size,
             font_index,
-            characters_range: characters_start..self.characters.len(),
+            characters_range: characters_start as u32..self.characters.len() as u32,
             shaped_clusters_range,
             glyphs_range: glyphs_start..self.glyphs.len(),
             normalized_coords_range,
@@ -404,7 +404,7 @@ pub struct ShapedRun {
     // meaning `ShapedRun` could become `Copy` once we have access to `core::range::Range`.
     pub font_index: usize,
     /// This run's characters, as a range into [`ShapedText::characters`].
-    pub characters_range: Range<usize>,
+    pub characters_range: Range<u32>,
     /// This run's shaped clusters, as a range into [`ShapedText::shaped_clusters`].
     pub shaped_clusters_range: Range<u32>,
     /// This run's glyphs, as a range into [`ShapedText::glyphs`].

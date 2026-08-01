@@ -294,7 +294,7 @@ impl<B: Brush> LayoutData<B> {
             "Shaped runs returned by `parley_engine` must be non-empty"
         );
         let style_index =
-            self.shaped_text.characters()[shaped_run.characters_range.start].style_index;
+            self.shaped_text.characters()[shaped_run.characters_range.start as usize].style_index;
 
         let line_height = {
             // Compute line height
