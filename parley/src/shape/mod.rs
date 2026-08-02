@@ -39,14 +39,14 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 
     // Do nothing if there is no text or styles (there should always be a default style)
-    let fallback_font;
+    let last_resort_font;
     if text.is_empty() || styles.is_empty() || {
         // Get any font (and only at this point, because if we returned due to empty text or styles,
         // we don't need to build the font).
-        fallback_font = any_font(fcx);
+        last_resort_font = any_font(fcx);
 
         // If `true`, there isn't even a single font we could use to shape.
-        fallback_font.is_none()
+        last_resort_font.is_none()
     } {
         // Process any remaining inline boxes whose index is greater than the length of the text
         for box_idx in 0..inline_boxes.len() {
@@ -55,7 +55,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         }
         return;
     }
-    let fallback_font = fallback_font.unwrap();
+    let last_resort_font = last_resort_font.unwrap();
 
     let mut fq = fcx.collection.query(&mut fcx.source_cache);
 
@@ -121,7 +121,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             style_index,
             item.script,
             style.locale,
-            &fallback_font,
+            &last_resort_font,
         );
 
         let shaped_runs_range = scx.shape_item(
@@ -169,13 +169,13 @@ struct FontSelector<'a, 'b, B: Brush> {
     features: &'a [FontFeature],
 
     /// The font to use if [`Self::query`] doesn't return any font.
-    fallback_font: &'b FontInstance,
+    last_resort_font: &'b FontInstance,
 }
 
 impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
     /// Construct a new `FontSelector`.
     ///
-    /// If `query` ends up not returning a font for a query, the `fallback_font` is returned
+    /// If `query` ends up not returning a font for a query, the `last_resort_font` is returned
     /// instead.
     fn new(
         query: &'b mut Query<'a>,
@@ -184,7 +184,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         style_index: u16,
         script: Script,
         locale: Option<Language>,
-        fallback_font: &'b FontInstance,
+        last_resort_font: &'b FontInstance,
     ) -> Self {
         let style = &styles[style_index as usize];
         let fonts_id = style.font_family.id();
@@ -210,7 +210,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             attrs,
             variations,
             features,
-            fallback_font,
+            last_resort_font,
         }
     }
 
@@ -293,7 +293,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
                 },
                 synthesis: selected_font.font.synthesis,
             })
-            .unwrap_or(self.fallback_font.clone())
+            .unwrap_or(self.last_resort_font.clone())
     }
 }
 
