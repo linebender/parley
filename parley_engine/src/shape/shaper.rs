@@ -47,7 +47,7 @@ pub struct FontInstance {
     pub synthesis: fontique::Synthesis,
 }
 
-/// Reusable scratch to shape [items][`Item`] into shaped text using [`Self::shape_item`].
+/// Reusable scratch to shape text using [`Self::shape_text`].
 pub struct Shaper {
     shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::ShaperData>,
     shape_instance_cache: LruCache<cache::ShapeInstanceId, harfrust::ShaperInstance>,
@@ -78,16 +78,30 @@ impl core::fmt::Debug for Shaper {
 }
 
 impl Shaper {
+    /// Shape text into glyphs, overwriting `shaped_text`.
+    ///
+    /// The `text` passed in must be the same as used for producing `analysis`.
+    ///
+    /// This uses the items returned by `items`, and further itemizes the text into
+    /// individually-shapeable runs of constant bidi level and script. `items` should be used to
+    /// split on properties like shaping-relevant style changes (e.g., font size) or properties like
+    /// language.
+    ///
+    /// Characters that don't have a particular script have their script resolved based on
+    /// surrounding context (see [`crate::itemizer::Item::script`]).
+    ///
+    /// Each item is then broken into runs of maximal sequences of character clusters for which
+    /// `select_font` returns the same font.
     ///
     /// # Panics
     ///
-    /// Panics if `items` does not cover the entire source text.
+    /// Panics if `items` does not cover the entire source text, or the font returned by
+    /// `select_font` is malformed.
     pub fn shape_text<'options>(
         &mut self,
         text: &str,
         analysis: &Analysis,
         items: impl IntoIterator<Item = Item_<'options>>,
-        // mut select_font: impl FnMut(&mut CharCluster) -> FontInstance,
         mut select_font: impl FontSelector,
         shaped_text: &mut ShapedText,
     ) {

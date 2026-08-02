@@ -89,9 +89,8 @@ pub struct FontMetrics {
 
 /// The result of shaping.
 ///
-/// After [itemizing][crate::itemize::Item] your text,
-/// [shape each item][crate::Shaper::shape_item], appending the result into this
-/// [`ShapedText`]. This then holds your shaped paragraph of text.
+/// After [analyzing][crate::Analysis] your text, [shape the text][crate::Shaper::shape_text],
+/// writing the result into this [`ShapedText`]. This then holds your shaped paragraph of text.
 ///
 /// This shaped text holds spans of the source text's characters that were shaped into
 /// [`ShapedCluster`]s. Note that the boundaries of shaped clusters and graphemes need not coincide;
