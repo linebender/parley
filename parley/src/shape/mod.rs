@@ -13,7 +13,6 @@ use super::style::{Brush, FontFeature, FontVariation};
 use crate::inline_box::InlineBox;
 use crate::util::nearly_eq;
 use crate::{FontContext, FontData};
-use fontique::Language;
 
 use fontique::{self, Query, QueryFamily, QueryFont};
 use parlance::{BidiLevel, GenericFamily, Script};
@@ -131,13 +130,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         })
     };
 
-    let font_selector = FontSelector::new(
-        &mut fq,
-        rcx,
-        styles,
-        char_style_indices,
-        analysis_data_sources,
-    );
+    let font_selector = FontSelector::new(&mut fq, rcx, styles, analysis_data_sources);
 
     scx.shape_text(
         text,
@@ -211,8 +204,6 @@ enum LastResortFont {
 }
 
 struct FontSelector<'a, 'b, B: Brush> {
-    char_style_indices: &'a [u16],
-
     query: &'b mut Query<'a>,
     fonts_id: Option<usize>,
     rcx: &'a ResolveContext,
@@ -356,7 +347,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         query: &'b mut Query<'a>,
         rcx: &'a ResolveContext,
         styles: &'a [ResolvedStyle<B>],
-        char_style_indices: &'a [u16],
         analysis_data_sources: &'a AnalysisDataSources,
     ) -> Self {
         let attrs = fontique::Attributes::default();
@@ -372,7 +362,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             features: &[],
             last_resort_font: LastResortFont::Unresolved,
 
-            char_style_indices,
             analysis_data_sources,
         }
     }
