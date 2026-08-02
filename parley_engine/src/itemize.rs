@@ -43,13 +43,24 @@ pub struct Item {
 /// An item produced by [`Analysis::itemize`].
 #[derive(Debug)]
 pub struct Item_<'a> {
-    /// The options to shape this item with.
-    pub options: ShapeOptions<'a>,
     /// The character offset in the source text which this item ends.
     ///
     /// This must be strictly greater than the previous item's end. For the first item, it must be
     /// greater than 0.
     pub char_end: u32,
+
+    /// The options to shape this item with.
+    pub options: ShapeOptions<'a>,
+
+    // TODO: we probably should allow users to pass in some data (like we allow passing
+    // style_indices elsewhere), which we copy onto `ShapedRun`. That allows users to easily
+    // correlate `ShapedRun`s with some data they themselves hold.
+    //
+    // This is potentially important for better correctness in `parley`: it itemizes based on
+    // `nearly_eq` of shaping-relevant styles like font size, i.e., it should then read that item's
+    // style to know the font size, even though it may be different for the run.
+    // /// Opaque data copied onto every `ShapedRun` produced from this item.
+    // pub user_data: u16,
 }
 
 /// Produces the items in a text via [`Self::next`]; created by [`Analysis::itemize`].
