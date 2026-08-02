@@ -51,20 +51,43 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
     let mut inline_box_iter = inline_boxes.iter().peekable();
 
+    // Split when shaping-relevant style properties change and at inline boxes.
     let items = {
-        core::iter::from_fn(|| {
-            let mut item_start_char: u32 = 0;
-            let mut cur_char: u32 = 0;
-            loop {
-                let mut split = false;
+        let char_count = char_style_indices.len();
 
+        // The first character of the item currently being built.
+        let mut item_start_char = 0_usize;
+
+        // Positioned at `item_start_char`, i.e., the first character not yet covered by an item.
+        let mut chars = text.char_indices().enumerate().peekable();
+        core::iter::from_fn(move || {
+            if item_start_char == char_count {
+                return None;
+            }
+
+            let item_style_index = char_style_indices[item_start_char];
+            let item_style = &styles[usize::from(item_style_index)];
+
+            // Items are at least one character long, therefore the item's own first character is
+            // never a split point.
+            chars.next();
+
+            let char_end = loop {
+                let Some(&(char_index, (byte_index, _))) = chars.peek() else {
+                    // End of text.
+                    break char_count;
+                };
+
+                // Split at inlines boxes, so each box falls on a shaping boundary.
+                //
                 // We loop because there may be multiple boxes at this index.
+                let mut split = false;
                 while let Some(inline_box) = inline_box_iter.peek() {
-                    if inline_box.index < cur_char as usize {
+                    if inline_box.index < byte_index {
                         // Inline boxes *before* this index are popped (this occurs if the itemizer
                         // split a run and we were not called, such as at a bidi boundary).
                         inline_box_iter.next();
-                    } else if inline_box.index == cur_char as usize {
+                    } else if inline_box.index == byte_index {
                         inline_box_iter.next();
                         split = true;
                     } else {
@@ -72,43 +95,43 @@ pub(crate) fn shape_text<'a, B: Brush>(
                     }
                 }
 
-                let item_style_index = char_style_indices[item_start_char as usize];
-                let style_index = char_style_indices[cur_char as usize];
+                if split {
+                    break char_index;
+                }
 
+                let style_index = char_style_indices[char_index];
                 if style_index != item_style_index {
-                    let item_style = &styles[usize::from(item_style_index)];
                     let style = &styles[usize::from(style_index)];
                     split = !nearly_eq(style.font_size, item_style.font_size)
                         || style.locale != item_style.locale
                         || style.font_variations != item_style.font_variations
                         || style.font_features != item_style.font_features
                         || !nearly_eq(style.letter_spacing, item_style.letter_spacing)
-                        || !nearly_eq(style.word_spacing, item_style.word_spacing)
+                        || !nearly_eq(style.word_spacing, item_style.word_spacing);
                 }
 
                 if split {
-                    item_start_char = cur_char;
-                    cur_char += 1;
-
-                    let item_style = &styles[usize::from(item_style_index)];
-                    break Some(parley_engine::itemize::Item_ {
-                        char_end: item_start_char,
-                        options: ShapeOptions {
-                            language: item_style.locale,
-                            font_size: item_style.font_size,
-                            features: rcx.features(item_style.font_features).unwrap_or(&[]),
-                            variations: rcx.variations(item_style.font_variations).unwrap_or(&[]),
-                            char_style_indices,
-                        },
-                    });
-                } else {
-                    cur_char += 1;
+                    break char_index;
                 }
-            }
+
+                chars.next();
+            };
+
+            item_start_char = char_end;
+            Some(parley_engine::itemize::Item_ {
+                char_end: char_end as u32,
+                options: ShapeOptions {
+                    language: item_style.locale,
+                    font_size: item_style.font_size,
+                    features: rcx.features(item_style.font_features).unwrap_or(&[]),
+                    variations: rcx.variations(item_style.font_variations).unwrap_or(&[]),
+                    char_style_indices,
+                },
+            })
         })
     };
 
-    let mut font_selector = FontSelector::new(
+    let font_selector = FontSelector::new(
         &mut fq,
         rcx,
         styles,
@@ -141,14 +164,16 @@ pub(crate) fn shape_text<'a, B: Brush>(
             }
         }
 
-        let shaped_run = &layout.data.shaped_text.runs()[shaped_run_idx];
-        let run_style_index = char_style_indices[shaped_run.range.char_range.start];
-        let run_style = &styles[usize::from(run_style_index)];
         layout.data.process_shaped_run(
             shaped_run_idx,
+            // TODO: should we get the *item's* style here?
+            //
+            // Using the run's style for word and letter spacing is probably correct (and in fact,
+            // we probably shouldn't itemize on them; we should just ensure we don't ligate if
+            // they're non-zero).
             run_style,
-            style.word_spacing,
-            style.letter_spacing,
+            run_style.word_spacing,
+            run_style.letter_spacing,
         );
     }
 
@@ -173,7 +198,7 @@ struct FontSelector<'a, 'b, B: Brush> {
     fonts_id: Option<usize>,
     rcx: &'a ResolveContext,
     styles: &'a [ResolvedStyle<B>],
-    // style_index: u16,
+    style_index: u16,
     attrs: fontique::Attributes,
     variations: &'a [FontVariation],
     features: &'a [FontFeature],
@@ -185,46 +210,57 @@ struct FontSelector<'a, 'b, B: Brush> {
 }
 
 impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
+    #[inline(always)]
     fn begin_item(&mut self, item: &parley_engine::itemize::Item, options: &ShapeOptions<'_>) {
-        let style_index = self.char_style_indices[item.range.char_range.start];
-
-        // self.style_index = style_index;
-        let style = &self.styles[style_index as usize];
-
-        let fonts_id = style.font_family.id();
-        let fonts = self.rcx.stack(style.font_family).unwrap_or(&[]);
-        let fonts = fonts.iter().copied().map(QueryFamily::Id);
-        // if is_emoji {
-        //     use core::iter::once;
-        //     let emoji_family = QueryFamily::Generic(GenericFamily::Emoji);
-        //     self.query.set_families(fonts.chain(once(emoji_family)));
-        //     self.fonts_id = None;
-        // } else if self.fonts_id != Some(fonts_id) {
-        self.query.set_families(fonts);
-        self.fonts_id = Some(fonts_id);
-        // }
-
-        let attrs = fontique::Attributes {
-            width: style.font_width,
-            weight: style.font_weight,
-            style: style.font_style,
-        };
-        if self.attrs != attrs {
-            self.query.set_attributes(attrs);
-            self.attrs = attrs;
-        }
-        self.variations = self.rcx.variations(style.font_variations).unwrap_or(&[]);
-        self.features = self.rcx.features(style.font_features).unwrap_or(&[]);
+        self.query.set_fallbacks(fontique::FallbackKey::new(
+            item.script,
+            options.language.as_ref(),
+        ));
     }
 
+    #[inline(always)]
     fn select_font(
         &mut self,
-        item: &parley_engine::itemize::Item,
-        options: &ShapeOptions<'_>,
+        _item: &parley_engine::itemize::Item,
+        _options: &ShapeOptions<'_>,
         cluster: &mut CharCluster,
     ) -> Option<FontInstance> {
+        let style_index = cluster.style_index();
+        let is_emoji = cluster.is_emoji();
+
+        if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
+            self.style_index = style_index;
+            let style = &self.styles[style_index as usize];
+
+            let fonts_id = style.font_family.id();
+            let fonts = self.rcx.stack(style.font_family).unwrap_or(&[]);
+            let fonts = fonts.iter().copied().map(QueryFamily::Id);
+            if is_emoji {
+                use core::iter::once;
+                let emoji_family = QueryFamily::Generic(GenericFamily::Emoji);
+                self.query.set_families(fonts.chain(once(emoji_family)));
+                self.fonts_id = None;
+            } else if self.fonts_id != Some(fonts_id) {
+                self.query.set_families(fonts);
+                self.fonts_id = Some(fonts_id);
+            }
+
+            let attrs = fontique::Attributes {
+                width: style.font_width,
+                weight: style.font_weight,
+                style: style.font_style,
+            };
+            if self.attrs != attrs {
+                self.query.set_attributes(attrs);
+                self.attrs = attrs;
+            }
+            self.variations = self.rcx.variations(style.font_variations).unwrap_or(&[]);
+            self.features = self.rcx.features(style.font_features).unwrap_or(&[]);
+        }
+
         let mut selected_font = None;
         let mut best_coverage = Coverage::NONE;
+
         self.query.matches_with(|font| {
             let Some(charmap) = font.charmap() else {
                 return fontique::QueryStatus::Continue;
@@ -304,33 +340,16 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         rcx: &'a ResolveContext,
         styles: &'a [ResolvedStyle<B>],
         char_style_indices: &'a [u16],
-        // style_index: u16,
-        // script: Script,
-        // locale: Option<Language>,
         analysis_data_sources: &'a AnalysisDataSources,
     ) -> Self {
-        // let style = &styles[style_index as usize];
-        // let fonts_id = style.font_family.id();
-        // let fonts = rcx.stack(style.font_family).unwrap_or(&[]);
         let attrs = fontique::Attributes::default();
-        // {
-        //     width: style.font_width,
-        //     weight: style.font_weight,
-        //     style: style.font_style,
-        // };
-        // let variations = rcx.variations(style.font_variations).unwrap_or(&[]);
-        // let features = rcx.features(style.font_features).unwrap_or(&[]);
-        // query.set_families(fonts.iter().copied());
-
-        // query.set_fallbacks(fontique::FallbackKey::new(script, locale.as_ref()));
-        // query.set_attributes(attrs);
 
         Self {
             query,
             fonts_id: None,
             rcx,
             styles,
-            // style_index,
+            style_index: 0,
             attrs,
             variations: &[],
             features: &[],
