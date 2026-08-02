@@ -51,7 +51,6 @@ pub struct Item_<'a> {
 
     /// The options to shape this item with.
     pub options: ShapeOptions<'a>,
-
     // TODO: we probably should allow users to pass in some data (like we allow passing
     // style_indices elsewhere), which we copy onto `ShapedRun`. That allows users to easily
     // correlate `ShapedRun`s with some data they themselves hold.

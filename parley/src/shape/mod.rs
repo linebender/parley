@@ -16,7 +16,7 @@ use crate::{FontContext, FontData};
 use fontique::Language;
 
 use fontique::{self, Query, QueryFamily, QueryFont};
-use parlance::{GenericFamily, Script};
+use parlance::{BidiLevel, GenericFamily, Script};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn shape_text<'a, B: Brush>(
@@ -42,7 +42,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         // Process any remaining inline boxes whose index is greater than the length of the text
         for box_idx in 0..inline_boxes.len() {
             // Push the box to the list of items
-            layout.data.push_inline_box(box_idx);
+            layout.data.push_inline_box(box_idx, BidiLevel::new(0));
         }
         return;
     }
@@ -155,9 +155,18 @@ pub(crate) fn shape_text<'a, B: Brush>(
         let run_style = &styles[usize::from(run_style_index)];
 
         // Push inline boxes positioned before the start of this item.
+        //
+        // TODO: this lets the inline box take the bidi level of the previous run, but in principle
+        // inline boxes should be included in bidi analysis as an object replacement character
+        // (U+FFFC). The box should then take the bidi level of that character.
+        let prev_bidi_level = if shaped_run_idx > 0 {
+            layout.data.shaped_text.runs()[&shaped_run_idx - 1].bidi_level
+        } else {
+            BidiLevel::new(0)
+        };
         while let Some((box_idx, inline_box)) = inline_box_iter.peek() {
             if inline_box.index <= run_text_byte_start {
-                layout.data.push_inline_box(*box_idx);
+                layout.data.push_inline_box(*box_idx, prev_bidi_level);
                 inline_box_iter.next();
             } else {
                 break;
@@ -178,8 +187,18 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 
     // Process any remaining inline boxes whose index is greater than the length of the text
+    //
+    // Give the box the same bidi level as the last text run (or else default to 0 if there is no
+    // text run).
+    let bidi_level = layout
+        .data
+        .shaped_text
+        .runs()
+        .last()
+        .map(|r| r.bidi_level)
+        .unwrap_or(BidiLevel::new(0));
     for (box_idx, _inline_box) in inline_box_iter {
-        layout.data.push_inline_box(box_idx);
+        layout.data.push_inline_box(box_idx, bidi_level);
     }
 }
 
@@ -210,7 +229,6 @@ struct FontSelector<'a, 'b, B: Brush> {
 }
 
 impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
-    #[inline(always)]
     fn begin_item(&mut self, item: &parley_engine::itemize::Item, options: &ShapeOptions<'_>) {
         self.query.set_fallbacks(fontique::FallbackKey::new(
             item.script,
@@ -218,7 +236,6 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
         ));
     }
 
-    #[inline(always)]
     fn select_font(
         &mut self,
         _item: &parley_engine::itemize::Item,
