@@ -52,6 +52,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
     // Split when shaping-relevant style properties change and at inline boxes.
     let items = {
+        // TODO: we currently walk characters here, but we could instead just walk boundaries of
+        // styles and inline boxes.
         let char_count = char_style_indices.len();
 
         // The first character of the item currently being built.
