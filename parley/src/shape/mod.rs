@@ -23,7 +23,6 @@ use parlance::Script;
 pub(crate) fn shape_text<'a, B: Brush>(
     rcx: &'a ResolveContext,
     fcx: &'a mut FontContext,
-    // mut fq: Query<'a>,
     styles: &'a [ResolvedStyle<B>],
     inline_boxes: &[InlineBox],
     analysis: &Analysis,
