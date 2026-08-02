@@ -309,22 +309,34 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
 fn any_font(fcx: &mut FontContext) -> Option<QueryFont> {
     let mut found = None;
 
-    // First try generic text families, and set Latin-script fallback fonts. But note that at this
-    // point, the font itself doesn't really matter: we mostly just need any font to work with.
-    {
-        let mut query = fcx.collection.query(&mut fcx.source_cache);
-        query.set_families(
-            [
-                GenericFamily::SansSerif,
-                GenericFamily::Serif,
-                GenericFamily::Monospace,
-            ]
-            .map(GenericFamily::from),
-        );
-        query.set_fallbacks(fontique::FallbackKey::new(
+    // First try the system's preferred generic text families.
+    //
+    // At this point, the font itself doesn't really matter: we mostly just need any font to work
+    // with. We take the first from each generic family, as on most systems that should "just work"
+    // and give a sensible font, while allowing us to skip extending our query's candidate font
+    // families with all the generic families registered on the system.
+    let sans = fcx
+        .collection
+        .generic_families(GenericFamily::SansSerif)
+        .next();
+    let serif = fcx.collection.generic_families(GenericFamily::Serif).next();
+    let monospace = fcx
+        .collection
+        .generic_families(GenericFamily::Monospace)
+        .next();
+    // Plus any font covering Latin.
+    let latin = fcx
+        .collection
+        .fallback_families(fontique::FallbackKey::new(
             Script::from_bytes(*b"Latn"),
             None,
-        ));
+        ))
+        .next();
+    let preferred = [sans, serif, monospace, latin];
+
+    {
+        let mut query = fcx.collection.query(&mut fcx.source_cache);
+        query.set_families(preferred.into_iter().flatten());
         query.matches_with(
             #[inline]
             |font: &QueryFont| {
