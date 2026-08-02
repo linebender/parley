@@ -404,7 +404,11 @@ pub(crate) fn script_to_harfrust(script: fontique::Script) -> harfrust::Script {
         .unwrap_or(harfrust::script::UNKNOWN)
 }
 
+/// Implements font selection for shaping.
 pub trait FontSelector {
+    /// Called when a new item starts.
+    ///
+    /// This can be useful to inspect, e.g., the item's script.
     fn begin_item(&mut self, item: &Item, options: &ShapeOptions<'_>) {
         let _ = (item, options);
     }
