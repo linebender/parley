@@ -110,9 +110,13 @@ impl Shaper {
 
         let mut items = items.into_iter();
 
-        let mut current_item = items
-            .next()
-            .expect("`items` does not cover the entire source text");
+        let Some(mut current_item) = items.next() else {
+            assert!(
+                text.is_empty(),
+                "`items` does not cover the entire source text"
+            );
+            return;
+        };
 
         let mut itemizer = analysis.itemize(text);
 
