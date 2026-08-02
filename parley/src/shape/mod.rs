@@ -4,7 +4,7 @@
 //! Text shaping implementation using `harfrust`for shaping
 //! and `icu` for text analysis.
 
-use alloc::borrow::ToOwned;
+use alloc::vec::Vec;
 use parley_engine::shape::{CharCluster, Coverage};
 use parley_engine::{Analysis, AnalysisDataSources, FontInstance, ShapeOptions, Shaper};
 
@@ -14,10 +14,10 @@ use super::style::{Brush, FontFeature, FontVariation};
 use crate::inline_box::InlineBox;
 use crate::util::nearly_eq;
 use crate::{FontContext, FontData};
-use fontique::{Language, Synthesis};
+use fontique::Language;
 
 use fontique::{self, Query, QueryFamily, QueryFont};
-use parlance::Script;
+use parlance::{GenericFamily, Script};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn shape_text<'a, B: Brush>(
@@ -169,7 +169,7 @@ struct FontSelector<'a, 'b, B: Brush> {
     features: &'a [FontFeature],
 
     /// The font to use if [`Self::query`] doesn't return any font.
-    last_resort_font: &'b FontInstance,
+    last_resort_font: &'b QueryFont,
 }
 
 impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
@@ -184,7 +184,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         style_index: u16,
         script: Script,
         locale: Option<Language>,
-        last_resort_font: &'b FontInstance,
+        last_resort_font: &'b QueryFont,
     ) -> Self {
         let style = &styles[style_index as usize];
         let fonts_id = style.font_family.id();
@@ -230,7 +230,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             let fonts = fonts.iter().copied().map(QueryFamily::Id);
             if is_emoji {
                 use core::iter::once;
-                let emoji_family = QueryFamily::Generic(fontique::GenericFamily::Emoji);
+                let emoji_family = QueryFamily::Generic(GenericFamily::Emoji);
                 self.query.set_families(fonts.chain(once(emoji_family)));
                 self.fonts_id = None;
             } else if self.fonts_id != Some(fonts_id) {
@@ -285,33 +285,73 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
                 fontique::QueryStatus::Continue
             }
         });
-        selected_font
-            .map(|selected_font| FontInstance {
-                font: FontData {
-                    data: selected_font.font.blob,
-                    index: selected_font.font.index,
-                },
-                synthesis: selected_font.font.synthesis,
-            })
-            .unwrap_or(self.last_resort_font.clone())
+
+        let selected_font = selected_font
+            .map(|selected_font| selected_font.font)
+            .unwrap_or(self.last_resort_font.clone());
+
+        FontInstance {
+            font: FontData {
+                data: selected_font.blob,
+                index: selected_font.index,
+            },
+            synthesis: selected_font.synthesis,
+        }
     }
 }
 
-/// Just select any font from the font collection.
+/// Just select any font from the font collection, preferring text fonts.
 ///
-/// If this returns `None`, there are no fonts available at all. This can be used to have a font at
-/// hand for shaping, in case more sophisticated font querying returns no fonts.
-fn any_font(fcx: &mut FontContext) -> Option<FontInstance> {
-    let name = fcx.collection.family_names().next()?.to_owned();
-    let font = fcx
-        .collection
-        .family_by_name(&name)?
-        .default_font()?
-        .clone();
-    Some(FontInstance {
-        font: FontData::new(font.load(Some(&mut fcx.source_cache))?, font.index()),
-        synthesis: Synthesis::default(),
-    })
+/// If this returns `None`, there are no fonts available at all.
+///
+/// This can be used to have a font at hand for shaping, in case more sophisticated font querying
+/// returns no fonts.
+fn any_font(fcx: &mut FontContext) -> Option<QueryFont> {
+    let mut found = None;
+
+    // First try generic text families, and set Latin-script fallback fonts. But note that at this
+    // point, the font itself doesn't really matter: we mostly just need any font to work with.
+    {
+        let mut query = fcx.collection.query(&mut fcx.source_cache);
+        query.set_families(
+            [
+                GenericFamily::SansSerif,
+                GenericFamily::Serif,
+                GenericFamily::Monospace,
+            ]
+            .map(GenericFamily::from),
+        );
+        query.set_fallbacks(fontique::FallbackKey::new(
+            Script::from_bytes(*b"Latn"),
+            None,
+        ));
+        query.matches_with(
+            #[inline]
+            |font: &QueryFont| {
+                found = Some(font.clone());
+                fontique::QueryStatus::Stop
+            },
+        );
+    }
+
+    if found.is_some() {
+        return found;
+    }
+
+    // If that failed, it seems like there aren't any text fonts in the collection, so just take
+    // anything at all. Unfortunately, we must collect IDs before the query, as iterating IDs
+    // borrows the collection mutably.
+    let families: Vec<fontique::FamilyId> = fcx.collection.family_ids().collect();
+    let mut query = fcx.collection.query(&mut fcx.source_cache);
+    query.set_families(families);
+    query.matches_with(
+        #[inline]
+        |font: &QueryFont| {
+            found = Some(font.clone());
+            fontique::QueryStatus::Stop
+        },
+    );
+    found
 }
 
 struct SelectedFont {
