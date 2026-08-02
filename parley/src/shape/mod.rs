@@ -116,7 +116,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
         analysis_data_sources,
     );
 
-    let mut inline_box_iter = inline_boxes.iter().enumerate().peekable();
     scx.shape_text(
         text,
         analysis,
@@ -124,6 +123,34 @@ pub(crate) fn shape_text<'a, B: Brush>(
         font_selector,
         &mut layout.data.shaped_text,
     );
+
+    let mut inline_box_iter = inline_boxes.iter().enumerate().peekable();
+    for shaped_run_idx in 0..layout.data.shaped_text.runs().len() {
+        let shaped_run = &layout.data.shaped_text.runs()[shaped_run_idx];
+        let run_text_byte_start = shaped_run.range.byte_range.start;
+        let run_style_index = char_style_indices[shaped_run.range.char_range.start];
+        let run_style = &styles[usize::from(run_style_index)];
+
+        // Push inline boxes positioned before the start of this item.
+        while let Some((box_idx, inline_box)) = inline_box_iter.peek() {
+            if inline_box.index <= run_text_byte_start {
+                layout.data.push_inline_box(*box_idx);
+                inline_box_iter.next();
+            } else {
+                break;
+            }
+        }
+
+        let shaped_run = &layout.data.shaped_text.runs()[shaped_run_idx];
+        let run_style_index = char_style_indices[shaped_run.range.char_range.start];
+        let run_style = &styles[usize::from(run_style_index)];
+        layout.data.process_shaped_run(
+            shaped_run_idx,
+            run_style,
+            style.word_spacing,
+            style.letter_spacing,
+        );
+    }
 
     // Process any remaining inline boxes whose index is greater than the length of the text
     for (box_idx, _inline_box) in inline_box_iter {
