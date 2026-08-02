@@ -109,6 +109,7 @@ impl Shaper {
         shaped_text: &mut ShapedText,
     ) {
         shaped_text.clear();
+        shaped_text.reserve(text.len());
 
         let mut items = items.into_iter();
 
