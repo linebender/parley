@@ -130,7 +130,7 @@ impl Shaper {
                     )
                     .expect("A segment must be yielded, given items tile the full text exactly");
 
-                if shape_item(
+                if shape_segment(
                     self,
                     text,
                     &segment,
@@ -166,11 +166,11 @@ impl Shaper {
     }
 }
 
-/// Shape one item.
+/// Shape one segment.
 ///
 /// Returns `Err(())` if shaping should be aborted, which happens iff [`FontSelector::select_font`]
 /// returned `None`.
-fn shape_item(
+fn shape_segment(
     scx: &mut Shaper,
     text: &str,
     item: &Segment,
@@ -179,7 +179,7 @@ fn shape_item(
     char_info: &[CharInfo],
     shaped_text: &mut ShapedText,
 ) -> Result<(), ()> {
-    select_font.begin_item(item, options);
+    select_font.begin_segment(item, options);
 
     let text_range = &item.range.byte_range;
     let char_range = &item.range.char_range;
@@ -412,7 +412,7 @@ pub trait FontSelector {
     /// Called when a new item starts.
     ///
     /// This can be useful to inspect, e.g., the item's script.
-    fn begin_item(&mut self, item: &Segment, options: &ShapeOptions<'_>) {
+    fn begin_segment(&mut self, item: &Segment, options: &ShapeOptions<'_>) {
         let _ = (item, options);
     }
 
