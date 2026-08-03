@@ -353,10 +353,12 @@ fn render_glyph(
         Content::Color => {
             let row_size = glyph_width as usize * 4;
             for (pixel_y, row) in rendered_glyph.data.chunks_exact(row_size).enumerate() {
-                for (pixel_x, pixel) in row.chunks_exact(4).enumerate() {
+                let pixels = row.as_chunks::<4>();
+                assert!(pixels.1.is_empty(), "Not RGBA");
+                for (pixel_x, &pixel) in pixels.0.iter().enumerate() {
                     let x = glyph_x + pixel_x as u32;
                     let y = glyph_y + pixel_y as u32;
-                    let color = Rgba(pixel.try_into().expect("Not RGBA"));
+                    let color = Rgba(pixel);
                     img.get_pixel_mut(x, y).blend(&color);
                 }
             }
