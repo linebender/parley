@@ -18,6 +18,10 @@ This release has an [MSRV] of 1.88.
 
 - `BidiLevel` to encode bidirectional text embedding levels. ([#710][] by [@tomcur][])
 
+#### Fontique
+
+- `Collection::family_ids` to iterate over unique font family identifiers. ([#725][] by [@tomcur][])
+
 ### Changed
 
 #### Parley
@@ -713,6 +717,7 @@ This release has an [MSRV][] of 1.70.
 [#697]: https://github.com/linebender/parley/pull/697
 [#710]: https://github.com/linebender/parley/pull/710
 [#717]: https://github.com/linebender/parley/pull/717
+[#725]: https://github.com/linebender/parley/pull/725
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.11.0...HEAD
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0
