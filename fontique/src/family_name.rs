@@ -88,9 +88,14 @@ impl FamilyNameMap {
         }
     }
 
-    /// Returns an iterator over all of the font family names.
+    /// Returns an iterator over all of the font family names, including aliases.
     pub fn iter(&self) -> impl Iterator<Item = &FamilyName> + Clone {
         self.name_map.values()
+    }
+
+    /// Returns an iterator over all of the font family identifiers.
+    pub fn ids(&self) -> impl Iterator<Item = FamilyId> + Clone + '_ {
+        self.id_map.keys().copied()
     }
 }
 
@@ -115,5 +120,34 @@ impl NameKey {
 
     pub fn as_bytes(&self) -> &[u8] {
         &self.data
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::FamilyNameMap;
+    use alloc::vec;
+    use alloc::vec::Vec;
+
+    #[test]
+    fn iterate_names_and_ids() {
+        let mut map = FamilyNameMap::default();
+        let name = map.get_or_insert("Family");
+        map.add_alias(name.id(), "Alias");
+        let other_name = map.get_or_insert("Other family");
+
+        let mut names: Vec<_> = map.iter().map(|f| f.name()).collect();
+        names.sort_unstable();
+        assert_eq!(
+            names,
+            &["Alias", "Family", "Other family"],
+            "family names and aliases should both show up"
+        );
+
+        let mut ids: Vec<_> = map.ids().collect();
+        ids.sort_unstable();
+        let mut expected = vec![name.id(), other_name.id()];
+        expected.sort_unstable();
+        assert_eq!(ids, expected, "family identifiers should only show up once");
     }
 }

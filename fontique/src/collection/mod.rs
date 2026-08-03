@@ -112,6 +112,14 @@ impl Collection {
         self.inner.family_names()
     }
 
+    /// Returns an iterator over all available family identifiers in the collection.
+    ///
+    /// If `fontique` was compiled with the `"system"` feature, then it will
+    /// include system fonts after the registered fonts.
+    pub fn family_ids(&mut self) -> impl Iterator<Item = FamilyId> + '_ + Clone {
+        self.inner.family_ids()
+    }
+
     /// Returns the family identifier for the given family name.
     pub fn family_id(&mut self, name: &str) -> Option<FamilyId> {
         self.inner.family_id(name)
@@ -285,6 +293,20 @@ impl Inner {
             system: self.system.as_ref().map(|sys| sys.family_names.iter()),
         }
         .map(|name| name.name())
+    }
+
+    /// Returns an iterator over all available family identifiers in the collection.
+    ///
+    /// This includes both system and registered fonts.
+    pub fn family_ids(&mut self) -> impl Iterator<Item = FamilyId> + '_ + Clone {
+        self.sync_shared();
+        self.data.family_names.ids().chain(
+            self.system
+                .as_ref()
+                .map(|sys| sys.family_names.ids())
+                .into_iter()
+                .flatten(),
+        )
     }
 
     /// Returns the family identifier for the given family name.
