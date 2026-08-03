@@ -221,6 +221,35 @@ struct FontSelector<'a, 'b, B: Brush> {
     analysis_data_sources: &'a AnalysisDataSources,
 }
 
+impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
+    /// Construct a new `FontSelector`.
+    ///
+    /// If `query` ends up not returning a font for a query, the `last_resort_font` is returned
+    /// instead.
+    fn new(
+        query: &'b mut Query<'a>,
+        rcx: &'a ResolveContext,
+        styles: &'a [ResolvedStyle<B>],
+        analysis_data_sources: &'a AnalysisDataSources,
+    ) -> Self {
+        let attrs = fontique::Attributes::default();
+
+        Self {
+            query,
+            fonts_id: None,
+            rcx,
+            styles,
+            style_index: 0,
+            attrs,
+            variations: &[],
+            features: &[],
+            last_resort_font: LastResortFont::Unresolved,
+
+            analysis_data_sources,
+        }
+    }
+}
+
 impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
     fn begin_item(&mut self, item: &parley_engine::itemize::Segment, options: &ShapeOptions<'_>) {
         self.query.set_fallbacks(fontique::FallbackKey::new(
@@ -337,35 +366,6 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
                     None
                 }
             })
-    }
-}
-
-impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
-    /// Construct a new `FontSelector`.
-    ///
-    /// If `query` ends up not returning a font for a query, the `last_resort_font` is returned
-    /// instead.
-    fn new(
-        query: &'b mut Query<'a>,
-        rcx: &'a ResolveContext,
-        styles: &'a [ResolvedStyle<B>],
-        analysis_data_sources: &'a AnalysisDataSources,
-    ) -> Self {
-        let attrs = fontique::Attributes::default();
-
-        Self {
-            query,
-            fonts_id: None,
-            rcx,
-            styles,
-            style_index: 0,
-            attrs,
-            variations: &[],
-            features: &[],
-            last_resort_font: LastResortFont::Unresolved,
-
-            analysis_data_sources,
-        }
     }
 }
 
