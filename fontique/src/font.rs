@@ -98,6 +98,11 @@ impl FontInfo {
         // 100. Unless we synthesize `wght=400`, shaping will use weight 100. So,
         // when the axis default and requested weight are not the same, synthesize
         // the requested weight for correct shaping.
+        //
+        // The requested weight and axis default can differ when:
+        // 1. A `FontInfoOverride` overrides font weight.
+        // 2. A non-conformant font specifies different weights in its OS/2 and `fvar` tables.
+        //      - See: <https://learn.microsoft.com/en-us/typography/opentype/spec/dvaraxistag_wght#additional-information>
         if let Some(weight_axis) = self.axes.iter().find(|axis| axis.tag == Tag::new(b"wght")) {
             if weight_axis.default != weight.value() {
                 synth.vars[len] = (Tag::new(b"wght"), weight.value());
