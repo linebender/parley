@@ -94,13 +94,22 @@ impl FontInfo {
             synth.vars[len] = (Tag::new(b"wdth"), width.percentage());
             len += 1;
         }
-        if self.weight != weight {
-            if self.has_weight_axis() {
+        // Imagine a caller requests weight 400, but the `wght` axis defaults to
+        // 100. Unless we synthesize `wght=400`, shaping will use weight 100. So,
+        // when the axis default and requested weight are not the same, synthesize
+        // the requested weight for correct shaping.
+        //
+        // The requested weight and axis default can differ when:
+        // 1. A `FontInfoOverride` overrides font weight.
+        // 2. A non-conformant font specifies different weights in its OS/2 and `fvar` tables.
+        //      - See: <https://learn.microsoft.com/en-us/typography/opentype/spec/dvaraxistag_wght#additional-information>
+        if let Some(weight_axis) = self.axes.iter().find(|axis| axis.tag == Tag::new(b"wght")) {
+            if weight_axis.default != weight.value() {
                 synth.vars[len] = (Tag::new(b"wght"), weight.value());
                 len += 1;
-            } else if weight.value() > self.weight.value() {
-                synth.embolden = true;
             }
+        } else if weight.value() > self.weight.value() {
+            synth.embolden = true;
         }
         if self.style != style {
             match style {
@@ -477,4 +486,69 @@ pub struct FontInfoOverride<'a> {
     /// Default values for the font's variation axes. Axes not included within
     /// the font will be ignored.
     pub axes: Option<&'a [(Tag, f32)]>,
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::sync::Arc;
+
+    use super::*;
+    use crate::SourceId;
+
+    const ROBOTO: &[u8] =
+        include_bytes!("../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
+    const ROBOTO_FLEX: &[u8] =
+        include_bytes!("../../parley_dev/assets/fonts/roboto_fonts/RobotoFlex-VariableFont.ttf");
+
+    fn font_info(data: &[u8]) -> FontInfo {
+        let source = SourceInfo::new(
+            SourceId::new(),
+            SourceKind::Memory(Blob::new(Arc::new(data.to_vec()))),
+        );
+        FontInfo::from_source(source, 0).unwrap()
+    }
+
+    #[test]
+    fn variable_weight_synthesis_uses_axis_default() {
+        let mut font = font_info(ROBOTO_FLEX);
+        let axes = [(Tag::new(b"wght"), FontWeight::THIN.value())];
+        font.apply_override(&FontInfoOverride {
+            axes: Some(&axes),
+            ..Default::default()
+        });
+
+        // Model a face whose declared weight is 400 but whose `wght` axis
+        // defaults to 100.
+        assert_eq!(font.weight(), FontWeight::NORMAL);
+        assert_eq!(
+            font.axes()
+                .iter()
+                .find(|axis| axis.tag == Tag::new(b"wght"))
+                .unwrap()
+                .default,
+            FontWeight::THIN.value()
+        );
+
+        let synthesis = font.synthesis(font.width(), font.style(), FontWeight::NORMAL);
+        assert_eq!(
+            synthesis.variation_settings(),
+            &[(Tag::new(b"wght"), FontWeight::NORMAL.value())]
+        );
+        assert!(!synthesis.embolden());
+
+        let synthesis = font.synthesis(font.width(), font.style(), FontWeight::THIN);
+        assert!(!synthesis.any());
+    }
+
+    #[test]
+    fn static_weight_synthesis_uses_face_weight() {
+        let font = font_info(ROBOTO);
+
+        let synthesis = font.synthesis(font.width(), font.style(), FontWeight::BOLD);
+        assert!(synthesis.embolden());
+        assert!(synthesis.variation_settings().is_empty());
+
+        let synthesis = font.synthesis(font.width(), font.style(), FontWeight::LIGHT);
+        assert!(!synthesis.any());
+    }
 }
