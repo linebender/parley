@@ -802,7 +802,7 @@ mod tests {
     use crate::{
         Analysis, AnalysisOptions, Analyzer, FontInstance, FontSelector, ShapeOptions, ShapedText,
         Shaper,
-        itemize::{Item, Item_},
+        itemize::{Item, Segment},
         shape::CharCluster,
     };
 
@@ -815,7 +815,7 @@ mod tests {
     impl FontSelector for SingleFont {
         fn select_font(
             &mut self,
-            _item: &Item,
+            _segment: &Segment,
             _options: &ShapeOptions<'_>,
             _cluster: &mut CharCluster,
         ) -> Option<FontInstance> {
@@ -851,7 +851,7 @@ mod tests {
         let mut shaped = ShapedText::new();
 
         let char_style_indices = vec![0; text.chars().count()];
-        let items = [Item_ {
+        let items = [Item {
             char_end: text.chars().count() as u32,
             options: ShapeOptions {
                 font_size: 32.0,

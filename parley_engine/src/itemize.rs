@@ -20,9 +20,9 @@ pub struct TextRange {
     pub char_range: Range<usize>,
 }
 
-/// An item produced by [`Analysis::itemize`].
+/// A span of text inside an [`Item`] with constant script and bidirectional embedding level.
 #[derive(Clone, Debug)]
-pub struct Item {
+pub struct Segment {
     /// The text range of this item.
     pub range: TextRange,
 
@@ -40,9 +40,11 @@ pub struct Item {
     pub script: Script,
 }
 
-/// An item produced by [`Analysis::itemize`].
+/// A span of text shaped with specific [`ShapeOptions`].
+///
+/// While shaping text, items are divided into [`Segment`]s.
 #[derive(Debug)]
-pub struct Item_<'a> {
+pub struct Item<'a> {
     /// The character offset in the source text which this item ends.
     ///
     /// This must be strictly greater than the previous item's end. For the first item, it must be
@@ -85,15 +87,15 @@ pub(crate) struct Itemizer<'a> {
 }
 
 impl Analysis {
-    /// Itemize the `text` into individually-shapeable runs.
+    /// Divide the `text` into individually-shapeable segments.
     ///
     /// The `text` passed in must be the same as used for producing the `self` analysis.
     ///
-    /// The text is itemized into items of constant bidi level and script, intersected with items
-    /// produced by a predicate passed to [`Itemizer::next`].
+    /// The text is divided into items produced by a predicate passed to [`Itemizer::next`] and
+    /// further divided into segments of constant bidi level and script.
     ///
     /// Characters that don't have a particular script have their script resolved based on
-    /// surrounding context (see [`Item::script`]).
+    /// surrounding context (see [`Segment::script`]).
     pub(crate) fn itemize<'a>(&'a self, text: &'a str) -> Itemizer<'a> {
         let first_real_script = self
             .char_info()
@@ -115,7 +117,7 @@ impl Analysis {
 }
 
 impl Itemizer<'_> {
-    /// Produce the next item, if any.
+    /// Produce the next segment, if any.
     ///
     /// For consecutive characters where the bidi level and script are unchanging, the `split_after`
     /// predicate is called with the growing item range, and can be used to split on additional
@@ -127,8 +129,15 @@ impl Itemizer<'_> {
     /// split after that item; i.e., given a range of `start..end`, the predicate controls whether
     /// that item is now finished, or whether it is extended to include the character at `end` (at
     /// which point the item spans `start..end+1`).
+    //
+    // TODO: currently the items from `split_after` have the same effect as a change in bidi or
+    // script. This is not how browsers handle things. In particular, `split_after` should reset
+    // grapheme segmentation, whereas bidi and script should produce separately-shaped segments.
     #[inline]
-    pub(crate) fn next(&mut self, mut split_after: impl FnMut(TextRange) -> bool) -> Option<Item> {
+    pub(crate) fn next(
+        &mut self,
+        mut split_after: impl FnMut(TextRange) -> bool,
+    ) -> Option<Segment> {
         if self.char_info.is_empty() {
             // We're already finished.
             debug_assert!(
@@ -199,7 +208,7 @@ impl Itemizer<'_> {
         let start_char_offset = self.current_char_offset;
         self.current_char_offset += item_char_len;
 
-        Some(Item {
+        Some(Segment {
             range: TextRange {
                 byte_range: start_byte_offset..self.char_indices.offset(),
                 char_range: start_char_offset..self.current_char_offset,
@@ -233,7 +242,7 @@ mod tests {
 
     use crate::{Analysis, AnalysisOptions, Analyzer};
 
-    use super::Item;
+    use super::Segment;
 
     const LATN: Script = Script::from_bytes(*b"Latn");
     const GREK: Script = Script::from_bytes(*b"Grek");
@@ -247,7 +256,7 @@ mod tests {
         analysis
     }
 
-    fn items(text: &str) -> Vec<Item> {
+    fn items(text: &str) -> Vec<Segment> {
         let analysis = analyze(text);
         let mut itemizer = analysis.itemize(text);
         core::iter::from_fn(|| itemizer.next(|_| false)).collect()
