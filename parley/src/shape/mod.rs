@@ -119,7 +119,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             };
 
             item_start_char = char_end;
-            Some(parley_engine::itemize::Item_ {
+            Some(parley_engine::itemize::Item {
                 char_end: char_end as u32,
                 options: ShapeOptions {
                     language: item_style.locale,
@@ -222,7 +222,7 @@ struct FontSelector<'a, 'b, B: Brush> {
 }
 
 impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
-    fn begin_item(&mut self, item: &parley_engine::itemize::Item, options: &ShapeOptions<'_>) {
+    fn begin_item(&mut self, item: &parley_engine::itemize::Segment, options: &ShapeOptions<'_>) {
         self.query.set_fallbacks(fontique::FallbackKey::new(
             item.script,
             options.language.as_ref(),
@@ -231,7 +231,7 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
 
     fn select_font(
         &mut self,
-        _item: &parley_engine::itemize::Item,
+        _item: &parley_engine::itemize::Segment,
         _options: &ShapeOptions<'_>,
         cluster: &mut CharCluster,
     ) -> Option<FontInstance> {

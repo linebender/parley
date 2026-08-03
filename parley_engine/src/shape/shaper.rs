@@ -11,7 +11,7 @@ use parlance::{FontFeature, FontVariation, Language};
 
 use crate::{
     Analysis, CharInfo, ShapedText,
-    itemize::{Item, Item_, TextRange},
+    itemize::{Item, Segment, TextRange},
     lru_cache::LruCache,
     shape::{CharCluster, cache},
 };
@@ -19,8 +19,8 @@ use crate::{
 /// Shaping options for one item.
 ///
 /// These are styling options relevant for shaping. They're styling, in that they're not derived
-/// from the underlying text. When you [itemize][`Analysis::itemize`] the text, you should split the
-/// text at points where these options change.
+/// from the underlying text. When you [shape the text][`Shaper::shape_text`], you should split the
+/// text into [`Item`]s at the points where these options change.
 #[derive(Debug)]
 pub struct ShapeOptions<'a> {
     /// The font size to shape the item with.
@@ -83,14 +83,14 @@ impl Shaper {
     /// The `text` passed in must be the same as used for producing `analysis`.
     ///
     /// This uses the items returned by `items`, and further itemizes the text into
-    /// individually-shapeable runs of constant bidi level and script. `items` should be used to
+    /// individually-shapeable segments of constant bidi level and script. `items` should be used to
     /// split on properties like shaping-relevant style changes (e.g., font size) or properties like
     /// language.
     ///
     /// Characters that don't have a particular script have their script resolved based on
-    /// surrounding context (see [`crate::itemizer::Item::script`]).
+    /// surrounding context (see [`Segment::script`]).
     ///
-    /// Each item is then broken into runs of maximal sequences of character clusters for which
+    /// Each segment is then broken into runs of maximal sequences of character clusters for which
     /// `select_font` returns the same font.
     ///
     /// # Panics
@@ -101,7 +101,7 @@ impl Shaper {
         &mut self,
         text: &str,
         analysis: &Analysis,
-        items: impl IntoIterator<Item = Item_<'options>>,
+        items: impl IntoIterator<Item = Item<'options>>,
         mut select_font: impl FontSelector,
         shaped_text: &mut ShapedText,
     ) {
@@ -166,7 +166,7 @@ impl Shaper {
 fn shape_item(
     scx: &mut Shaper,
     text: &str,
-    item: &Item,
+    item: &Segment,
     options: &ShapeOptions<'_>,
     select_font: &mut impl FontSelector,
     char_info: &[CharInfo],
@@ -405,7 +405,7 @@ pub trait FontSelector {
     /// Called when a new item starts.
     ///
     /// This can be useful to inspect, e.g., the item's script.
-    fn begin_item(&mut self, item: &Item, options: &ShapeOptions<'_>) {
+    fn begin_item(&mut self, item: &Segment, options: &ShapeOptions<'_>) {
         let _ = (item, options);
     }
 
@@ -417,7 +417,7 @@ pub trait FontSelector {
     /// Shaping is aborted if this returns `None`; [`ShapedText`] then contains a partial result.
     fn select_font(
         &mut self,
-        item: &Item,
+        item: &Segment,
         options: &ShapeOptions<'_>,
         cluster: &mut CharCluster,
     ) -> Option<FontInstance>;

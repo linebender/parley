@@ -9,15 +9,13 @@ use alloc::vec::Vec;
 use parlance::BidiLevel;
 
 use crate::{
-    CharInfo, FontInstance, Glyph, ShapeOptions,
-    itemize::{Item, TextRange},
-    shape::ShapedClusterFlags,
+    CharInfo, FontInstance, Glyph,
+    itemize::{Segment, TextRange},
 };
 
 use super::{
-    ClusterInfo, Whitespace,
-    atom::ShapedSlice,
-    data::{Character, ShapedCluster},
+    Character, ClusterInfo, ShapedCluster, ShapedClusterFlags, Whitespace, atom::ShapedSlice,
+    shaper::ShapeOptions,
 };
 
 /// A normalized font coordinate.
@@ -236,7 +234,7 @@ impl ShapedText {
         &mut self,
         text: &str,
         range: TextRange,
-        item: &Item,
+        item: &Segment,
         options: &ShapeOptions<'_>,
         char_info: &[CharInfo],
         font: &FontInstance,
@@ -564,7 +562,7 @@ mod tests {
 
     use crate::{
         Analysis, AnalysisOptions, Analyzer, FontInstance, FontSelector, ShapeOptions, Shaper,
-        itemize::{Item, Item_},
+        itemize::{Item, Segment},
         shape::CharCluster,
     };
 
@@ -581,7 +579,7 @@ mod tests {
     impl FontSelector for SingleFont {
         fn select_font(
             &mut self,
-            _item: &Item,
+            _item: &Segment,
             _options: &ShapeOptions<'_>,
             _cluster: &mut CharCluster,
         ) -> Option<FontInstance> {
@@ -617,7 +615,7 @@ mod tests {
         let mut shaped = ShapedText::new();
 
         let char_style_indices = vec![0; text.chars().count()];
-        let items = [Item_ {
+        let items = [Item {
             char_end: text.chars().count().try_into().unwrap(),
             options: ShapeOptions {
                 font_size: 32.0,
@@ -728,7 +726,7 @@ mod tests {
 
         // ...split over two items.
         let items = [
-            Item_ {
+            Item {
                 char_end: 1,
                 options: ShapeOptions {
                     font_size: 32.0,
@@ -738,7 +736,7 @@ mod tests {
                     char_style_indices: &char_style_indices,
                 },
             },
-            Item_ {
+            Item {
                 char_end: text.chars().count() as u32,
                 options: ShapeOptions {
                     font_size: 32.0,
