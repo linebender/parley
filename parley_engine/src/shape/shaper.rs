@@ -108,54 +108,61 @@ impl Shaper {
         shaped_text.clear();
         shaped_text.reserve(text.len());
 
-        let mut items = items.into_iter();
-
-        let Some(mut current_item) = items.next() else {
-            assert!(
-                text.is_empty(),
-                "`items` does not cover the entire source text"
-            );
-            return;
-        };
-
+        let char_count = analysis.char_info().len();
+        let mut previous_item_end = 0;
         let mut itemizer = analysis.itemize(text);
 
-        while let Some(item) = itemizer.next(
-            #[inline(always)]
-            |text_range| text_range.char_range.end == current_item.char_end as usize,
-        ) {
-            let item_char_end = item.range.char_range.end;
+        for item in items {
+            assert!(
+                item.char_end > previous_item_end,
+                "item ends must be strictly increasing"
+            );
+            assert!(
+                item.char_end as usize <= char_count,
+                "items must not span past the text"
+            );
 
-            if shape_item(
-                self,
-                text,
-                &item,
-                &current_item.options,
-                &mut select_font,
-                analysis.char_info(),
-                shaped_text,
-            )
-            .is_err()
-            {
-                // Abort on error. This happens iff `FontSelector::select_font` failed to return a
-                // font. By aborting we ensure `ShapedText` covers the source text contiguously (as
-                // we need a font to construct `ShapedRun`).
-                return;
-            };
+            loop {
+                let segment = itemizer
+                    .next(
+                        #[inline(always)]
+                        |text_range| text_range.char_range.end == item.char_end as usize,
+                    )
+                    .expect("A segment must be yielded, given items tile the full text exactly");
 
-            if item_char_end == current_item.char_end as usize {
-                let Some(next_item) = items.next() else {
-                    // The last item's end coincides with the end of the source text, so the
-                    // itemizer should be finished as well.
-                    assert!(
-                        itemizer.next(|_| false).is_none(),
-                        "`items` does not cover the entire source text"
-                    );
-                    break;
+                if shape_item(
+                    self,
+                    text,
+                    &segment,
+                    &item.options,
+                    &mut select_font,
+                    analysis.char_info(),
+                    shaped_text,
+                )
+                .is_err()
+                {
+                    // Abort on error. This happens iff `FontSelector::select_font` failed to return a
+                    // font. By aborting we ensure `ShapedText` covers the source text contiguously (as
+                    // we need a font to construct `ShapedRun`).
+                    return;
                 };
-                current_item = next_item;
+
+                debug_assert!(
+                    segment.range.char_range.end <= item.char_end as usize,
+                    "Segments must not span past the item."
+                );
+                if segment.range.char_range.end == item.char_end as usize {
+                    break;
+                }
             }
+
+            previous_item_end = item.char_end;
         }
+
+        assert_eq!(
+            previous_item_end as usize, char_count,
+            "`items` does not cover the entire source text"
+        );
     }
 }
 
