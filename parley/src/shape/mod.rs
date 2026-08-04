@@ -15,7 +15,7 @@ use crate::util::nearly_eq;
 use crate::{FontContext, FontData};
 
 use fontique::{self, Query, QueryFamily, QueryFont};
-use parlance::{BidiLevel, GenericFamily, Script};
+use parlance::{BidiLevel, GenericFamily};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn shape_text<'a, B: Brush>(
