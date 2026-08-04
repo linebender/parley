@@ -852,7 +852,7 @@ mod tests {
 
         let char_style_indices = vec![0; text.chars().count()];
         let items = [Item {
-            char_end: text.chars().count() as u32,
+            char_end: text.chars().count().try_into().unwrap(),
             options: ShapeOptions {
                 font_size: 32.0,
                 language: None,

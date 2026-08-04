@@ -736,7 +736,7 @@ mod tests {
                 },
             },
             Item {
-                char_end: text.chars().count() as u32,
+                char_end: text.chars().count().try_into().unwrap(),
                 options: ShapeOptions {
                     font_size: 32.0,
                     language: None,
