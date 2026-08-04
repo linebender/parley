@@ -17,6 +17,8 @@ This release has an [MSRV] of 1.88.
 #### Parlance
 
 - `BidiLevel` to encode bidirectional text embedding levels. ([#710][] by [@tomcur][])
+- `Script::is_cursive` returning whether a script is cursive. ([#728][] by [@tomcur][])  
+  This can be used to decide, for example, whether to apply letter spacing.
 
 #### Fontique
 
@@ -718,6 +720,7 @@ This release has an [MSRV][] of 1.70.
 [#710]: https://github.com/linebender/parley/pull/710
 [#717]: https://github.com/linebender/parley/pull/717
 [#725]: https://github.com/linebender/parley/pull/725
+[#728]: https://github.com/linebender/parley/pull/728
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.11.0...HEAD
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0
