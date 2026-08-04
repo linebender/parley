@@ -715,7 +715,7 @@ mod tests {
                     variations: &[],
                     char_style_indices: &char_style_indices,
                 },
-                |_| font.clone(),
+                |_| Some(font.clone()),
                 &mut shaped,
             );
         }

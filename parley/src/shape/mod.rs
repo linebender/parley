@@ -136,7 +136,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 char_style_indices,
             },
             #[inline(always)]
-            |char_cluster| font_selector.select_font(char_cluster, analysis_data_sources),
+            |char_cluster| Some(font_selector.select_font(char_cluster, analysis_data_sources)),
             &mut layout.data.shaped_text,
         );
         for shaped_run_idx in shaped_runs_range {
