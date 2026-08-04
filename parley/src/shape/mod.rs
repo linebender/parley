@@ -10,18 +10,18 @@ use parley_engine::{Analysis, AnalysisDataSources, FontInstance, ShapeOptions, S
 use super::layout::Layout;
 use super::resolve::{ResolveContext, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
-use crate::FontData;
 use crate::inline_box::InlineBox;
 use crate::util::nearly_eq;
+use crate::{FontContext, FontData};
 use fontique::Language;
 
 use fontique::{self, Query, QueryFamily, QueryFont};
-use parlance::Script;
+use parlance::{GenericFamily, Script};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn shape_text<'a, B: Brush>(
     rcx: &'a ResolveContext,
-    mut fq: Query<'a>,
+    fcx: &'a mut FontContext,
     styles: &'a [ResolvedStyle<B>],
     inline_boxes: &[InlineBox],
     analysis: &Analysis,
@@ -36,6 +36,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     if text.is_empty() && inline_boxes.is_empty() {
         text = " ";
     }
+
     // Do nothing if there is no text or styles (there should always be a default style)
     if text.is_empty() || styles.is_empty() {
         // Process any remaining inline boxes whose index is greater than the length of the text
@@ -45,6 +46,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
         }
         return;
     }
+
+    let mut fq = fcx.collection.query(&mut fcx.source_cache);
 
     let mut inline_box_iter = inline_boxes.iter().peekable();
     let split_after = |item_range: parley_engine::itemize::TextRange| {
@@ -116,17 +119,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 char_style_indices,
             },
             #[inline(always)]
-            |char_cluster| {
-                font_selector
-                    .select_font(char_cluster, analysis_data_sources)
-                    .map(|selected| FontInstance {
-                        font: FontData {
-                            data: selected.font.blob,
-                            index: selected.font.index,
-                        },
-                        synthesis: selected.font.synthesis,
-                    })
-            },
+            |char_cluster| font_selector.select_font(char_cluster, analysis_data_sources),
             &mut layout.data.shaped_text,
         );
         for shaped_run_idx in shaped_runs_range {
@@ -148,6 +141,14 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }
 }
 
+/// The font to use if a font query doesn't return any font candidates at all.
+#[derive(Debug)]
+enum LastResortFont {
+    Unresolved,
+    Resolved(FontInstance),
+    Unavailable,
+}
+
 struct FontSelector<'a, 'b, B: Brush> {
     query: &'b mut Query<'a>,
     fonts_id: Option<usize>,
@@ -157,9 +158,13 @@ struct FontSelector<'a, 'b, B: Brush> {
     attrs: fontique::Attributes,
     variations: &'a [FontVariation],
     features: &'a [FontFeature],
+
+    /// The font to use if [`Self::query`] doesn't return any font.
+    last_resort_font: LastResortFont,
 }
 
 impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
+    /// Construct a new `FontSelector`.
     fn new(
         query: &'b mut Query<'a>,
         rcx: &'a ResolveContext,
@@ -192,6 +197,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             attrs,
             variations,
             features,
+            last_resort_font: LastResortFont::Unresolved,
         }
     }
 
@@ -199,7 +205,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         &mut self,
         cluster: &mut CharCluster,
         analysis_data_sources: &AnalysisDataSources,
-    ) -> Option<SelectedFont> {
+    ) -> Option<FontInstance> {
         let style_index = cluster.style_index();
         let is_emoji = cluster.is_emoji();
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
@@ -211,7 +217,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             let fonts = fonts.iter().copied().map(QueryFamily::Id);
             if is_emoji {
                 use core::iter::once;
-                let emoji_family = QueryFamily::Generic(fontique::GenericFamily::Emoji);
+                let emoji_family = QueryFamily::Generic(GenericFamily::Emoji);
                 self.query.set_families(fonts.chain(once(emoji_family)));
                 self.fonts_id = None;
             } else if self.fonts_id != Some(fonts_id) {
@@ -266,8 +272,72 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
                 fontique::QueryStatus::Continue
             }
         });
+
         selected_font
+            .map(|selected_font| selected_font.font)
+            .map(|font| FontInstance {
+                font: FontData {
+                    data: font.blob,
+                    index: font.index,
+                },
+                synthesis: font.synthesis,
+            })
+            .or_else(|| {
+                if matches!(self.last_resort_font, LastResortFont::Unresolved) {
+                    if let Some(font) = any_font(self.query) {
+                        self.last_resort_font = LastResortFont::Resolved(FontInstance {
+                            font: FontData {
+                                data: font.blob,
+                                index: font.index,
+                            },
+                            synthesis: font.synthesis,
+                        });
+                    } else {
+                        self.last_resort_font = LastResortFont::Unavailable;
+                    }
+
+                    self.fonts_id = None;
+                }
+
+                if let LastResortFont::Resolved(ref font) = self.last_resort_font {
+                    Some(font.clone())
+                } else {
+                    None
+                }
+            })
     }
+}
+
+/// Just query for any generic family's font from the font collection.
+///
+/// This sets generic families on `query`, so callers need to make sure to set families back again.
+/// This returns `None` if it doesn't find any fonts, but note this only checks generic families.
+///
+/// This can be used to have a font at hand for shaping, in case more sophisticated font querying
+/// returns no fonts.
+fn any_font(query: &mut Query<'_>) -> Option<QueryFont> {
+    let mut found = None;
+
+    // Try the system's generic text families.
+    //
+    // At this point, the font itself doesn't really matter: we mostly just need any font to work
+    // with. This has a cost, as it extends our query's candidate font families with all the generic
+    // families registered on the system. A better future may be to allow users to register some
+    // last resort in `fontique`, or pass it directly to `parley`.
+    query.set_families([
+        QueryFamily::Generic(GenericFamily::SansSerif),
+        QueryFamily::Generic(GenericFamily::Serif),
+        QueryFamily::Generic(GenericFamily::Monospace),
+    ]);
+    query.matches_with(
+        #[inline]
+        |font: &QueryFont| {
+            found = Some(font.clone());
+            fontique::QueryStatus::Stop
+        },
+    );
+
+    found
 }
 
 struct SelectedFont {

@@ -89,23 +89,14 @@ impl Shaper {
     ///
     /// The `select_font` callback should return the font to shape `char_cluster` with. If
     /// consecutive character clusters select a different font, they become separately-shaped runs.
+    /// Shaping is aborted if `select_font` returns `None`; [`ShapedText`] then contains a partial
+    /// result.
     ///
     /// Returns the index range of runs appended to `shaped_text`.
     ///
     /// # Panics
     ///
     /// Panics if the font returned by `select_font` isn't a parseable font.
-    ///
-    // TODO: For `select_font`, on `None`, the previous font is taken (and the run is dropped if
-    // `None` is returned on the first call). This is identical to Parley's old behavior, but we
-    // probably want the commented-out documented behavior that follows, as returning a font is
-    // cheap and it probably doesn't make a ton of sense to hardcode some font fallback behavior
-    // here.
-    //
-    // /// Return `None` if there are no fonts available at all. The character cluster's text will be
-    // /// omitted from the shaped result. Instead, you probably want to render a `.notdef` glyph from a
-    // /// font you do have available, in which case you can return the previous font or some
-    // /// last-resort fallback font instead.
     pub fn shape_item(
         &mut self,
         text: &str,
@@ -118,7 +109,7 @@ impl Shaper {
         shaped_text.reserve(item.range.char_range.len());
 
         let start = shaped_text.runs().len();
-        shape_item(
+        let _ = shape_item(
             self,
             text,
             item,
@@ -131,6 +122,9 @@ impl Shaper {
     }
 }
 
+/// Shape one item.
+///
+/// Returns `Err(())` if shaping should be aborted, which happens iff `select_font` returned `None`.
 fn shape_item(
     scx: &mut Shaper,
     text: &str,
@@ -139,7 +133,7 @@ fn shape_item(
     mut select_font: impl FnMut(&mut CharCluster) -> Option<FontInstance>,
     char_info: &[CharInfo],
     shaped_text: &mut ShapedText,
-) {
+) -> Result<(), ()> {
     let text_range = &item.range.byte_range;
     let char_range = &item.range.char_range;
 
@@ -150,7 +144,7 @@ fn shape_item(
     let item_char_style_indices = &options.char_style_indices[char_range.start..char_range.end];
 
     if item_text.is_empty() {
-        return; // No clusters
+        return Ok(()); // No clusters
     }
 
     let mut item_infos_iter = item_char_info
@@ -176,7 +170,10 @@ fn shape_item(
         &mut code_unit_offset_in_string,
     );
 
-    let mut current_font = select_font(char_cluster);
+    let Some(next_font) = select_font(char_cluster) else {
+        return Err(());
+    };
+    let mut current_font = Some(next_font);
 
     // Main segmentation loop (based on swash shape_clusters) - only within current item
     while let Some(font) = current_font.take() {
@@ -195,17 +192,15 @@ fn shape_item(
                 &mut code_unit_offset_in_string,
             );
 
-            if let Some(next_font) = select_font(char_cluster) {
-                if next_font != font {
-                    current_font = Some(next_font);
-                    break;
-                } else {
-                    // Same font - add to current segment
-                    segment_end_offset = char_cluster.range().end as usize - text_range.start;
-                }
+            let Some(next_font) = select_font(char_cluster) else {
+                return Err(());
+            };
+            if next_font != font {
+                current_font = Some(next_font);
+                break;
             } else {
-                // No font determined, continue to next cluster
-                continue;
+                // Same font - add to current segment
+                segment_end_offset = char_cluster.range().end as usize - text_range.start;
             }
         }
 
@@ -337,6 +332,8 @@ fn shape_item(
         // Replace buffer to reuse allocation in next iteration.
         scx.unicode_buffer = Some(glyph_buffer.clear());
     }
+
+    Ok(())
 }
 
 #[inline]
