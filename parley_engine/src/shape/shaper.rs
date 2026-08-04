@@ -124,8 +124,7 @@ impl Shaper {
 
 /// Shape one item.
 ///
-/// Returns `Err(())` if shaping should be aborted, which can only happen if `select_font` returned
-/// `None`.
+/// Returns `Err(())` if shaping should be aborted, which happens iff `select_font` returned `None`.
 fn shape_item(
     scx: &mut Shaper,
     text: &str,
