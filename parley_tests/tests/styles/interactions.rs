@@ -70,19 +70,12 @@ fn interaction_font_size_line_height_absolute() {
 // ============================================================================
 
 #[test]
-// TODO: Ligatures should break with letter spacing. They currently do not.
 fn interaction_letter_spacing_ligatures() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LIGATURES;
 
     // Without letter spacing - ligatures should form (if font supports them)
-    let features_on = FontFeatures::List(Cow::Borrowed(&[FontFeature {
-        tag: Tag::new(b"liga"),
-        value: 1,
-    }]));
-
     let mut builder_no_spacing = env.ranged_builder(text);
-    builder_no_spacing.push_default(StyleProperty::FontFeatures(features_on.clone()));
     builder_no_spacing.push_default(StyleProperty::LetterSpacing(0.0));
     let mut layout_no_spacing = builder_no_spacing.build(text);
     layout_no_spacing.break_all_lines(None);
@@ -91,9 +84,8 @@ fn interaction_letter_spacing_ligatures() {
     env.with_name("no_spacing")
         .check_layout_snapshot(&layout_no_spacing);
 
-    // With letter spacing - ligatures SHOULD break
+    // With letter spacing - ligatures should not be formed
     let mut builder_with_spacing = env.ranged_builder(text);
-    builder_with_spacing.push_default(StyleProperty::FontFeatures(features_on));
     builder_with_spacing.push_default(StyleProperty::LetterSpacing(2.0));
     let mut layout_with_spacing = builder_with_spacing.build(text);
     layout_with_spacing.break_all_lines(None);

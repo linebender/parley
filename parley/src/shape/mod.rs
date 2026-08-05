@@ -4,6 +4,8 @@
 //! Text shaping implementation using `harfrust`for shaping
 //! and `icu` for text analysis.
 
+use alloc::vec::Vec;
+
 use parley_engine::shape::{CharCluster, Coverage};
 use parley_engine::{Analysis, AnalysisDataSources, FontInstance, ShapeOptions, Shaper};
 
@@ -11,12 +13,34 @@ use super::layout::Layout;
 use super::resolve::{ResolveContext, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
 use crate::inline_box::InlineBox;
-use crate::util::nearly_eq;
+use crate::util::{nearly_eq, nearly_zero};
 use crate::{FontContext, FontData};
 use fontique::Language;
 
 use fontique::{self, Query, QueryFamily, QueryFont};
-use parlance::{GenericFamily, Script};
+use parlance::{GenericFamily, Script, Tag};
+
+/// If these font features are passed to the shaper, optional ligatures are not applied.
+///
+/// Required ligation such as is common in cursive scripts' fonts is still applied.
+///
+/// Following [CSS Text 3 § 7.2][css-letter-spacing], pass these features if you are going to apply
+/// something like `letter-spacing`. Unfortunately, that specification doesn't say which font
+/// features specifically should be disabled. Here, we disable the OpenType features for "common",
+/// "discretionary" and "historic" ligatures as given by [CSS Fonts 4 § 6.4][css-fonts-ligatures].
+///
+/// As of writing, this list matches Gecko. Blink additionally disables contextual alternates
+/// (`calt`), but that's perhaps not desirable: disabling contextual alternates potentially makes
+/// text render wrong.
+///
+/// [css-letter-spacing]: https://www.w3.org/TR/css-text-3/#letter-spacing-property
+/// [css-fonts-ligatures]: https://www.w3.org/TR/css-fonts-4/#font-variant-ligatures-prop
+const OPTIONAL_LIGATURES_OFF: [FontFeature; 4] = [
+    FontFeature::new(Tag::new(b"liga"), 0),
+    FontFeature::new(Tag::new(b"clig"), 0),
+    FontFeature::new(Tag::new(b"dlig"), 0),
+    FontFeature::new(Tag::new(b"hlig"), 0),
+];
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn shape_text<'a, B: Brush>(
@@ -90,6 +114,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         }
     };
 
+    let mut features_scratch = Vec::new();
     let mut inline_box_iter = inline_boxes.iter().enumerate().peekable();
     for item in analysis.itemize(text, split_after) {
         // Push inline boxes positioned before the start of this item.
@@ -107,6 +132,20 @@ pub(crate) fn shape_text<'a, B: Brush>(
         let mut font_selector =
             FontSelector::new(&mut fq, rcx, styles, style_index, item.script, style.locale);
 
+        let style_features = rcx.features(style.font_features).unwrap_or(&[]);
+        let features = if !nearly_zero(style.letter_spacing) {
+            if style_features.is_empty() {
+                OPTIONAL_LIGATURES_OFF.as_slice()
+            } else {
+                features_scratch.clear();
+                features_scratch
+                    .extend(OPTIONAL_LIGATURES_OFF.iter().chain(style_features).copied());
+                features_scratch.as_slice()
+            }
+        } else {
+            style_features
+        };
+
         let shaped_runs_range = scx.shape_item(
             text,
             analysis,
@@ -114,7 +153,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             &ShapeOptions {
                 language: style.locale,
                 font_size: style.font_size,
-                features: rcx.features(style.font_features).unwrap_or(&[]),
+                features,
                 variations: rcx.variations(style.font_variations).unwrap_or(&[]),
                 char_style_indices,
             },
