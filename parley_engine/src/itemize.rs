@@ -52,6 +52,16 @@ pub struct Item<'a> {
     pub char_end: u32,
 
     /// The options to shape this item with.
+    //
+    // TODO: should users instead be allowed to build `options` at the `Segment` level (i.e.,
+    // through some callback)? The motivation is for users to have access to the segment's `Script`
+    // and be able to set font features based on that. If the entirety of `ShapeOptions` moves
+    // there, it would allow users to set, e.g., a font size per segment, even though it's not
+    // necessarily an item boundary; and note an item then doesn't mean a whole lot anymore. We
+    // could also allow only some options to be per-segment. In any case, we're probably moving
+    // towards a future where items reset grapheme segmentation, but segments do not (note Gecko and
+    // Blink also reset grapheme segmentation when something like font size changes, but not when
+    // the script changes).
     pub options: ShapeOptions<'a>,
     // TODO: we probably should allow users to pass in some data (like we allow passing
     // style_indices elsewhere), which we copy onto `ShapedRun`. That allows users to easily
