@@ -13,9 +13,7 @@ use crate::util::{TestEnv, samples};
 use parley::AlignmentOptions;
 use parley::layout::Alignment;
 use parley::setting::Tag;
-use parley::style::{
-    FontFeature, FontFeatures, FontVariation, FontVariations, LineHeight, StyleProperty,
-};
+use parley::style::{FontVariation, FontVariations, LineHeight, StyleProperty};
 
 // ============================================================================
 // FontSize × LineHeight Interactions
