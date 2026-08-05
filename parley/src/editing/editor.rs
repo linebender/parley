@@ -84,7 +84,7 @@ impl<'source> IntoIterator for SplitString<'source> {
 }
 
 /// Basic plain text editor with a single default style applied to the entire
-/// text, plus an optional ranged style overlay (see [`set_style_overlay`](Self::set_style_overlay)).
+/// text, plus an optional ranged style overlay (see [`edit_style_overlay`](Self::edit_style_overlay)).
 ///
 /// Internally, this is a wrapper around a string buffer and its corresponding [`Layout`],
 /// which is kept up-to-date as needed.
@@ -973,9 +973,6 @@ where
     }
 
     /// Replace the whole text buffer.
-    ///
-    /// A style overlay set via [`set_style_overlay`](Self::set_style_overlay)
-    /// is retained; set a new one if it no longer applies.
     pub fn set_text(&mut self, is: &str) {
         self.buffer.clear();
         self.buffer.push_str(is);
@@ -1045,31 +1042,16 @@ where
         &self.default_style
     }
 
-    /// Set ranged style overrides applied on top of the default styles.
+    /// Modify the ranged style overrides applied on top of the default styles,
+    /// e.g. for syntax highlighting or spellcheck squiggles.
     ///
-    /// Each entry styles a byte range of the raw text (see [`raw_text`](Self::raw_text)).
-    /// Entries are applied in order, so later entries win where they overlap. The IME
-    /// preedit underline is applied after the overlay and takes precedence over it.
-    ///
-    /// This is intended for derived, transient styling such as syntax highlighting,
-    /// spellcheck squiggles, or find-match emphasis. Ranges are not adjusted when the
-    /// text is edited; set a new overlay after editing.
-    ///
-    /// Out-of-bounds ranges are clamped to the text length; reversed or empty ranges
-    /// are ignored; entries whose clamped bounds do not fall on char boundaries
-    /// (e.g. stale after an edit) are skipped until a new overlay is set.
-    ///
-    /// To update the overlay atomically with a batch of edits, defer layout
-    /// rebuilds (`set_defer_layout`, where available) and set the new overlay
-    /// before the next read; the single rebuild then carries fresh styling.
-    ///
-    /// Setting an overlay equal to the current one is a no-op.
-    pub fn set_style_overlay(&mut self, overlay: Vec<(StyleProperty<'static, T>, Range<usize>)>) {
-        if self.style_overlay == overlay {
-            return;
-        }
-        self.style_overlay = overlay;
+    /// Later entries win where they overlap, and the IME preedit underline
+    /// takes precedence over all of them. The byte ranges are not adjusted
+    /// when the text is edited (invalid ranges are ignored), so recompute
+    /// the overlay after an edit.
+    pub fn edit_style_overlay(&mut self) -> &mut Vec<(StyleProperty<'static, T>, Range<usize>)> {
         self.layout_dirty = true;
+        &mut self.style_overlay
     }
 
     /// Get the current style overlay.

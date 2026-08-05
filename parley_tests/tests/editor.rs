@@ -123,10 +123,10 @@ fn editor_style_overlay_applies_ranges() {
     let mut env = TestEnv::new(test_name!(), None);
     let mut editor = env.editor("Hello world");
     let red = ColorBrush::new(Color::from_rgb8(255, 0, 0));
-    editor.set_style_overlay(vec![
+    *editor.edit_style_overlay() = vec![
         (StyleProperty::Underline(true), 0..5),
         (StyleProperty::Brush(red), 6..11),
-    ]);
+    ];
     let mut drv = env.driver(&mut editor);
     let layout = drv.layout();
     let style_at = |index: usize| {
@@ -151,18 +151,15 @@ fn editor_style_overlay_invalidates_layout() {
     env.driver(&mut editor).refresh_layout();
     assert!(editor.try_layout().is_some());
 
-    let overlay = vec![(StyleProperty::<ColorBrush>::Underline(true), 0..5)];
-    editor.set_style_overlay(overlay.clone());
+    editor
+        .edit_style_overlay()
+        .push((StyleProperty::<ColorBrush>::Underline(true), 0..5));
     assert!(editor.try_layout().is_none());
     env.driver(&mut editor).refresh_layout();
     assert!(editor.try_layout().is_some());
 
-    // Setting an equal overlay is a no-op.
-    editor.set_style_overlay(overlay);
-    assert!(editor.try_layout().is_some());
-
     // Clearing invalidates again.
-    editor.set_style_overlay(Vec::new());
+    editor.edit_style_overlay().clear();
     assert!(editor.try_layout().is_none());
 }
 
@@ -171,7 +168,7 @@ fn editor_style_overlay_preedit_underline_wins() {
     let mut env = TestEnv::new(test_name!(), None);
     let mut editor = env.editor("Hello");
     // The overlay tries to force underline off; the preedit push comes later and wins.
-    editor.set_style_overlay(vec![(StyleProperty::<ColorBrush>::Underline(false), 0..5)]);
+    *editor.edit_style_overlay() = vec![(StyleProperty::<ColorBrush>::Underline(false), 0..5)];
     env.driver(&mut editor).set_compose("XY", Some((0, 0)));
     let mut drv = env.driver(&mut editor);
     let layout = drv.layout();
@@ -191,7 +188,7 @@ fn editor_style_overlay_preedit_underline_wins() {
 fn editor_style_overlay_survives_edits() {
     let mut env = TestEnv::new(test_name!(), None);
     let mut editor = env.editor("abcd");
-    editor.set_style_overlay(vec![(StyleProperty::<ColorBrush>::Underline(true), 0..1)]);
+    *editor.edit_style_overlay() = vec![(StyleProperty::<ColorBrush>::Underline(true), 0..1)];
     {
         let mut drv = env.driver(&mut editor);
         drv.select_all();
@@ -207,7 +204,7 @@ fn editor_style_overlay_survives_edits() {
         assert!(style.underline.is_none());
     }
     // A fresh, aligned overlay applies again.
-    editor.set_style_overlay(vec![(StyleProperty::<ColorBrush>::Underline(true), 0..2)]);
+    *editor.edit_style_overlay() = vec![(StyleProperty::<ColorBrush>::Underline(true), 0..2)];
     let mut drv = env.driver(&mut editor);
     let layout = drv.layout();
     assert!(
@@ -224,13 +221,13 @@ fn editor_style_overlay_clamps_out_of_bounds() {
     let mut env = TestEnv::new(test_name!(), None);
     let mut editor = env.editor("");
     // Far out of bounds on empty text: clamped to empty, skipped, no panic.
-    editor.set_style_overlay(vec![(StyleProperty::<ColorBrush>::Underline(true), 0..10)]);
+    *editor.edit_style_overlay() = vec![(StyleProperty::<ColorBrush>::Underline(true), 0..10)];
     env.driver(&mut editor).refresh_layout();
     assert!(editor.try_layout().is_some());
     assert_eq!(editor.get_style_overlay().len(), 1);
 
     let mut editor = env.editor("abcd");
-    editor.set_style_overlay(vec![(StyleProperty::<ColorBrush>::Underline(true), 2..100)]);
+    *editor.edit_style_overlay() = vec![(StyleProperty::<ColorBrush>::Underline(true), 2..100)];
     let mut drv = env.driver(&mut editor);
     let layout = drv.layout();
     let style_at = |index: usize| {
