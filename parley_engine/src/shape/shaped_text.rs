@@ -702,7 +702,7 @@ mod tests {
             assert_eq!(
                 newline_cluster.glyph_len(),
                 0,
-                "newline glyphss are removed"
+                "newline glyphs are removed"
             );
             assert_eq!(newline_cluster.advance, 0., "newline advance is set to 0");
         }

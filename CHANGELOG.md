@@ -29,7 +29,7 @@ This release has an [MSRV] of 1.88.
 - Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. ([#661][] by [@tomcur][])
 - Breaking change: `Cluster` now spans a full grapheme cluster instead of a single character. ([#715][] by [@tomcur][])  
   Shaped clusters that cross grapheme boundaries are represented using the existing `Cluster::is_ligature_start` and `Cluster::is_ligature_continuation`; note these methods previously encoded graphemes as well.
-  Shapder clusters' advances are split evenly over the grapheme clusters they overlap.
+  Shaped clusters' advances are split evenly over the grapheme clusters they overlap.
   `Run::cluster_range` now returns grapheme cluster indices relative to the run's shaped run.
   `BreakerState::append_cluster_to_line` was replaced by `BreakerState::append_atom_to_line`.
 - Breaking change: lines with mixed inline content, like different fonts or sizes, or inline boxes, are now sized more closely to the CSS line-box model. ([#697][] by [@tomcur][])  
