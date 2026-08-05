@@ -24,6 +24,10 @@ This release has an [MSRV] of 1.88.
 
 - `Collection::family_ids` to iterate over unique font family identifiers. ([#725][] by [@tomcur][])
 
+#### Parley
+
+- `PlainEditor::{set_defer_layout, defers_layout}` to opt in to deferring layout rebuilds after edits to the next read, so a batch of edits performs a single rebuild. ([#729][] by [@AdrianEddy][])
+
 ### Changed
 
 #### Parley
@@ -542,6 +546,7 @@ This release has an [MSRV][] of 1.70.
 
 [MSRV]: README.md#minimum-supported-rust-version-msrv
 
+[@AdrianEddy]: https://github.com/AdrianEddy
 [@areopagitics]: https://github.com/areopagitics
 [@conor-93]: https://github.com/conor-93
 [@devunt]: https://github.com/devunt
@@ -727,6 +732,7 @@ This release has an [MSRV][] of 1.70.
 [#717]: https://github.com/linebender/parley/pull/717
 [#725]: https://github.com/linebender/parley/pull/725
 [#728]: https://github.com/linebender/parley/pull/728
+[#729]: https://github.com/linebender/parley/pull/729
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.11.0...HEAD
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0

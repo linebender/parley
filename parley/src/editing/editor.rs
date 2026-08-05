@@ -108,6 +108,9 @@ where
     font_size: f32,
     scale: f32,
     quantize: bool,
+    /// When `true`, operations defer the layout rebuild to the next read
+    /// instead of flushing it before returning.
+    defer_layout: bool,
     // Simple tracking of when the layout needs to be updated
     // before it can be used for `Selection` calculations or
     // for drawing.
@@ -141,6 +144,7 @@ where
             font_size,
             scale: 1.0,
             quantize: true,
+            defer_layout: false,
             layout_dirty: true,
             alignment: Alignment::Start,
             // We don't use the `default` value to start with, as our consumers
@@ -196,7 +200,7 @@ where
         self.editor.buffer.replace_range(range.clone(), "");
         self.editor
             .update_compose_for_replaced_range(range.clone(), 0);
-        self.update_layout();
+        self.editor.layout_dirty = true;
         let old_anchor = old_selection.anchor();
         let old_focus = old_selection.focus();
         // When doing the equivalent of a backspace on a collapsed selection,
@@ -207,17 +211,12 @@ where
             (old_anchor.affinity(), old_focus.affinity())
         };
         self.editor.set_selection(Selection::new(
-            Cursor::from_byte_index(
-                &self.editor.layout,
-                old_anchor.index() - range.len(),
-                anchor_affinity,
-            ),
-            Cursor::from_byte_index(
-                &self.editor.layout,
-                old_focus.index() - range.len(),
-                focus_affinity,
-            ),
+            self.editor
+                .cursor_for_index(old_anchor.index() - range.len(), anchor_affinity),
+            self.editor
+                .cursor_for_index(old_focus.index() - range.len(), focus_affinity),
         ));
+        self.flush_layout();
     }
 
     /// Delete the specified numbers of bytes after the selection.
@@ -237,11 +236,14 @@ where
         }
         self.editor.buffer.replace_range(range.clone(), "");
         self.editor.update_compose_for_replaced_range(range, 0);
-        self.update_layout();
+        self.editor.layout_dirty = true;
+        self.flush_layout();
     }
 
     /// Delete the selection or the next cluster (typical ‘delete’ behavior).
     pub fn delete(&mut self) {
+        // Reads cluster boundaries, so the layout must be fresh.
+        self.refresh_layout();
         if self.editor.selection.is_collapsed() {
             // Upstream cluster range
             if let Some(range) = self
@@ -255,7 +257,8 @@ where
             {
                 self.editor.buffer.replace_range(range.clone(), "");
                 self.editor.update_compose_for_replaced_range(range, 0);
-                self.update_layout();
+                self.editor.layout_dirty = true;
+                self.flush_layout();
             }
         } else {
             self.delete_selection();
@@ -264,6 +267,8 @@ where
 
     /// Delete the selection or up to the next word boundary (typical ‘ctrl + delete’ behavior).
     pub fn delete_word(&mut self) {
+        // Reads word boundaries, so the layout must be fresh.
+        self.refresh_layout();
         if self.editor.selection.is_collapsed() {
             let focus = self.editor.selection.focus();
             let start = focus.index();
@@ -271,11 +276,13 @@ where
             if self.editor.buffer.get(start..end).is_some() {
                 self.editor.buffer.replace_range(start..end, "");
                 self.editor.update_compose_for_replaced_range(start..end, 0);
-                self.update_layout();
+                self.editor.layout_dirty = true;
                 self.editor.set_selection(
-                    Cursor::from_byte_index(&self.editor.layout, start, Affinity::Downstream)
+                    self.editor
+                        .cursor_for_index(start, Affinity::Downstream)
                         .into(),
                 );
+                self.flush_layout();
             }
         } else {
             self.delete_selection();
@@ -284,6 +291,8 @@ where
 
     /// Delete the selection or the previous cluster (typical ‘backspace’ behavior).
     pub fn backdelete(&mut self) {
+        // Reads cluster boundaries, so the layout must be fresh.
+        self.refresh_layout();
         if self.editor.selection.is_collapsed() {
             // Upstream cluster
             if let Some(cluster) = self
@@ -311,11 +320,13 @@ where
                 };
                 self.editor.buffer.replace_range(start..end, "");
                 self.editor.update_compose_for_replaced_range(start..end, 0);
-                self.update_layout();
+                self.editor.layout_dirty = true;
                 self.editor.set_selection(
-                    Cursor::from_byte_index(&self.editor.layout, start, Affinity::Downstream)
+                    self.editor
+                        .cursor_for_index(start, Affinity::Downstream)
                         .into(),
                 );
+                self.flush_layout();
             }
         } else {
             self.delete_selection();
@@ -324,6 +335,8 @@ where
 
     /// Delete the selection or back to the previous word boundary (typical ‘ctrl + backspace’ behavior).
     pub fn backdelete_word(&mut self) {
+        // Reads word boundaries, so the layout must be fresh.
+        self.refresh_layout();
         if self.editor.selection.is_collapsed() {
             let focus = self.editor.selection.focus();
             let end = focus.index();
@@ -331,11 +344,13 @@ where
             if self.editor.buffer.get(start..end).is_some() {
                 self.editor.buffer.replace_range(start..end, "");
                 self.editor.update_compose_for_replaced_range(start..end, 0);
-                self.update_layout();
+                self.editor.layout_dirty = true;
                 self.editor.set_selection(
-                    Cursor::from_byte_index(&self.editor.layout, start, Affinity::Downstream)
+                    self.editor
+                        .cursor_for_index(start, Affinity::Downstream)
                         .into(),
                 );
+                self.flush_layout();
             }
         } else {
             self.delete_selection();
@@ -378,7 +393,7 @@ where
         };
         self.editor.compose = Some(start..start + text.len());
         self.editor.show_cursor = cursor.is_some();
-        self.update_layout();
+        self.editor.layout_dirty = true;
 
         // Select the location indicated by the IME. If `cursor` is none, collapse the selection to
         // a caret at the start of the preedit text. As `self.editor.show_cursor` is `false`, it
@@ -388,6 +403,7 @@ where
             self.editor.cursor_at(start + cursor.0),
             self.editor.cursor_at(start + cursor.1),
         ));
+        self.flush_layout();
     }
 
     /// Set the preedit range to a range of byte indices.
@@ -397,7 +413,8 @@ where
     pub fn set_compose_byte_range(&mut self, start: usize, end: usize) {
         if self.editor.buffer.is_char_boundary(start) && self.editor.buffer.is_char_boundary(end) {
             self.editor.compose = Some(start..end);
-            self.update_layout();
+            self.editor.layout_dirty = true;
+            self.flush_layout();
         }
     }
 
@@ -409,10 +426,11 @@ where
         if let Some(preedit_range) = self.editor.compose.take() {
             self.editor.buffer.replace_range(preedit_range.clone(), "");
             self.editor.show_cursor = true;
-            self.update_layout();
+            self.editor.layout_dirty = true;
 
             self.editor
                 .set_selection(self.editor.cursor_at(preedit_range.start).into());
+            self.flush_layout();
         }
     }
 
@@ -423,7 +441,8 @@ where
     pub fn finish_compose(&mut self) {
         if self.editor.compose.take().is_some() {
             self.editor.show_cursor = true;
-            self.update_layout();
+            self.editor.layout_dirty = true;
+            self.flush_layout();
         }
     }
 
@@ -803,9 +822,10 @@ where
         self.editor.refresh_layout(self.font_cx, self.layout_cx);
     }
 
-    /// Update the layout unconditionally.
-    fn update_layout(&mut self) {
-        self.editor.update_layout(self.font_cx, self.layout_cx);
+    /// Rebuild a dirty layout now, unless deferral is enabled
+    /// (see [`PlainEditor::set_defer_layout`]).
+    fn flush_layout(&mut self) {
+        self.editor.flush_layout(self.font_cx, self.layout_cx);
     }
 }
 
@@ -1028,6 +1048,30 @@ where
         self.layout_dirty = true;
     }
 
+    /// Set whether operations flush the layout rebuild before returning (the
+    /// default) or defer it to the next read.
+    ///
+    /// Every operation marks the layout dirty; this only controls when the
+    /// rebuild runs. With deferral enabled, a batch of edits performs a
+    /// single rebuild at the next read of the layout
+    /// ([`refresh_layout`](Self::refresh_layout), [`layout`](Self::layout),
+    /// or any driver method that needs it). While the layout is dirty,
+    /// [`try_layout`](Self::try_layout) returns `None`, selection indices
+    /// are provisional (snapped to cluster boundaries by the rebuild), the
+    /// `&self` geometry readers return geometry of the last-built layout,
+    /// and the [`Generation`] may not be nudged until the rebuild.
+    ///
+    /// Disabling deferral does not rebuild by itself; a dirty layout is
+    /// rebuilt at the next read.
+    pub fn set_defer_layout(&mut self, defer: bool) {
+        self.defer_layout = defer;
+    }
+
+    /// Whether mutations defer the layout rebuild to the next read.
+    pub fn defers_layout(&self) -> bool {
+        self.defer_layout
+    }
+
     /// Modify the styles provided for this editor.
     pub fn edit_styles(&mut self) -> &mut StyleSet<T> {
         self.layout_dirty = true;
@@ -1117,15 +1161,40 @@ where
         }
     }
 
+    /// Rebuild a dirty layout now, unless deferral is enabled
+    /// (see [`set_defer_layout`](Self::set_defer_layout)).
+    ///
+    /// Operations call this before returning, so with deferral off the
+    /// layout is always fresh after each call.
+    fn flush_layout(&mut self, font_cx: &mut FontContext, layout_cx: &mut LayoutContext<T>) {
+        if !self.defer_layout {
+            self.refresh_layout(font_cx, layout_cx);
+        }
+    }
+
+    /// Make a provisional cursor at a byte index and affinity.
+    ///
+    /// Only called while the layout is dirty (every mutation marks it dirty
+    /// before placing cursors): the index is clamped to the nearest char
+    /// boundary at or before it, and the next rebuild's selection refresh
+    /// snaps it to a cluster boundary.
+    fn cursor_for_index(&self, index: usize, affinity: Affinity) -> Cursor {
+        debug_assert!(self.layout_dirty);
+        let mut index = index.min(self.buffer.len());
+        while !self.buffer.is_char_boundary(index) {
+            index -= 1;
+        }
+        Cursor::provisional(index, affinity)
+    }
+
     // --- MARK: Internal Helpers ---
     /// Make a cursor at a given byte index.
     fn cursor_at(&self, index: usize) -> Cursor {
-        // TODO: Do we need to be non-dirty?
         // FIXME: `Selection` should make this easier
         if index >= self.buffer.len() {
-            Cursor::from_byte_index(&self.layout, self.buffer.len(), Affinity::Upstream)
+            self.cursor_for_index(self.buffer.len(), Affinity::Upstream)
         } else {
-            Cursor::from_byte_index(&self.layout, index, Affinity::Downstream)
+            self.cursor_for_index(index, Affinity::Downstream)
         }
     }
 
@@ -1173,14 +1242,15 @@ where
         }
         self.update_compose_for_replaced_range(range, s.len());
 
-        self.update_layout(font_cx, layout_cx);
+        self.layout_dirty = true;
         let new_index = start.saturating_add(s.len());
         let affinity = if s.ends_with(['\n', '\r', '\u{2028}', '\u{2029}']) {
             Affinity::Downstream
         } else {
             Affinity::Upstream
         };
-        self.set_selection(Cursor::from_byte_index(&self.layout, new_index, affinity).into());
+        self.set_selection(self.cursor_for_index(new_index, affinity).into());
+        self.flush_layout(font_cx, layout_cx);
     }
 
     /// Update the selection, and nudge the `Generation` if something other than `h_pos` changed.

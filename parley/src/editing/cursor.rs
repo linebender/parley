@@ -41,6 +41,15 @@ impl Cursor {
         }
     }
 
+    /// Creates a provisional cursor, without snapping to a cluster boundary.
+    ///
+    /// Only for use while the layout is dirty; `index` must be a char
+    /// boundary of the text, and the next rebuild refreshes the cursor
+    /// against the new layout (see [`Self::refresh`]).
+    pub(crate) fn provisional(index: usize, affinity: Affinity) -> Self {
+        Self { index, affinity }
+    }
+
     /// Creates a new cursor from the given coordinates.
     pub fn from_point<B: Brush>(layout: &Layout<B>, x: f32, y: f32) -> Self {
         let (index, affinity) = if let Some((cluster, side)) = Cluster::from_point(layout, x, y) {
