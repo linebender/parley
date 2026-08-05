@@ -73,6 +73,30 @@ impl Script {
     pub fn parse(s: &str) -> Result<Self, ParseScriptError> {
         s.parse()
     }
+
+    /// Whether this is a cursive script according to [CSS Text 3 Appendix D][css-cursive-scripts].
+    ///
+    /// As per that specification, "these scripts do not admit gaps between their letters for either
+    /// justification or letter-spacing."
+    ///
+    /// See also [CSS Text 3 § 6.4.4][css-cursive-justification] on cursive justification.
+    ///
+    /// [css-cursive-scripts]: https://www.w3.org/TR/css-text-3/#script-groups
+    /// [css-cursive-justification]: https://www.w3.org/TR/css-text-3/#justify-cursive
+    #[inline(always)]
+    pub const fn is_cursive(self) -> bool {
+        // Script identifiers from UAX #31: <https://www.unicode.org/reports/tr31/>.
+        matches!(
+            &self.raw,
+            b"Arab" | // Arabic
+            b"Rohg" | // Hanifi Rohingya
+            b"Mand" | // Mandaic
+            b"Mong" | // Mongolian
+            b"Nkoo" | // N'ko
+            b"Phag" | // Phags Pa
+            b"Syrc" // Syriac
+        )
+    }
 }
 
 impl fmt::Debug for Script {
