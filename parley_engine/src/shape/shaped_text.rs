@@ -9,15 +9,13 @@ use alloc::vec::Vec;
 use parlance::BidiLevel;
 
 use crate::{
-    CharInfo, FontInstance, Glyph, ShapeOptions,
-    itemize::{Item, TextRange},
-    shape::ShapedClusterFlags,
+    CharInfo, FontInstance, Glyph,
+    itemize::{Segment, TextRange},
 };
 
 use super::{
-    ClusterInfo, Whitespace,
-    atom::ShapedSlice,
-    data::{Character, ShapedCluster},
+    Character, ClusterInfo, ShapedCluster, ShapedClusterFlags, Whitespace, atom::ShapedSlice,
+    shaper::ShapeOptions,
 };
 
 /// A normalized font coordinate.
@@ -89,9 +87,8 @@ pub struct FontMetrics {
 
 /// The result of shaping.
 ///
-/// After [itemizing][crate::itemize::Item] your text,
-/// [shape each item][crate::Shaper::shape_item], appending the result into this
-/// [`ShapedText`]. This then holds your shaped paragraph of text.
+/// After [analyzing][crate::Analysis] your text, [shape the text][crate::Shaper::shape_text],
+/// writing the result into this [`ShapedText`]. This then holds your shaped paragraph of text.
 ///
 /// This shaped text holds spans of the source text's characters that were shaped into
 /// [`ShapedCluster`]s. Note that the boundaries of shaped clusters and graphemes need not coincide;
@@ -237,7 +234,7 @@ impl ShapedText {
         &mut self,
         text: &str,
         range: TextRange,
-        item: &Item,
+        item: &Segment,
         options: &ShapeOptions<'_>,
         char_info: &[CharInfo],
         font: &FontInstance,
@@ -563,7 +560,11 @@ mod tests {
     use fontique::Synthesis;
     use linebender_resource_handle::{Blob, FontData};
 
-    use crate::{Analysis, AnalysisOptions, Analyzer, FontInstance, ShapeOptions, Shaper};
+    use crate::{
+        Analysis, AnalysisOptions, Analyzer, FontInstance, FontSelector, ShapeOptions, Shaper,
+        itemize::{Item, Segment},
+        shape::CharCluster,
+    };
 
     use super::ShapedText;
 
@@ -571,6 +572,20 @@ mod tests {
         include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
     const NOTO_KUFI_ARABIC: &[u8] =
         include_bytes!("../../../parley_dev/assets/fonts/noto_fonts/NotoKufiArabic-Regular.otf");
+
+    /// A [`FontSelector`] shaping everything with a single font.
+    struct SingleFont(FontInstance);
+
+    impl FontSelector for SingleFont {
+        fn select_font(
+            &mut self,
+            _item: &Segment,
+            _options: &ShapeOptions<'_>,
+            _cluster: &mut CharCluster,
+        ) -> Option<FontInstance> {
+            Some(self.0.clone())
+        }
+    }
 
     fn analyze(text: &str) -> Analysis {
         let mut analysis = Analysis::new();
@@ -593,39 +608,24 @@ mod tests {
         }
     }
 
-    fn shape_item_with_font(
-        text: &str,
-        analysis: &Analysis,
-        item: &crate::itemize::Item,
-        font: &FontInstance,
-        shaper: &mut Shaper,
-        shaped: &mut ShapedText,
-    ) {
+    fn shape_with_font(text: &str, font_data: &'static [u8]) -> ShapedText {
+        let analysis = analyze(text);
+        let font = font_instance(font_data);
+        let mut shaper = Shaper::default();
+        let mut shaped = ShapedText::new();
+
         let char_style_indices = vec![0; text.chars().count()];
-        shaper.shape_item(
-            text,
-            analysis,
-            item,
-            &ShapeOptions {
+        let items = [Item {
+            char_end: text.chars().count().try_into().unwrap(),
+            options: ShapeOptions {
                 font_size: 32.0,
                 language: None,
                 features: &[],
                 variations: &[],
                 char_style_indices: &char_style_indices,
             },
-            |_| Some(font.clone()),
-            shaped,
-        );
-    }
-
-    fn shape_with_font(text: &str, font_data: &'static [u8]) -> ShapedText {
-        let analysis = analyze(text);
-        let font = font_instance(font_data);
-        let mut shaper = Shaper::default();
-        let mut shaped = ShapedText::new();
-        for item in analysis.itemize(text, |_| false) {
-            shape_item_with_font(text, &analysis, &item, &font, &mut shaper, &mut shaped);
-        }
+        }];
+        shaper.shape_text(text, &analysis, items, SingleFont(font), &mut shaped);
         shaped
     }
 
@@ -709,6 +709,7 @@ mod tests {
     fn item_boundaries_force_grapheme_start() {
         // Two regional indicators forming a single flag grapheme...
         let text = "\u{1F1E6}\u{1F1E7}";
+        let char_style_indices = vec![0; text.chars().count()];
         let analysis = analyze(text);
         assert_eq!(
             analysis
@@ -719,18 +720,34 @@ mod tests {
             [true, false]
         );
 
-        // ...split over two items.
-        let items: Vec<_> = analysis
-            .itemize(text, |range| range.char_range.end == 1)
-            .collect();
-        assert_eq!(items.len(), 2);
-
         let font = font_instance(ROBOTO);
         let mut shaper = Shaper::default();
         let mut shaped = ShapedText::new();
-        for item in &items {
-            shape_item_with_font(text, &analysis, item, &font, &mut shaper, &mut shaped);
-        }
+
+        // ...split over two items.
+        let items = [
+            Item {
+                char_end: 1,
+                options: ShapeOptions {
+                    font_size: 32.0,
+                    language: None,
+                    features: &[],
+                    variations: &[],
+                    char_style_indices: &char_style_indices,
+                },
+            },
+            Item {
+                char_end: text.chars().count().try_into().unwrap(),
+                options: ShapeOptions {
+                    font_size: 32.0,
+                    language: None,
+                    features: &[],
+                    variations: &[],
+                    char_style_indices: &char_style_indices,
+                },
+            },
+        ];
+        shaper.shape_text(text, &analysis, items, SingleFont(font), &mut shaped);
 
         let grapheme_starts: Vec<bool> =
             shaped.characters.iter().map(|c| c.grapheme_start).collect();

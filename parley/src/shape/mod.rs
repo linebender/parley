@@ -13,10 +13,9 @@ use super::style::{Brush, FontFeature, FontVariation};
 use crate::inline_box::InlineBox;
 use crate::util::nearly_eq;
 use crate::{FontContext, FontData};
-use fontique::Language;
 
 use fontique::{self, Query, QueryFamily, QueryFont};
-use parlance::{GenericFamily, Script};
+use parlance::{BidiLevel, GenericFamily};
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn shape_text<'a, B: Brush>(
@@ -42,7 +41,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         // Process any remaining inline boxes whose index is greater than the length of the text
         for box_idx in 0..inline_boxes.len() {
             // Push the box to the list of items
-            layout.data.push_inline_box(box_idx);
+            layout.data.push_inline_box(box_idx, BidiLevel::new(0));
         }
         return;
     }
@@ -50,94 +49,151 @@ pub(crate) fn shape_text<'a, B: Brush>(
     let mut fq = fcx.collection.query(&mut fcx.source_cache);
 
     let mut inline_box_iter = inline_boxes.iter().peekable();
-    let split_after = |item_range: parley_engine::itemize::TextRange| {
-        // Split at inlines boxes, so each box falls on a shaping boundary.
-        {
-            let mut split = false;
-            // We loop because there may be multiple boxes at this index.
-            while let Some(inline_box) = inline_box_iter.peek() {
-                if inline_box.index < item_range.byte_range.end {
-                    // Inline boxes *before* this index are popped (this occurs if the itemizer
-                    // split a run and we were not called, such as at a bidi boundary).
-                    inline_box_iter.next();
-                } else if inline_box.index == item_range.byte_range.end {
-                    inline_box_iter.next();
-                    split = true;
-                } else {
-                    break;
-                }
+
+    // Split when shaping-relevant style properties change and at inline boxes.
+    let items = {
+        // TODO: we currently walk characters here, but we could instead just walk boundaries of
+        // styles and inline boxes.
+        let char_count = char_style_indices.len();
+
+        // The first character of the item currently being built.
+        let mut item_start_char = 0_usize;
+
+        // Positioned at `item_start_char`, i.e., the first character not yet covered by an item.
+        let mut chars = text.char_indices().enumerate().peekable();
+        core::iter::from_fn(move || {
+            if item_start_char == char_count {
+                return None;
             }
 
-            if split {
-                return true;
-            }
-        }
-
-        let item_style_index = char_style_indices[item_range.char_range.start];
-        let style_index = char_style_indices[item_range.char_range.end];
-
-        if style_index != item_style_index {
+            let item_style_index = char_style_indices[item_start_char];
             let item_style = &styles[usize::from(item_style_index)];
-            let style = &styles[usize::from(style_index)];
-            !nearly_eq(style.font_size, item_style.font_size)
-                || style.locale != item_style.locale
-                || style.font_variations != item_style.font_variations
-                || style.font_features != item_style.font_features
-                || !nearly_eq(style.letter_spacing, item_style.letter_spacing)
-                || !nearly_eq(style.word_spacing, item_style.word_spacing)
-        } else {
-            false
-        }
+
+            // Items are at least one character long, therefore the item's own first character is
+            // never a split point.
+            chars.next();
+
+            let char_end = loop {
+                let Some(&(char_index, (byte_index, _))) = chars.peek() else {
+                    // End of text.
+                    break char_count;
+                };
+
+                // Split at inlines boxes, so each box falls on a shaping boundary.
+                //
+                // We loop because there may be multiple boxes at this index.
+                let mut split = false;
+                while let Some(inline_box) = inline_box_iter.peek() {
+                    if inline_box.index < byte_index {
+                        // Inline boxes *before* this index are popped (this occurs if the itemizer
+                        // split a run and we were not called, such as at a bidi boundary).
+                        inline_box_iter.next();
+                    } else if inline_box.index == byte_index {
+                        inline_box_iter.next();
+                        split = true;
+                    } else {
+                        break;
+                    }
+                }
+
+                if split {
+                    break char_index;
+                }
+
+                let style_index = char_style_indices[char_index];
+                if style_index != item_style_index {
+                    let style = &styles[usize::from(style_index)];
+                    split = !nearly_eq(style.font_size, item_style.font_size)
+                        || style.locale != item_style.locale
+                        || style.font_variations != item_style.font_variations
+                        || style.font_features != item_style.font_features
+                        || !nearly_eq(style.letter_spacing, item_style.letter_spacing)
+                        || !nearly_eq(style.word_spacing, item_style.word_spacing);
+                }
+
+                if split {
+                    break char_index;
+                }
+
+                chars.next();
+            };
+
+            item_start_char = char_end;
+            Some(parley_engine::itemize::Item {
+                char_end: char_end as u32,
+                options: ShapeOptions {
+                    language: item_style.locale,
+                    font_size: item_style.font_size,
+                    features: rcx.features(item_style.font_features).unwrap_or(&[]),
+                    variations: rcx.variations(item_style.font_variations).unwrap_or(&[]),
+                    char_style_indices,
+                },
+            })
+        })
     };
 
+    let font_selector = FontSelector::new(&mut fq, rcx, styles, analysis_data_sources);
+
+    scx.shape_text(
+        text,
+        analysis,
+        items,
+        font_selector,
+        &mut layout.data.shaped_text,
+    );
+
     let mut inline_box_iter = inline_boxes.iter().enumerate().peekable();
-    for item in analysis.itemize(text, split_after) {
+    for shaped_run_idx in 0..layout.data.shaped_text.runs().len() {
+        let shaped_run = &layout.data.shaped_text.runs()[shaped_run_idx];
+        let run_text_byte_start = shaped_run.range.byte_range.start;
+        let run_style_index = char_style_indices[shaped_run.range.char_range.start];
+        let run_style = &styles[usize::from(run_style_index)];
+
         // Push inline boxes positioned before the start of this item.
+        //
+        // TODO: this lets the inline box take the bidi level of the previous run, but in principle
+        // inline boxes should be included in bidi analysis as an object replacement character
+        // (U+FFFC). The box should then take the bidi level of that character.
+        let prev_bidi_level = if shaped_run_idx > 0 {
+            layout.data.shaped_text.runs()[&shaped_run_idx - 1].bidi_level
+        } else {
+            BidiLevel::new(0)
+        };
         while let Some((box_idx, inline_box)) = inline_box_iter.peek() {
-            if inline_box.index <= item.range.byte_range.start {
-                layout.data.push_inline_box(*box_idx);
+            if inline_box.index <= run_text_byte_start {
+                layout.data.push_inline_box(*box_idx, prev_bidi_level);
                 inline_box_iter.next();
             } else {
                 break;
             }
         }
 
-        let style_index = char_style_indices[item.range.char_range.start];
-        let style = &styles[usize::from(style_index)];
-        let mut font_selector =
-            FontSelector::new(&mut fq, rcx, styles, style_index, item.script, style.locale);
-
-        let shaped_runs_range = scx.shape_item(
-            text,
-            analysis,
-            &item,
-            &ShapeOptions {
-                language: style.locale,
-                font_size: style.font_size,
-                features: rcx.features(style.font_features).unwrap_or(&[]),
-                variations: rcx.variations(style.font_variations).unwrap_or(&[]),
-                char_style_indices,
-            },
-            #[inline(always)]
-            |char_cluster| font_selector.select_font(char_cluster, analysis_data_sources),
-            &mut layout.data.shaped_text,
+        layout.data.process_shaped_run(
+            shaped_run_idx,
+            // TODO: should we get the *item's* style here?
+            //
+            // Using the run's style for word and letter spacing is probably correct (and in fact,
+            // we probably shouldn't itemize on them; we should just ensure we don't ligate if
+            // they're non-zero).
+            run_style,
+            run_style.word_spacing,
+            run_style.letter_spacing,
         );
-        for shaped_run_idx in shaped_runs_range {
-            let shaped_run = &layout.data.shaped_text.runs()[shaped_run_idx];
-            let run_style_index = char_style_indices[shaped_run.range.char_range.start];
-            let run_style = &styles[usize::from(run_style_index)];
-            layout.data.process_shaped_run(
-                shaped_run_idx,
-                run_style,
-                style.word_spacing,
-                style.letter_spacing,
-            );
-        }
     }
 
     // Process any remaining inline boxes whose index is greater than the length of the text
+    //
+    // Give the box the same bidi level as the last text run (or else default to 0 if there is no
+    // text run).
+    let bidi_level = layout
+        .data
+        .shaped_text
+        .runs()
+        .last()
+        .map(|r| r.bidi_level)
+        .unwrap_or(BidiLevel::new(0));
     for (box_idx, _inline_box) in inline_box_iter {
-        layout.data.push_inline_box(box_idx);
+        layout.data.push_inline_box(box_idx, bidi_level);
     }
 }
 
@@ -161,53 +217,60 @@ struct FontSelector<'a, 'b, B: Brush> {
 
     /// The font to use if [`Self::query`] doesn't return any font.
     last_resort_font: LastResortFont,
+
+    analysis_data_sources: &'a AnalysisDataSources,
 }
 
 impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
     /// Construct a new `FontSelector`.
+    ///
+    /// If `query` ends up not returning a font for a query, the `last_resort_font` is returned
+    /// instead.
     fn new(
         query: &'b mut Query<'a>,
         rcx: &'a ResolveContext,
         styles: &'a [ResolvedStyle<B>],
-        style_index: u16,
-        script: Script,
-        locale: Option<Language>,
+        analysis_data_sources: &'a AnalysisDataSources,
     ) -> Self {
-        let style = &styles[style_index as usize];
-        let fonts_id = style.font_family.id();
-        let fonts = rcx.stack(style.font_family).unwrap_or(&[]);
-        let attrs = fontique::Attributes {
-            width: style.font_width,
-            weight: style.font_weight,
-            style: style.font_style,
-        };
-        let variations = rcx.variations(style.font_variations).unwrap_or(&[]);
-        let features = rcx.features(style.font_features).unwrap_or(&[]);
-        query.set_families(fonts.iter().copied());
-
-        query.set_fallbacks(fontique::FallbackKey::new(script, locale.as_ref()));
-        query.set_attributes(attrs);
+        let attrs = fontique::Attributes::default();
 
         Self {
             query,
-            fonts_id: Some(fonts_id),
+            fonts_id: None,
             rcx,
             styles,
-            style_index,
+            style_index: 0,
             attrs,
-            variations,
-            features,
+            variations: &[],
+            features: &[],
             last_resort_font: LastResortFont::Unresolved,
+
+            analysis_data_sources,
         }
+    }
+}
+
+impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
+    fn begin_segment(
+        &mut self,
+        item: &parley_engine::itemize::Segment,
+        options: &ShapeOptions<'_>,
+    ) {
+        self.query.set_fallbacks(fontique::FallbackKey::new(
+            item.script,
+            options.language.as_ref(),
+        ));
     }
 
     fn select_font(
         &mut self,
+        _item: &parley_engine::itemize::Segment,
+        _options: &ShapeOptions<'_>,
         cluster: &mut CharCluster,
-        analysis_data_sources: &AnalysisDataSources,
     ) -> Option<FontInstance> {
         let style_index = cluster.style_index();
         let is_emoji = cluster.is_emoji();
+
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
             self.style_index = style_index;
             let style = &self.styles[style_index as usize];
@@ -237,8 +300,10 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             self.variations = self.rcx.variations(style.font_variations).unwrap_or(&[]);
             self.features = self.rcx.features(style.font_features).unwrap_or(&[]);
         }
+
         let mut selected_font = None;
         let mut best_coverage = Coverage::NONE;
+
         self.query.matches_with(|font| {
             let Some(charmap) = font.charmap() else {
                 return fontique::QueryStatus::Continue;
@@ -254,7 +319,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
                         })
                         .unwrap_or_default()
                 },
-                analysis_data_sources,
+                self.analysis_data_sources,
             );
             if coverage > best_coverage {
                 selected_font = Some(SelectedFont { font: font.clone() });

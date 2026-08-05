@@ -803,12 +803,28 @@ mod tests {
     use linebender_resource_handle::{Blob, FontData};
 
     use crate::{
-        Analysis, AnalysisOptions, Analyzer, FontInstance, ShapeOptions, ShapedText, Shaper,
-        itemize::Item,
+        Analysis, AnalysisOptions, Analyzer, FontInstance, FontSelector, ShapeOptions, ShapedText,
+        Shaper,
+        itemize::{Item, Segment},
+        shape::CharCluster,
     };
 
     const ROBOTO: &[u8] =
         include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
+
+    /// A [`FontSelector`] shaping everything with a single font.
+    struct SingleFont(FontInstance);
+
+    impl FontSelector for SingleFont {
+        fn select_font(
+            &mut self,
+            _segment: &Segment,
+            _options: &ShapeOptions<'_>,
+            _cluster: &mut CharCluster,
+        ) -> Option<FontInstance> {
+            Some(self.0.clone())
+        }
+    }
 
     fn analyze(text: &str) -> Analysis {
         let mut analysis = Analysis::new();
@@ -831,39 +847,24 @@ mod tests {
         }
     }
 
-    fn shape_item_with_font(
-        text: &str,
-        analysis: &Analysis,
-        item: &Item,
-        font: &FontInstance,
-        shaper: &mut Shaper,
-        shaped: &mut ShapedText,
-    ) {
+    fn shape_with_font(text: &str, font_data: &'static [u8]) -> ShapedText {
+        let analysis = analyze(text);
+        let font = font_instance(font_data);
+        let mut shaper = Shaper::default();
+        let mut shaped = ShapedText::new();
+
         let char_style_indices = vec![0; text.chars().count()];
-        shaper.shape_item(
-            text,
-            analysis,
-            item,
-            &ShapeOptions {
+        let items = [Item {
+            char_end: text.chars().count().try_into().unwrap(),
+            options: ShapeOptions {
                 font_size: 32.0,
                 language: None,
                 features: &[],
                 variations: &[],
                 char_style_indices: &char_style_indices,
             },
-            |_| Some(font.clone()),
-            shaped,
-        );
-    }
-
-    fn shape_with_font(text: &str, font_data: &'static [u8]) -> ShapedText {
-        let analysis = analyze(text);
-        let font = font_instance(font_data);
-        let mut shaper = Shaper::default();
-        let mut shaped = ShapedText::new();
-        for item in analysis.itemize(text, |_| false) {
-            shape_item_with_font(text, &analysis, &item, &font, &mut shaper, &mut shaped);
-        }
+        }];
+        shaper.shape_text(text, &analysis, items, SingleFont(font), &mut shaped);
         shaped
     }
 

@@ -8,7 +8,7 @@ use core::{ops::Range, str::CharIndices};
 use icu_properties::props::Script as IcuScript;
 use parlance::{BidiLevel, Script};
 
-use crate::{Analysis, CharInfo};
+use crate::{Analysis, CharInfo, ShapeOptions};
 
 /// A range of text.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -20,9 +20,9 @@ pub struct TextRange {
     pub char_range: Range<usize>,
 }
 
-/// An item produced by [`Analysis::itemize`].
+/// A span of text inside an [`Item`] with constant script and bidirectional embedding level.
 #[derive(Clone, Debug)]
-pub struct Item {
+pub struct Segment {
     /// The text range of this item.
     pub range: TextRange,
 
@@ -40,8 +40,43 @@ pub struct Item {
     pub script: Script,
 }
 
-/// An iterator over items in text, produced by [`Analysis::itemize`].
-pub struct Itemizer<'a, F> {
+/// A span of text shaped with specific [`ShapeOptions`].
+///
+/// While shaping text, items are divided into [`Segment`]s.
+#[derive(Debug)]
+pub struct Item<'a> {
+    /// The character offset in the source text which this item ends.
+    ///
+    /// This must be strictly greater than the previous item's end. For the first item, it must be
+    /// greater than 0.
+    pub char_end: u32,
+
+    /// The options to shape this item with.
+    //
+    // TODO: should users instead be allowed to build `options` at the `Segment` level (i.e.,
+    // through some callback)? The motivation is for users to have access to the segment's `Script`
+    // and be able to set font features based on that. If the entirety of `ShapeOptions` moves
+    // there, it would allow users to set, e.g., a font size per segment, even though it's not
+    // necessarily an item boundary; and note an item then doesn't mean a whole lot anymore. We
+    // could also allow only some options to be per-segment. In any case, we're probably moving
+    // towards a future where items reset grapheme segmentation, but segments do not (note Gecko and
+    // Blink also reset grapheme segmentation when something like font size changes, but not when
+    // the script changes).
+    pub options: ShapeOptions<'a>,
+    // TODO: we probably should allow users to pass in some data (like we allow passing
+    // style_indices elsewhere), which we copy onto `ShapedRun`. That allows users to easily
+    // correlate `ShapedRun`s with some data they themselves hold.
+    //
+    // This is potentially important for better correctness in `parley`: it itemizes based on
+    // `nearly_eq` of shaping-relevant styles like font size, i.e., it should then read that item's
+    // style to know the font size, even though it may be different for the run.
+    // /// Opaque data copied onto every `ShapedRun` produced from this item.
+    // pub user_data: u16,
+}
+
+/// Produces the items in a text via [`Self::next`]; created by [`Analysis::itemize`].
+#[derive(Debug)]
+pub(crate) struct Itemizer<'a> {
     /// Our underlying iterator over the input text.
     char_indices: CharIndices<'a>,
     /// The per-char info, parallel to [`Self::char_indices`].
@@ -55,51 +90,23 @@ pub struct Itemizer<'a, F> {
     /// character.
     paragraph_bidi_level: BidiLevel,
 
-    /// User-provided itemization split predicate (e.g., if the font size changes).
-    split_after: F,
-
     /// The running character offset of the last-processed item.
     current_char_offset: usize,
     /// The running script of the last-processed item.
     current_script: IcuScript,
 }
 
-impl<F> core::fmt::Debug for Itemizer<'_, F> {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("Itemizer")
-            .field("char_indices", &self.char_indices)
-            .field("char_info", &self.char_info)
-            .field("bidi_levels", &self.bidi_levels)
-            .field("paragraph_bidi_level", &self.paragraph_bidi_level)
-            .field("current_char_offset", &self.current_char_offset)
-            .field("current_script", &self.current_script)
-            .finish_non_exhaustive()
-    }
-}
-
 impl Analysis {
-    /// Itemize the `text` into individually-shapeable runs.
+    /// Divide the `text` into individually-shapeable segments.
     ///
     /// The `text` passed in must be the same as used for producing the `self` analysis.
     ///
-    /// The text is itemized into items of constant bidi level and script. For consecutive
-    /// characters where the bidi level and script are unchanging, the `split_after` predicate is
-    /// called with the growing item range, and can be used to split on additional properties like
-    /// shaping-relevant style changes (e.g., font size) or properties like language.
-    ///
-    /// The predicate is given a range encoding the current item and considers whether to split
-    /// after that item based on the next character. Iff the predicate returns `true`, the text is
-    /// split after that item; i.e., given a range of `start..end`, the predicate controls whether
-    /// that item is now finished, or whether it is extended to include the character at `end` (at
-    /// which point the item spans `start..end+1`).
+    /// The text is divided into items produced by a predicate passed to [`Itemizer::next`] and
+    /// further divided into segments of constant bidi level and script.
     ///
     /// Characters that don't have a particular script have their script resolved based on
-    /// surrounding context (see [`Item::script`]).
-    pub fn itemize<'a, F: FnMut(TextRange) -> bool>(
-        &'a self,
-        text: &'a str,
-        split_after: F,
-    ) -> Itemizer<'a, F> {
+    /// surrounding context (see [`Segment::script`]).
+    pub(crate) fn itemize<'a>(&'a self, text: &'a str) -> Itemizer<'a> {
         let first_real_script = self
             .char_info()
             .iter()
@@ -112,7 +119,6 @@ impl Analysis {
             char_info: self.char_info(),
             bidi_levels: self.bidi_levels(),
             paragraph_bidi_level: self.paragraph_level(),
-            split_after,
 
             current_char_offset: 0,
             current_script: first_real_script,
@@ -120,10 +126,28 @@ impl Analysis {
     }
 }
 
-impl<F: FnMut(TextRange) -> bool> Iterator for Itemizer<'_, F> {
-    type Item = Item;
-
-    fn next(&mut self) -> Option<Self::Item> {
+impl Itemizer<'_> {
+    /// Produce the next segment, if any.
+    ///
+    /// For consecutive characters where the bidi level and script are unchanging, the `split_after`
+    /// predicate is called with the growing item range, and can be used to split on additional
+    /// properties like shaping-relevant style changes (e.g., font size) or properties like
+    /// language.
+    ///
+    /// The predicate is given a range encoding the current item and considers whether to split
+    /// after that item based on the next character. Iff the predicate returns `true`, the text is
+    /// split after that item; i.e., given a range of `start..end`, the predicate controls whether
+    /// that item is now finished, or whether it is extended to include the character at `end` (at
+    /// which point the item spans `start..end+1`).
+    //
+    // TODO: currently the items from `split_after` have the same effect as a change in bidi or
+    // script. This is not how browsers handle things. In particular, `split_after` should reset
+    // grapheme segmentation, whereas bidi and script should produce separately-shaped segments.
+    #[inline]
+    pub(crate) fn next(
+        &mut self,
+        mut split_after: impl FnMut(TextRange) -> bool,
+    ) -> Option<Segment> {
         if self.char_info.is_empty() {
             // We're already finished.
             debug_assert!(
@@ -169,7 +193,7 @@ impl<F: FnMut(TextRange) -> bool> Iterator for Itemizer<'_, F> {
             }
 
             if item_char_len > 0
-                && (self.split_after)(TextRange {
+                && split_after(TextRange {
                     byte_range: start_byte_offset..byte_offset,
                     char_range: self.current_char_offset..self.current_char_offset + item_char_len,
                 })
@@ -194,7 +218,7 @@ impl<F: FnMut(TextRange) -> bool> Iterator for Itemizer<'_, F> {
         let start_char_offset = self.current_char_offset;
         self.current_char_offset += item_char_len;
 
-        Some(Item {
+        Some(Segment {
             range: TextRange {
                 byte_range: start_byte_offset..self.char_indices.offset(),
                 char_range: start_char_offset..self.current_char_offset,
@@ -228,7 +252,7 @@ mod tests {
 
     use crate::{Analysis, AnalysisOptions, Analyzer};
 
-    use super::Item;
+    use super::Segment;
 
     const LATN: Script = Script::from_bytes(*b"Latn");
     const GREK: Script = Script::from_bytes(*b"Grek");
@@ -242,8 +266,10 @@ mod tests {
         analysis
     }
 
-    fn items(text: &str) -> Vec<Item> {
-        analyze(text).itemize(text, |_| false).collect()
+    fn items(text: &str) -> Vec<Segment> {
+        let analysis = analyze(text);
+        let mut itemizer = analysis.itemize(text);
+        core::iter::from_fn(|| itemizer.next(|_| false)).collect()
     }
 
     #[test]
@@ -277,9 +303,9 @@ mod tests {
     fn predicate() {
         let text = "abcdef";
         let analysis = analyze(text);
-        let items: Vec<_> = analysis
-            .itemize(text, |range| range.char_range.end == 3)
-            .collect();
+        let mut itemizer = analysis.itemize(text);
+        let items: Vec<_> =
+            core::iter::from_fn(|| itemizer.next(|range| range.char_range.end == 3)).collect();
         assert_eq!(items.len(), 2);
         assert_eq!(items[0].range.byte_range, 0..3);
         assert_eq!(items[0].range.char_range, 0..3);
