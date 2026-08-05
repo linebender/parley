@@ -215,7 +215,9 @@ impl EmojiDFA {
             return EmojiSequence::Zwj;
         }
 
-        if self.contains_state(EmojiState::TagBase) && self.contains_state(EmojiState::Terminal) {
+        if self.contains_category(EmojiSegmentationCategory::TagBase)
+            && self.contains_category(EmojiSegmentationCategory::TagEnd)
+        {
             return EmojiSequence::Tag;
         }
 
@@ -231,7 +233,7 @@ impl EmojiDFA {
             return EmojiSequence::Modifier;
         }
 
-        if self.contains_category(EmojiSegmentationCategory::KeycapBase) {
+        if self.contains_category(EmojiSegmentationCategory::KeycapEnd) {
             return EmojiSequence::Keycap;
         }
 
@@ -240,7 +242,10 @@ impl EmojiDFA {
 
     /// Returns the emoji presentation style.
     #[inline]
-    pub const fn presentation_style(self) -> EmojiPresentationStyle {
+    pub const fn presentation_style(
+        self,
+        leading_is_emoji_presentation: bool,
+    ) -> EmojiPresentationStyle {
         // Emoji presentation with variation selectors
         if self.contains_category(EmojiSegmentationCategory::Vs15) {
             return EmojiPresentationStyle::Text;
@@ -249,29 +254,22 @@ impl EmojiDFA {
             return EmojiPresentationStyle::Emoji;
         }
 
-        // `Emoji_Presentation=Yes`
-        if self.contains_category(EmojiSegmentationCategory::EmojiPresentation) {
-            return EmojiPresentationStyle::Emoji;
-        }
-
         // Resolves presentation
         match self.sequence() {
-            // unqualified keycap, e.g. #⃣
-            EmojiSequence::Keycap => EmojiPresentationStyle::Default,
-            EmojiSequence::Basic => {
-                // single emoji modifier, e.g. 🏻
-                if self.contains_category(EmojiSegmentationCategory::EmojiModifier) {
-                    EmojiPresentationStyle::Emoji
-                } else {
-                    // single emoji modifier base, e.g ☝
-                    if self.contains_category(EmojiSegmentationCategory::EmojiModifierBase) {
-                        EmojiPresentationStyle::Text
-                    } else {
-                        EmojiPresentationStyle::Default
-                    }
-                }
-            }
+            EmojiSequence::Basic if !leading_is_emoji_presentation => EmojiPresentationStyle::Text,
             _ => EmojiPresentationStyle::Emoji,
+        }
+    }
+
+    /// Returns true if the emoji has variation selector.
+    #[inline]
+    pub const fn has_vs(self) -> bool {
+        match self.sequence() {
+            EmojiSequence::Basic | EmojiSequence::Keycap => {
+                self.contains_category(EmojiSegmentationCategory::Vs15)
+                    || self.contains_category(EmojiSegmentationCategory::Vs16)
+            }
+            _ => false,
         }
     }
 }

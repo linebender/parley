@@ -349,9 +349,10 @@ impl CharCluster {
         let mut is_emoji = false;
         let mut map_len: u8 = 0;
         let mut emoji_dfa = EmojiDFA::new();
+        let mut leading_is_emoji_presentation = false;
         let start = *code_unit_offset_in_string as u32;
 
-        for ((_, ch), (info, style_index)) in
+        for ((i, ch), (info, style_index)) in
             segment_text.char_indices().zip(item_infos_iter.by_ref())
         {
             *code_unit_offset_in_string += ch.len_utf8();
@@ -362,6 +363,10 @@ impl CharCluster {
             let mut is_emoji_presentation_selector = false;
 
             if is_emoji {
+                if i == 0 {
+                    leading_is_emoji_presentation = info.emoji_properties.is_emoji_presentation();
+                }
+
                 let category =
                     EmojiSegmentationCategory::from_codepoint(ch as u32, info.emoji_properties);
 
@@ -392,7 +397,8 @@ impl CharCluster {
         self.force_normalize = force_normalize;
 
         if is_emoji {
-            self.emoji_presentation_style = emoji_dfa.presentation_style();
+            self.emoji_presentation_style =
+                emoji_dfa.presentation_style(leading_is_emoji_presentation);
         }
     }
 }

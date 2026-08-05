@@ -21,19 +21,22 @@ fn assert_emoji(entity: TestEntity<'_>) {
     let analysis = AnalysisDataSources::new();
 
     let mut emoji_dfa = EmojiDFA::new();
-    let mut has_vs = false;
+    let mut leading_is_emoji_presentation = false;
 
     let result = entity
         .sequence
         .iter()
         .copied()
-        .map(|cp| {
+        .enumerate()
+        .map(|(i, cp)| {
             let ch = char::from_u32(cp).unwrap();
             let emoji_properties = analysis.emoji_properties(ch);
 
-            let category = EmojiSegmentationCategory::from_codepoint(cp, emoji_properties);
+            if i == 0 {
+                leading_is_emoji_presentation = emoji_properties.is_emoji_presentation();
+            }
 
-            has_vs |= category.is_presentation_selector();
+            let category = EmojiSegmentationCategory::from_codepoint(cp, emoji_properties);
 
             emoji_dfa.step_record(category);
 
@@ -41,9 +44,13 @@ fn assert_emoji(entity: TestEntity<'_>) {
         })
         .collect::<Vec<_>>();
 
+    let presentation_style = emoji_dfa.presentation_style(leading_is_emoji_presentation);
+    let is_emoji = presentation_style.is_emoji();
+    let has_vs = emoji_dfa.has_vs();
+
     assert_eq!(result, entity.categories);
-    assert_eq!(emoji_dfa.presentation_style(), entity.style);
-    assert_eq!(emoji_dfa.presentation_style().is_emoji(), entity.is_emoji);
+    assert_eq!(presentation_style, entity.style);
+    assert_eq!(is_emoji, entity.is_emoji);
     assert_eq!(has_vs, entity.has_vs);
 }
 
@@ -71,7 +78,7 @@ fn text_presentation_default() {
             0x00A9, // COPYRIGHT SIGN
         ],
         categories: &[EmojiSegmentationCategory::Emoji],
-        style: EmojiPresentationStyle::Default,
+        style: EmojiPresentationStyle::Text,
         is_emoji: false,
         has_vs: false,
     });
@@ -84,12 +91,12 @@ fn text_presentation_default() {
 fn long_keycap_base() {
     assert_emoji(TestEntity {
         sequence: &[
-            0x0031 // DIGIT ONE
+            0x0031, // DIGIT ONE
         ],
         categories: &[EmojiSegmentationCategory::KeycapBase],
-        style: EmojiPresentationStyle::Default,
+        style: EmojiPresentationStyle::Text,
         is_emoji: false,
-        has_vs: false
+        has_vs: false,
     });
 }
 
@@ -107,7 +114,7 @@ fn keycap_base_vs15() {
         ],
         style: EmojiPresentationStyle::Text,
         is_emoji: false,
-        has_vs: true
+        has_vs: true,
     });
 }
 
@@ -141,7 +148,7 @@ fn unqualified_keycap() {
             EmojiSegmentationCategory::KeycapBase,
             EmojiSegmentationCategory::KeycapEnd,
         ],
-        style: EmojiPresentationStyle::Default,
+        style: EmojiPresentationStyle::Emoji,
         is_emoji: true,
         has_vs: false,
     });
@@ -281,7 +288,7 @@ fn lone_regional_indicator() {
             0x1F1FA, // REGIONAL INDICATOR SYMBOL LETTER U
         ],
         categories: &[EmojiSegmentationCategory::RegionalIndicator],
-        style: EmojiPresentationStyle::Default,
+        style: EmojiPresentationStyle::Emoji,
         is_emoji: true,
         has_vs: false,
     });
@@ -305,28 +312,30 @@ fn flag_sequence_us() {
     });
 }
 
-// // Double lone regional indicator + Flag sequence (US); Encoded: 🇺🇺🇸
-// //
-// // FIXME: segmented clusters are incorrect
-// //  ✖️, [[0x1F1FA, 0x1F1FA], [0x1F1F8]]
-// //  ✔️, [[0x1F1FA], [0x1F1FA, 0x1F1F8]]
-// #[test]
-// #[ignore]
-// fn double_lone_regional_indicator_flag_sequence_us() {
-//     assert_emoji_segmenters_produce_same_result(TestEntity {
-//         sequence: &[
-//             0x1F1FA, // REGIONAL INDICATOR SYMBOL LETTER U
-//             0x1F1FA, // REGIONAL INDICATOR SYMBOL LETTER U
-//             0x1F1F8, // REGIONAL INDICATOR SYMBOL LETTER S
-//         ],
-//         categories: &[
-//             EmojiSegmentationCategory::RegionalIndicator,
-//             EmojiSegmentationCategory::RegionalIndicator,
-//             EmojiSegmentationCategory::RegionalIndicator,
-//         ],
-//         style: EmojiPresentationStyle::Emoji,
-//     });
-// }
+// Double lone regional indicator + Flag sequence (US); Encoded: 🇺🇺🇸
+//
+// FIXME: segmented clusters are incorrect
+//  ✖️, [[0x1F1FA, 0x1F1FA], [0x1F1F8]]
+//  ✔️, [[0x1F1FA], [0x1F1FA, 0x1F1F8]]
+#[test]
+#[ignore]
+fn double_lone_regional_indicator_flag_sequence_us() {
+    assert_emoji(TestEntity {
+        sequence: &[
+            0x1F1FA, // REGIONAL INDICATOR SYMBOL LETTER U
+            0x1F1FA, // REGIONAL INDICATOR SYMBOL LETTER U
+            0x1F1F8, // REGIONAL INDICATOR SYMBOL LETTER S
+        ],
+        categories: &[
+            EmojiSegmentationCategory::RegionalIndicator,
+            EmojiSegmentationCategory::RegionalIndicator,
+            EmojiSegmentationCategory::RegionalIndicator,
+        ],
+        style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
+    });
+}
 
 // Variation selectors
 

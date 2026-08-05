@@ -148,7 +148,7 @@ impl EmojiSegmentationCategory {
 #[repr(u8)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(crate) enum EmojiSequence {
-    /// A single character
+    /// Emoji basic sequence
     Basic,
     /// Emoji modifier sequence
     ///
