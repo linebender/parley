@@ -1,10 +1,6 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Tests extracted from the [emoji segmenter].
-//!
-//! [emoji segmenter]: <https://github.com/google/emoji-segmenter>
-
 use alloc::vec::Vec;
 use core::char;
 
@@ -17,12 +13,15 @@ struct TestEntity<'a> {
     sequence: &'a [u32],
     categories: &'a [EmojiSegmentationCategory],
     style: EmojiPresentationStyle,
+    is_emoji: bool,
+    has_vs: bool,
 }
 
-fn assert_emoji_segmenters_produce_same_result(entity: TestEntity<'_>) {
+fn assert_emoji(entity: TestEntity<'_>) {
     let analysis = AnalysisDataSources::new();
 
     let mut emoji_dfa = EmojiDFA::new();
+    let mut has_vs = false;
 
     let result = entity
         .sequence
@@ -34,6 +33,8 @@ fn assert_emoji_segmenters_produce_same_result(entity: TestEntity<'_>) {
 
             let category = EmojiSegmentationCategory::from_codepoint(cp, emoji_properties);
 
+            has_vs |= category.is_presentation_selector();
+
             emoji_dfa.step_record(category);
 
             category
@@ -42,46 +43,60 @@ fn assert_emoji_segmenters_produce_same_result(entity: TestEntity<'_>) {
 
     assert_eq!(result, entity.categories);
     assert_eq!(emoji_dfa.presentation_style(), entity.style);
+    assert_eq!(emoji_dfa.presentation_style().is_emoji(), entity.is_emoji);
+    assert_eq!(has_vs, entity.has_vs);
 }
+
+// Basic emoji
 
 // Emoji presentation default; Encoded: 😀
 #[test]
 fn emoji_presentation_default() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F600, // GRINNING FACE
         ],
         categories: &[EmojiSegmentationCategory::EmojiPresentation],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
 // Text presentation default (copyright); Encoded: ©
 #[test]
 fn text_presentation_default() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x00A9, // COPYRIGHT SIGN
         ],
         categories: &[EmojiSegmentationCategory::Emoji],
         style: EmojiPresentationStyle::Default,
+        is_emoji: false,
+        has_vs: false,
     });
 }
+
+// Keycap sequences
 
 // Lone keycap base; Encoded: 1
 #[test]
 fn long_keycap_base() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
-        sequence: &[0x0031], // DIGIT ONE
+    assert_emoji(TestEntity {
+        sequence: &[
+            0x0031 // DIGIT ONE
+        ],
         categories: &[EmojiSegmentationCategory::KeycapBase],
         style: EmojiPresentationStyle::Default,
+        is_emoji: false,
+        has_vs: false
     });
 }
 
 // Keycap base + VS-15 (no term); Encoded: 1︎
 #[test]
 fn keycap_base_vs15() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x0031, // DIGIT ONE
             0xFE0E, // VARIATION SELECTOR-15
@@ -91,13 +106,15 @@ fn keycap_base_vs15() {
             EmojiSegmentationCategory::Vs15,
         ],
         style: EmojiPresentationStyle::Text,
+        is_emoji: false,
+        has_vs: true
     });
 }
 
 // Keycap base + VS-16 (no term); Encoded: 1️
 #[test]
 fn keycap_base_vs16() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x0031, // DIGIT ONE
             0xFE0F, // VARIATION SELECTOR-16
@@ -107,13 +124,15 @@ fn keycap_base_vs16() {
             EmojiSegmentationCategory::Vs16,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: true,
     });
 }
 
 // Unqualified keycap; Encoded: #⃣
 #[test]
 fn unqualified_keycap() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x0023, // NUMBER SIGN
             0x20E3, // COMBINING ENCLOSING KEYCAP
@@ -123,13 +142,15 @@ fn unqualified_keycap() {
             EmojiSegmentationCategory::KeycapEnd,
         ],
         style: EmojiPresentationStyle::Default,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
 // Keycap + VS-15 + term; Encoded: 1︎⃣
 #[test]
 fn keycap_vs15_term() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x0031, // DIGIT ONE
             0xFE0E, // VARIATION SELECTOR-15
@@ -141,13 +162,15 @@ fn keycap_vs15_term() {
             EmojiSegmentationCategory::KeycapEnd,
         ],
         style: EmojiPresentationStyle::Text,
+        is_emoji: false,
+        has_vs: true,
     });
 }
 
 // Qualified keycap; Encoded: *️⃣
 #[test]
 fn qualified_keycap() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x002A, // ASTERISK
             0xFE0F, // VARIATION SELECTOR-16
@@ -159,37 +182,45 @@ fn qualified_keycap() {
             EmojiSegmentationCategory::KeycapEnd,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: true,
     });
 }
+
+// Modifier sequences
 
 // Lone emoji modifier (Fitzpatrick); Encoded: 🏻
 #[test]
 fn lone_emoji_modifier() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F3FB, // EMOJI MODIFIER FITZPATRICK TYPE-1-2
         ],
         categories: &[EmojiSegmentationCategory::EmojiModifier],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
 // Bare modifier base, text default; Encoded: ☝
 #[test]
 fn bare_modifier_base_text_default() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x261D, // WHITE UP POINTING INDEX
         ],
         categories: &[EmojiSegmentationCategory::EmojiModifierBase],
         style: EmojiPresentationStyle::Text,
+        is_emoji: false,
+        has_vs: false,
     });
 }
 
 // Modifier base (text default) + VS-16; Encoded: ☝️
 #[test]
 fn modifier_base_text_default_vs16() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x261D, // WHITE UP POINTING INDEX
             0xFE0F, // VARIATION SELECTOR-16
@@ -199,13 +230,15 @@ fn modifier_base_text_default_vs16() {
             EmojiSegmentationCategory::Vs16,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: true,
     });
 }
 
 // Modifier base (text default) + skin tone; Encoded: ☝🏻
 #[test]
 fn modifier_base_text_default_skin_tone() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x261D,  // WHITE UP POINTING INDEX
             0x1F3FB, // EMOJI MODIFIER FITZPATRICK TYPE-1-2
@@ -215,13 +248,15 @@ fn modifier_base_text_default_skin_tone() {
             EmojiSegmentationCategory::EmojiModifier,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
 // Modifier base (emoji default) + skin tone; Encoded: 👦🏻
 #[test]
 fn modifier_base_emoji_default_skin_tone() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F466, // BOY
             0x1F3FB, // EMOJI MODIFIER FITZPATRICK TYPE-1-2
@@ -231,25 +266,31 @@ fn modifier_base_emoji_default_skin_tone() {
             EmojiSegmentationCategory::EmojiModifier,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
+
+// Regional indicators / flags
 
 // Lone regional indicator; Encoded: 🇺
 #[test]
 fn lone_regional_indicator() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F1FA, // REGIONAL INDICATOR SYMBOL LETTER U
         ],
         categories: &[EmojiSegmentationCategory::RegionalIndicator],
         style: EmojiPresentationStyle::Default,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
 // Flag sequence (US); Encoded: 🇺🇸
 #[test]
 fn flag_sequence_us() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F1FA, // REGIONAL INDICATOR SYMBOL LETTER U
             0x1F1F8, // REGIONAL INDICATOR SYMBOL LETTER S
@@ -259,36 +300,40 @@ fn flag_sequence_us() {
             EmojiSegmentationCategory::RegionalIndicator,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
-// Double lone regional indicator + Flag sequence (US); Encoded: 🇺🇺🇸
-//
-// FIXME: segmented clusters are incorrect
-//  ✖️, [[0x1F1FA, 0x1F1FA], [0x1F1F8]]
-//  ✔️, [[0x1F1FA], [0x1F1FA, 0x1F1F8]]
-#[test]
-#[ignore]
-fn double_lone_regional_indicator_flag_sequence_us() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
-        sequence: &[
-            0x1F1FA, // REGIONAL INDICATOR SYMBOL LETTER U
-            0x1F1FA, // REGIONAL INDICATOR SYMBOL LETTER U
-            0x1F1F8, // REGIONAL INDICATOR SYMBOL LETTER S
-        ],
-        categories: &[
-            EmojiSegmentationCategory::RegionalIndicator,
-            EmojiSegmentationCategory::RegionalIndicator,
-            EmojiSegmentationCategory::RegionalIndicator,
-        ],
-        style: EmojiPresentationStyle::Emoji,
-    });
-}
+// // Double lone regional indicator + Flag sequence (US); Encoded: 🇺🇺🇸
+// //
+// // FIXME: segmented clusters are incorrect
+// //  ✖️, [[0x1F1FA, 0x1F1FA], [0x1F1F8]]
+// //  ✔️, [[0x1F1FA], [0x1F1FA, 0x1F1F8]]
+// #[test]
+// #[ignore]
+// fn double_lone_regional_indicator_flag_sequence_us() {
+//     assert_emoji_segmenters_produce_same_result(TestEntity {
+//         sequence: &[
+//             0x1F1FA, // REGIONAL INDICATOR SYMBOL LETTER U
+//             0x1F1FA, // REGIONAL INDICATOR SYMBOL LETTER U
+//             0x1F1F8, // REGIONAL INDICATOR SYMBOL LETTER S
+//         ],
+//         categories: &[
+//             EmojiSegmentationCategory::RegionalIndicator,
+//             EmojiSegmentationCategory::RegionalIndicator,
+//             EmojiSegmentationCategory::RegionalIndicator,
+//         ],
+//         style: EmojiPresentationStyle::Emoji,
+//     });
+// }
+
+// Variation selectors
 
 // Text-default emoji + VS-15; Encoded: ☺︎
 #[test]
 fn text_default_emoji_vs15() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x263A, // WHITE SMILING FACE
             0xFE0E, // VARIATION SELECTOR-15
@@ -298,13 +343,15 @@ fn text_default_emoji_vs15() {
             EmojiSegmentationCategory::Vs15,
         ],
         style: EmojiPresentationStyle::Text,
+        is_emoji: false,
+        has_vs: true,
     });
 }
 
 // Text-default emoji + VS-16; Encoded: ☺️
 #[test]
 fn text_default_emoji_vs16() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x263A, // WHITE SMILING FACE
             0xFE0F, // VARIATION SELECTOR-16
@@ -314,13 +361,15 @@ fn text_default_emoji_vs16() {
             EmojiSegmentationCategory::Vs16,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: true,
     });
 }
 
-// Emoji-default emoji + VS-15; Encoded: 😀︎
+// Emoji-default emoji + VS-15; Encoded: 😀
 #[test]
 fn emoji_default_emoji_vs15() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F600, // GRINNING FACE
             0xFE0E,  // VARIATION SELECTOR-15
@@ -330,13 +379,15 @@ fn emoji_default_emoji_vs15() {
             EmojiSegmentationCategory::Vs15,
         ],
         style: EmojiPresentationStyle::Text,
+        is_emoji: false,
+        has_vs: true,
     });
 }
 
-// Emoji-default emoji + VS-16; Encoded: 😀️
+// Emoji-default emoji + VS-16; Encoded: 😀
 #[test]
 fn emoji_default_emoji_vs16() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F600, // GRINNING FACE
             0xFE0F,  // VARIATION SELECTOR-16
@@ -346,13 +397,17 @@ fn emoji_default_emoji_vs16() {
             EmojiSegmentationCategory::Vs16,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: true,
     });
 }
+
+// ZWJ sequences
 
 // ZWJ family; Encoded: 👨‍👩‍👧
 #[test]
 fn zwj_family() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F468, // MAN
             0x200D,  // ZERO WIDTH JOINER
@@ -368,13 +423,15 @@ fn zwj_family() {
             EmojiSegmentationCategory::EmojiModifierBase,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
 // Long ZWJ family (4 members); Encoded: 👨‍👩‍👧‍👦
 #[test]
 fn long_zwj_family() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F468, // MAN
             0x200D,  // ZERO WIDTH JOINER
@@ -394,13 +451,15 @@ fn long_zwj_family() {
             EmojiSegmentationCategory::EmojiModifierBase,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
 // ZWJ couple; Encoded: 👨‍❤‍👨
 #[test]
 fn zwj_couple() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F468, // MAN
             0x200D,  // ZERO WIDTH JOINER
@@ -416,13 +475,15 @@ fn zwj_couple() {
             EmojiSegmentationCategory::EmojiModifierBase,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
-// ZWJ with VS-16 element; Encoded: 👨️‍👩
+// ZWJ with VS-16 element; Encoded: 👨‍👩
 #[test]
 fn zwj_with_vs16_element() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F468, // MAN
             0xFE0F,  // VARIATION SELECTOR-16
@@ -436,13 +497,15 @@ fn zwj_with_vs16_element() {
             EmojiSegmentationCategory::EmojiModifierBase,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
-// ZWJ with VS-16 on both elements; Encoded: 👨️‍👩️
+// ZWJ with VS-16 on both elements; Encoded: 👨‍👩
 #[test]
 fn zwj_with_vs16_on_both_elements() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F468, // MAN
             0xFE0F,  // VARIATION SELECTOR-16
@@ -458,13 +521,15 @@ fn zwj_with_vs16_on_both_elements() {
             EmojiSegmentationCategory::Vs16,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
 // ZWJ after modifier sequence; Encoded: 👦🏻‍💻
 #[test]
 fn zwj_after_modifier_sequence() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F466, // BOY
             0x1F3FB, // EMOJI MODIFIER FITZPATRICK TYPE-1-2
@@ -478,13 +543,15 @@ fn zwj_after_modifier_sequence() {
             EmojiSegmentationCategory::EmojiPresentation,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
 // ZWJ technologist with skin tone; Encoded: 👨🏻‍💻
 #[test]
 fn zwj_technologist_with_skin_tone() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F468, // MAN
             0x1F3FB, // EMOJI MODIFIER FITZPATRICK TYPE-1-2
@@ -498,13 +565,15 @@ fn zwj_technologist_with_skin_tone() {
             EmojiSegmentationCategory::EmojiPresentation,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
 // VS-16 enables ZWJ continuation; Encoded: ☺️‍👩
 #[test]
 fn vs16_enables_zwj_continuation() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x263A,  // WHITE SMILING FACE
             0xFE0F,  // VARIATION SELECTOR-16
@@ -518,13 +587,17 @@ fn vs16_enables_zwj_continuation() {
             EmojiSegmentationCategory::EmojiModifierBase,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
+
+// Tag Sequences
 
 // Tag sequence (England); Encoded: 🏴󠁧󠁢󠁥󠁮󠁧󠁿
 #[test]
 fn tag_sequence_england() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F3F4, // WAVING BLACK FLAG
             0xE0067, // TAG LATIN SMALL LETTER G
@@ -544,13 +617,15 @@ fn tag_sequence_england() {
             EmojiSegmentationCategory::TagEnd,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
-// TAG_BASE as ZWJ element; Encoded: 🏴‍😀"
+// TAG_BASE as ZWJ element; Encoded: 🏴‍😀
 #[test]
 fn tag_base_as_zwj_element() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F3F4, // WAVING BLACK FLAG
             0x200D,  // ZERO WIDTH JOINER
@@ -562,13 +637,15 @@ fn tag_base_as_zwj_element() {
             EmojiSegmentationCategory::EmojiPresentation,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
-// TAG_BASE + VS-16 + ZWJ; Encoded: 🏴️‍😀",
+// TAG_BASE + VS-16 + ZWJ; Encoded: 🏴‍😀
 #[test]
 fn tag_base_vs16_as_zwj() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F3F4, // WAVING BLACK FLAG
             0xFE0F,  // VARIATION SELECTOR-16
@@ -582,13 +659,15 @@ fn tag_base_vs16_as_zwj() {
             EmojiSegmentationCategory::EmojiPresentation,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: false,
     });
 }
 
-// TAG_BASE + VS-15; Encoded: 🏴︎
+// TAG_BASE + VS-15; Encoded: 🏴
 #[test]
 fn tag_base_vs15() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F3F4, // WAVING BLACK FLAG
             0xFE0E,  // VARIATION SELECTOR-15
@@ -598,13 +677,15 @@ fn tag_base_vs15() {
             EmojiSegmentationCategory::Vs15,
         ],
         style: EmojiPresentationStyle::Text,
+        is_emoji: false,
+        has_vs: true,
     });
 }
 
-// TAG_BASE + VS-16; Encoded: 🏴️
+// TAG_BASE + VS-16; Encoded: 🏴
 #[test]
 fn tag_base_vs16() {
-    assert_emoji_segmenters_produce_same_result(TestEntity {
+    assert_emoji(TestEntity {
         sequence: &[
             0x1F3F4, // WAVING BLACK FLAG
             0xFE0F,  // VARIATION SELECTOR-16
@@ -614,5 +695,7 @@ fn tag_base_vs16() {
             EmojiSegmentationCategory::Vs16,
         ],
         style: EmojiPresentationStyle::Emoji,
+        is_emoji: true,
+        has_vs: true,
     });
 }

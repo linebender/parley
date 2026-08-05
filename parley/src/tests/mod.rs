@@ -3,5 +3,5 @@
 
 mod test_analysis;
 mod test_builders;
-mod test_emoji_segmenters;
+mod test_emoji;
 mod utils;
