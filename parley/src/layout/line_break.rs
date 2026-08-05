@@ -1506,18 +1506,18 @@ fn commit_line<B: Brush>(
     // let end_run_idx = lines.line_items.last().map(|item| item.index).unwrap_or(0);
     let end_item_idx = lines.line_items.len();
 
-    // Exclude the trailing space from justification space count.
-    // Only subtract if the line actually ends with a space — with
-    // WordBreak::BreakAll, regular breaks can land between non-space
-    // characters, in which case there is no trailing space to exclude.
+    // Exclude the trailing space from justification space count. Only subtract if the line actually
+    // ends with an atom starting with a space: with `WordBreak::BreakAll`, regular breaks can land
+    // between non-space graphemes, in which case there is no trailing space to exclude.
     let mut num_spaces = state.num_spaces;
-    if break_reason == BreakReason::Regular && state.clusters.start < state.clusters.end && {
-        let last_cluster = &shaped_clusters[state.clusters.end as usize - 1];
-        shaped_text.characters()[last_cluster.chars_range().end as usize - 1]
-            .info
-            .whitespace()
-            .is_space_or_nbsp()
-    } {
+    if break_reason == BreakReason::Regular
+        && state.clusters.start < state.clusters.end
+        && shaped_text
+            .run_slice(items_to_commit[last_run_pos].index as u32)
+            .atoms_from(state.clusters.end)
+            .prev()
+            .is_some_and(|atom| atom.characters()[0].info.whitespace().is_space_or_nbsp())
+    {
         num_spaces = num_spaces.saturating_sub(1);
     }
 
