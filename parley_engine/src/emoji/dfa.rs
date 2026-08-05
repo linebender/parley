@@ -241,6 +241,8 @@ impl EmojiDFA {
     }
 
     /// Returns the emoji presentation style.
+    ///
+    /// <https://www.unicode.org/reports/tr51/#Presentation_Style>
     #[inline]
     pub const fn presentation_style(
         self,
@@ -262,6 +264,12 @@ impl EmojiDFA {
     }
 
     /// Returns true if the emoji has variation selector.
+    ///
+    /// - `emoji_character + VS15`
+    /// - `emoji_character + VS16`
+    ///
+    /// <https://www.unicode.org/reports/tr51/#def_text_presentation_selector>
+    /// <https://www.unicode.org/reports/tr51/#def_emoji_presentation_selector>
     #[inline]
     pub const fn has_vs(self) -> bool {
         match self.sequence() {
