@@ -259,7 +259,7 @@ impl Cursor {
                     return Self::from_byte_index(layout, usize::MAX, Affinity::Downstream);
                 };
                 cluster = next;
-                if !cluster.data.info.is_whitespace() {
+                if !cluster.info().is_whitespace() {
                     break;
                 }
             }
@@ -283,7 +283,7 @@ impl Cursor {
             // on the start of the preceding "actual" word.
             while let Some(prev) = cluster.previous_logical_word() {
                 cluster = prev;
-                if !cluster.data.info.is_whitespace() {
+                if !cluster.info().is_whitespace() {
                     break;
                 }
             }
@@ -355,7 +355,7 @@ impl Cursor {
                 if cluster.is_rtl() {
                     [cluster.previous_visual(), Some(cluster)]
                 } else {
-                    [Some(cluster.clone()), cluster.next_visual()]
+                    [Some(cluster), cluster.next_visual()]
                 }
             } else if let Some(cluster) = self.downstream_cluster(layout) {
                 if cluster.is_rtl() {
@@ -368,7 +368,7 @@ impl Cursor {
             }
         } else if let Some(cluster) = self.downstream_cluster(layout) {
             if cluster.is_rtl() {
-                [Some(cluster.clone()), cluster.next_visual()]
+                [Some(cluster), cluster.next_visual()]
             } else {
                 [cluster.previous_visual(), Some(cluster)]
             }
@@ -433,9 +433,9 @@ impl Cursor {
             && layout
                 .data
                 .shaped_text
-                .clusters()
+                .characters()
                 .last()
-                .map(|cluster| cluster.info.whitespace() == Whitespace::Newline)
+                .map(|character| character.info.whitespace() == Whitespace::Newline)
                 .unwrap_or_default()
         {
             (ClusterPath::new(path.line_index + 1, 0, 0), 0)

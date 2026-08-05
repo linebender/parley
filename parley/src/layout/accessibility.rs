@@ -208,7 +208,7 @@ impl LayoutAccessibility {
                 let mut word_starts = Vec::new();
 
                 for cluster in run.clusters() {
-                    let style_index = cluster.data.style_index;
+                    let style_index = cluster.style_index();
                     if let Some(prev_index) = prev_style_index {
                         // Limit spans to 256 characters because `word_starts`
                         // consists of `u8`s.

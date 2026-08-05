@@ -546,6 +546,25 @@ fn overflow_alignment_rtl() {
 }
 
 #[test]
+/// Justified alignment must only stretch at grapheme boundaries, and not all spaces are grapheme
+/// boundaries. See <https://www.unicode.org/reports/tr29/#GB9b>.
+fn dont_justify_space_inside_grapheme() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "aa\u{0D4E} bb cc dd";
+    //                    ^
+    //         Not a grapheme boundary
+
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
+    // Breaks after "cc ", leaving the first line one space to stretch.
+    layout.break_all_lines(Some(80.0));
+    layout.align(Alignment::Justify, AlignmentOptions::default());
+
+    env.check_layout_snapshot(&layout);
+}
+
+#[test]
 fn content_widths() {
     let mut env = TestEnv::new(test_name!(), None);
 
