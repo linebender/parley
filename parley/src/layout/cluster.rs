@@ -52,18 +52,14 @@ pub enum ClusterSide {
 impl<'a, B: Brush> Cluster<'a, B> {
     /// Returns the cluster for the given layout and byte index.
     pub fn from_byte_index(layout: &'a Layout<B>, byte_index: usize) -> Option<Self> {
-        let mut path = ClusterPath::default();
-        if let Some((line_index, line)) = layout.line_for_byte_index(byte_index) {
-            path.line_index = line_index as u32;
+        if let Some((_, line)) = layout.line_for_byte_index(byte_index) {
             for run in line.runs() {
-                path.run_index = run.index;
                 if !run.text_range().contains(&byte_index) {
                     continue;
                 }
-                for (cluster_index, cluster) in run.clusters().enumerate() {
-                    path.logical_index = cluster_index as u32;
+                for cluster in run.clusters() {
                     if cluster.text_range().contains(&byte_index) {
-                        return path.cluster(layout);
+                        return Some(cluster);
                     }
                 }
             }
@@ -129,7 +125,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
                             } else {
                                 ClusterSide::Right
                             };
-                            return Some((path.cluster(layout)?, side));
+                            return Some((cluster, side));
                         }
                     }
                     LineItem::InlineBox(inline_box) => {
