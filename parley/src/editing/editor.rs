@@ -83,7 +83,8 @@ impl<'source> IntoIterator for SplitString<'source> {
     }
 }
 
-/// Basic plain text editor with a single style applied to the entire text.
+/// Basic plain text editor with a single default style applied to the entire
+/// text, plus an optional ranged style overlay (see [`set_style_overlay`](Self::set_style_overlay)).
 ///
 /// Internally, this is a wrapper around a string buffer and its corresponding [`Layout`],
 /// which is kept up-to-date as needed.
@@ -96,6 +97,7 @@ where
     layout: Layout<T>,
     buffer: String,
     default_style: StyleSet<T>,
+    style_overlay: Vec<(StyleProperty<'static, T>, Range<usize>)>,
     #[cfg(feature = "accesskit")]
     layout_access: LayoutAccessibility,
     selection: Selection,
@@ -130,6 +132,7 @@ where
     pub fn new(font_size: f32) -> Self {
         Self {
             default_style: StyleSet::new(font_size),
+            style_overlay: Vec::new(),
             buffer: String::default(),
             layout: Layout::default(),
             #[cfg(feature = "accesskit")]
@@ -970,6 +973,9 @@ where
     }
 
     /// Replace the whole text buffer.
+    ///
+    /// A style overlay set via [`set_style_overlay`](Self::set_style_overlay)
+    /// is retained; set a new one if it no longer applies.
     pub fn set_text(&mut self, is: &str) {
         self.buffer.clear();
         self.buffer.push_str(is);
@@ -1037,6 +1043,38 @@ where
     /// Get the current default styles for this editor.
     pub fn get_styles(&self) -> &StyleSet<T> {
         &self.default_style
+    }
+
+    /// Set ranged style overrides applied on top of the default styles.
+    ///
+    /// Each entry styles a byte range of the raw text (see [`raw_text`](Self::raw_text)).
+    /// Entries are applied in order, so later entries win where they overlap. The IME
+    /// preedit underline is applied after the overlay and takes precedence over it.
+    ///
+    /// This is intended for derived, transient styling such as syntax highlighting,
+    /// spellcheck squiggles, or find-match emphasis. Ranges are not adjusted when the
+    /// text is edited; set a new overlay after editing.
+    ///
+    /// Out-of-bounds ranges are clamped to the text length; reversed or empty ranges
+    /// are ignored; entries whose clamped bounds do not fall on char boundaries
+    /// (e.g. stale after an edit) are skipped until a new overlay is set.
+    ///
+    /// To update the overlay atomically with a batch of edits, defer layout
+    /// rebuilds (`set_defer_layout`, where available) and set the new overlay
+    /// before the next read; the single rebuild then carries fresh styling.
+    ///
+    /// Setting an overlay equal to the current one is a no-op.
+    pub fn set_style_overlay(&mut self, overlay: Vec<(StyleProperty<'static, T>, Range<usize>)>) {
+        if self.style_overlay == overlay {
+            return;
+        }
+        self.style_overlay = overlay;
+        self.layout_dirty = true;
+    }
+
+    /// Get the current style overlay.
+    pub fn get_style_overlay(&self) -> &[(StyleProperty<'static, T>, Range<usize>)] {
+        &self.style_overlay
     }
 
     /// Whether the editor is currently in IME composing mode.
@@ -1231,6 +1269,20 @@ where
         for prop in self.default_style.inner().values() {
             builder.push_default(prop.to_owned());
         }
+        for (prop, range) in &self.style_overlay {
+            // Clamp to the buffer and skip entries that no longer align to
+            // char boundaries (stale after an edit).
+            let start = range.start.min(self.buffer.len());
+            let end = range.end.min(self.buffer.len());
+            if start >= end
+                || !self.buffer.is_char_boundary(start)
+                || !self.buffer.is_char_boundary(end)
+            {
+                continue;
+            }
+            builder.push(prop.clone(), start..end);
+        }
+        // Pushed after the overlay so it wins where they overlap.
         if let Some(preedit_range) = &self.compose {
             builder.push(StyleProperty::Underline(true), preedit_range.clone());
         }
