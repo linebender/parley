@@ -699,11 +699,7 @@ mod tests {
                 .position(|cluster| cluster.chars_range().start == 1)
                 .unwrap();
             let newline_cluster = &shaped.shaped_clusters[index];
-            assert_eq!(
-                newline_cluster.glyph_len(),
-                0,
-                "newline glyphs are removed"
-            );
+            assert_eq!(newline_cluster.glyph_len(), 0, "newline glyphs are removed");
             assert_eq!(newline_cluster.advance, 0., "newline advance is set to 0");
         }
     }
