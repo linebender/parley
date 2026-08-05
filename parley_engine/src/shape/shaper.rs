@@ -33,6 +33,8 @@ pub struct ShapeOptions<'a> {
     pub variations: &'a [FontVariation],
     /// The per-character style indices.
     // TODO: rename to something like `user_data` (s.t. we don't assume it's a style per se).
+    // TODO: probably move this out of `ShapeOptions`, and supply it as a parameter on
+    // `Shaper::shape_text`.
     pub char_style_indices: &'a [u16],
 }
 
