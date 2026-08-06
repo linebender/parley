@@ -137,11 +137,11 @@ fn generate_emojis(emojis: &[(u32, u32)]) -> String {
         let mut v = Vec::<Range<u32>>::new();
 
         for c in a {
-            if let Some(last) = v.last_mut() {
-                if c - last.end == 1 {
-                    last.end = c;
-                    continue;
-                }
+            if let Some(last) = v.last_mut()
+                && c - last.end == 1
+            {
+                last.end = c;
+                continue;
             }
             v.push(c..c);
         }
