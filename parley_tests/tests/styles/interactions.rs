@@ -109,7 +109,8 @@ fn interaction_letter_spacing_ligatures() {
         layout.break_all_lines(None);
         layout.align(Alignment::Start, AlignmentOptions::default());
 
-        env.with_name("with_spacing_and_ligatures").check_layout_snapshot(&layout);
+        env.with_name("with_spacing_and_ligatures")
+            .check_layout_snapshot(&layout);
     }
 }
 
