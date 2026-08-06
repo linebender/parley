@@ -28,6 +28,9 @@ pub struct ShapeOptions<'a> {
     /// The language to shape the item with.
     pub language: Option<Language>,
     /// The font features to shape the item with.
+    ///
+    /// If there are font features with duplicate [tags][`FontFeature::tag`], later values override
+    /// earlier values.
     pub features: &'a [FontFeature],
     /// The font variations that are constant over an item.
     pub variations: &'a [FontVariation],

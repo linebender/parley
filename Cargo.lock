@@ -2973,6 +2973,7 @@ dependencies = [
  "parley_engine",
  "peniko",
  "skrifa 0.44.0",
+ "smallvec",
 ]
 
 [[package]]

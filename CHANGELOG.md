@@ -44,6 +44,10 @@ This release has an [MSRV] of 1.88.
 
 ### Fixed
 
+#### Parley
+
+- Applying letter spacing now stops optional ligatures from forming. ([#731][] by [@tomcur][])
+
 #### Fontique
 
 - Fix compilation on 32-bit platforms without 64-bit atomics (e.g. `mipsel-unknown-linux-gnu`). ([#671][] by [@nicoburns][])
@@ -727,6 +731,7 @@ This release has an [MSRV][] of 1.70.
 [#717]: https://github.com/linebender/parley/pull/717
 [#725]: https://github.com/linebender/parley/pull/725
 [#728]: https://github.com/linebender/parley/pull/728
+[#731]: https://github.com/linebender/parley/pull/731
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.11.0...HEAD
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0
