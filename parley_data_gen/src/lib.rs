@@ -32,29 +32,45 @@ pub struct Config {
 
 /// Exports ICU data as `PackTab` lookup tables + generated Rust code into the `out` directory.
 pub fn generate(out: std::path::PathBuf, config: &Config) {
+    let emoji_data = CodePointSetData::new::<Emoji>();
+    let extended_pictographic_data = CodePointSetData::new::<ExtendedPictographic>();
+    let emoji_component_data = CodePointSetData::new::<EmojiComponent>();
+    let regional_indicator_data = CodePointSetData::new::<RegionalIndicator>();
+
+    let script_data = CodePointMapData::<Script>::new();
+    let general_category_data = CodePointMapData::<GeneralCategory>::new();
+    let grapheme_cluster_break_data = CodePointMapData::<GraphemeClusterBreak>::new();
+    let bidi_class_data = CodePointMapData::<BidiClass>::new();
+
+    let variation_selector_data = CodePointSetData::new::<VariationSelector>();
+    let line_break_data = CodePointMapData::<LineBreak>::new();
+
+    let emoji_presentation_data = CodePointSetData::new::<EmojiPresentation>();
+    let emoji_modifier_data = CodePointSetData::new::<EmojiModifier>();
+    let emoji_modifier_base_data = CodePointSetData::new::<EmojiModifierBase>();
+
     // Generate the data required for `CompositeProps`.
     // Dense characters table for 0..=0x10FFFF
     let mut characters = Vec::with_capacity(0x110000);
     let mut emojis = Vec::new();
 
     for cp in 0_u32..=0x10FFFF {
-        let is_emoji = CodePointSetData::new::<Emoji>().contains32(cp);
-        let is_extended_pictographic =
-            CodePointSetData::new::<ExtendedPictographic>().contains32(cp);
-        let is_emoji_component = CodePointSetData::new::<EmojiComponent>().contains32(cp);
-        let is_regional_indicator = CodePointSetData::new::<RegionalIndicator>().contains32(cp);
+        let is_emoji = emoji_data.contains32(cp);
+        let is_extended_pictographic = extended_pictographic_data.contains32(cp);
+        let is_emoji_component = emoji_component_data.contains32(cp);
+        let is_regional_indicator = regional_indicator_data.contains32(cp);
 
         let v = Properties::new(
-            CodePointMapData::<Script>::new().get32(cp),
-            CodePointMapData::<GeneralCategory>::new().get32(cp),
-            CodePointMapData::<GraphemeClusterBreak>::new().get32(cp),
-            CodePointMapData::<BidiClass>::new().get32(cp),
+            script_data.get32(cp),
+            general_category_data.get32(cp),
+            grapheme_cluster_break_data.get32(cp),
+            bidi_class_data.get32(cp),
             is_emoji || is_extended_pictographic,
-            CodePointSetData::new::<VariationSelector>().contains32(cp),
+            variation_selector_data.contains32(cp),
             is_regional_indicator,
             // See: https://github.com/unicode-org/icu4x/blob/ee5399a77a6b94efb5d4b60678bb458c5eedb25d/components/segmenter/src/line.rs#L338-L351
             matches!(
-                CodePointMapData::<LineBreak>::new().get32(cp),
+                line_break_data.get32(cp),
                 LineBreak::MandatoryBreak
                     | LineBreak::CarriageReturn
                     | LineBreak::LineFeed
@@ -69,9 +85,9 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
                 is_emoji,
                 is_extended_pictographic,
                 is_emoji_component,
-                CodePointSetData::new::<EmojiPresentation>().contains32(cp),
-                CodePointSetData::new::<EmojiModifier>().contains32(cp),
-                CodePointSetData::new::<EmojiModifierBase>().contains32(cp),
+                emoji_presentation_data.contains32(cp),
+                emoji_modifier_data.contains32(cp),
+                emoji_modifier_base_data.contains32(cp),
                 is_regional_indicator,
             );
             emojis.push((cp, u32::from(emoji_properties)));
