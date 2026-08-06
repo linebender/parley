@@ -61,14 +61,20 @@ impl EmojiState {
     }
 
     /// Returns true if the emoji state is started.
-    #[allow(unused, reason = "The text has been shaped and segmented into clusters.")]
+    #[allow(
+        unused,
+        reason = "The text has been shaped and segmented into clusters."
+    )]
     #[inline]
     pub(crate) const fn is_started(self) -> bool {
         matches!(self, Self::Start)
     }
 
     /// Returns true if the emoji state is accepting.
-    #[allow(unused, reason = "The text has been shaped and segmented into clusters.")]
+    #[allow(
+        unused,
+        reason = "The text has been shaped and segmented into clusters."
+    )]
     #[inline]
     pub(crate) const fn is_accepting(self) -> bool {
         let cur = self as u8;
