@@ -4,10 +4,9 @@
 //! Text shaping implementation using `harfrust`for shaping
 //! and `icu` for text analysis.
 
-use alloc::vec::Vec;
-
 use parley_engine::shape::{CharCluster, Coverage};
 use parley_engine::{Analysis, AnalysisDataSources, FontInstance, ShapeOptions, Shaper};
+use smallvec::SmallVec;
 
 use super::layout::Layout;
 use super::resolve::{ResolveContext, ResolvedStyle};
@@ -114,7 +113,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         }
     };
 
-    let mut features_scratch = Vec::new();
+    let mut features_scratch = SmallVec::<[FontFeature; 8]>::new();
     let mut inline_box_iter = inline_boxes.iter().enumerate().peekable();
     for item in analysis.itemize(text, split_after) {
         // Push inline boxes positioned before the start of this item.
