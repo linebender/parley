@@ -97,6 +97,41 @@ impl<'a> ShapedSlice<'a> {
         &self.shaped_clusters[clusters_range.start as usize..clusters_range.end as usize]
     }
 
+    /// Iterate shaped clusters in visual left-to-right order.
+    #[inline(always)]
+    pub fn shaped_clusters_visual(&self) -> impl ExactSizeIterator<Item = u32> + Clone + use<> {
+        #[derive(Clone)]
+        struct ShapedClusters {
+            range: Range<u32>,
+            rev: bool,
+        }
+
+        impl Iterator for ShapedClusters {
+            type Item = u32;
+
+            #[inline(always)]
+            fn next(&mut self) -> Option<Self::Item> {
+                if self.rev {
+                    self.range.next_back()
+                } else {
+                    self.range.next()
+                }
+            }
+
+            #[inline(always)]
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                self.range.size_hint()
+            }
+        }
+
+        impl ExactSizeIterator for ShapedClusters {}
+
+        ShapedClusters {
+            range: self.clusters.0..self.clusters.1,
+            rev: self.bidi_level.is_rtl(),
+        }
+    }
+
     /// The byte range in the source text of the given range of [`Self::characters`].
     ///
     /// If `chars` is empty, this is the empty range at the byte position of `chars.start`; see
@@ -134,6 +169,45 @@ impl<'a> ShapedSlice<'a> {
         } else {
             self.characters[char_idx as usize].text_byte_start as usize
         }
+    }
+
+    /// Get an iterator over glyphs in visual left-to-right order of the shaped cluster with the
+    /// given index.
+    #[inline]
+    pub fn shaped_cluster_glyphs(
+        &self,
+        cluster_idx: u32,
+    ) -> impl Iterator<Item = Glyph> + Clone + use<'a> {
+        debug_assert!(
+            self.clusters.0 <= cluster_idx && cluster_idx < self.clusters.1,
+            "cluster index out of this slice's range"
+        );
+
+        let shaped_cluster = self.shaped_clusters[cluster_idx as usize];
+
+        let inline = shaped_cluster.has_inline_glyph().then_some(Glyph {
+            id: shaped_cluster.glyph_offset,
+            x: 0.,
+            y: 0.,
+            advance: shaped_cluster.advance,
+        });
+
+        let stored: &'a [Glyph] = if shaped_cluster.has_inline_glyph() {
+            &[]
+        } else {
+            let start = shaped_cluster.glyph_offset as usize;
+            &self.glyphs[start..start + usize::from(shaped_cluster.glyph_len())]
+        };
+
+        inline.into_iter().chain(stored.iter().copied())
+    }
+
+    /// Get an iterator over this slice's glyphs in visual left-to-right order.
+    #[inline(always)]
+    pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + Clone + use<'a> {
+        let slice = *self;
+        self.shaped_clusters_visual()
+            .flat_map(move |cluster_idx| slice.shaped_cluster_glyphs(cluster_idx))
     }
 
     /// Get a cursor to walk atoms from the logical start of this slice.
@@ -431,37 +505,6 @@ impl<'a> Atom<'a> {
     #[inline(always)]
     pub fn shaped_clusters(&self) -> &'a [ShapedCluster] {
         self.slice.shaped_clusters_in(self.shaped_clusters_range())
-    }
-
-    /// The atom's glyphs in visual left-to-right order.
-    pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + Clone + use<'a> {
-        let clusters = self.shaped_clusters();
-        let glyphs = self.slice.glyphs;
-
-        let rtl = self.slice.bidi_level.is_rtl();
-        rtl.then(|| clusters.iter().rev())
-            .into_iter()
-            .flatten()
-            // we chain because `.rev()` wraps the iterator in `Rev` - a different type than the LTR
-            // iterator.
-            .chain((!rtl).then(|| clusters.iter()).into_iter().flatten())
-            .flat_map(move |cluster| {
-                let inline = cluster.has_inline_glyph().then_some(Glyph {
-                    id: cluster.glyph_offset,
-                    x: 0.,
-                    y: 0.,
-                    advance: cluster.advance,
-                });
-
-                let stored: &'a [Glyph] = if cluster.has_inline_glyph() {
-                    &[]
-                } else {
-                    let start = cluster.glyph_offset as usize;
-                    &glyphs[start..start + cluster.glyph_len() as usize]
-                };
-
-                inline.into_iter().chain(stored.iter().copied())
-            })
     }
 
     /// This atom as a [`ShapedSlice`].
