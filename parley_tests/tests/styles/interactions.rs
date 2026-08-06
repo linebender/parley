@@ -10,10 +10,10 @@ use std::borrow::Cow;
 
 use crate::test_name;
 use crate::util::{TestEnv, samples};
-use parley::AlignmentOptions;
 use parley::layout::Alignment;
 use parley::setting::Tag;
 use parley::style::{FontVariation, FontVariations, LineHeight, StyleProperty};
+use parley::{AlignmentOptions, FontFeature, FontFeatures};
 
 // ============================================================================
 // FontSize × LineHeight Interactions
@@ -72,25 +72,45 @@ fn interaction_letter_spacing_ligatures() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LIGATURES;
 
-    // Without letter spacing - ligatures should form (if font supports them)
-    let mut builder_no_spacing = env.ranged_builder(text);
-    builder_no_spacing.push_default(StyleProperty::LetterSpacing(0.0));
-    let mut layout_no_spacing = builder_no_spacing.build(text);
-    layout_no_spacing.break_all_lines(None);
-    layout_no_spacing.align(Alignment::Start, AlignmentOptions::default());
+    // Without letter spacing - ligatures should form (if the font supports them)
+    {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::LetterSpacing(0.0));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
-    env.with_name("no_spacing")
-        .check_layout_snapshot(&layout_no_spacing);
+        env.with_name("no_spacing").check_layout_snapshot(&layout);
+    }
 
     // With letter spacing - ligatures should not be formed
-    let mut builder_with_spacing = env.ranged_builder(text);
-    builder_with_spacing.push_default(StyleProperty::LetterSpacing(2.0));
-    let mut layout_with_spacing = builder_with_spacing.build(text);
-    layout_with_spacing.break_all_lines(None);
-    layout_with_spacing.align(Alignment::Start, AlignmentOptions::default());
+    {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::LetterSpacing(2.0));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(Alignment::Start, AlignmentOptions::default());
 
-    env.with_name("with_spacing")
-        .check_layout_snapshot(&layout_with_spacing);
+        env.with_name("with_spacing").check_layout_snapshot(&layout);
+    }
+
+    // With letter spacing and common ligatures explicitly turned on - ligatures should form (if the
+    // font supports them)
+    {
+        let features_on = FontFeatures::List(Cow::Borrowed(&[FontFeature {
+            tag: Tag::new(b"liga"),
+            value: 1,
+        }]));
+
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::FontFeatures(features_on));
+        builder.push_default(StyleProperty::LetterSpacing(2.0));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(Alignment::Start, AlignmentOptions::default());
+
+        env.with_name("with_spacing_and_ligatures").check_layout_snapshot(&layout);
+    }
 }
 
 // ============================================================================
