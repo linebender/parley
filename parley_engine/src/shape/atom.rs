@@ -3,8 +3,6 @@
 
 use core::ops::Range;
 
-use parlance::BidiLevel;
-
 use crate::{Boundary, Glyph, shape::Whitespace};
 
 use super::data::{Character, ShapedCluster};
@@ -27,7 +25,6 @@ pub struct ShapedSlice<'a> {
 
     pub(crate) shaped_clusters: &'a [ShapedCluster],
     pub(crate) glyphs: &'a [Glyph],
-    pub(crate) bidi_level: BidiLevel,
 
     /// The range of [`Self::shaped_clusters`] this slice covers.
     pub(crate) clusters: (u32, u32),
@@ -95,41 +92,6 @@ impl<'a> ShapedSlice<'a> {
             "cluster range out of this slice's range"
         );
         &self.shaped_clusters[clusters_range.start as usize..clusters_range.end as usize]
-    }
-
-    /// Iterate shaped clusters in visual left-to-right order.
-    #[inline(always)]
-    pub fn shaped_clusters_visual(&self) -> impl ExactSizeIterator<Item = u32> + Clone + use<> {
-        #[derive(Clone)]
-        struct ShapedClusters {
-            range: Range<u32>,
-            rev: bool,
-        }
-
-        impl Iterator for ShapedClusters {
-            type Item = u32;
-
-            #[inline(always)]
-            fn next(&mut self) -> Option<Self::Item> {
-                if self.rev {
-                    self.range.next_back()
-                } else {
-                    self.range.next()
-                }
-            }
-
-            #[inline(always)]
-            fn size_hint(&self) -> (usize, Option<usize>) {
-                self.range.size_hint()
-            }
-        }
-
-        impl ExactSizeIterator for ShapedClusters {}
-
-        ShapedClusters {
-            range: self.clusters.0..self.clusters.1,
-            rev: self.bidi_level.is_rtl(),
-        }
     }
 
     /// The byte range in the source text of the given range of [`Self::characters`].
@@ -200,14 +162,6 @@ impl<'a> ShapedSlice<'a> {
         };
 
         inline.into_iter().chain(stored.iter().copied())
-    }
-
-    /// Get an iterator over this slice's glyphs in visual left-to-right order.
-    #[inline(always)]
-    pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + Clone + use<'a> {
-        let slice = *self;
-        self.shaped_clusters_visual()
-            .flat_map(move |cluster_idx| slice.shaped_cluster_glyphs(cluster_idx))
     }
 
     /// Get a cursor to walk atoms from the logical start of this slice.

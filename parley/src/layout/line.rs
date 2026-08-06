@@ -276,9 +276,9 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
 
     /// Returns an iterator over the glyphs in the run.
     pub fn glyphs(&'a self) -> impl Iterator<Item = Glyph> + 'a + Clone {
+        let clusters = self.run.line_slice().shaped_clusters_range();
         self.run
-            .line_slice()
-            .glyphs()
+            .glyphs_in(clusters)
             .skip(self.glyph_start)
             .take(self.glyph_count)
     }
