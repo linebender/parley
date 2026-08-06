@@ -77,8 +77,8 @@ impl EmojiState {
     )]
     #[inline]
     pub(crate) const fn is_accepting(self) -> bool {
-        let cur = self as u8;
-        Self::TERMINAL <= cur && cur <= Self::REGIONAL_INDICATOR
+        let curr = self as u8;
+        Self::TERMINAL <= curr && curr <= Self::REGIONAL_INDICATOR
     }
 }
 
