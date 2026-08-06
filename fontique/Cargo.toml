@@ -38,6 +38,9 @@ system = [
 # will not work properly in this case (no such fallback will occur)
 fontconfig-dlopen = ["yeslogic-fontconfig-sys?/dlopen"]
 
+# Enables decoding of WOFF and WOFF2 fonts in `Collection::register_fonts`
+woff = ["std", "dep:wuff", "wuff/z", "wuff/brotli"]
+
 [dependencies]
 read-fonts = { workspace = true }
 linebender_resource_handle = { workspace = true }
@@ -45,6 +48,7 @@ smallvec = "1.15.1"
 memmap2 = { version = "0.9.10", optional = true }
 hashbrown = { workspace = true }
 parlance = { workspace = true }
+wuff = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.62.2", features = ["Win32_Graphics_DirectWrite"], optional = true }
