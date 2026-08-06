@@ -10,8 +10,6 @@ We expect you to have fully understood and self-reviewed your contributions to L
 If you did not use any LLM tools, please replace "Unspecified" with 'None'. -->
 LLM Contributions: Unspecified.
 
-**Description**
-
 _Describe what problem this is solving, and how it's solved. Use your own words - descriptions authored by LLMs are not allowed._
 
 <!--
