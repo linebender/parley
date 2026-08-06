@@ -155,45 +155,23 @@ impl EmojiDFA {
 
     /// Updates the emoji state with [`EmojiSegmentationCategory`].
     #[inline]
-    const fn step(&mut self, category: EmojiSegmentationCategory) {
-        self.state = EmojiState::from_u8(DFA_TRANS[self.state as usize][category as usize]);
+    const fn step(state: EmojiState, category: EmojiSegmentationCategory) -> EmojiState {
+        EmojiState::from_u8(DFA_TRANS[state as usize][category as usize])
     }
 
     /// Records the emoji state and segmentation category with [`EmojiSegmentationCategory`].
     #[inline]
-    pub const fn step_record(&mut self, category: EmojiSegmentationCategory) {
-        self.step(category);
+    pub fn step_record(&mut self, category: EmojiSegmentationCategory) {
+        let curr = self.state;
+        let next = Self::step(curr, category);
 
-        if self.is_rejected() || self.is_started() {
+        if next.is_rejected() {
             return;
         }
 
-        self.recorded.0 |= 1 << (self.state as u8);
+        self.recorded.0 |= 1 << (next as u8);
         self.recorded.1 |= 1 << (category as u8);
-    }
-
-    /// Returns true if the emoji state is rejected.
-    #[inline]
-    pub(crate) const fn is_rejected(self) -> bool {
-        self.state.eq(EmojiState::Reject)
-    }
-
-    /// Returns true if the emoji state is started.
-    #[inline]
-    pub(crate) const fn is_started(self) -> bool {
-        self.state.eq(EmojiState::Start)
-    }
-
-    /// Returns true if the emoji state is accepting.
-    #[allow(unused)]
-    #[inline]
-    pub(crate) const fn is_accepting(self) -> bool {
-        const START: u8 = EmojiState::Terminal as u8;
-        const END: u8 = EmojiState::RegionalIndicator as u8;
-
-        let cur = self.state as u8;
-
-        START <= cur && cur <= END
+        self.state = next;
     }
 
     #[inline]

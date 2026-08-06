@@ -32,6 +32,9 @@ pub(crate) enum EmojiState {
 }
 
 impl EmojiState {
+    pub(crate) const TERMINAL: u8 = Self::Terminal as u8;
+    pub(crate) const REGIONAL_INDICATOR: u8 = Self::RegionalIndicator as u8;
+
     #[inline]
     pub(crate) const fn from_u8(value: u8) -> Self {
         match value {
@@ -51,9 +54,25 @@ impl EmojiState {
         }
     }
 
+    /// Returns true if the emoji state is rejected.
     #[inline]
-    pub(crate) const fn eq(self, other: Self) -> bool {
-        (self as u8) == (other as u8)
+    pub(crate) const fn is_rejected(self) -> bool {
+        matches!(self, Self::Reject)
+    }
+
+    /// Returns true if the emoji state is started.
+    #[allow(unused, reason = "The text has been shaped and segmented into clusters.")]
+    #[inline]
+    pub(crate) const fn is_started(self) -> bool {
+        matches!(self, Self::Start)
+    }
+
+    /// Returns true if the emoji state is accepting.
+    #[allow(unused, reason = "The text has been shaped and segmented into clusters.")]
+    #[inline]
+    pub(crate) const fn is_accepting(self) -> bool {
+        let cur = self as u8;
+        Self::TERMINAL <= cur && cur <= Self::REGIONAL_INDICATOR
     }
 }
 
@@ -89,8 +108,8 @@ pub enum EmojiSegmentationCategory {
     Vs16,
     /// `0x200D`
     Zwj,
-    /// No value
-    None,
+    /// Other character
+    Other,
 }
 
 impl EmojiSegmentationCategory {
@@ -127,7 +146,7 @@ impl EmojiSegmentationCategory {
                     return Self::Emoji;
                 }
 
-                Self::None
+                Self::Other
             }
         }
     }

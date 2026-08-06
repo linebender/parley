@@ -313,12 +313,7 @@ fn flag_sequence_us() {
 }
 
 // Double lone regional indicator + Flag sequence (US); Encoded: 🇺🇺🇸
-//
-// FIXME: segmented clusters are incorrect
-//  ✖️, [[0x1F1FA, 0x1F1FA], [0x1F1F8]]
-//  ✔️, [[0x1F1FA], [0x1F1FA, 0x1F1F8]]
 #[test]
-#[ignore]
 fn double_lone_regional_indicator_flag_sequence_us() {
     assert_emoji(TestEntity {
         sequence: &[
