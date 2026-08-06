@@ -137,6 +137,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 OPTIONAL_LIGATURES_OFF.as_slice()
             } else {
                 features_scratch.clear();
+                // Later values override earlier values.
                 features_scratch
                     .extend(OPTIONAL_LIGATURES_OFF.iter().chain(style_features).copied());
                 features_scratch.as_slice()
