@@ -1174,14 +1174,28 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                     // Compute the run's advance including any inserted spacing. Note this is the
                     // unjusitifed advance.
-                    let spacing = LineSpacing::new(self.layout.data.runs[line_item.index].spacing);
-                    let slice = self
-                        .layout
-                        .data
-                        .shaped_text
-                        .run_slice(line_item.index as u32)
-                        .narrow(line_item.shaped_cluster_range.clone());
-                    line_item.advance = spacing.slice_advance(slice);
+                    let spacing = self.layout.data.runs[line_item.index].spacing;
+
+                    // Calculate the advance. If no spacing is applied, just go through the shaped
+                    // clusters directly, which will be slightly faster.
+                    line_item.advance = if spacing.is_zero() {
+                        let range = line_item.shaped_cluster_range.start as usize
+                            ..line_item.shaped_cluster_range.end as usize;
+
+                        self.layout.data.shaped_text.shaped_clusters()[range]
+                            .iter()
+                            .map(|cluster| cluster.advance)
+                            .sum()
+                    } else {
+                        let slice = self
+                            .layout
+                            .data
+                            .shaped_text
+                            .run_slice(line_item.index as u32)
+                            .narrow(line_item.shaped_cluster_range.clone());
+
+                        LineSpacing::new(spacing).slice_advance(slice)
+                    };
 
                     // Ignore trailing whitespace when deciding whether the line has content
                     // (we are iterating backwards so trailing whitespace comes first)
