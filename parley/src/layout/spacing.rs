@@ -153,7 +153,6 @@ impl LineSpacing {
             }
         }
 
-        // TODO: add justification
         gaps
     }
 
