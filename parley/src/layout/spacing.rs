@@ -132,6 +132,7 @@ impl LineSpacing {
     }
 
     /// The gaps around `atom`.
+    #[inline(always)]
     pub(crate) fn gaps(self, atom: &Atom<'_>) -> Gaps {
         let whitespace = atom.characters()[0].info.whitespace();
 
@@ -157,6 +158,7 @@ impl LineSpacing {
     }
 
     /// The total advance of `atom`, i.e., the sum of the shaped advance and gaps.
+    #[inline(always)]
     pub(crate) fn atom_advance(self, atom: &Atom<'_>) -> f32 {
         atom.advance() + self.gaps(atom).total()
     }
