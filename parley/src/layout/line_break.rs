@@ -315,6 +315,9 @@ impl BreakerState {
         line_height: f32,
         quantize: bool,
     ) {
+        if atom.characters()[0].info.whitespace().is_space_or_nbsp() {
+            self.line.num_spaces += 1;
+        }
         self.line.items.end = self.item_idx + 1;
         self.line.clusters.end = atom.shaped_clusters_range().end;
         self.cluster_idx = atom.shaped_clusters_range().end;
@@ -826,9 +829,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 line_height,
                                 self.layout.data.quantize,
                             );
-                            if is_space {
-                                self.state.line.num_spaces += 1;
-                            }
                         }
                         // Else we attempt to line break:
                         //
@@ -1010,7 +1010,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let first_character = &atom.characters()[0];
                         let whitespace = first_character.info.whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
-                        let is_space = whitespace.is_space_or_nbsp();
                         let advance = spacing.atom_advance(&atom);
 
                         // Compute the x position.
@@ -1029,10 +1028,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.layout.data.quantize,
                         );
                         char_count += atom.char_range().len() as u32;
-
-                        if is_space {
-                            self.state.line.num_spaces += 1;
-                        }
 
                         // Check if we've reached the limit after adding this atom
                         if char_count >= max_chars {
