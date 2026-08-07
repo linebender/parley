@@ -3,6 +3,12 @@
 
 //! Additional advance applied on top of shaped advance.
 
+use parley_engine::{Atom, ShapedSlice, shape::Whitespace};
+
+pub(crate) fn is_word_separator(whitespace: Whitespace) -> bool {
+    whitespace.is_space_or_nbsp()
+}
+
 /// Additional gaps to apply around a shaped advance.
 ///
 /// This spacing is in visual order.
@@ -91,3 +97,80 @@ pub(crate) struct Justification {
     pub(crate) line_end_char: u32,
 }
 
+/// Spacing that applies to a shaped run on a line.
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct LineSpacing {
+    spacing: Spacing,
+    justification: Justification,
+}
+
+impl LineSpacing {
+    /// Spacing of text without justification.
+    ///
+    /// In general, justification is known only after a line is finalized, but you need the
+    /// [`Spacing`] to be able to measure the line.
+    #[inline(always)]
+    pub(crate) const fn new(spacing: Spacing) -> Self {
+        Self {
+            spacing,
+            justification: Justification {
+                amount_per_opportunity: 0.,
+                line_end_char: 0,
+            },
+        }
+    }
+
+    #[inline(always)]
+    pub(crate) const fn with_justification(mut self, justification: Justification) -> Self {
+        self.justification = justification;
+        self
+    }
+
+    #[inline(always)]
+    pub(crate) const fn is_zero(self) -> bool {
+        self.spacing.is_zero() && self.justification.amount_per_opportunity == 0.
+    }
+
+    /// The gaps around `atom`.
+    pub(crate) fn gaps(self, atom: &Atom<'_>) -> Gaps {
+        let whitespace = atom.characters()[0].info.whitespace();
+
+        if whitespace == Whitespace::Newline {
+            return Gaps::ZERO;
+        }
+
+        let mut gaps = Gaps {
+            before: 0.,
+            after: self.spacing.letter,
+        };
+
+        if is_word_separator(whitespace) {
+            gaps.after += self.spacing.word;
+        }
+
+        // TODO: add justification
+        gaps
+    }
+
+    /// The total advance of `atom`, i.e., the sum of the shaped advance and gaps.
+    pub(crate) fn atom_advance(self, atom: &Atom<'_>) -> f32 {
+        atom.advance() + self.gaps(atom).total()
+    }
+
+    /// The total advance of `slice`, i.e., the sum of shaped advances and gaps.
+    #[inline]
+    pub(crate) fn slice_advance(self, slice: ShapedSlice<'_>) -> f32 {
+        if self.is_zero() {
+            return slice
+                .shaped_clusters()
+                .iter()
+                .map(|cluster| cluster.advance)
+                .sum();
+        } else {
+            slice
+                .atoms_start()
+                .map(|atom| self.atom_advance(&atom))
+                .sum()
+        }
+    }
+}
