@@ -3,7 +3,7 @@
 
 //! Additional advance applied on top of shaped advance.
 
-use parley_engine::{Atom, ShapedSlice, shape::Whitespace};
+use parley_engine::{Atom, Grapheme, ShapedSlice, shape::Whitespace};
 
 pub(crate) fn is_word_separator(whitespace: Whitespace) -> bool {
     whitespace.is_space_or_nbsp()
@@ -155,6 +155,31 @@ impl LineSpacing {
     /// The total advance of `atom`, i.e., the sum of the shaped advance and gaps.
     pub(crate) fn atom_advance(self, atom: &Atom<'_>) -> f32 {
         atom.advance() + self.gaps(atom).total()
+    }
+
+    /// The total advance of `grapheme`, i.e., the sum of the shaped advance and gaps.
+    ///
+    /// This only adds the gap that the grapheme owns, i.e., if that grapheme boundary is also an
+    /// atom boundary.
+    pub(crate) fn grapheme_advance(
+        self,
+        atom: &Atom<'_>,
+        grapheme: &Grapheme,
+        is_rtl: bool,
+    ) -> f32 {
+        let gaps = self.gaps(atom);
+
+        // TODO: perhaps spacing should not be applied if the grapheme `continues_before` /
+        // `continues_after`. The same then should hold true in `gaps` computed for an atom.
+        let (owns_before, owns_after) = if is_rtl {
+            (grapheme.is_atom_end(), grapheme.is_atom_start())
+        } else {
+            (grapheme.is_atom_start(), grapheme.is_atom_end())
+        };
+
+        grapheme.advance()
+            + if owns_before { gaps.before } else { 0. }
+            + if owns_after { gaps.after } else { 0. }
     }
 
     /// The total advance of `slice`, i.e., the sum of shaped advances and gaps.
