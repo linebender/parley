@@ -108,7 +108,7 @@ impl FontInfo {
                 synth.vars[len] = (Tag::new(b"wght"), weight.value());
                 len += 1;
             }
-        } else if weight.value() > self.weight.value() {
+        } else if weight.value() > self.weight.value() + 200.0 {
             synth.embolden = true;
         }
         if self.style != style {
@@ -541,14 +541,22 @@ mod tests {
     }
 
     #[test]
-    fn static_weight_synthesis_uses_face_weight() {
+    fn static_weight_synthesis_requires_more_than_200_weight_increase() {
         let font = font_info(ROBOTO);
 
-        let synthesis = font.synthesis(font.width(), font.style(), FontWeight::BOLD);
+        let synthesis = font.synthesis(
+            font.width(),
+            font.style(),
+            FontWeight::new(font.weight().value() + 1.0),
+        );
+        assert!(!synthesis.any());
+
+        let synthesis = font.synthesis(
+            font.width(),
+            font.style(),
+            FontWeight::new(font.weight().value() + 201.0),
+        );
         assert!(synthesis.embolden());
         assert!(synthesis.variation_settings().is_empty());
-
-        let synthesis = font.synthesis(font.width(), font.style(), FontWeight::LIGHT);
-        assert!(!synthesis.any());
     }
 }
