@@ -10,6 +10,7 @@ mod cluster;
 mod line;
 mod line_break;
 mod run;
+mod spacing;
 
 // TODO - Add to allowed lint set?
 #[expect(
@@ -36,6 +37,7 @@ pub use run::Run;
 
 pub(crate) use data::{LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData};
 pub(crate) use line::LineItem;
+pub(crate) use spacing::Spacing;
 
 // TODO - Deprecation not yet active to ease internal code migration.
 #[deprecated(since = "TBD", note = "Access from the `editing` module instead.")]

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::inline_box::InlineBox;
+use crate::layout::spacing::Spacing;
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
@@ -23,10 +24,13 @@ pub(crate) struct RunData {
     pub(crate) synthesis: fontique::Synthesis,
     /// The line height
     pub line_height: f32,
-    /// Additional word spacing.
-    pub(crate) word_spacing: f32,
-    /// Additional letter spacing.
-    pub(crate) letter_spacing: f32,
+    /// Additional spacing inserted between this run's atoms.
+    ///
+    /// TODO: Letter spacing in the form of gaps should not be applied between cursive scripts, see
+    /// [CSS Text 4 § 8.2.1][css-spacing-cursive]. Currently we erroneously *do* apply it.
+    ///
+    /// [css-spacing-cursive]: https://www.w3.org/TR/css-text-4/#cursive-tracking
+    pub(crate) spacing: Spacing,
 }
 
 #[derive(Copy, Clone, Default, PartialEq, Debug)]
@@ -71,6 +75,10 @@ pub(crate) struct LineItemData {
     /// Bidi level for the item (used for reordering)
     pub(crate) bidi_level: BidiLevel,
     /// Advance (size in direction of text flow) for the run.
+    ///
+    /// This includes the run's [`Spacing`], but not the justification. Spacing is a property of
+    /// graphemes and shaped clusters, so can be known, whereas justification depends on a line's
+    /// free space.
     pub(crate) advance: f32,
 
     // Fields that only apply to text runs (Ignored for boxes)
@@ -276,8 +284,7 @@ impl<B: Brush> LayoutData<B> {
         &mut self,
         shaped_run_idx: usize,
         run_style: &ResolvedStyle<B>,
-        word_spacing: f32,
-        letter_spacing: f32,
+        spacing: Spacing,
     ) {
         let shaped_run = &self.shaped_text.runs()[shaped_run_idx];
         debug_assert!(
@@ -311,8 +318,7 @@ impl<B: Brush> LayoutData<B> {
             },
             synthesis: font.synthesis,
             line_height,
-            word_spacing,
-            letter_spacing,
+            spacing,
         };
 
         self.runs.push(run);
@@ -325,9 +331,8 @@ impl<B: Brush> LayoutData<B> {
 
     pub(crate) fn finish(&mut self) {
         for (run_index, run_data) in self.runs.iter().enumerate() {
-            let word = run_data.word_spacing;
-            let letter = run_data.letter_spacing;
-            if nearly_zero(word) && nearly_zero(letter) {
+            let spacing = run_data.spacing;
+            if nearly_zero(spacing.word) && nearly_zero(spacing.letter) {
                 continue;
             }
             let cluster_range = self.shaped_text.runs()[run_index]
@@ -337,19 +342,19 @@ impl<B: Brush> LayoutData<B> {
                 self.shaped_text.characters_shaped_clusters_and_glyphs_mut();
             for cluster in &mut clusters[cluster_range.start as usize..cluster_range.end as usize] {
                 let first_character = &characters[cluster.chars_range().start as usize];
-                let mut spacing = letter;
-                if !nearly_zero(word) && first_character.info.whitespace().is_space_or_nbsp() {
-                    spacing += word;
+                let mut additional_spacing = spacing.letter;
+                if !nearly_zero(spacing.word) && first_character.info.whitespace().is_space_or_nbsp() {
+                    additional_spacing += spacing.word;
                 }
-                if !nearly_zero(spacing) {
-                    cluster.advance += spacing;
+                if !nearly_zero(additional_spacing) {
+                    cluster.advance += additional_spacing;
                     // An inline glyph's advance is the cluster's advance, so it needs no separate
                     // adjustment.
                     if !cluster.has_inline_glyph() && cluster.glyph_len() > 0 {
                         let start = cluster.glyph_offset as usize;
                         let end = start + cluster.glyph_len() as usize;
                         if let Some(last) = glyphs[start..end].last_mut() {
-                            last.advance += spacing;
+                            last.advance += additional_spacing;
                         }
                     }
                 }
