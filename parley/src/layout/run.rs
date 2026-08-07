@@ -216,7 +216,7 @@ impl<'a, B: Brush> Run<'a, B> {
         Clusters::new(*self, self.is_rtl())
     }
 
-    /// An iterator over the glyphs in `clusters`.
+    /// An iterator over the glyphs in `clusters` in visual left-to-right order.
     pub(crate) fn glyphs_in(
         self,
         clusters: Range<u32>,
