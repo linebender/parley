@@ -6,6 +6,26 @@
 //! ## Features
 //!
 //! - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
+//!
+//! ## Typical shaping pipeline
+//!
+//! A caller normally reuses an [`Analyzer`], [`Analysis`], and [`Shaper`] while
+//! laying out text. The analysis must be produced before itemization and
+//! shaping, and the same source string must be passed to each stage:
+//!
+//! ```text
+//! analyzer.analyze(text, &options, &mut analysis);
+//! for item in analysis.itemize(text, split_after) {
+//!     shaper.shape_item(text, &analysis, &item, &shape_options, select_font, &mut shaped_text);
+//! }
+//! ```
+//!
+//! [`Analysis::itemize`] divides text into runs with compatible bidi and
+//! script properties. [`Shaper::shape_item`] then turns each run into glyphs;
+//! the `select_font` callback chooses a [`FontInstance`] for each character
+//! cluster. Higher-level users should generally prefer `parley`'s
+//! [`LayoutContext`](https://docs.rs/parley/latest/parley/struct.LayoutContext.html),
+//! which manages these stages and adds style resolution and line layout.
 
 // LINEBENDER LINT SET - lib.rs - v3
 // See https://linebender.org/wiki/canonical-lints/
