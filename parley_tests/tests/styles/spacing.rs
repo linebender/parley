@@ -195,3 +195,42 @@ fn spacing_causes_style_run_breaks() {
     env.with_name("spacing_style_run_breaks")
         .check_layout_snapshot(&layout);
 }
+
+// ============================================================================
+// Grapheme tests
+// ============================================================================
+
+#[test]
+fn spacing_and_multi_shaped_cluster_graphemes() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // The combining acute accent `U+0301` combines with the character to form a grapheme, including
+    // if that previous character is a space. Our Roboto font doesn't carry a glyph for `sp+U+0301`
+    // or `h+U+0301`, so both become two shaped clusters, but form one grapheme.
+    //
+    // Compare with the following HTML.
+    //
+    // ```html
+    // <p style="letter-spacing: 10px; background: #eee; width: fit-content;">a &#x0301;bh&#x0301;d</p>
+    // <p style="word-spacing: 10px; background: #eee; width: fit-content;">a &#x0301;bh&#x0301;d</p>
+    // ```
+    let text = "a \u{0301}bh\u{0301}d";
+
+    {
+        let mut builder = env.ranged_builder(text);
+        builder.push(StyleProperty::LetterSpacing(10.), 0..text.len());
+
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        env.with_name("letter").check_layout_snapshot(&layout);
+    }
+
+    {
+        let mut builder = env.ranged_builder(text);
+        builder.push(StyleProperty::WordSpacing(10.), 0..text.len());
+
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        env.with_name("word").check_layout_snapshot(&layout);
+    }
+}
