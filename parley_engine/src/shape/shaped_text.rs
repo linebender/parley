@@ -145,7 +145,6 @@ impl ShapedText {
 
             shaped_clusters: &self.shaped_clusters,
             glyphs: &self.glyphs,
-            bidi_level: run.bidi_level,
 
             clusters: (
                 run.shaped_clusters_range.start,

@@ -276,9 +276,9 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
 
     /// Returns an iterator over the glyphs in the run.
     pub fn glyphs(&'a self) -> impl Iterator<Item = Glyph> + 'a + Clone {
+        let clusters = self.run.line_slice().shaped_clusters_range();
         self.run
-            .visual_clusters()
-            .flat_map(|cluster| cluster.glyphs())
+            .glyphs_in(clusters)
             .skip(self.glyph_start)
             .take(self.glyph_count)
     }
@@ -333,6 +333,10 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                     }));
                 }
                 LineItem::Run(run) => {
+                    // TODO: this is taking the glyphs and style indices from `parley`'s `Cluster`,
+                    // which means style indices are taken from the atom's first character. We could
+                    // get the style index from `parley_engine`'s `ShapedCluster` instead, which
+                    // would be somewhat finer-grained.
                     let mut glyphs = run
                         .visual_clusters()
                         .flat_map(|c| {
