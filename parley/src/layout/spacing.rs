@@ -94,7 +94,7 @@ pub(crate) struct Justification {
 
     /// The end of the line's logically last atom, i.e., the line's end, where justification won't
     /// be applied.
-    pub(crate) line_end_char: u32,
+    pub(crate) line_end_cluster: u32,
 }
 
 /// Spacing that applies to a shaped run on a line.
@@ -115,7 +115,7 @@ impl LineSpacing {
             spacing,
             justification: Justification {
                 amount_per_opportunity: 0.,
-                line_end_char: 0,
+                line_end_cluster: 0,
             },
         }
     }
@@ -148,7 +148,7 @@ impl LineSpacing {
         if is_word_separator(whitespace) {
             gaps.after += self.spacing.word;
 
-            if atom.shaped_clusters_range().end != self.justification.line_end_char {
+            if atom.shaped_clusters_range().end != self.justification.line_end_cluster {
                 gaps.after += self.justification.amount_per_opportunity;
             }
         }

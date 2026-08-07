@@ -1538,7 +1538,7 @@ fn commit_line<B: Brush>(
             .is_some_and(|atom| atom.characters()[0].info.whitespace().is_space_or_nbsp())
     {
         num_spaces = num_spaces.saturating_sub(1);
-        justification.line_end_char = state.clusters.end;
+        justification.line_end_cluster = state.clusters.end;
     }
 
     lines.lines.push(LineData {
