@@ -70,11 +70,6 @@ pub(crate) struct Spacing {
 }
 
 impl Spacing {
-    pub(crate) const ZERO: Self = Self {
-        word: 0.,
-        letter: 0.,
-    };
-
     #[inline(always)]
     pub(crate) const fn new(word: f32, letter: f32) -> Self {
         Self { word, letter }
@@ -165,12 +160,7 @@ impl LineSpacing {
     ///
     /// This only adds the gap that the grapheme owns, i.e., if that grapheme boundary is also an
     /// atom boundary.
-    pub(crate) fn grapheme_advance(
-        self,
-        atom: &Atom<'_>,
-        grapheme: &Grapheme,
-        is_rtl: bool,
-    ) -> f32 {
+    pub(crate) fn grapheme_advance(self, atom: &Atom<'_>, grapheme: Grapheme, is_rtl: bool) -> f32 {
         let gaps = self.gaps(atom);
 
         // TODO: perhaps spacing should not be applied if the grapheme `continues_before` /
@@ -190,11 +180,11 @@ impl LineSpacing {
     #[inline]
     pub(crate) fn slice_advance(self, slice: ShapedSlice<'_>) -> f32 {
         if self.is_zero() {
-            return slice
+            slice
                 .shaped_clusters()
                 .iter()
                 .map(|cluster| cluster.advance)
-                .sum();
+                .sum()
         } else {
             slice
                 .atoms_start()
