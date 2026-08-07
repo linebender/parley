@@ -25,6 +25,11 @@ pub(crate) struct Gaps {
     /// For horizontal text, additional spacing visually to the left.
     ///
     /// For vertical text, this is to the top.
+    ///
+    /// Note: this field is wired up, but it's currently always zero as we follow Blink in assigning
+    /// word and letter spacing to be visually after (see also docs on [`Spacing`]). However, e.g.,
+    /// `text-justify: inter-character` would distribute spacing around graphemes, at which point
+    /// `before` becomes used.
     pub(crate) before: f32,
 
     /// For horizontal text, additional spacing visually to the right.
