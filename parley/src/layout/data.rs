@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::inline_box::InlineBox;
-use crate::layout::spacing::{LineSpacing, Spacing};
+use crate::layout::spacing::{Justification, LineSpacing, Spacing};
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
-use crate::util::nearly_zero;
 use crate::{IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode};
 use core::ops::Range;
 
@@ -56,6 +55,7 @@ pub(crate) struct LineData {
     pub(crate) max_advance: f32,
     /// Number of justified clusters on the line.
     pub(crate) num_spaces: usize,
+    pub(crate) justification: Justification,
     /// Text indent applied to this line.
     pub(crate) indent: f32,
 }
@@ -218,8 +218,8 @@ pub(crate) struct LayoutData<B: Brush> {
     /// Directly store the alignment if accessibility is enabled so we can
     /// set the corresponding AccessKit property.
     pub(crate) alignment: Option<super::Alignment>,
-    /// Whether the layout is aligned with [`crate::Alignment::Justify`].
-    pub(crate) is_aligned_justified: bool,
+    // /// Whether the layout is aligned with [`crate::Alignment::Justify`].
+    // pub(crate) is_aligned_justified: bool,
     /// The text-indent amount in layout units.
     pub(crate) indent_amount: f32,
     /// Options controlling text-indent behavior (each-line, hanging).
@@ -245,7 +245,6 @@ impl<B: Brush> Default for LayoutData<B> {
             line_items: Vec::new(),
             #[cfg(feature = "accesskit")]
             alignment: None,
-            is_aligned_justified: false,
             layout_max_advance: 0.0,
             indent_amount: 0.0,
             indent_options: IndentOptions::default(),

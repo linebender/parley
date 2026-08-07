@@ -11,7 +11,7 @@ use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
 use crate::layout::data::count_graphemes;
-use crate::layout::spacing::LineSpacing;
+use crate::layout::spacing::{Justification, LineSpacing};
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -1534,6 +1534,7 @@ fn commit_line<B: Brush>(
     // ends with an atom starting with a space: with `WordBreak::BreakAll`, regular breaks can land
     // between non-space graphemes, in which case there is no trailing space to exclude.
     let mut num_spaces = state.num_spaces;
+    let mut justification = Justification::default();
     if break_reason == BreakReason::Regular
         && state.clusters.start < state.clusters.end
         && shaped_text
@@ -1543,6 +1544,7 @@ fn commit_line<B: Brush>(
             .is_some_and(|atom| atom.characters()[0].info.whitespace().is_space_or_nbsp())
     {
         num_spaces = num_spaces.saturating_sub(1);
+        justification.line_end_char = state.clusters.end;
     }
 
     lines.lines.push(LineData {
@@ -1550,6 +1552,7 @@ fn commit_line<B: Brush>(
         max_advance,
         break_reason,
         num_spaces,
+        justification,
         indent: line_indent,
         metrics: LineMetrics {
             advance: state.x,

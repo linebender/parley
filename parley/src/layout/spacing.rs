@@ -87,7 +87,7 @@ impl Spacing {
 }
 
 /// Justification to apply to a single line.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
 pub(crate) struct Justification {
     /// The amount of additional spacing to apply per justification opportunity.
     pub(crate) amount_per_opportunity: f32,
@@ -146,6 +146,10 @@ impl LineSpacing {
 
         if is_word_separator(whitespace) {
             gaps.after += self.spacing.word;
+
+            if atom.shaped_clusters_range().end != self.justification.line_end_char {
+                gaps.after += self.justification.amount_per_opportunity;
+            }
         }
 
         // TODO: add justification
