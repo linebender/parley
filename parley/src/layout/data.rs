@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::inline_box::InlineBox;
-use crate::layout::spacing::Spacing;
+use crate::layout::spacing::{LineSpacing, Spacing};
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
@@ -359,10 +359,11 @@ impl<B: Brush> LayoutData<B> {
             match item.kind {
                 LayoutItemKind::TextRun => {
                     let slice = self.shaped_text.run_slice(item.index as u32);
+                    let spacing = LineSpacing::new(self.runs[item.index].spacing);
                     if is_rtl {
                         prev_atom = slice.atoms_start().next().map(|atom| {
                             let character = &atom.characters()[0];
-                            (character.info.whitespace(), atom.advance())
+                            (character.info.whitespace(), spacing.atom_advance(&atom))
                         });
                     }
                     for atom in slice.atoms_start() {
@@ -384,10 +385,11 @@ impl<B: Brush> LayoutData<B> {
                                 running_max_width = 0.0;
                             }
                         }
-                        running_min_width += atom.advance();
-                        running_max_width += atom.advance();
+                        let advance = spacing.atom_advance(&atom);
+                        running_min_width += advance;
+                        running_max_width += advance;
                         if !is_rtl {
-                            prev_atom = Some((character.info.whitespace(), atom.advance()));
+                            prev_atom = Some((character.info.whitespace(), advance));
                         }
                     }
                     let trailing_whitespace = whitespace_advance(prev_atom);
