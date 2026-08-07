@@ -196,6 +196,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
     /// [`Self::is_ligature_continuation`]), the shaped cluster's advance is split evenly over the
     /// clusters it overlaps.
     pub fn advance(&self) -> f32 {
+        let _ = self.run.line_spacing();
         self.grapheme.advance()
     }
 
