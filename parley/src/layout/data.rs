@@ -218,8 +218,6 @@ pub(crate) struct LayoutData<B: Brush> {
     /// Directly store the alignment if accessibility is enabled so we can
     /// set the corresponding AccessKit property.
     pub(crate) alignment: Option<super::Alignment>,
-    // /// Whether the layout is aligned with [`crate::Alignment::Justify`].
-    // pub(crate) is_aligned_justified: bool,
     /// The text-indent amount in layout units.
     pub(crate) indent_amount: f32,
     /// Options controlling text-indent behavior (each-line, hanging).

@@ -143,7 +143,6 @@ impl<'a, B: Brush> Run<'a, B> {
     ///
     /// This includes the additional advance inserted between the run's atoms.
     pub fn advance(&self) -> f32 {
-        // TODO: add justification
         let spacing = self.line_spacing();
         spacing.slice_advance(self.line_slice())
     }
