@@ -129,8 +129,14 @@ impl<'a, B: Brush> Run<'a, B> {
 
     #[inline]
     pub(crate) fn line_spacing(&self) -> LineSpacing {
-        // TODO: add justification
-        LineSpacing::new(self.data.spacing)
+        let spacing = LineSpacing::new(self.data.spacing);
+        if self.line_data.is_some() {
+            // If `line_data` is `Some`, this run is scoped to a line. Add its justification.
+            spacing
+                .with_justification(self.layout.data.lines[self.line_index as usize].justification)
+        } else {
+            spacing
+        }
     }
 
     /// Returns the advance for the run.
