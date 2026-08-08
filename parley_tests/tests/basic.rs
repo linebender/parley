@@ -864,11 +864,11 @@ fn shaping_context_across_items() {
 
     assert_eq!(
         layout.get(0).unwrap().runs().count(),
-        3,
-        "The first line must be three shaped runs (otherwise it didn't actually separate into items)"
+        4,
+        "The first line must be four shaped runs (one for each character, and the newline), otherwise it didn't actually separate into items"
     );
     assert_eq!(
-        layout.get(2).unwrap().runs().count(),
+        layout.get(1).unwrap().runs().count(),
         1,
         "The second line must be a single shaped run"
     );
