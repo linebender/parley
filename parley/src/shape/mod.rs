@@ -13,7 +13,7 @@ use super::resolve::{ResolveContext, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
 use crate::inline_box::InlineBox;
 use crate::util::{nearly_eq, nearly_zero};
-use crate::{FontContext, FontData};
+use crate::{FontContext, FontData, Spacing};
 use fontique::Language;
 
 use fontique::{self, Query, QueryFamily, QueryFont};
@@ -168,8 +168,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             layout.data.process_shaped_run(
                 shaped_run_idx,
                 run_style,
-                style.word_spacing,
-                style.letter_spacing,
+                Spacing::new(style.word_spacing, style.letter_spacing),
             );
         }
     }

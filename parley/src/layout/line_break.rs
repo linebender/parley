@@ -11,6 +11,7 @@ use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
 use crate::layout::data::count_graphemes;
+use crate::layout::spacing::{Justification, LineSpacing};
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -19,7 +20,7 @@ use crate::style::Brush;
 use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
 
 use core::ops::Range;
-use parley_engine::shape::{Character, ShapedCluster, Whitespace};
+use parley_engine::shape::Whitespace;
 use parley_engine::{Atom, Boundary, FontMetrics};
 
 #[derive(Default)]
@@ -314,6 +315,9 @@ impl BreakerState {
         line_height: f32,
         quantize: bool,
     ) {
+        if atom.characters()[0].info.whitespace().is_space_or_nbsp() {
+            self.line.num_spaces += 1;
+        }
         self.line.items.end = self.item_idx + 1;
         self.line.clusters.end = atom.shaped_clusters_range().end;
         self.cluster_idx = atom.shaped_clusters_range().end;
@@ -708,6 +712,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let slice = run.full_slice();
                     let cluster_end = shaped_run.shaped_clusters_range.end;
 
+                    // Additional spacing to apply between atoms. Because we're still forming the
+                    // lines, justification is not yet known here.
+                    let spacing = LineSpacing::new(run.data.spacing);
+
                     // println!("TextRun ({:?})", &run_data.text_range);
 
                     // Iterate over the remaining atoms in the Run
@@ -800,7 +808,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         // Breaking an atom requires reshaping, which we don't do here, so it is
                         // consumed as a whole (this includes all clusters of a ligature).
-                        let advance = atom.advance();
+                        let advance = spacing.atom_advance(&atom);
 
                         // Compute the x position of the content being currently processed
                         let next_x = self.state.line.x + advance;
@@ -821,9 +829,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 line_height,
                                 self.layout.data.quantize,
                             );
-                            if is_space {
-                                self.state.line.num_spaces += 1;
-                            }
                         }
                         // Else we attempt to line break:
                         //
@@ -992,6 +997,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let shaped_run = &self.layout.data.shaped_text.runs()[run_idx];
                     let run = Run::new(self.layout, 0, 0, run_idx, None);
                     let slice = run.full_slice();
+                    let spacing = run.line_spacing();
                     let cluster_end = shaped_run.shaped_clusters_range.end;
 
                     for atom in slice.atoms_from(self.state.cluster_idx) {
@@ -1004,8 +1010,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let first_character = &atom.characters()[0];
                         let whitespace = first_character.info.whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
-                        let is_space = whitespace.is_space_or_nbsp();
-                        let advance = atom.advance();
+                        let advance = spacing.atom_advance(&atom);
 
                         // Compute the x position.
                         // Newlines don't contribute to line width (matching break_next behavior).
@@ -1023,10 +1028,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.layout.data.quantize,
                         );
                         char_count += atom.char_range().len() as u32;
-
-                        if is_space {
-                            self.state.line.num_spaces += 1;
-                        }
 
                         // Check if we've reached the limit after adding this atom
                         if char_count >= max_chars {
@@ -1171,14 +1172,29 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         needs_reorder = true;
                     }
 
-                    // Compute the run's advance by summing the advances of its constituent clusters
-                    line_item.advance = {
+                    // Compute the run's advance including any inserted spacing. Note this is the
+                    // unjustified advance.
+                    let spacing = self.layout.data.runs[line_item.index].spacing;
+
+                    // Calculate the advance. If no spacing is applied, just go through the shaped
+                    // clusters directly, which will be slightly faster.
+                    line_item.advance = if spacing.is_zero() {
                         let range = line_item.shaped_cluster_range.start as usize
                             ..line_item.shaped_cluster_range.end as usize;
+
                         self.layout.data.shaped_text.shaped_clusters()[range]
                             .iter()
-                            .map(|c| c.advance)
+                            .map(|cluster| cluster.advance)
                             .sum()
+                    } else {
+                        let slice = self
+                            .layout
+                            .data
+                            .shaped_text
+                            .run_slice(line_item.index as u32)
+                            .narrow(line_item.shaped_cluster_range.clone());
+
+                        LineSpacing::new(spacing).slice_advance(slice)
                     };
 
                     // Ignore trailing whitespace when deciding whether the line has content
@@ -1210,30 +1226,32 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.trailing_whitespace = run
             .filter(|item| item.is_text_run() && item.has_trailing_whitespace)
             .map(|run| {
-                fn whitespace_advance<'c, I: Iterator<Item = &'c ShapedCluster>>(
-                    characters: &[Character],
-                    clusters: I,
+                fn whitespace_advance<'a>(
+                    spacing: LineSpacing,
+                    atoms: impl Iterator<Item = Atom<'a>>,
                 ) -> f32 {
-                    clusters
-                        .take_while(|cluster| {
-                            characters[cluster.chars_range().start as usize
-                                ..cluster.chars_range().end as usize]
+                    atoms
+                        .take_while(|atom| {
+                            atom.characters()
                                 .iter()
-                                .all(|c| c.info.whitespace() != Whitespace::None)
+                                .all(|character| character.info.whitespace() != Whitespace::None)
                         })
-                        .map(|cluster| cluster.advance)
+                        .map(|atom| spacing.atom_advance(&atom))
                         .sum()
                 }
 
-                let characters = self.layout.data.shaped_text.characters();
-                let clusters =
-                    &self.layout.data.shaped_text.shaped_clusters()[run.shaped_cluster_range.start
-                        as usize
-                        ..run.shaped_cluster_range.end as usize];
+                let slice = self
+                    .layout
+                    .data
+                    .shaped_text
+                    .run_slice(run.index as u32)
+                    .narrow(run.shaped_cluster_range.clone());
+                let spacing = LineSpacing::new(self.layout.data.runs[run.index].spacing);
+
                 if run.is_rtl() {
-                    whitespace_advance(characters, clusters.iter())
+                    whitespace_advance(spacing, slice.atoms_start())
                 } else {
-                    whitespace_advance(characters, clusters.iter().rev())
+                    whitespace_advance(spacing, slice.atoms_end().rev())
                 }
             })
             .unwrap_or(0.0);
@@ -1510,6 +1528,7 @@ fn commit_line<B: Brush>(
     // ends with an atom starting with a space: with `WordBreak::BreakAll`, regular breaks can land
     // between non-space graphemes, in which case there is no trailing space to exclude.
     let mut num_spaces = state.num_spaces;
+    let mut justification = Justification::default();
     if break_reason == BreakReason::Regular
         && state.clusters.start < state.clusters.end
         && shaped_text
@@ -1519,6 +1538,7 @@ fn commit_line<B: Brush>(
             .is_some_and(|atom| atom.characters()[0].info.whitespace().is_space_or_nbsp())
     {
         num_spaces = num_spaces.saturating_sub(1);
+        justification.line_end_cluster = state.clusters.end;
     }
 
     lines.lines.push(LineData {
@@ -1526,6 +1546,7 @@ fn commit_line<B: Brush>(
         max_advance,
         break_reason,
         num_spaces,
+        justification,
         indent: line_indent,
         metrics: LineMetrics {
             advance: state.x,
