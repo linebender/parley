@@ -47,6 +47,100 @@ pub fn defaults() -> Vec<Benchmark> {
         .collect()
 }
 
+/// Benchmark for nonzero word and letter spacing.
+pub fn spacing() -> Vec<Benchmark> {
+    const DISPLAY_SCALE: f32 = 1.0;
+    const QUANTIZE: bool = true;
+    const MAX_ADVANCE: f32 = 200.0 * DISPLAY_SCALE;
+    const WORD_SPACING: f32 = 2.0;
+    const LETTER_SPACING: f32 = 1.0;
+
+    let samples = get_samples();
+
+    samples
+        .iter()
+        .map(|sample| {
+            benchmark_fn(
+                format!(
+                    "Word + Letter Spacing - {} {}",
+                    sample.name, sample.modification
+                ),
+                |b| {
+                    b.iter(|| {
+                        let text = &sample.text;
+                        with_contexts(|font_cx, layout_cx| {
+                            let mut builder =
+                                layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
+                            builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+                            builder.push_default(StyleProperty::WordSpacing(WORD_SPACING));
+                            builder.push_default(StyleProperty::LetterSpacing(LETTER_SPACING));
+
+                            let mut layout: Layout<ColorBrush> = builder.build(text);
+                            layout.break_all_lines(Some(MAX_ADVANCE));
+                            layout.align(Alignment::Start, AlignmentOptions::default());
+
+                            black_box(layout);
+                        });
+                    })
+                },
+            )
+        })
+        .collect()
+}
+
+/// Benchmark repeatedly justifying an already line-broken layout.
+pub fn repeated_justification() -> [Benchmark; 1] {
+    const DISPLAY_SCALE: f32 = 1.0;
+    const QUANTIZE: bool = true;
+    const MAX_ADVANCE: f32 = 200.0 * DISPLAY_SCALE;
+
+    let sample = get_samples()
+        .iter()
+        .find(|sample| sample.name == "latin" && sample.modification == "4 paragraph")
+        .expect("the Latin four-paragraph benchmark sample should exist");
+
+    [benchmark_fn(
+        format!(
+            "Repeated Justification - {} {}",
+            sample.name, sample.modification
+        ),
+        move |b| {
+            let text = &sample.text;
+            let mut layout = with_contexts(|font_cx, layout_cx| {
+                let mut builder = layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
+                builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+
+                let mut layout: Layout<ColorBrush> = builder.build(text);
+                layout.break_all_lines(Some(MAX_ADVANCE));
+                layout
+            });
+
+            b.iter(move || {
+                layout.align(Alignment::Justify, AlignmentOptions::default());
+
+                // Pass to black box so the optimizer cannot optimize alignment away.
+                black_box(
+                    layout
+                        .lines()
+                        .flat_map(|line| line.runs())
+                        .map(|run| run.advance())
+                        .sum::<f32>(),
+                );
+                layout.align(Alignment::Start, AlignmentOptions::default());
+
+                // Pass to black box so the optimizer cannot optimize alignment away.
+                black_box(
+                    layout
+                        .lines()
+                        .flat_map(|line| line.runs())
+                        .map(|run| run.advance())
+                        .sum::<f32>(),
+                )
+            })
+        },
+    )]
+}
+
 /// Benchmark for styled text.
 pub fn styled() -> Vec<Benchmark> {
     const DISPLAY_SCALE: f32 = 1.0;
