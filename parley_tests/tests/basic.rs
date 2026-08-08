@@ -843,3 +843,53 @@ fn layout_impl_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<Layout<()>>();
 }
+
+#[test]
+fn shaping_context_across_items() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "كتب\nكتب";
+    // Bytes:   0246..
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::FontSize(16.));
+    // On the first line, the change in font size creates itemization boundaries. Shaping should
+    // still select correct alternates (initial/medial/final forms in this case). Noto Kufi doesn't
+    // form ligatures here, so the glyphs of the first and second lines should be identical (modulo
+    // font size).
+    builder.push(StyleProperty::FontSize(18.0), 2..4);
+
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    env.check_layout_snapshot(&layout);
+
+    assert_eq!(
+        layout.get(0).unwrap().runs().count(),
+        3,
+        "The first line must be three shaped runs (otherwise it didn't actually separate into items)"
+    );
+    assert_eq!(
+        layout.get(2).unwrap().runs().count(),
+        1,
+        "The second line must be a single shaped run"
+    );
+
+    let glyph_ids_by_line: Vec<Vec<u32>> = layout
+        .lines()
+        .map(|line| {
+            line.items()
+                .filter_map(|item| match item {
+                    PositionedLayoutItem::GlyphRun(run) => {
+                        Some(run.glyphs().map(|glyph| glyph.id).collect::<Vec<_>>())
+                    }
+                    PositionedLayoutItem::InlineBox(_) => None,
+                })
+                .flatten()
+                .collect()
+        })
+        .collect();
+
+    assert_eq!(
+        glyph_ids_by_line[0], glyph_ids_by_line[1],
+        "Glyphs must be identical"
+    );
+}
