@@ -1188,7 +1188,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     }
 
                     // Compute the run's advance including any inserted spacing. Note this is the
-                    // unjusitifed advance.
+                    // unjustified advance.
                     let spacing = self.layout.data.runs[line_item.index].spacing;
 
                     // Calculate the advance. If no spacing is applied, just go through the shaped
