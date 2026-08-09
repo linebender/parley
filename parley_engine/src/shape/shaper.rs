@@ -115,6 +115,12 @@ impl Shaper {
         shaped_text.reserve(text.len());
 
         let char_count = analysis.char_info().len();
+        debug_assert_eq!(
+            char_style_indices.len(),
+            char_count,
+            "The number of character style indices must be equal to the character count"
+        );
+
         let mut previous_item_end = 0;
         let mut itemizer = analysis.itemize(text);
 
