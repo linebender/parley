@@ -173,7 +173,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
                     font_size: item_style.font_size,
                     features: &style_features[item_style_index as usize],
                     variations: rcx.variations(item_style.font_variations).unwrap_or(&[]),
-                    char_style_indices,
                 },
             })
         })
@@ -184,6 +183,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     scx.shape_text(
         text,
         analysis,
+        char_style_indices,
         items,
         font_selector,
         &mut layout.data.shaped_text,

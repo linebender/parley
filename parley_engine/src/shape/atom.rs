@@ -858,10 +858,16 @@ mod tests {
                 language: None,
                 features: &[],
                 variations: &[],
-                char_style_indices: &char_style_indices,
             },
         }];
-        shaper.shape_text(text, &analysis, items, SingleFont(font), &mut shaped);
+        shaper.shape_text(
+            text,
+            &analysis,
+            &char_style_indices,
+            items,
+            SingleFont(font),
+            &mut shaped,
+        );
         shaped
     }
 

@@ -34,11 +34,6 @@ pub struct ShapeOptions<'a> {
     pub features: &'a [FontFeature],
     /// The font variations that are constant over an item.
     pub variations: &'a [FontVariation],
-    /// The per-character style indices.
-    // TODO: rename to something like `user_data` (s.t. we don't assume it's a style per se).
-    // TODO: probably move this out of `ShapeOptions`, and supply it as a parameter on
-    // `Shaper::shape_text`.
-    pub char_style_indices: &'a [u16],
 }
 
 /// The font instance to shape an item with.
@@ -92,6 +87,10 @@ impl Shaper {
     /// split on properties like shaping-relevant style changes (e.g., font size) or properties like
     /// language.
     ///
+    /// `char_style_indices` holds per-character style indices; these are copied onto
+    /// [`Character`][super::Character`] and [`ShapedCluster`][super::ShapedCluster]. A shaped
+    /// cluster's style index is that of its logically first constituent character.
+    ///
     /// Characters that don't have a particular script have their script resolved based on
     /// surrounding context (see [`Segment::script`]).
     ///
@@ -106,6 +105,8 @@ impl Shaper {
         &mut self,
         text: &str,
         analysis: &Analysis,
+        // TODO: rename to something like `user_data` (s.t. we don't assume it's a style per se).
+        char_style_indices: &[u16],
         items: impl IntoIterator<Item = Item<'options>>,
         mut select_font: impl FontSelector,
         shaped_text: &mut ShapedText,
@@ -142,6 +143,7 @@ impl Shaper {
                     &item.options,
                     &mut select_font,
                     analysis.char_info(),
+                    char_style_indices,
                     shaped_text,
                 )
                 .is_err()
@@ -182,6 +184,7 @@ fn shape_segment(
     options: &ShapeOptions<'_>,
     select_font: &mut impl FontSelector,
     char_info: &[CharInfo],
+    char_style_indices: &[u16],
     shaped_text: &mut ShapedText,
 ) -> Result<(), ()> {
     select_font.begin_segment(item, options);
@@ -193,7 +196,7 @@ fn shape_segment(
 
     // Only process current item
     let item_char_info = &char_info[char_range.start..char_range.end];
-    let item_char_style_indices = &options.char_style_indices[char_range.start..char_range.end];
+    let item_char_style_indices = &char_style_indices[char_range.start..char_range.end];
 
     if item_text.is_empty() {
         return Ok(()); // No clusters
@@ -378,6 +381,7 @@ fn shape_segment(
             item,
             options,
             char_info,
+            char_style_indices,
             &font,
             &glyph_buffer,
             harf_shaper.coords(),

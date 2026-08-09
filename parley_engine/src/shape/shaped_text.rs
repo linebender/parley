@@ -236,6 +236,7 @@ impl ShapedText {
         item: &Segment,
         options: &ShapeOptions<'_>,
         char_info: &[CharInfo],
+        char_style_indices: &[u16],
         font: &FontInstance,
         glyph_buffer: &harfrust::GlyphBuffer,
         normalized_coords: &[harfrust::NormalizedCoord],
@@ -318,7 +319,7 @@ impl ShapedText {
         for (((byte_offset, ch), info), style_index) in text[range.byte_range.clone()]
             .char_indices()
             .zip(&char_info[range.char_range.clone()])
-            .zip(&options.char_style_indices[range.char_range.clone()])
+            .zip(&char_style_indices[range.char_range.clone()])
         {
             self.characters.push(Character {
                 text_byte_start: (range.byte_range.start + byte_offset) as u32,
@@ -340,7 +341,7 @@ impl ShapedText {
                 scale_factor,
                 glyph_infos.iter(),
                 glyph_positions.iter(),
-                &options.char_style_indices[range.char_range.clone()],
+                &char_style_indices[range.char_range.clone()],
                 &self.characters,
                 characters_start,
             );
@@ -351,7 +352,7 @@ impl ShapedText {
                 scale_factor,
                 glyph_infos.iter().rev(),
                 glyph_positions.iter().rev(),
-                &options.char_style_indices[range.char_range.clone()],
+                &char_style_indices[range.char_range.clone()],
                 &self.characters,
                 characters_start,
             );
@@ -621,10 +622,16 @@ mod tests {
                 language: None,
                 features: &[],
                 variations: &[],
-                char_style_indices: &char_style_indices,
             },
         }];
-        shaper.shape_text(text, &analysis, items, SingleFont(font), &mut shaped);
+        shaper.shape_text(
+            text,
+            &analysis,
+            &char_style_indices,
+            items,
+            SingleFont(font),
+            &mut shaped,
+        );
         shaped
     }
 
@@ -732,7 +739,6 @@ mod tests {
                     language: None,
                     features: &[],
                     variations: &[],
-                    char_style_indices: &char_style_indices,
                 },
             },
             Item {
@@ -742,11 +748,17 @@ mod tests {
                     language: None,
                     features: &[],
                     variations: &[],
-                    char_style_indices: &char_style_indices,
                 },
             },
         ];
-        shaper.shape_text(text, &analysis, items, SingleFont(font), &mut shaped);
+        shaper.shape_text(
+            text,
+            &analysis,
+            &char_style_indices,
+            items,
+            SingleFont(font),
+            &mut shaped,
+        );
 
         let grapheme_starts: Vec<bool> =
             shaped.characters.iter().map(|c| c.grapheme_start).collect();
