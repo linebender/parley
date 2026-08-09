@@ -341,7 +341,6 @@ impl ShapedText {
                 scale_factor,
                 glyph_infos.iter(),
                 glyph_positions.iter(),
-                &char_style_indices[range.char_range.clone()],
                 &self.characters,
                 characters_start,
             );
@@ -352,7 +351,6 @@ impl ShapedText {
                 scale_factor,
                 glyph_infos.iter().rev(),
                 glyph_positions.iter().rev(),
-                &char_style_indices[range.char_range.clone()],
                 &self.characters,
                 characters_start,
             );
@@ -430,7 +428,6 @@ pub struct ShapedRun {
 /// * `glyph_infos` - `HarfRust` glyph information in logical order (i.e., reversed for RTL runs).
 /// * `glyph_positions` - `HarfRust` glyph positioning data in logical order (i.e., reversed for RTL
 ///   runs).
-/// * `char_style_indices` - The run's slice of per-character style indices, indexed by cluster ID.
 /// * `characters` must contain the shaped characters whose clusters we're now processing, starting at
 ///   index `characters_start`.
 /// * `characters_start` - See `characters`.
@@ -440,7 +437,6 @@ fn process_shaped_clusters<'a>(
     scale_factor: f32,
     glyph_infos: impl Iterator<Item = &'a harfrust::GlyphInfo>,
     glyph_positions: impl Iterator<Item = &'a harfrust::GlyphPosition>,
-    char_style_indices: &[u16],
     characters: &[Character],
     characters_start: usize,
 ) {
@@ -458,7 +454,6 @@ fn process_shaped_clusters<'a>(
     fn flush(
         cluster: &mut Cluster,
         char_end: usize,
-        style_index: u16,
         characters: &[Character],
         shaped_clusters: &mut Vec<ShapedCluster>,
     ) {
@@ -480,7 +475,7 @@ fn process_shaped_clusters<'a>(
 
         shaped_clusters.push(ShapedCluster {
             chars_range: (cluster.characters_start as u32, char_end as u32),
-            style_index,
+            style_index: first_character.style_index,
             flags: ShapedClusterFlags::new(glyph_len)
                 .with_grapheme_start(first_character.grapheme_start)
                 // TODO: fill with actual shaping data (`parley` currently just ignores this)
@@ -503,14 +498,7 @@ fn process_shaped_clusters<'a>(
     for (glyph_info, glyph_pos) in glyph_infos.zip(glyph_positions) {
         if glyph_info.cluster != cluster.id {
             let char_end = characters_start + glyph_info.cluster as usize;
-            let style_index = char_style_indices[cluster.id as usize];
-            flush(
-                &mut cluster,
-                char_end,
-                style_index,
-                characters,
-                shaped_clusters,
-            );
+            flush(&mut cluster, char_end, characters, shaped_clusters);
 
             cluster = Cluster {
                 id: glyph_info.cluster,
@@ -543,14 +531,7 @@ fn process_shaped_clusters<'a>(
     }
 
     // Flush the final cluster.
-    let style_index = char_style_indices[cluster.id as usize];
-    flush(
-        &mut cluster,
-        characters.len(),
-        style_index,
-        characters,
-        shaped_clusters,
-    );
+    flush(&mut cluster, characters.len(), characters, shaped_clusters);
 }
 
 #[cfg(test)]
