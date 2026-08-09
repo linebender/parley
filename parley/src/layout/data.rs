@@ -264,16 +264,7 @@ impl<B: Brush> LayoutData<B> {
     }
 
     /// Push an inline box to the list of items
-    pub(crate) fn push_inline_box(&mut self, index: usize) {
-        // Give the box the same bidi level as the preceding text run
-        // (or else default to 0 if there is not yet a text run)
-        let bidi_level = self
-            .shaped_text
-            .runs()
-            .last()
-            .map(|r| r.bidi_level)
-            .unwrap_or(BidiLevel::new(0));
-
+    pub(crate) fn push_inline_box(&mut self, index: usize, bidi_level: BidiLevel) {
         self.items.push(LayoutItem {
             kind: LayoutItemKind::InlineBox,
             index,
