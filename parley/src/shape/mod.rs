@@ -4,6 +4,7 @@
 //! Text shaping implementation using `harfrust`for shaping
 //! and `icu` for text analysis.
 
+use alloc::vec::Vec;
 use parley_engine::shape::{CharCluster, Coverage};
 use parley_engine::{Analysis, AnalysisDataSources, FontInstance, ShapeOptions, Shaper};
 use smallvec::SmallVec;
@@ -72,6 +73,29 @@ pub(crate) fn shape_text<'a, B: Brush>(
     let mut fq = fcx.collection.query(&mut fcx.source_cache);
 
     let mut inline_box_iter = inline_boxes.iter().peekable();
+
+    // Merge font features with letter-spacing ligature suppression.
+    //
+    // TODO: This allocation is slightly unfortunate (though solvable). It's required currently,
+    // because the iterator providing `ShapeOptions` has to provide a borrowed `&'a [FontFeature]`,
+    // which cannot be tied to the lifetime of the call to `Iterator::next`. What we'd need is a
+    // lending iterator (i.e., we probably just need to let `parley_engine` take some trait
+    // providing the items).
+    let style_features: &'_ Vec<SmallVec<[FontFeature; 8]>> = &styles
+        .iter()
+        .map(|style| {
+            let style_features = rcx.features(style.font_features).unwrap_or(&[]);
+            if !nearly_zero(style.letter_spacing) {
+                // Later values override earlier values.
+                OPTIONAL_LIGATURES_OFF
+                    .into_iter()
+                    .chain(style_features.iter().copied())
+                    .collect()
+            } else {
+                style_features.iter().copied().collect()
+            }
+        })
+        .collect();
 
     // Split when shaping-relevant style properties change and at inline boxes.
     let items = {
@@ -147,7 +171,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 options: ShapeOptions {
                     language: item_style.locale,
                     font_size: item_style.font_size,
-                    features: rcx.features(item_style.font_features).unwrap_or(&[]),
+                    features: &style_features[item_style_index as usize],
                     variations: rcx.variations(item_style.font_variations).unwrap_or(&[]),
                     char_style_indices,
                 },

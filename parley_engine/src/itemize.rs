@@ -42,7 +42,10 @@ pub struct Segment {
 
 /// A span of text shaped with specific [`ShapeOptions`].
 ///
-/// While shaping text, items are divided into [`Segment`]s.
+/// An [`Item`] represents a sequence of constant [`ShapeOptions`], but cannot always be passed to
+/// the shaper as a single unit. Within an item, the script or bidirectional text embedding level
+/// may change, which requires further splitting the item into segments of constant script and bidi
+/// level (see [`Segment`]).
 #[derive(Debug)]
 pub struct Item<'a> {
     /// The character offset in the source text which this item ends.
