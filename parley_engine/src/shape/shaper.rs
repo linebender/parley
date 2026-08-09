@@ -299,8 +299,9 @@ fn shape_item(
             buffer.add(ch, i as u32);
         }
 
+        buffer.set_pre_context(&text[..text_range.start + segment_start_offset]);
+        buffer.set_post_context(&text[text_range.start + segment_end_offset..]);
         buffer.set_direction(direction);
-
         buffer.set_script(hb_script);
 
         if let Some(lang) = language {
