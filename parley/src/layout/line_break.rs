@@ -97,14 +97,29 @@ struct Extents {
 
 impl Default for Extents {
     fn default() -> Self {
+        // Initialized to negative infinity so that content with negative extents (e.g. text with
+        // negative half-leading from a small `line-height`) is not floored at zero. Lines with no
+        // contributing content resolve to zero via [`Self::or_zero`], keeping the sentinel
+        // internal.
+        //
+        // Ideally, a line's initial extents should be sourced from the primary font.
         Self {
-            // NOTE: these should be `f32::NEG_INFINITY`, but that's currently causing
-            // `tests::test_builders::builders_empty` to fail with a `NaN`.
-            //
-            // And even more ideally, a line's initial extents should be sourced from the primary
-            // font.
-            over: 0.,
-            under: 0.,
+            over: f32::NEG_INFINITY,
+            under: f32::NEG_INFINITY,
+        }
+    }
+}
+
+impl Extents {
+    /// Resolve unset (default) extents to zero.
+    fn or_zero(self) -> Self {
+        if self.over == f32::NEG_INFINITY && self.under == f32::NEG_INFINITY {
+            Self {
+                over: 0.,
+                under: 0.,
+            }
+        } else {
+            self
         }
     }
 }
@@ -113,7 +128,8 @@ impl LineBoxMetrics {
     /// The line height seen so far.
     #[inline(always)]
     fn line_height(self) -> f32 {
-        self.line_box.over + self.line_box.under
+        let line_box = self.line_box.or_zero();
+        line_box.over + line_box.under
     }
 
     fn add_text(&mut self, metrics: &FontMetrics, line_height: f32, quantize: bool) {
@@ -625,26 +641,36 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // and the portion below to its descent. By default (no explicit baseline) the
                     // bottom of the box is aligned with the text baseline, i.e. the box is all
                     // ascent and zero descent. Out-of-flow boxes contribute nothing.
-                    let (width_contribution, height_contribution, resolved_baseline) =
-                        match inline_box.kind {
-                            InlineBoxKind::InFlow => {
-                                let baseline = inline_box.baseline.unwrap_or(inline_box.height);
-                                (inline_box.width, inline_box.height, baseline)
-                            }
-                            InlineBoxKind::OutOfFlow => (0.0, 0.0, 0.0),
-                            // If the box is a `CustomOutOfFlow` box then we yield control flow back to the caller.
-                            // It is then the caller's responsibility to handle placement of the box.
-                            InlineBoxKind::CustomOutOfFlow => {
-                                return Some(YieldData::InlineBoxBreak(BoxBreakData {
-                                    inline_box_id: inline_box.id,
-                                    inline_box_index: item.index,
-                                    advance: self.state.line.x,
-                                }));
-                            }
-                        };
-
-                    let ascent_contribution = resolved_baseline;
-                    let descent_contribution = height_contribution - resolved_baseline;
+                    let (
+                        width_contribution,
+                        height_contribution,
+                        ascent_contribution,
+                        descent_contribution,
+                    ) = match inline_box.kind {
+                        InlineBoxKind::InFlow => {
+                            let baseline = inline_box.baseline.unwrap_or(inline_box.height);
+                            (
+                                inline_box.width,
+                                inline_box.height,
+                                baseline,
+                                inline_box.height - baseline,
+                            )
+                        }
+                        // Negative infinity extents are a no-op when maxed into the line's
+                        // extents, so out-of-flow boxes truly contribute nothing.
+                        InlineBoxKind::OutOfFlow => {
+                            (0.0, 0.0, f32::NEG_INFINITY, f32::NEG_INFINITY)
+                        }
+                        // If the box is a `CustomOutOfFlow` box then we yield control flow back to the caller.
+                        // It is then the caller's responsibility to handle placement of the box.
+                        InlineBoxKind::CustomOutOfFlow => {
+                            return Some(YieldData::InlineBoxBreak(BoxBreakData {
+                                inline_box_id: inline_box.id,
+                                inline_box_index: item.index,
+                                advance: self.state.line.x,
+                            }));
+                        }
+                    };
 
                     // Compute the x position of the content being currently processed
                     let next_x = self.state.line.x + width_contribution;
@@ -941,8 +967,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     if inline_box.kind != InlineBoxKind::InFlow {
                         self.state.append_inline_box_to_line(
                             self.state.line.x,
-                            0.0,
-                            0.0,
+                            f32::NEG_INFINITY,
+                            f32::NEG_INFINITY,
                             self.layout.data.quantize,
                         );
                         continue;
@@ -1223,8 +1249,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // Whether metrics should be quantized to pixel boundaries
         let quantize = self.layout.data.quantize;
 
-        let mut line_box_extents = self.state.line.box_metrics.line_box;
-        let mut content_box_extents = self.state.line.box_metrics.content_box;
+        let mut line_box_extents = self.state.line.box_metrics.line_box.or_zero();
+        let mut content_box_extents = self.state.line.box_metrics.content_box.or_zero();
         if !have_metrics
             && line.item_range.is_empty()
             && let Some(metrics) = prev_line_metrics
