@@ -29,6 +29,7 @@ complex-scripts = ["parley_engine/complex-scripts"]
 
 [dependencies]
 skrifa = { workspace = true, optional = true }
+smallvec = { workspace = true }
 linebender_resource_handle = { workspace = true }
 fontique = { workspace = true }
 parlance = { workspace = true }

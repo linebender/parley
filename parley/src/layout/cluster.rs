@@ -251,7 +251,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
     pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + Clone + use<'a, B> {
         self.grapheme
             .is_atom_start()
-            .then(|| self.atom.glyphs())
+            .then(|| self.run.glyphs_in(self.atom.shaped_clusters_range()))
             .into_iter()
             .flatten()
     }

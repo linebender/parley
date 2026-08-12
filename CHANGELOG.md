@@ -37,7 +37,6 @@ This release has an [MSRV] of 1.88.
   Shaped clusters that cross grapheme boundaries are represented using the existing `Cluster::is_ligature_start` and `Cluster::is_ligature_continuation`; note these methods previously encoded graphemes as well.
   Shaped clusters' advances are split evenly over the grapheme clusters they overlap.
   `Run::cluster_range` now returns grapheme cluster indices relative to the run's shaped run.
-  `BreakerState::append_cluster_to_line` was replaced by `BreakerState::append_atom_to_line`.
 - Breaking change: lines with mixed inline content, like different fonts or sizes, or inline boxes, are now sized more closely to the CSS line-box model. ([#697][] by [@tomcur][])  
   The `LineMetrics::{ascent,descent,leading}` fields were removed, and `LineMetrics::block_{min,max}_coord` now describe the block-axis layout bounds of each line box.
   Glyphs may overflow these layout bounds, especially when a small line height is used.
@@ -47,6 +46,10 @@ This release has an [MSRV] of 1.88.
 - `parley::editing::Cursor::{previous,next}_logical_word` now land at the previous/next logical start of a word and skip over whitespace. ([#215][] by [@tomcur][])
 
 ### Fixed
+
+#### Parley
+
+- Applying letter spacing now stops optional ligatures from forming. ([#731][] by [@tomcur][])
 
 #### Fontique
 
@@ -733,6 +736,7 @@ This release has an [MSRV][] of 1.70.
 [#725]: https://github.com/linebender/parley/pull/725
 [#728]: https://github.com/linebender/parley/pull/728
 [#730]: https://github.com/linebender/parley/pull/730
+[#731]: https://github.com/linebender/parley/pull/731
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.11.0...HEAD
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0

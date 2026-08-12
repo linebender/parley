@@ -3,8 +3,6 @@
 
 use core::ops::Range;
 
-use parlance::BidiLevel;
-
 use crate::{Boundary, Glyph, shape::Whitespace};
 
 use super::data::{Character, ShapedCluster};
@@ -27,7 +25,6 @@ pub struct ShapedSlice<'a> {
 
     pub(crate) shaped_clusters: &'a [ShapedCluster],
     pub(crate) glyphs: &'a [Glyph],
-    pub(crate) bidi_level: BidiLevel,
 
     /// The range of [`Self::shaped_clusters`] this slice covers.
     pub(crate) clusters: (u32, u32),
@@ -134,6 +131,37 @@ impl<'a> ShapedSlice<'a> {
         } else {
             self.characters[char_idx as usize].text_byte_start as usize
         }
+    }
+
+    /// Get an iterator over glyphs in visual left-to-right order of the shaped cluster with the
+    /// given index.
+    #[inline]
+    pub fn shaped_cluster_glyphs(
+        &self,
+        cluster_idx: u32,
+    ) -> impl Iterator<Item = Glyph> + Clone + use<'a> {
+        debug_assert!(
+            self.clusters.0 <= cluster_idx && cluster_idx < self.clusters.1,
+            "cluster index out of this slice's range"
+        );
+
+        let shaped_cluster = self.shaped_clusters[cluster_idx as usize];
+
+        let inline = shaped_cluster.has_inline_glyph().then_some(Glyph {
+            id: shaped_cluster.glyph_offset,
+            x: 0.,
+            y: 0.,
+            advance: shaped_cluster.advance,
+        });
+
+        let stored: &'a [Glyph] = if shaped_cluster.has_inline_glyph() {
+            &[]
+        } else {
+            let start = shaped_cluster.glyph_offset as usize;
+            &self.glyphs[start..start + usize::from(shaped_cluster.glyph_len())]
+        };
+
+        inline.into_iter().chain(stored.iter().copied())
     }
 
     /// Get a cursor to walk atoms from the logical start of this slice.
@@ -431,37 +459,6 @@ impl<'a> Atom<'a> {
     #[inline(always)]
     pub fn shaped_clusters(&self) -> &'a [ShapedCluster] {
         self.slice.shaped_clusters_in(self.shaped_clusters_range())
-    }
-
-    /// The atom's glyphs in visual left-to-right order.
-    pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + Clone + use<'a> {
-        let clusters = self.shaped_clusters();
-        let glyphs = self.slice.glyphs;
-
-        let rtl = self.slice.bidi_level.is_rtl();
-        rtl.then(|| clusters.iter().rev())
-            .into_iter()
-            .flatten()
-            // we chain because `.rev()` wraps the iterator in `Rev` - a different type than the LTR
-            // iterator.
-            .chain((!rtl).then(|| clusters.iter()).into_iter().flatten())
-            .flat_map(move |cluster| {
-                let inline = cluster.has_inline_glyph().then_some(Glyph {
-                    id: cluster.glyph_offset,
-                    x: 0.,
-                    y: 0.,
-                    advance: cluster.advance,
-                });
-
-                let stored: &'a [Glyph] = if cluster.has_inline_glyph() {
-                    &[]
-                } else {
-                    let start = cluster.glyph_offset as usize;
-                    &glyphs[start..start + cluster.glyph_len() as usize]
-                };
-
-                inline.into_iter().chain(stored.iter().copied())
-            })
     }
 
     /// This atom as a [`ShapedSlice`].
@@ -803,12 +800,28 @@ mod tests {
     use linebender_resource_handle::{Blob, FontData};
 
     use crate::{
-        Analysis, AnalysisOptions, Analyzer, FontInstance, ShapeOptions, ShapedText, Shaper,
-        itemize::Item,
+        Analysis, AnalysisOptions, Analyzer, FontInstance, FontSelector, ShapeOptions, ShapedText,
+        Shaper,
+        itemize::{Item, Segment},
+        shape::CharCluster,
     };
 
     const ROBOTO: &[u8] =
         include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
+
+    /// A [`FontSelector`] shaping everything with a single font.
+    struct SingleFont(FontInstance);
+
+    impl FontSelector for SingleFont {
+        fn select_font(
+            &mut self,
+            _segment: &Segment,
+            _options: &ShapeOptions<'_>,
+            _cluster: &mut CharCluster,
+        ) -> Option<FontInstance> {
+            Some(self.0.clone())
+        }
+    }
 
     fn analyze(text: &str) -> Analysis {
         let mut analysis = Analysis::new();
@@ -831,39 +844,30 @@ mod tests {
         }
     }
 
-    fn shape_item_with_font(
-        text: &str,
-        analysis: &Analysis,
-        item: &Item,
-        font: &FontInstance,
-        shaper: &mut Shaper,
-        shaped: &mut ShapedText,
-    ) {
-        let char_style_indices = vec![0; text.chars().count()];
-        shaper.shape_item(
-            text,
-            analysis,
-            item,
-            &ShapeOptions {
-                font_size: 32.0,
-                language: None,
-                features: &[],
-                variations: &[],
-                char_style_indices: &char_style_indices,
-            },
-            |_| Some(font.clone()),
-            shaped,
-        );
-    }
-
     fn shape_with_font(text: &str, font_data: &'static [u8]) -> ShapedText {
         let analysis = analyze(text);
         let font = font_instance(font_data);
         let mut shaper = Shaper::default();
         let mut shaped = ShapedText::new();
-        for item in analysis.itemize(text, |_| false) {
-            shape_item_with_font(text, &analysis, &item, &font, &mut shaper, &mut shaped);
-        }
+
+        let char_style_indices = vec![0; text.chars().count()];
+        let items = [Item {
+            char_end: text.chars().count().try_into().unwrap(),
+            options: ShapeOptions {
+                font_size: 32.0,
+                language: None,
+                features: &[],
+                variations: &[],
+            },
+        }];
+        shaper.shape_text(
+            text,
+            &analysis,
+            &char_style_indices,
+            items,
+            SingleFont(font),
+            &mut shaped,
+        );
         shaped
     }
 

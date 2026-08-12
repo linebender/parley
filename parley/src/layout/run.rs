@@ -9,7 +9,8 @@ use crate::style::Brush;
 use core::ops::Range;
 use fontique::Synthesis;
 use parley_engine::{
-    Atom, Atoms, FontInstance, FontMetrics, Graphemes, NormalizedCoord, ShapedRun, ShapedSlice,
+    Atom, Atoms, FontInstance, FontMetrics, Glyph, Graphemes, NormalizedCoord, ShapedRun,
+    ShapedSlice,
 };
 
 /// Sequence of clusters with a single font and style.
@@ -213,6 +214,32 @@ impl<'a, B: Brush> Run<'a, B> {
     /// Returns an iterator over the clusters in visual order.
     pub fn visual_clusters(&self) -> impl Iterator<Item = Cluster<'a, B>> + Clone + use<'a, B> {
         Clusters::new(*self, self.is_rtl())
+    }
+
+    /// An iterator over the glyphs in `clusters` in visual left-to-right order.
+    pub(crate) fn glyphs_in(
+        self,
+        clusters: Range<u32>,
+    ) -> impl Iterator<Item = Glyph> + Clone + use<'a, B> {
+        let slice = self
+            .layout
+            .data
+            .shaped_text
+            .run_slice(self.shaped_text_run_index);
+
+        (!self.is_rtl())
+            .then(|| clusters.clone())
+            .into_iter()
+            .flatten()
+            // we chain because `.rev()` wraps the iterator in `Rev` - a different type than the LTR
+            // iterator.
+            .chain(
+                (self.is_rtl())
+                    .then(|| clusters.rev())
+                    .into_iter()
+                    .flatten(),
+            )
+            .flat_map(move |cluster_idx| slice.shaped_cluster_glyphs(cluster_idx))
     }
 }
 

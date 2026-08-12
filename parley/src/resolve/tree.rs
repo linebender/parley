@@ -100,16 +100,12 @@ impl<B: Brush> TreeStyleBuilder<B> {
 
                 if self.is_span_first
                     || (self.last_item_kind == ItemKind::TextRun
-                        && self
-                            .text
-                            .chars()
-                            .last()
-                            .is_some_and(|c| c.is_ascii_whitespace()))
+                        && self.text.ends_with(|c: char| c.is_ascii_whitespace()))
                 {
-                    span_text = span_text.trim_start();
+                    span_text = span_text.trim_ascii_start();
                 }
                 if is_span_last {
-                    span_text = span_text.trim_end();
+                    span_text = span_text.trim_ascii_end();
                 }
 
                 // Collapse spaces
@@ -235,6 +231,20 @@ mod tests {
     use super::*;
     use alloc::vec::Vec;
     use core::ops::Range;
+
+    #[test]
+    fn collapses_ascii_whitespace_without_trimming_non_ascii_whitespace() {
+        let mut builder = TreeStyleBuilder::<u32>::default();
+        builder.begin(ResolvedStyle::default());
+        builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+        builder.push_text(" \u{00a0}text\u{00a0} ");
+
+        let mut style_table = Vec::new();
+        let mut style_runs = Vec::new();
+        let text = builder.finish(&mut style_table, &mut style_runs);
+
+        assert_eq!(text, "\u{00a0}text\u{00a0}");
+    }
 
     #[test]
     fn reuses_style_id_when_returning_to_parent_span() {

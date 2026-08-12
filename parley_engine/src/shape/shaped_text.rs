@@ -9,15 +9,13 @@ use alloc::vec::Vec;
 use parlance::BidiLevel;
 
 use crate::{
-    CharInfo, FontInstance, Glyph, ShapeOptions,
-    itemize::{Item, TextRange},
-    shape::ShapedClusterFlags,
+    CharInfo, FontInstance, Glyph,
+    itemize::{Segment, TextRange},
 };
 
 use super::{
-    ClusterInfo, Whitespace,
-    atom::ShapedSlice,
-    data::{Character, ShapedCluster},
+    Character, ClusterInfo, ShapedCluster, ShapedClusterFlags, Whitespace, atom::ShapedSlice,
+    shaper::ShapeOptions,
 };
 
 /// A normalized font coordinate.
@@ -89,9 +87,8 @@ pub struct FontMetrics {
 
 /// The result of shaping.
 ///
-/// After [itemizing][crate::itemize::Item] your text,
-/// [shape each item][crate::Shaper::shape_item], appending the result into this
-/// [`ShapedText`]. This then holds your shaped paragraph of text.
+/// After [analyzing][crate::Analysis] your text, [shape the text][crate::Shaper::shape_text],
+/// writing the result into this [`ShapedText`]. This then holds your shaped paragraph of text.
 ///
 /// This shaped text holds spans of the source text's characters that were shaped into
 /// [`ShapedCluster`]s. Note that the boundaries of shaped clusters and graphemes need not coincide;
@@ -145,7 +142,6 @@ impl ShapedText {
 
             shaped_clusters: &self.shaped_clusters,
             glyphs: &self.glyphs,
-            bidi_level: run.bidi_level,
 
             clusters: (
                 run.shaped_clusters_range.start,
@@ -237,9 +233,10 @@ impl ShapedText {
         &mut self,
         text: &str,
         range: TextRange,
-        item: &Item,
+        item: &Segment,
         options: &ShapeOptions<'_>,
         char_info: &[CharInfo],
+        char_style_indices: &[u16],
         font: &FontInstance,
         glyph_buffer: &harfrust::GlyphBuffer,
         normalized_coords: &[harfrust::NormalizedCoord],
@@ -322,7 +319,7 @@ impl ShapedText {
         for (((byte_offset, ch), info), style_index) in text[range.byte_range.clone()]
             .char_indices()
             .zip(&char_info[range.char_range.clone()])
-            .zip(&options.char_style_indices[range.char_range.clone()])
+            .zip(&char_style_indices[range.char_range.clone()])
         {
             self.characters.push(Character {
                 text_byte_start: (range.byte_range.start + byte_offset) as u32,
@@ -344,7 +341,6 @@ impl ShapedText {
                 scale_factor,
                 glyph_infos.iter(),
                 glyph_positions.iter(),
-                &options.char_style_indices[range.char_range.clone()],
                 &self.characters,
                 characters_start,
             );
@@ -355,7 +351,6 @@ impl ShapedText {
                 scale_factor,
                 glyph_infos.iter().rev(),
                 glyph_positions.iter().rev(),
-                &options.char_style_indices[range.char_range.clone()],
                 &self.characters,
                 characters_start,
             );
@@ -433,7 +428,6 @@ pub struct ShapedRun {
 /// * `glyph_infos` - `HarfRust` glyph information in logical order (i.e., reversed for RTL runs).
 /// * `glyph_positions` - `HarfRust` glyph positioning data in logical order (i.e., reversed for RTL
 ///   runs).
-/// * `char_style_indices` - The run's slice of per-character style indices, indexed by cluster ID.
 /// * `characters` must contain the shaped characters whose clusters we're now processing, starting at
 ///   index `characters_start`.
 /// * `characters_start` - See `characters`.
@@ -443,7 +437,6 @@ fn process_shaped_clusters<'a>(
     scale_factor: f32,
     glyph_infos: impl Iterator<Item = &'a harfrust::GlyphInfo>,
     glyph_positions: impl Iterator<Item = &'a harfrust::GlyphPosition>,
-    char_style_indices: &[u16],
     characters: &[Character],
     characters_start: usize,
 ) {
@@ -461,7 +454,6 @@ fn process_shaped_clusters<'a>(
     fn flush(
         cluster: &mut Cluster,
         char_end: usize,
-        style_index: u16,
         characters: &[Character],
         shaped_clusters: &mut Vec<ShapedCluster>,
     ) {
@@ -483,7 +475,7 @@ fn process_shaped_clusters<'a>(
 
         shaped_clusters.push(ShapedCluster {
             chars_range: (cluster.characters_start as u32, char_end as u32),
-            style_index,
+            style_index: first_character.style_index,
             flags: ShapedClusterFlags::new(glyph_len)
                 .with_grapheme_start(first_character.grapheme_start)
                 // TODO: fill with actual shaping data (`parley` currently just ignores this)
@@ -506,14 +498,7 @@ fn process_shaped_clusters<'a>(
     for (glyph_info, glyph_pos) in glyph_infos.zip(glyph_positions) {
         if glyph_info.cluster != cluster.id {
             let char_end = characters_start + glyph_info.cluster as usize;
-            let style_index = char_style_indices[cluster.id as usize];
-            flush(
-                &mut cluster,
-                char_end,
-                style_index,
-                characters,
-                shaped_clusters,
-            );
+            flush(&mut cluster, char_end, characters, shaped_clusters);
 
             cluster = Cluster {
                 id: glyph_info.cluster,
@@ -546,14 +531,7 @@ fn process_shaped_clusters<'a>(
     }
 
     // Flush the final cluster.
-    let style_index = char_style_indices[cluster.id as usize];
-    flush(
-        &mut cluster,
-        characters.len(),
-        style_index,
-        characters,
-        shaped_clusters,
-    );
+    flush(&mut cluster, characters.len(), characters, shaped_clusters);
 }
 
 #[cfg(test)]
@@ -563,7 +541,11 @@ mod tests {
     use fontique::Synthesis;
     use linebender_resource_handle::{Blob, FontData};
 
-    use crate::{Analysis, AnalysisOptions, Analyzer, FontInstance, ShapeOptions, Shaper};
+    use crate::{
+        Analysis, AnalysisOptions, Analyzer, FontInstance, FontSelector, ShapeOptions, Shaper,
+        itemize::{Item, Segment},
+        shape::CharCluster,
+    };
 
     use super::ShapedText;
 
@@ -571,6 +553,20 @@ mod tests {
         include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
     const NOTO_KUFI_ARABIC: &[u8] =
         include_bytes!("../../../parley_dev/assets/fonts/noto_fonts/NotoKufiArabic-Regular.otf");
+
+    /// A [`FontSelector`] shaping everything with a single font.
+    struct SingleFont(FontInstance);
+
+    impl FontSelector for SingleFont {
+        fn select_font(
+            &mut self,
+            _item: &Segment,
+            _options: &ShapeOptions<'_>,
+            _cluster: &mut CharCluster,
+        ) -> Option<FontInstance> {
+            Some(self.0.clone())
+        }
+    }
 
     fn analyze(text: &str) -> Analysis {
         let mut analysis = Analysis::new();
@@ -593,39 +589,30 @@ mod tests {
         }
     }
 
-    fn shape_item_with_font(
-        text: &str,
-        analysis: &Analysis,
-        item: &crate::itemize::Item,
-        font: &FontInstance,
-        shaper: &mut Shaper,
-        shaped: &mut ShapedText,
-    ) {
-        let char_style_indices = vec![0; text.chars().count()];
-        shaper.shape_item(
-            text,
-            analysis,
-            item,
-            &ShapeOptions {
-                font_size: 32.0,
-                language: None,
-                features: &[],
-                variations: &[],
-                char_style_indices: &char_style_indices,
-            },
-            |_| Some(font.clone()),
-            shaped,
-        );
-    }
-
     fn shape_with_font(text: &str, font_data: &'static [u8]) -> ShapedText {
         let analysis = analyze(text);
         let font = font_instance(font_data);
         let mut shaper = Shaper::default();
         let mut shaped = ShapedText::new();
-        for item in analysis.itemize(text, |_| false) {
-            shape_item_with_font(text, &analysis, &item, &font, &mut shaper, &mut shaped);
-        }
+
+        let char_style_indices = vec![0; text.chars().count()];
+        let items = [Item {
+            char_end: text.chars().count().try_into().unwrap(),
+            options: ShapeOptions {
+                font_size: 32.0,
+                language: None,
+                features: &[],
+                variations: &[],
+            },
+        }];
+        shaper.shape_text(
+            text,
+            &analysis,
+            &char_style_indices,
+            items,
+            SingleFont(font),
+            &mut shaped,
+        );
         shaped
     }
 
@@ -709,6 +696,7 @@ mod tests {
     fn item_boundaries_force_grapheme_start() {
         // Two regional indicators forming a single flag grapheme...
         let text = "\u{1F1E6}\u{1F1E7}";
+        let char_style_indices = vec![0; text.chars().count()];
         let analysis = analyze(text);
         assert_eq!(
             analysis
@@ -719,18 +707,39 @@ mod tests {
             [true, false]
         );
 
-        // ...split over two items.
-        let items: Vec<_> = analysis
-            .itemize(text, |range| range.char_range.end == 1)
-            .collect();
-        assert_eq!(items.len(), 2);
-
         let font = font_instance(ROBOTO);
         let mut shaper = Shaper::default();
         let mut shaped = ShapedText::new();
-        for item in &items {
-            shape_item_with_font(text, &analysis, item, &font, &mut shaper, &mut shaped);
-        }
+
+        // ...split over two items.
+        let items = [
+            Item {
+                char_end: 1,
+                options: ShapeOptions {
+                    font_size: 32.0,
+                    language: None,
+                    features: &[],
+                    variations: &[],
+                },
+            },
+            Item {
+                char_end: text.chars().count().try_into().unwrap(),
+                options: ShapeOptions {
+                    font_size: 32.0,
+                    language: None,
+                    features: &[],
+                    variations: &[],
+                },
+            },
+        ];
+        shaper.shape_text(
+            text,
+            &analysis,
+            &char_style_indices,
+            items,
+            SingleFont(font),
+            &mut shaped,
+        );
 
         let grapheme_starts: Vec<bool> =
             shaped.characters.iter().map(|c| c.grapheme_start).collect();

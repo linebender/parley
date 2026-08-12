@@ -306,7 +306,7 @@ impl BreakerState {
     /// line height of the atom (i.e. including the full leading), which may be smaller than
     /// `ascent + descent` when the leading is negative.
     #[inline]
-    pub fn append_atom_to_line(
+    fn append_atom_to_line(
         &mut self,
         atom: &Atom<'_>,
         next_x: f32,
