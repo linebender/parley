@@ -218,7 +218,7 @@ impl FontInfo {
         self.attr_axes & OPTICAL_SIZE_AXIS != 0
     }
 
-    /// Returns `true` if the font has a color glyph table (`COLR`, `CBDT` or `sbix`).
+    /// Returns `true` if the font has a color glyph table.
     pub fn has_color_tables(&self) -> bool {
         self.has_color_tables
     }
