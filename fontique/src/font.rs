@@ -14,6 +14,19 @@ use smallvec::SmallVec;
 
 type AxisVec = SmallVec<[AxisInfo; 1]>;
 
+const SBIX: Tag = Tag::new(b"sbix");
+const COLR: Tag = Tag::new(b"COLR");
+const CPAL: Tag = Tag::new(b"CPAL");
+const CBDT: Tag = Tag::new(b"CBDT");
+const CBLC: Tag = Tag::new(b"CBLC");
+
+/// Color tables in the pairs Blink's `ColorTableLookup` accepts.
+fn has_color_tables(font: &FontRef<'_>) -> bool {
+    font.table_data(SBIX).is_some()
+        || (font.table_data(COLR).is_some() && font.table_data(CPAL).is_some())
+        || (font.table_data(CBDT).is_some() && font.table_data(CBLC).is_some())
+}
+
 /// Representation of a single font in a family.
 #[derive(Clone, Debug)]
 pub struct FontInfo {
@@ -25,6 +38,7 @@ pub struct FontInfo {
     axes: AxisVec,
     attr_axes: u8,
     charmap_index: CharmapIndex,
+    has_color_tables: bool,
 }
 
 impl FontInfo {
@@ -204,6 +218,11 @@ impl FontInfo {
         self.attr_axes & OPTICAL_SIZE_AXIS != 0
     }
 
+    /// Returns `true` if the font has a color glyph table (`COLR`, `CBDT` or `sbix`).
+    pub fn has_color_tables(&self) -> bool {
+        self.has_color_tables
+    }
+
     /// Returns the index used for constructing a [Charmap] for this font.
     ///
     /// [Charmap]: crate::Charmap
@@ -255,6 +274,7 @@ impl FontInfo {
             axes,
             attr_axes,
             charmap_index,
+            has_color_tables: has_color_tables(font),
         })
     }
 

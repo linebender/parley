@@ -234,6 +234,8 @@ pub struct QueryFont {
     pub synthesis: Synthesis,
     /// Data used for constructing a character map for this font.
     pub charmap_index: CharmapIndex,
+    /// Whether the font has a color glyph table (`COLR`, `CBDT` or `sbix`).
+    pub has_color_tables: bool,
 }
 
 impl QueryFont {
@@ -280,6 +282,7 @@ fn load_bucket<'a>(
                         attributes.weight,
                     ),
                     charmap_index: font_info.charmap_index(),
+                    has_color_tables: font_info.has_color_tables(),
                 });
             }
             if fonts.is_empty() {
@@ -319,6 +322,7 @@ fn load_font<'a>(
                 index: blob_index,
                 synthesis,
                 charmap_index: font_info.charmap_index(),
+                has_color_tables: font_info.has_color_tables(),
             });
             if let Entry::Ok(font) = status {
                 Some(font)

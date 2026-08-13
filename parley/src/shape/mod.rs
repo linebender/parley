@@ -348,42 +348,106 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
             self.features = self.rcx.features(style.font_features).unwrap_or(&[]);
         }
 
+        // `U+FE0F` requests a color glyph and `U+FE0E` a monochrome one.
+        // Within each font, an exact cmap format 14 mapping beats the
+        // color-table heuristic. Fonts with the matching glyph style come
+        // first, and mismatched fonts stay as a fallback so the base
+        // character still renders.
+        // See <https://www.unicode.org/reports/tr51/#Presentation_Style>.
+        let variation_sequences: SmallVec<[(char, char); 2]> = cluster
+            .chars()
+            .windows(2)
+            .filter(|pair| matches!(pair[1].ch, '\u{FE0E}' | '\u{FE0F}'))
+            .map(|pair| (pair[0].ch, pair[1].ch))
+            .collect();
+        let requested_color = variation_sequences
+            .first()
+            .map(|(_, selector)| *selector == '\u{FE0F}');
+
         let mut selected_font = None;
         let mut best_coverage = Coverage::NONE;
+        let mut mismatched_font = None;
+        let mut mismatched_coverage = Coverage::NONE;
 
         self.query.matches_with(|font| {
             let Some(charmap) = font.charmap() else {
                 return fontique::QueryStatus::Continue;
             };
 
+            let mut matches_presentation =
+                requested_color.is_none_or(|color| font.has_color_tables == color);
+            let mut exact_variant = !variation_sequences.is_empty();
+            let mut variant_bases: SmallVec<[char; 2]> = SmallVec::new();
+            for &(base, selector) in &variation_sequences {
+                match charmap.map_variant(base, selector) {
+                    Some(fontique::MapVariant::Variant(glyph)) if glyph.to_u32() != 0 => {
+                        matches_presentation = true;
+                        variant_bases.push(base);
+                    }
+                    // The nominal glyph is declared correct for this sequence.
+                    Some(fontique::MapVariant::UseDefault) => matches_presentation = true,
+                    _ => exact_variant = false,
+                }
+            }
+
             let coverage = cluster.calculate_coverage(
                 |ch| {
-                    charmap
-                        .map(ch)
-                        .map(|g| {
-                            // Any non-zero value indicates the existence of a glyph.
-                            g != 0
-                        })
-                        .unwrap_or_default()
+                    // A variant mapping covers its base character even when
+                    // the nominal character map does not encode it.
+                    variant_bases.contains(&ch)
+                        || charmap
+                            .map(ch)
+                            .map(|g| {
+                                // Any non-zero value indicates the existence of a glyph.
+                                g != 0
+                            })
+                            .unwrap_or_default()
                 },
                 self.analysis_data_sources,
             );
-            if coverage > best_coverage {
+            // Exact mappings win only when the font also covers the rest of
+            // the cluster, so a partial font cannot shadow a complete one.
+            if exact_variant && coverage.is_complete() {
                 selected_font = Some(SelectedFont { font: font.clone() });
                 best_coverage = coverage;
-
-                if coverage.is_complete() {
-                    fontique::QueryStatus::Stop
-                } else {
-                    fontique::QueryStatus::Continue
-                }
-            } else {
-                if selected_font.is_none() {
-                    selected_font = Some(SelectedFont { font: font.clone() });
-                }
-                fontique::QueryStatus::Continue
+                return fontique::QueryStatus::Stop;
             }
+            let candidate_coverage = if matches_presentation {
+                best_coverage
+            } else {
+                mismatched_coverage
+            };
+            if coverage > candidate_coverage {
+                if matches_presentation {
+                    selected_font = Some(SelectedFont { font: font.clone() });
+                    best_coverage = coverage;
+                    if coverage.is_complete() {
+                        return fontique::QueryStatus::Stop;
+                    }
+                } else {
+                    mismatched_font = Some(SelectedFont { font: font.clone() });
+                    mismatched_coverage = coverage;
+                }
+            } else if selected_font.is_none() && mismatched_font.is_none() {
+                let fallback = Some(SelectedFont { font: font.clone() });
+                if matches_presentation {
+                    selected_font = fallback;
+                } else {
+                    mismatched_font = fallback;
+                }
+            }
+            fontique::QueryStatus::Continue
         });
+
+        // A zero-coverage font must not shadow one that can render the base
+        // character, whichever bucket each landed in.
+        let selected_font = if best_coverage > Coverage::NONE {
+            selected_font
+        } else if mismatched_coverage > Coverage::NONE {
+            mismatched_font
+        } else {
+            selected_font.or(mismatched_font)
+        };
 
         selected_font
             .map(|selected_font| selected_font.font)
