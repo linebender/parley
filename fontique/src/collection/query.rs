@@ -234,7 +234,7 @@ pub struct QueryFont {
     pub synthesis: Synthesis,
     /// Data used for constructing a character map for this font.
     pub charmap_index: CharmapIndex,
-    /// Whether the font has a color glyph table (`COLR`, `CBDT` or `sbix`).
+    /// Whether the font has a color glyph table.
     pub has_color_tables: bool,
 }
 
