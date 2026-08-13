@@ -371,11 +371,16 @@ impl<B: Brush> LayoutData<B> {
                             min_width = min_width.max(running_min_width - trailing_whitespace);
                             running_min_width = 0.0;
                         }
+
+                        // Handle `Whitespace::Newline` rather than relying on `Boundary::Mandatory`,
+                        // because `Boundary::Mandatory` is only set on the character *following* a break,
+                        // at which point it is too late too handle inline boxes between the line break
+                        // and the following character.
+                        //
+                        // This function doesn't have special handling for CRLF because two linebreaks
+                        // immediately following each are equivalent to one linebreak for the purpose of
+                        // width calculation.
                         if whitespace == Whitespace::Newline {
-                            // Mirror the line breaker: a newline ends the line immediately
-                            // after itself (any content that follows it — including inline
-                            // boxes — belongs to the next line) and does not contribute to
-                            // line width.
                             let trailing_whitespace = whitespace_advance(prev_atom);
                             min_width = min_width.max(running_min_width - trailing_whitespace);
                             max_width = max_width.max(running_max_width - trailing_whitespace);
