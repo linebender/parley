@@ -193,7 +193,7 @@ fn inline_boxes_after_newline_max_content_width() {
             id,
             kind: InlineBoxKind::InFlow,
             index,
-            width: 100.0,
+            width: 14.0,
             height: 30.0,
             baseline: None,
         });
