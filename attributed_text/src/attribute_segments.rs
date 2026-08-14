@@ -364,7 +364,9 @@ pub struct AttributeSegments<'w, 'a, T: Clone + Debug + TextStorage, Attr: Clone
     index: usize,
 }
 
-impl<'w, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug> AttributeSegments<'w, 'a, T, Attr> {
+impl<'w, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug>
+    AttributeSegments<'w, 'a, T, Attr>
+{
     fn update_active_for_boundary(&mut self, boundary_index: usize) {
         update_active_for_boundary(self.workspace, boundary_index);
     }
@@ -403,7 +405,9 @@ pub struct AttributeSegment<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone 
     attributed: &'a AttributedText<T, Attr>,
 }
 
-impl<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug> AttributeSegment<'s, 'a, T, Attr> {
+impl<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug>
+    AttributeSegment<'s, 'a, T, Attr>
+{
     /// Returns the segment range.
     #[must_use]
     pub const fn range(&self) -> TextRange {
@@ -420,7 +424,9 @@ impl<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug> AttributeSegme
     }
 }
 
-impl<T: Clone + Debug + TextStorage, Attr: Clone + Debug> Iterator for AttributeSegments<'_, '_, T, Attr> {
+impl<T: Clone + Debug + TextStorage, Attr: Clone + Debug> Iterator
+    for AttributeSegments<'_, '_, T, Attr>
+{
     type Item = TextRange;
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -448,7 +454,9 @@ impl<T: Clone + Debug + TextStorage, Attr: Clone + Debug> Iterator for Attribute
     }
 }
 
-impl<T: Clone + Debug + TextStorage, Attr: Clone + Debug> ExactSizeIterator for AttributeSegments<'_, '_, T, Attr> {
+impl<T: Clone + Debug + TextStorage, Attr: Clone + Debug> ExactSizeIterator
+    for AttributeSegments<'_, '_, T, Attr>
+{
     fn len(&self) -> usize {
         // Remaining segments are remaining adjacent boundary pairs: [i, i + 1).
         self.workspace
@@ -478,7 +486,9 @@ pub struct ActiveSpansIter<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone +
     attributed: &'a AttributedText<T, Attr>,
 }
 
-impl<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug> Iterator for ActiveSpansIter<'s, 'a, T, Attr> {
+impl<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug> Iterator
+    for ActiveSpansIter<'s, 'a, T, Attr>
+{
     type Item = (TextRange, &'a Attr);
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -495,7 +505,10 @@ impl<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug> Iterator for A
     }
 }
 
-impl<T: Clone + Debug + TextStorage, Attr: Clone + Debug> ExactSizeIterator for ActiveSpansIter<'_, '_, T, Attr> {}
+impl<T: Clone + Debug + TextStorage, Attr: Clone + Debug> ExactSizeIterator
+    for ActiveSpansIter<'_, '_, T, Attr>
+{
+}
 
 impl<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug> DoubleEndedIterator
     for ActiveSpansIter<'s, 'a, T, Attr>

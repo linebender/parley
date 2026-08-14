@@ -814,7 +814,10 @@ where
     }
 
     /// Iterate over the styles applied at a given byte `index`, in application order.
-    pub fn style_at(&self, index: usize) -> impl Iterator<Item = (Range<usize>, &StyleProperty<T>)> {
+    pub fn style_at(
+        &self,
+        index: usize,
+    ) -> impl Iterator<Item = (Range<usize>, &StyleProperty<T>)> {
         self.spans
             .attributes_at(index)
             .map(|(range, prop)| (range.as_range(), prop))
