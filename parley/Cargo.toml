@@ -18,7 +18,14 @@ workspace = true
 
 [features]
 default = ["system"]
-std = ["fontique/std", "parley_engine/std", "peniko/std", "skrifa?/std", "parlance/std", "attributed_text/std"]
+std = [
+    "fontique/std",
+    "parley_engine/std",
+    "peniko/std",
+    "skrifa?/std",
+    "parlance/std",
+    "attributed_text/std"
+]
 libm = ["fontique/libm", "parley_engine/libm", "peniko/libm", "skrifa?/libm", "dep:core_maths"]
 # Enables support for system font backends
 system = ["std", "fontique/system"]
