@@ -424,6 +424,21 @@ jobs:
       - name: check for differences
         run: git diff --exit-code
 
+  test-fonts:
+    name: test fonts (regen check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install test font dependencies
+        run: python3 -m pip install --requirement parley_tests/assets/fonts/issue_748/requirements.txt
+
+      - name: regenerate test fonts
+        run: python3 parley_tests/assets/fonts/issue_748/generate.py
+
+      - name: check for differences
+        run: git diff --exit-code -- parley_tests/assets/fonts
+
   # If this fails, consider changing your text or adding something to .typos.toml.
   typos:
     runs-on: ubuntu-latest

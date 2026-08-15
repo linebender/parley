@@ -3,9 +3,14 @@
 
 //! Regression tests for specific issues.
 
+use std::sync::Arc;
+
 use crate::test_name;
 use crate::util::TestEnv;
-use parley::{Alignment, AlignmentOptions, PositionedLayoutItem, StyleProperty, TextWrapMode};
+use fontique::Blob;
+use parley::{
+    Alignment, AlignmentOptions, FontFamily, PositionedLayoutItem, StyleProperty, TextWrapMode,
+};
 
 /// Test that rendering RTL text doesn't affect subsequent LTR layouts.
 /// See <https://github.com/linebender/parley/issues/489>.
@@ -113,4 +118,37 @@ Third line that ends with newlines\n\n";
     layout.align(Alignment::Start, AlignmentOptions::default());
     env.with_name("max_context_with_mandatory_breaks")
         .check_layout_snapshot(&layout);
+}
+
+/// Test that script and region subtags select the corresponding OpenType language system.
+/// See <https://github.com/linebender/parley/issues/748>.
+#[test]
+fn issue_748_language_subtags() {
+    let mut env = TestEnv::new(test_name!(), None);
+    const FONT: &[u8] = include_bytes!("../assets/fonts/issue_748/issue748-Regular.ttf");
+    env.collection()
+        .register_fonts(Blob::new(Arc::new(FONT)), None);
+    let text = "zh: 一\nzh-Hans: 一\nzh-Hant: 一\nzh-TW: 一\nzh-HK: 一";
+
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::FontSize(32.0));
+    for ((start, marker), language) in text
+        .match_indices('一')
+        .zip(["zh", "zh-Hans", "zh-Hant", "zh-TW", "zh-HK"])
+    {
+        let range = start..start + marker.len();
+        builder.push(
+            StyleProperty::FontFamily(FontFamily::named("Issue 748")),
+            range.clone(),
+        );
+        builder.push(
+            StyleProperty::Locale(Some(language.parse().unwrap())),
+            range,
+        );
+    }
+
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    layout.align(Alignment::Start, AlignmentOptions::default());
+    env.check_layout_snapshot(&layout);
 }
