@@ -23,6 +23,7 @@ pub fn font_dirs() -> impl Iterator<Item = PathBuf> {
 pub const FONT_FAMILIES: &[&str] = &[
     "Arimo",
     "Roboto",
+    "Noto Sans CJK SC",
     "Noto Kufi Arabic",
     "Noto Color Emoji",
     "Noto Color Emoji CBTF",
