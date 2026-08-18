@@ -1085,10 +1085,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         self.state.layout_max_advance = max_advance;
         self.state.line_max_advance = max_advance;
         while let Some(yield_data) = self.break_next() {
-            // `break_next` yields on `CustomOutOfFlow` boxes without advancing past them,
-            // leaving placement (and advancing the breaker state) to the caller. Here there
-            // is no custom placement logic, so treat the box as zero-sized out-of-flow
-            // content and advance past it to guarantee progress.
+            // When `break_next` encounters a `CustomOutOfFlow`, it yields a `YieldData::InlineBoxBreak`
+            // without advancing the item iteration past the box. This allows embedders to implement custom
+            // placement logic to place the box. However, it means that we must also handle placing the box
+            // and advancing the iteration here to avoid an infinite loop.
+            //
+            // So we place the box as a zero-sized out-of-flow box to guarantee progress.
             if let YieldData::InlineBoxBreak(_) = yield_data {
                 self.state.append_inline_box_to_line(
                     self.state.line.x,

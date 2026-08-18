@@ -121,9 +121,7 @@ Third line that ends with newlines\n\n";
 /// Test that `break_all_lines` terminates when the layout contains a
 /// `CustomOutOfFlow` inline box.
 ///
-/// `break_next` yields on `CustomOutOfFlow` boxes without advancing past them,
-/// so `break_remaining` must advance past the box itself or it will loop forever.
-/// See <https://github.com/linebender/parley/issues/752>.
+/// Regression test for <https://github.com/linebender/parley/issues/752>.
 #[test]
 fn issue_752() {
     let mut env = TestEnv::new(test_name!(), None);
