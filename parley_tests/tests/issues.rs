@@ -5,7 +5,10 @@
 
 use crate::test_name;
 use crate::util::TestEnv;
-use parley::{Alignment, AlignmentOptions, PositionedLayoutItem, StyleProperty, TextWrapMode};
+use parley::{
+    Alignment, AlignmentOptions, InlineBox, InlineBoxKind, PositionedLayoutItem, StyleProperty,
+    TextWrapMode,
+};
 
 /// Test that rendering RTL text doesn't affect subsequent LTR layouts.
 /// See <https://github.com/linebender/parley/issues/489>.
@@ -113,4 +116,29 @@ Third line that ends with newlines\n\n";
     layout.align(Alignment::Start, AlignmentOptions::default());
     env.with_name("max_context_with_mandatory_breaks")
         .check_layout_snapshot(&layout);
+}
+
+/// Test that `break_all_lines` terminates when the layout contains a
+/// `CustomOutOfFlow` inline box.
+///
+/// Regression test for <https://github.com/linebender/parley/issues/752>.
+#[test]
+fn issue_752() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "Hello world this is some text";
+
+    let mut builder = env.ranged_builder(text);
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        kind: InlineBoxKind::CustomOutOfFlow,
+        index: 5,
+        width: 10.0,
+        height: 10.0,
+        baseline: None,
+    });
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(100.0));
+
+    assert!(!layout.is_empty());
 }
