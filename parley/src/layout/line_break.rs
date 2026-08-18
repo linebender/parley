@@ -1084,7 +1084,20 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // println!("\nBREAK ALL");
         self.state.layout_max_advance = max_advance;
         self.state.line_max_advance = max_advance;
-        while self.break_next().is_some() {}
+        while let Some(yield_data) = self.break_next() {
+            // `break_next` yields on `CustomOutOfFlow` boxes without advancing past them,
+            // leaving placement (and advancing the breaker state) to the caller. Here there
+            // is no custom placement logic, so treat the box as zero-sized out-of-flow
+            // content and advance past it to guarantee progress.
+            if let YieldData::InlineBoxBreak(_) = yield_data {
+                self.state.append_inline_box_to_line(
+                    self.state.line.x,
+                    0.0,
+                    0.0,
+                    self.layout.data.quantize,
+                );
+            }
+        }
         self.finish();
     }
 
