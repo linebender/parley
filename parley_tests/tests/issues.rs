@@ -175,12 +175,6 @@ fn issue_748_language_subtags() {
 
 /// Test that inline boxes directly following a mandatory line break all
 /// contribute to the max content width of the line they end up on.
-///
-/// The mandatory break used to be detected via the boundary flag on the text
-/// atom *after* the break, so inline boxes between the newline and that atom
-/// were attributed to the line *before* the break, under-reporting the max
-/// content width. In Blitz this caused inline-block links following a `<br>`
-/// to wrap inside a shrink-to-fit container even though they fit on one line.
 #[test]
 fn inline_boxes_after_newline_max_content_width() {
     let mut env = TestEnv::new(test_name!(), None);
