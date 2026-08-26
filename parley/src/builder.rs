@@ -9,10 +9,10 @@ use super::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
 
 use super::layout::Layout;
 
+use crate::LineBreakOverrideFn;
 use alloc::string::String;
 use core::ops::{Bound, Range, RangeBounds};
 use parlance::BaseDirection;
-use parley_engine::break_overrides::LineBreakOverrideFn;
 
 use crate::InlineBoxKind;
 use crate::inline_box::InlineBox;
@@ -341,6 +341,10 @@ fn build_into_layout<B: Brush>(
     layout.data.quantize = options.quantize;
     layout.data.base_level = lcx.analysis.paragraph_level();
     layout.data.text_len = text.len();
+    layout
+        .data
+        .word_boundary_bytes
+        .extend_from_slice(&lcx.word_boundary_bytes);
 
     lcx.char_style_indices
         .resize(lcx.analysis.char_info().len(), 0);

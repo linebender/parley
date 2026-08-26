@@ -216,7 +216,24 @@ impl<'a, B: Brush> Cluster<'a, B> {
 
     /// Returns `true` if the cluster is a word boundary.
     pub fn is_word_boundary(&self) -> bool {
-        self.info().is_boundary()
+        let range = self.text_range();
+        let word_boundary = self
+            .run
+            .layout
+            .data
+            .word_boundary_bytes
+            .binary_search_by(|offset| {
+                if *offset < range.start {
+                    core::cmp::Ordering::Less
+                } else if *offset >= range.end {
+                    core::cmp::Ordering::Greater
+                } else {
+                    core::cmp::Ordering::Equal
+                }
+            });
+        // HACK(follow-up): Preserve the legacy inclusion of line and mandatory
+        // boundaries until callers can migrate to word-segment boundaries only.
+        word_boundary.is_ok() || self.info().is_boundary()
     }
 
     /// Returns `true` if the cluster is a soft line break.
