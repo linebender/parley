@@ -31,4 +31,4 @@ fonttools subset NotoSansCJKsc-Regular.otf \
 ```
 
 If in adding future tests you need more glyphs, then replacing the current subset is fine, so long as this doc is updated.
-Note that this might change if the font file gets to be a considerable size; avoid replacing it if larger than 300KiB or so.
+Note that this might change if the font file gets to be a considerable size; recondier replacing it if larger than, say, 150KiB.
