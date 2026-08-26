@@ -19,16 +19,6 @@ pub fn font_dirs() -> impl Iterator<Item = PathBuf> {
     .into_iter()
 }
 
-/// The font families that are available in the assets/fonts directory.
-pub const FONT_FAMILIES: &[&str] = &[
-    "Arimo",
-    "Roboto",
-    "Noto Sans CJK SC",
-    "Noto Kufi Arabic",
-    "Noto Color Emoji",
-    "Noto Color Emoji CBTF",
-];
-
 /// A sample to be used for development.
 #[derive(Debug)]
 pub struct Sample {
