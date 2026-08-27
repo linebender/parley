@@ -6,8 +6,8 @@
 use crate::test_name;
 use crate::util::TestEnv;
 use parley::{
-    Alignment, AlignmentOptions, InlineBox, InlineBoxKind, PositionedLayoutItem, StyleProperty,
-    TextWrapMode,
+    Alignment, AlignmentOptions, FontFamily, InlineBox, InlineBoxKind, PositionedLayoutItem,
+    StyleProperty, TextWrapMode,
 };
 
 /// Test that rendering RTL text doesn't affect subsequent LTR layouts.
@@ -141,4 +141,34 @@ fn issue_752() {
     layout.break_all_lines(Some(100.0));
 
     assert!(!layout.is_empty());
+}
+
+/// Test that script and region subtags select the corresponding OpenType language system.
+/// See <https://github.com/linebender/parley/issues/748>.
+#[test]
+fn issue_748_language_subtags() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "zh: 骨\nzh-Hans: 骨\nzh-Hant: 骨\nzh-TW: 骨\nzh-HK: 骨";
+
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::FontSize(32.0));
+    for ((start, marker), language) in text
+        .match_indices('骨')
+        .zip(["zh", "zh-Hans", "zh-Hant", "zh-TW", "zh-HK"])
+    {
+        let range = start..start + marker.len();
+        builder.push(
+            StyleProperty::FontFamily(FontFamily::named("Noto Sans CJK SC")),
+            range.clone(),
+        );
+        builder.push(
+            StyleProperty::Locale(Some(language.parse().unwrap())),
+            range,
+        );
+    }
+
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    layout.align(Alignment::Start, AlignmentOptions::default());
+    env.check_layout_snapshot(&layout);
 }

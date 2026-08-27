@@ -303,7 +303,7 @@ fn shape_segment(
         let language = options
             .language
             .as_ref()
-            .and_then(|lang| lang.language().parse::<harfrust::Language>().ok());
+            .and_then(|lang| lang.as_str().parse::<harfrust::Language>().ok());
         scx.features.clear();
         for feature in options.features {
             scx.features.push(harfrust::Feature::new(
