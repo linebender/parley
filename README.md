@@ -59,8 +59,7 @@ Besides what the other libraries do, this involves things like determining a gly
 
 ## Web Platform Tests
 
-To test Parley using Blitz's WPT runner, clone Blitz, point its `parley`
-dependency at your local checkout, and follow the
+The [Web Platform Tests](https://github.com/web-platform-tests/wpt) contain a large number of tests for correct text layout. These can be run against Parley by using [Blitz](https://github.com/dioxuslabs/blitz)'s WPT test runner. See: the
 [Parley WPT guide](https://github.com/DioxusLabs/blitz/blob/main/docs/parley.md).
 
 ## Minimum supported Rust Version (MSRV)
