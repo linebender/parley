@@ -24,11 +24,74 @@ See https://linebender.org/blog/doc-include/ for related discussion. -->
 
 <!-- cargo-rdme start -->
 
-Parley Engine provides low level APIs for implementing text layout.
+Parley Engine provides low level APIs for shaping paragraphs of text.
+
+## Usage
+
+Use [`Analyzer`], [`Analysis`], [`Shaper`] and [`ShapedText`] to shape a paragraph of text into
+glyphs. Correct reshaping of lines is in progress; in the meantime you can break text at
+[`Atom`] or [`ShapedCluster`][crate::shape::ShapedCluster] boundaries.
+
+Text analysis is performed before shaping, and the same source string must be passed to each
+stage.
+
+Higher-level users may prefer using [`parley`][parley], which uses this crate and implements
+layout and styling.
+
+```rust
+let mut analysis = Analysis::default();
+let mut analyzer = Analyzer::default();
+let mut shaped_text = ShapedText::default();
+let mut shaper = Shaper::default();
+
+let text = "The quick brown ثعلب jumps over the lazy dog.";
+let char_count = text.chars().count();
+let char_style_indices = vec![0; char_count];
+
+analyzer.analyze(text, &AnalysisOptions::default(), &mut analysis);
+shaper.shape_text(
+    text,
+    &analysis,
+    &char_style_indices,
+    [Item {
+        char_end: char_count.try_into().unwrap(),
+        options: ShapeOptions {
+            font_size: 16.0,
+            language: None,
+            features: &[],
+            variations: &[],
+        },
+     }],
+     select_font, // Selects fonts covering each cluster.
+     &mut shaped_text,
+);
+
+for (run_idx, run) in shaped_text.runs().iter().enumerate() {
+    let slice = shaped_text.run_slice(run_idx as u32);
+    // You can, for example, measure grapheme advances for hit-testing or
+    // placing carets.
+    for atom in slice.atoms_start() {
+        for grapheme in atom.graphemes_start() {
+            std::dbg!(grapheme);
+        }
+    }
+
+    // Or get glyphs for rendering (for simplicity, this iterates clusters in
+    // logical order, but for rendering you'd want to reorder runs and clusters
+    // according to their `run.bidi_level`).
+    for cluster in slice.shaped_clusters_range() {
+        for glyph in slice.shaped_cluster_glyphs(cluster) {
+            std::dbg!(glyph);
+        }
+    }
+}
+```
 
 ## Features
 
 - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
+
+[parley]: https://docs.rs/parley
 
 <!-- cargo-rdme end -->
 
