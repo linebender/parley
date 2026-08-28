@@ -24,10 +24,11 @@ pub(crate) fn is_word_separator(whitespace: Whitespace) -> bool {
 /// This spacing is in visual order.
 ///
 /// [CSS Text 4 § 8][css-spacing] says to apply spacing around word separators and "typographic
-/// characters units." Such a typographic character unit is an extended grapheme cluster, i.e.,
+/// character units." Such a typographic character unit is an extended grapheme cluster, i.e.,
 /// [`parley_engine::Grapheme`]. Word separators form their own graphemes. As ligatures should not
-/// be broken up, you probably want to apply spacing at the boundaries of an
-/// [`parley_engine::Atom`].
+/// be broken up and we cannot tell HarfRust we want spacing between graphemes, you probably want to
+/// apply spacing at the boundaries of an [`parley_engine::Atom`] (and in case of letter spacing,
+/// disable optional ligation when shaping).
 ///
 /// [css-spacing]: https://www.w3.org/TR/css-text-4/#spacing
 #[derive(Copy, Clone, Debug)]
