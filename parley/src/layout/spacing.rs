@@ -5,6 +5,16 @@
 
 use parley_engine::{Atom, Grapheme, ShapedSlice, shape::Whitespace};
 
+/// Whether the whitespace is a word separator.
+///
+/// This mostly follows [CSS Text 3 § 7.1][css-word-separator], in that fixed-width spaces are not
+/// considered word separators (and do not get stretched). Unicode's segmentation does consider such
+/// fixed-width spaces to be word boundaries.
+///
+/// Note that the spec includes, e.g., the Ethiopic word space (U+1361) as a word separator (which
+/// generally has a glyph), but we currently do not.
+///
+/// [css-word-separator]: https://www.w3.org/TR/css-text-3/#word-separator
 pub(crate) fn is_word_separator(whitespace: Whitespace) -> bool {
     whitespace.is_space_or_nbsp()
 }
