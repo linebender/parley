@@ -4,7 +4,7 @@
 use crate::layout::cluster::{Cluster, ClusterPath};
 use crate::layout::data::{LineItemData, RunData, count_graphemes};
 use crate::layout::layout::Layout;
-use crate::layout::spacing::LineSpacing;
+use crate::layout::spacing::{EffectiveSpacing, Justification};
 use crate::style::Brush;
 
 use core::ops::Range;
@@ -128,14 +128,13 @@ impl<'a, B: Brush> Run<'a, B> {
     }
 
     #[inline]
-    pub(crate) fn line_spacing(&self) -> LineSpacing {
-        let spacing = LineSpacing::new(self.data.spacing);
-        if self.line_data.is_some() {
-            spacing
-                .with_justification(self.layout.data.lines[self.line_index as usize].justification)
+    pub(crate) fn line_spacing(&self) -> EffectiveSpacing {
+        let justification = if self.line_data.is_some() {
+            self.layout.data.lines[self.line_index as usize].justification
         } else {
-            spacing
-        }
+            Justification::NONE
+        };
+        EffectiveSpacing::new(self.data.spacing, justification)
     }
 
     /// Returns the advance for the run.
@@ -275,7 +274,7 @@ impl<'a, B: Brush> Run<'a, B> {
         fn glyphs_with_spacing<'a, B: Brush>(
             run: Run<'a, B>,
             clusters: Range<u32>,
-            spacing: LineSpacing,
+            spacing: EffectiveSpacing,
         ) -> impl Iterator<Item = Glyph> + Clone + use<'a, B> {
             let slice = run
                 .layout

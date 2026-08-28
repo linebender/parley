@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::inline_box::InlineBox;
-use crate::layout::spacing::{Justification, LineSpacing, Spacing};
+use crate::layout::spacing::{EffectiveSpacing, Justification, Spacing};
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
@@ -347,7 +347,8 @@ impl<B: Brush> LayoutData<B> {
             match item.kind {
                 LayoutItemKind::TextRun => {
                     let slice = self.shaped_text.run_slice(item.index as u32);
-                    let spacing = LineSpacing::new(self.runs[item.index].spacing);
+                    let spacing =
+                        EffectiveSpacing::new(self.runs[item.index].spacing, Justification::NONE);
                     if is_rtl {
                         prev_atom = slice.atoms_start().next().map(|atom| {
                             let character = &atom.characters()[0];

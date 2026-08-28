@@ -98,7 +98,7 @@ impl Spacing {
 }
 
 /// Justification to apply to a single line.
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Justification {
     /// The amount of additional spacing to apply per justification opportunity.
     pub(crate) amount_per_opportunity: f32,
@@ -108,33 +108,37 @@ pub(crate) struct Justification {
     pub(crate) line_end_cluster: u32,
 }
 
-/// Spacing that applies to a shaped run on a line.
+impl Justification {
+    /// No justification.
+    pub(crate) const NONE: Self = Self {
+        amount_per_opportunity: 0.,
+        line_end_cluster: 0,
+    };
+}
+
+impl Default for Justification {
+    fn default() -> Self {
+        Self::NONE
+    }
+}
+
+/// Additional spacing to apply, including justification (if any).
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct LineSpacing {
+pub(crate) struct EffectiveSpacing {
     spacing: Spacing,
     justification: Justification,
 }
 
-impl LineSpacing {
-    /// Spacing of text without justification.
+impl EffectiveSpacing {
+    /// The combined [`Spacing`] and [`Justification`] effective for a run.
     ///
-    /// In general, justification is known only after a line is finalized, but you need the
-    /// [`Spacing`] to be able to measure the line.
+    /// To measure text for purposes like line breaking, pass [`Justification::NONE`].
     #[inline(always)]
-    pub(crate) const fn new(spacing: Spacing) -> Self {
+    pub(crate) const fn new(spacing: Spacing, justification: Justification) -> Self {
         Self {
             spacing,
-            justification: Justification {
-                amount_per_opportunity: 0.,
-                line_end_cluster: 0,
-            },
+            justification,
         }
-    }
-
-    #[inline(always)]
-    pub(crate) const fn with_justification(mut self, justification: Justification) -> Self {
-        self.justification = justification;
-        self
     }
 
     #[inline(always)]

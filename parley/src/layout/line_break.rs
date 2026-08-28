@@ -11,7 +11,7 @@ use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
 use crate::layout::data::count_graphemes;
-use crate::layout::spacing::{Justification, LineSpacing};
+use crate::layout::spacing::{EffectiveSpacing, Justification};
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -713,7 +713,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let cluster_end = shaped_run.shaped_clusters_range.end;
 
                     // Additional spacing to apply between atoms.
-                    let spacing = LineSpacing::new(run.data.spacing);
+                    let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
 
                     // Iterate over the remaining atoms in the Run
                     for atom in slice.atoms_from(self.state.cluster_idx) {
@@ -1205,7 +1205,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             .run_slice(line_item.index as u32)
                             .narrow(line_item.shaped_cluster_range.clone());
 
-                        LineSpacing::new(spacing).slice_advance(slice)
+                        EffectiveSpacing::new(spacing, Justification::NONE).slice_advance(slice)
                     };
 
                     // Ignore trailing whitespace when deciding whether the line has content
@@ -1238,7 +1238,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             .filter(|item| item.is_text_run() && item.has_trailing_whitespace)
             .map(|run| {
                 fn whitespace_advance<'a>(
-                    spacing: LineSpacing,
+                    spacing: EffectiveSpacing,
                     atoms: impl Iterator<Item = Atom<'a>>,
                 ) -> f32 {
                     atoms
@@ -1257,7 +1257,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     .shaped_text
                     .run_slice(run.index as u32)
                     .narrow(run.shaped_cluster_range.clone());
-                let spacing = LineSpacing::new(self.layout.data.runs[run.index].spacing);
+                let spacing = EffectiveSpacing::new(
+                    self.layout.data.runs[run.index].spacing,
+                    Justification::NONE,
+                );
 
                 if run.is_rtl() {
                     whitespace_advance(spacing, slice.atoms_start())
@@ -1539,7 +1542,7 @@ fn commit_line<B: Brush>(
     // ends with an atom starting with a space: with `WordBreak::BreakAll`, regular breaks can land
     // between non-space graphemes, in which case there is no trailing space to exclude.
     let mut num_spaces = state.num_spaces;
-    let mut justification = Justification::default();
+    let mut justification = Justification::NONE;
     if break_reason == BreakReason::Regular
         && state.clusters.start < state.clusters.end
         && shaped_text
