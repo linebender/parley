@@ -103,8 +103,8 @@ pub(crate) struct Justification {
     /// The amount of additional spacing to apply per justification opportunity.
     pub(crate) amount_per_opportunity: f32,
 
-    /// The end of the line's logically last atom, i.e., the line's end, where justification won't
-    /// be applied.
+    /// One past the line's logically last shaped cluster, i.e., the line's end. This may be
+    /// trailing whitespace where justification should not be applied.
     pub(crate) line_end_cluster: u32,
 }
 
