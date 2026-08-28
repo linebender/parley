@@ -712,11 +712,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let slice = run.full_slice();
                     let cluster_end = shaped_run.shaped_clusters_range.end;
 
-                    // Additional spacing to apply between atoms. Because we're still forming the
-                    // lines, justification is not yet known here.
+                    // Additional spacing to apply between atoms.
                     let spacing = LineSpacing::new(run.data.spacing);
-
-                    // println!("TextRun ({:?})", &run_data.text_range);
 
                     // Iterate over the remaining atoms in the Run
                     for atom in slice.atoms_from(self.state.cluster_idx) {
@@ -1187,12 +1184,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         needs_reorder = true;
                     }
 
-                    // Compute the run's advance including any inserted spacing. Note this is the
-                    // unjustified advance.
+                    // Calculate the run's advance including any word/letter spacing. If no spacing
+                    // is applied, just go through the shaped clusters directly, which will be
+                    // slightly faster. This doesn't include justification, as that's applied after
+                    // lines are broken.
                     let spacing = self.layout.data.runs[line_item.index].spacing;
-
-                    // Calculate the advance. If no spacing is applied, just go through the shaped
-                    // clusters directly, which will be slightly faster.
                     line_item.advance = if spacing.is_zero() {
                         let range = line_item.shaped_cluster_range.start as usize
                             ..line_item.shaped_cluster_range.end as usize;

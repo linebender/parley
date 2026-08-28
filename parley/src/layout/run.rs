@@ -131,7 +131,6 @@ impl<'a, B: Brush> Run<'a, B> {
     pub(crate) fn line_spacing(&self) -> LineSpacing {
         let spacing = LineSpacing::new(self.data.spacing);
         if self.line_data.is_some() {
-            // If `line_data` is `Some`, this run is scoped to a line. Add its justification.
             spacing
                 .with_justification(self.layout.data.lines[self.line_index as usize].justification)
         } else {
@@ -141,7 +140,9 @@ impl<'a, B: Brush> Run<'a, B> {
 
     /// Returns the advance for the run.
     ///
-    /// This includes the additional advance inserted between the run's atoms.
+    /// This includes the additional advances inserted for word spacing, letter spacing, and, if the
+    /// layout has been [aligned](Layout::align) with [`Justify`](crate::Alignment::Justify), the
+    /// justification.
     pub fn advance(&self) -> f32 {
         let spacing = self.line_spacing();
         spacing.slice_advance(self.line_slice())
