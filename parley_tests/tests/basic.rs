@@ -598,6 +598,40 @@ fn justify_with_overflowing_trailing_space() {
 }
 
 #[test]
+fn justify_consecutive_spaces() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Each space is a separate justification opportunity, including when they are consecutive
+    // (without whitespace collapsing). The second paragraph here has a run of three consecutive
+    // spaces.
+    let text = "Foo bar baz supercalifragilistic.\n\nFoo   bar baz supercalifragilistic.";
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(150.0));
+    layout.align(Alignment::Justify, AlignmentOptions::default());
+
+    env.check_layout_snapshot(&layout);
+
+    // Check that the second paragraph's interior spaces on the first line all stretch by the same
+    // amount.
+    let space_advances: Vec<_> = layout
+        .get(3)
+        .unwrap()
+        .runs()
+        .flat_map(|run| run.clusters())
+        .filter(|cluster| cluster.is_space_or_nbsp())
+        .map(|cluster| cluster.advance())
+        .collect();
+    assert_eq!(space_advances.len(), 5, "four spaces plus one trailing");
+    assert!(
+        space_advances[..4]
+            .iter()
+            .all(|advance| (advance - space_advances[0]).abs() < 0.001),
+        "The interior spaces should stretch equally"
+    );
+}
+
+#[test]
 fn content_widths() {
     let mut env = TestEnv::new(test_name!(), None);
 
