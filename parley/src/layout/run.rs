@@ -232,7 +232,7 @@ impl<'a, B: Brush> Run<'a, B> {
 
     /// An iterator over the glyphs in `clusters` in visual left-to-right order.
     ///
-    /// This includes additional spacing from [`LineSpacing`].
+    /// This includes additional spacing from [`EffectiveSpacing`].
     pub(crate) fn glyphs_in(
         self,
         clusters: Range<u32>,
