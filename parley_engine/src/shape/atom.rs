@@ -376,6 +376,12 @@ impl<'a> Atoms<'a> {
             advance,
         })
     }
+
+    /// Walk the cursor backwards as an iterator.
+    #[inline(always)]
+    pub fn rev(mut self) -> impl Iterator<Item = Atom<'a>> + Clone + use<'a> {
+        core::iter::from_fn(move || self.prev())
+    }
 }
 
 impl<'a> Iterator for Atoms<'a> {

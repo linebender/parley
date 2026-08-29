@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::inline_box::InlineBox;
+use crate::layout::spacing::{EffectiveSpacing, Justification, Spacing};
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
-use crate::util::nearly_zero;
 use crate::{IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode};
 use core::ops::Range;
 
@@ -23,10 +23,13 @@ pub(crate) struct RunData {
     pub(crate) synthesis: fontique::Synthesis,
     /// The line height
     pub line_height: f32,
-    /// Additional word spacing.
-    pub(crate) word_spacing: f32,
-    /// Additional letter spacing.
-    pub(crate) letter_spacing: f32,
+    /// Additional spacing inserted between this run's atoms.
+    ///
+    /// TODO: Letter spacing in the form of gaps should not be applied between cursive scripts, see
+    /// [CSS Text 4 § 8.2.1][css-spacing-cursive]. Currently we erroneously *do* apply it.
+    ///
+    /// [css-spacing-cursive]: https://www.w3.org/TR/css-text-4/#cursive-tracking
+    pub(crate) spacing: Spacing,
 }
 
 #[derive(Copy, Clone, Default, PartialEq, Debug)]
@@ -52,6 +55,7 @@ pub(crate) struct LineData {
     pub(crate) max_advance: f32,
     /// Number of justified clusters on the line.
     pub(crate) num_spaces: usize,
+    pub(crate) justification: Justification,
     /// Text indent applied to this line.
     pub(crate) indent: f32,
 }
@@ -71,6 +75,10 @@ pub(crate) struct LineItemData {
     /// Bidi level for the item (used for reordering)
     pub(crate) bidi_level: BidiLevel,
     /// Advance (size in direction of text flow) for the run.
+    ///
+    /// This includes the run's [`Spacing`], but not the justification. Spacing is a property of
+    /// graphemes and shaped clusters, so can be known, whereas justification depends on a line's
+    /// free space.
     pub(crate) advance: f32,
 
     // Fields that only apply to text runs (Ignored for boxes)
@@ -210,8 +218,6 @@ pub(crate) struct LayoutData<B: Brush> {
     /// Directly store the alignment if accessibility is enabled so we can
     /// set the corresponding AccessKit property.
     pub(crate) alignment: Option<super::Alignment>,
-    /// Whether the layout is aligned with [`crate::Alignment::Justify`].
-    pub(crate) is_aligned_justified: bool,
     /// The text-indent amount in layout units.
     pub(crate) indent_amount: f32,
     /// Options controlling text-indent behavior (each-line, hanging).
@@ -237,7 +243,6 @@ impl<B: Brush> Default for LayoutData<B> {
             line_items: Vec::new(),
             #[cfg(feature = "accesskit")]
             alignment: None,
-            is_aligned_justified: false,
             layout_max_advance: 0.0,
             indent_amount: 0.0,
             indent_options: IndentOptions::default(),
@@ -276,8 +281,7 @@ impl<B: Brush> LayoutData<B> {
         &mut self,
         shaped_run_idx: usize,
         run_style: &ResolvedStyle<B>,
-        word_spacing: f32,
-        letter_spacing: f32,
+        spacing: Spacing,
     ) {
         let shaped_run = &self.shaped_text.runs()[shaped_run_idx];
         debug_assert!(
@@ -311,8 +315,7 @@ impl<B: Brush> LayoutData<B> {
             },
             synthesis: font.synthesis,
             line_height,
-            word_spacing,
-            letter_spacing,
+            spacing,
         };
 
         self.runs.push(run);
@@ -321,40 +324,6 @@ impl<B: Brush> LayoutData<B> {
             index: self.runs.len() - 1,
             bidi_level: shaped_run.bidi_level,
         });
-    }
-
-    pub(crate) fn finish(&mut self) {
-        for (run_index, run_data) in self.runs.iter().enumerate() {
-            let word = run_data.word_spacing;
-            let letter = run_data.letter_spacing;
-            if nearly_zero(word) && nearly_zero(letter) {
-                continue;
-            }
-            let cluster_range = self.shaped_text.runs()[run_index]
-                .shaped_clusters_range
-                .clone();
-            let (characters, clusters, glyphs) =
-                self.shaped_text.characters_shaped_clusters_and_glyphs_mut();
-            for cluster in &mut clusters[cluster_range.start as usize..cluster_range.end as usize] {
-                let first_character = &characters[cluster.chars_range().start as usize];
-                let mut spacing = letter;
-                if !nearly_zero(word) && first_character.info.whitespace().is_space_or_nbsp() {
-                    spacing += word;
-                }
-                if !nearly_zero(spacing) {
-                    cluster.advance += spacing;
-                    // An inline glyph's advance is the cluster's advance, so it needs no separate
-                    // adjustment.
-                    if !cluster.has_inline_glyph() && cluster.glyph_len() > 0 {
-                        let start = cluster.glyph_offset as usize;
-                        let end = start + cluster.glyph_len() as usize;
-                        if let Some(last) = glyphs[start..end].last_mut() {
-                            last.advance += spacing;
-                        }
-                    }
-                }
-            }
-        }
     }
 
     // TODO: this method does not handle mixed direction text at all.
@@ -378,10 +347,12 @@ impl<B: Brush> LayoutData<B> {
             match item.kind {
                 LayoutItemKind::TextRun => {
                     let slice = self.shaped_text.run_slice(item.index as u32);
+                    let spacing =
+                        EffectiveSpacing::new(self.runs[item.index].spacing, Justification::NONE);
                     if is_rtl {
                         prev_atom = slice.atoms_start().next().map(|atom| {
                             let character = &atom.characters()[0];
-                            (character.info.whitespace(), atom.advance())
+                            (character.info.whitespace(), spacing.atom_advance(&atom))
                         });
                     }
                     for atom in slice.atoms_start() {
@@ -403,10 +374,11 @@ impl<B: Brush> LayoutData<B> {
                                 running_max_width = 0.0;
                             }
                         }
-                        running_min_width += atom.advance();
-                        running_max_width += atom.advance();
+                        let advance = spacing.atom_advance(&atom);
+                        running_min_width += advance;
+                        running_max_width += advance;
                         if !is_rtl {
-                            prev_atom = Some((character.info.whitespace(), atom.advance()));
+                            prev_atom = Some((character.info.whitespace(), advance));
                         }
                     }
                     let trailing_whitespace = whitespace_advance(prev_atom);

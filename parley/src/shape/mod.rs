@@ -14,7 +14,7 @@ use super::resolve::{ResolveContext, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
 use crate::inline_box::InlineBox;
 use crate::util::{nearly_eq, nearly_zero};
-use crate::{FontContext, FontData};
+use crate::{FontContext, FontData, Spacing};
 
 use fontique::{self, Query, QueryFamily, QueryFont};
 use parlance::{BidiLevel, GenericFamily, Tag};
@@ -223,8 +223,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             // we probably shouldn't itemize on them; we should just ensure we don't ligate if
             // they're non-zero).
             run_style,
-            run_style.word_spacing,
-            run_style.letter_spacing,
+            Spacing::new(run_style.word_spacing, run_style.letter_spacing),
         );
     }
 

@@ -565,6 +565,39 @@ fn dont_justify_space_inside_grapheme() {
 }
 
 #[test]
+fn justify_with_overflowing_trailing_space() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // This test has a trailing space on the first line that hangs past the line box. This checks
+    // whether that interacts correctly with justification. In previous versions, that hanging space
+    // was miscounted, resulting in justification opportunities being undercounted.
+    //
+    // The large word spacing ensures the trailing space actually overflows, and also makes the
+    // justification more clearly visible: the free space that justification redistributes is the
+    // portion of the hanging space that's inside the line box.
+    let text = "sit amet, consectetur adipiscing";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::WordSpacing(48.0));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(280.0));
+    layout.align(Alignment::Justify, AlignmentOptions::default());
+
+    env.check_layout_snapshot(&layout);
+
+    let line = layout.get(0).unwrap();
+    let justified_space_advances: Vec<_> = line
+        .runs()
+        .flat_map(|run| run.clusters())
+        .filter(|cluster| cluster.is_space_or_nbsp())
+        .map(|cluster| cluster.advance())
+        .collect();
+    assert!(
+        (justified_space_advances[0] - justified_space_advances[1]).abs() < 0.001,
+        "The two spaces on the first line should be equal in size"
+    );
+}
+
+#[test]
 fn content_widths() {
     let mut env = TestEnv::new(test_name!(), None);
 

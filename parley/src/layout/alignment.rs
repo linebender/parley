@@ -1,11 +1,9 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::{BreakReason, data::LineItemData};
+use super::BreakReason;
 use crate::data::LayoutData;
 use crate::style::Brush;
-
-use parley_engine::shape::ShapedCluster;
 
 /// Alignment of a layout.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
@@ -54,9 +52,6 @@ impl Default for AlignmentOptions {
 }
 
 /// Align the layout.
-///
-/// If [`Alignment::Justify`] is requested, clusters' [`ShapedCluster::advance`] will be adjusted.
-/// Prior to re-line-breaking or re-aligning, [`unjustify`] has to be called.
 pub(crate) fn align<B: Brush>(
     layout: &mut LayoutData<B>,
     alignment: Alignment,
@@ -66,40 +61,13 @@ pub(crate) fn align<B: Brush>(
     {
         layout.alignment = Some(alignment);
     }
-    layout.is_aligned_justified = alignment == Alignment::Justify;
 
-    align_impl::<_, false>(layout, alignment, options);
-}
-
-/// Removes previous justification applied to clusters.
-///
-/// This is part of resetting state in preparation for re-line-breaking or re-aligning the same
-/// layout.
-pub(crate) fn unjustify<B: Brush>(layout: &mut LayoutData<B>) {
-    if layout.is_aligned_justified {
-        align_impl::<_, true>(layout, Alignment::Justify, AlignmentOptions::default());
-        layout.is_aligned_justified = false;
-    }
-}
-
-/// The actual alignment implementation.
-///
-/// This is const-generic over `UNDO_JUSTIFICATION`: justified alignment adjusts clusters'
-/// [`ShapedCluster::advance`], and this mutation has to be undone for re-line-breaking or
-/// re-aligning. `UNDO_JUSTIFICATION` indicates whether the adjustment has to be applied, or
-/// undone.
-///
-/// Writing a separate function for undoing justification would be faster, but not by much, and
-/// doing it this way we are sure the calculations performed are equivalent.
-fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
-    layout: &mut LayoutData<B>,
-    alignment: Alignment,
-    options: AlignmentOptions,
-) {
     let is_rtl = layout.base_level.is_rtl();
 
     // Apply alignment to line items
     for line in &mut layout.lines {
+        line.justification.amount_per_opportunity = 0.;
+
         let indent = line.indent;
 
         if is_rtl {
@@ -153,54 +121,7 @@ fn align_impl<B: Brush, const UNDO_JUSTIFICATION: bool>(
                     continue;
                 }
 
-                let adjustment =
-                    free_space / line.num_spaces as f32 * if UNDO_JUSTIFICATION { -1. } else { 1. };
-                let mut applied = 0;
-                // Iterate over text runs in the line and clusters in the text run
-                //   - Iterate forwards for even bidi levels (which represent LTR runs)
-                //   - Iterate backwards for odd bidi levels (which represent RTL runs)
-                let line_items: &mut dyn Iterator<Item = &LineItemData> = if is_rtl {
-                    &mut layout.line_items[line.item_range.clone()].iter().rev()
-                } else {
-                    &mut layout.line_items[line.item_range.clone()].iter()
-                };
-                line_items
-                    .filter(|item| item.is_text_run())
-                    .for_each(|line_item| {
-                        let (characters, shaped_clusters, _) = layout
-                            .shaped_text
-                            .characters_shaped_clusters_and_glyphs_mut();
-                        let clusters = &mut shaped_clusters[line_item.shaped_cluster_range.start
-                            as usize
-                            ..line_item.shaped_cluster_range.end as usize];
-                        let clusters: &mut dyn Iterator<Item = &mut ShapedCluster> =
-                            if line_item.bidi_level.is_rtl() {
-                                &mut clusters.iter_mut().rev()
-                            } else {
-                                &mut clusters.iter_mut()
-                            };
-                        clusters.for_each(|cluster| {
-                            if applied == line.num_spaces {
-                                return;
-                            }
-                            // We check whether the cluster starts with a space or non-breaking
-                            // space, because we stretch that whitespace, *and* is a grapheme start,
-                            // i.e., an atom boundary.
-                            //
-                            // Not all spaces are grapheme boundaries (see
-                            // <https://www.unicode.org/reports/tr29/#GB9b>). Note the
-                            // `line.num_spaces` above was also counted over atoms.
-                            if cluster.is_grapheme_start()
-                                && characters[cluster.chars_range().start as usize]
-                                    .info
-                                    .whitespace()
-                                    .is_space_or_nbsp()
-                            {
-                                cluster.advance += adjustment;
-                                applied += 1;
-                            }
-                        });
-                    });
+                line.justification.amount_per_opportunity = free_space / line.num_spaces as f32;
             }
         }
     }

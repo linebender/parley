@@ -158,20 +158,6 @@ impl ShapedText {
         &self.runs
     }
 
-    /// Escape hatch for `parley` while it's still mutating advances in place (spacing and
-    /// justification). This is not for public consumption!
-    #[doc(hidden)]
-    #[inline(always)]
-    pub fn characters_shaped_clusters_and_glyphs_mut(
-        &mut self,
-    ) -> (&[Character], &mut [ShapedCluster], &mut [Glyph]) {
-        (
-            &self.characters,
-            &mut self.shaped_clusters,
-            &mut self.glyphs,
-        )
-    }
-
     /// Escape hatch for `parley` tests that remap style indices to check whether layouts are
     /// otherwise identical. This is not for public consumption!
     #[doc(hidden)]
