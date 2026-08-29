@@ -572,12 +572,14 @@ fn justify_with_overflowing_trailing_space() {
     // whether that interacts correctly with justification. In previous versions, that hanging space
     // was miscounted, resulting in justification opportunities being undercounted.
     //
-    // The large word spacing makes it more obvious whether gaps between the words are equal.
+    // The large word spacing ensures the trailing space actually overflows, and also makes the
+    // justification more clearly visible: the free space that justification redistributes is the
+    // portion of the hanging space that's inside the line box.
     let text = "sit amet, consectetur adipiscing";
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::WordSpacing(24.0));
+    builder.push_default(StyleProperty::WordSpacing(48.0));
     let mut layout = builder.build(text);
-    layout.break_all_lines(Some(214.0));
+    layout.break_all_lines(Some(280.0));
     layout.align(Alignment::Justify, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
