@@ -4,6 +4,10 @@ This changelog follows the patterns described here: <https://keepachangelog.com/
 
 Subheadings to categorize changes are `added, changed, deprecated, removed, fixed, security`.
 
+This changelog is updated based on pull request bodies - see `.github/pull_request_template.md`.
+In general, when submitting a PR, you should generally not manually edit this file.
+Every change to this file must be written by a human.
+
 -->
 
 # Changelog
