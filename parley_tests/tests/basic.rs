@@ -598,6 +598,27 @@ fn justify_with_overflowing_trailing_space() {
 }
 
 #[test]
+fn justify_with_multiple_trailing_spaces() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // The first line breaks after "CC   ", leaving three trailing spaces. All of them should hang
+    // past the line box unstretched, while justification distributes the line's free space over the
+    // two inter-word spaces only.
+    let text = "AA BB CC   DD EE";
+    let max_advance = 95.0;
+    let builder = env.ranged_builder(text);
+
+    // TODO: this should also correctly hang the whitespace when the spaces are not in the same run (e.g.,
+    // because of a font or font size change). However, we don't currently handle that correctly.
+    //
+    // builder.push(StyleProperty::FontSize(15.9), 10..11);
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(max_advance));
+    layout.align(Alignment::Justify, AlignmentOptions::default());
+    env.check_cluster_snapshot(&layout, text, 12.0);
+}
+
+#[test]
 fn content_widths() {
     let mut env = TestEnv::new(test_name!(), None);
 
