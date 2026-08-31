@@ -57,6 +57,11 @@ Parley itself does text layout and includes utilities for text selection and edi
 **Text layout** means computing x/y coordinates for each glyph in a string of text.
 Besides what the other libraries do, this involves things like determining a glyph's size, line breaking, and bidi resolution.
 
+## Web Platform Tests
+
+The [Web Platform Tests](https://github.com/web-platform-tests/wpt) contain a large number of tests for correct text layout. These can be run against Parley by using [Blitz](https://github.com/dioxuslabs/blitz)'s WPT test runner. See: the
+[Parley WPT guide](https://github.com/DioxusLabs/blitz/blob/main/docs/parley.md).
+
 ## Minimum supported Rust Version (MSRV)
 
 This version of Parley has been verified to compile with **Rust 1.88** and later.
