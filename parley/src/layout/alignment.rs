@@ -113,7 +113,7 @@ pub(crate) fn align<B: Brush>(
                 // gaps to adjust. In that case, start-align, i.e., left-align for LTR text and
                 // right-align for RTL text.
                 if matches!(line.break_reason, BreakReason::None | BreakReason::Explicit)
-                    || line.num_spaces == 0
+                    || line.justification_opportunities == 0
                 {
                     if is_rtl {
                         line.metrics.offset += free_space;
@@ -121,7 +121,8 @@ pub(crate) fn align<B: Brush>(
                     continue;
                 }
 
-                line.justification.amount_per_opportunity = free_space / line.num_spaces as f32;
+                line.justification.amount_per_opportunity =
+                    free_space / line.justification_opportunities as f32;
             }
         }
     }
