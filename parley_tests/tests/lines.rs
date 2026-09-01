@@ -534,6 +534,51 @@ fn lines_negative_leading_inline_box_grows_line_box() {
     env.check_layout_snapshot(&layout);
 }
 
+/// Test that a line height small enough to make the half-leading exceed the descent keeps the
+/// resulting negative extent below the baseline, rather than clamping it to zero.
+#[test]
+fn lines_zero_line_height_keeps_negative_under_extent() {
+    let font_size = 16.0;
+    let line_height_px = 0.0;
+    let text = "dig\npug\nyak";
+
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::FontSize(font_size));
+    builder.push_default(LineHeight::Absolute(line_height_px));
+    let mut layout: Layout<ColorBrush> = builder.build(text);
+    layout.break_all_lines(None);
+
+    let (ascent, descent) = roboto_ascent_descent(font_size);
+    let half_leading = (line_height_px - (ascent.round() + descent.round())) / 2.;
+    let expected_above = ascent.round() + half_leading.floor();
+    let expected_below = line_height_px - expected_above;
+    assert!(
+        expected_below < 0.,
+        "expected a negative extent below the baseline, but got {expected_below}"
+    );
+
+    for line in layout.lines() {
+        let metrics = line.metrics();
+        assert_eq!(
+            metrics.baseline - metrics.block_min_coord,
+            expected_above,
+            "expected {expected_above} above the baseline"
+        );
+        assert_eq!(
+            metrics.block_max_coord - metrics.baseline,
+            expected_below,
+            "expected {expected_below} below the baseline"
+        );
+        assert_eq!(
+            metrics.block_max_coord - metrics.block_min_coord,
+            line_height_px,
+            "expected the line box height to equal the line height {line_height_px}"
+        );
+    }
+    assert_eq!(layout.height(), line_height_px * 3.);
+}
+
 /// Test fractional line height with a positive leading.
 ///
 /// The line box height must be increased by the leading,
