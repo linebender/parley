@@ -97,10 +97,11 @@ struct Extents {
 
 impl Default for Extents {
     fn default() -> Self {
-        // Initialized to negative infinity so that content with negative extents (e.g. text with
-        // negative half-leading from a small `line-height`) is not floored at zero. Lines with no
-        // contributing content resolve to zero via [`Self::or_zero`], keeping the sentinel
-        // internal.
+        // Content with small line heights and/or with inline boxes sitting entirely above or
+        // below the baseline can cause the baseline to fall outside the line box; i.e., extents
+        // can be negative. Hence, we initialize the space over and under the line box's
+        // baseline to negative infinity. Lines with no contributing content resolve to zero via
+        // [`Self::or_zero`], keeping the sentinel internal.
         //
         // Ideally, a line's initial extents should be sourced from the primary font.
         Self {
