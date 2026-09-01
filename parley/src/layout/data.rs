@@ -54,7 +54,7 @@ pub(crate) struct LineData {
     /// Maximum advance for the line.
     pub(crate) max_advance: f32,
     /// Number of justified clusters on the line.
-    pub(crate) num_spaces: usize,
+    pub(crate) justification_opportunities: usize,
     pub(crate) justification: Justification,
     /// Text indent applied to this line.
     pub(crate) indent: f32,
@@ -83,10 +83,6 @@ pub(crate) struct LineItemData {
 
     // Fields that only apply to text runs (Ignored for boxes)
     // TODO: factor this out?
-    /// True if the run is composed entirely of whitespace.
-    pub(crate) is_whitespace: bool,
-    /// True if the run ends in whitespace.
-    pub(crate) has_trailing_whitespace: bool,
     /// Range of the source text.
     pub(crate) text_range: Range<usize>,
     /// This run's shaped clusters on this line, as a range into [`ShapedText::shaped_clusters`].
@@ -106,48 +102,6 @@ impl LineItemData {
     #[inline(always)]
     pub(crate) fn is_rtl(&self) -> bool {
         self.bidi_level.is_rtl()
-    }
-
-    /// If the item is a text run
-    ///   - Determine if it consists entirely of whitespace (`is_whitespace` property)
-    ///   - Determine if it has trailing whitespace (`has_trailing_whitespace` property)
-    pub(crate) fn compute_whitespace_properties<B: Brush>(&mut self, layout_data: &LayoutData<B>) {
-        // Skip items which are not text runs
-        if self.kind != LayoutItemKind::TextRun {
-            return;
-        }
-
-        let clusters = layout_data.shaped_text.shaped_clusters();
-        let range = self.shaped_cluster_range.clone();
-        let char_range = if range.is_empty() {
-            0..0
-        } else {
-            clusters[range.start as usize].chars_range().start as usize
-                ..clusters[range.end as usize - 1].chars_range().end as usize
-        };
-        let characters = &layout_data.shaped_text.characters()[char_range];
-
-        self.is_whitespace = true;
-        if self.is_rtl() {
-            // RTL runs check for "trailing" whitespace at the front.
-            for character in characters {
-                if character.info.is_whitespace() {
-                    self.has_trailing_whitespace = true;
-                } else {
-                    self.is_whitespace = false;
-                    break;
-                }
-            }
-        } else {
-            for character in characters.iter().rev() {
-                if character.info.is_whitespace() {
-                    self.has_trailing_whitespace = true;
-                } else {
-                    self.is_whitespace = false;
-                    break;
-                }
-            }
-        }
     }
 }
 
@@ -330,8 +284,13 @@ impl<B: Brush> LayoutData<B> {
     #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
         fn whitespace_advance(atom: Option<(Whitespace, f32)>) -> f32 {
-            atom.filter(|(whitespace, _)| whitespace.is_space_or_nbsp())
-                .map_or(0.0, |(_, advance)| advance)
+            atom.filter(|(whitespace, _)| {
+                matches!(
+                    whitespace,
+                    Whitespace::Space | Whitespace::Tab | Whitespace::Newline
+                )
+            })
+            .map_or(0.0, |(_, advance)| advance)
         }
 
         let mut min_width = 0.0_f32;
