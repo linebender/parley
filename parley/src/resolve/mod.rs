@@ -176,6 +176,7 @@ impl ResolveContext {
         scale: f32,
     ) -> ResolvedStyle<B> {
         ResolvedStyle {
+            parent: 0,
             font_family: self.resolve_font_family(fcx, &raw_style.font_family),
             font_size: raw_style.font_size * scale,
             font_width: raw_style.font_width,
@@ -392,6 +393,9 @@ pub(crate) enum ResolvedProperty<B: Brush> {
 /// Flattened group of style properties.
 #[derive(Clone, PartialEq, Debug, Default)]
 pub(crate) struct ResolvedStyle<B: Brush> {
+    /// Index in the style table of the style of the enclosing span (the root style refers to
+    /// itself).
+    pub(crate) parent: u16,
     /// `font-family`.
     pub(crate) font_family: Resolved<FamilyId>,
     /// Font size.
@@ -490,6 +494,7 @@ impl<B: Brush> ResolvedStyle<B> {
 
     pub(crate) fn as_layout_style(&self) -> layout::Style<B> {
         layout::Style {
+            parent: self.parent,
             brush: self.brush.clone(),
             underline: self.underline.as_layout_decoration(&self.brush),
             strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
