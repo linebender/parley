@@ -606,12 +606,11 @@ fn justify_with_multiple_trailing_spaces() {
     // two inter-word spaces only.
     let text = "AA BB CC   DD EE";
     let max_advance = 95.0;
-    let builder = env.ranged_builder(text);
+    let mut builder = env.ranged_builder(text);
 
-    // TODO: this should also correctly hang the whitespace when the spaces are not in the same run (e.g.,
-    // because of a font or font size change). However, we don't currently handle that correctly.
-    //
-    // builder.push(StyleProperty::FontSize(15.9), 10..11);
+    // This should also correctly hang the whitespace when the spaces are not in the same run (e.g.,
+    // because of a font size change).
+    builder.push(StyleProperty::FontSize(15.9), 10..11);
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(max_advance));
     layout.align(Alignment::Justify, AlignmentOptions::default());
