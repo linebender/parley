@@ -45,11 +45,14 @@ pub enum LineHeight {
 
 impl Default for LineHeight {
     fn default() -> Self {
-        Self::MetricsRelative(1.0)
+        Self::NORMAL
     }
 }
 
 impl LineHeight {
+    /// The font's preferred line height (ascent + descent + line gap), as CSS `line-height: normal`.
+    pub const NORMAL: Self = Self::MetricsRelative(1.0);
+
     pub(crate) fn nearly_eq(self, other: Self) -> bool {
         match (self, other) {
             (Self::MetricsRelative(a), Self::MetricsRelative(b))

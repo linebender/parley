@@ -23,6 +23,7 @@ fn canonicalize_layout_data<B: Brush>(layout_data: &LayoutData<B>) -> LayoutData
         let mut metrics = *metrics;
         metrics.baseline_offset = 0.;
         metrics.aligned_subtree = 0;
+        metrics.parent = 0;
         if let Some(index) = canonical_styles
             .iter()
             .position(|existing| *existing == style)

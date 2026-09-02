@@ -149,7 +149,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.last_item_kind = ItemKind::TextRun;
     }
 
-    fn resolve_current_style_id(&mut self) -> u16 {
+    pub(crate) fn resolve_current_style_id(&mut self) -> u16 {
         self.resolve_style_id(self.current_span)
     }
 
