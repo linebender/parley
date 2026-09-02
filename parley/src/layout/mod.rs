@@ -11,6 +11,7 @@ mod line;
 mod line_break;
 mod run;
 mod spacing;
+pub(crate) mod style_metrics;
 
 // TODO - Add to allowed lint set?
 #[expect(

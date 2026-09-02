@@ -20,7 +20,7 @@ use crate::{
 // duplicated between this crate and `parley_test`. We can't move the builder
 // tests into `parley_test` because they use private APIs, but should eventually
 // figure out some way to reduce the duplication.
-const FONT_FAMILY_LIST: &[FontFamilyName<'_>] = &[
+pub(crate) const FONT_FAMILY_LIST: &[FontFamilyName<'_>] = &[
     FontFamilyName::Named(Cow::Borrowed("Roboto")),
     FontFamilyName::Named(Cow::Borrowed("Noto Kufi Arabic")),
 ];
@@ -51,7 +51,7 @@ pub(crate) fn load_fonts(
     Ok(())
 }
 
-fn create_font_context() -> FontContext {
+pub(crate) fn create_font_context() -> FontContext {
     let mut collection = Collection::new(CollectionOptions {
         shared: false,
         system_fonts: false,
@@ -686,4 +686,28 @@ fn builders_crlf_across_run_boundary_counts_as_single_line_break() {
         split_crlf, split_lf,
         "styled CRLF should match styled LF line count"
     );
+}
+
+#[test]
+fn builders_empty_text_after_styled_layout_reuses_context() {
+    let mut fcx = FontContext::default();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+
+    let root = TextStyle::default();
+    let mut builder = lcx.tree_builder(&mut fcx, 1.0, true, &root);
+    builder.push_style_span(TextStyle {
+        font_size: 20.,
+        ..Default::default()
+    });
+    builder.push_text("a");
+    builder.pop_style_span();
+    let (layout, _) = builder.build();
+    assert_eq!(layout.styles().len(), 2);
+
+    // The empty layout is shaped with a substitute space, which must use the root style rather
+    // than a stale style index left over from the previous layout.
+    let builder = lcx.ranged_builder(&mut fcx, "", 1.0, true);
+    let mut layout = builder.build("");
+    layout.break_all_lines(None);
+    assert_eq!(layout.lines().count(), 1);
 }

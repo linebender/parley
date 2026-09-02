@@ -7,6 +7,7 @@ use core::ops::Range;
 
 use alloc::vec::Vec;
 use parlance::BidiLevel;
+use skrifa::MetadataProvider;
 
 use crate::{
     CharInfo, FontInstance, Glyph,
@@ -83,6 +84,70 @@ pub struct FontMetrics {
     /// Distance from the baseline to the top of the lowercase "x" or
     /// similar character.
     pub x_height: Option<f32>,
+}
+
+impl FontMetrics {
+    /// Compute the metrics of `font` at `font_size`, positioned at the variable font location
+    /// given by the `synthesis` and `variations` axis settings.
+    ///
+    /// Returns `None` if the font data cannot be parsed.
+    pub fn from_font_instance(
+        font: &FontInstance,
+        font_size: f32,
+        variations: &[parlance::FontVariation],
+    ) -> Option<Self> {
+        let font_ref =
+            skrifa::FontRef::from_index(font.font.data.as_ref(), font.font.index).ok()?;
+        let location = font_ref.axes().location(
+            font.synthesis
+                .variation_settings()
+                .iter()
+                .map(|(tag, value)| (skrifa::Tag::new(&tag.to_be_bytes()), *value))
+                .chain(
+                    variations
+                        .iter()
+                        .map(|v| (skrifa::Tag::new(&v.tag.to_bytes()), v.value)),
+                ),
+        );
+        Some(Self::from_skrifa_metrics(&skrifa::metrics::Metrics::new(
+            &font_ref,
+            skrifa::prelude::Size::new(font_size),
+            &location,
+        )))
+    }
+
+    fn from_skrifa_metrics(metrics: &skrifa::metrics::Metrics) -> Self {
+        let units_per_em = metrics.units_per_em as f32;
+
+        // TODO: The following seems to be in the wrong scale, as its staying in design units rather
+        // than scaled to the font size like the other fields for `FontMetrics`.
+        let (underline_offset, underline_size) = if let Some(underline) = metrics.underline {
+            (underline.offset, underline.thickness)
+        } else {
+            // Default values from Harfbuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334
+            let default = units_per_em / 18.0;
+            (default, default)
+        };
+        let (strikethrough_offset, strikethrough_size) = if let Some(strikeout) = metrics.strikeout
+        {
+            (strikeout.offset, strikeout.thickness)
+        } else {
+            // Default values from HarfBuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334-L347
+            (metrics.ascent / 2.0, units_per_em / 18.0)
+        };
+
+        Self {
+            ascent: metrics.ascent,
+            descent: -metrics.descent,
+            leading: metrics.leading,
+            underline_offset,
+            underline_size,
+            strikethrough_offset,
+            strikethrough_size,
+            x_height: metrics.x_height,
+            cap_height: metrics.cap_height,
+        }
+    }
 }
 
 /// The result of shaping.
@@ -263,35 +328,7 @@ impl ShapedText {
             )
         };
         let units_per_em = metrics.units_per_em as f32;
-
-        // TODO: The following seems to be in the wrong scale, as its staying in design units rather
-        // than scaled to the font size like the other fields for `FontMetrics`.
-        let (underline_offset, underline_size) = if let Some(underline) = metrics.underline {
-            (underline.offset, underline.thickness)
-        } else {
-            // Default values from Harfbuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334
-            let default = units_per_em / 18.0;
-            (default, default)
-        };
-        let (strikethrough_offset, strikethrough_size) = if let Some(strikeout) = metrics.strikeout
-        {
-            (strikeout.offset, strikeout.thickness)
-        } else {
-            // Default values from HarfBuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334-L347
-            (metrics.ascent / 2.0, units_per_em / 18.0)
-        };
-
-        let font_metrics = FontMetrics {
-            ascent: metrics.ascent,
-            descent: -metrics.descent,
-            leading: metrics.leading,
-            underline_offset,
-            underline_size,
-            strikethrough_offset,
-            strikethrough_size,
-            x_height: metrics.x_height,
-            cap_height: metrics.cap_height,
-        };
+        let font_metrics = FontMetrics::from_skrifa_metrics(&metrics);
 
         // `HarfRust` returns glyphs in visual order, so we need to process them as such while
         // maintaining logical ordering of clusters.
