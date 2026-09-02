@@ -7,7 +7,8 @@ use super::test_builders::{FONT_FAMILY_LIST, create_font_context};
 use super::utils::ColorBrush;
 use crate::layout::style_metrics::StyleMetrics;
 use crate::{
-    FontFamily, Layout, LayoutContext, LineHeight, StyleProperty, TextStyle, VerticalAlign,
+    AlignmentBaseline, BaselineShift, FontFamily, InlineBox, InlineBoxKind, Layout, LayoutContext,
+    LineHeight, StyleProperty, TextStyle, VerticalAlign,
 };
 
 fn root_style() -> TextStyle<'static, 'static, ColorBrush> {
@@ -143,6 +144,137 @@ fn text_top_middle_and_text_bottom() {
 }
 
 #[test]
+fn alignment_baseline_and_baseline_shift_compose() {
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+    let root = root_style();
+    let mut builder = lcx.tree_builder(&mut fcx, 1., false, &root);
+    for align in [
+        VerticalAlign::TEXT_TOP,
+        VerticalAlign::new(AlignmentBaseline::TextTop, BaselineShift::Length(-4.)),
+        VerticalAlign::new(AlignmentBaseline::TextTop, BaselineShift::Super),
+    ] {
+        builder.push_style_span(TextStyle {
+            font_size: 10.,
+            vertical_align: align,
+            ..root_style()
+        });
+        builder.push_text("x");
+        builder.pop_style_span();
+    }
+    let (layout, _) = builder.build();
+    let m = metrics(&layout);
+    // `vertical-align: text-top -4px` is `text-top` lowered by 4px ...
+    assert!((m[2].baseline_offset - (m[1].baseline_offset - 4.)).abs() < 1e-4);
+    // ... and `text-top super` is `text-top` raised by a third of the parent font size.
+    assert!((m[3].baseline_offset - (m[1].baseline_offset + m[0].font_size / 3.)).abs() < 1e-4);
+}
+
+#[test]
+fn trailing_line_after_newline_keeps_newline_style() {
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+    let root = TextStyle {
+        line_height: LineHeight::Absolute(10.),
+        ..root_style()
+    };
+    let mut builder = lcx.tree_builder(&mut fcx, 1., false, &root);
+    builder.push_style_span(TextStyle {
+        font_size: 40.,
+        line_height: LineHeight::Absolute(40.),
+        ..root_style()
+    });
+    builder.push_text("x\n");
+    builder.pop_style_span();
+    let (mut layout, _) = builder.build();
+    layout.break_all_lines(None);
+    let mut lines = layout.lines();
+    let first = lines.next().unwrap();
+    let last = lines.next().unwrap();
+    assert!(lines.next().is_none());
+    assert_eq!(first.metrics().line_height, 40.);
+    assert_eq!(last.metrics().line_height, 40.);
+    assert_eq!(last.metrics().block_min_coord, 40.);
+    assert_eq!(layout.height(), 80.);
+}
+
+#[test]
+fn quantized_shifted_baselines_are_whole_pixels() {
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+    let root = root_style();
+    let mut builder = lcx.tree_builder(&mut fcx, 1., true, &root);
+    builder.push_text("a");
+    for align in [
+        VerticalAlign::length(0.5),
+        VerticalAlign::MIDDLE,
+        VerticalAlign::SUPER,
+    ] {
+        builder.push_style_span(TextStyle {
+            font_size: 13.,
+            line_height: LineHeight::Absolute(15.5),
+            vertical_align: align,
+            ..root_style()
+        });
+        builder.push_text("b");
+        builder.pop_style_span();
+    }
+    builder.push_style_span(TextStyle {
+        vertical_align: VerticalAlign::BOTTOM,
+        ..root_style()
+    });
+    builder.push_style_span(TextStyle {
+        font_size: 13.,
+        vertical_align: VerticalAlign::length(0.5),
+        ..root_style()
+    });
+    builder.push_text("c");
+    builder.pop_style_span();
+    builder.pop_style_span();
+    let (mut layout, _) = builder.build();
+    layout.break_all_lines(None);
+    let line = layout.lines().next().unwrap();
+    let mut runs = 0;
+    for item in line.items() {
+        if let crate::PositionedLayoutItem::GlyphRun(run) = item {
+            assert_eq!(run.baseline(), run.baseline().round());
+            runs += 1;
+        }
+    }
+    assert_eq!(runs, 5);
+}
+
+#[test]
+fn quantization_does_not_compound_along_ancestors() {
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+    let root = root_style();
+    let mut builder = lcx.tree_builder(&mut fcx, 1., true, &root);
+    builder.push_text("a");
+    for _ in 0..3 {
+        builder.push_style_span(TextStyle {
+            vertical_align: VerticalAlign::length(0.4),
+            ..root_style()
+        });
+    }
+    builder.push_text("b");
+    for _ in 0..3 {
+        builder.pop_style_span();
+    }
+    let (mut layout, _) = builder.build();
+    layout.break_all_lines(None);
+    let line = layout.lines().next().unwrap();
+    let mut baselines = line.items().filter_map(|item| match item {
+        crate::PositionedLayoutItem::GlyphRun(run) => Some(run.baseline()),
+        _ => None,
+    });
+    let a = baselines.next().unwrap();
+    let b = baselines.next().unwrap();
+    // 3 × 0.4 = 1.2 rounds to a 1px shift; rounding each level would give none.
+    assert_eq!(a - b, 1.);
+}
+
+#[test]
 fn quantized_metrics_are_whole_pixels() {
     let mut fcx = create_font_context();
     let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
@@ -157,6 +289,93 @@ fn quantized_metrics_are_whole_pixels() {
     assert_eq!(root.ascent.fract(), 0.);
     assert_eq!(root.descent.fract(), 0.);
     assert_eq!(root.over.fract(), 0.);
+}
+
+#[test]
+fn line_with_only_empty_inline_boxes_is_invisible() {
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+    let root = root_style();
+    let mut line_height = |height: f32, kind: InlineBoxKind| {
+        let mut builder = lcx.tree_builder(&mut fcx, 1., false, &root);
+        builder.push_inline_box(InlineBox {
+            id: 0,
+            kind,
+            index: 0,
+            width: 0.,
+            height,
+            baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
+        });
+        let (mut layout, _) = builder.build();
+        layout.break_all_lines(None);
+        layout.lines().next().unwrap().metrics().line_height
+    };
+    // Empty and out-of-flow boxes alone do not make the strut apply.
+    assert_eq!(line_height(0., InlineBoxKind::InFlow), 0.);
+    assert_eq!(line_height(10., InlineBoxKind::OutOfFlow), 0.);
+    // A non-empty in-flow box does.
+    assert_eq!(line_height(10., InlineBoxKind::InFlow), 30.);
+}
+
+/// With quantization, an inline box's fractional height must not be rounded up twice (once for
+/// the ascent and once for the descent): the line reserves exactly the box's height.
+#[test]
+fn quantized_inline_box_extents_are_not_rounded_separately() {
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+    let root = root_style();
+    let mut builder = lcx.tree_builder(&mut fcx, 1., true, &root);
+    // Baseline splits the box into 40.5 above and 40.5 below the baseline; rounding each
+    // separately would reserve 82px for an 81px box.
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        kind: InlineBoxKind::InFlow,
+        index: 0,
+        width: 10.,
+        height: 81.,
+        baseline: Some(40.5),
+        vertical_align: VerticalAlign::BASELINE,
+    });
+    let (mut layout, _) = builder.build();
+    layout.break_all_lines(None);
+    let line = layout.lines().next().unwrap();
+    assert_eq!(line.metrics().line_height, 81.);
+}
+
+/// A box whose reserved space is negative (e.g. an atomic inline with a large negative
+/// `margin-top`) is still content: the strut applies and the line keeps its height.
+#[test]
+fn line_with_negative_height_inline_box_is_not_invisible() {
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+    let root = root_style();
+    let mut builder = lcx.tree_builder(&mut fcx, 1., false, &root);
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        kind: InlineBoxKind::InFlow,
+        index: 0,
+        width: 10.,
+        height: -300.,
+        baseline: Some(-305.),
+        vertical_align: VerticalAlign::BASELINE,
+    });
+    let (mut layout, _) = builder.build();
+    layout.break_all_lines(None);
+    let line = layout.lines().next().unwrap();
+    assert_eq!(line.metrics().line_height, 30.);
+    let inline_box = line
+        .items()
+        .find_map(|item| match item {
+            crate::PositionedLayoutItem::InlineBox(inline_box) => Some(inline_box),
+            _ => None,
+        })
+        .unwrap();
+    // The box's own baseline coincides with the line's baseline.
+    assert_eq!(
+        inline_box.y + inline_box.baseline.unwrap(),
+        line.metrics().baseline
+    );
 }
 
 #[test]

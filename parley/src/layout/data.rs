@@ -59,9 +59,53 @@ pub(crate) struct LineData {
     pub(crate) justification: Justification,
     /// Text indent applied to this line.
     pub(crate) indent: f32,
+    /// This line's entries in [`LayoutData::aligned_subtree_offsets`]. Empty for lines with only
+    /// baseline-relative content.
+    pub(crate) aligned_subtree_offsets: Range<u32>,
+}
+
+/// Position of an [aligned subtree] (rooted at a `vertical-align: top | bottom` style) on a line.
+///
+/// [aligned subtree]: crate::layout::style_metrics#aligned-subtrees
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct AlignedSubtreeOffset {
+    /// Style index of the subtree root.
+    pub(crate) root: u16,
+    /// Offset from the line's baseline to the subtree's baseline (positive upwards).
+    pub(crate) baseline_offset: f32,
 }
 
 impl LineData {
+    /// Offset from the line's baseline to the baseline of the aligned subtree rooted at style
+    /// `root` (positive upwards). `offsets` is [`LayoutData::aligned_subtree_offsets`].
+    pub(crate) fn aligned_subtree_offset(
+        &self,
+        offsets: &[AlignedSubtreeOffset],
+        root: u16,
+    ) -> f32 {
+        if root == 0 {
+            return 0.;
+        }
+        let range =
+            self.aligned_subtree_offsets.start as usize..self.aligned_subtree_offsets.end as usize;
+        offsets[range]
+            .iter()
+            .find(|subtree| subtree.root == root)
+            .map_or(0., |subtree| subtree.baseline_offset)
+    }
+
+    /// Block-axis coordinate of the baseline of the given style's inline box. `offsets` is
+    /// [`LayoutData::aligned_subtree_offsets`].
+    pub(crate) fn style_baseline(
+        &self,
+        offsets: &[AlignedSubtreeOffset],
+        metrics: &StyleMetrics,
+    ) -> f32 {
+        self.metrics.baseline
+            - self.aligned_subtree_offset(offsets, metrics.aligned_subtree)
+            - metrics.baseline_offset
+    }
+
     pub(crate) fn size(&self) -> f32 {
         self.metrics.line_height
     }
@@ -150,6 +194,9 @@ pub(crate) struct LayoutData<B: Brush> {
     /// Inline box metrics of each entry of `styles`.
     pub(crate) style_metrics: Vec<StyleMetrics>,
     pub(crate) inline_boxes: Vec<InlineBox>,
+    /// Style index of the inline box (span) containing each entry of `inline_boxes`. This is the
+    /// parent against which the box's `vertical_align` is resolved.
+    pub(crate) inline_box_styles: Vec<u16>,
 
     // Output of shaping (input to line breaking)
     pub(crate) shaped_text: ShapedText,
@@ -161,6 +208,10 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) lines: Vec<LineData>,
     /// Items within each line
     pub(crate) line_items: Vec<LineItemData>,
+    /// Position of each aligned subtree rooted at a `vertical-align: top | bottom` style on each
+    /// line. Each line owns a contiguous range ([`LineData::aligned_subtree_offsets`]), in line
+    /// order.
+    pub(crate) aligned_subtree_offsets: Vec<AlignedSubtreeOffset>,
     /// The width constraint that was used to line break the layout
     pub(crate) layout_max_advance: f32,
     /// The computed width of the layout excluding hanging whitespace
@@ -194,11 +245,13 @@ impl<B: Brush> Default for LayoutData<B> {
             styles: Vec::new(),
             style_metrics: Vec::new(),
             inline_boxes: Vec::new(),
+            inline_box_styles: Vec::new(),
             shaped_text: ShapedText::new(),
             runs: Vec::new(),
             items: Vec::new(),
             lines: Vec::new(),
             line_items: Vec::new(),
+            aligned_subtree_offsets: Vec::new(),
             #[cfg(feature = "accesskit")]
             alignment: None,
             layout_max_advance: 0.0,
@@ -220,11 +273,13 @@ impl<B: Brush> LayoutData<B> {
         self.styles.clear();
         self.style_metrics.clear();
         self.inline_boxes.clear();
+        self.inline_box_styles.clear();
         self.shaped_text.clear();
         self.runs.clear();
         self.items.clear();
         self.lines.clear();
         self.line_items.clear();
+        self.aligned_subtree_offsets.clear();
     }
 
     /// Push an inline box to the list of items
