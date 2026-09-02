@@ -3,6 +3,7 @@
 
 use crate::inline_box::InlineBox;
 use crate::layout::spacing::{EffectiveSpacing, Justification, Spacing};
+use crate::layout::style_metrics::StyleMetrics;
 use crate::layout::whitespace::{atom_hanging_advance, whitespace_hangs};
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
@@ -125,6 +126,8 @@ pub(crate) struct LayoutData<B: Brush> {
 
     // Output of style resolution (input to line breaking)
     pub(crate) styles: Vec<Style<B>>,
+    /// Inline box metrics of each entry of `styles`.
+    pub(crate) style_metrics: Vec<StyleMetrics>,
     pub(crate) inline_boxes: Vec<InlineBox>,
 
     // Output of shaping (input to line breaking)
@@ -166,6 +169,7 @@ impl<B: Brush> Default for LayoutData<B> {
             full_width: 0.,
             height: 0.,
             styles: Vec::new(),
+            style_metrics: Vec::new(),
             inline_boxes: Vec::new(),
             shaped_text: ShapedText::new(),
             runs: Vec::new(),
@@ -193,6 +197,7 @@ impl<B: Brush> LayoutData<B> {
         self.indent_amount = 0.0;
         self.indent_options = IndentOptions::default();
         self.styles.clear();
+        self.style_metrics.clear();
         self.inline_boxes.clear();
         self.shaped_text.clear();
         self.runs.clear();
