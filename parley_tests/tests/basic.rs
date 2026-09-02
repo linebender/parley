@@ -618,6 +618,44 @@ fn justify_with_multiple_trailing_spaces() {
 }
 
 #[test]
+fn trailing_nbsp_doesnt_hang_but_also_doesnt_justify_ltr() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // The first line breaks after "CC\u{a0} " (with `\u{a0}` being a non-breaking space). That last
+    // space hangs, but the non-breaking space doesn't. As it ends the line, the non-breaking space
+    // should not get a justification stretch applied.
+    let text = "AA BB CC\u{a0} DD EE";
+    let max_advance = 95.0;
+    let builder = env.ranged_builder(text);
+
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(max_advance));
+    layout.align(Alignment::Justify, AlignmentOptions::default());
+    env.check_cluster_snapshot(&layout, text, 12.0);
+}
+
+#[test]
+fn trailing_nbsp_doesnt_hang_but_also_doesnt_justify_rtl() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // The first line breaks after "ججج\u{a0} " (with `\u{a0}` being a non-breaking space). The last
+    // space hangs (on the left side of the line, as the paragraph is RTL), but the non-breaking
+    // space doesn't. As it ends the line, the non-breaking space should not get a justification
+    // stretch applied, but does get word-spacing.
+    let text = "ااا ببب ججج\u{a0} ددد";
+    let max_advance = 143.0;
+    let mut builder = env.ranged_builder(text);
+
+    // Add some word spacing to also test interaction with spacing.
+    builder.push_default(StyleProperty::WordSpacing(12.0));
+
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(max_advance));
+    layout.align(Alignment::Justify, AlignmentOptions::default());
+    env.check_cluster_snapshot(&layout, text, 12.0);
+}
+
+#[test]
 fn content_widths() {
     let mut env = TestEnv::new(test_name!(), None);
 
