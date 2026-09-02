@@ -17,7 +17,7 @@ use super::style::{
 use crate::font::FontContext;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
-use crate::{LineHeight, OverflowWrap, layout};
+use crate::{LineHeight, OverflowWrap, VerticalAlign, layout};
 use crate::{TextWrapMode, WordBreak};
 use core::borrow::Borrow;
 use core::ops::Range;
@@ -161,6 +161,7 @@ impl ResolveContext {
             StyleProperty::StrikethroughSize(value) => StrikethroughSize(value.map(|x| x * scale)),
             StyleProperty::StrikethroughBrush(value) => StrikethroughBrush(value.clone()),
             StyleProperty::LineHeight(value) => LineHeight(value.scale(scale)),
+            StyleProperty::VerticalAlign(value) => VerticalAlign(value.scale(scale)),
             StyleProperty::WordSpacing(value) => WordSpacing(*value * scale),
             StyleProperty::LetterSpacing(value) => LetterSpacing(*value * scale),
             StyleProperty::WordBreak(value) => WordBreak(*value),
@@ -199,6 +200,7 @@ impl ResolveContext {
                 brush: raw_style.strikethrough_brush.clone(),
             },
             line_height: raw_style.line_height.scale(scale),
+            vertical_align: raw_style.vertical_align.scale(scale),
             word_spacing: raw_style.word_spacing * scale,
             letter_spacing: raw_style.letter_spacing * scale,
             word_break: raw_style.word_break,
@@ -378,6 +380,8 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     StrikethroughBrush(Option<B>),
     /// Line height.
     LineHeight(LineHeight),
+    /// Vertical alignment within the line.
+    VerticalAlign(VerticalAlign),
     /// Extra spacing between words.
     WordSpacing(f32),
     /// Extra spacing between letters.
@@ -420,6 +424,8 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     pub(crate) strikethrough: ResolvedDecoration<B>,
     /// Line height.
     pub(crate) line_height: LineHeight,
+    /// Vertical alignment within the line.
+    pub(crate) vertical_align: VerticalAlign,
     /// Extra spacing between words.
     pub(crate) word_spacing: f32,
     /// Extra spacing between letters.
@@ -455,6 +461,7 @@ impl<B: Brush> ResolvedStyle<B> {
             StrikethroughSize(value) => self.strikethrough.size = value,
             StrikethroughBrush(value) => self.strikethrough.brush = value,
             LineHeight(value) => self.line_height = value,
+            VerticalAlign(value) => self.vertical_align = value,
             WordSpacing(value) => self.word_spacing = value,
             LetterSpacing(value) => self.letter_spacing = value,
             WordBreak(value) => self.word_break = value,
@@ -484,6 +491,7 @@ impl<B: Brush> ResolvedStyle<B> {
             StrikethroughSize(value) => self.strikethrough.size == *value,
             StrikethroughBrush(value) => self.strikethrough.brush == *value,
             LineHeight(value) => self.line_height.nearly_eq(*value),
+            VerticalAlign(value) => self.vertical_align.nearly_eq(*value),
             WordSpacing(value) => nearly_eq(self.word_spacing, *value),
             LetterSpacing(value) => nearly_eq(self.letter_spacing, *value),
             WordBreak(value) => self.word_break == *value,
@@ -499,6 +507,7 @@ impl<B: Brush> ResolvedStyle<B> {
             underline: self.underline.as_layout_decoration(&self.brush),
             strikethrough: self.strikethrough.as_layout_decoration(&self.brush),
             line_height: self.line_height,
+            vertical_align: self.vertical_align,
             overflow_wrap: self.overflow_wrap,
             text_wrap_mode: self.text_wrap_mode,
             #[cfg(feature = "accesskit")]
