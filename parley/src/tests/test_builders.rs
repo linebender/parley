@@ -13,7 +13,7 @@ use super::utils::{ColorBrush, asserts::assert_eq_layout_data};
 use crate::{
     BaseDirection, FontContext, FontFamily, FontFeatures, FontVariations, Layout, LayoutContext,
     LineHeight, OverflowWrap, RangedBuilder, StyleProperty, StyleRunBuilder, TextStyle,
-    TextWrapMode, TreeBuilder, WordBreak,
+    TextWrapMode, TreeBuilder, VerticalAlign, WordBreak,
 };
 
 // TODO: `FONT_FAMILY_LIST`, `load_fonts`, and `create_font_context` are
@@ -276,6 +276,7 @@ fn create_root_style() -> TextStyle<'static, 'static, ColorBrush> {
         strikethrough_size: Some(1.7),
         strikethrough_brush: Some(ColorBrush::new(palette::css::BEIGE)),
         line_height: LineHeight::Absolute(30.),
+        vertical_align: VerticalAlign::length(2.),
         word_spacing: 2.,
         letter_spacing: 1.5,
         word_break: WordBreak::BreakAll,
@@ -310,6 +311,7 @@ fn set_root_style(rb: &mut RangedBuilder<'_, ColorBrush>) {
         palette::css::BEIGE,
     ))));
     rb.push_default(LineHeight::Absolute(30.));
+    rb.push_default(VerticalAlign::length(2.));
     rb.push_default(StyleProperty::WordSpacing(2.));
     rb.push_default(StyleProperty::LetterSpacing(1.5));
     rb.push_default(StyleProperty::WordBreak(WordBreak::BreakAll));

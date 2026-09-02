@@ -5,6 +5,7 @@
 
 use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
+use parley::VerticalAlign;
 use parley::{
     Alignment, AlignmentOptions, BreakReason, ContentWidths, FontFamily, InlineBox, InlineBoxKind,
     Layout, LineHeight, PositionedLayoutItem, StyleProperty, TextStyle, WhiteSpaceCollapse,
@@ -71,6 +72,7 @@ fn placing_inboxes() {
             width: 10.0,
             height: 10.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
@@ -93,6 +95,7 @@ fn only_inboxes_wrap() {
             width: 10.0,
             height: 10.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
     }
     let mut layout = builder.build(text);
@@ -116,6 +119,7 @@ fn full_width_inbox() {
             width: 10.,
             height: 10.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
         builder.push_inline_box(InlineBox {
             id: 1,
@@ -124,6 +128,7 @@ fn full_width_inbox() {
             width,
             height: 10.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
         builder.push_inline_box(InlineBox {
             id: 2,
@@ -132,6 +137,7 @@ fn full_width_inbox() {
             width,
             height: 10.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(100.));
@@ -152,6 +158,7 @@ fn inbox_separated_by_whitespace() {
         width: 10.,
         height: 10.0,
         baseline: None,
+        vertical_align: VerticalAlign::BASELINE,
     });
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
@@ -161,6 +168,7 @@ fn inbox_separated_by_whitespace() {
         width: 10.0,
         height: 10.0,
         baseline: None,
+        vertical_align: VerticalAlign::BASELINE,
     });
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
@@ -170,6 +178,7 @@ fn inbox_separated_by_whitespace() {
         width: 10.0,
         height: 10.0,
         baseline: None,
+        vertical_align: VerticalAlign::BASELINE,
     });
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
@@ -179,6 +188,7 @@ fn inbox_separated_by_whitespace() {
         width: 10.0,
         height: 10.0,
         baseline: None,
+        vertical_align: VerticalAlign::BASELINE,
     });
     let (mut layout, _text) = builder.build();
     layout.break_all_lines(Some(100.));
@@ -208,6 +218,7 @@ fn inbox_with_baseline() {
             width: 20.0,
             height: 30.0,
             baseline: Some(baseline),
+            vertical_align: VerticalAlign::BASELINE,
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
@@ -232,6 +243,7 @@ fn inboxes_with_matching_baselines() {
         width: 15.0,
         height: 15.0,
         baseline: Some(10.0),
+        vertical_align: VerticalAlign::BASELINE,
     });
     builder.push_inline_box(InlineBox {
         id: 1,
@@ -240,6 +252,7 @@ fn inboxes_with_matching_baselines() {
         width: 15.0,
         height: 40.0,
         baseline: Some(10.0),
+        vertical_align: VerticalAlign::BASELINE,
     });
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
@@ -269,6 +282,7 @@ fn inboxes_with_large_ascent_and_descent() {
         width: 15.0,
         height: 40.0,
         baseline: Some(38.0),
+        vertical_align: VerticalAlign::BASELINE,
     });
     // Large descent: the baseline is near the top of the box, so most of it is below the baseline.
     builder.push_inline_box(InlineBox {
@@ -278,6 +292,7 @@ fn inboxes_with_large_ascent_and_descent() {
         width: 15.0,
         height: 40.0,
         baseline: Some(2.0),
+        vertical_align: VerticalAlign::BASELINE,
     });
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
@@ -309,6 +324,7 @@ fn inbox_below_baseline_keeps_grid() {
         width: 20.0,
         height: 15.0,
         baseline: Some(0.0),
+        vertical_align: VerticalAlign::BASELINE,
     });
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
@@ -719,6 +735,7 @@ fn inbox_content_width() {
             width: 100.0,
             height: 10.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
         let mut layout = builder.build(text);
         let ContentWidths {
@@ -741,6 +758,7 @@ fn inbox_content_width() {
             width: 10.0,
             height: 10.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
         let mut layout = builder.build(text);
         let ContentWidths {
