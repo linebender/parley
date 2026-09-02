@@ -1,6 +1,8 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::VerticalAlign;
+
 /// A box to be laid out inline with text
 #[derive(PartialEq, Debug, Clone)]
 pub struct InlineBox {
@@ -20,6 +22,8 @@ pub struct InlineBox {
     ///
     /// If `None`, the baseline is the box's bottom edge.
     pub baseline: Option<f32>,
+    /// Vertical alignment of the box within its line, relative to the enclosing style span.
+    pub vertical_align: VerticalAlign,
 }
 
 /// Whether a box is in-flow (takes up space in the layout) or out-of-flow (e.g. absolutely positioned)

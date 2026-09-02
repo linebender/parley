@@ -68,6 +68,116 @@ impl LineHeight {
     }
 }
 
+/// Which reference of an inline box is aligned with the same reference of its *parent* inline
+/// box (the enclosing style span, or the root style for top-level content). Mirrors the CSS
+/// `alignment-baseline` property.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AlignmentBaseline {
+    /// Align the baseline of the box with the baseline of the parent box.
+    #[default]
+    Baseline,
+    /// Align the top of the box with the top of the parent's content area (font ascent).
+    TextTop,
+    /// Align the bottom of the box with the bottom of the parent's content area (font descent).
+    TextBottom,
+    /// Align the vertical midpoint of the box with the baseline of the parent box plus half the
+    /// x-height of the parent.
+    Middle,
+}
+
+/// A shift applied to an inline box after [`AlignmentBaseline`] alignment. Mirrors the CSS
+/// `baseline-shift` property.
+///
+/// [`Top`](Self::Top) and [`Bottom`](Self::Bottom) are *line-relative*: the box and its
+/// descendants form an aligned subtree that is placed against the line box, and the
+/// [`AlignmentBaseline`] is ignored. All other values are relative to the parent inline box.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BaselineShift {
+    /// Raise the box by the given distance (in layout units). Negative values lower it.
+    Length(f32),
+    /// Lower the box to the proper position for subscripts of the parent box.
+    Sub,
+    /// Raise the box to the proper position for superscripts of the parent box.
+    Super,
+    /// Align the top of the box (and its descendants) with the top of the line box.
+    Top,
+    /// Align the bottom of the box (and its descendants) with the bottom of the line box.
+    Bottom,
+}
+
+impl Default for BaselineShift {
+    fn default() -> Self {
+        Self::Length(0.)
+    }
+}
+
+/// Vertical alignment of an inline box (a styled span of text or an [`InlineBox`]) within its
+/// line. This mirrors the CSS `vertical-align` shorthand, which sets [`AlignmentBaseline`] and
+/// [`BaselineShift`]; the associated constants cover the CSS 2 keywords.
+///
+/// [`InlineBox`]: crate::InlineBox
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct VerticalAlign {
+    /// The `alignment-baseline` component.
+    pub alignment: AlignmentBaseline,
+    /// The `baseline-shift` component.
+    pub shift: BaselineShift,
+}
+
+impl VerticalAlign {
+    /// `vertical-align: baseline`.
+    pub const BASELINE: Self = Self::new(AlignmentBaseline::Baseline, BaselineShift::Length(0.));
+    /// `vertical-align: sub`.
+    pub const SUB: Self = Self::new(AlignmentBaseline::Baseline, BaselineShift::Sub);
+    /// `vertical-align: super`.
+    pub const SUPER: Self = Self::new(AlignmentBaseline::Baseline, BaselineShift::Super);
+    /// `vertical-align: text-top`.
+    pub const TEXT_TOP: Self = Self::new(AlignmentBaseline::TextTop, BaselineShift::Length(0.));
+    /// `vertical-align: text-bottom`.
+    pub const TEXT_BOTTOM: Self =
+        Self::new(AlignmentBaseline::TextBottom, BaselineShift::Length(0.));
+    /// `vertical-align: middle`.
+    pub const MIDDLE: Self = Self::new(AlignmentBaseline::Middle, BaselineShift::Length(0.));
+    /// `vertical-align: top`.
+    pub const TOP: Self = Self::new(AlignmentBaseline::Baseline, BaselineShift::Top);
+    /// `vertical-align: bottom`.
+    pub const BOTTOM: Self = Self::new(AlignmentBaseline::Baseline, BaselineShift::Bottom);
+
+    /// Combine an `alignment-baseline` with a `baseline-shift`.
+    pub const fn new(alignment: AlignmentBaseline, shift: BaselineShift) -> Self {
+        Self { alignment, shift }
+    }
+
+    /// `vertical-align: <length>`: raise the baseline of the box by `length` (in layout units)
+    /// above the baseline of the parent box. Negative values lower the baseline.
+    pub const fn length(length: f32) -> Self {
+        Self::new(AlignmentBaseline::Baseline, BaselineShift::Length(length))
+    }
+
+    /// Whether this value forms a line-relative aligned subtree (`top` or `bottom`).
+    pub fn is_line_relative(self) -> bool {
+        matches!(self.shift, BaselineShift::Top | BaselineShift::Bottom)
+    }
+
+    pub(crate) fn nearly_eq(self, other: Self) -> bool {
+        self.alignment == other.alignment
+            && match (self.shift, other.shift) {
+                (BaselineShift::Length(a), BaselineShift::Length(b)) => nearly_eq(a, b),
+                (a, b) => a == b,
+            }
+    }
+
+    pub(crate) fn scale(self, scale: f32) -> Self {
+        match self.shift {
+            BaselineShift::Length(value) => Self {
+                shift: BaselineShift::Length(value * scale),
+                ..self
+            },
+            _ => self,
+        }
+    }
+}
+
 /// Properties that define a style.
 #[derive(Clone, PartialEq, Debug)]
 pub enum StyleProperty<'a, B: Brush> {
@@ -107,6 +217,8 @@ pub enum StyleProperty<'a, B: Brush> {
     StrikethroughBrush(Option<B>),
     /// Line height.
     LineHeight(LineHeight),
+    /// Vertical alignment within the line.
+    VerticalAlign(VerticalAlign),
     /// Extra spacing between words.
     WordSpacing(f32),
     /// Extra spacing between letters.
@@ -158,6 +270,8 @@ pub struct TextStyle<'family, 'settings, B: Brush> {
     pub strikethrough_brush: Option<B>,
     /// Line height.
     pub line_height: LineHeight,
+    /// Vertical alignment within the line.
+    pub vertical_align: VerticalAlign,
     /// Extra spacing between words.
     pub word_spacing: f32,
     /// Extra spacing between letters.
@@ -191,6 +305,7 @@ impl<B: Brush> Default for TextStyle<'static, 'static, B> {
             strikethrough_size: None,
             strikethrough_brush: None,
             line_height: LineHeight::default(),
+            vertical_align: VerticalAlign::default(),
             word_spacing: 0.0,
             letter_spacing: 0.0,
             word_break: WordBreak::default(),
@@ -239,6 +354,12 @@ impl<B: Brush> From<GenericFamily> for StyleProperty<'_, B> {
 impl<B: Brush> From<LineHeight> for StyleProperty<'_, B> {
     fn from(value: LineHeight) -> Self {
         StyleProperty::LineHeight(value)
+    }
+}
+
+impl<B: Brush> From<VerticalAlign> for StyleProperty<'_, B> {
+    fn from(value: VerticalAlign) -> Self {
+        StyleProperty::VerticalAlign(value)
     }
 }
 
