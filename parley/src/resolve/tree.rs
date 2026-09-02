@@ -190,6 +190,11 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.commit_styled_text(style_index, " ");
     }
 
+    /// The style table index of the span that text is currently being pushed into.
+    pub(crate) fn resolve_current_style_id(&mut self) -> u16 {
+        self.resolve_style_id(self.current_span)
+    }
+
     /// Appends already white space processed `text` to the buffer, attributed to `span`.
     fn commit_text(&mut self, span: usize, text: &str) {
         let style_index = self.resolve_style_id(span);
