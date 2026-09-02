@@ -27,6 +27,8 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) style_table: Vec<ResolvedStyle<B>>,
     pub(crate) style_runs: Vec<StyleRun>,
     pub(crate) inline_boxes: Vec<InlineBox>,
+    /// Style index of the inline box (span) containing each entry of `inline_boxes`.
+    pub(crate) inline_box_styles: Vec<u16>,
 
     // Reusable text analysis
     pub(crate) analyzer: Analyzer,
@@ -52,6 +54,7 @@ impl<B: Brush> LayoutContext<B> {
             style_table: vec![],
             style_runs: vec![],
             inline_boxes: vec![],
+            inline_box_styles: vec![],
             analyzer: Analyzer::new(),
             analysis: Analysis::new(),
             word_break: Vec::new(),
@@ -187,6 +190,7 @@ impl<B: Brush> LayoutContext<B> {
         self.style_table.clear();
         self.style_runs.clear();
         self.inline_boxes.clear();
+        self.inline_box_styles.clear();
     }
 }
 
