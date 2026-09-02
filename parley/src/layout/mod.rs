@@ -52,6 +52,9 @@ use crate::{LineHeight, OverflowWrap, TextWrapMode};
 /// Style properties.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Style<B: Brush> {
+    /// Index of the style of the enclosing span in [`Layout::styles`]. The root style (index 0)
+    /// refers to itself.
+    pub(crate) parent: u16,
     /// Brush for drawing glyphs.
     pub brush: B,
     /// Underline decoration.

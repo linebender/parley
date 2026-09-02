@@ -70,10 +70,15 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.text.clear();
         self.uncommitted_text.clear();
 
+        // The root style is always materialised at index 0 so that it can act as the parent of
+        // every other style (and as the strut for otherwise empty lines).
+        let mut root_style = root_style;
+        root_style.parent = 0;
+        self.style_table.push(root_style.clone());
         self.tree.push(StyleTreeNode {
             parent: None,
             style: root_style,
-            style_id: None,
+            style_id: Some(0),
         });
         self.current_span = 0;
         self.is_span_first = true;
@@ -145,13 +150,27 @@ impl<B: Brush> TreeStyleBuilder<B> {
     }
 
     fn resolve_current_style_id(&mut self) -> u16 {
-        if let Some(style_id) = self.tree[self.current_span].style_id {
+        self.resolve_style_id(self.current_span)
+    }
+
+    /// Returns the style table index for the given tree node, adding it (and any ancestors that
+    /// have not yet been added) to the style table. Ancestors are added first so that a style's
+    /// parent always has a lower index than the style itself.
+    fn resolve_style_id(&mut self, node: usize) -> u16 {
+        if let Some(style_id) = self.tree[node].style_id {
             return style_id;
         }
-        let style_id = self.style_table.len() as u16;
-        self.style_table.push(self.current_style());
-        self.tree[self.current_span].style_id = Some(style_id);
-        style_id
+        let parent = self.tree[node]
+            .parent
+            .expect("root style is materialised in `begin`");
+        let parent_id = self.resolve_style_id(parent);
+        let style_id = self.style_table.len();
+        assert!(style_id <= u16::MAX as usize, "too many styles");
+        let mut style = self.tree[node].style.clone();
+        style.parent = parent_id;
+        self.style_table.push(style);
+        self.tree[node].style_id = Some(style_id as u16);
+        style_id as u16
     }
 
     pub(crate) fn current_text_len(&self) -> usize {
@@ -216,10 +235,9 @@ impl<B: Brush> TreeStyleBuilder<B> {
         if style_runs.is_empty() {
             // If there's no text, the layout still needs the root style, e.g., to size a cursor.
             style_runs.push(StyleRun {
-                style_index: style_table.len() as u16,
+                style_index: 0,
                 range: 0..0,
             });
-            style_table.push(self.current_style());
         }
 
         core::mem::take(&mut self.text)
@@ -297,6 +315,46 @@ mod tests {
         assert_eq!(style_runs[2].style_index, 0);
         assert_eq!(style_runs[3].style_index, 2);
         assert_eq!(style_runs[4].style_index, 0);
+    }
+
+    #[test]
+    fn materialises_ancestor_spans_without_text() {
+        let mut builder = TreeStyleBuilder::<u32>::default();
+        builder.begin(ResolvedStyle::default());
+        builder.push_style_modification_span([ResolvedProperty::FontSize(40.)].into_iter());
+        builder.push_style_modification_span([ResolvedProperty::FontSize(20.)].into_iter());
+        builder.push_text("B");
+        builder.pop_style_span();
+        builder.pop_style_span();
+
+        let mut style_table = Vec::new();
+        let mut style_runs = Vec::new();
+        let text = builder.finish(&mut style_table, &mut style_runs);
+
+        assert_eq!(text, "B");
+        assert_eq!(style_table.len(), 3);
+        assert_eq!(style_table[0].parent, 0);
+        assert_eq!(style_table[1].parent, 0);
+        assert_eq!(style_table[1].font_size, 40.);
+        assert_eq!(style_table[2].parent, 1);
+        assert_eq!(style_table[2].font_size, 20.);
+        assert_eq!(style_runs.len(), 1);
+        assert_eq!(style_runs[0].style_index, 2);
+    }
+
+    #[test]
+    fn empty_text_uses_root_style() {
+        let mut builder = TreeStyleBuilder::<u32>::default();
+        builder.begin(ResolvedStyle::default());
+
+        let mut style_table = Vec::new();
+        let mut style_runs = Vec::new();
+        builder.finish(&mut style_table, &mut style_runs);
+
+        assert_eq!(style_table.len(), 1);
+        assert_eq!(style_runs.len(), 1);
+        assert_eq!(style_runs[0].style_index, 0);
+        assert_eq!(style_runs[0].range, Range { start: 0, end: 0 });
     }
 
     #[test]
