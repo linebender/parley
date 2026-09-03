@@ -1282,7 +1282,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 let cluster_hangs =
                                     slice.characters_in(cluster.chars_range()).iter().all(|c| {
                                         let whitespace = c.info.whitespace();
-                                        // Note non-breaking spaces don't hang.
+                                        // Note non-breaking spaces don't hang: CSS Text 4 § 4.3.2
+                                        // hangs only spaces, tabs, segment breaks, and "other space
+                                        // separators." We don't currently handle "other space
+                                        // separators".
                                         matches!(
                                             whitespace,
                                             Whitespace::Space
