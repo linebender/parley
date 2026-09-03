@@ -357,6 +357,7 @@ impl<B: Brush> LayoutData<B> {
                     }
                     for atom in slice.atoms_start() {
                         let character = &atom.characters()[0];
+                        let whitespace = character.info.whitespace();
                         let boundary = character.info.boundary();
                         let style = &self.styles[character.style_index as usize];
                         let prev_text_wrap_mode = text_wrap_mode;
@@ -369,16 +370,32 @@ impl<B: Brush> LayoutData<B> {
                             let trailing_whitespace = whitespace_advance(prev_atom);
                             min_width = min_width.max(running_min_width - trailing_whitespace);
                             running_min_width = 0.0;
-                            if boundary == Boundary::Mandatory {
-                                max_width = max_width.max(running_max_width - trailing_whitespace);
-                                running_max_width = 0.0;
-                            }
                         }
-                        let advance = spacing.atom_advance(&atom);
-                        running_min_width += advance;
-                        running_max_width += advance;
-                        if !is_rtl {
-                            prev_atom = Some((character.info.whitespace(), advance));
+
+                        // Handle `Whitespace::Newline` rather than relying on `Boundary::Mandatory`,
+                        // because `Boundary::Mandatory` is only set on the character *following* a break,
+                        // at which point it is too late to handle inline boxes between the line break
+                        // and the following character.
+                        //
+                        // This function doesn't have special handling for CRLF because two linebreaks
+                        // immediately following each other are equivalent to one linebreak for the purpose
+                        // of width calculation.
+                        if whitespace == Whitespace::Newline {
+                            let trailing_whitespace = whitespace_advance(prev_atom);
+                            min_width = min_width.max(running_min_width - trailing_whitespace);
+                            max_width = max_width.max(running_max_width - trailing_whitespace);
+                            running_min_width = 0.0;
+                            running_max_width = 0.0;
+                            if !is_rtl {
+                                prev_atom = None;
+                            }
+                        } else {
+                            let advance = spacing.atom_advance(&atom);
+                            running_min_width += advance;
+                            running_max_width += advance;
+                            if !is_rtl {
+                                prev_atom = Some((whitespace, advance));
+                            }
                         }
                     }
                     let trailing_whitespace = whitespace_advance(prev_atom);
