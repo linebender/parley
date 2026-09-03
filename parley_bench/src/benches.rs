@@ -11,6 +11,7 @@ use parley::{
     RangedBuilder, StyleProperty,
 };
 use std::hint::black_box;
+use std::ops::Range;
 use tango_bench::{Benchmark, benchmark_fn};
 
 /// Benchmark for default style.
@@ -150,7 +151,7 @@ fn build_styled_layout(text: &str) -> Layout<ColorBrush> {
     fn apply_style(
         builder: &mut RangedBuilder<'_, ColorBrush>,
         style_idx: usize,
-        range: std::ops::Range<usize>,
+        range: Range<usize>,
     ) {
         // Cycle through 5 different styles
         match style_idx % 5 {
@@ -215,40 +216,145 @@ pub fn styled() -> Vec<Benchmark> {
 
 /// Benchmark for iterating the positioned glyph runs and glyphs of a styled layout, as a renderer
 /// would.
-pub fn iterate_styled_items() -> Vec<Benchmark> {
-    let samples = get_samples();
-
-    samples
+///
+/// The cases fall into three groups:
+///
+/// - Latin with uniform styling, giving one glyph run per shaped run, each as long as the shaped
+///   run.
+/// - Latin with a style alternating every few characters. Glyph runs break wherever the style
+///   index changes, but only a subset of style properties also splits the shaped run: underline
+///   leaves the text in one shaped run carrying many glyph runs, whereas bold selects a different
+///   font and so gives every glyph run a shaped run of its own.
+/// - Mixed styling of each script, wrapped. This covers script, bidi and font fallback handling,
+///   and, being wrapped, the line-scoped runs a renderer normally walks. Mixed styling mostly
+///   changes the font, so these split into separately shaped runs.
+pub fn iterate_glyph_runs() -> Vec<Benchmark> {
+    let latin = get_samples()
         .iter()
-        .map(|sample| {
-            benchmark_fn(
-                format!("Styled Items - {} {}", sample.name, sample.modification),
-                |b| {
-                    let layout = build_styled_layout(&sample.text);
-                    b.iter(move || {
-                        let mut glyph_count = 0_usize;
-                        let mut advance = 0.0_f32;
-                        for line in layout.lines() {
-                            for item in line.items() {
-                                match item {
-                                    PositionedLayoutItem::GlyphRun(glyph_run) => {
-                                        for glyph in glyph_run.positioned_glyphs() {
-                                            glyph_count += 1;
-                                            advance += glyph.advance;
-                                        }
-                                    }
-                                    PositionedLayoutItem::InlineBox(inline_box) => {
-                                        advance += inline_box.width;
-                                    }
-                                }
-                            }
-                        }
-                        black_box((glyph_count, advance))
-                    })
-                },
-            )
-        })
-        .collect()
+        .find(|sample| sample.name == "latin" && sample.modification == "4 paragraph")
+        .expect("the Latin four-paragraph benchmark sample should exist");
+
+    let mut benchmarks = vec![benchmark_fn(
+        format!(
+            "Glyph Runs - {} {}, uniform",
+            latin.name, latin.modification
+        ),
+        |b| {
+            let layout = build_unwrapped_layout(&latin.text, []);
+            b.iter(move || black_box(walk_items(&layout)))
+        },
+    )];
+
+    // Underline splits the glyph runs only; bold also splits the shaped runs.
+    for (label, chunk_len, style) in [
+        ("non-splitting", 1, StyleProperty::Underline(true)),
+        ("non-splitting", 16, StyleProperty::Underline(true)),
+        ("splitting", 1, StyleProperty::FontWeight(FontWeight::BOLD)),
+        ("splitting", 16, StyleProperty::FontWeight(FontWeight::BOLD)),
+    ] {
+        benchmarks.push(benchmark_fn(
+            format!(
+                "Glyph Runs - {} {}, {label} every {chunk_len} chars",
+                latin.name, latin.modification
+            ),
+            move |b| {
+                let layout = build_alternating_layout(&latin.text, chunk_len, &style);
+                b.iter(move || black_box(walk_items(&layout)))
+            },
+        ));
+    }
+
+    for sample in get_samples()
+        .iter()
+        .filter(|sample| sample.modification == "4 paragraph")
+    {
+        benchmarks.push(benchmark_fn(
+            format!(
+                "Glyph Runs - {} {}, mixed",
+                sample.name, sample.modification
+            ),
+            |b| {
+                let layout = build_styled_layout(&sample.text);
+                b.iter(move || black_box(walk_items(&layout)))
+            },
+        ));
+    }
+
+    benchmarks
+}
+
+/// Iterate the positioned glyph runs and glyphs of `layout`, as a renderer would.
+fn walk_items(layout: &Layout<ColorBrush>) -> (usize, f32) {
+    let mut glyph_count = 0_usize;
+    let mut advance = 0.0_f32;
+    for line in layout.lines() {
+        for item in line.items() {
+            match item {
+                PositionedLayoutItem::GlyphRun(glyph_run) => {
+                    for glyph in glyph_run.positioned_glyphs() {
+                        glyph_count += 1;
+                        advance += glyph.advance;
+                    }
+                }
+                PositionedLayoutItem::InlineBox(inline_box) => {
+                    advance += inline_box.width;
+                }
+            }
+        }
+    }
+    (glyph_count, advance)
+}
+
+/// Build a single long line of `text`, applying each style of `styles` to its byte range.
+///
+/// The layout is a single long line. Depending on the styles used, the proportion of glyphs per
+/// shaped run or style span varies. E.g., switching between bold and non-bold, the font changes, so
+/// the styles split the text into separately shaped items. Switching between underline and
+/// non-underline, there's no impact on shaping, and only the style spans change.
+fn build_unwrapped_layout<'a>(
+    text: &str,
+    styles: impl IntoIterator<Item = (StyleProperty<'a, ColorBrush>, Range<usize>)>,
+) -> Layout<ColorBrush> {
+    const DISPLAY_SCALE: f32 = 1.0;
+    const QUANTIZE: bool = true;
+
+    with_contexts(|font_cx, layout_cx| {
+        let mut builder = layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
+        builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+        for (style, range) in styles {
+            builder.push(style, range);
+        }
+
+        let mut layout: Layout<ColorBrush> = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(Alignment::Start, AlignmentOptions::default());
+        layout
+    })
+}
+
+/// Build a single long line of `text`, applying `style` to every other chunk of `chunk_len`
+/// characters.
+///
+/// See [`build_unwrapped_layout`] for an explanation of the impact of varying styles.
+fn build_alternating_layout(
+    text: &str,
+    chunk_len: usize,
+    style: &StyleProperty<'_, ColorBrush>,
+) -> Layout<ColorBrush> {
+    // The byte offset of every `chunk_len`-th character, plus the end of the text.
+    let bounds = text
+        .char_indices()
+        .step_by(chunk_len)
+        .map(|(byte_idx, _)| byte_idx)
+        .chain([text.len()])
+        .collect::<Vec<_>>();
+    build_unwrapped_layout(
+        text,
+        bounds
+            .windows(2)
+            .step_by(2)
+            .map(|chunk| (style.clone(), chunk[0]..chunk[1])),
+    )
 }
 
 /// Benchmark for a single very long line (no wrapping) with and without justification.
