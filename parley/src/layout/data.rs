@@ -160,9 +160,9 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) line_items: Vec<LineItemData>,
     /// The width constraint that was used to line break the layout
     pub(crate) layout_max_advance: f32,
-    /// The computed width of the layout excluding trailing whitespace
+    /// The computed width of the layout excluding hanging whitespace
     pub(crate) width: f32,
-    /// The computed width of the layout including trailing whitespace
+    /// The computed width of the layout including hanging whitespace
     pub(crate) full_width: f32,
     /// The computed height of the layout
     pub(crate) height: f32,
@@ -283,7 +283,7 @@ impl<B: Brush> LayoutData<B> {
     // TODO: this method does not handle mixed direction text at all.
     #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
-        fn whitespace_advance(atom: Option<(Whitespace, f32)>) -> f32 {
+        fn hanging_whitespace_advance(atom: Option<(Whitespace, f32)>) -> f32 {
             atom.filter(|(whitespace, _)| {
                 matches!(
                     whitespace,
@@ -325,8 +325,8 @@ impl<B: Brush> LayoutData<B> {
                             && (boundary == Boundary::Line
                                 || style.overflow_wrap == OverflowWrap::Anywhere)
                         {
-                            let trailing_whitespace = whitespace_advance(prev_atom);
-                            min_width = min_width.max(running_min_width - trailing_whitespace);
+                            let hanging_whitespace = hanging_whitespace_advance(prev_atom);
+                            min_width = min_width.max(running_min_width - hanging_whitespace);
                             running_min_width = 0.0;
                         }
 
@@ -339,9 +339,9 @@ impl<B: Brush> LayoutData<B> {
                         // immediately following each other are equivalent to one linebreak for the purpose
                         // of width calculation.
                         if whitespace == Whitespace::Newline {
-                            let trailing_whitespace = whitespace_advance(prev_atom);
-                            min_width = min_width.max(running_min_width - trailing_whitespace);
-                            max_width = max_width.max(running_max_width - trailing_whitespace);
+                            let hanging_whitespace = hanging_whitespace_advance(prev_atom);
+                            min_width = min_width.max(running_min_width - hanging_whitespace);
+                            max_width = max_width.max(running_max_width - hanging_whitespace);
                             running_min_width = 0.0;
                             running_max_width = 0.0;
                             if !is_rtl {
@@ -356,16 +356,16 @@ impl<B: Brush> LayoutData<B> {
                             }
                         }
                     }
-                    let trailing_whitespace = whitespace_advance(prev_atom);
-                    min_width = min_width.max(running_min_width - trailing_whitespace);
+                    let hanging_whitespace = hanging_whitespace_advance(prev_atom);
+                    min_width = min_width.max(running_min_width - hanging_whitespace);
                 }
                 LayoutItemKind::InlineBox => {
                     let ibox = &self.inline_boxes[item.index];
                     if ibox.kind == InlineBoxKind::InFlow {
                         running_max_width += ibox.width;
                         if text_wrap_mode == TextWrapMode::Wrap {
-                            let trailing_whitespace = whitespace_advance(prev_atom);
-                            min_width = min_width.max(running_min_width - trailing_whitespace);
+                            let hanging_whitespace = hanging_whitespace_advance(prev_atom);
+                            min_width = min_width.max(running_min_width - hanging_whitespace);
                             min_width = min_width.max(ibox.width);
                             running_min_width = 0.0;
                         } else {
@@ -375,12 +375,12 @@ impl<B: Brush> LayoutData<B> {
                     prev_atom = None;
                 }
             }
-            let trailing_whitespace = whitespace_advance(prev_atom);
-            max_width = max_width.max(running_max_width - trailing_whitespace);
+            let hanging_whitespace = hanging_whitespace_advance(prev_atom);
+            max_width = max_width.max(running_max_width - hanging_whitespace);
         }
 
-        let trailing_whitespace = whitespace_advance(prev_atom);
-        min_width = min_width.max(running_min_width - trailing_whitespace);
+        let hanging_whitespace = hanging_whitespace_advance(prev_atom);
+        min_width = min_width.max(running_min_width - hanging_whitespace);
 
         ContentWidths {
             min: min_width,
