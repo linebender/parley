@@ -54,7 +54,7 @@ pub(crate) struct LineData {
     /// Maximum advance for the line.
     pub(crate) max_advance: f32,
     /// Number of justified clusters on the line.
-    pub(crate) justification_opportunities: usize,
+    pub(crate) num_justification_opportunities: usize,
     pub(crate) justification: Justification,
     /// Text indent applied to this line.
     pub(crate) indent: f32,

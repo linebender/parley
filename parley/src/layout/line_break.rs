@@ -1319,8 +1319,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
 
         line.metrics.hanging_advance = hanging_whitespace_advance;
-        line.justification_opportunities = num_justification_opportunities;
-        line.justification.justified_end_cluster = justified_end;
+        line.num_justification_opportunities = num_justification_opportunities;
+        line.justification.justification_end_cluster = justified_end;
 
         // Reorder the items within the line (if required). Reordering is required if the line contains
         // a mix of bidi levels (a mix of LTR and RTL text)
@@ -1594,7 +1594,7 @@ fn commit_line<B: Brush>(
         item_range: start_item_idx..end_item_idx,
         max_advance,
         break_reason,
-        justification_opportunities: 0,
+        num_justification_opportunities: 0,
         justification: Justification::NONE,
         indent: line_indent,
         metrics: LineMetrics {
