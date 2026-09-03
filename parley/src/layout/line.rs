@@ -5,13 +5,13 @@ use crate::layout::Style;
 use crate::layout::data::BreakReason;
 use crate::layout::data::{LayoutItemKind, LineData};
 use crate::layout::layout::Layout;
-use crate::layout::run::{Clusters, Run};
+use crate::layout::run::Run;
+use crate::layout::spacing::EffectiveSpacing;
 use crate::style::Brush;
 use crate::{InlineBox, InlineBoxKind};
 
-use core::iter::Peekable;
 use core::ops::Range;
-use parley_engine::Glyph;
+use parley_engine::{Atom, Atoms, Glyph, ShapedSlice};
 
 /// Line in a text layout.
 #[derive(Copy, Clone)]
@@ -108,7 +108,7 @@ impl<'a, B: Brush> Line<'a, B> {
         GlyphRunIter {
             line: self.clone(),
             item_index: 0,
-            clusters: None,
+            atoms: None,
             glyph_start: 0,
             offset: 0.,
         }
@@ -298,13 +298,81 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     }
 }
 
+/// Cursor over the atoms of a run in visual order, resumable across [`GlyphRunIter::next`] calls.
+///
+/// This walks the run's shaped data ([`ShapedSlice`]/[`Atom`]) directly rather than
+/// materialising [`Cluster`](crate::Cluster)s and their composed glyph iterators. It computes
+/// the same glyph counts and advances as [`Run::glyphs_in`] over the same atoms.
+#[derive(Clone)]
+struct AtomCursor<'a> {
+    slice: ShapedSlice<'a>,
+    atoms: Atoms<'a>,
+    spacing: EffectiveSpacing,
+    is_rtl: bool,
+    /// The next atom in visual order, if it has been peeked but not yet consumed.
+    peeked: Option<Atom<'a>>,
+}
+
+impl<'a> AtomCursor<'a> {
+    fn new<B: Brush>(run: Run<'a, B>) -> Self {
+        let slice = run.line_slice();
+        let is_rtl = run.is_rtl();
+        Self {
+            slice,
+            atoms: if is_rtl {
+                slice.atoms_end()
+            } else {
+                slice.atoms_start()
+            },
+            spacing: run.line_spacing(),
+            is_rtl,
+            peeked: None,
+        }
+    }
+
+    #[inline]
+    fn peek(&mut self) -> Option<Atom<'a>> {
+        if self.peeked.is_none() {
+            self.peeked = if self.is_rtl {
+                self.atoms.prev()
+            } else {
+                self.atoms.next()
+            };
+        }
+        self.peeked
+    }
+
+    #[inline]
+    fn advance(&mut self) {
+        self.peeked = None;
+    }
+
+    /// The number of glyphs in `atom` and the sum of their advances (including spacing gaps),
+    /// matching what [`Run::glyphs_in`] yields for the atom's clusters.
+    #[inline]
+    fn glyphs(&self, atom: &Atom<'a>) -> (usize, f32) {
+        let mut glyph_count = 0_usize;
+        let mut advance = 0.0_f32;
+        for cluster_idx in atom.shaped_clusters_range() {
+            for glyph in self.slice.shaped_cluster_glyphs(cluster_idx) {
+                glyph_count += 1;
+                advance += glyph.advance;
+            }
+        }
+        if glyph_count != 0 && !self.spacing.is_zero() {
+            advance += self.spacing.gaps(atom).total();
+        }
+        (glyph_count, advance)
+    }
+}
+
 #[derive(Clone)]
 struct GlyphRunIter<'a, B: Brush> {
     line: Line<'a, B>,
     item_index: usize,
-    /// Cursor over the visual clusters of the run at `item_index`, positioned at the first
-    /// cluster not yet yielded as part of a glyph run. `None` before entering a run.
-    clusters: Option<Peekable<Clusters<'a, B>>>,
+    /// Cursor over the visual atoms of the run at `item_index`, positioned at the first atom not
+    /// yet yielded as part of a glyph run. `None` before entering a run.
+    atoms: Option<AtomCursor<'a>>,
     glyph_start: usize,
     offset: f32,
 }
@@ -338,36 +406,29 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                     }));
                 }
                 LineItem::Run(run) => {
-                    // TODO: this is taking the glyphs and style indices from `parley`'s `Cluster`,
-                    // which means style indices are taken from the atom's first character. We could
-                    // get the style index from `parley_engine`'s `ShapedCluster` instead, which
-                    // would be somewhat finer-grained.
-                    let clusters = self
-                        .clusters
-                        .get_or_insert_with(|| Clusters::new(run, run.is_rtl()).peekable());
+                    // TODO: style indices are taken from the atom's first character, matching
+                    // `Cluster::style_index`. We could get the style index from `parley_engine`'s
+                    // `ShapedCluster` instead, which would be somewhat finer-grained.
+                    let atoms = self.atoms.get_or_insert_with(|| AtomCursor::new(run));
 
-                    // Styles are uniform within a cluster, so glyph runs always end on cluster
-                    // boundaries and the cursor only needs to resume at cluster granularity.
-                    // Clusters without glyphs (ligature continuations) don't take part.
+                    // Styles are uniform within an atom, so glyph runs always end on atom
+                    // boundaries and the cursor only needs to resume at atom granularity.
+                    // Atoms without glyphs don't take part.
                     let mut advance = 0.0;
                     let mut glyph_count = 0;
                     let mut style_index: Option<u16> = None;
-                    while let Some(cluster) = clusters.peek() {
-                        let mut glyphs = cluster.glyphs();
-                        if let Some(first_glyph) = glyphs.next() {
-                            let cluster_style_index = cluster.style_index();
-                            if style_index.is_some_and(|s| s != cluster_style_index) {
+                    while let Some(atom) = atoms.peek() {
+                        let (atom_glyph_count, atom_advance) = atoms.glyphs(&atom);
+                        if atom_glyph_count != 0 {
+                            let atom_style_index = atom.characters()[0].style_index;
+                            if style_index.is_some_and(|s| s != atom_style_index) {
                                 break;
                             }
-                            style_index = Some(cluster_style_index);
-                            glyph_count += 1;
-                            advance += first_glyph.advance;
-                            for glyph in glyphs {
-                                glyph_count += 1;
-                                advance += glyph.advance;
-                            }
+                            style_index = Some(atom_style_index);
+                            glyph_count += atom_glyph_count;
+                            advance += atom_advance;
                         }
-                        clusters.next();
+                        atoms.advance();
                     }
 
                     if let Some(first_style_index) = style_index {
@@ -387,8 +448,8 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                             advance,
                         }));
                     }
-                    // Any clusters left have no glyphs and thus nothing to yield.
-                    self.clusters = None;
+                    // Any atoms left have no glyphs and thus nothing to yield.
+                    self.atoms = None;
                     self.item_index += 1;
                     self.glyph_start = 0;
                 }
