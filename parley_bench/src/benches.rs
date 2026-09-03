@@ -211,3 +211,51 @@ pub fn styled() -> Vec<Benchmark> {
         })
         .collect()
 }
+
+/// Benchmark for a single very long line (no wrapping) with and without justification.
+///
+/// This exercises per-line work that scales with line length.
+pub fn long_line() -> Vec<Benchmark> {
+    const DISPLAY_SCALE: f32 = 1.0;
+    const QUANTIZE: bool = true;
+    const REPEAT: usize = 4;
+
+    fn layout_long_line(text: &str, max_advance: Option<f32>, alignment: Alignment) {
+        with_contexts(|font_cx, layout_cx| {
+            let mut builder = layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
+            builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+
+            let mut layout: Layout<ColorBrush> = builder.build(text);
+            layout.break_all_lines(max_advance);
+            layout.align(alignment, AlignmentOptions::default());
+
+            black_box(layout);
+        });
+    }
+
+    let samples = get_samples();
+
+    samples
+        .iter()
+        .filter(|sample| sample.modification == "4 paragraph")
+        .flat_map(|sample| {
+            let text: &'static str = Box::leak(
+                sample
+                    .text
+                    .replace('\n', " ")
+                    .repeat(REPEAT)
+                    .into_boxed_str(),
+            );
+            [
+                benchmark_fn(format!("Long Line - {}", sample.name), move |b| {
+                    b.iter(move || layout_long_line(text, None, Alignment::Start))
+                }),
+                benchmark_fn(format!("Long Line Justify - {}", sample.name), move |b| {
+                    // Justification requires a finite `max_advance`; use one wide enough that the
+                    // text still lays out as a single line.
+                    b.iter(move || layout_long_line(text, Some(1.0e7), Alignment::Justify))
+                }),
+            ]
+        })
+        .collect()
+}

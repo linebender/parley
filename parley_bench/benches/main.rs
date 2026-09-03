@@ -5,7 +5,7 @@
 
 use tango_bench::tango_benchmarks;
 
-use parley_bench::benches::{defaults, repeated_justification, spacing, styled};
+use parley_bench::benches::{defaults, long_line, repeated_justification, spacing, styled};
 use parley_bench::fontique_benches::system_fonts_init;
 
 tango_benchmarks!(
@@ -13,5 +13,6 @@ tango_benchmarks!(
     styled(),
     spacing(),
     repeated_justification(),
+    long_line(),
     system_fonts_init()
 );
