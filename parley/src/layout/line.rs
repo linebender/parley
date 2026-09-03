@@ -5,10 +5,11 @@ use crate::layout::Style;
 use crate::layout::data::BreakReason;
 use crate::layout::data::{LayoutItemKind, LineData};
 use crate::layout::layout::Layout;
-use crate::layout::run::Run;
+use crate::layout::run::{Clusters, Run};
 use crate::style::Brush;
 use crate::{InlineBox, InlineBoxKind};
 
+use core::iter::Peekable;
 use core::ops::Range;
 use parley_engine::Glyph;
 
@@ -107,6 +108,7 @@ impl<'a, B: Brush> Line<'a, B> {
         GlyphRunIter {
             line: self.clone(),
             item_index: 0,
+            clusters: None,
             glyph_start: 0,
             offset: 0.,
         }
@@ -300,6 +302,9 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
 struct GlyphRunIter<'a, B: Brush> {
     line: Line<'a, B>,
     item_index: usize,
+    /// Cursor over the visual clusters of the run at `item_index`, positioned at the first
+    /// cluster not yet yielded as part of a glyph run. `None` before entering a run.
+    clusters: Option<Peekable<Clusters<'a, B>>>,
     glyph_start: usize,
     offset: f32,
 }
@@ -337,23 +342,35 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                     // which means style indices are taken from the atom's first character. We could
                     // get the style index from `parley_engine`'s `ShapedCluster` instead, which
                     // would be somewhat finer-grained.
-                    let mut glyphs = run
-                        .visual_clusters()
-                        .flat_map(|c| {
-                            let style_index = c.style_index();
-                            c.glyphs().map(move |glyph| (glyph, style_index))
-                        })
-                        .skip(self.glyph_start);
+                    let clusters = self
+                        .clusters
+                        .get_or_insert_with(|| Clusters::new(run, run.is_rtl()).peekable());
 
-                    if let Some((first_glyph, first_style_index)) = glyphs.next() {
-                        let mut advance = first_glyph.advance;
-                        let mut glyph_count = 1;
-                        for (glyph, _) in
-                            glyphs.take_while(|(_, style_index)| *style_index == first_style_index)
-                        {
+                    // Styles are uniform within a cluster, so glyph runs always end on cluster
+                    // boundaries and the cursor only needs to resume at cluster granularity.
+                    // Clusters without glyphs (ligature continuations) don't take part.
+                    let mut advance = 0.0;
+                    let mut glyph_count = 0;
+                    let mut style_index: Option<u16> = None;
+                    while let Some(cluster) = clusters.peek() {
+                        let mut glyphs = cluster.glyphs();
+                        if let Some(first_glyph) = glyphs.next() {
+                            let cluster_style_index = cluster.style_index();
+                            if style_index.is_some_and(|s| s != cluster_style_index) {
+                                break;
+                            }
+                            style_index = Some(cluster_style_index);
                             glyph_count += 1;
-                            advance += glyph.advance;
+                            advance += first_glyph.advance;
+                            for glyph in glyphs {
+                                glyph_count += 1;
+                                advance += glyph.advance;
+                            }
                         }
+                        clusters.next();
+                    }
+
+                    if let Some(first_style_index) = style_index {
                         let glyph_start = self.glyph_start;
                         self.glyph_start += glyph_count;
                         let offset = self.offset;
@@ -370,6 +387,8 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                             advance,
                         }));
                     }
+                    // Any clusters left have no glyphs and thus nothing to yield.
+                    self.clusters = None;
                     self.item_index += 1;
                     self.glyph_start = 0;
                 }

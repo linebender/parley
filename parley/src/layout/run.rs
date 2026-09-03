@@ -330,7 +330,7 @@ impl<'a, B: Brush> Run<'a, B> {
 /// An iterator over a [`Run`]'s clusters.
 ///
 /// This walks the run's graphemes. Each grapheme is one [`Cluster`].
-struct Clusters<'a, B: Brush> {
+pub(crate) struct Clusters<'a, B: Brush> {
     run: Run<'a, B>,
     /// Cursor over the run's (line-scoped) atoms.
     atoms: Atoms<'a>,
@@ -346,7 +346,7 @@ struct Clusters<'a, B: Brush> {
 }
 
 impl<'a, B: Brush> Clusters<'a, B> {
-    fn new(run: Run<'a, B>, rev: bool) -> Self {
+    pub(crate) fn new(run: Run<'a, B>, rev: bool) -> Self {
         let slice = run.line_slice();
         Self {
             run,
