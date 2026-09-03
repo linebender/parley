@@ -1183,7 +1183,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // the line was built and are read from there below.
         let mut needs_reorder = false;
         let mut hanging = true;
-        let mut trailing_whitespace_advance = 0.;
+        let mut hanging_whitespace_advance = 0.;
         let mut num_justification_opportunities = 0;
         // One past the justified region: atoms with shaped clusters before this index may be
         // stretched by justification.
@@ -1298,15 +1298,15 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     break;
                                 }
                                 if last_cluster {
-                                    trailing_whitespace_advance += gap_end;
+                                    hanging_whitespace_advance += gap_end;
                                     last_cluster = false;
                                 }
-                                trailing_whitespace_advance += cluster.advance;
+                                hanging_whitespace_advance += cluster.advance;
                                 justified_end = cluster_idx;
                             }
 
                             if hanging {
-                                trailing_whitespace_advance += gap_start;
+                                hanging_whitespace_advance += gap_start;
                             } else {
                                 justified_end = atom.shaped_clusters_range().start;
                             }
@@ -1318,7 +1318,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
         }
 
-        line.metrics.trailing_whitespace = trailing_whitespace_advance;
+        line.metrics.hanging_advance = hanging_whitespace_advance;
         line.justification_opportunities = num_justification_opportunities;
         line.justification.justified_end_cluster = justified_end;
 
@@ -1417,7 +1417,7 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
             let indent_extra = line.indent.max(0.0);
             let line_max = line.metrics.inline_min_coord + line.metrics.advance + indent_extra;
             layout_full_width = layout_full_width.max(line_max);
-            layout_width = layout_width.max(line_max - line.metrics.trailing_whitespace);
+            layout_width = layout_width.max(line_max - line.metrics.hanging_advance);
             height += line.metrics.line_height as f64;
         }
 

@@ -74,15 +74,14 @@ pub(crate) fn align<B: Brush>(
             // In RTL text, trailing whitespace is on the left. As we hang that whitespace, offset
             // the line to the left. Note: indent is not subtracted here because `free_space` below
             // already accounts for it.
-            line.metrics.offset = -line.metrics.trailing_whitespace;
+            line.metrics.offset = -line.metrics.hanging_advance;
         } else {
             line.metrics.offset = indent;
         }
 
         // Compute free space.
         let line_width = line.metrics.inline_max_coord - line.metrics.inline_min_coord;
-        let free_space =
-            line_width - indent - line.metrics.advance + line.metrics.trailing_whitespace;
+        let free_space = line_width - indent - line.metrics.advance + line.metrics.hanging_advance;
 
         if !options.align_when_overflowing && free_space <= 0.0 {
             if is_rtl {
