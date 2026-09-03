@@ -11,7 +11,7 @@ use crate::style::Brush;
 use crate::{InlineBox, InlineBoxKind};
 
 use core::ops::Range;
-use parley_engine::{Atom, Atoms, Glyph, ShapedSlice};
+use parley_engine::{Atom, Atoms, Glyph};
 
 /// Line in a text layout.
 #[derive(Copy, Clone)]
@@ -298,14 +298,14 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     }
 }
 
-/// Cursor over the atoms of a run in visual order, resumable across [`GlyphRunIter::next`] calls.
+/// Peekable iterator over the atoms of a run in visual order, resumable across
+/// [`GlyphRunIter::next`] calls.
 ///
-/// This walks the run's shaped data ([`ShapedSlice`]/[`Atom`]) directly rather than
-/// materialising [`Cluster`](crate::Cluster)s and their composed glyph iterators. It computes
-/// the same glyph counts and advances as [`Run::glyphs_in`] over the same atoms.
+/// This walks the run's shaped data ([`Atom`]s) directly rather than materialising
+/// [`Cluster`](crate::Cluster)s and their composed glyph iterators. It computes the same glyph
+/// counts and advances as [`Run::glyphs_in`] over the same atoms.
 #[derive(Clone)]
-struct AtomCursor<'a> {
-    slice: ShapedSlice<'a>,
+struct AtomIter<'a> {
     atoms: Atoms<'a>,
     spacing: EffectiveSpacing,
     is_rtl: bool,
@@ -313,12 +313,11 @@ struct AtomCursor<'a> {
     peeked: Option<Atom<'a>>,
 }
 
-impl<'a> AtomCursor<'a> {
+impl<'a> AtomIter<'a> {
     fn new<B: Brush>(run: Run<'a, B>) -> Self {
         let slice = run.line_slice();
         let is_rtl = run.is_rtl();
         Self {
-            slice,
             atoms: if is_rtl {
                 slice.atoms_end()
             } else {
@@ -342,23 +341,22 @@ impl<'a> AtomCursor<'a> {
         self.peeked
     }
 
+    /// Consume the atom returned by [`Self::peek`], so the next peek moves on.
     #[inline]
-    fn advance(&mut self) {
+    fn consume(&mut self) {
         self.peeked = None;
     }
 
     /// The number of glyphs in `atom` and the sum of their advances (including spacing gaps),
     /// matching what [`Run::glyphs_in`] yields for the atom's clusters.
     #[inline]
-    fn glyphs(&self, atom: &Atom<'a>) -> (usize, f32) {
-        let mut glyph_count = 0_usize;
-        let mut advance = 0.0_f32;
-        for cluster_idx in atom.shaped_clusters_range() {
-            for glyph in self.slice.shaped_cluster_glyphs(cluster_idx) {
-                glyph_count += 1;
-                advance += glyph.advance;
-            }
-        }
+    fn measure(&self, atom: &Atom<'a>) -> (usize, f32) {
+        let glyph_count: usize = atom
+            .shaped_clusters()
+            .iter()
+            .map(|cluster| usize::from(cluster.glyph_len()))
+            .sum();
+        let mut advance = atom.advance();
         if glyph_count != 0 && !self.spacing.is_zero() {
             advance += self.spacing.gaps(atom).total();
         }
@@ -370,9 +368,9 @@ impl<'a> AtomCursor<'a> {
 struct GlyphRunIter<'a, B: Brush> {
     line: Line<'a, B>,
     item_index: usize,
-    /// Cursor over the visual atoms of the run at `item_index`, positioned at the first atom not
-    /// yet yielded as part of a glyph run. `None` before entering a run.
-    atoms: Option<AtomCursor<'a>>,
+    /// Iterator over the visual atoms of the run at `item_index`, positioned at the first atom
+    /// not yet yielded as part of a glyph run. `None` before entering a run.
+    atoms: Option<AtomIter<'a>>,
     glyph_start: usize,
     offset: f32,
 }
@@ -409,16 +407,16 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                     // TODO: style indices are taken from the atom's first character, matching
                     // `Cluster::style_index`. We could get the style index from `parley_engine`'s
                     // `ShapedCluster` instead, which would be somewhat finer-grained.
-                    let atoms = self.atoms.get_or_insert_with(|| AtomCursor::new(run));
+                    let atoms = self.atoms.get_or_insert_with(|| AtomIter::new(run));
 
                     // Styles are uniform within an atom, so glyph runs always end on atom
-                    // boundaries and the cursor only needs to resume at atom granularity.
+                    // boundaries and the iterator only needs to resume at atom granularity.
                     // Atoms without glyphs don't take part.
                     let mut advance = 0.0;
                     let mut glyph_count = 0;
                     let mut style_index: Option<u16> = None;
                     while let Some(atom) = atoms.peek() {
-                        let (atom_glyph_count, atom_advance) = atoms.glyphs(&atom);
+                        let (atom_glyph_count, atom_advance) = atoms.measure(&atom);
                         if atom_glyph_count != 0 {
                             let atom_style_index = atom.characters()[0].style_index;
                             if style_index.is_some_and(|s| s != atom_style_index) {
@@ -428,7 +426,7 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                             glyph_count += atom_glyph_count;
                             advance += atom_advance;
                         }
-                        atoms.advance();
+                        atoms.consume();
                     }
 
                     if let Some(first_style_index) = style_index {
