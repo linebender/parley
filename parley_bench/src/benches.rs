@@ -7,8 +7,8 @@
 
 use crate::{ColorBrush, FONT_FAMILY_LIST, get_samples, with_contexts};
 use parley::{
-    Alignment, AlignmentOptions, FontFamily, FontStyle, FontWeight, Layout, RangedBuilder,
-    StyleProperty,
+    Alignment, AlignmentOptions, FontFamily, FontStyle, FontWeight, Layout, PositionedLayoutItem,
+    RangedBuilder, StyleProperty,
 };
 use std::hint::black_box;
 use tango_bench::{Benchmark, benchmark_fn};
@@ -141,8 +141,8 @@ pub fn repeated_justification() -> [Benchmark; 1] {
     )]
 }
 
-/// Benchmark for styled text.
-pub fn styled() -> Vec<Benchmark> {
+/// Build a styled layout for `text`, changing style every few characters.
+fn build_styled_layout(text: &str) -> Layout<ColorBrush> {
     const DISPLAY_SCALE: f32 = 1.0;
     const QUANTIZE: bool = true;
     const MAX_ADVANCE: f32 = 200.0 * DISPLAY_SCALE;
@@ -163,6 +163,39 @@ pub fn styled() -> Vec<Benchmark> {
         }
     }
 
+    with_contexts(|font_cx, layout_cx| {
+        let mut builder = layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
+        builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+
+        // Apply different styles every `style_interval` characters
+        let style_interval = (text.len() / 5).min(10);
+        {
+            let mut chunk_start = 0;
+            let mut style_idx = 0;
+
+            for (char_count, (byte_idx, _)) in text.char_indices().enumerate() {
+                if char_count != 0 && char_count % style_interval == 0 {
+                    apply_style(&mut builder, style_idx, chunk_start..byte_idx);
+                    chunk_start = byte_idx;
+                    style_idx += 1;
+                }
+            }
+
+            // Apply style to the last chunk if there's remaining text
+            if chunk_start < text.len() {
+                apply_style(&mut builder, style_idx, chunk_start..text.len());
+            }
+        }
+
+        let mut layout: Layout<ColorBrush> = builder.build(text);
+        layout.break_all_lines(Some(MAX_ADVANCE));
+        layout.align(Alignment::Start, AlignmentOptions::default());
+        layout
+    })
+}
+
+/// Benchmark for styled text.
+pub fn styled() -> Vec<Benchmark> {
     let samples = get_samples();
 
     samples
@@ -172,39 +205,45 @@ pub fn styled() -> Vec<Benchmark> {
                 format!("Styled - {} {}", sample.name, sample.modification),
                 |b| {
                     b.iter(|| {
-                        let text = &sample.text;
+                        black_box(build_styled_layout(&sample.text));
+                    })
+                },
+            )
+        })
+        .collect()
+}
 
-                        with_contexts(|font_cx, layout_cx| {
-                            let mut builder =
-                                layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
-                            builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+/// Benchmark for iterating the positioned glyph runs and glyphs of a styled layout, as a renderer
+/// would.
+pub fn iterate_styled_items() -> Vec<Benchmark> {
+    let samples = get_samples();
 
-                            // Apply different styles every `style_interval` characters
-                            let style_interval = (text.len() / 5).min(10);
-                            {
-                                let mut chunk_start = 0;
-                                let mut style_idx = 0;
-
-                                for (char_count, (byte_idx, _)) in text.char_indices().enumerate() {
-                                    if char_count != 0 && char_count % style_interval == 0 {
-                                        apply_style(&mut builder, style_idx, chunk_start..byte_idx);
-                                        chunk_start = byte_idx;
-                                        style_idx += 1;
+    samples
+        .iter()
+        .map(|sample| {
+            benchmark_fn(
+                format!("Styled Items - {} {}", sample.name, sample.modification),
+                |b| {
+                    let layout = build_styled_layout(&sample.text);
+                    b.iter(move || {
+                        let mut glyph_count = 0_usize;
+                        let mut advance = 0.0_f32;
+                        for line in layout.lines() {
+                            for item in line.items() {
+                                match item {
+                                    PositionedLayoutItem::GlyphRun(glyph_run) => {
+                                        for glyph in glyph_run.positioned_glyphs() {
+                                            glyph_count += 1;
+                                            advance += glyph.advance;
+                                        }
+                                    }
+                                    PositionedLayoutItem::InlineBox(inline_box) => {
+                                        advance += inline_box.width;
                                     }
                                 }
-
-                                // Apply style to the last chunk if there's remaining text
-                                if chunk_start < text.len() {
-                                    apply_style(&mut builder, style_idx, chunk_start..text.len());
-                                }
                             }
-
-                            let mut layout: Layout<ColorBrush> = builder.build(text);
-                            layout.break_all_lines(Some(MAX_ADVANCE));
-                            layout.align(Alignment::Start, AlignmentOptions::default());
-
-                            black_box(layout);
-                        });
+                        }
+                        black_box((glyph_count, advance))
                     })
                 },
             )
