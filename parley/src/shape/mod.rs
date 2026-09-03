@@ -375,6 +375,11 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
             self.features = self.rcx.features(style.font_features).unwrap_or(&[]);
         }
 
+        let mut selected_font: Option<FontInstance> = None;
+        let mut best_coverage = Coverage::NONE;
+        // The primary font is the first font the query yields; don't compute its coverage twice.
+        let mut skip_first = None;
+
         if let Some(primary) = &self.primary_font
             && let Some(charmap) = primary
                 .charmap_index
@@ -387,12 +392,19 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
             if coverage.is_complete() {
                 return Some(primary.font.clone());
             }
+            selected_font = Some(primary.font.clone());
+            best_coverage = coverage;
+            skip_first = Some((primary.font.font.data.id(), primary.font.font.index));
         }
 
-        let mut selected_font = None;
-        let mut best_coverage = Coverage::NONE;
-
         self.query.matches_with(|font| {
+            if skip_first
+                .take()
+                .is_some_and(|(id, index)| font.blob.id() == id && font.index == index)
+            {
+                return fontique::QueryStatus::Continue;
+            }
+
             let Some(charmap) = font.charmap() else {
                 return fontique::QueryStatus::Continue;
             };
@@ -410,7 +422,7 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
                 self.analysis_data_sources,
             );
             if coverage > best_coverage {
-                selected_font = Some(SelectedFont { font: font.clone() });
+                selected_font = Some(font_instance(font));
                 best_coverage = coverage;
 
                 if coverage.is_complete() {
@@ -420,44 +432,35 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
                 }
             } else {
                 if selected_font.is_none() {
-                    selected_font = Some(SelectedFont { font: font.clone() });
+                    selected_font = Some(font_instance(font));
                 }
                 fontique::QueryStatus::Continue
             }
         });
 
-        selected_font
-            .map(|selected_font| selected_font.font)
-            .map(|font| FontInstance {
-                font: FontData {
-                    data: font.blob,
-                    index: font.index,
-                },
-                synthesis: font.synthesis,
-            })
-            .or_else(|| {
-                if matches!(self.last_resort_font, LastResortFont::Unresolved) {
-                    if let Some(font) = any_font(self.query) {
-                        self.last_resort_font = LastResortFont::Resolved(FontInstance {
-                            font: FontData {
-                                data: font.blob,
-                                index: font.index,
-                            },
-                            synthesis: font.synthesis,
-                        });
-                    } else {
-                        self.last_resort_font = LastResortFont::Unavailable;
-                    }
-
-                    self.fonts_id = None;
-                }
-
-                if let LastResortFont::Resolved(ref font) = self.last_resort_font {
-                    Some(font.clone())
+        selected_font.or_else(|| {
+            if matches!(self.last_resort_font, LastResortFont::Unresolved) {
+                if let Some(font) = any_font(self.query) {
+                    self.last_resort_font = LastResortFont::Resolved(FontInstance {
+                        font: FontData {
+                            data: font.blob,
+                            index: font.index,
+                        },
+                        synthesis: font.synthesis,
+                    });
                 } else {
-                    None
+                    self.last_resort_font = LastResortFont::Unavailable;
                 }
-            })
+
+                self.fonts_id = None;
+            }
+
+            if let LastResortFont::Resolved(ref font) = self.last_resort_font {
+                Some(font.clone())
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -493,12 +496,12 @@ fn any_font(query: &mut Query<'_>) -> Option<QueryFont> {
     found
 }
 
-struct SelectedFont {
-    font: QueryFont,
-}
-
-impl PartialEq for SelectedFont {
-    fn eq(&self, other: &Self) -> bool {
-        self.font.family == other.font.family && self.font.synthesis == other.font.synthesis
+fn font_instance(font: &QueryFont) -> FontInstance {
+    FontInstance {
+        font: FontData {
+            data: font.blob.clone(),
+            index: font.index,
+        },
+        synthesis: font.synthesis,
     }
 }
