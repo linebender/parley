@@ -118,24 +118,23 @@ impl<B: Brush> TreeStyleBuilder<B> {
                 self.commit_text(span, &uncommitted_text);
             }
             WhiteSpaceCollapse::Collapse => {
-                let mut span_text = String::with_capacity(uncommitted_text.len());
-                for c in uncommitted_text.chars() {
-                    if c.is_ascii_whitespace() {
+                let mut rest = uncommitted_text.as_str();
+                while !rest.is_empty() {
+                    let whitespace_len = rest
+                        .find(|c: char| !c.is_ascii_whitespace())
+                        .unwrap_or(rest.len());
+                    if whitespace_len > 0 {
                         self.pending_whitespace = Some(span);
-                    } else {
-                        if self.pending_whitespace.is_some() {
-                            if span_text.is_empty() {
-                                self.commit_pending_whitespace();
-                            } else {
-                                self.pending_whitespace = None;
-                                span_text.push(' ');
-                            }
-                        }
-                        span_text.push(c);
+                        rest = &rest[whitespace_len..];
+                        continue;
                     }
-                }
-                if !span_text.is_empty() {
-                    self.commit_text(span, &span_text);
+
+                    let text_len = rest
+                        .find(|c: char| c.is_ascii_whitespace())
+                        .unwrap_or(rest.len());
+                    self.commit_pending_whitespace();
+                    self.commit_text(span, &rest[..text_len]);
+                    rest = &rest[text_len..];
                 }
             }
         }
