@@ -119,6 +119,6 @@ pub use parlance::BaseDirection;
 pub use analysis::{Analysis, AnalysisDataSources, Boundary, CharInfo};
 pub use analyzer::{AnalysisOptions, Analyzer};
 pub use glyph::Glyph;
-pub use shape::atom::{Atom, Atoms, Grapheme, Graphemes, ShapedSlice};
+pub use shape::atom::{Atom, Atoms, Grapheme, Graphemes, ShapedClusterGlyphs, ShapedSlice};
 pub use shape::shaped_text::{FontMetrics, NormalizedCoord, ShapedRun, ShapedText};
 pub use shape::shaper::{FontInstance, FontSelector, ShapeOptions, Shaper};
