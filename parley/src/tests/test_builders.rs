@@ -685,3 +685,30 @@ fn builders_crlf_across_run_boundary_counts_as_single_line_break() {
         "styled CRLF should match styled LF line count"
     );
 }
+
+/// Test that a `LineHeight` difference alone forces a new itemizer item.
+#[test]
+fn line_height_alone_forces_a_new_item() {
+    let text = "Hello world";
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+
+    let mut rb = lcx.ranged_builder(&mut fcx, text, 1.0, true);
+    rb.push_default(FontFamily::from(FONT_FAMILY_LIST));
+    rb.push_default(StyleProperty::FontSize(16.));
+    rb.push_default(LineHeight::Absolute(20.));
+    rb.push(StyleProperty::LineHeight(LineHeight::Absolute(40.)), 6..11);
+    let mut layout = rb.build(text);
+    layout.break_all_lines(None);
+
+    let runs: Vec<_> = layout.lines().flat_map(|line| line.runs()).collect();
+    assert_eq!(
+        runs.len(),
+        2,
+        "a LineHeight-only change should split into its own run"
+    );
+    assert_eq!(runs[0].text_range(), 0..6);
+    assert_eq!(runs[0].line_height(), 20.);
+    assert_eq!(runs[1].text_range(), 6..11);
+    assert_eq!(runs[1].line_height(), 40.);
+}
