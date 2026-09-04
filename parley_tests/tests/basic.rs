@@ -484,13 +484,16 @@ fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
     builder.push_text(" b");
     assert_eq!(builder.build().1, "a b");
 
-    // Whitespace surrounding an inline box collapses into a single space on each side.
+    // Whitespace surrounding an inline box collapses into a single space on each side. The box is
+    // not whitespace, so the two spaces do not collapse with each other.
     let mut builder = env.tree_builder();
     builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
-    builder.push_text("a ");
+    builder.push_text("a  ");
     builder.push_inline_box(inline_box());
-    builder.push_text(" b");
-    assert_eq!(builder.build().1, "a b");
+    builder.push_text("  b");
+    let (layout, text) = builder.build();
+    assert_eq!(text, "a  b");
+    assert_eq!(layout.inline_boxes()[0].index, 2);
 
     // Whitespace at the start and end of the text is removed, including in enclosing spans.
     let mut builder = env.tree_builder();
@@ -512,6 +515,21 @@ fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
     let (layout, text) = builder.build();
     assert_eq!(text, "a ");
     assert_eq!(layout.inline_boxes()[0].index, 2);
+
+    // Collapsible whitespace on either side of a preserved segment break (e.g. a `<br>`) is
+    // removed, while whitespace following a preserved space is kept.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text("a ");
+    builder.set_white_space_mode(WhiteSpaceCollapse::Preserve);
+    builder.push_text("\n");
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text(" b ");
+    builder.set_white_space_mode(WhiteSpaceCollapse::Preserve);
+    builder.push_text(" ");
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text(" c");
+    assert_eq!(builder.build().1, "a\nb   c");
 }
 
 #[test]

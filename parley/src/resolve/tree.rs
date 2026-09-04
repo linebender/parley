@@ -15,6 +15,11 @@ struct StyleTreeNode<B: Brush> {
     style_id: Option<u16>,
 }
 
+/// Whether `c` is a segment break, i.e. a character which is a forced line break when preserved.
+fn is_segment_break(c: char) -> bool {
+    matches!(c, '\n' | '\r' | '\u{2028}' | '\u{2029}')
+}
+
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum ItemKind {
     None,
@@ -86,6 +91,8 @@ impl<B: Brush> TreeStyleBuilder<B> {
     }
 
     pub(crate) fn set_white_space_mode(&mut self, white_space_collapse: WhiteSpaceCollapse) {
+        // Text pushed so far is processed with the mode that was in effect when it was pushed.
+        self.push_uncommitted_text();
         self.white_space_collapse = white_space_collapse;
     }
 
@@ -102,6 +109,11 @@ impl<B: Brush> TreeStyleBuilder<B> {
         let span = self.current_span;
         match self.white_space_collapse {
             WhiteSpaceCollapse::Preserve => {
+                if uncommitted_text.starts_with(is_segment_break) {
+                    // Collapsible whitespace immediately preceding a preserved segment break is
+                    // removed.
+                    self.pending_whitespace = None;
+                }
                 self.commit_pending_whitespace();
                 self.commit_text(span, &uncommitted_text);
             }
@@ -137,10 +149,10 @@ impl<B: Brush> TreeStyleBuilder<B> {
         };
 
         // Whitespace at the start of the inline formatting context is removed, as is whitespace
-        // following whitespace which has already been committed (which is preserved whitespace, as
-        // collapsible whitespace is never committed while it is trailing).
+        // immediately following a preserved segment break. Whitespace following a preserved space
+        // or tab is retained, as only collapsible whitespace collapses.
         let is_at_start = self.text.is_empty() && self.last_item_kind != ItemKind::InlineBox;
-        if is_at_start || self.text.ends_with(|c: char| c.is_ascii_whitespace()) {
+        if is_at_start || self.text.ends_with(is_segment_break) {
             return;
         }
 
@@ -303,7 +315,27 @@ mod tests {
         let mut style_runs = Vec::new();
         let text = builder.finish(&mut style_table, &mut style_runs);
 
-        assert_eq!(text, "A   B  C");
+        assert_eq!(text, "A   B   C");
+    }
+
+    #[test]
+    fn collapsible_whitespace_around_a_preserved_segment_break_is_removed() {
+        let mut builder = TreeStyleBuilder::<u32>::default();
+        builder.begin(ResolvedStyle::default());
+        builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+        builder.push_text("A  ");
+        builder.push_style_modification_span([].into_iter());
+        builder.set_white_space_mode(WhiteSpaceCollapse::Preserve);
+        builder.push_text("\n");
+        builder.pop_style_span();
+        builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+        builder.push_text("  B");
+
+        let mut style_table = Vec::new();
+        let mut style_runs = Vec::new();
+        let text = builder.finish(&mut style_table, &mut style_runs);
+
+        assert_eq!(text, "A\nB");
     }
 
     #[test]
