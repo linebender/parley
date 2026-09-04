@@ -362,10 +362,9 @@ impl<B: Brush> LayoutData<B> {
                         let style = &self.styles[character.style_index as usize];
                         let prev_text_wrap_mode = text_wrap_mode;
                         text_wrap_mode = style.text_wrap_mode;
-                        if boundary == Boundary::Mandatory
-                            || (prev_text_wrap_mode == TextWrapMode::Wrap
-                                && (boundary == Boundary::Line
-                                    || style.overflow_wrap == OverflowWrap::Anywhere))
+                        if prev_text_wrap_mode == TextWrapMode::Wrap
+                            && (boundary == Boundary::Line
+                                || style.overflow_wrap == OverflowWrap::Anywhere)
                         {
                             let trailing_whitespace = whitespace_advance(prev_atom);
                             min_width = min_width.max(running_min_width - trailing_whitespace);
