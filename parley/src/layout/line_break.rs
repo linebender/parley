@@ -1570,16 +1570,19 @@ fn commit_line<B: Brush>(
     // between non-space graphemes, in which case there is no trailing space to exclude.
     let mut num_spaces = state.num_spaces;
     let mut justification = Justification::NONE;
-    if break_reason == BreakReason::Regular
-        && state.clusters.start < state.clusters.end
-        && shaped_text
+    if break_reason == BreakReason::Regular && state.clusters.start < state.clusters.end {
+        let mut atoms = shaped_text
             .run_slice(items_to_commit[last_run_pos].index as u32)
-            .atoms_from(state.clusters.end)
-            .prev()
-            .is_some_and(|atom| atom.characters()[0].info.whitespace().is_space_or_nbsp())
-    {
-        num_spaces = num_spaces.saturating_sub(1);
-        justification.line_end_cluster = state.clusters.end;
+            .atoms_from(state.clusters.end);
+        while let Some(atom) = atoms.prev() {
+            if atom.shaped_clusters_range().start < state.clusters.start
+                || !atom.characters()[0].info.whitespace().is_space_or_nbsp()
+            {
+                break;
+            }
+            num_spaces = num_spaces.saturating_sub(1);
+            justification.justified_end_cluster = atom.shaped_clusters_range().start;
+        }
     }
 
     lines.lines.push(LineData {
