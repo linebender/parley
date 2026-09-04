@@ -441,6 +441,80 @@ fn leading_whitespace() {
 }
 
 #[test]
+fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let inline_box = || InlineBox {
+        id: 0,
+        index: 0,
+        width: 10.,
+        height: 10.,
+        baseline: None,
+        kind: InlineBoxKind::InFlow,
+    };
+
+    // Trailing whitespace of a span collapses with the content following the span.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_style_modification_span(None);
+    builder.push_text("Hello ");
+    builder.pop_style_span();
+    builder.push_text("world");
+    assert_eq!(builder.build().1, "Hello world");
+
+    // A whitespace-only span collapses into a single space.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text("Hello");
+    builder.push_style_modification_span(None);
+    builder.push_text("  ");
+    builder.pop_style_span();
+    builder.push_text("  world");
+    assert_eq!(builder.build().1, "Hello world");
+
+    // Whitespace collapses across nested span boundaries.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text("a ");
+    builder.push_style_modification_span(None);
+    builder.push_style_modification_span(None);
+    builder.push_text(" ");
+    builder.pop_style_span();
+    builder.pop_style_span();
+    builder.push_text(" b");
+    assert_eq!(builder.build().1, "a b");
+
+    // Whitespace surrounding an inline box collapses into a single space on each side.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text("a ");
+    builder.push_inline_box(inline_box());
+    builder.push_text(" b");
+    assert_eq!(builder.build().1, "a b");
+
+    // Whitespace at the start and end of the text is removed, including in enclosing spans.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_style_modification_span(None);
+    builder.push_text("  ");
+    builder.pop_style_span();
+    builder.push_text("a");
+    builder.push_style_modification_span(None);
+    builder.push_text("  ");
+    builder.pop_style_span();
+    assert_eq!(builder.build().1, "a");
+
+    // An inline box is not whitespace: whitespace before it is kept.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text("a ");
+    builder.push_inline_box(inline_box());
+    let (layout, text) = builder.build();
+    assert_eq!(text, "a ");
+    assert_eq!(layout.inline_boxes()[0].index, 2);
+}
+
+#[test]
 fn nested_span_inheritance() {
     let ts = |c: AlphaColor<Srgb>| TextStyle {
         font_family: FontFamily::from(crate::util::env::FONT_FAMILY_LIST),

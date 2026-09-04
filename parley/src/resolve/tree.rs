@@ -32,7 +32,12 @@ pub(crate) struct TreeStyleBuilder<B: Brush> {
     text: String,
     uncommitted_text: String,
     current_span: usize,
-    is_span_first: bool,
+    /// The span that a not-yet-committed collapsible whitespace sequence belongs to.
+    ///
+    /// Collapsible whitespace is only committed once it is known to be followed by content in the
+    /// same inline formatting context, so that it can collapse across span and inline box
+    /// boundaries and be removed at the end of the text.
+    pending_whitespace: Option<usize>,
     last_item_kind: ItemKind,
 }
 
@@ -52,7 +57,7 @@ impl<B: Brush> Default for TreeStyleBuilder<B> {
             text: String::new(),
             uncommitted_text: String::new(),
             current_span: usize::MAX,
-            is_span_first: false,
+            pending_whitespace: None,
             last_item_kind: ItemKind::None,
         }
     }
@@ -69,6 +74,8 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.white_space_collapse = WhiteSpaceCollapse::Preserve;
         self.text.clear();
         self.uncommitted_text.clear();
+        self.pending_whitespace = None;
+        self.last_item_kind = ItemKind::None;
 
         self.tree.push(StyleTreeNode {
             parent: None,
@@ -76,81 +83,93 @@ impl<B: Brush> TreeStyleBuilder<B> {
             style_id: None,
         });
         self.current_span = 0;
-        self.is_span_first = true;
     }
 
     pub(crate) fn set_white_space_mode(&mut self, white_space_collapse: WhiteSpaceCollapse) {
         self.white_space_collapse = white_space_collapse;
     }
 
-    pub(crate) fn set_is_span_first(&mut self, is_span_first: bool) {
-        self.is_span_first = is_span_first;
-    }
-
     pub(crate) fn set_last_item_kind(&mut self, item_kind: ItemKind) {
         self.last_item_kind = item_kind;
     }
 
-    pub(crate) fn push_uncommitted_text(&mut self, is_span_last: bool) {
+    pub(crate) fn push_uncommitted_text(&mut self) {
         let uncommitted_text = core::mem::take(&mut self.uncommitted_text);
-        let span_text = match self.white_space_collapse {
-            WhiteSpaceCollapse::Preserve => uncommitted_text,
-            WhiteSpaceCollapse::Collapse => {
-                let mut span_text = uncommitted_text.as_str();
-
-                if self.is_span_first
-                    || (self.last_item_kind == ItemKind::TextRun
-                        && self.text.ends_with(|c: char| c.is_ascii_whitespace()))
-                {
-                    span_text = span_text.trim_ascii_start();
-                }
-                if is_span_last {
-                    span_text = span_text.trim_ascii_end();
-                }
-
-                // Collapse spaces
-                let mut last_char_whitespace = false;
-                span_text
-                    .chars()
-                    .filter_map(|c: char| {
-                        let this_char_whitespace = c.is_ascii_whitespace();
-                        let prev_char_whitespace = last_char_whitespace;
-                        last_char_whitespace = this_char_whitespace;
-
-                        if this_char_whitespace {
-                            if prev_char_whitespace {
-                                None
-                            } else {
-                                Some(' ')
-                            }
-                        } else {
-                            Some(c)
-                        }
-                    })
-                    .collect()
-            }
-        };
-
-        // Nothing to do if there is no uncommitted text.
-        if span_text.is_empty() {
+        if uncommitted_text.is_empty() {
             return;
         }
 
-        let range = self.text.len()..(self.text.len() + span_text.len());
-        let style_index = self.resolve_current_style_id();
-        self.style_runs.push(StyleRun { style_index, range });
-        self.text.push_str(&span_text);
-        self.is_span_first = false;
+        let span = self.current_span;
+        match self.white_space_collapse {
+            WhiteSpaceCollapse::Preserve => {
+                self.commit_pending_whitespace();
+                self.commit_text(span, &uncommitted_text);
+            }
+            WhiteSpaceCollapse::Collapse => {
+                let mut span_text = String::with_capacity(uncommitted_text.len());
+                for c in uncommitted_text.chars() {
+                    if c.is_ascii_whitespace() {
+                        self.pending_whitespace = Some(span);
+                    } else {
+                        if self.pending_whitespace.is_some() {
+                            if span_text.is_empty() {
+                                self.commit_pending_whitespace();
+                            } else {
+                                self.pending_whitespace = None;
+                                span_text.push(' ');
+                            }
+                        }
+                        span_text.push(c);
+                    }
+                }
+                if !span_text.is_empty() {
+                    self.commit_text(span, &span_text);
+                }
+            }
+        }
+    }
+
+    /// Commits a single space for a pending collapsible whitespace sequence, if it is followed by
+    /// content that it can collapse into.
+    pub(crate) fn commit_pending_whitespace(&mut self) {
+        let Some(span) = self.pending_whitespace.take() else {
+            return;
+        };
+
+        // Whitespace at the start of the inline formatting context is removed, as is whitespace
+        // following whitespace which has already been committed (which is preserved whitespace, as
+        // collapsible whitespace is never committed while it is trailing).
+        let is_at_start = self.text.is_empty() && self.last_item_kind != ItemKind::InlineBox;
+        if is_at_start || self.text.ends_with(|c: char| c.is_ascii_whitespace()) {
+            return;
+        }
+
+        self.commit_text(span, " ");
+    }
+
+    fn commit_text(&mut self, span: usize, text: &str) {
+        let style_index = self.resolve_style_id(span);
+        let start = self.text.len();
+        self.text.push_str(text);
+        match self.style_runs.last_mut() {
+            Some(run) if run.style_index == style_index && run.range.end == start => {
+                run.range.end = self.text.len();
+            }
+            _ => self.style_runs.push(StyleRun {
+                style_index,
+                range: start..self.text.len(),
+            }),
+        }
         self.last_item_kind = ItemKind::TextRun;
     }
 
-    fn resolve_current_style_id(&mut self) -> u16 {
-        if let Some(style_id) = self.tree[self.current_span].style_id {
+    fn resolve_style_id(&mut self, span: usize) -> u16 {
+        if let Some(style_id) = self.tree[span].style_id {
             return style_id;
         }
         let style_id = self.style_table.len() as u16;
-        self.style_table.push(self.current_style());
-        self.tree[self.current_span].style_id = Some(style_id);
+        self.style_table.push(self.tree[span].style.clone());
+        self.tree[span].style_id = Some(style_id);
         style_id
     }
 
@@ -159,7 +178,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
     }
 
     pub(crate) fn push_style_span(&mut self, style: ResolvedStyle<B>) {
-        self.push_uncommitted_text(false);
+        self.push_uncommitted_text();
 
         self.tree.push(StyleTreeNode {
             parent: Some(self.current_span),
@@ -167,7 +186,6 @@ impl<B: Brush> TreeStyleBuilder<B> {
             style_id: None,
         });
         self.current_span = self.tree.len() - 1;
-        self.is_span_first = true;
     }
 
     pub(crate) fn push_style_modification_span(
@@ -182,7 +200,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
     }
 
     pub(crate) fn pop_style_span(&mut self) {
-        self.push_uncommitted_text(true);
+        self.push_uncommitted_text();
 
         self.current_span = self.tree[self.current_span]
             .parent
@@ -206,7 +224,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
             self.pop_style_span();
         }
 
-        self.push_uncommitted_text(true);
+        self.push_uncommitted_text();
 
         style_table.clear();
         style_runs.clear();
@@ -244,6 +262,48 @@ mod tests {
         let text = builder.finish(&mut style_table, &mut style_runs);
 
         assert_eq!(text, "\u{00a0}text\u{00a0}");
+    }
+
+    #[test]
+    fn collapsible_whitespace_at_span_end_is_committed_with_the_span_style() {
+        let mut builder = TreeStyleBuilder::<u32>::default();
+        builder.begin(ResolvedStyle::default());
+        builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+        builder.push_style_modification_span([ResolvedProperty::FontSize(20.)].into_iter());
+        builder.push_text("A ");
+        builder.pop_style_span();
+        builder.push_text("B");
+
+        let mut style_table = Vec::new();
+        let mut style_runs = Vec::new();
+        let text = builder.finish(&mut style_table, &mut style_runs);
+
+        assert_eq!(text, "A B");
+        assert_eq!(style_runs.len(), 2);
+        assert_eq!(style_runs[0].style_index, 0);
+        assert_eq!(style_runs[0].range, Range { start: 0, end: 2 });
+        assert_eq!(style_runs[1].style_index, 1);
+        assert_eq!(style_runs[1].range, Range { start: 2, end: 3 });
+    }
+
+    #[test]
+    fn collapsible_whitespace_before_preserved_text_is_committed() {
+        let mut builder = TreeStyleBuilder::<u32>::default();
+        builder.begin(ResolvedStyle::default());
+        builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+        builder.push_text("A ");
+        builder.push_style_modification_span([].into_iter());
+        builder.set_white_space_mode(WhiteSpaceCollapse::Preserve);
+        builder.push_text("  B  ");
+        builder.pop_style_span();
+        builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+        builder.push_text("  C");
+
+        let mut style_table = Vec::new();
+        let mut style_runs = Vec::new();
+        let text = builder.finish(&mut style_table, &mut style_runs);
+
+        assert_eq!(text, "A   B  C");
     }
 
     #[test]
