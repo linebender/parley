@@ -136,10 +136,7 @@ impl<'a> ShapedSlice<'a> {
     /// Get an iterator over glyphs in visual left-to-right order of the shaped cluster with the
     /// given index.
     #[inline]
-    pub fn shaped_cluster_glyphs(
-        &self,
-        cluster_idx: u32,
-    ) -> impl Iterator<Item = Glyph> + Clone + use<'a> {
+    pub fn shaped_cluster_glyphs(&self, cluster_idx: u32) -> ShapedClusterGlyphs<'a> {
         debug_assert!(
             self.clusters.0 <= cluster_idx && cluster_idx < self.clusters.1,
             "cluster index out of this slice's range"
@@ -147,21 +144,23 @@ impl<'a> ShapedSlice<'a> {
 
         let shaped_cluster = self.shaped_clusters[cluster_idx as usize];
 
-        let inline = shaped_cluster.has_inline_glyph().then_some(Glyph {
-            id: shaped_cluster.glyph_offset,
-            x: 0.,
-            y: 0.,
-            advance: shaped_cluster.advance,
-        });
-
-        let stored: &'a [Glyph] = if shaped_cluster.has_inline_glyph() {
-            &[]
+        if shaped_cluster.has_inline_glyph() {
+            ShapedClusterGlyphs {
+                inline: Some(Glyph {
+                    id: shaped_cluster.glyph_offset,
+                    x: 0.,
+                    y: 0.,
+                    advance: shaped_cluster.advance,
+                }),
+                stored: [].iter(),
+            }
         } else {
             let start = shaped_cluster.glyph_offset as usize;
-            &self.glyphs[start..start + usize::from(shaped_cluster.glyph_len())]
-        };
-
-        inline.into_iter().chain(stored.iter().copied())
+            ShapedClusterGlyphs {
+                inline: None,
+                stored: self.glyphs[start..start + usize::from(shaped_cluster.glyph_len())].iter(),
+            }
+        }
     }
 
     /// Get a cursor to walk atoms from the logical start of this slice.
@@ -333,6 +332,59 @@ impl<'a> ShapedSlice<'a> {
         cluster.advance / cluster.graphemes_overlapped(self.characters) as f32
     }
 }
+
+/// An iterator over the glyphs of a single [`ShapedCluster`], in visual left-to-right order.
+///
+/// See [`ShapedSlice::shaped_cluster_glyphs`]. The default value yields no glyphs.
+#[derive(Clone, Debug)]
+pub struct ShapedClusterGlyphs<'a> {
+    /// The cluster's glyph if it is stored inline.
+    inline: Option<Glyph>,
+    /// The cluster's glyphs in the glyph array.
+    stored: core::slice::Iter<'a, Glyph>,
+}
+
+impl ShapedClusterGlyphs<'static> {
+    /// An empty iterator that does not return any glyphs.
+    ///
+    /// This can be used to store a value of this type before actually having access to any shaped
+    /// clusters.
+    pub fn empty() -> Self {
+        Self {
+            inline: None,
+            stored: [].iter(),
+        }
+    }
+}
+
+impl Iterator for ShapedClusterGlyphs<'_> {
+    type Item = Glyph;
+
+    #[inline]
+    fn next(&mut self) -> Option<Glyph> {
+        if let Some(glyph) = self.inline.take() {
+            return Some(glyph);
+        }
+        self.stored.next().copied()
+    }
+
+    #[inline]
+    fn nth(&mut self, n: usize) -> Option<Glyph> {
+        match self.inline.take() {
+            Some(glyph) if n == 0 => Some(glyph),
+            Some(_) => self.stored.nth(n - 1).copied(),
+            None => self.stored.nth(n).copied(),
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = usize::from(self.inline.is_some()) + self.stored.len();
+        (len, Some(len))
+    }
+}
+
+impl ExactSizeIterator for ShapedClusterGlyphs<'_> {}
 
 /// An [`Atom`] cursor.
 ///
