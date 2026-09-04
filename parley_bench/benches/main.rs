@@ -6,14 +6,14 @@
 use tango_bench::tango_benchmarks;
 
 use parley_bench::benches::{
-    defaults, iterate_styled_items, long_line, repeated_justification, spacing, styled,
+    defaults, iterate_glyph_runs, long_line, repeated_justification, spacing, styled,
 };
 use parley_bench::fontique_benches::system_fonts_init;
 
 tango_benchmarks!(
     defaults(),
     styled(),
-    iterate_styled_items(),
+    iterate_glyph_runs(),
     spacing(),
     repeated_justification(),
     long_line(),
