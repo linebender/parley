@@ -219,15 +219,12 @@ pub fn styled() -> Vec<Benchmark> {
 ///
 /// The cases fall into three groups:
 ///
-/// - Latin with uniform styling, giving one glyph run per shaped run, each as long as the shaped
-///   run.
-/// - Latin with a style alternating every few characters. Glyph runs break wherever the style
-///   index changes, but only a subset of style properties also splits the shaped run: underline
-///   leaves the text in one shaped run carrying many glyph runs, whereas bold selects a different
-///   font and so gives every glyph run a shaped run of its own.
-/// - Mixed styling of each script, wrapped. This covers script, bidi and font fallback handling,
-///   and, being wrapped, the line-scoped runs a renderer normally walks. Mixed styling mostly
-///   changes the font, so these split into separately shaped runs.
+/// - Four paragraphs of Latin with a single style, without line wrapping, giving four shaped runs.
+/// - Four paragraphs of Latin with a style alternating every few characters, without line wrapping.
+///   Glyph runs break wherever the style changes; some properties, such as bold, also split the
+///   shaped run. This benches both cases.
+/// - Mixed styling of each script with line wrapping. This covers script, bidi and font fallback
+///   handling, and, being wrapped, the line-scoped runs a renderer normally walks.
 pub fn iterate_glyph_runs() -> Vec<Benchmark> {
     let latin = get_samples()
         .iter()
@@ -305,7 +302,7 @@ fn walk_items(layout: &Layout<ColorBrush>) -> (usize, f32) {
     (glyph_count, advance)
 }
 
-/// Build a single long line of `text`, applying each style of `styles` to its byte range.
+/// Build `text` without line wrapping, applying each style of `styles` to its byte range.
 ///
 /// The layout is a single long line. Depending on the styles used, the proportion of glyphs per
 /// shaped run or style span varies. E.g., switching between bold and non-bold, the font changes, so
@@ -332,7 +329,7 @@ fn build_unwrapped_layout<'a>(
     })
 }
 
-/// Build a single long line of `text`, applying `style` to every other chunk of `chunk_len`
+/// Build `text` without line wrapping, applying `style` to every other chunk of `chunk_len`
 /// characters.
 ///
 /// See [`build_unwrapped_layout`] for an explanation of the impact of varying styles.
