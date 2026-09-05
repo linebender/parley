@@ -74,15 +74,14 @@ pub(crate) fn align<B: Brush>(
             // In RTL text, trailing whitespace is on the left. As we hang that whitespace, offset
             // the line to the left. Note: indent is not subtracted here because `free_space` below
             // already accounts for it.
-            line.metrics.offset = -line.metrics.trailing_whitespace;
+            line.metrics.offset = -line.metrics.hanging_advance;
         } else {
             line.metrics.offset = indent;
         }
 
         // Compute free space.
         let line_width = line.metrics.inline_max_coord - line.metrics.inline_min_coord;
-        let free_space =
-            line_width - indent - line.metrics.advance + line.metrics.trailing_whitespace;
+        let free_space = line_width - indent - line.metrics.advance + line.metrics.hanging_advance;
 
         if !options.align_when_overflowing && free_space <= 0.0 {
             if is_rtl {
@@ -113,7 +112,7 @@ pub(crate) fn align<B: Brush>(
                 // gaps to adjust. In that case, start-align, i.e., left-align for LTR text and
                 // right-align for RTL text.
                 if matches!(line.break_reason, BreakReason::None | BreakReason::Explicit)
-                    || line.num_spaces == 0
+                    || line.num_justification_opportunities == 0
                 {
                     if is_rtl {
                         line.metrics.offset += free_space;
@@ -121,7 +120,8 @@ pub(crate) fn align<B: Brush>(
                     continue;
                 }
 
-                line.justification.amount_per_opportunity = free_space / line.num_spaces as f32;
+                line.justification.amount_per_opportunity =
+                    free_space / line.num_justification_opportunities as f32;
             }
         }
     }

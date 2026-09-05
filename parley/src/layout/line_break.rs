@@ -11,7 +11,7 @@ use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
 use crate::layout::data::count_graphemes;
-use crate::layout::spacing::{EffectiveSpacing, Justification};
+use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -43,7 +43,6 @@ struct LineState {
     /// The line's shaped clusters, as a range into [`parley_engine::ShapedText::shaped_clusters`].
     /// The bounds are atom-aligned.
     clusters: Range<u32>,
-    num_spaces: usize,
     box_metrics: LineBoxMetrics,
     /// This is set to true if we encounter something on the line (either a glyph or an inline box)
     /// that is taller than the `line_max_height`. When in this state `break_next` should yield control
@@ -332,9 +331,6 @@ impl BreakerState {
         line_height: f32,
         quantize: bool,
     ) {
-        if atom.characters()[0].info.whitespace().is_space_or_nbsp() {
-            self.line.num_spaces += 1;
-        }
         self.line.items.end = self.item_idx + 1;
         self.line.clusters.end = atom.shaped_clusters_range().end;
         self.cluster_idx = atom.shaped_clusters_range().end;
@@ -748,7 +744,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let first_character = &atom.characters()[0];
                         let whitespace = first_character.info.whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
-                        let is_space = whitespace.is_space_or_nbsp();
+                        // Whether this is a space that is allowed to hang past the line. NBSP is
+                        // not included.
+                        let is_space = matches!(
+                            whitespace,
+                            Whitespace::Space | Whitespace::Tab | Whitespace::Newline
+                        );
                         let boundary = first_character.info.boundary();
                         let metrics = run.font_metrics();
                         let line_height = run.data.line_height;
@@ -1175,14 +1176,19 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         if line.item_range.is_empty() {
             line.text_range = self.layout.data.text_len..self.layout.data.text_len;
         }
-        // Walk the line's items to compute text ranges, per-run advances and bidi ordering. The
-        // vertical metrics (ascent/descent/line-height and inline box extents) are *not* computed
-        // here: they were already accumulated into `self.state.line` as the line was built and are
-        // read from there below. `have_metrics` records whether the line has any non-whitespace
-        // content (text or an in-flow box), which distinguishes a genuinely empty line from a
-        // whitespace-only one.
-        let mut have_metrics = false;
+
+        // Walk the line's items to compute text ranges, per-run advances, bidi ordering, and
+        // hanging whitespace. The vertical metrics (ascent/descent/line-height and inline box
+        // extents) are *not* computed here: they were already accumulated into `self.state.line` as
+        // the line was built and are read from there below.
         let mut needs_reorder = false;
+        let mut hanging = true;
+        let mut hanging_whitespace_advance = 0.;
+        let mut num_justification_opportunities = 0;
+        // One past the justified region: atoms with shaped clusters before this index may be
+        // stretched by justification.
+        let mut justified_end = u32::MAX;
+
         for line_item in self.lines.line_items[line.item_range.clone()]
             .iter_mut()
             .rev()
@@ -1193,12 +1199,18 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                     // Advance is already computed in "commit line" for items
                     if item.kind == InlineBoxKind::InFlow {
-                        // Mark us as having seen non-whitespace content on this line
-                        have_metrics = true;
+                        // Inline boxes don't hang.
+                        hanging = false;
                     }
                 }
                 LayoutItemKind::TextRun => {
-                    line_item.compute_whitespace_properties(&self.layout.data);
+                    // Trailing whitespace can only hang if it ends up at the line's end edge after
+                    // bidi reordering. We don't currently apply UAX #9 L1 (resetting trailing
+                    // whitespace to paragraph level), so only logically-last items that match the
+                    // paragraph level are guaranteed to be at that edge.
+                    if hanging && line_item.bidi_level != self.layout.data.base_level {
+                        hanging = false;
+                    }
 
                     // Compute the text range for the line
                     // Q: Can we not simplify this computation by assuming that items are in order?
@@ -1235,17 +1247,80 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         EffectiveSpacing::new(spacing, Justification::NONE).slice_advance(slice)
                     };
 
-                    // Ignore trailing whitespace when deciding whether the line has content
-                    // (we are iterating backwards so trailing whitespace comes first)
-                    if !have_metrics && line_item.is_whitespace {
-                        continue;
-                    }
+                    // Ignore trailing whitespace for the line's content advance calculation
+                    // (we are iterating backwards so trailing whitespace comes first).
+                    let slice = self
+                        .layout
+                        .data
+                        .shaped_text
+                        .run_slice(line_item.index as u32)
+                        .narrow(line_item.shaped_cluster_range.clone());
+                    let effective_spacing = EffectiveSpacing::new(spacing, Justification::NONE);
+                    for atom in slice.atoms_end().rev() {
+                        if hanging {
+                            // An atom can hang partially: e.g., a prepend character followed by a
+                            // space is a single atom (as it's a grapheme), but may consist of
+                            // multiple shaped clusters. We can hang the advance of the space's
+                            // shaped cluster. In case of such partial hanging, if the atom has any
+                            // additional spacing (e.g., through word spacing), only the logically
+                            // last spacing is hung.
+                            let mut last_cluster = true;
+                            let (gap_start, gap_end) = {
+                                let gaps = effective_spacing.gaps(&atom);
+                                if line_item.is_rtl() {
+                                    (gaps.after, gaps.before)
+                                } else {
+                                    (gaps.before, gaps.after)
+                                }
+                            };
+                            for (cluster, cluster_idx) in atom
+                                .shaped_clusters()
+                                .iter()
+                                .zip(atom.shaped_clusters_range())
+                                .rev()
+                            {
+                                let cluster_hangs =
+                                    slice.characters_in(cluster.chars_range()).iter().all(|c| {
+                                        let whitespace = c.info.whitespace();
+                                        // Note non-breaking spaces don't hang: CSS Text 4 § 4.3.2
+                                        // hangs only spaces, tabs, segment breaks, and "other space
+                                        // separators." We don't currently handle "other space
+                                        // separators".
+                                        matches!(
+                                            whitespace,
+                                            Whitespace::Space
+                                                | Whitespace::Tab
+                                                | Whitespace::Newline
+                                        )
+                                    });
+                                if !cluster_hangs {
+                                    hanging = false;
+                                    break;
+                                }
+                                if last_cluster {
+                                    hanging_whitespace_advance += gap_end;
+                                    last_cluster = false;
+                                }
+                                hanging_whitespace_advance += cluster.advance;
+                                justified_end = cluster_idx;
+                            }
 
-                    // Mark us as having seen non-whitespace content on this line
-                    have_metrics = true;
+                            if hanging {
+                                hanging_whitespace_advance += gap_start;
+                            } else {
+                                justified_end = atom.shaped_clusters_range().start;
+                            }
+                        } else if is_word_separator(atom.characters()[0].info.whitespace()) {
+                            num_justification_opportunities += 1;
+                        }
+                    }
                 }
             }
         }
+
+        line.metrics.hanging_advance = hanging_whitespace_advance;
+        line.num_justification_opportunities = num_justification_opportunities;
+        line.justification.justification_end_cluster = justified_end;
 
         // Reorder the items within the line (if required). Reordering is required if the line contains
         // a mix of bidi levels (a mix of LTR and RTL text)
@@ -1254,56 +1329,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             reorder_line_items(&mut self.lines.line_items[line.item_range.clone()]);
         }
 
-        // Compute size of line's trailing whitespace. "Trailing" is considered the right edge
-        // for LTR text and the left edge for RTL text.
-        let run = if self.layout.is_rtl() {
-            self.lines.line_items[line.item_range.clone()].first()
-        } else {
-            self.lines.line_items[line.item_range.clone()].last()
-        };
-        line.metrics.trailing_whitespace = run
-            .filter(|item| item.is_text_run() && item.has_trailing_whitespace)
-            .map(|run| {
-                fn whitespace_advance<'a>(
-                    spacing: EffectiveSpacing,
-                    atoms: impl Iterator<Item = Atom<'a>>,
-                ) -> f32 {
-                    atoms
-                        .take_while(|atom| {
-                            atom.characters()
-                                .iter()
-                                .all(|character| character.info.whitespace() != Whitespace::None)
-                        })
-                        .map(|atom| spacing.atom_advance(&atom))
-                        .sum()
-                }
-
-                let slice = self
-                    .layout
-                    .data
-                    .shaped_text
-                    .run_slice(run.index as u32)
-                    .narrow(run.shaped_cluster_range.clone());
-                let spacing = EffectiveSpacing::new(
-                    self.layout.data.runs[run.index].spacing,
-                    Justification::NONE,
-                );
-
-                if run.is_rtl() {
-                    whitespace_advance(spacing, slice.atoms_start())
-                } else {
-                    whitespace_advance(spacing, slice.atoms_end().rev())
-                }
-            })
-            .unwrap_or(0.0);
-
         // Whether metrics should be quantized to pixel boundaries
         let quantize = self.layout.data.quantize;
 
         let mut line_box_extents = self.state.line.box_metrics.line_box.or_zero();
         let mut content_box_extents = self.state.line.box_metrics.content_box.or_zero();
-        if !have_metrics
-            && line.item_range.is_empty()
+        if line.item_range.is_empty()
             && let Some(metrics) = prev_line_metrics
         {
             // HACK: copy metrics from previous line if we don't have
@@ -1341,8 +1372,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     index,
                     bidi_level: BidiLevel::new(0),
                     advance: 0.,
-                    is_whitespace: false,
-                    has_trailing_whitespace: false,
                     shaped_cluster_range: cluster..cluster,
                     grapheme_range: grapheme..grapheme,
                     text_range: text..text,
@@ -1388,7 +1417,7 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
             let indent_extra = line.indent.max(0.0);
             let line_max = line.metrics.inline_min_coord + line.metrics.advance + indent_extra;
             layout_full_width = layout_full_width.max(line_max);
-            layout_width = layout_width.max(line_max - line.metrics.trailing_whitespace);
+            layout_width = layout_width.max(line_max - line.metrics.hanging_advance);
             height += line.metrics.line_height as f64;
         }
 
@@ -1472,8 +1501,6 @@ fn commit_line<B: Brush>(
                     advance: inline_box.width,
 
                     // These properties are ignored for inline boxes. So we just put a dummy value.
-                    is_whitespace: false,
-                    has_trailing_whitespace: false,
                     shaped_cluster_range: 0..0,
                     grapheme_range: 0..0,
                     text_range: 0..0,
@@ -1553,8 +1580,6 @@ fn commit_line<B: Brush>(
                     index: item.index,
                     bidi_level: shaped_run.bidi_level,
                     advance: 0.,
-                    is_whitespace: false,
-                    has_trailing_whitespace: false,
                     shaped_cluster_range: cluster_range,
                     grapheme_range,
                     text_range,
@@ -1565,32 +1590,12 @@ fn commit_line<B: Brush>(
     // let end_run_idx = lines.line_items.last().map(|item| item.index).unwrap_or(0);
     let end_item_idx = lines.line_items.len();
 
-    // Exclude the trailing space from justification space count. Only subtract if the line actually
-    // ends with an atom starting with a space: with `WordBreak::BreakAll`, regular breaks can land
-    // between non-space graphemes, in which case there is no trailing space to exclude.
-    let mut num_spaces = state.num_spaces;
-    let mut justification = Justification::NONE;
-    if break_reason == BreakReason::Regular && state.clusters.start < state.clusters.end {
-        let mut atoms = shaped_text
-            .run_slice(items_to_commit[last_run_pos].index as u32)
-            .atoms_from(state.clusters.end);
-        while let Some(atom) = atoms.prev() {
-            if atom.shaped_clusters_range().start < state.clusters.start
-                || !atom.characters()[0].info.whitespace().is_space_or_nbsp()
-            {
-                break;
-            }
-            num_spaces = num_spaces.saturating_sub(1);
-            justification.justified_end_cluster = atom.shaped_clusters_range().start;
-        }
-    }
-
     lines.lines.push(LineData {
         item_range: start_item_idx..end_item_idx,
         max_advance,
         break_reason,
-        num_spaces,
-        justification,
+        num_justification_opportunities: 0,
+        justification: Justification::NONE,
         indent: line_indent,
         metrics: LineMetrics {
             advance: state.x,
@@ -1600,7 +1605,6 @@ fn commit_line<B: Brush>(
     });
 
     // Reset state for the new line
-    state.num_spaces = 0;
     if committed_text_run {
         state.clusters.start = state.clusters.end;
     }
