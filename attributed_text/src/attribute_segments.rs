@@ -145,7 +145,7 @@ fn build_segment_state_from_ranges<I>(
     }
 }
 
-fn build_segment_state<T: Debug + TextStorage, Attr: Debug>(
+fn build_segment_state<T: Clone + Debug + TextStorage, Attr: Clone + Debug>(
     attributed: &AttributedText<T, Attr>,
     workspace: &mut AttributeSegmentsWorkspace,
 ) {
@@ -202,7 +202,7 @@ impl AttributeSegmentsWorkspace {
     }
 
     /// Build an iterator using this workspace's retained allocations.
-    pub fn segments<'w, 'a, T: Debug + TextStorage, Attr: Debug>(
+    pub fn segments<'w, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug>(
         &'w mut self,
         attributed: &'a AttributedText<T, Attr>,
     ) -> AttributeSegments<'w, 'a, T, Attr> {
@@ -271,7 +271,7 @@ impl AttributeSegmentsWorkspace {
 /// ```
 /// use attributed_text::{AttributeSegmentsWorkspace, AttributedText, TextRange};
 ///
-/// #[derive(Debug, PartialEq, Eq)]
+/// #[derive(Clone, Debug, PartialEq, Eq)]
 /// enum Color {
 ///     Red,
 ///     Blue,
@@ -358,13 +358,15 @@ impl AttributeSegmentsWorkspace {
 /// Zero-length attribute ranges are excluded from the active span set, but their boundaries are
 /// still included in segmentation, so they can split output ranges.
 #[derive(Debug)]
-pub struct AttributeSegments<'w, 'a, T: Debug + TextStorage, Attr: Debug> {
+pub struct AttributeSegments<'w, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug> {
     attributed: &'a AttributedText<T, Attr>,
     workspace: &'w mut AttributeSegmentsWorkspace,
     index: usize,
 }
 
-impl<'w, 'a, T: Debug + TextStorage, Attr: Debug> AttributeSegments<'w, 'a, T, Attr> {
+impl<'w, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug>
+    AttributeSegments<'w, 'a, T, Attr>
+{
     fn update_active_for_boundary(&mut self, boundary_index: usize) {
         update_active_for_boundary(self.workspace, boundary_index);
     }
@@ -397,13 +399,15 @@ impl<'w, 'a, T: Debug + TextStorage, Attr: Debug> AttributeSegments<'w, 'a, T, A
 
 /// A range yielded by [`AttributeSegments`] with its active attribute spans.
 #[derive(Clone, Debug)]
-pub struct AttributeSegment<'s, 'a, T: Debug + TextStorage, Attr: Debug> {
+pub struct AttributeSegment<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug> {
     range: TextRange,
     active_ids: &'s [u32],
     attributed: &'a AttributedText<T, Attr>,
 }
 
-impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> AttributeSegment<'s, 'a, T, Attr> {
+impl<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug>
+    AttributeSegment<'s, 'a, T, Attr>
+{
     /// Returns the segment range.
     #[must_use]
     pub const fn range(&self) -> TextRange {
@@ -420,7 +424,9 @@ impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> AttributeSegment<'s, 'a, T, At
     }
 }
 
-impl<T: Debug + TextStorage, Attr: Debug> Iterator for AttributeSegments<'_, '_, T, Attr> {
+impl<T: Clone + Debug + TextStorage, Attr: Clone + Debug> Iterator
+    for AttributeSegments<'_, '_, T, Attr>
+{
     type Item = TextRange;
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -448,7 +454,9 @@ impl<T: Debug + TextStorage, Attr: Debug> Iterator for AttributeSegments<'_, '_,
     }
 }
 
-impl<T: Debug + TextStorage, Attr: Debug> ExactSizeIterator for AttributeSegments<'_, '_, T, Attr> {
+impl<T: Clone + Debug + TextStorage, Attr: Clone + Debug> ExactSizeIterator
+    for AttributeSegments<'_, '_, T, Attr>
+{
     fn len(&self) -> usize {
         // Remaining segments are remaining adjacent boundary pairs: [i, i + 1).
         self.workspace
@@ -463,7 +471,7 @@ impl<T: Debug + TextStorage, Attr: Debug> ExactSizeIterator for AttributeSegment
 /// Provides iteration in both application order (ascending span id) and reverse
 /// application order (descending span id — useful for last-writer-wins resolution).
 #[derive(Clone, Debug)]
-pub struct ActiveSpans<'s, 'a, T: Debug + TextStorage, Attr: Debug> {
+pub struct ActiveSpans<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug> {
     active_ids: &'s [u32],
     attributed: &'a AttributedText<T, Attr>,
 }
@@ -473,12 +481,14 @@ pub struct ActiveSpans<'s, 'a, T: Debug + TextStorage, Attr: Debug> {
 /// Obtain this by calling [`ActiveSpans::iter`] or by iterating `&ActiveSpans`
 /// via [`IntoIterator`].
 #[derive(Clone, Debug)]
-pub struct ActiveSpansIter<'s, 'a, T: Debug + TextStorage, Attr: Debug> {
+pub struct ActiveSpansIter<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug> {
     ids: core::slice::Iter<'s, u32>,
     attributed: &'a AttributedText<T, Attr>,
 }
 
-impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> Iterator for ActiveSpansIter<'s, 'a, T, Attr> {
+impl<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug> Iterator
+    for ActiveSpansIter<'s, 'a, T, Attr>
+{
     type Item = (TextRange, &'a Attr);
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -495,9 +505,12 @@ impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> Iterator for ActiveSpansIter<'
     }
 }
 
-impl<T: Debug + TextStorage, Attr: Debug> ExactSizeIterator for ActiveSpansIter<'_, '_, T, Attr> {}
+impl<T: Clone + Debug + TextStorage, Attr: Clone + Debug> ExactSizeIterator
+    for ActiveSpansIter<'_, '_, T, Attr>
+{
+}
 
-impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> DoubleEndedIterator
+impl<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug> DoubleEndedIterator
     for ActiveSpansIter<'s, 'a, T, Attr>
 {
     fn next_back(&mut self) -> Option<Self::Item> {
@@ -510,7 +523,7 @@ impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> DoubleEndedIterator
     }
 }
 
-impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> ActiveSpans<'s, 'a, T, Attr> {
+impl<'s, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug> ActiveSpans<'s, 'a, T, Attr> {
     /// Iterate over the active spans in application order (ascending span id).
     ///
     /// Each item is `(TextRange, &Attr)`.
@@ -532,7 +545,7 @@ impl<'s, 'a, T: Debug + TextStorage, Attr: Debug> ActiveSpans<'s, 'a, T, Attr> {
     }
 }
 
-impl<'active, 's, 'a, T: Debug + TextStorage, Attr: Debug> IntoIterator
+impl<'active, 's, 'a, T: Clone + Debug + TextStorage, Attr: Clone + Debug> IntoIterator
     for &'active ActiveSpans<'s, 'a, T, Attr>
 {
     type Item = (TextRange, &'a Attr);
