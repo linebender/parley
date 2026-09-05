@@ -700,10 +700,9 @@ impl GraphemeFlags {
     fn boundary_before(self) -> Boundary {
         match self.0 & Self::BOUNDARY_MASK {
             0 => Boundary::None,
-            1 => Boundary::Word,
-            2 => Boundary::Line,
-            3 => Boundary::Mandatory,
-            _ => unreachable!("0..4 are the only valid values"),
+            1 => Boundary::Line,
+            2 => Boundary::Mandatory,
+            _ => unreachable!("0..3 are the only valid values"),
         }
     }
 
@@ -834,8 +833,7 @@ mod tests {
         Analyzer::new().analyze(
             text,
             &AnalysisOptions {
-                word_break: &[],
-                line_break_override: None,
+                line_break_opportunities: &[],
                 ..AnalysisOptions::default()
             },
             &mut analysis,

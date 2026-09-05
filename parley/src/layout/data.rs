@@ -189,6 +189,8 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) base_level: BidiLevel,
     /// The length of the text in the layout
     pub(crate) text_len: usize,
+    /// Ordered byte offsets of word-segment boundaries in the source text.
+    pub(crate) word_boundary_bytes: Vec<usize>,
 
     // Output of style resolution (input to line breaking)
     pub(crate) styles: Vec<Style<B>>,
@@ -231,6 +233,7 @@ impl<B: Brush> Default for LayoutData<B> {
             quantize: true,
             base_level: BidiLevel::new(0),
             text_len: 0,
+            word_boundary_bytes: Vec::new(),
             width: 0.,
             full_width: 0.,
             height: 0.,
@@ -256,6 +259,7 @@ impl<B: Brush> LayoutData<B> {
         self.quantize = true;
         self.base_level = BidiLevel::new(0);
         self.text_len = 0;
+        self.word_boundary_bytes.clear();
         self.width = 0.;
         self.full_width = 0.;
         self.height = 0.;

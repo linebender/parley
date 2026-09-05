@@ -32,6 +32,8 @@ This release has an [MSRV] of 1.88.
 
 #### Parley
 
+- Line and word segmentation now runs in Parley rather than `parley_engine`, preserving existing
+  layout behavior while allowing the engine to accept host-provided line break opportunities.
 - Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. ([#661][] by [@tomcur][])
 - Breaking change: `Cluster` now spans a full grapheme cluster instead of a single character. ([#715][] by [@tomcur][])  
   Shaped clusters that cross grapheme boundaries are represented using the existing `Cluster::is_ligature_start` and `Cluster::is_ligature_continuation`; note these methods previously encoded graphemes as well.
@@ -44,6 +46,12 @@ This release has an [MSRV] of 1.88.
   Note glyphs overflow these content bounds as well, for example when many combining marks are stacked.
   The union of the line-box and content bounds is close to the old `LineMetrics::block_{min,max}_coord` fields.
 - `parley::editing::Cursor::{previous,next}_logical_word` now land at the previous/next logical start of a word and skip over whitespace. ([#215][] by [@tomcur][])
+
+#### Parley Engine
+
+- Breaking change: `AnalysisOptions` now accepts caller-provided UTF-8 line break offsets. The
+  engine no longer performs line or word segmentation, and `Boundary` no longer has a `Word`
+  variant.
 
 ### Fixed
 

@@ -559,8 +559,7 @@ mod tests {
         Analyzer::new().analyze(
             text,
             &AnalysisOptions {
-                word_break: &[],
-                line_break_override: None,
+                line_break_opportunities: &[],
                 ..AnalysisOptions::default()
             },
             &mut analysis,
