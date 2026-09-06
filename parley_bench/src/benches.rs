@@ -8,7 +8,7 @@
 use crate::{ColorBrush, FONT_FAMILY_LIST, get_samples, with_contexts};
 use parley::{
     Alignment, AlignmentOptions, FontFamily, FontStyle, FontWeight, Layout, PositionedLayoutItem,
-    RangedBuilder, StyleProperty,
+    StyleProperty,
 };
 use std::hint::black_box;
 use std::ops::Range;
@@ -142,57 +142,62 @@ pub fn repeated_justification() -> [Benchmark; 1] {
     )]
 }
 
+/// Get the byte ranges of each consecutive chunk of `char_len` characters.
+///
+/// The last chunk holds the characters remaining.
+fn chunks(text: &str, char_len: usize) -> impl Iterator<Item = Range<usize>> {
+    let mut starts = text
+        .char_indices()
+        .map(|(byte_idx, _)| byte_idx)
+        .step_by(char_len)
+        .peekable();
+    std::iter::from_fn(move || {
+        let start = starts.next()?;
+        let end = starts.peek().copied().unwrap_or(text.len());
+        Some(start..end)
+    })
+}
+
+/// Create style spans changing style every few characters.
+fn styled_spans(
+    text: &str,
+) -> impl Iterator<Item = (StyleProperty<'static, ColorBrush>, Range<usize>)> {
+    let style_interval = (text.len() / 5).min(10);
+    chunks(text, style_interval)
+        .enumerate()
+        .filter_map(|(style_idx, range)| {
+            let style = match style_idx % 5 {
+                0 => StyleProperty::FontStyle(FontStyle::Italic),
+                1 => StyleProperty::FontWeight(FontWeight::BOLD),
+                2 => StyleProperty::Underline(true),
+                3 => StyleProperty::Strikethrough(true),
+                4 => return None, // Default style
+                _ => unreachable!(),
+            };
+            Some((style, range))
+        })
+}
+
+/// Apply `style` to every other chunk of `chunk_char_len` characters of `text`.
+fn alternating_spans<'s>(
+    text: &str,
+    chunk_char_len: usize,
+    style: &StyleProperty<'s, ColorBrush>,
+) -> impl Iterator<Item = (StyleProperty<'s, ColorBrush>, Range<usize>)> {
+    chunks(text, chunk_char_len)
+        .step_by(2)
+        .map(move |range| (style.clone(), range))
+}
+
 /// Build a styled layout for `text`, changing style every few characters.
 fn build_styled_layout(text: &str) -> Layout<ColorBrush> {
     const DISPLAY_SCALE: f32 = 1.0;
-    const QUANTIZE: bool = true;
     const MAX_ADVANCE: f32 = 200.0 * DISPLAY_SCALE;
 
-    fn apply_style(
-        builder: &mut RangedBuilder<'_, ColorBrush>,
-        style_idx: usize,
-        range: Range<usize>,
-    ) {
-        // Cycle through 5 different styles
-        match style_idx % 5 {
-            0 => builder.push(StyleProperty::FontStyle(FontStyle::Italic), range),
-            1 => builder.push(StyleProperty::FontWeight(FontWeight::BOLD), range),
-            2 => builder.push(StyleProperty::Underline(true), range),
-            3 => builder.push(StyleProperty::Strikethrough(true), range),
-            4 => {} // Default style
-            _ => unreachable!(),
-        }
-    }
-
-    with_contexts(|font_cx, layout_cx| {
-        let mut builder = layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
-        builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
-
-        // Apply different styles every `style_interval` characters
-        let style_interval = (text.len() / 5).min(10);
-        {
-            let mut chunk_start = 0;
-            let mut style_idx = 0;
-
-            for (char_count, (byte_idx, _)) in text.char_indices().enumerate() {
-                if char_count != 0 && char_count % style_interval == 0 {
-                    apply_style(&mut builder, style_idx, chunk_start..byte_idx);
-                    chunk_start = byte_idx;
-                    style_idx += 1;
-                }
-            }
-
-            // Apply style to the last chunk if there's remaining text
-            if chunk_start < text.len() {
-                apply_style(&mut builder, style_idx, chunk_start..text.len());
-            }
-        }
-
-        let mut layout: Layout<ColorBrush> = builder.build(text);
-        layout.break_all_lines(Some(MAX_ADVANCE));
-        layout.align(Alignment::Start, AlignmentOptions::default());
-        layout
-    })
+    let mut layout = build_layout(text, styled_spans(text));
+    layout.break_all_lines(Some(MAX_ADVANCE));
+    layout.align(Alignment::Start, AlignmentOptions::default());
+    layout
 }
 
 /// Benchmark for styled text.
@@ -255,7 +260,10 @@ pub fn iterate_glyph_runs() -> Vec<Benchmark> {
                 latin.name, latin.modification
             ),
             move |b| {
-                let layout = build_alternating_layout(&latin.text, chunk_len, &style);
+                let layout = build_unwrapped_layout(
+                    &latin.text,
+                    alternating_spans(&latin.text, chunk_len, &style),
+                );
                 b.iter(move || black_box(walk_items(&layout)))
             },
         ));
@@ -302,13 +310,10 @@ fn walk_items(layout: &Layout<ColorBrush>) -> (usize, f32) {
     (glyph_count, advance)
 }
 
-/// Build `text` without line wrapping, applying each style of `styles` to its byte range.
+/// Build `text` into a layout. Each style of `styles` is applied to its given byte range.
 ///
-/// The layout is a single long line. Depending on the styles used, the proportion of glyphs per
-/// shaped run or style span varies. E.g., switching between bold and non-bold, the font changes, so
-/// the styles split the text into separately shaped items. Switching between underline and
-/// non-underline, there's no impact on shaping, and only the style spans change.
-fn build_unwrapped_layout<'a>(
+/// This doesn't break the layout into lines.
+fn build_layout<'a>(
     text: &str,
     styles: impl IntoIterator<Item = (StyleProperty<'a, ColorBrush>, Range<usize>)>,
 ) -> Layout<ColorBrush> {
@@ -322,36 +327,25 @@ fn build_unwrapped_layout<'a>(
             builder.push(style, range);
         }
 
-        let mut layout: Layout<ColorBrush> = builder.build(text);
-        layout.break_all_lines(None);
-        layout.align(Alignment::Start, AlignmentOptions::default());
-        layout
+        builder.build(text)
     })
 }
 
-/// Build `text` without line wrapping, applying `style` to every other chunk of `chunk_len`
-/// characters.
+/// Build `text` and line break without a maximum advance, i.e., lines are not wrapped. Each style
+/// of `styles` is applied to its given byte range.
 ///
-/// See [`build_unwrapped_layout`] for an explanation of the impact of varying styles.
-fn build_alternating_layout(
+/// The layout is a single long line. Depending on the styles used, the proportion of glyphs per
+/// shaped run or style span varies. E.g., switching between bold and non-bold, the font changes, so
+/// the styles split the text into separately shaped items. Switching between underline and
+/// non-underline, there's no impact on shaping, and only the style spans change.
+fn build_unwrapped_layout<'a>(
     text: &str,
-    chunk_len: usize,
-    style: &StyleProperty<'_, ColorBrush>,
+    styles: impl IntoIterator<Item = (StyleProperty<'a, ColorBrush>, Range<usize>)>,
 ) -> Layout<ColorBrush> {
-    // The byte offset of every `chunk_len`-th character, plus the end of the text.
-    let bounds = text
-        .char_indices()
-        .step_by(chunk_len)
-        .map(|(byte_idx, _)| byte_idx)
-        .chain([text.len()])
-        .collect::<Vec<_>>();
-    build_unwrapped_layout(
-        text,
-        bounds
-            .windows(2)
-            .step_by(2)
-            .map(|chunk| (style.clone(), chunk[0]..chunk[1])),
-    )
+    let mut layout = build_layout(text, styles);
+    layout.break_all_lines(None);
+    layout.align(Alignment::Start, AlignmentOptions::default());
+    layout
 }
 
 /// Benchmark for a single very long line (no wrapping) with and without justification.
