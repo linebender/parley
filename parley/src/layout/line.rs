@@ -235,8 +235,7 @@ pub struct GlyphRun<'a, B: Brush> {
     style_index: u16,
     /// The glyph run's shaped clusters, indexing into the shaped run this [`Run`] belongs to.
     ///
-    /// Both bounds are atom boundaries (as of writing, the line breaker doesn't break ligated
-    /// shaped clusters, and if in the future it does, it would reshape).
+    /// Both bounds are atom boundaries, as glyph runs must span full ligatures.
     shaped_clusters: Range<u32>,
     /// The number of glyphs in [`Self::shaped_clusters`].
     glyph_count: usize,
