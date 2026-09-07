@@ -108,6 +108,7 @@ mod analysis;
 mod analyzer;
 pub mod bidi;
 pub mod break_overrides;
+pub mod emoji;
 mod glyph;
 pub mod itemize;
 mod lru_cache;
