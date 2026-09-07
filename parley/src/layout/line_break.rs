@@ -12,6 +12,7 @@ use parlance::BidiLevel;
 
 use crate::layout::data::count_graphemes;
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
+use crate::layout::whitespace::whitespace_can_hang;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -744,12 +745,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let first_character = &atom.characters()[0];
                         let whitespace = first_character.info.whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
-                        // Whether this is a space that is allowed to hang past the line. NBSP is
-                        // not included.
-                        let is_space = matches!(
-                            whitespace,
-                            Whitespace::Space | Whitespace::Tab | Whitespace::Newline
-                        );
+                        // Whether this is a space that is allowed to hang past the line.
+                        let is_space = whitespace_can_hang(whitespace);
                         let boundary = first_character.info.boundary();
                         let metrics = run.font_metrics();
                         let line_height = run.data.line_height;
@@ -1286,12 +1283,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                         // hangs only spaces, tabs, segment breaks, and "other space
                                         // separators." We don't currently handle "other space
                                         // separators".
-                                        matches!(
-                                            whitespace,
-                                            Whitespace::Space
-                                                | Whitespace::Tab
-                                                | Whitespace::Newline
-                                        )
+                                        whitespace_can_hang(whitespace)
                                     });
                                 if !cluster_hangs {
                                     hanging = false;

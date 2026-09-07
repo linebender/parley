@@ -3,6 +3,7 @@
 
 use crate::inline_box::InlineBox;
 use crate::layout::spacing::{EffectiveSpacing, Justification, Spacing};
+use crate::layout::whitespace::whitespace_can_hang;
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
@@ -284,13 +285,8 @@ impl<B: Brush> LayoutData<B> {
     #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
         fn hanging_whitespace_advance(atom: Option<(Whitespace, f32)>) -> f32 {
-            atom.filter(|(whitespace, _)| {
-                matches!(
-                    whitespace,
-                    Whitespace::Space | Whitespace::Tab | Whitespace::Newline
-                )
-            })
-            .map_or(0.0, |(_, advance)| advance)
+            atom.filter(|(whitespace, _)| whitespace_can_hang(*whitespace))
+                .map_or(0.0, |(_, advance)| advance)
         }
 
         let mut min_width = 0.0_f32;
