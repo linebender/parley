@@ -310,6 +310,45 @@ fn walk_items(layout: &Layout<ColorBrush>) -> (usize, f32) {
     (glyph_count, advance)
 }
 
+/// Benchmark for computing content widths.
+///
+/// Note this benches the calculation on layouts before line breaking is performed; that's the
+/// sequencing that'll likely be used by clients (i.e., measure possible sizes, and later on line
+/// break once the target size is known).
+pub fn content_widths() -> Vec<Benchmark> {
+    let samples = get_samples();
+
+    let mut benchmarks = Vec::new();
+
+    for sample in samples.iter() {
+        benchmarks.push(benchmark_fn(
+            format!(
+                "Content Widths - {} {}, uniform",
+                sample.name, sample.modification
+            ),
+            |b| {
+                let layout = build_layout(&sample.text, []);
+                b.iter(move || black_box(layout.calculate_content_widths()))
+            },
+        ));
+    }
+
+    for sample in samples.iter() {
+        benchmarks.push(benchmark_fn(
+            format!(
+                "Content Widths - {} {}, mixed",
+                sample.name, sample.modification
+            ),
+            |b| {
+                let layout = build_layout(&sample.text, styled_spans(&sample.text));
+                b.iter(move || black_box(layout.calculate_content_widths()))
+            },
+        ));
+    }
+
+    benchmarks
+}
+
 /// Build `text` into a layout. Each style of `styles` is applied to its given byte range.
 ///
 /// This doesn't break the layout into lines.
