@@ -4,14 +4,14 @@
 use crate::layout::cluster::{Cluster, ClusterPath};
 use crate::layout::data::{LineItemData, RunData, count_graphemes};
 use crate::layout::layout::Layout;
-use crate::layout::spacing::{EffectiveSpacing, Justification};
+use crate::layout::spacing::{EffectiveSpacing, Gaps, Justification};
 use crate::style::Brush;
 
 use core::ops::Range;
 use fontique::Synthesis;
 use parley_engine::{
-    Atom, Atoms, FontInstance, FontMetrics, Glyph, Graphemes, NormalizedCoord, ShapedRun,
-    ShapedSlice,
+    Atom, Atoms, FontInstance, FontMetrics, Glyph, Graphemes, NormalizedCoord, ShapedClusterGlyphs,
+    ShapedRun, ShapedSlice,
 };
 
 /// Sequence of clusters with a single font and style.
@@ -230,99 +230,117 @@ impl<'a, B: Brush> Run<'a, B> {
         Clusters::new(*self, self.is_rtl())
     }
 
-    /// An iterator over the glyphs in `clusters` in visual left-to-right order.
+    /// An iterator over the glyphs in `shaped_clusters` in visual left-to-right order.
     ///
     /// This includes additional spacing from [`EffectiveSpacing`].
-    pub(crate) fn glyphs_in(
-        self,
-        clusters: Range<u32>,
-    ) -> impl Iterator<Item = Glyph> + Clone + use<'a, B> {
-        let spacing = self.line_spacing();
+    ///
+    /// `shaped_clusters` indexes into the shaped run this [`Run`] belongs to, and must be
+    /// atom-aligned.
+    pub(crate) fn glyphs_in(self, shaped_clusters: Range<u32>) -> Glyphs<'a> {
+        Glyphs::new(
+            self.full_slice().narrow(shaped_clusters),
+            self.is_rtl(),
+            self.line_spacing(),
+        )
+    }
+}
 
-        return spacing
-            .is_zero()
-            .then(|| glyphs_without_spacing(self, clusters.clone()))
-            .into_iter()
-            .flatten()
-            .chain(
-                (!spacing.is_zero())
-                    .then(|| glyphs_with_spacing(self, clusters, spacing))
-                    .into_iter()
-                    .flatten(),
-            );
+/// An iterator over the glyphs of a range of shaped clusters, in visual left-to-right order.
+///
+/// See [`Run::glyphs_in`].
+#[derive(Clone)]
+pub(crate) struct Glyphs<'a> {
+    /// The slice of shaped text narrowed to the shaped clusters being iterated.
+    slice: ShapedSlice<'a>,
+    is_rtl: bool,
+    /// The spacing to apply, if any. Without spacing, atoms are not tracked.
+    spacing: Option<EffectiveSpacing>,
+    /// The shaped clusters not yet visited: all of `slice`'s clusters without spacing, otherwise
+    /// those of the current atom. Visited in logical order for LTR text and in reverse for RTL.
+    shaped_clusters: Range<u32>,
+    /// The not-yet-yielded glyphs of the current shaped cluster.
+    glyphs: ShapedClusterGlyphs<'a>,
+    /// The gaps around the current atom; only meaningful with `spacing`.
+    gaps: Gaps,
+    /// The index within the current atom of the next glyph to yield. The first one gets
+    /// `gaps.before`.
+    atom_glyph: usize,
+    /// The number of glyphs of the current atom. The last one gets `gaps.after`.
+    atom_glyph_count: usize,
+}
 
-        fn glyphs_without_spacing<'a, B: Brush>(
-            run: Run<'a, B>,
-            clusters: Range<u32>,
-        ) -> impl Iterator<Item = Glyph> + Clone + use<'a, B> {
-            let slice = run
-                .layout
-                .data
-                .shaped_text
-                .run_slice(run.shaped_text_run_index);
-
-            (!run.is_rtl())
-                .then(|| clusters.clone())
-                .into_iter()
-                .flatten()
-                // we chain because `.rev()` wraps the iterator in `Rev` - a different type than the LTR
-                // iterator.
-                .chain((run.is_rtl()).then(|| clusters.rev()).into_iter().flatten())
-                .flat_map(move |cluster_idx| slice.shaped_cluster_glyphs(cluster_idx))
+impl<'a> Glyphs<'a> {
+    fn new(slice: ShapedSlice<'a>, is_rtl: bool, spacing: EffectiveSpacing) -> Self {
+        let clusters = slice.shaped_clusters_range();
+        Self {
+            slice,
+            is_rtl,
+            spacing: (!spacing.is_zero()).then_some(spacing),
+            shaped_clusters: if spacing.is_zero() {
+                clusters
+            } else {
+                // With spacing, clusters are visited atom by atom: start out on no atom, at the
+                // visually leftmost edge of the slice.
+                if is_rtl {
+                    clusters.end..clusters.end
+                } else {
+                    clusters.start..clusters.start
+                }
+            },
+            glyphs: ShapedClusterGlyphs::empty(),
+            gaps: Gaps::ZERO,
+            atom_glyph: 0,
+            atom_glyph_count: 0,
         }
+    }
+}
 
-        fn glyphs_with_spacing<'a, B: Brush>(
-            run: Run<'a, B>,
-            clusters: Range<u32>,
-            spacing: EffectiveSpacing,
-        ) -> impl Iterator<Item = Glyph> + Clone + use<'a, B> {
-            let slice = run
-                .layout
-                .data
-                .shaped_text
-                .run_slice(run.shaped_text_run_index)
-                .narrow(clusters);
+impl Iterator for Glyphs<'_> {
+    type Item = Glyph;
 
-            let is_rtl = run.is_rtl();
-            (!is_rtl)
-                .then(|| slice.atoms_start())
-                .into_iter()
-                .flatten()
-                // we chain because `.rev()` wraps the iterator in `Rev` - a different type than the LTR
-                // iterator.
-                .chain(
-                    is_rtl
-                        .then(|| slice.atoms_end().rev())
-                        .into_iter()
-                        .flatten(),
-                )
-                .flat_map(move |atom| {
-                    let gaps = spacing.gaps(&atom);
-                    let glyph_count: usize = atom
-                        .shaped_clusters()
-                        .iter()
-                        .map(|cluster| usize::from(cluster.glyph_len()))
-                        .sum();
+    #[inline]
+    fn next(&mut self) -> Option<Glyph> {
+        loop {
+            if let Some(mut glyph) = self.glyphs.next() {
+                if self.spacing.is_some() {
+                    if self.atom_glyph == 0 {
+                        glyph.x += self.gaps.before;
+                        glyph.advance += self.gaps.before;
+                    }
+                    self.atom_glyph += 1;
+                    if self.atom_glyph == self.atom_glyph_count {
+                        glyph.advance += self.gaps.after;
+                    }
+                }
+                return Some(glyph);
+            }
 
-                    let atom_clusters = atom.shaped_clusters_range();
-                    (!is_rtl)
-                        .then(|| atom_clusters.clone())
-                        .into_iter()
-                        .flatten()
-                        .chain(is_rtl.then(|| atom_clusters.rev()).into_iter().flatten())
-                        .flat_map(move |cluster_idx| slice.shaped_cluster_glyphs(cluster_idx))
-                        .enumerate()
-                        .map(move |(glyph_idx, mut glyph)| {
-                            if glyph_idx == 0 {
-                                glyph.x += gaps.before;
-                                glyph.advance += gaps.before;
-                            }
-                            if glyph_idx + 1 == glyph_count {
-                                glyph.advance += gaps.after;
-                            }
-                            glyph
-                        })
-                })
+            let cluster = if self.is_rtl {
+                self.shaped_clusters.next_back()
+            } else {
+                self.shaped_clusters.next()
+            };
+            if let Some(cluster) = cluster {
+                self.glyphs = self.slice.shaped_cluster_glyphs(cluster);
+                continue;
+            }
+
+            // Without spacing, that was the last cluster. With spacing, it was the last cluster of
+            // the current atom; move on to the next atom.
+            let spacing = self.spacing?;
+            let atom = if self.is_rtl {
+                self.slice.atoms_from(self.shaped_clusters.start).prev()
+            } else {
+                self.slice.atoms_from(self.shaped_clusters.end).next()
+            }?;
+            self.shaped_clusters = atom.shaped_clusters_range();
+            self.gaps = spacing.gaps(&atom);
+            self.atom_glyph = 0;
+            self.atom_glyph_count = atom
+                .shaped_clusters()
+                .iter()
+                .map(|cluster| usize::from(cluster.glyph_len()))
+                .sum();
         }
     }
 }
