@@ -447,6 +447,11 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                     }
 
                     if let Some((style_index, shaped_clusters)) = glyph_run {
+                        debug_assert_eq!(
+                            run.glyphs_in(shaped_clusters.clone()).count(),
+                            glyph_count,
+                            "The calculated shaped cluster range of this glyph run must hold exactly the number of glyphs we counted above."
+                        );
                         let offset = self.offset;
                         self.offset += advance;
                         return Some(PositionedLayoutItem::GlyphRun(GlyphRun {
