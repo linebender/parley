@@ -139,8 +139,9 @@ pub struct LineMetrics {
     ///
     /// For LTR paragraphs, this is the right edge, and in RTL paragraphs, it's the left edge.
     //
-    // Note: only whitespace hangs at the moment. With something like hanging punctuation, content
-    // could also hang past the start edge.
+    // Note: only whitespace hangs at the moment. With something like hanging punctuation, inked
+    // content could hang past both the start and end edge. That would likely require splitting this
+    // into two fields.
     pub hanging_advance: f32,
 
     /// The minimum inline-axis coordinate of the line.
