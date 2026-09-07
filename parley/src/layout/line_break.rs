@@ -1179,13 +1179,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // extents) are *not* computed here: they were already accumulated into `self.state.line` as
         // the line was built and are read from there below.
         let mut needs_reorder = false;
-        let mut hanging = true;
         let mut hanging_whitespace_advance = 0.;
         let mut num_justification_opportunities = 0;
         // One past the justified region: atoms with shaped clusters before this index may be
         // stretched by justification.
-        let mut justified_end = u32::MAX;
+        let mut justification_end_cluster = u32::MAX;
 
+        let mut hanging = true; // Whether we've seen any line item that stops hanging.
         for line_item in self.lines.line_items[line.item_range.clone()]
             .iter_mut()
             .rev()
@@ -1288,13 +1288,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     last_cluster = false;
                                 }
                                 hanging_whitespace_advance += cluster.advance;
-                                justified_end = cluster_idx;
+                                justification_end_cluster = cluster_idx;
                             }
 
                             if hanging {
                                 hanging_whitespace_advance += gap_start;
                             } else {
-                                justified_end = atom.shaped_clusters_range().start;
+                                justification_end_cluster = atom.shaped_clusters_range().start;
                             }
                         } else if is_word_separator(atom.characters()[0].info.whitespace()) {
                             num_justification_opportunities += 1;
@@ -1306,7 +1306,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         line.metrics.hanging_advance = hanging_whitespace_advance;
         line.num_justification_opportunities = num_justification_opportunities;
-        line.justification.justification_end_cluster = justified_end;
+        line.justification.justification_end_cluster = justification_end_cluster;
 
         // Reorder the items within the line (if required). Reordering is required if the line contains
         // a mix of bidi levels (a mix of LTR and RTL text)
