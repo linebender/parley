@@ -1227,26 +1227,16 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         .run_slice(line_item.index as u32)
                         .narrow(line_item.shaped_cluster_range.clone());
 
-                    // Calculate the run's advance including any word/letter spacing. If no spacing
-                    // is applied, just go through the shaped clusters directly, which will be
-                    // slightly faster. This doesn't include justification, as that's applied after
-                    // lines are broken.
-                    let spacing = self.layout.data.runs[line_item.index].spacing;
-                    line_item.advance = if spacing.is_zero() {
-                        let range = line_item.shaped_cluster_range.start as usize
-                            ..line_item.shaped_cluster_range.end as usize;
-
-                        self.layout.data.shaped_text.shaped_clusters()[range]
-                            .iter()
-                            .map(|cluster| cluster.advance)
-                            .sum()
-                    } else {
-                        EffectiveSpacing::new(spacing, Justification::NONE).slice_advance(slice)
-                    };
+                    // Calculate the run's advance including any word/letter spacing. This doesn't
+                    // include justification, as that's applied after lines are broken.
+                    let effective_spacing = EffectiveSpacing::new(
+                        self.layout.data.runs[line_item.index].spacing,
+                        Justification::NONE,
+                    );
+                    line_item.advance = effective_spacing.slice_advance(slice);
 
                     // Ignore trailing whitespace for the line's content advance calculation
                     // (we are iterating backwards so trailing whitespace comes first).
-                    let effective_spacing = EffectiveSpacing::new(spacing, Justification::NONE);
                     for atom in slice.atoms_end().rev() {
                         if hanging {
                             // An atom can hang partially: e.g., a prepend character followed by a
