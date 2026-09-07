@@ -243,8 +243,6 @@ pub struct GlyphRun<'a, B: Brush> {
     ///
     /// Both bounds are atom boundaries, as glyph runs must span full ligatures.
     shaped_clusters: Range<u32>,
-    /// The number of glyphs in [`Self::shaped_clusters`].
-    glyph_count: usize,
     offset: f32,
     baseline: f32,
     advance: f32,
@@ -287,9 +285,7 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
 
     /// Returns an iterator over the glyphs in the run.
     pub fn glyphs(&'a self) -> impl Iterator<Item = Glyph> + 'a + Clone {
-        self.run
-            .glyphs_in(self.shaped_clusters.clone())
-            .take(self.glyph_count)
+        self.run.glyphs_in(self.shaped_clusters.clone())
     }
 
     /// Returns an iterator over the fully positioned glyphs in the run.
@@ -458,7 +454,6 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                             run,
                             style_index,
                             shaped_clusters,
-                            glyph_count,
                             offset: offset
                                 + self.line.data.metrics.inline_min_coord
                                 + self.line.data.metrics.offset,
