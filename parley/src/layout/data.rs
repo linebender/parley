@@ -307,8 +307,8 @@ impl<B: Brush> LayoutData<B> {
             match item.kind {
                 LayoutItemKind::TextRun => {
                     let slice = self.shaped_text.run_slice(item.index as u32);
-                    let spacing =
-                        EffectiveSpacing::new(self.runs[item.index].spacing, Justification::NONE);
+                    let run_spacing = self.runs[item.index].spacing;
+                    let spacing = EffectiveSpacing::new(run_spacing, Justification::NONE);
                     // Trailing whitespace can only hang if it ends up at the line's end edge after
                     // bidi reordering. We don't currently apply UAX #9 L1 (resetting trailing
                     // whitespace to paragraph level), so only logically-last items that match the
@@ -354,40 +354,54 @@ impl<B: Brush> LayoutData<B> {
                             continue;
                         }
 
-                        let advance = spacing.atom_advance(&atom);
+                        let advance = if !run_spacing.is_zero() {
+                            spacing.atom_advance(&atom)
+                        } else {
+                            atom.advance()
+                        };
                         running_min_width += advance;
                         running_max_width += advance;
 
                         if !can_hang {
                             running_hanging_whitespace = 0.0;
-                        } else if characters
-                            .iter()
-                            .all(|c| whitespace_can_hang(c.info.whitespace()))
-                        {
-                            // The whole atom hangs, including its spacing.
-                            running_hanging_whitespace += advance;
+                        } else if characters.len() == 1 {
+                            // Fast path for the common-case that the atom is a single character,
+                            // and so a single shaped cluster.
+                            if whitespace_can_hang(whitespace) {
+                                running_hanging_whitespace += advance;
+                            } else {
+                                running_hanging_whitespace = 0.0;
+                            }
                         } else {
                             // The atom may hang partially: e.g., a prepend character followed by a
                             // space is a single atom (as it's a grapheme), but may consist of
-                            // multiple shaped clusters, of which the space's can hang. Only the
+                            // multiple shaped clusters, of which the spaces can hang. Only the
                             // atom's spacing at its logical end hangs along with the clusters.
                             let gaps = spacing.gaps(&atom);
+                            let gap_before = if is_rtl { gaps.after } else { gaps.before };
                             let gap_end = if is_rtl { gaps.before } else { gaps.after };
                             let mut last_cluster = true;
-                            running_hanging_whitespace = 0.0;
+                            let mut all_hang = true;
+                            let mut hanging = 0.0;
                             for cluster in atom.shaped_clusters().iter().rev() {
                                 let cluster_hangs = slice
                                     .characters_in(cluster.chars_range())
                                     .iter()
                                     .all(|c| whitespace_can_hang(c.info.whitespace()));
                                 if !cluster_hangs {
+                                    all_hang = false;
                                     break;
                                 }
                                 if last_cluster {
-                                    running_hanging_whitespace += gap_end;
+                                    hanging += gap_end;
                                     last_cluster = false;
                                 }
-                                running_hanging_whitespace += cluster.advance;
+                                hanging += cluster.advance;
+                            }
+                            if all_hang {
+                                running_hanging_whitespace += hanging + gap_before;
+                            } else {
+                                running_hanging_whitespace = hanging;
                             }
                         }
                     }
