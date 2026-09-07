@@ -134,8 +134,14 @@ pub struct LineMetrics {
     /// Full inline advance of the line, including trailing whitespace.
     pub advance: f32,
 
-    /// The portion of [`Self::advance`] contributed by trailing whitespace.
-    pub trailing_whitespace: f32,
+    /// The portion of [`Self::advance`] that hangs past the line's end edge.
+    ///
+    /// For LTR paragraphs, this is the right edge, and in RTL paragraphs, it's the left edge.
+    //
+    // Note: only whitespace hangs at the moment. With something like hanging punctuation, inked
+    // content could hang past both the start and end edge. That would likely require splitting this
+    // into two fields.
+    pub hanging_advance: f32,
 
     /// The minimum inline-axis coordinate of the line.
     ///

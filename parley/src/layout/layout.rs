@@ -63,7 +63,7 @@ impl<B: Brush> Layout<B> {
         self.data.layout_max_advance
     }
 
-    /// Returns the computed width of the layout excluding the width of trailing whitespace.
+    /// Returns the computed width of the layout excluding the width of hanging whitespace.
     pub fn width(&self) -> f32 {
         self.data.width
     }

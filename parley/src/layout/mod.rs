@@ -11,6 +11,7 @@ mod line;
 mod line_break;
 mod run;
 mod spacing;
+mod whitespace;
 
 // TODO - Add to allowed lint set?
 #[expect(
