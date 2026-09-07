@@ -1220,6 +1220,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         needs_reorder = true;
                     }
 
+                    let slice = self
+                        .layout
+                        .data
+                        .shaped_text
+                        .run_slice(line_item.index as u32)
+                        .narrow(line_item.shaped_cluster_range.clone());
+
                     // Calculate the run's advance including any word/letter spacing. If no spacing
                     // is applied, just go through the shaped clusters directly, which will be
                     // slightly faster. This doesn't include justification, as that's applied after
@@ -1234,24 +1241,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             .map(|cluster| cluster.advance)
                             .sum()
                     } else {
-                        let slice = self
-                            .layout
-                            .data
-                            .shaped_text
-                            .run_slice(line_item.index as u32)
-                            .narrow(line_item.shaped_cluster_range.clone());
-
                         EffectiveSpacing::new(spacing, Justification::NONE).slice_advance(slice)
                     };
 
                     // Ignore trailing whitespace for the line's content advance calculation
                     // (we are iterating backwards so trailing whitespace comes first).
-                    let slice = self
-                        .layout
-                        .data
-                        .shaped_text
-                        .run_slice(line_item.index as u32)
-                        .narrow(line_item.shaped_cluster_range.clone());
                     let effective_spacing = EffectiveSpacing::new(spacing, Justification::NONE);
                     for atom in slice.atoms_end().rev() {
                         if hanging {
