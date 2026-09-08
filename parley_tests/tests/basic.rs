@@ -6,8 +6,9 @@
 use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
-    Alignment, AlignmentOptions, BreakReason, ContentWidths, FontFamily, InlineBox, InlineBoxKind,
-    Layout, LineHeight, PositionedLayoutItem, StyleProperty, TextStyle, WhiteSpaceCollapse,
+    Alignment, AlignmentOptions, BreakReason, ContentWidths, FontFamily, FontWeight, InlineBox,
+    InlineBoxKind, Layout, LineHeight, PositionedLayoutItem, StyleProperty, TextStyle,
+    WhiteSpaceCollapse,
 };
 use peniko::color::{AlphaColor, Srgb, palette};
 use peniko::kurbo::Size;
@@ -530,6 +531,33 @@ fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
     builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
     builder.push_text(" c");
     assert_eq!(builder.build().1, "a\nb   c");
+}
+
+#[test]
+fn collapsed_space_belongs_to_first_span() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Whitespace spanning a span boundary collapses into a single space, which belongs to the span
+    // the whitespace sequence started in.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text("aa ");
+    builder.push_style_modification_span(&[StyleProperty::FontWeight(FontWeight::BOLD)]);
+    builder.push_text(" bb");
+    builder.pop_style_span();
+    let (mut layout, text) = builder.build();
+    layout.break_all_lines(None);
+    assert_eq!(text, "aa bb");
+
+    let style_indices: Vec<u16> = layout
+        .get(0)
+        .unwrap()
+        .runs()
+        .flat_map(|run| run.clusters().map(|cluster| cluster.style_index()))
+        .collect();
+    let space_style = style_indices[2];
+    assert_eq!(space_style, style_indices[0], "space is not bold");
+    assert_ne!(space_style, style_indices[3], "\"bb\" is not bold");
 }
 
 #[test]

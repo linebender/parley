@@ -123,7 +123,9 @@ impl<B: Brush> TreeStyleBuilder<B> {
                         .find(|c: char| !c.is_ascii_whitespace())
                         .unwrap_or(rest.len());
                     if whitespace_len > 0 {
-                        self.pending_whitespace = Some(span);
+                        // The collapsed space is attributed to the span the whitespace sequence
+                        // started in.
+                        self.pending_whitespace.get_or_insert(span);
                         rest = &rest[whitespace_len..];
                         continue;
                     }
