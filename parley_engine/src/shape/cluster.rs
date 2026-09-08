@@ -624,7 +624,7 @@ mod tests {
 
     #[test]
     fn whitespace() {
-        // These all code points from `NUL` up to the last `White_Space` character as defined in
+        // Test all code points from `NUL` up to the last `White_Space` character as defined in
         // https://www.unicode.org/Public/UCD/latest/ucd/PropList.txt.
         for c in '\u{0000}'..='\u{3000}' {
             let ws = Whitespace::from_char(c);
