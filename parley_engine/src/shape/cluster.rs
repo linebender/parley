@@ -63,23 +63,83 @@ pub struct Char {
     pub style_index: u16,
 }
 
-/// Whitespace content of a cluster.
+/// Whitespace class of a character.
+///
+/// All white space characters as defined
+/// [by Unicode](https://www.unicode.org/Public/UCD/latest/ucd/PropList.txt) map to a variant of
+/// this enum. The variants are based on the various sets of white space as in
+/// [CSS Text 4][css-text-4].
+///
+/// A character maps to [`Whitespace::None`] if and only if that character's [`char::is_whitespace`]
+/// is `false`.
+///
+/// [css-text-4]: https://www.w3.org/TR/css-text-4/
 #[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum Whitespace {
-    /// Not a space.
+    /// Not white space.
     None = 0,
+
     /// Standard space.
     Space = 1,
+
     /// Non-breaking space (U+00A0).
     NoBreakSpace = 2,
+
+    /// Ideographic space (U+3000).
+    ///
+    /// Note CSS Text 4 doesn't treat this space any differently from [`Self::OtherSpaceSeparator`],
+    /// but some applications do.
+    IdeographicSpace = 3,
+
+    /// The Unicode "space separators" (category `Zs`), except for the standard space, non-breaking
+    /// space and ideographic space.
+    ///
+    /// Applications may want to treat those three space separators differently from the general
+    /// class of space separators.
+    OtherSpaceSeparator = 4,
+
     /// Horizontal tab.
-    Tab = 3,
+    Tab = 5,
+
     /// Newline (CR, LF, CRLF, LS, or PS).
-    Newline = 4,
+    Newline = 6,
+
+    /// Vertical tab, form feed and next line.
+    ///
+    /// These are Unicode `White_Space`, but CSS Text 4 § 4 says to treat them as visible glyphs.
+    ///
+    /// Note [`Self::Tab`] and some of [`Self::Newline`] are also in the Unicode `Cc` category.
+    /// There are also `Cc` characters that aren't `White_Space` (those would be
+    /// [`Whitespace::None`]).
+    ControlWhitespace = 7,
+    // NOTE: if you grow these variants more than eight, ensure you also update the encoding in
+    // `GraphemeFlags`.
 }
 
 impl Whitespace {
+    #[inline]
+    pub(crate) const fn from_char(c: char) -> Self {
+        // See https://www.unicode.org/Public/UCD/latest/ucd/PropList.txt.
+        match c {
+            ' ' => Self::Space,
+            '\u{00A0}' => Self::NoBreakSpace,
+            '\u{3000}' => Self::IdeographicSpace,
+            // Ogham space mark, en quad through hair space, narrow no-break space, medium
+            // mathematical space.
+            '\u{1680}' | '\u{2000}'..='\u{200A}' | '\u{202F}' | '\u{205F}' => {
+                Self::OtherSpaceSeparator
+            }
+            '\t' => Self::Tab,
+            // Newline, carriage return, line separator, paragraph separator.
+            '\n' | '\r' | '\u{2028}' | '\u{2029}' => Self::Newline,
+            // Vertical tab, form feed, next line. These are `White_Space` that CSS says to render
+            // as control characters.
+            '\u{000b}' | '\u{000c}' | '\u{0085}' => Self::ControlWhitespace,
+            _ => Self::None,
+        }
+    }
+
     /// Returns true for space or no break space.
     #[inline]
     pub fn is_space_or_nbsp(self) -> bool {
@@ -490,6 +550,8 @@ impl<'a> Mapper<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::shape::Whitespace;
+
     use super::Coverage;
 
     #[test]
@@ -552,5 +614,19 @@ mod tests {
                 total: 255,
             } < Coverage::COMPLETE
         );
+    }
+
+    #[test]
+    fn whitespace() {
+        // Test all code points from `NUL` up to the last `White_Space` character as defined in
+        // https://www.unicode.org/Public/UCD/latest/ucd/PropList.txt.
+        for c in '\u{0000}'..='\u{3000}' {
+            let ws = Whitespace::from_char(c);
+            assert!(
+                c.is_whitespace() && ws != Whitespace::None
+                    || !c.is_whitespace() && ws == Whitespace::None,
+                "`Whitespace` should encode exactly all of Unicode's `White_Space` characters."
+            );
+        }
     }
 }
