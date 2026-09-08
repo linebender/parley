@@ -5,6 +5,7 @@ use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty, WordBreak}
 use alloc::{vec, vec::Vec};
 use fontique::FontWeight;
 use icu_properties::props::{GraphemeClusterBreak, Script};
+use icu_segmenter::{LineSegmenter, options::LineBreakOptions};
 use parley_engine::Boundary;
 
 #[derive(Default)]
@@ -314,6 +315,15 @@ fn test_paragraph_separator_is_hard_break() {
 /// regular wrap opportunity. See <https://github.com/linebender/parley/issues/768>.
 #[test]
 fn test_mandatory_break_after_complex_script_run() {
+    // Check that the ICU4X bug still reproduces: a break opportunity is reported at byte 6,
+    // between the second Thai character and the `\n`. Once this assertion fails, ICU4X has
+    // been fixed and the `is_line = !properties.is_mandatory_linebreak()` workaround in
+    // `parley_engine::analysis` can be reverted to `is_line = true`.
+    let icu_breaks: Vec<usize> = LineSegmenter::new_dictionary(LineBreakOptions::default())
+        .segment_str("กก\nกก")
+        .collect();
+    assert_eq!(icu_breaks, vec![0, 6, 7, 13]);
+
     // Thai
     verify_analysis("กก\nกก", |_| {}).expect_boundary_list(vec![
         Boundary::Word,

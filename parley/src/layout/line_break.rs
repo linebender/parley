@@ -757,8 +757,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let text_wrap_mode = self.state.line.text_wrap_mode;
                         self.state.line.text_wrap_mode = style.text_wrap_mode;
 
-                        // A newline always ends the line, regardless of any soft break
-                        // opportunity that analysis may have recorded on it.
+                        // Take mandatory line breaks before checking for line wrapping.
                         if is_newline {
                             if max_height_exceeded {
                                 return self.max_height_break_data(line_height);

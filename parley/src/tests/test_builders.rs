@@ -703,6 +703,7 @@ fn builders_newline_inside_complex_script_run_is_hard_break() {
         };
         let layout = build_layout_with_ranged(&mut fcx, &mut lcx, &ropts, |rb| {
             set_root_style(rb);
+            rb.push_default(StyleProperty::WordBreak(WordBreak::Normal));
         });
         layout.lines().map(|line| line.break_reason()).collect()
     };

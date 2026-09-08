@@ -45,6 +45,7 @@ peniko = { workspace = true }
 
 bytemuck = { workspace = true }
 icu_properties = { workspace = true, features = ["compiled_data"] }
+icu_segmenter = { workspace = true, features = ["compiled_data"] }
 
 # We special-case android targets because oxipng doesn't build in Android CI.
 [target.'cfg(not(target_os = "android"))'.dev-dependencies]
