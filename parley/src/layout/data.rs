@@ -320,9 +320,10 @@ impl<B: Brush> LayoutData<B> {
 
                     for atom in slice.atoms_start() {
                         let characters = atom.characters();
-                        let whitespace = characters[0].info.whitespace();
-                        let boundary = characters[0].info.boundary();
-                        let style = &self.styles[characters[0].style_index as usize];
+                        let first_character = characters[0];
+                        let whitespace = first_character.info.whitespace();
+                        let boundary = first_character.info.boundary();
+                        let style = &self.styles[first_character.style_index as usize];
                         let prev_text_wrap_mode = text_wrap_mode;
                         text_wrap_mode = style.text_wrap_mode;
                         if prev_text_wrap_mode == TextWrapMode::Wrap
@@ -382,8 +383,11 @@ impl<B: Brush> LayoutData<B> {
                             // multiple shaped clusters, of which the spaces can hang. Only the
                             // atom's spacing at its logical end hangs along with the clusters.
                             let gaps = spacing.gaps(&atom);
-                            let gap_before = if is_rtl { gaps.after } else { gaps.before };
-                            let gap_end = if is_rtl { gaps.before } else { gaps.after };
+                            let (gap_start, gap_end) = if is_rtl {
+                                (gaps.after, gaps.before)
+                            } else {
+                                (gaps.before, gaps.after)
+                            };
                             let mut last_cluster = true;
                             let mut all_hang = true;
                             let mut hanging = 0.0;
@@ -405,7 +409,7 @@ impl<B: Brush> LayoutData<B> {
                                 hanging += cluster.advance;
                             }
                             if all_hang {
-                                running_hanging_whitespace += hanging + gap_before;
+                                running_hanging_whitespace += hanging + gap_start;
                             } else {
                                 running_hanging_whitespace = hanging;
                             }
