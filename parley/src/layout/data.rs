@@ -288,6 +288,9 @@ impl<B: Brush> LayoutData<B> {
     ///
     /// This should mirror the line breaker in terms of layout decisions like hanging whitespace (if
     /// it doesn't, one of the calculations is buggy).
+    //
+    // Note: this currently assumes the text collapse mode is `preserve` in regards to conditionally
+    // hanging white space.
     #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
         let mut min_width = 0.0_f32;
@@ -346,11 +349,11 @@ impl<B: Brush> LayoutData<B> {
                         //
                         // Note newlines have no advance.
                         if whitespace == Whitespace::Newline {
-                            // Newlines hang, so whitespace before them keeps hanging.
+                            // Following CSS Text 4 § 4.3.2, whitespace before a newline hangs
+                            // conditionally, meaning it only hangs if it doesn't fit.
                             min_width =
                                 min_width.max(running_min_width - running_hanging_whitespace);
-                            max_width =
-                                max_width.max(running_max_width - running_hanging_whitespace);
+                            max_width = max_width.max(running_max_width);
                             running_min_width = 0.0;
                             running_max_width = 0.0;
                             running_hanging_whitespace = 0.0;
@@ -435,8 +438,10 @@ impl<B: Brush> LayoutData<B> {
             }
         }
 
+        // Like before a newline, whitespace at the end of the layout hangs conditionally: the end
+        // of the layout is considered to be a forced line break as per CSS Text 4 § 5.
         min_width = min_width.max(running_min_width - running_hanging_whitespace);
-        max_width = max_width.max(running_max_width - running_hanging_whitespace);
+        max_width = max_width.max(running_max_width);
 
         ContentWidths {
             min: min_width,

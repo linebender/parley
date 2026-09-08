@@ -874,11 +874,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     line_height,
                                     self.layout.data.quantize,
                                 );
-                                return self.start_new_line(
-                                    BreakReason::Regular,
-                                    max_advance,
-                                    line_indent,
-                                );
+                                self.state.mark_line_break_opportunity();
                             }
                             // Case: we have previously encountered a REGULAR line-breaking opportunity in the current line
                             //
@@ -1302,6 +1298,16 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
         }
 
+        // Trailing whitespace before a forced break hangs conditionally (CSS Text 4 § 4.3.2): only
+        // the part that doesn't fit hangs. Whitespace that fits, stays inside the line box, and
+        // counts towards alignment and the layout width. The end of the layout is considered to be
+        // a forced line break as well (CSS Text 4 § 5). Trailing whitespace before a soft break
+        // hangs unconditionally.
+        if matches!(line.break_reason, BreakReason::Explicit | BreakReason::None) {
+            let overflow = line.metrics.advance - line.max_advance;
+            hanging_whitespace_advance = hanging_whitespace_advance.min(overflow).max(0.);
+        }
+
         line.metrics.hanging_advance = hanging_whitespace_advance;
         line.num_justification_opportunities = num_justification_opportunities;
         line.justification.justification_end_cluster = justification_end_cluster;
@@ -1393,7 +1399,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 impl<B: Brush> Drop for BreakLines<'_, B> {
     fn drop(&mut self) {
         // Compute the overall width and height of the entire layout
-        // The "width" excludes trailing whitespace. The "full_width" includes it.
+        // The "width" excludes hanging whitespace. The "full_width" includes it.
         let mut layout_width = 0_f32;
         let mut layout_full_width = 0_f32;
         let mut height = 0_f64; // f32 causes test failures due to accumulated error
