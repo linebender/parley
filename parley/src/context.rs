@@ -32,6 +32,8 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) analyzer: Analyzer,
     pub(crate) analysis: Analysis,
     pub(crate) word_break: Vec<(Range<usize>, WordBreak)>,
+    pub(crate) line_break_opportunities: Vec<usize>,
+    pub(crate) word_boundary_bytes: Vec<usize>,
 
     // Reusable style builders (to amortise allocations)
     pub(crate) ranged_style_builder: RangedStyleBuilder<B>,
@@ -55,6 +57,8 @@ impl<B: Brush> LayoutContext<B> {
             analyzer: Analyzer::new(),
             analysis: Analysis::new(),
             word_break: Vec::new(),
+            line_break_opportunities: Vec::new(),
+            word_boundary_bytes: Vec::new(),
             ranged_style_builder: RangedStyleBuilder::default(),
             tree_style_builder: TreeStyleBuilder::default(),
             char_style_indices: vec![],

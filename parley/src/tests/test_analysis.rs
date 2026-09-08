@@ -5,24 +5,35 @@ use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty, WordBreak}
 use alloc::{vec, vec::Vec};
 use fontique::FontWeight;
 use icu_properties::props::{GraphemeClusterBreak, Script};
-use parley_engine::Boundary;
+use parley_engine::Boundary as EngineBoundary;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Boundary {
+    None,
+    Word,
+    Line,
+    Mandatory,
+}
 
 #[derive(Default)]
 struct TestContext {
     pub layout_context: LayoutContext,
     pub font_context: FontContext,
+    text: alloc::string::String,
 }
 
 impl TestContext {
     fn expect_boundary_list(self, expected: Vec<Boundary>) -> Self {
-        let actual: Vec<_> = self
-            .layout_context
-            .analysis
-            .char_info()
-            .iter()
-            .map(|info| info.boundary)
-            .collect();
+        let actual = self.legacy_boundary_list();
         assert_eq!(actual, expected, "Boundary list mismatch");
+        self
+    }
+
+    fn expect_word_boundary_bytes(self, expected: &[usize]) -> Self {
+        assert_eq!(
+            self.layout_context.word_boundary_bytes, expected,
+            "Word boundary byte list mismatch"
+        );
         self
     }
 
@@ -132,12 +143,30 @@ impl TestContext {
         self
     }
 
-    fn boundary_list(&self) -> Vec<Boundary> {
-        self.layout_context
-            .analysis
-            .char_info()
-            .iter()
-            .map(|info| info.boundary)
+    /// Reconstructs the combined boundary representation used before word
+    /// segmentation moved out of `parley_engine`.
+    fn legacy_boundary_list(&self) -> Vec<Boundary> {
+        let text = if self.text.is_empty() {
+            " "
+        } else {
+            &self.text
+        };
+        text.char_indices()
+            .zip(self.layout_context.analysis.char_info().iter())
+            .map(|((byte_offset, _), info)| match info.boundary {
+                EngineBoundary::Mandatory => Boundary::Mandatory,
+                EngineBoundary::Line => Boundary::Line,
+                EngineBoundary::None
+                    if self
+                        .layout_context
+                        .word_boundary_bytes
+                        .binary_search(&byte_offset)
+                        .is_ok() =>
+                {
+                    Boundary::Word
+                }
+                EngineBoundary::None => Boundary::None,
+            })
             .collect()
     }
 }
@@ -146,7 +175,10 @@ fn verify_analysis(
     text: &str,
     configure_builder: impl for<'a> FnOnce(&mut RangedBuilder<'a, [u8; 4]>),
 ) -> TestContext {
-    let mut test_context = TestContext::default();
+    let mut test_context = TestContext {
+        text: text.into(),
+        ..TestContext::default()
+    };
 
     {
         let mut builder = test_context.layout_context.ranged_builder(
@@ -169,7 +201,10 @@ fn verify_analysis_with_override(
     text: &str,
     line_break_override: &crate::LineBreakOverrideFn,
 ) -> TestContext {
-    let mut test_context = TestContext::default();
+    let mut test_context = TestContext {
+        text: text.into(),
+        ..TestContext::default()
+    };
 
     {
         let mut builder = test_context.layout_context.ranged_builder(
@@ -188,28 +223,28 @@ fn verify_analysis_with_override(
 #[test]
 fn test_line_break_override_none_matches_default() {
     let text = "ab/cd ef";
-    let default = verify_analysis(text, |_| {}).boundary_list();
-    let overridden = verify_analysis_with_override(text, &|_| None).boundary_list();
+    let default = verify_analysis(text, |_| {}).legacy_boundary_list();
+    let overridden = verify_analysis_with_override(text, &|_| None).legacy_boundary_list();
     assert_eq!(default, overridden);
 }
 
 #[test]
 fn test_line_break_override_suppresses_break_after_slash() {
     let text = "ab/cd";
-    let default = verify_analysis(text, |_| {}).boundary_list();
+    let default = verify_analysis(text, |_| {}).legacy_boundary_list();
     assert!(default.contains(&Boundary::Line),);
 
     let overridden = verify_analysis_with_override(text, &|cx| {
         if cx.before == '/' { Some(false) } else { None }
     })
-    .boundary_list();
+    .legacy_boundary_list();
 
     assert!(!overridden.contains(&Boundary::Line),);
 }
 
 #[test]
 fn test_line_break_override_does_not_suppress_mandatory_break() {
-    let overridden = verify_analysis_with_override("a\nb", &|_| Some(false)).boundary_list();
+    let overridden = verify_analysis_with_override("a\nb", &|_| Some(false)).legacy_boundary_list();
 
     assert_eq!(
         overridden,
@@ -219,13 +254,18 @@ fn test_line_break_override_does_not_suppress_mandatory_break() {
 
 #[test]
 fn test_line_break_override_mandatory_break_takes_precedence() {
-    let overridden = verify_analysis_with_override("a\nb", &|_| Some(true)).boundary_list();
+    let overridden = verify_analysis_with_override("a\nb", &|_| Some(true)).legacy_boundary_list();
 
     assert_eq!(
         overridden,
         // A mandatory break (e.g. `\n`) takes precedence over a forced line break override.
         vec![Boundary::Word, Boundary::Line, Boundary::Mandatory]
     );
+}
+
+#[test]
+fn test_word_boundaries_are_stored_as_utf8_byte_offsets() {
+    verify_analysis("é ok", |_| {}).expect_word_boundary_bytes(&[0, 2, 3, 5]);
 }
 
 #[test]

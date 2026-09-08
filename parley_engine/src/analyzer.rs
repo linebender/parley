@@ -3,11 +3,9 @@
 
 //! The analyzer API.
 
-use core::ops::Range;
+use parlance::BaseDirection;
 
-use parlance::{BaseDirection, WordBreak};
-
-use crate::{bidi::BidiResolver, break_overrides::LineBreakOverrideFn};
+use crate::bidi::BidiResolver;
 
 use crate::analysis::{Analysis, analyze_text};
 
@@ -45,24 +43,26 @@ pub struct AnalysisOptions<'a> {
     ///
     /// Defaults to [`BaseDirection::Auto`], which infers the direction from the text.
     pub base_direction: BaseDirection,
-
-    /// Word break configuration for ranges of the source text.
+    /// Sorted UTF-8 byte offsets at which a soft line break is allowed.
     ///
-    /// Ranges must be sorted and non-overlapping, and must start and end on character boundaries of
-    /// the text. Empty ranges are ignored. Gaps use [`WordBreak::Normal`].
-    pub word_break: &'a [(Range<usize>, WordBreak)],
-
-    /// The callback which will be called as a first provider of line breaking decisions.
+    /// Each offset is before the character that starts there and must be both a
+    /// character boundary and a grapheme-cluster boundary. An empty slice disables
+    /// soft wrapping; mandatory line breaks are still detected by the analyzer.
+    /// APIs that report UTF-16 indices, such as JavaScript's `Intl.Segmenter`, must
+    /// have their results converted to UTF-8 byte offsets by the caller.
     ///
-    /// See [`LineBreakOverrideFn`] for more details.
-    pub line_break_override: Option<&'a LineBreakOverrideFn>,
+    /// # Panics
+    ///
+    /// [`Analyzer::analyze`] panics if these offsets are not sorted, do not fall on
+    /// UTF-8 character boundaries, or fall within a grapheme cluster.
+    pub line_break_opportunities: &'a [usize],
 }
 
 impl core::fmt::Debug for AnalysisOptions<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("AnalysisOptions")
             .field("base_direction", &self.base_direction)
-            .field("word_break", &self.word_break)
+            .field("line_break_opportunities", &self.line_break_opportunities)
             .finish_non_exhaustive()
     }
 }
@@ -72,7 +72,7 @@ mod tests {
     use parlance::BidiLevel;
 
     use super::{AnalysisOptions, Analyzer};
-    use crate::{Analysis, BaseDirection};
+    use crate::{Analysis, BaseDirection, Boundary};
 
     fn analyze(text: &str, base_direction: BaseDirection) -> Analysis {
         let mut analyzer = Analyzer::new();
@@ -134,5 +134,73 @@ mod tests {
 
         assert!(analysis.paragraph_level().is_rtl());
         assert!(analysis.bidi_levels().is_empty());
+    }
+
+    #[test]
+    fn caller_provided_line_breaks_are_used() {
+        let mut analyzer = Analyzer::new();
+        let mut analysis = Analysis::new();
+        analyzer.analyze(
+            "abc",
+            &AnalysisOptions {
+                line_break_opportunities: &[1],
+                ..AnalysisOptions::default()
+            },
+            &mut analysis,
+        );
+        assert_eq!(analysis.char_info()[1].boundary, Boundary::Line);
+    }
+
+    #[test]
+    fn empty_line_breaks_disable_soft_wrapping() {
+        let analysis = analyze("abc def", BaseDirection::Auto);
+        assert!(
+            analysis
+                .char_info()
+                .iter()
+                .all(|info| info.boundary == Boundary::None)
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "must be sorted")]
+    fn rejects_unsorted_line_breaks() {
+        let mut analyzer = Analyzer::new();
+        analyzer.analyze(
+            "abc",
+            &AnalysisOptions {
+                line_break_opportunities: &[2, 1],
+                ..AnalysisOptions::default()
+            },
+            &mut Analysis::new(),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "UTF-8 character boundaries")]
+    fn rejects_non_character_line_breaks() {
+        let mut analyzer = Analyzer::new();
+        analyzer.analyze(
+            "aé",
+            &AnalysisOptions {
+                line_break_opportunities: &[2],
+                ..AnalysisOptions::default()
+            },
+            &mut Analysis::new(),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "grapheme-cluster boundaries")]
+    fn rejects_mid_grapheme_line_breaks() {
+        let mut analyzer = Analyzer::new();
+        analyzer.analyze(
+            "a\u{301}",
+            &AnalysisOptions {
+                line_break_opportunities: &[1],
+                ..AnalysisOptions::default()
+            },
+            &mut Analysis::new(),
+        );
     }
 }

@@ -114,17 +114,11 @@ static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable<5> =
 /// # Example
 ///
 /// ```
-/// # use parley_engine::break_overrides::CHROMIUM_LINE_BREAK_OVERRIDE;
-/// # use parley_engine::{Analysis, AnalysisOptions, Analyzer};
-/// # let mut analyzer = Analyzer::new();
-/// # let mut analysis = Analysis::new();
+/// # use parley::CHROMIUM_LINE_BREAK_OVERRIDE;
 /// let text = "Hello there!";
-/// let options = AnalysisOptions {
-///     // Emulate Chromium:
-///     line_break_override: Some(CHROMIUM_LINE_BREAK_OVERRIDE),
-///     ..AnalysisOptions::default()
-/// };
-/// analyzer.analyze(text, &options, &mut analysis);
+/// # let _ = text;
+/// // Pass `CHROMIUM_LINE_BREAK_OVERRIDE` to a layout builder's
+/// // `set_line_break_override` method to emulate Chromium.
 /// ```
 #[derive(Clone, Debug)]
 pub struct AsciiLineBreakTable<const N: usize> {

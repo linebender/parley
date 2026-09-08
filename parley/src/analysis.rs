@@ -3,7 +3,7 @@
 
 use crate::{Brush, LayoutContext};
 
-use parley_engine::break_overrides::LineBreakOverrideFn;
+use crate::LineBreakOverrideFn;
 
 use parley_engine::AnalysisOptions;
 
@@ -26,10 +26,17 @@ pub(crate) fn analyze_text<B: Brush>(
             (word_break != WordBreak::Normal).then(|| (sr.range.clone(), word_break))
         }));
 
+    crate::segmentation::line_break_opportunities(
+        text,
+        &lcx.word_break,
+        line_break_override,
+        &mut lcx.line_break_opportunities,
+    );
+    crate::segmentation::word_boundaries(text, &mut lcx.word_boundary_bytes);
+
     let options = AnalysisOptions {
         base_direction,
-        word_break: &lcx.word_break,
-        line_break_override,
+        line_break_opportunities: &lcx.line_break_opportunities,
     };
     lcx.analyzer.analyze(text, &options, &mut lcx.analysis);
 }

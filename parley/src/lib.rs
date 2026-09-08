@@ -109,11 +109,13 @@ extern crate std;
 pub use fontique;
 
 mod analysis;
+mod break_overrides;
 mod builder;
 mod context;
 mod font;
 mod inline_box;
 mod resolve;
+mod segmentation;
 mod shape;
 mod util;
 
@@ -125,12 +127,12 @@ pub mod style;
 #[cfg(test)]
 mod tests;
 
-pub use linebender_resource_handle::FontData;
-pub use parlance::BaseDirection;
-pub use parley_engine::break_overrides::{
+pub use break_overrides::{
     AsciiLineBreakTable, AsciiLineBreakTableBuilder, CHROMIUM_LINE_BREAK_OVERRIDE,
     LineBreakContext, LineBreakOverrideFn,
 };
+pub use linebender_resource_handle::FontData;
+pub use parlance::BaseDirection;
 
 pub use builder::{RangedBuilder, StyleRunBuilder, TreeBuilder};
 pub use context::LayoutContext;
