@@ -299,6 +299,8 @@ impl<B: Brush> LayoutData<B> {
         // The running advance of whitespace that would hang if a line ended here. Can exceed
         // `running_min_width` when the hanging whitespace started before the last break
         // opportunity, in which case the line consists entirely of hanging whitespace.
+        //
+        // Note whitespace only hangs with `TextWrapMode::Wrap`, following CSS Text 4 § 4.3.2.
         let mut running_hanging_whitespace = 0.0;
 
         let mut text_wrap_mode = TextWrapMode::Wrap;
@@ -367,7 +369,9 @@ impl<B: Brush> LayoutData<B> {
                         } else if characters.len() == 1 {
                             // Fast path for the common-case that the atom is a single character,
                             // and so a single shaped cluster.
-                            if whitespace_can_hang(whitespace) {
+                            if whitespace_can_hang(whitespace)
+                                && text_wrap_mode == TextWrapMode::Wrap
+                            {
                                 running_hanging_whitespace += advance;
                             } else {
                                 running_hanging_whitespace = 0.0;
@@ -384,10 +388,12 @@ impl<B: Brush> LayoutData<B> {
                             let mut all_hang = true;
                             let mut hanging = 0.0;
                             for cluster in atom.shaped_clusters().iter().rev() {
-                                let cluster_hangs = slice
-                                    .characters_in(cluster.chars_range())
-                                    .iter()
-                                    .all(|c| whitespace_can_hang(c.info.whitespace()));
+                                let cluster_hangs =
+                                    slice.characters_in(cluster.chars_range()).iter().all(|c| {
+                                        whitespace_can_hang(c.info.whitespace())
+                                            && self.styles[c.style_index as usize].text_wrap_mode
+                                                == TextWrapMode::Wrap
+                                    });
                                 if !cluster_hangs {
                                     all_hang = false;
                                     break;

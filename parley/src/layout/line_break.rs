@@ -863,7 +863,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             // Case: the atom is a space character (and wrapping is enabled)
                             //
                             // We hang any overflowing whitespace and then line-break.
-                            if is_space && text_wrap_mode == TextWrapMode::Wrap {
+                            if is_space && style.text_wrap_mode == TextWrapMode::Wrap {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
@@ -1269,7 +1269,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                         // hangs only spaces, tabs, segment breaks, and "other space
                                         // separators." Of those "other space separators," we
                                         // currently hang only the ideographic space.
+                                        //
+                                        // Note whitespace only hangs with `TextWrapMode::Wrap`,
+                                        // following CSS Text 4 § 4.3.2.
                                         whitespace_can_hang(whitespace)
+                                            && self.layout.data.styles[c.style_index as usize]
+                                                .text_wrap_mode
+                                                == TextWrapMode::Wrap
                                     });
                                 if !cluster_hangs {
                                     hanging = false;
