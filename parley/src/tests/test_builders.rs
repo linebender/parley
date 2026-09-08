@@ -3,7 +3,7 @@
 
 //! Test that the various builders produce the same results.
 
-use std::{borrow::Cow, path::PathBuf, sync::Arc, vec::Vec};
+use std::{borrow::Cow, path::PathBuf, sync::Arc, vec, vec::Vec};
 
 use fontique::{Collection, CollectionOptions, FontStyle, FontWeight, FontWidth, SourceCache};
 use parlance::FontFamilyName;
@@ -11,9 +11,9 @@ use peniko::{Blob, color::palette};
 
 use super::utils::{ColorBrush, asserts::assert_eq_layout_data};
 use crate::{
-    BaseDirection, FontContext, FontFamily, FontFeatures, FontVariations, Layout, LayoutContext,
-    LineHeight, OverflowWrap, RangedBuilder, StyleProperty, StyleRunBuilder, TextStyle,
-    TextWrapMode, TreeBuilder, WordBreak,
+    BaseDirection, BreakReason, FontContext, FontFamily, FontFeatures, FontVariations, Layout,
+    LayoutContext, LineHeight, OverflowWrap, RangedBuilder, StyleProperty, StyleRunBuilder,
+    TextStyle, TextWrapMode, TreeBuilder, WordBreak,
 };
 
 // TODO: `FONT_FAMILY_LIST`, `load_fonts`, and `create_font_context` are
@@ -684,4 +684,41 @@ fn builders_crlf_across_run_boundary_counts_as_single_line_break() {
         split_crlf, split_lf,
         "styled CRLF should match styled LF line count"
     );
+}
+
+/// ICU4X's line segmenter emits a soft break opportunity at the end of a
+/// complex-script (Thai, Khmer, Lao, ...) run even when the next character is a
+/// mandatory break, which must not shadow the hard break.
+/// See <https://github.com/linebender/parley/issues/768>.
+#[test]
+fn builders_newline_inside_complex_script_run_is_hard_break() {
+    let mut fcx = create_font_context();
+    let mut break_reasons = |text: &str| -> Vec<BreakReason> {
+        let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+        let ropts = RangedOptions {
+            scale: 1.0,
+            quantize: false,
+            max_advance: None,
+            text,
+        };
+        let layout = build_layout_with_ranged(&mut fcx, &mut lcx, &ropts, |rb| {
+            set_root_style(rb);
+        });
+        layout.lines().map(|line| line.break_reason()).collect()
+    };
+
+    for text in [
+        "กก\nกก",
+        "ក្ម\nក្ម",
+        "ກກ\nກກ",
+        "กก\r\nกก",
+        "กก\u{2028}กก",
+        "aa\nbb",
+    ] {
+        assert_eq!(
+            break_reasons(text),
+            vec![BreakReason::Explicit, BreakReason::None],
+            "{text:?} should produce exactly two lines with an explicit break",
+        );
+    }
 }

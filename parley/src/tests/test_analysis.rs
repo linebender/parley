@@ -308,6 +308,40 @@ fn test_paragraph_separator_is_hard_break() {
         .expect_contributes_to_shaping_list(vec![true, false, true]);
 }
 
+/// ICU4X emits a soft break opportunity at the end of a complex-script run even
+/// when it is directly followed by a mandatory break character (violating UAX #14
+/// LB6). That opportunity must be dropped so the newline is not treated as a
+/// regular wrap opportunity. See <https://github.com/linebender/parley/issues/768>.
+#[test]
+fn test_mandatory_break_after_complex_script_run() {
+    // Thai
+    verify_analysis("กก\nกก", |_| {}).expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Mandatory,
+        Boundary::None,
+    ]);
+    // Khmer
+    verify_analysis("ក្ម\nក្ម", |_| {}).expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::None,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Mandatory,
+        Boundary::None,
+        Boundary::None,
+    ]);
+    // Lao
+    verify_analysis("ກກ\nກກ", |_| {}).expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::None,
+        Boundary::Word,
+        Boundary::Mandatory,
+        Boundary::None,
+    ]);
+}
+
 #[test]
 fn test_blank() {
     verify_analysis("", |_| {})

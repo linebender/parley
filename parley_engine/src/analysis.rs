@@ -581,11 +581,15 @@ pub(crate) fn analyze_text(
             is_grapheme_start = true;
             _ = gb_iter.next();
         }
+        let properties = data_sources.properties(ch);
         let mut is_line = false;
         if let Some(&l) = lb_iter.peek()
             && *l == byte_pos
         {
-            is_line = true;
+            // A soft break opportunity is never valid directly before a mandatory break
+            // character (UAX #14 LB6), but ICU4X's line segmenter emits one at the end of a
+            // complex-script (Thai, Khmer, Lao, ...) run regardless of what follows it.
+            is_line = !properties.is_mandatory_linebreak();
             _ = lb_iter.next();
         }
 
@@ -611,10 +615,8 @@ pub(crate) fn analyze_text(
             Boundary::None
         };
 
-        (boundary, is_grapheme_start, ch)
+        (boundary, is_grapheme_start, ch, properties)
     });
-
-    let properties = |c| data_sources.properties(c);
 
     let mut needs_bidi_resolution = false;
 
@@ -626,8 +628,7 @@ pub(crate) fn analyze_text(
         // character-indexed.
         .fold(
             false,
-            |is_mandatory_linebreak, (boundary, is_grapheme_start, ch)| {
-                let properties = properties(ch);
+            |is_mandatory_linebreak, (boundary, is_grapheme_start, ch, properties)| {
                 let script = properties.script();
                 let grapheme_cluster_break = properties.grapheme_cluster_break();
                 let bidi_class = properties.bidi_class();
