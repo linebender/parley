@@ -911,11 +911,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     text_metrics,
                                     is_separator,
                                 );
-                                return self.start_new_line(
-                                    BreakReason::Regular,
-                                    max_advance,
-                                    line_indent,
-                                );
+                                self.state.mark_line_break_opportunity();
                             }
                             // Case: we have previously encountered a REGULAR line-breaking opportunity in the current line
                             //
@@ -1289,7 +1285,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 impl<B: Brush> Drop for BreakLines<'_, B> {
     fn drop(&mut self) {
         // Compute the overall width and height of the entire layout
-        // The "width" excludes trailing whitespace. The "full_width" includes it.
+        // The "width" excludes hanging whitespace. The "full_width" includes it.
         let mut layout_width = 0_f32;
         let mut layout_full_width = 0_f32;
         let mut height = 0_f64; // f32 causes test failures due to accumulated error
@@ -1465,6 +1461,17 @@ fn commit_line<B: Brush>(
 
     let (hanging_advance, justification_end_cluster, hanging_opportunities) =
         hanging_whitespace(layout, &lines.line_items[start_item_idx..end_item_idx]);
+    // Trailing whitespace before a forced break hangs conditionally (CSS Text 4 § 4.3.2): only
+    // the part that doesn't fit hangs. Whitespace that fits, stays inside the line box, and
+    // counts towards alignment and the layout width. The end of the layout is considered to be
+    // a forced line break as well (CSS Text 4 § 5). Trailing whitespace before a soft break
+    // hangs unconditionally.
+    let hanging_advance = if matches!(break_reason, BreakReason::Explicit | BreakReason::None) {
+        let overflow = state.x - max_advance;
+        hanging_advance.min(overflow).max(0.)
+    } else {
+        hanging_advance
+    };
     // The word separators counted as the line was built include the line's hanging whitespace, and
     // hanging whitespace is not stretched by justification.
     let num_justification_opportunities = state.num_word_separators - hanging_opportunities;
