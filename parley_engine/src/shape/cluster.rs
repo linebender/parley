@@ -120,9 +120,6 @@ pub enum Whitespace {
 impl Whitespace {
     #[inline]
     pub(crate) const fn from_char(c: char) -> Self {
-        const LINE_SEPARATOR: char = '\u{2028}';
-        const PARAGRAPH_SEPARATOR: char = '\u{2029}';
-
         // See https://www.unicode.org/Public/UCD/latest/ucd/PropList.txt.
         match c {
             ' ' => Self::Space,
@@ -135,7 +132,8 @@ impl Whitespace {
             }
 
             '\t' => Self::Tab,
-            '\n' | '\r' | LINE_SEPARATOR | PARAGRAPH_SEPARATOR => Self::Newline,
+            // Newline, carriage return, line separator, paragraph separator.
+            '\n' | '\r' | '\u{2028}' | '\u{2029}' => Self::Newline,
             // Vertical tab, form feed, next line. These are `White_Space` that CSS says to render
             // as control characters.
             '\u{000b}' | '\u{000c}' | '\u{0085}' => Self::ControlWhitespace,
