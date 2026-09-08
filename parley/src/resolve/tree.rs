@@ -47,6 +47,7 @@ pub(crate) struct TreeStyleBuilder<B: Brush> {
 }
 
 impl<B: Brush> TreeStyleBuilder<B> {
+    /// The style of the span that text is currently being pushed into.
     fn current_style(&self) -> ResolvedStyle<B> {
         self.tree[self.current_span].style.clone()
     }
@@ -90,16 +91,21 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.current_span = 0;
     }
 
+    /// Sets the white space collapsing mode applied to subsequently pushed text.
     pub(crate) fn set_white_space_mode(&mut self, white_space_collapse: WhiteSpaceCollapse) {
         // Text pushed so far is processed with the mode that was in effect when it was pushed.
         self.commit_uncommitted_text();
         self.white_space_collapse = white_space_collapse;
     }
 
+    /// Records the kind of the most recently pushed item, which determines whether pending
+    /// collapsible whitespace is at the start of the inline formatting context.
     pub(crate) fn set_last_item_kind(&mut self, item_kind: ItemKind) {
         self.last_item_kind = item_kind;
     }
 
+    /// Applies white space processing to the buffered text and commits the result, leaving any
+    /// trailing collapsible whitespace pending.
     pub(crate) fn commit_uncommitted_text(&mut self) {
         let uncommitted_text = core::mem::take(&mut self.uncommitted_text);
         if uncommitted_text.is_empty() {
@@ -158,6 +164,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.commit_text(span, " ");
     }
 
+    /// Appends already white space processed `text` to the buffer, attributed to `span`.
     fn commit_text(&mut self, span: usize, text: &str) {
         let style_index = self.resolve_style_id(span);
         let start = self.text.len();
@@ -174,6 +181,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.last_item_kind = ItemKind::TextRun;
     }
 
+    /// The index of `span`'s style in the style table, adding it to the table if necessary.
     fn resolve_style_id(&mut self, span: usize) -> u16 {
         if let Some(style_id) = self.tree[span].style_id {
             return style_id;
@@ -184,10 +192,12 @@ impl<B: Brush> TreeStyleBuilder<B> {
         style_id
     }
 
+    /// The length in bytes of the text committed so far.
     pub(crate) fn current_text_len(&self) -> usize {
         self.text.len()
     }
 
+    /// Begins a child span with the given style, which subsequent text is attributed to.
     pub(crate) fn push_style_span(&mut self, style: ResolvedStyle<B>) {
         self.commit_uncommitted_text();
 
@@ -199,6 +209,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.current_span = self.tree.len() - 1;
     }
 
+    /// Begins a child span with the current style modified by the given properties.
     pub(crate) fn push_style_modification_span(
         &mut self,
         properties: impl Iterator<Item = ResolvedProperty<B>>,
@@ -210,6 +221,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.push_style_span(style);
     }
 
+    /// Ends the current span, returning to its parent.
     pub(crate) fn pop_style_span(&mut self) {
         self.commit_uncommitted_text();
 
@@ -218,7 +230,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
             .expect("Popped root style");
     }
 
-    /// Pushes a property that covers the specified range of text.
+    /// Buffers text in the current span, to be white space processed when it is committed.
     pub(crate) fn push_text(&mut self, text: &str) {
         if !text.is_empty() {
             self.uncommitted_text.push_str(text);
