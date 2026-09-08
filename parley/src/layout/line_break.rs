@@ -1275,8 +1275,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                         let whitespace = c.info.whitespace();
                                         // Note non-breaking spaces don't hang: CSS Text 4 § 4.3.2
                                         // hangs only spaces, tabs, segment breaks, and "other space
-                                        // separators." We don't currently handle "other space
-                                        // separators".
+                                        // separators." Of those "other space separators," we
+                                        // currently hang only the ideographic space.
                                         whitespace_can_hang(whitespace)
                                     });
                                 if !cluster_hangs {
