@@ -130,7 +130,6 @@ impl Whitespace {
             '\u{1680}' | '\u{2000}'..='\u{200A}' | '\u{202F}' | '\u{205F}' => {
                 Self::OtherSpaceSeparator
             }
-
             '\t' => Self::Tab,
             // Newline, carriage return, line separator, paragraph separator.
             '\n' | '\r' | '\u{2028}' | '\u{2029}' => Self::Newline,
