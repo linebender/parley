@@ -20,13 +20,6 @@ fn is_segment_break(c: char) -> bool {
     matches!(c, '\n' | '\r' | '\u{2028}' | '\u{2029}')
 }
 
-#[derive(Clone, Copy, PartialEq)]
-pub(crate) enum ItemKind {
-    None,
-    InlineBox,
-    TextRun,
-}
-
 /// Builder for constructing a tree of styles
 #[derive(Clone)]
 pub(crate) struct TreeStyleBuilder<B: Brush> {
@@ -43,14 +36,9 @@ pub(crate) struct TreeStyleBuilder<B: Brush> {
     /// same inline formatting context, so that it can collapse across span and inline box
     /// boundaries and be removed at the end of the text.
     pending_whitespace: Option<usize>,
-    last_item_kind: ItemKind,
-}
-
-impl<B: Brush> TreeStyleBuilder<B> {
-    /// The style of the span that text is currently being pushed into.
-    fn current_style(&self) -> ResolvedStyle<B> {
-        self.tree[self.current_span].style.clone()
-    }
+    /// Whether the most recently pushed item is an inline box, in which case pending collapsible
+    /// whitespace is not at the start of the inline formatting context.
+    last_item_is_inline_box: bool,
 }
 
 impl<B: Brush> Default for TreeStyleBuilder<B> {
@@ -64,12 +52,17 @@ impl<B: Brush> Default for TreeStyleBuilder<B> {
             uncommitted_text: String::new(),
             current_span: usize::MAX,
             pending_whitespace: None,
-            last_item_kind: ItemKind::None,
+            last_item_is_inline_box: false,
         }
     }
 }
 
 impl<B: Brush> TreeStyleBuilder<B> {
+    /// The style of the span that text is currently being pushed into.
+    fn current_style(&self) -> ResolvedStyle<B> {
+        self.tree[self.current_span].style.clone()
+    }
+
     /// Prepares the builder for accepting a tree of styles and text.
     ///
     /// The provided `root_style` is the default style applied to all text unless overridden.
@@ -81,7 +74,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.text.clear();
         self.uncommitted_text.clear();
         self.pending_whitespace = None;
-        self.last_item_kind = ItemKind::None;
+        self.last_item_is_inline_box = false;
 
         self.tree.push(StyleTreeNode {
             parent: None,
@@ -98,10 +91,10 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.white_space_collapse = white_space_collapse;
     }
 
-    /// Records the kind of the most recently pushed item, which determines whether pending
-    /// collapsible whitespace is at the start of the inline formatting context.
-    pub(crate) fn set_last_item_kind(&mut self, item_kind: ItemKind) {
-        self.last_item_kind = item_kind;
+    /// Records that an inline box has been pushed, so that following collapsible whitespace is not
+    /// treated as whitespace at the start of the inline formatting context.
+    pub(crate) fn set_last_item_is_inline_box(&mut self) {
+        self.last_item_is_inline_box = true;
     }
 
     /// Applies white space processing to the buffered text and commits the result, leaving any
@@ -156,7 +149,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
         // Whitespace at the start of the inline formatting context is removed, as is whitespace
         // immediately following a preserved segment break. Whitespace following a preserved space
         // or tab is retained, as only collapsible whitespace collapses.
-        let is_at_start = self.text.is_empty() && self.last_item_kind != ItemKind::InlineBox;
+        let is_at_start = self.text.is_empty() && !self.last_item_is_inline_box;
         if is_at_start || self.text.ends_with(is_segment_break) {
             return;
         }
@@ -178,7 +171,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
                 range: start..self.text.len(),
             }),
         }
-        self.last_item_kind = ItemKind::TextRun;
+        self.last_item_is_inline_box = false;
     }
 
     /// The index of `span`'s style in the style table, adding it to the table if necessary.
@@ -216,7 +209,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
     ) {
         let mut style = self.current_style();
         for prop in properties {
-            style.apply(prop.clone());
+            style.apply(prop);
         }
         self.push_style_span(style);
     }
@@ -232,9 +225,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
 
     /// Buffers text in the current span, to be white space processed when it is committed.
     pub(crate) fn push_text(&mut self, text: &str) {
-        if !text.is_empty() {
-            self.uncommitted_text.push_str(text);
-        }
+        self.uncommitted_text.push_str(text);
     }
 
     /// Computes style table + style runs and returns the final text buffer.

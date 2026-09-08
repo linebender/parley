@@ -16,7 +16,7 @@ use parley_engine::break_overrides::LineBreakOverrideFn;
 
 use crate::InlineBoxKind;
 use crate::inline_box::InlineBox;
-use crate::resolve::{ResolvedStyle, StyleRun, tree::ItemKind};
+use crate::resolve::{ResolvedStyle, StyleRun};
 
 #[derive(Clone, Copy)]
 pub(crate) struct BuilderOptions<'a> {
@@ -258,9 +258,7 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
         if inline_box.kind == InlineBoxKind::InFlow {
             self.lcx.tree_style_builder.commit_uncommitted_text();
             self.lcx.tree_style_builder.flush_pending_whitespace();
-            self.lcx
-                .tree_style_builder
-                .set_last_item_kind(ItemKind::InlineBox);
+            self.lcx.tree_style_builder.set_last_item_is_inline_box();
         }
 
         // TODO: arrange type better here to factor out the index
