@@ -757,14 +757,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let text_wrap_mode = self.state.line.text_wrap_mode;
                         self.state.line.text_wrap_mode = style.text_wrap_mode;
 
-                        if boundary == Boundary::Line && text_wrap_mode == TextWrapMode::Wrap {
-                            // We don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
-                            // line breaks. We should accept the overflowing fragment in that scenario.
-                            if self.state.line.x != 0.0 {
-                                self.state.mark_line_break_opportunity();
-                                // break_opportunity = true;
-                            }
-                        } else if is_newline {
+                        // Take mandatory line breaks before checking for line wrapping.
+                        if is_newline {
                             if max_height_exceeded {
                                 return self.max_height_break_data(line_height);
                             }
@@ -818,6 +812,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 max_advance,
                                 line_indent,
                             );
+                        } else if boundary == Boundary::Line && text_wrap_mode == TextWrapMode::Wrap
+                        {
+                            // We don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
+                            // line breaks. We should accept the overflowing fragment in that scenario.
+                            if self.state.line.x != 0.0 {
+                                self.state.mark_line_break_opportunity();
+                                // break_opportunity = true;
+                            }
                         } else if
                         // This text can contribute "emergency" line breaks.
                         style.overflow_wrap != OverflowWrap::Normal
