@@ -44,6 +44,9 @@ struct LineState {
     /// The line's shaped clusters, as a range into [`parley_engine::ShapedText::shaped_clusters`].
     /// The bounds are atom-aligned.
     clusters: Range<u32>,
+    /// Number of atoms appended to this line whose first character is a word separator (i.e., a
+    /// justification opportunity). `finish_line` subtracts the ones that hang past the line's end.
+    num_word_separators: usize,
     box_metrics: LineBoxMetrics,
     /// This is set to true if we encounter something on the line (either a glyph or an inline box)
     /// that is taller than the `line_max_height`. When in this state `break_next` should yield control
@@ -61,6 +64,7 @@ impl LineState {
     /// Reset the per-line running state in preparation for building a new line.
     fn reset(&mut self) {
         self.x = 0.0;
+        self.num_word_separators = 0;
         self.box_metrics = LineBoxMetrics::default();
     }
 }
@@ -327,11 +331,15 @@ impl BreakerState {
     fn append_atom_to_line(
         &mut self,
         atom: &Atom<'_>,
+        whitespace: Whitespace,
         next_x: f32,
         font_metrics: &FontMetrics,
         line_height: f32,
         quantize: bool,
     ) {
+        if is_word_separator(whitespace) {
+            self.line.num_word_separators += 1;
+        }
         self.line.items.end = self.item_idx + 1;
         self.line.clusters.end = atom.shaped_clusters_range().end;
         self.cluster_idx = atom.shaped_clusters_range().end;
@@ -803,6 +811,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                             self.state.append_atom_to_line(
                                 &atom,
+                                whitespace,
                                 self.state.line.x,
                                 metrics,
                                 line_height,
@@ -846,6 +855,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             }
                             self.state.append_atom_to_line(
                                 &atom,
+                                whitespace,
                                 next_x,
                                 metrics,
                                 line_height,
@@ -867,6 +877,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 }
                                 self.state.append_atom_to_line(
                                     &atom,
+                                    whitespace,
                                     next_x,
                                     metrics,
                                     line_height,
@@ -916,6 +927,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 }
                                 self.state.append_atom_to_line(
                                     &atom,
+                                    whitespace,
                                     next_x,
                                     metrics,
                                     line_height,
@@ -1044,6 +1056,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let metrics = run.font_metrics();
                         self.state.append_atom_to_line(
                             &atom,
+                            whitespace,
                             next_x,
                             metrics,
                             run.data.line_height,
@@ -1180,7 +1193,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // the line was built and are read from there below.
         let mut needs_reorder = false;
         let mut hanging_whitespace_advance = 0.;
-        let mut num_justification_opportunities = 0;
+        // Justification opportunities (word-separator atoms) were counted as atoms were appended
+        // to the line. Atoms that hang past the line's end, and the atom that stops hanging, are
+        // not justification opportunities, so we subtract them below.
+        let mut hanging_word_separators = 0usize;
+        let mut stopper_is_word_separator = false;
         // One past the justified region: atoms with shaped clusters before this index may be
         // stretched by justification.
         let mut justification_end_cluster = u32::MAX;
@@ -1235,16 +1252,19 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     );
                     line_item.advance = effective_spacing.slice_advance(slice);
 
-                    // Ignore trailing whitespace for the line's content advance calculation
-                    // (we are iterating backwards so trailing whitespace comes first).
-                    for atom in slice.atoms_end().rev() {
-                        if hanging {
+                    // Walk the run's atoms backwards only while they can still hang: hanging
+                    // ends at the first atom with a non-hangable shaped cluster. Atoms before
+                    // that need no per-atom work; their justification opportunities were counted
+                    // when they were appended to the line.
+                    if hanging {
+                        for atom in slice.atoms_end().rev() {
                             // An atom can hang partially: e.g., a prepend character followed by a
                             // space is a single atom (as it's a grapheme), but may consist of
                             // multiple shaped clusters. We can hang the advance of the space's
                             // shaped cluster. In case of such partial hanging, if the atom has any
                             // additional spacing (e.g., through word spacing), only the logically
                             // last spacing is hung.
+                            let first_whitespace = atom.characters()[0].info.whitespace();
                             let mut last_cluster = true;
                             let (gap_start, gap_end) = {
                                 let gaps = effective_spacing.gaps(&atom);
@@ -1283,11 +1303,17 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                             if hanging {
                                 hanging_whitespace_advance += gap_start;
+                                if is_word_separator(first_whitespace) {
+                                    hanging_word_separators += 1;
+                                }
                             } else {
                                 justification_end_cluster = atom.shaped_clusters_range().start;
+                                // The atom that stops hanging is not a justification opportunity
+                                // (e.g., a non-breaking space closing the line).
+                                stopper_is_word_separator =
+                                    is_word_separator(first_whitespace);
+                                break;
                             }
-                        } else if is_word_separator(atom.characters()[0].info.whitespace()) {
-                            num_justification_opportunities += 1;
                         }
                     }
                 }
@@ -1295,7 +1321,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
 
         line.metrics.hanging_advance = hanging_whitespace_advance;
-        line.num_justification_opportunities = num_justification_opportunities;
+        line.num_justification_opportunities = self
+            .state
+            .line
+            .num_word_separators
+            .saturating_sub(hanging_word_separators + usize::from(stopper_is_word_separator));
         line.justification.justification_end_cluster = justification_end_cluster;
 
         // Reorder the items within the line (if required). Reordering is required if the line contains
