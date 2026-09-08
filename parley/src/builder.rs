@@ -257,14 +257,14 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
     pub fn push_inline_box(&mut self, mut inline_box: InlineBox) {
         if inline_box.kind == InlineBoxKind::InFlow {
             self.lcx.tree_style_builder.commit_uncommitted_text();
-            self.lcx.tree_style_builder.commit_pending_whitespace();
+            self.lcx.tree_style_builder.flush_pending_whitespace();
             self.lcx
                 .tree_style_builder
                 .set_last_item_kind(ItemKind::InlineBox);
         }
 
         // TODO: arrange type better here to factor out the index
-        inline_box.index = self.lcx.tree_style_builder.current_text_len();
+        inline_box.index = self.lcx.tree_style_builder.committed_text_len();
         self.lcx.inline_boxes.push(inline_box);
     }
 

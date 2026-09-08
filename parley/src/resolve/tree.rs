@@ -120,7 +120,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
                     // removed.
                     self.pending_whitespace = None;
                 }
-                self.commit_pending_whitespace();
+                self.flush_pending_whitespace();
                 self.commit_text(span, &uncommitted_text);
             }
             WhiteSpaceCollapse::Collapse => {
@@ -138,7 +138,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
                     let text_len = rest
                         .find(|c: char| c.is_ascii_whitespace())
                         .unwrap_or(rest.len());
-                    self.commit_pending_whitespace();
+                    self.flush_pending_whitespace();
                     self.commit_text(span, &rest[..text_len]);
                     rest = &rest[text_len..];
                 }
@@ -146,9 +146,9 @@ impl<B: Brush> TreeStyleBuilder<B> {
         }
     }
 
-    /// Commits a single space for a pending collapsible whitespace sequence, if it is followed by
-    /// content that it can collapse into.
-    pub(crate) fn commit_pending_whitespace(&mut self) {
+    /// Resolves a pending collapsible whitespace sequence, committing a single space for it if it
+    /// is followed by content that it can collapse into, and dropping it otherwise.
+    pub(crate) fn flush_pending_whitespace(&mut self) {
         let Some(span) = self.pending_whitespace.take() else {
             return;
         };
@@ -192,8 +192,8 @@ impl<B: Brush> TreeStyleBuilder<B> {
         style_id
     }
 
-    /// The length in bytes of the text committed so far.
-    pub(crate) fn current_text_len(&self) -> usize {
+    /// The length in bytes of the text committed so far, excluding buffered text.
+    pub(crate) fn committed_text_len(&self) -> usize {
         self.text.len()
     }
 
