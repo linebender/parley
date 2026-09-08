@@ -287,7 +287,7 @@ impl<B: Brush> LayoutData<B> {
     /// min-content width is the widest line when breaking at every opportunity.
     ///
     /// This should mirror the line breaker in terms of layout decisions like hanging whitespace (if
-    /// it doesn't, this calculation is buggy).
+    /// it doesn't, one of the calculations is buggy).
     #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
         let mut min_width = 0.0_f32;
