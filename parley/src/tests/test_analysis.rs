@@ -4,7 +4,7 @@
 use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty, WordBreak};
 use alloc::{vec, vec::Vec};
 use fontique::FontWeight;
-use icu_properties::props::{GraphemeClusterBreak, Script};
+use icu_properties::props::Script;
 use icu_segmenter::{LineSegmenter, options::LineBreakOptions};
 use parley_engine::Boundary;
 
@@ -46,18 +46,6 @@ impl TestContext {
             .map(|info| info.script)
             .collect();
         assert_eq!(actual, expected, "Script list mismatch");
-        self
-    }
-
-    fn expect_grapheme_cluster_break_list(self, expected: Vec<GraphemeClusterBreak>) -> Self {
-        let actual: Vec<_> = self
-            .layout_context
-            .analysis
-            .char_info()
-            .iter()
-            .map(|info| info.grapheme_cluster_break)
-            .collect();
-        assert_eq!(actual, expected, "Grapheme cluster break list mismatch");
         self
     }
 
@@ -238,10 +226,6 @@ fn test_latin_mixed_keep_all_last() {
     .expect_boundary_list(vec![Boundary::Word, Boundary::None])
     .expect_bidi_embed_level_list(&[])
     .expect_script_list(vec![Script::Latin, Script::Latin])
-    .expect_grapheme_cluster_break_list(vec![
-        GraphemeClusterBreak::Other,
-        GraphemeClusterBreak::Other,
-    ])
     .expect_is_control_list(vec![false, false])
     .expect_contributes_to_shaping_list(vec![true, true])
     .expect_force_normalize_list(vec![false, false]);
@@ -272,17 +256,6 @@ fn test_mandatory_break_in_text() {
             Script::Latin,
             Script::Common,
             Script::Latin,
-        ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::LF,
-            GraphemeClusterBreak::Other,
         ])
         .expect_is_control_list(vec![
             false, false, false, false, false, false, false, true, false,
@@ -358,7 +331,6 @@ fn test_blank() {
         .expect_boundary_list(vec![Boundary::Word])
         .expect_bidi_embed_level_list(&[])
         .expect_script_list(vec![Script::Common])
-        .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::Other])
         .expect_is_control_list(vec![false])
         .expect_contributes_to_shaping_list(vec![true])
         .expect_force_normalize_list(vec![false]);
@@ -479,14 +451,6 @@ fn test_multi_char_grapheme() {
             Script::Inherited,
             Script::Common,
             Script::Latin,
-        ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Extend,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
         ])
         .expect_is_control_list(vec![false, false, false, false, false, false])
         .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
@@ -817,14 +781,6 @@ fn test_multi_char_grapheme_mixed_break_all() {
         Script::Common,
         Script::Latin,
     ])
-    .expect_grapheme_cluster_break_list(vec![
-        GraphemeClusterBreak::Other,
-        GraphemeClusterBreak::Other,
-        GraphemeClusterBreak::Other,
-        GraphemeClusterBreak::Extend,
-        GraphemeClusterBreak::Other,
-        GraphemeClusterBreak::Other,
-    ])
     .expect_is_control_list(vec![false, false, false, false, false, false])
     .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
     .expect_force_normalize_list(vec![false, false, false, true, false, false]);
@@ -936,42 +892,6 @@ fn test_mixed_ltr_rtl_multiple_segments() {
             Script::Arabic,
             Script::Arabic,
             Script::Arabic,
-        ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
         ]);
 }
 
@@ -1000,14 +920,6 @@ fn test_multi_char_grapheme_mixed_break_and_keep_all() {
         Script::Inherited,
         Script::Common,
         Script::Latin,
-    ])
-    .expect_grapheme_cluster_break_list(vec![
-        GraphemeClusterBreak::Other,
-        GraphemeClusterBreak::Other,
-        GraphemeClusterBreak::Other,
-        GraphemeClusterBreak::Extend,
-        GraphemeClusterBreak::Other,
-        GraphemeClusterBreak::Other,
     ])
     .expect_is_control_list(vec![false, false, false, false, false, false])
     .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
@@ -1039,14 +951,6 @@ fn test_multi_char_grapheme_mixed_keep_all() {
         Script::Inherited,
         Script::Common,
         Script::Latin,
-    ])
-    .expect_grapheme_cluster_break_list(vec![
-        GraphemeClusterBreak::Other,
-        GraphemeClusterBreak::Other,
-        GraphemeClusterBreak::Other,
-        GraphemeClusterBreak::Extend,
-        GraphemeClusterBreak::Other,
-        GraphemeClusterBreak::Other,
     ])
     .expect_is_control_list(vec![false, false, false, false, false, false])
     .expect_contributes_to_shaping_list(vec![true, true, true, true, true, true])
@@ -1111,32 +1015,6 @@ fn test_multi_paragraph_bidi() {
             Script::Arabic,
             Script::Arabic,
         ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::LF,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-        ])
         .expect_is_control_list(vec![
             false, false, false, false, false, false, false, false, false, false, false, false,
             true, false, false, false, false, false, false, false, false, false, false, false,
@@ -1182,19 +1060,6 @@ fn test_rtl_paragraph_with_non_authoritative_logical_first_char_two_paragraphs()
             Script::Inherited,
             Script::Common,
         ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Extend,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::LF,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Extend,
-            GraphemeClusterBreak::Other,
-        ])
         .expect_is_control_list(vec![
             false, false, false, false, false, true, false, false, false, false, false,
         ])
@@ -1221,8 +1086,7 @@ fn test_single_char_multi_byte() {
     })
     .expect_boundary_list(vec![Boundary::Word])
     .expect_bidi_embed_level_list(&[])
-    .expect_script_list(vec![Script::Common])
-    .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::Other]);
+    .expect_script_list(vec![Script::Common]);
 }
 
 #[test]
@@ -1243,13 +1107,6 @@ fn test_rtl_paragraph_with_non_authoritative_logical_first_character() {
             Script::Inherited,
             Script::Common,
         ])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Other,
-            GraphemeClusterBreak::Extend,
-            GraphemeClusterBreak::Other,
-        ])
         .expect_is_control_list(vec![false, false, false, false, false])
         .expect_contributes_to_shaping_list(vec![true, true, true, true, true])
         .expect_force_normalize_list(vec![false, false, false, true, false]);
@@ -1260,11 +1117,7 @@ fn test_two_newlines() {
     verify_analysis("\n\n", |_| {})
         .expect_boundary_list(vec![Boundary::Word, Boundary::Mandatory])
         .expect_bidi_embed_level_list(&[])
-        .expect_script_list(vec![Script::Common, Script::Common])
-        .expect_grapheme_cluster_break_list(vec![
-            GraphemeClusterBreak::LF,
-            GraphemeClusterBreak::LF,
-        ]);
+        .expect_script_list(vec![Script::Common, Script::Common]);
 }
 
 #[test]
@@ -1272,8 +1125,7 @@ fn test_newline() {
     verify_analysis("\n", |_| {})
         .expect_boundary_list(vec![Boundary::Word])
         .expect_bidi_embed_level_list(&[])
-        .expect_script_list(vec![Script::Common])
-        .expect_grapheme_cluster_break_list(vec![GraphemeClusterBreak::LF]);
+        .expect_script_list(vec![Script::Common]);
 }
 
 #[test]

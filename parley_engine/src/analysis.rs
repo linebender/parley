@@ -175,8 +175,6 @@ pub struct CharInfo {
     pub boundary: Boundary,
     /// The Unicode script this character belongs to.
     pub script: Script,
-    /// The grapheme cluster boundary property of this character.
-    pub grapheme_cluster_break: GraphemeClusterBreak,
     /// The impact this character has on directionality.
     pub bidi_class: icu_properties::props::BidiClass,
     /// Whether or not the character is a bracket, plus mirror data if so.
@@ -213,7 +211,6 @@ impl CharInfo {
     fn new(
         boundary: Boundary,
         script: Script,
-        grapheme_cluster_break: GraphemeClusterBreak,
         bidi_class: icu_properties::props::BidiClass,
         bracket: BidiMirroringGlyph,
         is_variation_selector: bool,
@@ -227,7 +224,6 @@ impl CharInfo {
         Self {
             boundary,
             script,
-            grapheme_cluster_break,
             bidi_class,
             bracket,
             flags: (is_variation_selector as u8) << Self::VARIATION_SELECTOR_SHIFT
@@ -664,7 +660,6 @@ pub(crate) fn analyze_text(
                 analysis.info.push(CharInfo::new(
                     boundary,
                     script,
-                    grapheme_cluster_break,
                     bidi_class,
                     bracket,
                     is_variation_selector,
