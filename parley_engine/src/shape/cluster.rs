@@ -113,7 +113,6 @@ pub enum Whitespace {
     /// There are also `Cc` characters that aren't `White_Space` (those would be
     /// [`Whitespace::None`]).
     ControlWhitespace = 7,
-
     // NOTE: if you grow these variants more than eight, ensure you also update the encoding in
     // `GraphemeFlags`.
 }
@@ -125,7 +124,7 @@ impl Whitespace {
         const PARAGRAPH_SEPARATOR: char = '\u{2029}';
 
         // See https://www.unicode.org/Public/UCD/latest/ucd/PropList.txt.
-        let whitespace = match c {
+        match c {
             ' ' => Self::Space,
             '\u{00A0}' => Self::NoBreakSpace,
             '\u{3000}' => Self::IdeographicSpace,
@@ -141,9 +140,7 @@ impl Whitespace {
             // as control characters.
             '\u{000b}' | '\u{000c}' | '\u{0085}' => Self::ControlWhitespace,
             _ => Self::None,
-        };
-
-        whitespace
+        }
     }
 
     /// Returns true for space or no break space.
