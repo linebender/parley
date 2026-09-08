@@ -205,7 +205,7 @@ impl ClusterInfo {
     // Returns the whitespace type of the cluster.
     #[inline(always)]
     pub fn whitespace(self) -> Whitespace {
-        to_whitespace(self.source_char)
+        Whitespace::from_char(self.source_char)
     }
 
     /// Returns if the cluster is a line boundary.
@@ -224,27 +224,12 @@ impl ClusterInfo {
     /// Returns if the cluster is any whitespace.
     #[inline(always)]
     pub fn is_whitespace(self) -> bool {
-        self.source_char.is_whitespace()
+        self.whitespace() != Whitespace::None
     }
 
     /// Returns the cluster's original character.
     #[inline(always)]
     pub fn source_char(self) -> char {
         self.source_char
-    }
-}
-
-// TODO: should become private when more of `parley`'s shaping is in `parley_engine`
-#[inline]
-pub const fn to_whitespace(c: char) -> Whitespace {
-    const LINE_SEPARATOR: char = '\u{2028}';
-    const PARAGRAPH_SEPARATOR: char = '\u{2029}';
-
-    match c {
-        ' ' => Whitespace::Space,
-        '\t' => Whitespace::Tab,
-        '\n' | '\r' | LINE_SEPARATOR | PARAGRAPH_SEPARATOR => Whitespace::Newline,
-        '\u{00A0}' => Whitespace::NoBreakSpace,
-        _ => Whitespace::None,
     }
 }
