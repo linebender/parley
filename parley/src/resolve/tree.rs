@@ -4,7 +4,7 @@
 //! Hierarchical tree based style application.
 use alloc::{string::String, vec::Vec};
 
-use crate::style::WhiteSpaceCollapse;
+use crate::style::{TextWrapMode, WhiteSpaceCollapse};
 
 use super::{Brush, ResolvedProperty, ResolvedStyle, StyleRun};
 
@@ -13,6 +13,19 @@ struct StyleTreeNode<B: Brush> {
     parent: Option<usize>,
     style: ResolvedStyle<B>,
     style_id: Option<u16>,
+    /// The style's id when it is used for whitespace that wrapping is allowed after, which differs
+    /// from `style_id` only for spans that disable wrapping.
+    wrappable_style_id: Option<u16>,
+}
+
+/// A collapsible whitespace sequence that has not been committed yet.
+#[derive(Debug, Clone, Copy)]
+struct PendingWhitespace {
+    /// The span the sequence started in, which the collapsed space is attributed to.
+    span: usize,
+    /// Whether any of the collapsed whitespace came from a span that allows wrapping, in which
+    /// case the collapsed space is a soft wrap opportunity.
+    wrappable: bool,
 }
 
 /// Whether `c` is a segment break, i.e. a character which is a forced line break when preserved.
@@ -35,7 +48,7 @@ pub(crate) struct TreeStyleBuilder<B: Brush> {
     /// Collapsible whitespace is only committed once it is known to be followed by content in the
     /// same inline formatting context, so that it can collapse across span and inline box
     /// boundaries and be removed at the end of the text.
-    pending_whitespace: Option<usize>,
+    pending_whitespace: Option<PendingWhitespace>,
     /// Whether the most recently pushed item is an inline box, in which case pending collapsible
     /// whitespace is not at the start of the inline formatting context.
     last_item_is_inline_box: bool,
@@ -80,6 +93,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
             parent: None,
             style: root_style,
             style_id: None,
+            wrappable_style_id: None,
         });
         self.current_span = 0;
     }
@@ -124,8 +138,13 @@ impl<B: Brush> TreeStyleBuilder<B> {
                         .unwrap_or(rest.len());
                     if whitespace_len > 0 {
                         // The collapsed space is attributed to the span the whitespace sequence
-                        // started in.
-                        self.pending_whitespace.get_or_insert(span);
+                        // started in, but is a wrap opportunity if any of the spans it collapses
+                        // whitespace from allows wrapping.
+                        let wrappable = self.tree[span].style.text_wrap_mode == TextWrapMode::Wrap;
+                        let pending = self
+                            .pending_whitespace
+                            .get_or_insert(PendingWhitespace { span, wrappable });
+                        pending.wrappable |= wrappable;
                         rest = &rest[whitespace_len..];
                         continue;
                     }
@@ -144,7 +163,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
     /// Resolves a pending collapsible whitespace sequence, committing a single space for it if it
     /// is followed by content that it can collapse into, and dropping it otherwise.
     pub(crate) fn flush_pending_whitespace(&mut self) {
-        let Some(span) = self.pending_whitespace.take() else {
+        let Some(pending) = self.pending_whitespace.take() else {
             return;
         };
 
@@ -156,12 +175,22 @@ impl<B: Brush> TreeStyleBuilder<B> {
             return;
         }
 
-        self.commit_text(span, " ");
+        let style_index = if pending.wrappable {
+            self.resolve_wrappable_style_id(pending.span)
+        } else {
+            self.resolve_style_id(pending.span)
+        };
+        self.commit_styled_text(style_index, " ");
     }
 
     /// Appends already white space processed `text` to the buffer, attributed to `span`.
     fn commit_text(&mut self, span: usize, text: &str) {
         let style_index = self.resolve_style_id(span);
+        self.commit_styled_text(style_index, text);
+    }
+
+    /// Appends already white space processed `text` to the buffer with the given style.
+    fn commit_styled_text(&mut self, style_index: u16, text: &str) {
         let start = self.text.len();
         self.text.push_str(text);
         match self.style_runs.last_mut() {
@@ -187,6 +216,22 @@ impl<B: Brush> TreeStyleBuilder<B> {
         style_id
     }
 
+    /// The index of `span`'s style with wrapping enabled, adding it to the table if necessary.
+    fn resolve_wrappable_style_id(&mut self, span: usize) -> u16 {
+        if self.tree[span].style.text_wrap_mode == TextWrapMode::Wrap {
+            return self.resolve_style_id(span);
+        }
+        if let Some(style_id) = self.tree[span].wrappable_style_id {
+            return style_id;
+        }
+        let mut style = self.tree[span].style.clone();
+        style.text_wrap_mode = TextWrapMode::Wrap;
+        let style_id = self.style_table.len() as u16;
+        self.style_table.push(style);
+        self.tree[span].wrappable_style_id = Some(style_id);
+        style_id
+    }
+
     /// The length in bytes of the text committed so far, excluding buffered text.
     pub(crate) fn committed_text_len(&self) -> usize {
         self.text.len()
@@ -200,6 +245,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
             parent: Some(self.current_span),
             style,
             style_id: None,
+            wrappable_style_id: None,
         });
         self.current_span = self.tree.len() - 1;
     }

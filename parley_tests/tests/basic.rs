@@ -8,7 +8,7 @@ use crate::{test_name, util::ColorBrush};
 use parley::{
     Alignment, AlignmentOptions, BreakReason, ContentWidths, FontFamily, FontWeight, InlineBox,
     InlineBoxKind, Layout, LineHeight, PositionedLayoutItem, StyleProperty, TextStyle,
-    WhiteSpaceCollapse,
+    TextWrapMode, WhiteSpaceCollapse,
 };
 use peniko::color::{AlphaColor, Srgb, palette};
 use peniko::kurbo::Size;
@@ -558,6 +558,43 @@ fn collapsed_space_belongs_to_first_span() {
     let space_style = style_indices[2];
     assert_eq!(space_style, style_indices[0], "space is not bold");
     assert_ne!(space_style, style_indices[3], "\"bb\" is not bold");
+}
+
+#[test]
+fn collapsed_space_wraps_if_any_collapsed_span_wraps() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Number of lines the given text is broken into at a width that only fits one word, where
+    // `nowrap` selects which of the two spans disables wrapping.
+    let mut line_count = |first: &str, second: &str, nowrap: [bool; 2]| {
+        let mut builder = env.tree_builder();
+        builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+        for (text, nowrap) in [first, second].into_iter().zip(nowrap) {
+            let mode = if nowrap {
+                TextWrapMode::NoWrap
+            } else {
+                TextWrapMode::Wrap
+            };
+            builder.push_style_modification_span(&[StyleProperty::TextWrapMode(mode)]);
+            builder.push_text(text);
+            builder.pop_style_span();
+        }
+        let (mut layout, _) = builder.build();
+        layout.break_all_lines(Some(30.));
+        layout.len()
+    };
+
+    // The collapsed space is a wrap opportunity if any of the whitespace it collapses comes from a
+    // span that allows wrapping, even when it is attributed to a span that does not.
+    assert_eq!(line_count("aa ", " bb", [true, false]), 2);
+    assert_eq!(line_count("aa ", " bb", [false, true]), 2);
+    assert_eq!(line_count("aa ", " bb", [false, false]), 2);
+    assert_eq!(line_count("aa ", " bb", [true, true]), 1);
+
+    // Whitespace from a single span keeps that span's wrapping behaviour.
+    assert_eq!(line_count("aa ", "bb", [true, false]), 1);
+    assert_eq!(line_count("aa", " bb", [false, true]), 1);
+    assert_eq!(line_count("aa ", "bb", [false, true]), 2);
 }
 
 #[test]
