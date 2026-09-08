@@ -92,7 +92,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
 
     pub(crate) fn set_white_space_mode(&mut self, white_space_collapse: WhiteSpaceCollapse) {
         // Text pushed so far is processed with the mode that was in effect when it was pushed.
-        self.push_uncommitted_text();
+        self.commit_uncommitted_text();
         self.white_space_collapse = white_space_collapse;
     }
 
@@ -100,7 +100,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.last_item_kind = item_kind;
     }
 
-    pub(crate) fn push_uncommitted_text(&mut self) {
+    pub(crate) fn commit_uncommitted_text(&mut self) {
         let uncommitted_text = core::mem::take(&mut self.uncommitted_text);
         if uncommitted_text.is_empty() {
             return;
@@ -189,7 +189,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
     }
 
     pub(crate) fn push_style_span(&mut self, style: ResolvedStyle<B>) {
-        self.push_uncommitted_text();
+        self.commit_uncommitted_text();
 
         self.tree.push(StyleTreeNode {
             parent: Some(self.current_span),
@@ -211,7 +211,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
     }
 
     pub(crate) fn pop_style_span(&mut self) {
-        self.push_uncommitted_text();
+        self.commit_uncommitted_text();
 
         self.current_span = self.tree[self.current_span]
             .parent
@@ -235,7 +235,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
             self.pop_style_span();
         }
 
-        self.push_uncommitted_text();
+        self.commit_uncommitted_text();
 
         style_table.clear();
         style_runs.clear();
