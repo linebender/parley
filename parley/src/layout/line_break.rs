@@ -11,7 +11,7 @@ use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
 use crate::layout::data::count_graphemes;
-use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
+use crate::layout::spacing::{EffectiveSpacing, Justification};
 use crate::layout::whitespace::{atom_hanging_advance, whitespace_can_hang};
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
@@ -1168,109 +1168,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         // Reset metrics for line
         line.metrics.offset = 0.;
-        line.text_range.start = usize::MAX;
 
         line.metrics.line_height = line_height;
 
         if line.item_range.is_empty() {
             line.text_range = self.layout.data.text_len..self.layout.data.text_len;
-        }
-
-        // Walk the line's items to compute text ranges, per-run advances, bidi ordering, and
-        // hanging whitespace. The vertical metrics (ascent/descent/line-height and inline box
-        // extents) are *not* computed here: they were already accumulated into `self.state.line` as
-        // the line was built and are read from there below.
-        let mut needs_reorder = false;
-        let mut hanging_whitespace_advance = 0.;
-        let mut num_justification_opportunities = 0;
-        // One past the justified region: atoms with shaped clusters before this index may be
-        // stretched by justification.
-        let mut justification_end_cluster = u32::MAX;
-
-        let mut hanging = true; // Whether we've seen any line item that stops hanging.
-        for line_item in self.lines.line_items[line.item_range.clone()]
-            .iter_mut()
-            .rev()
-        {
-            match line_item.kind {
-                LayoutItemKind::InlineBox => {
-                    let item = &self.layout.data.inline_boxes[line_item.index];
-
-                    // Advance is already computed in "commit line" for items
-                    if item.kind == InlineBoxKind::InFlow {
-                        // Inline boxes don't hang.
-                        hanging = false;
-                    }
-                }
-                LayoutItemKind::TextRun => {
-                    // Trailing whitespace can only hang if it ends up at the line's end edge after
-                    // bidi reordering. We don't currently apply UAX #9 L1 (resetting trailing
-                    // whitespace to paragraph level), so only logically-last items that match the
-                    // paragraph level are guaranteed to be at that edge.
-                    if hanging && line_item.bidi_level != self.layout.data.base_level {
-                        hanging = false;
-                    }
-
-                    // Compute the text range for the line
-                    // Q: Can we not simplify this computation by assuming that items are in order?
-                    line.text_range.end = line.text_range.end.max(line_item.text_range.end);
-                    line.text_range.start = line.text_range.start.min(line_item.text_range.start);
-
-                    // Mark line as needing bidi re-ordering if it contains any runs with non-zero bidi level
-                    // (zero is the default level, so this is equivalent to marking lines that have multiple levels)
-                    if line_item.bidi_level != BidiLevel::new(0) {
-                        needs_reorder = true;
-                    }
-
-                    let slice = self
-                        .layout
-                        .data
-                        .shaped_text
-                        .run_slice(line_item.index as u32)
-                        .narrow(line_item.shaped_cluster_range.clone());
-
-                    // Calculate the run's advance including any word/letter spacing. This doesn't
-                    // include justification, as that's applied after lines are broken.
-                    let effective_spacing = EffectiveSpacing::new(
-                        self.layout.data.runs[line_item.index].spacing,
-                        Justification::NONE,
-                    );
-                    line_item.advance = effective_spacing.slice_advance(slice);
-
-                    // Ignore trailing whitespace for the line's content advance calculation
-                    // (we are iterating backwards so trailing whitespace comes first).
-                    for atom in slice.atoms_end().rev() {
-                        if hanging {
-                            let (atom_hanging, all_hang) = atom_hanging_advance(
-                                slice,
-                                &atom,
-                                &self.layout.data.styles,
-                                effective_spacing,
-                                line_item.is_rtl(),
-                            );
-                            hanging_whitespace_advance += atom_hanging;
-                            // Justification can't stretch within an atom, so it stops at the start
-                            // of the last atom that hangs, whether in its entirety or only
-                            // partially.
-                            justification_end_cluster = atom.shaped_clusters_range().start;
-                            hanging = all_hang;
-                        } else if is_word_separator(atom.characters()[0].info.whitespace()) {
-                            num_justification_opportunities += 1;
-                        }
-                    }
-                }
-            }
-        }
-
-        line.metrics.hanging_advance = hanging_whitespace_advance;
-        line.num_justification_opportunities = num_justification_opportunities;
-        line.justification.justification_end_cluster = justification_end_cluster;
-
-        // Reorder the items within the line (if required). Reordering is required if the line contains
-        // a mix of bidi levels (a mix of LTR and RTL text)
-        let item_count = line.item_range.end - line.item_range.start;
-        if needs_reorder && item_count > 1 {
-            reorder_line_items(&mut self.lines.line_items[line.item_range.clone()]);
         }
 
         // Whether metrics should be quantized to pixel boundaries
@@ -1431,6 +1333,12 @@ fn commit_line<B: Brush>(
     // println!("\nCOMMIT LINE");
     let mut last_item_kind = LayoutItemKind::TextRun;
     let mut committed_text_run = false;
+    // The line's source text range, as the union of the ranges of the text runs committed to it.
+    let mut text_start = usize::MAX;
+    let mut text_end = 0;
+    // Mark line as needing bidi re-ordering if it contains any runs with non-zero bidi level
+    // (zero is the default level, so this is equivalent to marking lines that have multiple levels)
+    let mut needs_reorder = false;
     for (i, item) in items_to_commit.iter().enumerate() {
         // println!("i = {} index = {} {:?}", i, item.index, item.kind);
 
@@ -1501,7 +1409,7 @@ fn commit_line<B: Brush>(
                                 shaped_run.shaped_clusters_range.start..cluster_range.start,
                             ))
                         });
-                let (text_range, grapheme_range) = if cluster_range.is_empty() {
+                let (item_text_range, grapheme_range) = if cluster_range.is_empty() {
                     let char_pos = shaped_clusters[cluster_range.start as usize]
                         .chars_range()
                         .start;
@@ -1519,14 +1427,28 @@ fn commit_line<B: Brush>(
                     (text_range, grapheme_start..grapheme_start + grapheme_len)
                 };
 
+                // Compute the text range for the line
+                // Q: Can we not simplify this computation by assuming that items are in order?
+                text_start = text_start.min(item_text_range.start);
+                text_end = text_end.max(item_text_range.end);
+                needs_reorder |= shaped_run.bidi_level != BidiLevel::new(0);
+
+                // Calculate the run's advance including any word/letter spacing. This doesn't
+                // include justification, as that's applied after lines are broken.
+                let effective_spacing = EffectiveSpacing::new(
+                    layout.data.runs[item.index].spacing,
+                    Justification::NONE,
+                );
+                let advance = effective_spacing.slice_advance(slice.narrow(cluster_range.clone()));
+
                 lines.line_items.push(LineItemData {
                     kind: LayoutItemKind::TextRun,
                     index: item.index,
                     bidi_level: shaped_run.bidi_level,
-                    advance: 0.,
+                    advance,
                     shaped_cluster_range: cluster_range,
                     grapheme_range,
-                    text_range,
+                    text_range: item_text_range,
                 });
             }
         }
@@ -1534,18 +1456,32 @@ fn commit_line<B: Brush>(
     // let end_run_idx = lines.line_items.last().map(|item| item.index).unwrap_or(0);
     let end_item_idx = lines.line_items.len();
 
+    let (hanging_advance, justification_end_cluster) =
+        hanging_whitespace(layout, &lines.line_items[start_item_idx..end_item_idx]);
+
+    // Reorder the items within the line (if required). Reordering is required if the line contains
+    // a mix of bidi levels (a mix of LTR and RTL text)
+    if needs_reorder && end_item_idx - start_item_idx > 1 {
+        reorder_line_items(&mut lines.line_items[start_item_idx..end_item_idx]);
+    }
+
     lines.lines.push(LineData {
         item_range: start_item_idx..end_item_idx,
+        text_range: text_start..text_end,
         max_advance,
         break_reason,
-        num_justification_opportunities: 0,
-        justification: Justification::NONE,
+        // Justification opportunities are counted lazily.
+        num_justification_opportunities: None,
+        justification: Justification {
+            justification_end_cluster,
+            ..Justification::NONE
+        },
         indent: line_indent,
         metrics: LineMetrics {
             advance: state.x,
+            hanging_advance,
             ..Default::default()
         },
-        ..Default::default()
     });
 
     // Reset state for the new line
@@ -1566,6 +1502,68 @@ fn commit_line<B: Brush>(
     };
 
     true
+}
+
+/// Returns the advance of the whitespace hanging past the end of the line made up of `line_items`,
+/// plus the index one past its logically last shaped cluster that's eligible for justification (see
+/// [`Justification::justification_end_cluster`]).
+///
+/// `line_items` must be in logical order.
+fn hanging_whitespace<B: Brush>(layout: &Layout<B>, line_items: &[LineItemData]) -> (f32, u32) {
+    let mut hanging_whitespace_advance = 0.;
+    // Atoms with shaped clusters before this index may be stretched by justification.
+    let mut justification_end_cluster = u32::MAX;
+
+    for line_item in line_items.iter().rev() {
+        match line_item.kind {
+            LayoutItemKind::InlineBox => {
+                let item = &layout.data.inline_boxes[line_item.index];
+
+                // Inline boxes don't hang.
+                if item.kind == InlineBoxKind::InFlow {
+                    break;
+                }
+            }
+            LayoutItemKind::TextRun => {
+                // Trailing whitespace can only hang if it ends up at the line's end edge after bidi
+                // reordering. We don't currently apply UAX #9 L1 (resetting trailing whitespace to
+                // paragraph level), so only logically-last items that match the paragraph level are
+                // guaranteed to be at that edge.
+                if line_item.bidi_level != layout.data.base_level {
+                    break;
+                }
+
+                let effective_spacing = EffectiveSpacing::new(
+                    layout.data.runs[line_item.index].spacing,
+                    Justification::NONE,
+                );
+                let slice = layout
+                    .data
+                    .shaped_text
+                    .run_slice(line_item.index as u32)
+                    .narrow(line_item.shaped_cluster_range.clone());
+
+                for atom in slice.atoms_end().rev() {
+                    let (hanging, all_hang) = atom_hanging_advance(
+                        slice,
+                        &atom,
+                        &layout.data.styles,
+                        effective_spacing,
+                        line_item.is_rtl(),
+                    );
+                    hanging_whitespace_advance += hanging;
+                    // Justification can't stretch within an atom, so it stops at the start of the
+                    // last atom that hangs atom hangs in its entirety or only partially.
+                    justification_end_cluster = atom.shaped_clusters_range().start;
+                    if !all_hang {
+                        return (hanging_whitespace_advance, justification_end_cluster);
+                    }
+                }
+            }
+        }
+    }
+
+    (hanging_whitespace_advance, justification_end_cluster)
 }
 
 /// Reorder items within line according to the bidi levels of the items

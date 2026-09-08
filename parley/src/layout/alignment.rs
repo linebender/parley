@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use super::BreakReason;
-use crate::data::LayoutData;
+use crate::layout::data::{LayoutData, LayoutItemKind, LineData, LineItemData};
+use crate::layout::spacing::is_word_separator;
 use crate::style::Brush;
+use parley_engine::ShapedText;
 
 /// Alignment of a layout.
 #[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
@@ -111,18 +113,68 @@ pub(crate) fn align<B: Brush>(
                 // (`BreakReason::None`), (`BreakReason::Explicit`) or if there are no whitespace
                 // gaps to adjust. In that case, start-align, i.e., left-align for LTR text and
                 // right-align for RTL text.
-                if matches!(line.break_reason, BreakReason::None | BreakReason::Explicit)
-                    || line.num_justification_opportunities == 0
-                {
+                if matches!(line.break_reason, BreakReason::None | BreakReason::Explicit) {
                     if is_rtl {
                         line.metrics.offset += free_space;
                     }
                     continue;
                 }
 
-                line.justification.amount_per_opportunity =
-                    free_space / line.num_justification_opportunities as f32;
+                // Count the line's justification opportunities, and cache.
+                let opportunities = match line.num_justification_opportunities {
+                    Some(opportunities) => opportunities,
+                    None => {
+                        let opportunities = justification_opportunities(
+                            line,
+                            &layout.line_items,
+                            &layout.shaped_text,
+                        );
+                        line.num_justification_opportunities = Some(opportunities);
+                        opportunities
+                    }
+                };
+
+                if opportunities == 0 {
+                    if is_rtl {
+                        line.metrics.offset += free_space;
+                    }
+                    continue;
+                }
+
+                line.justification.amount_per_opportunity = free_space / opportunities as f32;
             }
         }
     }
+}
+
+/// The number of justification opportunities on the line.
+///
+/// An opportunity is a [word separator](`is_word_separator`) that lies before
+/// [`Justification::justification_end_cluster`](crate::layout::spacing::Justification).
+fn justification_opportunities(
+    line: &LineData,
+    line_items: &[LineItemData],
+    shaped_text: &ShapedText,
+) -> u32 {
+    let end_cluster = line.justification.justification_end_cluster;
+
+    let mut opportunities = 0;
+    for line_item in &line_items[line.item_range.clone()] {
+        if line_item.kind != LayoutItemKind::TextRun {
+            continue;
+        }
+        let slice = shaped_text
+            .run_slice(line_item.index as u32)
+            .narrow(line_item.shaped_cluster_range.clone());
+        for atom in slice.atoms_start() {
+            if atom.shaped_clusters_range().end > end_cluster {
+                break;
+            }
+            if is_word_separator(atom.characters()[0].info.whitespace()) {
+                opportunities += 1;
+            }
+        }
+    }
+
+    opportunities
 }
