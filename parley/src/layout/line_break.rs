@@ -862,7 +862,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         else {
                             // Case: the atom is a space character (and wrapping is enabled)
                             //
-                            // We hang any overflowing whitespace and then line-break.
+                            // We hang overflowing whitespace and continue scanning rather than
+                            // breaking immediately: hanging whitespace does not end the line on
+                            // its own. A following forced break (e.g. a newline) terminates the
+                            // line normally, while following non-whitespace content that doesn't
+                            // fit breaks at the opportunity marked after the hanging whitespace.
                             if is_space && style.text_wrap_mode == TextWrapMode::Wrap {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
@@ -874,11 +878,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     line_height,
                                     self.layout.data.quantize,
                                 );
-                                return self.start_new_line(
-                                    BreakReason::Regular,
-                                    max_advance,
-                                    line_indent,
-                                );
+                                self.state.mark_line_break_opportunity();
                             }
                             // Case: we have previously encountered a REGULAR line-breaking opportunity in the current line
                             //

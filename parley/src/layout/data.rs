@@ -349,8 +349,8 @@ impl<B: Brush> LayoutData<B> {
                             // Newlines hang, so whitespace before them keeps hanging.
                             min_width =
                                 min_width.max(running_min_width - running_hanging_whitespace);
-                            max_width =
-                                max_width.max(running_max_width - running_hanging_whitespace);
+                            // A max-content line never wraps, so nothing can hang off it.
+                            max_width = max_width.max(running_max_width);
                             running_min_width = 0.0;
                             running_max_width = 0.0;
                             running_hanging_whitespace = 0.0;
@@ -365,7 +365,7 @@ impl<B: Brush> LayoutData<B> {
                         running_min_width += advance;
                         running_max_width += advance;
 
-                        if !can_hang {
+                        if !can_hang || text_wrap_mode != TextWrapMode::Wrap {
                             running_hanging_whitespace = 0.0;
                         } else if characters.len() == 1 {
                             // Fast path for the common-case that the atom is a single character,
@@ -436,7 +436,7 @@ impl<B: Brush> LayoutData<B> {
         }
 
         min_width = min_width.max(running_min_width - running_hanging_whitespace);
-        max_width = max_width.max(running_max_width - running_hanging_whitespace);
+        max_width = max_width.max(running_max_width);
 
         ContentWidths {
             min: min_width,
