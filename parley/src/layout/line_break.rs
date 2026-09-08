@@ -669,10 +669,19 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 inline_box.height - baseline,
                             )
                         }
+                        // Out-of-flow boxes are not in-flow content: unlike an atomic inline they
+                        // neither contribute to the line's extents nor introduce a line break
+                        // opportunity, so they are appended to the line and otherwise skipped.
                         // Negative infinity extents are a no-op when maxed into the line's
                         // extents, so out-of-flow boxes truly contribute nothing.
                         InlineBoxKind::OutOfFlow => {
-                            (0.0, 0.0, f32::NEG_INFINITY, f32::NEG_INFINITY)
+                            self.state.append_inline_box_to_line(
+                                self.state.line.x,
+                                f32::NEG_INFINITY,
+                                f32::NEG_INFINITY,
+                                self.layout.data.quantize,
+                            );
+                            continue;
                         }
                         // If the box is a `CustomOutOfFlow` box then we yield control flow back to the caller.
                         // It is then the caller's responsibility to handle placement of the box.

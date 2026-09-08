@@ -76,3 +76,43 @@ fn out_of_flow_box_has_no_effect_on_layout() {
     });
     assert!(found_oof);
 }
+
+/// An out-of-flow box is not in-flow content, so it must not introduce a line break
+/// opportunity: a word containing one still overflows rather than being split.
+#[test]
+fn out_of_flow_box_is_not_a_line_break_opportunity() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "unbreakable";
+
+    let line_ranges = |layout: &Layout<ColorBrush>| -> Vec<_> {
+        layout.lines().map(|line| line.text_range()).collect()
+    };
+
+    let mut layout_ref = env.ranged_builder(text).build(text);
+    layout_ref.break_all_lines(Some(20.0));
+    assert_eq!(layout_ref.len(), 1);
+
+    // A box anywhere in the word, including at either edge, leaves the line breaking unchanged.
+    for index in [0, 5, text.len()] {
+        let mut builder = env.ranged_builder(text);
+        builder.push_inline_box(InlineBox {
+            id: 42,
+            kind: InlineBoxKind::OutOfFlow,
+            index,
+            width: 9999.0,
+            height: 9999.0,
+            baseline: None,
+        });
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(20.0));
+
+        assert_eq!(layout.width(), layout_ref.width(), "index {index}");
+        assert_eq!(layout.height(), layout_ref.height(), "index {index}");
+        assert_eq!(
+            line_ranges(&layout),
+            line_ranges(&layout_ref),
+            "index {index}"
+        );
+    }
+}
