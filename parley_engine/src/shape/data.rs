@@ -37,6 +37,12 @@ impl ShapedClusterFlags {
     const INLINE_GLYPH: u16 = 1 << 8;
     const GRAPHEME_START: u16 = 1 << 9;
     const SAFE_TO_BREAK_BEFORE: u16 = 1 << 10;
+    /// [`Boundary`] before the cluster's first character (2 bits).
+    const BOUNDARY_SHIFT: u16 = 11;
+    const BOUNDARY_MASK: u16 = 0b11 << Self::BOUNDARY_SHIFT;
+    /// [`Whitespace`] class of the cluster's first character (3 bits).
+    const WHITESPACE_SHIFT: u16 = 13;
+    const WHITESPACE_MASK: u16 = 0b111 << Self::WHITESPACE_SHIFT;
 
     #[inline(always)]
     pub(crate) const fn new(glyph_len: u8) -> Self {
@@ -60,6 +66,39 @@ impl ShapedClusterFlags {
         self.0 =
             self.0 & !Self::SAFE_TO_BREAK_BEFORE | if set { Self::SAFE_TO_BREAK_BEFORE } else { 0 };
         self
+    }
+
+    #[inline(always)]
+    pub(crate) const fn with_first_char(
+        mut self,
+        boundary: Boundary,
+        whitespace: Whitespace,
+    ) -> Self {
+        self.0 = self.0 & !(Self::BOUNDARY_MASK | Self::WHITESPACE_MASK)
+            | ((boundary as u16) << Self::BOUNDARY_SHIFT)
+            | ((whitespace as u16) << Self::WHITESPACE_SHIFT);
+        self
+    }
+
+    #[inline(always)]
+    const fn boundary(self) -> Boundary {
+        match (self.0 & Self::BOUNDARY_MASK) >> Self::BOUNDARY_SHIFT {
+            0 => Boundary::None,
+            1 => Boundary::Word,
+            2 => Boundary::Line,
+            _ => Boundary::Mandatory,
+        }
+    }
+
+    #[inline(always)]
+    const fn whitespace(self) -> Whitespace {
+        match (self.0 & Self::WHITESPACE_MASK) >> Self::WHITESPACE_SHIFT {
+            1 => Whitespace::Space,
+            2 => Whitespace::NoBreakSpace,
+            3 => Whitespace::Tab,
+            4 => Whitespace::Newline,
+            _ => Whitespace::None,
+        }
     }
 
     #[inline(always)]
@@ -165,6 +204,29 @@ impl ShapedCluster {
     #[inline(always)]
     pub fn is_safe_to_break_before(self) -> bool {
         self.flags.is_safe_to_break_before()
+    }
+
+    /// The [`Boundary`] before this cluster's first character.
+    ///
+    /// This is [`Character::info`]'s boundary of the first character of [`Self::chars_range`], cached
+    /// here so that measuring text does not need to touch the character array.
+    #[inline(always)]
+    pub fn boundary_before(self) -> Boundary {
+        self.flags.boundary()
+    }
+
+    /// The [`Whitespace`] class of this cluster's first character.
+    ///
+    /// See [`Self::boundary_before`].
+    #[inline(always)]
+    pub fn whitespace(self) -> Whitespace {
+        self.flags.whitespace()
+    }
+
+    /// The number of characters in this cluster.
+    #[inline(always)]
+    pub fn char_len(self) -> u32 {
+        self.chars_range.1 - self.chars_range.0
     }
 
     /// The number of graphemes this cluster overlaps.
