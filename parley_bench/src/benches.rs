@@ -142,6 +142,77 @@ pub fn repeated_justification() -> [Benchmark; 1] {
     )]
 }
 
+/// Benchmark breaking a layout into lines.
+///
+/// This is part of the work that'd be performed as, e.g., a window is being resized.
+pub fn line_breaking() -> Vec<Benchmark> {
+    const NARROW_MAX_ADVANCE: f32 = 50.;
+    const MAX_ADVANCE: f32 = 200.;
+    const WORD_SPACING: f32 = 2.;
+    const LETTER_SPACING: f32 = 1.;
+
+    // The maximum advances to break at, with the name each is given in the benchmark name.
+    const MAX_ADVANCES: [(&str, Option<f32>); 3] = [
+        // Narrow lines break often and will have some emergency-breaks within words that don't fit.
+        ("narrow", Some(NARROW_MAX_ADVANCE)),
+        ("wider", Some(MAX_ADVANCE)),
+        // Unwrapped lines only break at mandatory line breaks.
+        ("unwrapped", None),
+    ];
+
+    fn break_lines(layout: &mut Layout<ColorBrush>, max_advance: Option<f32>) {
+        layout.break_all_lines(max_advance);
+        black_box((layout.len(), layout.width(), layout.height()));
+    }
+
+    // The samples are long enough to break into a meaningful number of lines.
+    let samples = || {
+        get_samples()
+            .iter()
+            .filter(|sample| sample.modification == "4 paragraph")
+    };
+
+    let mut benchmarks = Vec::new();
+
+    for sample in samples() {
+        for (max_advance_name, max_advance) in MAX_ADVANCES {
+            benchmarks.push(benchmark_fn(
+                format!(
+                    "Line Breaking - {} {}, {max_advance_name}",
+                    sample.name, sample.modification
+                ),
+                move |b| {
+                    let mut layout = build_layout(&sample.text, []);
+                    b.iter(move || break_lines(&mut layout, max_advance))
+                },
+            ));
+        }
+    }
+
+    // Also bench with word and letter spacing applied, as there are some zero-spacing fast paths.
+    for sample in samples() {
+        benchmarks.push(benchmark_fn(
+            format!(
+                "Line Breaking - {} {}, wrapped + spacing",
+                sample.name, sample.modification
+            ),
+            |b| {
+                let text_range = 0..sample.text.len();
+                let mut layout = build_layout(
+                    &sample.text,
+                    [
+                        (StyleProperty::WordSpacing(WORD_SPACING), text_range.clone()),
+                        (StyleProperty::LetterSpacing(LETTER_SPACING), text_range),
+                    ],
+                );
+                b.iter(move || break_lines(&mut layout, Some(MAX_ADVANCE)))
+            },
+        ));
+    }
+
+    benchmarks
+}
+
 /// Get the byte ranges of each consecutive chunk of `char_len` characters.
 ///
 /// The last chunk holds the characters remaining.
