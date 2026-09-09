@@ -177,3 +177,45 @@ pub fn get_samples() -> &'static [Sample] {
         ]
     })
 }
+
+static DOCUMENTS: OnceLock<Vec<Sample>> = OnceLock::new();
+
+/// Returns large, document-scale samples for benchmarking.
+///
+/// Each sample is the full text of the built-in sample file, plus a large
+/// Latin document built by repeating the Latin sample — ~250KB, the scale of a
+/// long article page, where per-phase layout costs become measurable.
+pub fn get_documents() -> &'static [Sample] {
+    let samples = parley_dev::TextSamples::new();
+
+    DOCUMENTS.get_or_init(|| {
+        let mut large_latin = String::with_capacity(samples.latin.text.len() * 21);
+        while large_latin.len() < 250_000 {
+            large_latin.push_str(samples.latin.text);
+            large_latin.push('\n');
+        }
+
+        vec![
+            Sample {
+                name: samples.arabic.name,
+                modification: "full text",
+                text: samples.arabic.text.to_string(),
+            },
+            Sample {
+                name: samples.latin.name,
+                modification: "full text",
+                text: samples.latin.text.to_string(),
+            },
+            Sample {
+                name: samples.japanese.name,
+                modification: "full text",
+                text: samples.japanese.text.to_string(),
+            },
+            Sample {
+                name: samples.latin.name,
+                modification: "~250KB",
+                text: large_latin,
+            },
+        ]
+    })
+}
