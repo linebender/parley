@@ -97,8 +97,8 @@ pub fn repeated_justification() -> [Benchmark; 1] {
 
     let sample = get_samples()
         .iter()
-        .find(|sample| sample.name == "latin" && sample.modification == "4 paragraph")
-        .expect("the Latin four-paragraph benchmark sample should exist");
+        .find(|sample| sample.name == "latin" && sample.modification == "8000 characters")
+        .expect("the Latin 8000-character benchmark sample should exist");
 
     [benchmark_fn(
         format!(
@@ -169,7 +169,7 @@ pub fn line_breaking() -> Vec<Benchmark> {
     let samples = || {
         get_samples()
             .iter()
-            .filter(|sample| sample.modification == "4 paragraph")
+            .filter(|sample| sample.modification == "8000 characters")
     };
 
     let mut benchmarks = Vec::new();
@@ -295,8 +295,9 @@ pub fn styled() -> Vec<Benchmark> {
 ///
 /// The cases fall into three groups:
 ///
-/// - Four paragraphs of Latin with a single style, without line wrapping, giving four shaped runs.
-/// - Four paragraphs of Latin with a style alternating every few characters, without line wrapping.
+/// - 8000 characters of Latin with a single style, without line wrapping, giving one shaped run per
+///   paragraph.
+/// - 8000 characters of Latin with a style alternating every few characters, without line wrapping.
 ///   Glyph runs break wherever the style changes; some properties, such as bold, also split the
 ///   shaped run. This benches both cases.
 /// - Mixed styling of each script with line wrapping. This covers script, bidi and font fallback
@@ -304,8 +305,8 @@ pub fn styled() -> Vec<Benchmark> {
 pub fn iterate_glyph_runs() -> Vec<Benchmark> {
     let latin = get_samples()
         .iter()
-        .find(|sample| sample.name == "latin" && sample.modification == "4 paragraph")
-        .expect("the Latin four-paragraph benchmark sample should exist");
+        .find(|sample| sample.name == "latin" && sample.modification == "8000 characters")
+        .expect("the Latin 8000-character benchmark sample should exist");
 
     let mut benchmarks = vec![benchmark_fn(
         format!(
@@ -342,7 +343,7 @@ pub fn iterate_glyph_runs() -> Vec<Benchmark> {
 
     for sample in get_samples()
         .iter()
-        .filter(|sample| sample.modification == "4 paragraph")
+        .filter(|sample| sample.modification == "8000 characters")
     {
         benchmarks.push(benchmark_fn(
             format!(
@@ -464,7 +465,6 @@ fn build_unwrapped_layout<'a>(
 pub fn long_line() -> Vec<Benchmark> {
     const DISPLAY_SCALE: f32 = 1.0;
     const QUANTIZE: bool = true;
-    const REPEAT: usize = 4;
 
     fn layout_long_line(text: &str, max_advance: Option<f32>, alignment: Alignment) {
         with_contexts(|font_cx, layout_cx| {
@@ -483,15 +483,9 @@ pub fn long_line() -> Vec<Benchmark> {
 
     samples
         .iter()
-        .filter(|sample| sample.modification == "4 paragraph")
+        .filter(|sample| sample.modification == "8000 characters")
         .flat_map(|sample| {
-            let text: &'static str = Box::leak(
-                sample
-                    .text
-                    .replace('\n', " ")
-                    .repeat(REPEAT)
-                    .into_boxed_str(),
-            );
+            let text: &'static str = Box::leak(sample.text.replace('\n', " ").into_boxed_str());
             [
                 benchmark_fn(format!("Long Line - {}", sample.name), move |b| {
                     b.iter(move || layout_long_line(text, None, Alignment::Start))

@@ -105,6 +105,27 @@ pub struct Sample {
 
 static SAMPLES: OnceLock<Vec<Sample>> = OnceLock::new();
 
+/// Take `chars` characters of `text`.
+///
+/// A paragraph that crosses the budget is truncated. Paragraphs are joined by a single `\n`.
+fn take_chars(text: &str, chars: usize) -> String {
+    let mut out = String::new();
+    let mut remaining = chars;
+    for paragraph in text.split("\n\n").map(str::trim).filter(|p| !p.is_empty()) {
+        if remaining == 0 {
+            break;
+        }
+        if !out.is_empty() {
+            out.push('\n');
+            remaining -= 1;
+        }
+        let taken = paragraph.chars().take(remaining).collect::<String>();
+        remaining -= taken.chars().count();
+        out.push_str(&taken);
+    }
+    out
+}
+
 /// Returns a list of samples to be used for benchmarking.
 pub fn get_samples() -> &'static [Sample] {
     let samples = parley_dev::TextSamples::new();
@@ -114,65 +135,47 @@ pub fn get_samples() -> &'static [Sample] {
             Sample {
                 name: samples.arabic.name,
                 modification: "20 characters",
-                text: samples.arabic.text.chars().take(20).collect(),
+                text: take_chars(samples.arabic.text, 20),
             },
             Sample {
                 name: samples.latin.name,
                 modification: "20 characters",
-                text: samples.latin.text.chars().take(20).collect(),
+                text: take_chars(samples.latin.text, 20),
             },
             Sample {
                 name: samples.japanese.name,
                 modification: "20 characters",
-                text: samples.japanese.text.chars().take(20).collect(),
+                text: take_chars(samples.japanese.text, 20),
             },
             Sample {
                 name: samples.arabic.name,
-                modification: "1 paragraph",
-                text: samples.arabic.text.lines().next().unwrap().to_string(),
+                modification: "400 characters",
+                text: take_chars(samples.arabic.text, 400),
             },
             Sample {
                 name: samples.latin.name,
-                modification: "1 paragraph",
-                text: samples.latin.text.lines().next().unwrap().to_string(),
+                modification: "400 characters",
+                text: take_chars(samples.latin.text, 400),
             },
             Sample {
                 name: samples.japanese.name,
-                modification: "1 paragraph",
-                text: samples.japanese.text.lines().next().unwrap().to_string(),
+                modification: "400 characters",
+                text: take_chars(samples.japanese.text, 400),
             },
             Sample {
                 name: samples.arabic.name,
-                modification: "4 paragraph",
-                text: samples
-                    .arabic
-                    .text
-                    .lines()
-                    .take(4)
-                    .collect::<Vec<_>>()
-                    .join("\n"),
+                modification: "8000 characters",
+                text: take_chars(samples.arabic.text, 8000),
             },
             Sample {
                 name: samples.latin.name,
-                modification: "4 paragraph",
-                text: samples
-                    .latin
-                    .text
-                    .lines()
-                    .take(4)
-                    .collect::<Vec<_>>()
-                    .join("\n"),
+                modification: "8000 characters",
+                text: take_chars(samples.latin.text, 8000),
             },
             Sample {
                 name: samples.japanese.name,
-                modification: "4 paragraph",
-                text: samples
-                    .japanese
-                    .text
-                    .lines()
-                    .take(4)
-                    .collect::<Vec<_>>()
-                    .join("\n"),
+                modification: "8000 characters",
+                text: take_chars(samples.japanese.text, 8000),
             },
         ]
     })
