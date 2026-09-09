@@ -5,7 +5,7 @@
 //!
 //! This module provides benchmarks for text layout and rendering.
 
-use crate::{ColorBrush, FONT_FAMILY_LIST, get_samples, with_contexts};
+use crate::{ColorBrush, FONT_FAMILY_LIST, Sample, get_samples, with_contexts};
 use parley::{
     Alignment, AlignmentOptions, FontFamily, FontStyle, FontWeight, Layout, PositionedLayoutItem,
     StyleProperty,
@@ -498,4 +498,145 @@ pub fn long_line() -> Vec<Benchmark> {
             ]
         })
         .collect()
+}
+
+/// Benchmark the type of work a document viewer performs.
+///
+/// Each paragraph in the source text becomes a [`Layout`]. This benches the following:
+///
+/// - a full pass from building the layouts to iterating each layouts' glyphs;
+/// - each of the various stages separately (e.g., line-breaking all the layouts one after the
+///   other); and
+/// - resizing layouts one after the other, cycling through some different max advances.
+pub fn page() -> Vec<Benchmark> {
+    // Around 90 characters of 16px Roboto per line.
+    const MAX_ADVANCE: f32 = 720.;
+    // The widths a resize cycles through.
+    const RESIZE_MAX_ADVANCES: [f32; 6] = [720., 700., 660., 600., 520., 400.];
+
+    /// One layout per paragraph of `page`.
+    fn build_page(text: &[&str]) -> Vec<Layout<ColorBrush>> {
+        text.iter()
+            .map(|paragraph| build_layout(paragraph, []))
+            .collect()
+    }
+
+    /// Line-break every layout of a page, returning the total line count.
+    fn break_page(layouts: &mut [Layout<ColorBrush>], max_advance: f32) -> usize {
+        layouts
+            .iter_mut()
+            .map(|layout| {
+                layout.break_all_lines(Some(max_advance));
+                layout.align(Alignment::Start, AlignmentOptions::default());
+                layout.len()
+            })
+            .sum()
+    }
+
+    /// Measures every layout's content widths, and returns the total min and max widths.
+    fn measure_page(layouts: &[Layout<ColorBrush>]) -> (f32, f32) {
+        layouts.iter().fold((0.0, 0.0), |(min, max), layout| {
+            let widths = layout.calculate_content_widths();
+            (f32::max(min, widths.min), f32::max(max, widths.max))
+        })
+    }
+
+    /// Walk the glyph runs of every layout of a page.
+    fn paint_page(layouts: &[Layout<ColorBrush>]) -> (usize, f32) {
+        layouts
+            .iter()
+            .map(walk_items)
+            .fold((0, 0.0), |(count, advance), (c, a)| {
+                (count + c, advance + a)
+            })
+    }
+
+    /// Split a [`Sample`] into paragraphs.
+    fn paragraphs_of(sample: &Sample) -> Vec<&str> {
+        sample.text.split('\n').collect()
+    }
+
+    let samples = || {
+        get_samples()
+            .iter()
+            .filter(|sample| sample.modification == "8000 characters")
+    };
+
+    let mut benchmarks = Vec::new();
+
+    for sample in samples() {
+        benchmarks.push(benchmark_fn(
+            format!("Page Full - {} {}", sample.name, sample.modification),
+            move |b| {
+                let page = paragraphs_of(sample);
+                b.iter(move || {
+                    let mut layouts = build_page(&page);
+                    let widths = measure_page(&layouts);
+                    let lines = break_page(&mut layouts, MAX_ADVANCE);
+                    let painted = paint_page(&layouts);
+                    black_box((widths, lines, painted))
+                })
+            },
+        ));
+    }
+
+    for sample in samples() {
+        benchmarks.push(benchmark_fn(
+            format!("Page Build - {} {}", sample.name, sample.modification),
+            move |b| {
+                let page = paragraphs_of(sample);
+                b.iter(move || black_box(build_page(&page)))
+            },
+        ));
+    }
+
+    for sample in samples() {
+        benchmarks.push(benchmark_fn(
+            format!(
+                "Page Content Widths - {} {}",
+                sample.name, sample.modification
+            ),
+            move |b| {
+                let layouts = build_page(&paragraphs_of(sample));
+                b.iter(move || black_box(measure_page(&layouts)))
+            },
+        ));
+    }
+
+    for sample in samples() {
+        benchmarks.push(benchmark_fn(
+            format!("Page Break - {} {}", sample.name, sample.modification),
+            move |b| {
+                let mut layouts = build_page(&paragraphs_of(sample));
+                b.iter(move || black_box(break_page(&mut layouts, MAX_ADVANCE)))
+            },
+        ));
+    }
+
+    for sample in samples() {
+        benchmarks.push(benchmark_fn(
+            format!("Page Resize - {} {}", sample.name, sample.modification),
+            move |b| {
+                let mut layouts = build_page(&paragraphs_of(sample));
+                let mut max_advances = RESIZE_MAX_ADVANCES.iter().copied().cycle();
+                b.iter(move || {
+                    let max_advance = max_advances.next().unwrap();
+                    black_box(break_page(&mut layouts, max_advance))
+                })
+            },
+        ));
+    }
+
+    for sample in samples() {
+        benchmarks.push(benchmark_fn(
+            format!("Page Glyph Runs - {} {}", sample.name, sample.modification),
+            move |b| {
+                let mut layouts = build_page(&paragraphs_of(sample));
+                break_page(&mut layouts, MAX_ADVANCE);
+                b.iter(move || black_box(paint_page(&layouts)))
+            },
+        ));
+    }
+
+    benchmarks
 }
