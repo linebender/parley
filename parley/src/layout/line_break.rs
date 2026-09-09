@@ -305,7 +305,7 @@ impl LineBoxMetrics {
             subtree
                 .content_box
                 .add(metrics.baseline_offset, metrics.ascent, metrics.descent);
-            if metrics.parent == index {
+            if index == 0 {
                 return;
             }
             index = metrics.parent;
