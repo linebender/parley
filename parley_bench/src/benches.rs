@@ -592,7 +592,10 @@ pub fn page() -> Vec<Benchmark> {
 
     for sample in samples() {
         benchmarks.push(benchmark_fn(
-            format!("Page Content Widths - {} {}", sample.name, sample.modification),
+            format!(
+                "Page Content Widths - {} {}",
+                sample.name, sample.modification
+            ),
             move |b| {
                 let layouts = build_page(&page_of(sample));
                 b.iter(move || black_box(measure_page(&layouts)))
