@@ -552,7 +552,7 @@ pub fn page() -> Vec<Benchmark> {
     }
 
     /// Split a [`Sample`] into paragraphs.
-    fn page_of(sample: &Sample) -> Vec<&str> {
+    fn paragraphs_of(sample: &Sample) -> Vec<&str> {
         sample.text.split('\n').collect()
     }
 
@@ -568,7 +568,7 @@ pub fn page() -> Vec<Benchmark> {
         benchmarks.push(benchmark_fn(
             format!("Page Full - {} {}", sample.name, sample.modification),
             move |b| {
-                let page = page_of(sample);
+                let page = paragraphs_of(sample);
                 b.iter(move || {
                     let mut layouts = build_page(&page);
                     let widths = measure_page(&layouts);
@@ -584,7 +584,7 @@ pub fn page() -> Vec<Benchmark> {
         benchmarks.push(benchmark_fn(
             format!("Page Build - {} {}", sample.name, sample.modification),
             move |b| {
-                let page = page_of(sample);
+                let page = paragraphs_of(sample);
                 b.iter(move || black_box(build_page(&page)))
             },
         ));
@@ -597,7 +597,7 @@ pub fn page() -> Vec<Benchmark> {
                 sample.name, sample.modification
             ),
             move |b| {
-                let layouts = build_page(&page_of(sample));
+                let layouts = build_page(&paragraphs_of(sample));
                 b.iter(move || black_box(measure_page(&layouts)))
             },
         ));
@@ -607,7 +607,7 @@ pub fn page() -> Vec<Benchmark> {
         benchmarks.push(benchmark_fn(
             format!("Page Break - {} {}", sample.name, sample.modification),
             move |b| {
-                let mut layouts = build_page(&page_of(sample));
+                let mut layouts = build_page(&paragraphs_of(sample));
                 b.iter(move || black_box(break_page(&mut layouts, MAX_ADVANCE)))
             },
         ));
@@ -617,7 +617,7 @@ pub fn page() -> Vec<Benchmark> {
         benchmarks.push(benchmark_fn(
             format!("Page Resize - {} {}", sample.name, sample.modification),
             move |b| {
-                let mut layouts = build_page(&page_of(sample));
+                let mut layouts = build_page(&paragraphs_of(sample));
                 let mut max_advances = RESIZE_MAX_ADVANCES.iter().copied().cycle();
                 b.iter(move || {
                     let max_advance = max_advances.next().unwrap();
@@ -631,7 +631,7 @@ pub fn page() -> Vec<Benchmark> {
         benchmarks.push(benchmark_fn(
             format!("Page Glyph Runs - {} {}", sample.name, sample.modification),
             move |b| {
-                let mut layouts = build_page(&page_of(sample));
+                let mut layouts = build_page(&paragraphs_of(sample));
                 break_page(&mut layouts, MAX_ADVANCE);
                 b.iter(move || black_box(paint_page(&layouts)))
             },
