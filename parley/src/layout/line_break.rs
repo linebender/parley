@@ -138,8 +138,13 @@ impl LineBoxMetrics {
         line_box.over + line_box.under
     }
 
-    fn add_text(&mut self, metrics: &FontMetrics, line_height: f32, quantize: bool) {
-        // TODO: perhaps precompute these run metrics and store in `RunMetrics`.
+    /// The metrics contributed by text with the given font metrics and line height.
+    ///
+    /// `font_metrics` provides the raw font ascent and descent of the text (i.e. the distances
+    /// it extends above and below the baseline, *not* including leading) as well as the intrinsic
+    /// line height of the text (i.e. including the full leading), which may be smaller than
+    /// `ascent + descent` when the leading is negative.
+    fn for_text(metrics: &FontMetrics, line_height: f32, quantize: bool) -> Self {
         let (ascent, descent) = if quantize {
             (metrics.ascent.round(), metrics.descent.round())
         } else {
@@ -156,24 +161,37 @@ impl LineBoxMetrics {
         // by rounding.
         let under = line_height - over;
 
-        self.line_box.over = self.line_box.over.max(over);
-        self.line_box.under = self.line_box.under.max(under);
-        self.content_box.over = self.content_box.over.max(ascent);
-        self.content_box.under = self.content_box.under.max(descent);
+        Self {
+            line_box: Extents { over, under },
+            content_box: Extents {
+                over: ascent,
+                under: descent,
+            },
+        }
     }
 
-    fn add_inline_box(&mut self, ascent: f32, descent: f32, quantize: bool) {
-        if quantize {
-            self.line_box.over = self.line_box.over.max(ascent.round());
-            self.line_box.under = self.line_box.under.max(descent.round());
-            self.content_box.over = self.content_box.over.max(ascent.round());
-            self.content_box.under = self.content_box.under.max(descent.round());
+    /// The metrics contributed by an inline box extending `ascent` above and `descent` below the
+    /// text baseline.
+    fn for_inline_box(ascent: f32, descent: f32, quantize: bool) -> Self {
+        let (over, under) = if quantize {
+            (ascent.round(), descent.round())
         } else {
-            self.line_box.over = self.line_box.over.max(ascent);
-            self.line_box.under = self.line_box.under.max(descent);
-            self.content_box.over = self.content_box.over.max(ascent);
-            self.content_box.under = self.content_box.under.max(descent);
+            (ascent, descent)
+        };
+
+        Self {
+            line_box: Extents { over, under },
+            content_box: Extents { over, under },
         }
+    }
+
+    /// Grow the line box to fit the given metrics.
+    #[inline(always)]
+    fn add(&mut self, content: Self) {
+        self.line_box.over = self.line_box.over.max(content.line_box.over);
+        self.line_box.under = self.line_box.under.max(content.line_box.under);
+        self.content_box.over = self.content_box.over.max(content.content_box.over);
+        self.content_box.under = self.content_box.under.max(content.content_box.under);
     }
 }
 
@@ -319,26 +337,14 @@ impl Default for BreakerState {
 impl BreakerState {
     /// Add the atom currently being evaluated to the current line.
     ///
-    /// `font_metrics` provides the raw font ascent and descent of the atom (i.e. the distances
-    /// it extends above and below the baseline, *not* including leading) as well as the intrinsic
-    /// line height of the atom (i.e. including the full leading), which may be smaller than
-    /// `ascent + descent` when the leading is negative.
+    /// `text_metrics` are the line box metrics contributed by the atom's text.
     #[inline]
-    fn append_atom_to_line(
-        &mut self,
-        atom: &Atom<'_>,
-        next_x: f32,
-        font_metrics: &FontMetrics,
-        line_height: f32,
-        quantize: bool,
-    ) {
+    fn append_atom_to_line(&mut self, atom: &Atom<'_>, next_x: f32, text_metrics: LineBoxMetrics) {
         self.line.items.end = self.item_idx + 1;
         self.line.clusters.end = atom.shaped_clusters_range().end;
         self.cluster_idx = atom.shaped_clusters_range().end;
         self.line.x = next_x;
-        self.line
-            .box_metrics
-            .add_text(font_metrics, line_height, quantize);
+        self.line.box_metrics.add(text_metrics);
         self.update_max_height_exceeded();
     }
 
@@ -359,7 +365,7 @@ impl BreakerState {
         self.line.x = next_x;
         self.line
             .box_metrics
-            .add_inline_box(ascent, descent, quantize);
+            .add(LineBoxMetrics::for_inline_box(ascent, descent, quantize));
         self.update_max_height_exceeded();
     }
 
@@ -739,6 +745,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // Additional spacing to apply between atoms.
                     let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
 
+                    // Note that, within a run, all the atoms' text metrics are the same.
+                    let line_height = run.data.line_height;
+                    let text_metrics = LineBoxMetrics::for_text(
+                        run.font_metrics(),
+                        line_height,
+                        self.layout.data.quantize,
+                    );
+
                     // Iterate over the remaining atoms in the Run
                     for atom in slice.atoms_from(self.state.cluster_idx) {
                         // Retrieve metadata about the atom
@@ -748,8 +762,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // Whether this is a space that is allowed to hang past the line.
                         let is_space = whitespace_can_hang(whitespace);
                         let boundary = first_character.info.boundary();
-                        let metrics = run.font_metrics();
-                        let line_height = run.data.line_height;
                         let max_height_exceeded = self.state.line.max_height_exceeded;
                         let style = &self.layout.data.styles[first_character.style_index as usize];
 
@@ -795,13 +807,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                         && next.info.source_char() == '\n'
                                 });
 
-                            self.state.append_atom_to_line(
-                                &atom,
-                                self.state.line.x,
-                                metrics,
-                                line_height,
-                                self.layout.data.quantize,
-                            );
+                            self.state
+                                .append_atom_to_line(&atom, self.state.line.x, text_metrics);
 
                             if is_cr_before_lf {
                                 continue;
@@ -846,13 +853,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             if max_height_exceeded {
                                 return self.max_height_break_data(line_height);
                             }
-                            self.state.append_atom_to_line(
-                                &atom,
-                                next_x,
-                                metrics,
-                                line_height,
-                                self.layout.data.quantize,
-                            );
+                            self.state.append_atom_to_line(&atom, next_x, text_metrics);
                         }
                         // Else we attempt to line break:
                         //
@@ -867,13 +868,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
-                                self.state.append_atom_to_line(
-                                    &atom,
-                                    next_x,
-                                    metrics,
-                                    line_height,
-                                    self.layout.data.quantize,
-                                );
+                                self.state.append_atom_to_line(&atom, next_x, text_metrics);
                                 return self.start_new_line(
                                     BreakReason::Regular,
                                     max_advance,
@@ -916,13 +911,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
-                                self.state.append_atom_to_line(
-                                    &atom,
-                                    next_x,
-                                    metrics,
-                                    line_height,
-                                    self.layout.data.quantize,
-                                );
+                                self.state.append_atom_to_line(&atom, next_x, text_metrics);
                             }
                         }
                     }
@@ -1024,6 +1013,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let spacing = run.line_spacing();
                     let cluster_end = shaped_run.shaped_clusters_range.end;
 
+                    // Note that, within a run, all the atoms' text metrics are the same.
+                    let text_metrics = LineBoxMetrics::for_text(
+                        run.font_metrics(),
+                        run.data.line_height,
+                        self.layout.data.quantize,
+                    );
+
                     for atom in slice.atoms_from(self.state.cluster_idx) {
                         // Check if we should break before this atom
                         if char_count >= max_chars && max_chars != 0 {
@@ -1043,14 +1039,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         } else {
                             self.state.line.x + advance
                         };
-                        let metrics = run.font_metrics();
-                        self.state.append_atom_to_line(
-                            &atom,
-                            next_x,
-                            metrics,
-                            run.data.line_height,
-                            self.layout.data.quantize,
-                        );
+                        self.state.append_atom_to_line(&atom, next_x, text_metrics);
                         char_count += atom.char_range().len() as u32;
 
                         // Check if we've reached the limit after adding this atom
