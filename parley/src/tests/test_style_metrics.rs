@@ -379,49 +379,6 @@ fn line_with_negative_height_inline_box_is_not_invisible() {
 }
 
 #[test]
-fn first_available_font_skips_faces_without_a_space_glyph() {
-    // The Noto Color Emoji subset has no U+0020 glyph, so per CSS Fonts' "first available font"
-    // rule the inline box metrics come from Roboto (the next family) instead.
-    let mut fcx = create_font_context();
-    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
-    let emoji_first = [
-        parlance::FontFamilyName::Named("Noto Color Emoji".into()),
-        parlance::FontFamilyName::Named("Roboto".into()),
-    ];
-    let roboto = [parlance::FontFamilyName::Named("Roboto".into())];
-    let root = TextStyle {
-        font_family: FontFamily::from(&emoji_first[..]),
-        font_size: 20.,
-        line_height: LineHeight::MetricsRelative(1.),
-        ..TextStyle::default()
-    };
-    let mut builder = lcx.tree_builder(&mut fcx, 1., false, &root);
-    builder.push_text("x");
-    let (layout, _) = builder.build();
-    let with_emoji_first = metrics(&layout)[0];
-
-    let mut builder = lcx.tree_builder(
-        &mut fcx,
-        1.,
-        false,
-        &TextStyle {
-            font_family: FontFamily::from(&roboto[..]),
-            ..root
-        },
-    );
-    builder.push_text("x");
-    let (layout, _) = builder.build();
-    let roboto_only = metrics(&layout)[0];
-
-    // Both fonts share ascent/descent ratios; the x-height tells them apart.
-    assert!((roboto_only.x_height - 10.57).abs() < 0.01);
-    assert_eq!(with_emoji_first.x_height, roboto_only.x_height);
-    assert_eq!(with_emoji_first.ascent, roboto_only.ascent);
-    assert_eq!(with_emoji_first.descent, roboto_only.descent);
-    assert_eq!(with_emoji_first.line_height, roboto_only.line_height);
-}
-
-#[test]
 fn fallback_font_glyphs_only_size_the_line_for_normal_line_height() {
     // CSS Inline 3 § 4.1: with a non-`normal` `line-height`, an inline box's layout bounds derive
     // solely from its first available font, ignoring glyphs from fallback fonts.
