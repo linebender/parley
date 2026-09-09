@@ -30,7 +30,7 @@ use alloc::vec::Vec;
 #[cfg(feature = "libm")]
 #[allow(unused_imports)]
 use core_maths::CoreFloat;
-use fontique::{FontStyle, FontWeight, FontWidth, Query, QueryFamily};
+use fontique::{Query, QueryFamily};
 use parley_engine::{FontInstance, FontMetrics, ShapedText};
 
 use crate::resolve::{ResolveContext, ResolvedStyle};
@@ -92,30 +92,16 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
     out.reserve(styles.len());
 
     let mut query = fcx.collection.query(&mut fcx.source_cache);
-    // Styles that differ only in properties that do not affect font selection (brush, decoration,
-    // spacing, ...) share one font lookup. The parent is checked first as it most often matches.
-    let mut font_keys: Vec<(FontKey, FontMetrics)> = Vec::with_capacity(styles.len());
 
     for (index, style) in styles.iter().enumerate() {
-        let key = FontKey::new(style);
         let parent_index = usize::from(style.parent);
-        let cached = if parent_index < index && font_keys[parent_index].0 == key {
-            Some(parent_index)
-        } else {
-            font_keys.iter().position(|(k, _)| *k == key)
-        };
-        let font_metrics = match cached {
-            Some(cached) => font_keys[cached].1,
-            None => first_available_font(&mut query, rcx, style)
-                .and_then(|font| {
-                    let variations = rcx.variations(style.font_variations).unwrap_or(&[]);
-                    shaped_run_metrics(shaped_text, &font, style.font_size, variations).or_else(
-                        || FontMetrics::from_font_instance(&font, style.font_size, variations),
-                    )
-                })
-                .unwrap_or_else(|| fallback_metrics(style.font_size)),
-        };
-        font_keys.push((key, font_metrics));
+        let font_metrics = first_available_font(&mut query, rcx, style)
+            .and_then(|font| {
+                let variations = rcx.variations(style.font_variations).unwrap_or(&[]);
+                shaped_run_metrics(shaped_text, &font, style.font_size, variations)
+                    .or_else(|| FontMetrics::from_font_instance(&font, style.font_size, variations))
+            })
+            .unwrap_or_else(|| fallback_metrics(style.font_size));
 
         let line_height = match style.line_height {
             LineHeight::Absolute(value) => value,
@@ -155,30 +141,6 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
         }
 
         out.push(metrics);
-    }
-}
-
-/// The properties of a style that determine its first available font and that font's metrics.
-#[derive(Clone, Copy, PartialEq)]
-struct FontKey {
-    family: usize,
-    variations: usize,
-    size: u32,
-    width: FontWidth,
-    weight: FontWeight,
-    style: FontStyle,
-}
-
-impl FontKey {
-    fn new<B: Brush>(style: &ResolvedStyle<B>) -> Self {
-        Self {
-            family: style.font_family.id(),
-            variations: style.font_variations.id(),
-            size: style.font_size.to_bits(),
-            width: style.font_width,
-            weight: style.font_weight,
-            style: style.font_style,
-        }
     }
 }
 
