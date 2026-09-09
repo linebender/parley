@@ -3,7 +3,7 @@
 
 use crate::inline_box::InlineBox;
 use crate::layout::spacing::{EffectiveSpacing, Justification, Spacing};
-use crate::layout::whitespace::whitespace_can_hang;
+use crate::layout::whitespace::{atom_hanging_advance, whitespace_can_hang};
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
@@ -378,38 +378,10 @@ impl<B: Brush> LayoutData<B> {
                                 running_hanging_whitespace = 0.0;
                             }
                         } else {
-                            // The atom may hang partially: e.g., a prepend character followed by a
-                            // space is a single atom (as it's a grapheme), but may consist of
-                            // multiple shaped clusters, of which the spaces can hang. Only the
-                            // atom's spacing at its logical end hangs along with the clusters.
-                            let gaps = spacing.gaps(&atom);
-                            let (gap_start, gap_end) = if is_rtl {
-                                (gaps.after, gaps.before)
-                            } else {
-                                (gaps.before, gaps.after)
-                            };
-                            let mut last_cluster = true;
-                            let mut all_hang = true;
-                            let mut hanging = 0.0;
-                            for cluster in atom.shaped_clusters().iter().rev() {
-                                let cluster_hangs =
-                                    slice.characters_in(cluster.chars_range()).iter().all(|c| {
-                                        whitespace_can_hang(c.info.whitespace())
-                                            && self.styles[c.style_index as usize].text_wrap_mode
-                                                == TextWrapMode::Wrap
-                                    });
-                                if !cluster_hangs {
-                                    all_hang = false;
-                                    break;
-                                }
-                                if last_cluster {
-                                    hanging += gap_end;
-                                    last_cluster = false;
-                                }
-                                hanging += cluster.advance;
-                            }
+                            let (hanging, all_hang) =
+                                atom_hanging_advance(slice, &atom, &self.styles, spacing, is_rtl);
                             if all_hang {
-                                running_hanging_whitespace += hanging + gap_start;
+                                running_hanging_whitespace += hanging;
                             } else {
                                 running_hanging_whitespace = hanging;
                             }

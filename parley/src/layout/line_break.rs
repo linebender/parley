@@ -12,7 +12,7 @@ use parlance::BidiLevel;
 
 use crate::layout::data::count_graphemes;
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
-use crate::layout::whitespace::whitespace_can_hang;
+use crate::layout::whitespace::{atom_hanging_advance, whitespace_can_hang};
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -1241,59 +1241,19 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // (we are iterating backwards so trailing whitespace comes first).
                     for atom in slice.atoms_end().rev() {
                         if hanging {
-                            // An atom can hang partially: e.g., a prepend character followed by a
-                            // space is a single atom (as it's a grapheme), but may consist of
-                            // multiple shaped clusters. We can hang the advance of the space's
-                            // shaped cluster. In case of such partial hanging, if the atom has any
-                            // additional spacing (e.g., through word spacing), only the logically
-                            // last spacing is hung.
-                            let mut last_cluster = true;
-                            let (gap_start, gap_end) = {
-                                let gaps = effective_spacing.gaps(&atom);
-                                if line_item.is_rtl() {
-                                    (gaps.after, gaps.before)
-                                } else {
-                                    (gaps.before, gaps.after)
-                                }
-                            };
-                            for (cluster, cluster_idx) in atom
-                                .shaped_clusters()
-                                .iter()
-                                .zip(atom.shaped_clusters_range())
-                                .rev()
-                            {
-                                let cluster_hangs =
-                                    slice.characters_in(cluster.chars_range()).iter().all(|c| {
-                                        let whitespace = c.info.whitespace();
-                                        // Note non-breaking spaces don't hang: CSS Text 4 § 4.3.2
-                                        // hangs only spaces, tabs, segment breaks, and "other space
-                                        // separators." Of those "other space separators," we
-                                        // currently hang only the ideographic space.
-                                        //
-                                        // Note whitespace only hangs with `TextWrapMode::Wrap`,
-                                        // following CSS Text 4 § 4.3.2.
-                                        whitespace_can_hang(whitespace)
-                                            && self.layout.data.styles[c.style_index as usize]
-                                                .text_wrap_mode
-                                                == TextWrapMode::Wrap
-                                    });
-                                if !cluster_hangs {
-                                    hanging = false;
-                                    break;
-                                }
-                                if last_cluster {
-                                    hanging_whitespace_advance += gap_end;
-                                    last_cluster = false;
-                                }
-                                hanging_whitespace_advance += cluster.advance;
-                                justification_end_cluster = cluster_idx;
-                            }
-
-                            if hanging {
-                                hanging_whitespace_advance += gap_start;
-                            } else {
-                                justification_end_cluster = atom.shaped_clusters_range().start;
-                            }
+                            let (atom_hanging, all_hang) = atom_hanging_advance(
+                                slice,
+                                &atom,
+                                &self.layout.data.styles,
+                                effective_spacing,
+                                line_item.is_rtl(),
+                            );
+                            hanging_whitespace_advance += atom_hanging;
+                            // Justification can't stretch within an atom, so it stops at the start
+                            // of the last atom that hangs, whether in its entirety or only
+                            // partially.
+                            justification_end_cluster = atom.shaped_clusters_range().start;
+                            hanging = all_hang;
                         } else if is_word_separator(atom.characters()[0].info.whitespace()) {
                             num_justification_opportunities += 1;
                         }
