@@ -108,7 +108,7 @@ impl LineState {
 /// See <https://www.w3.org/TR/CSS22/visudet.html#line-height>.
 ///
 /// [aligned subtree]: crate::layout::style_metrics#aligned-subtrees
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 struct LineBoxMetrics {
     /// Extents of each aligned subtree with content on this line. The first entry is always the
     /// root subtree (root style index `0`).
@@ -208,21 +208,51 @@ impl SubtreeExtents {
     }
 }
 
-impl LineBoxMetrics {
-    fn reset(&mut self, strut: Option<&StyleMetrics>) {
-        self.subtrees.clear();
-        self.contributed.clear();
-        self.line_relative_top_height = 0.;
-        self.line_relative_bottom_height = 0.;
-        self.has_content = false;
-        self.last_text = (usize::MAX, 0);
-        let mut root = SubtreeExtents::new(0);
-        if let Some(strut) = strut {
-            root.line_box.add(0., strut.over, strut.under);
-            root.content_box.add(0., strut.ascent, strut.descent);
-            self.contributed.push(0);
+impl Default for LineBoxMetrics {
+    /// An empty line containing only the root aligned subtree, without a strut.
+    fn default() -> Self {
+        let mut subtrees = SmallVec::new();
+        subtrees.push(SubtreeExtents::new(0));
+        Self {
+            subtrees,
+            contributed: SmallVec::new(),
+            line_relative_top_height: 0.,
+            line_relative_bottom_height: 0.,
+            has_content: false,
+            last_text: (usize::MAX, 0),
         }
-        self.subtrees.push(root);
+    }
+}
+
+impl LineBoxMetrics {
+    /// Reset to an empty line whose root aligned subtree contains only `strut`, if any.
+    fn reset(&mut self, strut: Option<&StyleMetrics>) {
+        let Self {
+            subtrees,
+            contributed,
+            line_relative_top_height,
+            line_relative_bottom_height,
+            has_content,
+            last_text,
+        } = Self::default();
+        self.subtrees.clear();
+        self.subtrees.extend(subtrees);
+        self.contributed.clear();
+        self.contributed.extend(contributed);
+        self.line_relative_top_height = line_relative_top_height;
+        self.line_relative_bottom_height = line_relative_bottom_height;
+        self.has_content = has_content;
+        self.last_text = last_text;
+        if let Some(strut) = strut {
+            self.add_strut(strut);
+        }
+    }
+
+    fn add_strut(&mut self, strut: &StyleMetrics) {
+        let root = &mut self.subtrees[0];
+        root.line_box.add(0., strut.over, strut.under);
+        root.content_box.add(0., strut.ascent, strut.descent);
+        self.contributed.push(0);
     }
 
     /// The extents of the root aligned subtree.
