@@ -11,7 +11,7 @@ use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
 use crate::layout::data::count_graphemes;
-use crate::layout::spacing::{EffectiveSpacing, Justification};
+use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
 use crate::layout::whitespace::{atom_hanging_advance, whitespace_can_hang};
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
@@ -55,6 +55,12 @@ struct LineState {
     /// We lag the text-wrap-mode by one cluster due to line-breaking boundaries only
     /// being triggered on the cluster after the linebreak.
     text_wrap_mode: TextWrapMode,
+
+    /// The number of word separators appended to the line so far.
+    ///
+    /// These are the line's justification opportunities, before subtracting those that end up in
+    /// the line's hanging whitespace.
+    num_word_separators: u32,
 }
 
 impl LineState {
@@ -62,6 +68,7 @@ impl LineState {
     fn reset(&mut self) {
         self.x = 0.0;
         self.box_metrics = LineBoxMetrics::default();
+        self.num_word_separators = 0;
     }
 }
 
@@ -338,12 +345,21 @@ impl BreakerState {
     /// Add the atom currently being evaluated to the current line.
     ///
     /// `text_metrics` are the line box metrics contributed by the atom's text.
+    /// `is_word_separator` is `true` iff the atom is a [word separator](`is_word_separator`), i.e.,
+    /// a justification opportunity.
     #[inline]
-    fn append_atom_to_line(&mut self, atom: &Atom<'_>, next_x: f32, text_metrics: LineBoxMetrics) {
+    fn append_atom_to_line(
+        &mut self,
+        atom: &Atom<'_>,
+        next_x: f32,
+        text_metrics: LineBoxMetrics,
+        is_word_separator: bool,
+    ) {
         self.line.items.end = self.item_idx + 1;
         self.line.clusters.end = atom.shaped_clusters_range().end;
         self.cluster_idx = atom.shaped_clusters_range().end;
         self.line.x = next_x;
+        self.line.num_word_separators += u32::from(is_word_separator);
         self.line.box_metrics.add(text_metrics);
         self.update_max_height_exceeded();
     }
@@ -772,6 +788,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let is_newline = whitespace == Whitespace::Newline;
                         // Whether this is a space that is allowed to hang past the line.
                         let is_space = whitespace_can_hang(whitespace);
+                        // Whether this atom is a justification opportunity.
+                        let is_separator = is_word_separator(whitespace);
                         let boundary = first_character.info.boundary();
                         let max_height_exceeded = self.state.line.max_height_exceeded;
                         let style = &self.layout.data.styles[first_character.style_index as usize];
@@ -818,8 +836,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                         && next.info.source_char() == '\n'
                                 });
 
-                            self.state
-                                .append_atom_to_line(&atom, self.state.line.x, text_metrics);
+                            self.state.append_atom_to_line(
+                                &atom,
+                                self.state.line.x,
+                                text_metrics,
+                                is_separator,
+                            );
 
                             if is_cr_before_lf {
                                 continue;
@@ -864,7 +886,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             if max_height_exceeded {
                                 return self.max_height_break_data(line_height);
                             }
-                            self.state.append_atom_to_line(&atom, next_x, text_metrics);
+                            self.state.append_atom_to_line(
+                                &atom,
+                                next_x,
+                                text_metrics,
+                                is_separator,
+                            );
                         }
                         // Else we attempt to line break:
                         //
@@ -879,7 +906,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
-                                self.state.append_atom_to_line(&atom, next_x, text_metrics);
+                                self.state.append_atom_to_line(
+                                    &atom,
+                                    next_x,
+                                    text_metrics,
+                                    is_separator,
+                                );
                                 return self.start_new_line(
                                     BreakReason::Regular,
                                     max_advance,
@@ -922,7 +954,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
-                                self.state.append_atom_to_line(&atom, next_x, text_metrics);
+                                self.state.append_atom_to_line(
+                                    &atom,
+                                    next_x,
+                                    text_metrics,
+                                    is_separator,
+                                );
                             }
                         }
                     }
@@ -1041,6 +1078,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let first_character = &atom.characters()[0];
                         let whitespace = first_character.info.whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
+                        let is_separator = is_word_separator(whitespace);
                         let advance = spacing.atom_advance(&atom);
 
                         // Compute the x position.
@@ -1050,7 +1088,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         } else {
                             self.state.line.x + advance
                         };
-                        self.state.append_atom_to_line(&atom, next_x, text_metrics);
+                        self.state
+                            .append_atom_to_line(&atom, next_x, text_metrics, is_separator);
                         char_count += atom.char_range().len() as u32;
 
                         // Check if we've reached the limit after adding this atom
@@ -1456,8 +1495,11 @@ fn commit_line<B: Brush>(
     // let end_run_idx = lines.line_items.last().map(|item| item.index).unwrap_or(0);
     let end_item_idx = lines.line_items.len();
 
-    let (hanging_advance, justification_end_cluster) =
+    let (hanging_advance, justification_end_cluster, hanging_opportunities) =
         hanging_whitespace(layout, &lines.line_items[start_item_idx..end_item_idx]);
+    // The word separators counted as the line was built include the line's hanging whitespace, and
+    // hanging whitespace is not stretched by justification.
+    let num_justification_opportunities = state.num_word_separators - hanging_opportunities;
 
     // Reorder the items within the line (if required). Reordering is required if the line contains
     // a mix of bidi levels (a mix of LTR and RTL text)
@@ -1470,8 +1512,7 @@ fn commit_line<B: Brush>(
         text_range: text_start..text_end,
         max_advance,
         break_reason,
-        // Justification opportunities are counted lazily.
-        num_justification_opportunities: None,
+        num_justification_opportunities,
         justification: Justification {
             justification_end_cluster,
             ..Justification::NONE
@@ -1505,14 +1546,19 @@ fn commit_line<B: Brush>(
 }
 
 /// Returns the advance of the whitespace hanging past the end of the line made up of `line_items`,
-/// plus the index one past its logically last shaped cluster that's eligible for justification (see
-/// [`Justification::justification_end_cluster`]).
+/// the index one past its logically last shaped cluster that's eligible for justification (see
+/// [`Justification::justification_end_cluster`]), and the number of justification opportunities
+/// that are no longer eligible, as they are at or beyond that cluster.
 ///
 /// `line_items` must be in logical order.
-fn hanging_whitespace<B: Brush>(layout: &Layout<B>, line_items: &[LineItemData]) -> (f32, u32) {
+fn hanging_whitespace<B: Brush>(
+    layout: &Layout<B>,
+    line_items: &[LineItemData],
+) -> (f32, u32, u32) {
     let mut hanging_whitespace_advance = 0.;
     // Atoms with shaped clusters before this index may be stretched by justification.
     let mut justification_end_cluster = u32::MAX;
+    let mut hanging_opportunities = 0;
 
     for line_item in line_items.iter().rev() {
         match line_item.kind {
@@ -1555,15 +1601,26 @@ fn hanging_whitespace<B: Brush>(layout: &Layout<B>, line_items: &[LineItemData])
                     // Justification can't stretch within an atom, so it stops at the start of the
                     // last atom that hangs atom hangs in its entirety or only partially.
                     justification_end_cluster = atom.shaped_clusters_range().start;
+                    if is_word_separator(atom.characters()[0].info.whitespace()) {
+                        hanging_opportunities += 1;
+                    }
                     if !all_hang {
-                        return (hanging_whitespace_advance, justification_end_cluster);
+                        return (
+                            hanging_whitespace_advance,
+                            justification_end_cluster,
+                            hanging_opportunities,
+                        );
                     }
                 }
             }
         }
     }
 
-    (hanging_whitespace_advance, justification_end_cluster)
+    (
+        hanging_whitespace_advance,
+        justification_end_cluster,
+        hanging_opportunities,
+    )
 }
 
 /// Reorder items within line according to the bidi levels of the items
