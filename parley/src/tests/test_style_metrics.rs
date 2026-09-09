@@ -3,8 +3,8 @@
 
 //! Tests for per-style span box metrics.
 
-use super::utils::fonts::{FONT_FAMILY_LIST, create_font_context};
 use super::utils::ColorBrush;
+use super::utils::fonts::{FONT_FAMILY_LIST, create_font_context};
 use crate::layout::style_metrics::StyleMetrics;
 use crate::{
     AlignmentBaseline, BaselineShift, FontFamily, InlineBox, InlineBoxKind, Layout, LayoutContext,
