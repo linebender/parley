@@ -1,0 +1,92 @@
+name: Benchmarks
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  RUST_STABLE_VER: "1.98.1" # Keep in sync with ci.yml
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: "sparse"
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    name: "Benchmarks: PR vs ${{ github.base_ref }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: checkout PR head
+        uses: actions/checkout@v4
+
+      - name: install stable toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_STABLE_VER }}
+
+      - name: Install fontconfig-dev
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig-dev
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: "parley-bench-linux"
+          cache-all-crates: "true"
+
+      - name: Build candidate benchmarks
+        run: |
+          cargo build --release --bench main -p parley_bench --message-format=json \
+            | tee /tmp/build.json
+          jq -r 'select(.reason=="compiler-artifact" and .executable!=null) | .executable' /tmp/build.json \
+            | tail -1 | xargs -I{} cp {} /tmp/bench-candidate
+          cp .github/scripts/bench_results_to_pr.py /tmp/
+
+      # Build the baseline in the *same* directory as the candidate. Paired
+      # benchmarking cancels time-varying machine noise, but not persistent
+      # per-binary differences — binaries built under different paths differ
+      # in embedded paths and code layout, which produces a systematic skew
+      # of a few percent on every benchmark.
+      - name: Build baseline benchmarks
+        run: |
+          git fetch --depth 1 origin ${{ github.event.pull_request.base.sha }}
+          git checkout --detach FETCH_HEAD
+          cargo build --release --bench main -p parley_bench --message-format=json \
+            | tee /tmp/build-baseline.json
+          jq -r 'select(.reason=="compiler-artifact" and .executable!=null) | .executable' /tmp/build-baseline.json \
+            | tail -1 | xargs -I{} cp {} /tmp/bench-baseline
+
+      # Paired A/B benchmarking: each benchmark runs interleaved on the same
+      # runner, which cancels out machine noise much better than comparing
+      # separately-collected point measurements.
+      # The `|| true` keeps regressions (nonzero exit on significant slowdown)
+      # from failing the job — results are reported, not gated on.
+      - name: Run paired comparison
+        run: |
+          chmod +x /tmp/bench-candidate /tmp/bench-baseline
+          /tmp/bench-candidate compare /tmp/bench-baseline \
+            --time 5 \
+            --noise-threshold 5 \
+            -d ./bench-samples \
+            2>&1 | tee ./bench-results.txt || true
+
+      - name: Render results in step summary
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BASE_REF: ${{ github.base_ref }}
+        # The working tree is checked out at the base commit here, so run the
+        # copy of the script stashed before the checkout.
+        run: python3 /tmp/bench_results_to_pr.py --dry-run ./bench-results.txt
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: |
+            bench-results.txt
+            bench-samples/
+          if-no-files-found: error

@@ -5,7 +5,7 @@
 //!
 //! This module provides benchmarks for text layout and rendering.
 
-use crate::{ColorBrush, FONT_FAMILY_LIST, get_samples, with_contexts};
+use crate::{ColorBrush, FONT_FAMILY_LIST, get_documents, get_samples, with_contexts};
 use parley::{
     Alignment, AlignmentOptions, FontFamily, FontStyle, FontWeight, Layout, PositionedLayoutItem,
     StyleProperty,
@@ -504,4 +504,75 @@ pub fn long_line() -> Vec<Benchmark> {
             ]
         })
         .collect()
+}
+
+/// Benchmarks for document-scale inputs, exercising each layout pipeline phase
+/// separately.
+///
+/// The other groups cover short excerpts (at most four paragraphs) and mostly
+/// run the whole pipeline end-to-end. These use the full text samples
+/// (~12–120KB) plus a ~250KB Latin document, at a page-like 800px wrap width —
+/// the scale at which per-phase costs in build, line breaking, content widths,
+/// and glyph iteration diverge.
+pub fn document() -> Vec<Benchmark> {
+    const MAX_ADVANCE: f32 = 800.0;
+
+    let mut benchmarks = Vec::new();
+
+    for sample in get_documents() {
+        benchmarks.push(benchmark_fn(
+            format!("Document Build - {} {}", sample.name, sample.modification),
+            move |b| {
+                let text = &sample.text;
+                b.iter(move || black_box(build_layout(text, [])))
+            },
+        ));
+    }
+
+    for sample in get_documents() {
+        benchmarks.push(benchmark_fn(
+            format!(
+                "Document Break + Align - {} {}",
+                sample.name, sample.modification
+            ),
+            move |b| {
+                let mut layout = build_layout(&sample.text, []);
+                b.iter(move || {
+                    layout.break_all_lines(Some(MAX_ADVANCE));
+                    layout.align(Alignment::Start, AlignmentOptions::default());
+                    black_box(layout.lines().count())
+                })
+            },
+        ));
+    }
+
+    for sample in get_documents() {
+        benchmarks.push(benchmark_fn(
+            format!(
+                "Document Content Widths - {} {}",
+                sample.name, sample.modification
+            ),
+            move |b| {
+                let layout = build_layout(&sample.text, []);
+                b.iter(move || black_box(layout.calculate_content_widths()))
+            },
+        ));
+    }
+
+    for sample in get_documents() {
+        benchmarks.push(benchmark_fn(
+            format!(
+                "Document Glyph Iteration - {} {}",
+                sample.name, sample.modification
+            ),
+            move |b| {
+                let mut layout = build_layout(&sample.text, []);
+                layout.break_all_lines(Some(MAX_ADVANCE));
+                layout.align(Alignment::Start, AlignmentOptions::default());
+                b.iter(move || black_box(walk_items(&layout)))
+            },
+        ));
+    }
+
+    benchmarks
 }
