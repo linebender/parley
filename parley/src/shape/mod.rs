@@ -12,7 +12,7 @@ use smallvec::SmallVec;
 use super::layout::Layout;
 use super::resolve::{ResolveContext, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
-use crate::font::{FontCache, PrimaryFont};
+use crate::font::{FirstAvailableFont, FontCache};
 use crate::inline_box::LayoutInlineBox;
 use crate::util::{nearly_eq, nearly_zero};
 use crate::{FontContext, FontData, Spacing};
@@ -261,10 +261,10 @@ struct FontSelector<'a, 'b, B: Brush> {
     font_cache: &'b mut FontCache,
     /// The font stack whose families are currently set on [`Self::query`], if any.
     fonts_id: Option<usize>,
-    /// The cached primary font of the current (non-emoji) style, if it has one. Clusters this
-    /// font fully covers are resolved without consulting the query, which is what the query
+    /// The cached first available font of the current (non-emoji) style, if it has one. Clusters
+    /// this font fully covers are resolved without consulting the query, which is what the query
     /// would select anyway as this is the first font it yields.
-    primary_font: Option<PrimaryFont>,
+    first_available_font: Option<FirstAvailableFont>,
     rcx: &'a ResolveContext,
     styles: &'a [ResolvedStyle<B>],
     style_index: u16,
@@ -296,7 +296,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             query,
             font_cache,
             fonts_id: None,
-            primary_font: None,
+            first_available_font: None,
             rcx,
             styles,
             style_index: 0,
@@ -354,12 +354,12 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
                 );
                 self.query.set_attributes(attrs);
                 self.fonts_id = None;
-                self.primary_font = None;
+                self.first_available_font = None;
             } else {
-                let (primary_font, queried) = self
+                let (first_available_font, queried) = self
                     .font_cache
                     .first_available_font(self.query, fonts, attrs);
-                self.primary_font = primary_font;
+                self.first_available_font = first_available_font;
                 if queried {
                     // The cache miss left the query set to exactly this stack and attributes.
                     self.fonts_id = Some(fonts_id);
@@ -377,24 +377,23 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
 
         let mut selected_font: Option<FontInstance> = None;
         let mut best_coverage = Coverage::NONE;
-        // The primary font is the first font the query yields; don't compute its coverage twice.
+        // The first available font is the first font the query yields; don't compute its coverage
+        // twice.
         let mut skip_first = None;
 
-        if let Some(primary) = &self.primary_font
-            && let Some(charmap) = primary
-                .charmap_index
-                .charmap(primary.font.font.data.as_ref())
+        if let Some(faf) = &self.first_available_font
+            && let Some(charmap) = faf.charmap_index.charmap(faf.font.font.data.as_ref())
         {
             let coverage = cluster.calculate_coverage(
                 |ch| charmap.map(ch).map(|g| g != 0).unwrap_or_default(),
                 self.analysis_data_sources,
             );
             if coverage.is_complete() {
-                return Some(primary.font.clone());
+                return Some(faf.font.clone());
             }
-            selected_font = Some(primary.font.clone());
+            selected_font = Some(faf.font.clone());
             best_coverage = coverage;
-            skip_first = Some((primary.font.font.data.id(), primary.font.font.index));
+            skip_first = Some((faf.font.font.data.id(), faf.font.font.index));
         }
 
         self.query.matches_with(|font| {
