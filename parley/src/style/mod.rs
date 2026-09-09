@@ -71,36 +71,40 @@ impl LineHeight {
     }
 }
 
-/// Which reference of an inline box is aligned with the same reference of its *parent* inline
-/// box (the enclosing style span, or the root style for top-level content). Mirrors the CSS
-/// `alignment-baseline` property.
+/// Which reference of a span (or [`InlineBox`]) is aligned with the same reference of its
+/// *parent* span (the enclosing style span, or the root style for top-level content). Mirrors the
+/// CSS `alignment-baseline` property.
+///
+/// [`InlineBox`]: crate::InlineBox
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AlignmentBaseline {
-    /// Align the baseline of the box with the baseline of the parent box.
+    /// Align the baseline of the box with the baseline of the parent span.
     #[default]
     Baseline,
     /// Align the top of the box with the top of the parent's content area (font ascent).
     TextTop,
     /// Align the bottom of the box with the bottom of the parent's content area (font descent).
     TextBottom,
-    /// Align the vertical midpoint of the box with the baseline of the parent box plus half the
+    /// Align the vertical midpoint of the box with the parent span's baseline plus half the
     /// x-height of the parent.
     Middle,
 }
 
-/// A shift applied to an inline box after [`AlignmentBaseline`] alignment. Mirrors the CSS
-/// `baseline-shift` property.
+/// A shift applied to a span (or [`InlineBox`]) after [`AlignmentBaseline`] alignment. Mirrors
+/// the CSS `baseline-shift` property.
 ///
 /// [`Top`](Self::Top) and [`Bottom`](Self::Bottom) are *line-relative*: the box and its
 /// descendants form an aligned subtree that is placed against the line box, and the
-/// [`AlignmentBaseline`] is ignored. All other values are relative to the parent inline box.
+/// [`AlignmentBaseline`] is ignored. All other values are relative to the parent span.
+///
+/// [`InlineBox`]: crate::InlineBox
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BaselineShift {
     /// Raise the box by the given distance (in layout units). Negative values lower it.
     Length(f32),
-    /// Lower the box to the proper position for subscripts of the parent box.
+    /// Lower the box to the proper position for subscripts of the parent span.
     Sub,
-    /// Raise the box to the proper position for superscripts of the parent box.
+    /// Raise the box to the proper position for superscripts of the parent span.
     Super,
     /// Align the top of the box (and its descendants) with the top of the line box.
     Top,
@@ -114,8 +118,8 @@ impl Default for BaselineShift {
     }
 }
 
-/// Vertical alignment of an inline box (a styled span of text or an [`InlineBox`]) within its
-/// line. This mirrors the CSS `vertical-align` shorthand, which sets [`AlignmentBaseline`] and
+/// Vertical alignment of a span (a styled range of text) or an [`InlineBox`] within its line.
+/// This mirrors the CSS `vertical-align` shorthand, which sets [`AlignmentBaseline`] and
 /// [`BaselineShift`]; the associated constants cover the CSS 2 keywords.
 ///
 /// [`InlineBox`]: crate::InlineBox
@@ -152,7 +156,7 @@ impl VerticalAlign {
     }
 
     /// `vertical-align: <length>`: raise the baseline of the box by `length` (in layout units)
-    /// above the baseline of the parent box. Negative values lower the baseline.
+    /// above the baseline of the parent span. Negative values lower the baseline.
     pub const fn length(length: f32) -> Self {
         Self::new(AlignmentBaseline::Baseline, BaselineShift::Length(length))
     }

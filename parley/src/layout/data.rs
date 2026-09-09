@@ -95,7 +95,7 @@ impl LineData {
             .map_or(0., |subtree| subtree.baseline_offset)
     }
 
-    /// Block-axis coordinate of the baseline of the given style's inline box. `offsets` is
+    /// Block-axis coordinate of the baseline of the given style's span box. `offsets` is
     /// [`LayoutData::aligned_subtree_offsets`].
     pub(crate) fn style_baseline(
         &self,
@@ -192,10 +192,10 @@ pub(crate) struct LayoutData<B: Brush> {
 
     // Output of style resolution (input to line breaking)
     pub(crate) styles: Vec<Style<B>>,
-    /// Inline box metrics of each entry of `styles`.
+    /// Span box metrics of each entry of `styles`.
     pub(crate) style_metrics: Vec<StyleMetrics>,
     pub(crate) inline_boxes: Vec<InlineBox>,
-    /// Style index of the inline box (span) containing each entry of `inline_boxes`. This is the
+    /// Style index of the span containing each entry of `inline_boxes`. This is the
     /// parent against which the box's `vertical_align` is resolved.
     pub(crate) inline_box_styles: Vec<u16>,
 

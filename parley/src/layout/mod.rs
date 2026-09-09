@@ -65,7 +65,7 @@ pub struct Style<B: Brush> {
     pub strikethrough: Option<Decoration<B>>,
     /// Partially resolved line height, either in in layout units or dependent on metrics
     pub(crate) line_height: LineHeight,
-    /// Vertical alignment of this style's inline box within the line
+    /// Vertical alignment of this style's span within the line
     pub(crate) vertical_align: VerticalAlign,
     /// Per-cluster overflow-wrap setting
     pub(crate) overflow_wrap: OverflowWrap,

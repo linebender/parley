@@ -1,7 +1,7 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Tests for per-style inline box metrics.
+//! Tests for per-style span box metrics.
 
 use super::test_builders::{FONT_FAMILY_LIST, create_font_context};
 use super::utils::ColorBrush;
@@ -380,7 +380,7 @@ fn line_with_negative_height_inline_box_is_not_invisible() {
 
 #[test]
 fn fallback_font_glyphs_only_size_the_line_for_normal_line_height() {
-    // CSS Inline 3 § 4.1: with a non-`normal` `line-height`, an inline box's layout bounds derive
+    // CSS Inline 3 § 4.1: with a non-`normal` `line-height`, a span box's layout bounds derive
     // solely from its first available font, ignoring glyphs from fallback fonts.
     let mut fcx = create_font_context();
     let kufi = fcx.collection.family_id("Noto Kufi Arabic").unwrap();
