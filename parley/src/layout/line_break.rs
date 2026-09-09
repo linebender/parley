@@ -1196,7 +1196,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // Justification opportunities (word-separator atoms) were counted as atoms were appended
         // to the line. Atoms that hang past the line's end, and the atom that stops hanging, are
         // not justification opportunities, so we subtract them below.
-        let mut hanging_word_separators = 0usize;
+        let mut hanging_word_separators = 0_usize;
         let mut stopper_is_word_separator = false;
         // One past the justified region: atoms with shaped clusters before this index may be
         // stretched by justification.
@@ -1310,8 +1310,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 justification_end_cluster = atom.shaped_clusters_range().start;
                                 // The atom that stops hanging is not a justification opportunity
                                 // (e.g., a non-breaking space closing the line).
-                                stopper_is_word_separator =
-                                    is_word_separator(first_whitespace);
+                                stopper_is_word_separator = is_word_separator(first_whitespace);
                                 break;
                             }
                         }
