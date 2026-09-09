@@ -69,7 +69,8 @@ pub(crate) struct StyleMetrics {
     ///
     /// [aligned subtree]: self#aligned-subtrees
     pub(crate) aligned_subtree: u16,
-    /// Style index of the parent span (`0`, itself, for the root).
+    /// Style index of the parent span; always less than the span's own index, except for the
+    /// root (index `0`), whose parent is `0`.
     pub(crate) parent: u16,
     /// The style's font size, against which `sub`/`super` of children are resolved.
     pub(crate) font_size: f32,
@@ -94,7 +95,6 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
     let mut query = fcx.collection.query(&mut fcx.source_cache);
 
     for (index, style) in styles.iter().enumerate() {
-        let parent_index = usize::from(style.parent);
         let font_metrics = first_available_font(&mut query, rcx, style)
             .and_then(|font| {
                 let variations = rcx.variations(style.font_variations).unwrap_or(&[]);
@@ -112,20 +112,27 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
         };
 
         let mut metrics = StyleMetrics::from_font(&font_metrics, line_height, quantize);
-        metrics.parent = style.parent;
         metrics.font_size = style.font_size;
 
-        debug_assert!(
-            parent_index <= index,
-            "style table must be ordered parent-first"
-        );
-        if index == 0 || parent_index >= index {
+        if index == 0 {
             // The root span box (the strut).
-            metrics.parent = index as u16;
+            metrics.parent = 0;
             metrics.baseline_offset = 0.;
             metrics.exact_baseline_offset = 0.;
             metrics.aligned_subtree = 0;
         } else {
+            let parent_index = usize::from(style.parent);
+            debug_assert!(
+                parent_index < index,
+                "style table must be ordered parent-first"
+            );
+            // Never let a malformed table create an orphaned span; treat it as a child of the root.
+            let parent_index = if parent_index < index {
+                parent_index
+            } else {
+                0
+            };
+            metrics.parent = parent_index as u16;
             let parent = &out[parent_index];
             let align = style.vertical_align;
             if align.is_line_relative() {
