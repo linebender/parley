@@ -12,7 +12,7 @@ use smallvec::SmallVec;
 use super::layout::Layout;
 use super::resolve::{ResolveContext, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
-use crate::inline_box::InlineBox;
+use crate::inline_box::LayoutInlineBox;
 use crate::util::{nearly_eq, nearly_zero};
 use crate::{FontContext, FontData, Spacing};
 
@@ -46,7 +46,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     rcx: &'a ResolveContext,
     fcx: &'a mut FontContext,
     styles: &'a [ResolvedStyle<B>],
-    inline_boxes: &[InlineBox],
+    inline_boxes: &[LayoutInlineBox],
     analysis: &Analysis,
     char_style_indices: &[u16],
     scx: &mut Shaper,
@@ -72,7 +72,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
     let mut fq = fcx.collection.query(&mut fcx.source_cache);
 
-    let mut inline_box_iter = inline_boxes.iter().peekable();
+    let mut inline_box_iter = inline_boxes.iter().map(|b| &b.inline_box).peekable();
 
     // Merge font features with letter-spacing ligature suppression.
     //
@@ -189,7 +189,11 @@ pub(crate) fn shape_text<'a, B: Brush>(
         &mut layout.data.shaped_text,
     );
 
-    let mut inline_box_iter = inline_boxes.iter().enumerate().peekable();
+    let mut inline_box_iter = inline_boxes
+        .iter()
+        .map(|b| &b.inline_box)
+        .enumerate()
+        .peekable();
     for shaped_run_idx in 0..layout.data.shaped_text.runs().len() {
         let shaped_run = &layout.data.shaped_text.runs()[shaped_run_idx];
         let run_text_byte_start = shaped_run.range.byte_range.start;

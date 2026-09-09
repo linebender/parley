@@ -10,13 +10,12 @@ use super::style::{Brush, StyleProperty, TextStyle, WhiteSpaceCollapse};
 use super::layout::Layout;
 
 use alloc::string::String;
-use alloc::vec::Vec;
 use core::ops::{Bound, Range, RangeBounds};
 use parlance::BaseDirection;
 use parley_engine::break_overrides::LineBreakOverrideFn;
 
 use crate::InlineBoxKind;
-use crate::inline_box::InlineBox;
+use crate::inline_box::{InlineBox, LayoutInlineBox};
 use crate::resolve::{ResolvedStyle, StyleRun, tree::ItemKind};
 
 #[derive(Clone, Copy)]
@@ -68,8 +67,10 @@ impl<'b, B: Brush> RangedBuilder<'b, B> {
     }
 
     pub fn push_inline_box(&mut self, inline_box: InlineBox) {
-        self.lcx.inline_boxes.push(inline_box);
-        self.lcx.inline_box_styles.push(0);
+        self.lcx.inline_boxes.push(LayoutInlineBox {
+            inline_box,
+            style_index: 0,
+        });
     }
 
     /// Sets the paragraph's base direction.
@@ -167,8 +168,10 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
     }
 
     pub fn push_inline_box(&mut self, inline_box: InlineBox) {
-        self.lcx.inline_boxes.push(inline_box);
-        self.lcx.inline_box_styles.push(0);
+        self.lcx.inline_boxes.push(LayoutInlineBox {
+            inline_box,
+            style_index: 0,
+        });
     }
 
     /// Sets the paragraph's base direction.
@@ -268,10 +271,11 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
 
         // TODO: arrange type better here to factor out the index
         inline_box.index = self.lcx.tree_style_builder.current_text_len();
-        self.lcx.inline_boxes.push(inline_box);
-        self.lcx
-            .inline_box_styles
-            .push(self.lcx.tree_style_builder.resolve_current_style_id());
+        let style_index = self.lcx.tree_style_builder.resolve_current_style_id();
+        self.lcx.inline_boxes.push(LayoutInlineBox {
+            inline_box,
+            style_index,
+        });
     }
 
     pub fn set_white_space_mode(&mut self, white_space_collapse: WhiteSpaceCollapse) {
@@ -369,7 +373,7 @@ fn build_into_layout<B: Brush>(
 
     // Sort the inline boxes as subsequent code assumes that they are in text index order.
     // Note: It's important that this is a stable sort to allow users to control the order of contiguous inline boxes
-    sort_inline_boxes(&mut lcx.inline_boxes, &mut lcx.inline_box_styles);
+    sort_inline_boxes(&mut lcx.inline_boxes);
 
     {
         super::shape::shape_text(
@@ -399,32 +403,15 @@ fn build_into_layout<B: Brush>(
     // Move inline boxes into the layout
     layout.data.inline_boxes.clear();
     core::mem::swap(&mut layout.data.inline_boxes, &mut lcx.inline_boxes);
-    layout.data.inline_box_styles.clear();
-    core::mem::swap(
-        &mut layout.data.inline_box_styles,
-        &mut lcx.inline_box_styles,
-    );
 }
 
-/// Stably sort inline boxes by text index, keeping `styles` parallel to `boxes`.
+/// Stably sort inline boxes by text index.
 ///
 /// TODO: consider dropping the sort and instead requiring `push_inline_box` callers to push boxes
 /// in text index order (as `TreeBuilder` already does, and as styles are required to be
 /// parent-first), which would reduce this to an assertion.
-fn sort_inline_boxes(boxes: &mut Vec<InlineBox>, styles: &mut Vec<u16>) {
-    debug_assert_eq!(boxes.len(), styles.len());
-    if boxes.is_sorted_by_key(|b| b.index) {
-        return;
-    }
-    let mut order: Vec<usize> = (0..boxes.len()).collect();
-    order.sort_by_key(|&i| boxes[i].index);
-    let sorted_styles: Vec<u16> = order.iter().map(|&i| styles[i]).collect();
-    let mut sorted_boxes = Vec::with_capacity(boxes.len());
-    for &i in &order {
-        sorted_boxes.push(boxes[i].clone());
-    }
-    *boxes = sorted_boxes;
-    *styles = sorted_styles;
+fn sort_inline_boxes(boxes: &mut [LayoutInlineBox]) {
+    boxes.sort_by_key(|b| b.inline_box.index);
 }
 
 fn resolve_range(range: impl RangeBounds<usize>, len: usize) -> Range<usize> {

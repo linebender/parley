@@ -26,6 +26,15 @@ pub struct InlineBox {
     pub vertical_align: VerticalAlign,
 }
 
+/// An [`InlineBox`] together with the style index of the span that contains it.
+#[derive(PartialEq, Debug, Clone)]
+pub(crate) struct LayoutInlineBox {
+    pub(crate) inline_box: InlineBox,
+    /// Style index of the span containing the box. This is the parent against which the
+    /// box's `vertical_align` is resolved.
+    pub(crate) style_index: u16,
+}
+
 /// Whether a box is in-flow (takes up space in the layout) or out-of-flow (e.g. absolutely positioned)
 /// or custom-out-of-flow (line-breaking should yield control flow)
 #[derive(PartialEq, Debug, Clone, Copy)]

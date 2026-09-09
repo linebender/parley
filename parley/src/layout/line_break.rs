@@ -733,9 +733,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     /// Add the layout's inline box `index` to the current line. Out-of-flow boxes contribute
     /// nothing to the line's metrics.
     fn append_layout_inline_box(&mut self, index: usize, next_x: f32) {
-        let inline_box = &self.layout.data.inline_boxes[index];
+        let layout_box = &self.layout.data.inline_boxes[index];
+        let inline_box = &layout_box.inline_box;
         if inline_box.kind == InlineBoxKind::InFlow {
-            let parent_style = self.layout.data.inline_box_styles[index];
+            let parent_style = layout_box.style_index;
             self.state.append_aligned_inline_box_to_line(
                 next_x,
                 inline_box,
@@ -934,7 +935,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
             match item.kind {
                 LayoutItemKind::InlineBox => {
-                    let inline_box = &self.layout.data.inline_boxes[item.index];
+                    let inline_box = &self.layout.data.inline_boxes[item.index].inline_box;
 
                     // In-flow boxes are aligned relative to their containing style's span box
                     // (see `append_aligned_inline_box_to_line`). Out-of-flow boxes are not in-flow
@@ -1239,7 +1240,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
             match item.kind {
                 LayoutItemKind::InlineBox => {
-                    let inline_box = &self.layout.data.inline_boxes[item.index];
+                    let inline_box = &self.layout.data.inline_boxes[item.index].inline_box;
 
                     if inline_box.kind != InlineBoxKind::InFlow {
                         self.append_layout_inline_box(item.index, self.state.line.x);
@@ -1674,7 +1675,7 @@ fn commit_line<B: Brush>(
 
         match item.kind {
             LayoutItemKind::InlineBox => {
-                let inline_box = &layout.data.inline_boxes[item.index];
+                let inline_box = &layout.data.inline_boxes[item.index].inline_box;
 
                 lines.line_items.push(LineItemData {
                     kind: LayoutItemKind::InlineBox,
@@ -1855,7 +1856,7 @@ fn hanging_whitespace<B: Brush>(
     for line_item in line_items.iter().rev() {
         match line_item.kind {
             LayoutItemKind::InlineBox => {
-                let item = &layout.data.inline_boxes[line_item.index];
+                let item = &layout.data.inline_boxes[line_item.index].inline_box;
 
                 // Inline boxes don't hang.
                 if item.kind == InlineBoxKind::InFlow {

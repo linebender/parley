@@ -1,7 +1,7 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::inline_box::InlineBox;
+use crate::inline_box::LayoutInlineBox;
 use crate::layout::spacing::{EffectiveSpacing, Justification, Spacing};
 use crate::layout::style_metrics::StyleMetrics;
 use crate::layout::whitespace::{atom_hanging_advance, whitespace_can_hang};
@@ -194,10 +194,7 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) styles: Vec<Style<B>>,
     /// Span box metrics of each entry of `styles`.
     pub(crate) style_metrics: Vec<StyleMetrics>,
-    pub(crate) inline_boxes: Vec<InlineBox>,
-    /// Style index of the span containing each entry of `inline_boxes`. This is the
-    /// parent against which the box's `vertical_align` is resolved.
-    pub(crate) inline_box_styles: Vec<u16>,
+    pub(crate) inline_boxes: Vec<LayoutInlineBox>,
 
     // Output of shaping (input to line breaking)
     pub(crate) shaped_text: ShapedText,
@@ -246,7 +243,6 @@ impl<B: Brush> Default for LayoutData<B> {
             styles: Vec::new(),
             style_metrics: Vec::new(),
             inline_boxes: Vec::new(),
-            inline_box_styles: Vec::new(),
             shaped_text: ShapedText::new(),
             runs: Vec::new(),
             items: Vec::new(),
@@ -274,7 +270,6 @@ impl<B: Brush> LayoutData<B> {
         self.styles.clear();
         self.style_metrics.clear();
         self.inline_boxes.clear();
-        self.inline_box_styles.clear();
         self.shaped_text.clear();
         self.runs.clear();
         self.items.clear();
@@ -449,7 +444,7 @@ impl<B: Brush> LayoutData<B> {
                     }
                 }
                 LayoutItemKind::InlineBox => {
-                    let ibox = &self.inline_boxes[item.index];
+                    let ibox = &self.inline_boxes[item.index].inline_box;
                     if ibox.kind == InlineBoxKind::InFlow {
                         running_max_width += ibox.width;
                         if text_wrap_mode == TextWrapMode::Wrap {
