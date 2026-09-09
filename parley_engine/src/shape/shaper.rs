@@ -236,6 +236,9 @@ fn shape_segment(
     };
     let mut current_font = Some(next_font);
 
+    // The character offset prefix sum.
+    let mut char_start = char_range.start;
+
     // Main segmentation loop (based on swash shape_clusters) - only within current item
     while let Some(font) = current_font.take() {
         // Collect all clusters for this font segment
@@ -374,13 +377,13 @@ fn shape_segment(
                 .point_size(Some(options.font_size)),
         );
 
-        let char_start = char_range.start + item_text[..segment_start_offset].chars().count();
         let segment_char_count = segment_text.chars().count();
         let range = TextRange {
             byte_range: (item.range.byte_range.start + segment_start_offset)
                 ..(item.range.byte_range.start + segment_end_offset),
             char_range: char_start..char_start + segment_char_count,
         };
+        char_start += segment_char_count;
         shaped_text.push_run(
             text,
             range,
