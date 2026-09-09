@@ -140,10 +140,10 @@ impl LineBoxMetrics {
 
     /// The metrics contributed by text with the given font metrics and line height.
     ///
-    /// `font_metrics` provides the raw font ascent and descent of the text (i.e. the distances
-    /// it extends above and below the baseline, *not* including leading) as well as the intrinsic
-    /// line height of the text (i.e. including the full leading), which may be smaller than
-    /// `ascent + descent` when the leading is negative.
+    /// `metrics` provides the raw font ascent and descent of the text (i.e. the distances it
+    /// extends above and below the baseline, *not* including leading). `line_height` is the
+    /// intrinsic line height of the text (i.e. including the full leading), which may be smaller
+    /// than `ascent + descent` when the leading is negative.
     fn for_text(metrics: &FontMetrics, line_height: f32, quantize: bool) -> Self {
         let (ascent, descent) = if quantize {
             (metrics.ascent.round(), metrics.descent.round())
