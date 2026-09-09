@@ -740,61 +740,6 @@ fn content_widths_rtl() {
 }
 
 #[test]
-fn inbox_content_width() {
-    let mut env = TestEnv::new(test_name!(), None);
-
-    {
-        let text = "Hello world!";
-        let mut builder = env.ranged_builder(text);
-        builder.push_inline_box(InlineBox {
-            id: 0,
-            kind: InlineBoxKind::InFlow,
-            index: 3,
-            width: 100.0,
-            height: 10.0,
-            baseline: None,
-        });
-        let mut layout = builder.build(text);
-        let ContentWidths {
-            min: min_content_width,
-            ..
-        } = layout.calculate_content_widths();
-        layout.break_all_lines(Some(min_content_width));
-        layout.align(Alignment::Start, AlignmentOptions::default());
-
-        env.with_name("full_width").check_layout_snapshot(&layout);
-    }
-
-    {
-        let text = "A ";
-        let mut builder = env.ranged_builder(text);
-        builder.push_inline_box(InlineBox {
-            id: 0,
-            kind: InlineBoxKind::InFlow,
-            index: 2,
-            width: 10.0,
-            height: 10.0,
-            baseline: None,
-        });
-        let mut layout = builder.build(text);
-        let ContentWidths {
-            max: max_content_width,
-            ..
-        } = layout.calculate_content_widths();
-        layout.break_all_lines(Some(max_content_width));
-        layout.align(Alignment::Start, AlignmentOptions::default());
-
-        assert!(
-            layout.width() <= max_content_width,
-            "Layout should never be wider than the max content width"
-        );
-
-        env.with_name("trailing_whitespace")
-            .check_layout_snapshot(&layout);
-    }
-}
-
-#[test]
 fn test_cluster_info() {
     let test_name = test_name!();
     let mut env = TestEnv::new(test_name, Size::new(400.0, 200.0));
