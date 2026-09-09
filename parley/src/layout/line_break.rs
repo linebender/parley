@@ -747,6 +747,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                     // Note that, within a run, all the atoms' text metrics are the same.
                     let line_height = run.data.line_height;
+                    // TODO: perhaps precompute these text metrics and store them in `RunMetrics`,
+                    // as we currently calculate them for each line a run is on.
                     let text_metrics = LineBoxMetrics::for_text(
                         run.font_metrics(),
                         line_height,
