@@ -12,7 +12,7 @@ use parlance::BidiLevel;
 
 use crate::layout::data::{AlignedSubtreeOffset, count_graphemes};
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
-use crate::layout::style_metrics::{StyleMetrics, inline_box_placement};
+use crate::layout::style_metrics::{BoxMetrics, StyleMetrics, inline_box_placement};
 use crate::layout::whitespace::{atom_hanging_advance, whitespace_can_hang};
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
@@ -324,7 +324,7 @@ impl LineBoxMetrics {
         item_idx: usize,
         style_index: u16,
         style_metrics: &[StyleMetrics],
-        run_box: Option<&StyleMetrics>,
+        run_box: Option<&BoxMetrics>,
     ) {
         self.has_content = true;
         // Consecutive atoms almost always come from the same run and style, whose boxes are then
@@ -542,7 +542,7 @@ impl BreakerState {
         next_x: f32,
         style_index: u16,
         style_metrics: &[StyleMetrics],
-        run_box: Option<&StyleMetrics>,
+        run_box: Option<&BoxMetrics>,
         is_word_separator: bool,
     ) {
         self.line.items.end = self.item_idx + 1;
@@ -1925,12 +1925,12 @@ fn hanging_whitespace<B: Brush>(
 ///
 /// [CSS Inline 3 § 4.1]: https://drafts.csswg.org/css-inline-3/#inline-height
 #[inline]
-fn run_box_metrics<B: Brush>(data: &LayoutData<B>, run_idx: usize) -> Option<StyleMetrics> {
+fn run_box_metrics<B: Brush>(data: &LayoutData<B>, run_idx: usize) -> Option<BoxMetrics> {
     let shaped_run = &data.shaped_text.runs()[run_idx];
     let style_index =
         data.shaped_text.characters()[shaped_run.characters_range.start as usize].style_index;
     match data.styles[usize::from(style_index)].line_height {
-        LineHeight::MetricsRelative(_) => Some(StyleMetrics::from_font(
+        LineHeight::MetricsRelative(_) => Some(BoxMetrics::from_font(
             &shaped_run.font_metrics,
             data.runs[run_idx].line_height,
             data.quantize,
