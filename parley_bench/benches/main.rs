@@ -6,8 +6,8 @@
 use tango_bench::tango_benchmarks;
 
 use parley_bench::benches::{
-    content_widths, defaults, iterate_glyph_runs, line_breaking, long_line, repeated_justification,
-    spacing, styled,
+    content_widths, defaults, document, iterate_glyph_runs, line_breaking, long_line,
+    repeated_justification, spacing, styled,
 };
 use parley_bench::fontique_benches::system_fonts_init;
 
@@ -16,6 +16,7 @@ tango_benchmarks!(
     styled(),
     iterate_glyph_runs(),
     content_widths(),
+    document(),
     spacing(),
     repeated_justification(),
     line_breaking(),
