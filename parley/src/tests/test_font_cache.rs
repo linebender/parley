@@ -46,13 +46,13 @@ fn cache_is_populated_and_reused_across_layouts() {
     assert_eq!(fcx.cache_len(), (0, 0));
 
     let first = build(&mut fcx, "hello");
-    let (primary, metrics) = fcx.cache_len();
-    assert!(primary >= 1, "primary font cache should be populated");
+    let (fonts, metrics) = fcx.cache_len();
+    assert!(fonts >= 1, "first available font cache should be populated");
     assert!(metrics >= 2, "one metrics entry per (font, size)");
 
     // A second layout with the same styles must not add entries.
     let second = build(&mut fcx, "world");
-    assert_eq!(fcx.cache_len(), (primary, metrics));
+    assert_eq!(fcx.cache_len(), (fonts, metrics));
     assert_eq!(
         first.data.style_metrics.len(),
         second.data.style_metrics.len()
@@ -69,7 +69,7 @@ fn cache_is_populated_and_reused_across_layouts() {
 }
 
 #[test]
-fn unknown_family_caches_no_primary_font() {
+fn unknown_family_caches_no_first_available_font() {
     let mut fcx = create_font_context();
     let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
     let root = TextStyle {
@@ -80,7 +80,8 @@ fn unknown_family_caches_no_primary_font() {
     let mut builder = lcx.tree_builder(&mut fcx, 1., false, &root);
     builder.push_text("hello");
     let _ = builder.build();
-    // The (negative) query result is cached, but no metrics are since there is no primary font.
+    // The (negative) query result is cached, but no metrics are since there is no first available
+    // font.
     assert_eq!(fcx.cache_len(), (1, 0));
 }
 
