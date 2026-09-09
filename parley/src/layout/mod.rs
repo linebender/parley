@@ -4,7 +4,7 @@
 //! Layout types.
 
 #[cfg(feature = "accesskit")]
-mod accessibility;
+pub(crate) mod accessibility;
 mod alignment;
 mod cluster;
 mod line;
