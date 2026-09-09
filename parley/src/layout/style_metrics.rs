@@ -209,8 +209,25 @@ fn shaped_run_metrics(
         .map(|run| run.font_metrics)
 }
 
-impl StyleMetrics {
-    /// Build the box metrics from first available font metrics and a resolved `line-height`.
+/// The line-height expanded box of a font at a resolved `line-height`: the font's content area
+/// (`ascent`/`descent`) with the leading distributed around it (`over`/`under`).
+///
+/// All distances are measured from the box's own baseline; `over`/`ascent` extend upwards,
+/// `under`/`descent` downwards.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct BoxMetrics {
+    /// Ascent of the font (the top of the content area).
+    pub(crate) ascent: f32,
+    /// Descent of the font (the bottom of the content area).
+    pub(crate) descent: f32,
+    /// Distance from the baseline to the top of the line-height expanded box.
+    pub(crate) over: f32,
+    /// Distance from the baseline to the bottom of the line-height expanded box.
+    pub(crate) under: f32,
+}
+
+impl BoxMetrics {
+    /// The box of `font` expanded to `line_height`.
     ///
     /// The half-leading is distributed as in CSS 2 §10.8.1. With `quantize`, ascent and descent
     /// are rounded to whole pixels and the leading above the baseline is floored, mirroring how
@@ -227,14 +244,28 @@ impl StyleMetrics {
         } else {
             ascent + half_leading
         };
-        let under = line_height - over;
-        let x_height = font.x_height.unwrap_or(ascent * 0.5);
         Self {
             ascent,
             descent,
-            x_height: if quantize { x_height.round() } else { x_height },
             over,
-            under,
+            under: line_height - over,
+        }
+    }
+}
+
+impl StyleMetrics {
+    /// The font-derived metrics of a span box: its [`BoxMetrics`] and x-height. The remaining
+    /// fields describe the box's place in the style tree and are filled in by
+    /// [`resolve_style_metrics`].
+    fn from_font(font: &FontMetrics, line_height: f32, quantize: bool) -> Self {
+        let box_metrics = BoxMetrics::from_font(font, line_height, quantize);
+        let x_height = font.x_height.unwrap_or(box_metrics.ascent * 0.5);
+        Self {
+            ascent: box_metrics.ascent,
+            descent: box_metrics.descent,
+            x_height: if quantize { x_height.round() } else { x_height },
+            over: box_metrics.over,
+            under: box_metrics.under,
             line_height,
             baseline_offset: 0.,
             exact_baseline_offset: 0.,
