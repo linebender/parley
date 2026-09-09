@@ -227,6 +227,12 @@ impl ShapedText {
         glyph_buffer: &harfrust::GlyphBuffer,
         normalized_coords: &[harfrust::NormalizedCoord],
     ) {
+        debug_assert_eq!(
+            range.char_range.len(),
+            text[range.byte_range.clone()].chars().count(),
+            "The claimed character range and the text's covered byte range should agree"
+        );
+
         let glyph_infos = glyph_buffer.glyph_infos();
         if glyph_infos.is_empty() {
             return;
