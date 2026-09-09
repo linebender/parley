@@ -77,8 +77,8 @@ pub(crate) struct StyleMetrics {
 ///
 /// Relies on the style table being ordered parent-first (`style.parent <= index`), which both
 /// style builders guarantee. `shaped_text` is the already shaped text of the layout, whose run
-/// metrics are reused where a style's first available font was also used for shaping. Fonts and metrics
-/// not covered by either are looked up in the [`FontContext`]'s cross-layout cache.
+/// metrics are reused where a style's first available font was also used for shaping. Fonts and
+/// metrics not covered by either are looked up in the [`FontContext`]'s cross-layout cache.
 pub(crate) fn resolve_style_metrics<B: Brush>(
     rcx: &ResolveContext,
     fcx: &mut FontContext,
@@ -102,8 +102,8 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
         let font_metrics = cache
             .first_available_font(&mut query, families, attributes)
             .0
-            .and_then(|primary| {
-                let font = primary.font;
+            .and_then(|faf| {
+                let font = faf.font;
                 let variations = rcx.variations(style.font_variations).unwrap_or(&[]);
                 cache.metrics(&font, style.font_size, variations, || {
                     shaped_run_metrics(shaped_text, &font, style.font_size, variations).or_else(

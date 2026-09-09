@@ -49,9 +49,12 @@ impl FontContext {
         self.cache.clear();
     }
 
-    /// Number of `(primary font, metrics)` entries currently cached.
+    /// Number of `(first available font, metrics)` entries currently cached.
     pub fn cache_len(&self) -> (usize, usize) {
-        (self.cache.primary_fonts.len(), self.cache.metrics.len())
+        (
+            self.cache.first_available_fonts.len(),
+            self.cache.metrics.len(),
+        )
     }
 
     /// Drop stale cache entries and return the query and the cache with disjoint borrows.
@@ -71,14 +74,14 @@ const MAX_ENTRIES: usize = 1024;
 #[derive(Clone, Default)]
 pub(crate) struct FontCache {
     generation: Option<u64>,
-    primary_fonts: HashMap<PrimaryFontKey, Option<PrimaryFont>>,
+    first_available_fonts: HashMap<FirstAvailableFontKey, Option<FirstAvailableFont>>,
     metrics: HashMap<MetricsKey, FontMetrics>,
 }
 
 impl FontCache {
     fn clear(&mut self) {
         self.generation = None;
-        self.primary_fonts.clear();
+        self.first_available_fonts.clear();
         self.metrics.clear();
     }
 
@@ -103,14 +106,14 @@ impl FontCache {
         query: &mut Query<'_>,
         families: &[FamilyId],
         attributes: Attributes,
-    ) -> (Option<PrimaryFont>, bool) {
-        let key = PrimaryFontKey::new(families, attributes);
-        if let Some(font) = self.primary_fonts.get(&key) {
+    ) -> (Option<FirstAvailableFont>, bool) {
+        let key = FirstAvailableFontKey::new(families, attributes);
+        if let Some(font) = self.first_available_fonts.get(&key) {
             return (font.clone(), false);
         }
         query.set_families(families.iter().copied().map(QueryFamily::Id));
         query.set_attributes(attributes);
-        let found = query.first_available_font().map(|font| PrimaryFont {
+        let found = query.first_available_font().map(|font| FirstAvailableFont {
             font: FontInstance {
                 font: FontData {
                     data: font.blob,
@@ -120,10 +123,10 @@ impl FontCache {
             },
             charmap_index: font.charmap_index,
         });
-        if self.primary_fonts.len() >= MAX_ENTRIES {
-            self.primary_fonts.clear();
+        if self.first_available_fonts.len() >= MAX_ENTRIES {
+            self.first_available_fonts.clear();
         }
-        self.primary_fonts.insert(key, found.clone());
+        self.first_available_fonts.insert(key, found.clone());
         (found, true)
     }
 
@@ -151,13 +154,13 @@ impl FontCache {
 
 /// A cached font selection result.
 #[derive(Clone)]
-pub(crate) struct PrimaryFont {
+pub(crate) struct FirstAvailableFont {
     pub(crate) font: FontInstance,
     pub(crate) charmap_index: CharmapIndex,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
-struct PrimaryFontKey {
+struct FirstAvailableFontKey {
     families: SmallVec<[FamilyId; 4]>,
     width: u32,
     weight: u32,
@@ -165,7 +168,7 @@ struct PrimaryFontKey {
     style: (u8, u32),
 }
 
-impl PrimaryFontKey {
+impl FirstAvailableFontKey {
     fn new(families: &[FamilyId], attributes: Attributes) -> Self {
         let style = match attributes.style {
             FontStyle::Normal => (0, 0),
