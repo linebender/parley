@@ -422,3 +422,25 @@ fn fallback_font_glyphs_only_size_the_line_for_normal_line_height() {
         "fallback glyphs should grow a `normal` line: {normal_fallback} vs {normal}"
     );
 }
+
+#[test]
+fn breaking_after_reverting_to_a_default_state_does_not_panic() {
+    // `BreakerState::default()` is public, so the line metrics it carries must be a valid
+    // (empty) line rather than one that indexing the root aligned subtree would panic on.
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+    let mut builder = lcx.tree_builder(&mut fcx, 1., false, &root_style());
+    builder.push_text("one two three four");
+    let (mut layout, _) = builder.build();
+
+    let mut breaker = layout.break_lines();
+    breaker.break_next_with_length(4).unwrap();
+    breaker.revert_to(crate::layout::BreakerState::default());
+    while breaker.break_next_with_length(4).is_some() {}
+    breaker.finish();
+
+    assert!(layout.len() >= 4);
+    for line in layout.lines() {
+        assert!(line.metrics().line_height > 0.);
+    }
+}
