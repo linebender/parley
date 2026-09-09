@@ -184,6 +184,7 @@ impl ShapedCluster {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ClusterInfo {
     boundary: Boundary,
+    whitespace: Whitespace,
     source_char: char,
 }
 
@@ -192,6 +193,7 @@ impl ClusterInfo {
     pub fn new(boundary: Boundary, source_char: char) -> Self {
         Self {
             boundary,
+            whitespace: Whitespace::from_char(source_char),
             source_char,
         }
     }
@@ -205,7 +207,7 @@ impl ClusterInfo {
     // Returns the whitespace type of the cluster.
     #[inline(always)]
     pub fn whitespace(self) -> Whitespace {
-        Whitespace::from_char(self.source_char)
+        self.whitespace
     }
 
     /// Returns if the cluster is a line boundary.
