@@ -236,7 +236,7 @@ fn shape_segment(
     };
     let mut current_font = Some(next_font);
 
-    // The character offset prefix sum.
+    // The character offset of the current font run's start, accumulated per run.
     let mut char_start = char_range.start;
 
     // Main segmentation loop (based on swash shape_clusters) - only within current item
