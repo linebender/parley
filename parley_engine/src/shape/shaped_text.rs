@@ -171,12 +171,12 @@ impl ShapedText {
         }
     }
 
-    /// The characters of the shaped runs, in logical order.
+    /// The character data of the text, in logical order.
     ///
-    /// [`ShapedRun::characters_range`] indexes into this.
-    ///
-    /// Each [`Character`] corresponds to one `char` of shaped source text. This only contains the
-    /// characters of runs that were actually shaped into this [`ShapedText`].
+    /// [`ShapedRun::characters_range`] indexes into this. The nth [`Character`] corresponds exactly
+    /// to the nth character of the source text (in the Unicode scalar value sense). This contains
+    /// every character of the source text unless shaping was aborted due to
+    /// [`FontSelector::select_font`][crate::FontSelector::select_font] failing to return a font.
     #[inline(always)]
     pub fn characters(&self) -> &[Character] {
         &self.characters
