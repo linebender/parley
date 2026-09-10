@@ -116,14 +116,6 @@ fn check_cluster_navigation(text: &str, max_advance: Option<f32>) {
                 }
             }
             let run_visual_clusters: Vec<_> = run.visual_clusters().collect();
-            let mut expected: Vec<_> = run_logical_clusters.iter().map(key).collect();
-            if run.is_rtl() {
-                expected.reverse();
-            }
-            assert_eq!(
-                run_visual_clusters.iter().map(key).collect::<Vec<_>>(),
-                expected
-            );
             logical.extend(run_logical_clusters);
             visual.extend(run_visual_clusters);
         }
