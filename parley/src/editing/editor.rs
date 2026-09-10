@@ -83,7 +83,8 @@ impl<'source> IntoIterator for SplitString<'source> {
     }
 }
 
-/// Basic plain text editor with a single style applied to the entire text.
+/// Basic plain text editor with a single default style applied to the entire
+/// text, plus an optional ranged style overlay (see [`edit_style_overlay`](Self::edit_style_overlay)).
 ///
 /// Internally, this is a wrapper around a string buffer and its corresponding [`Layout`],
 /// which is kept up-to-date as needed.
@@ -96,6 +97,7 @@ where
     layout: Layout<T>,
     buffer: String,
     default_style: StyleSet<T>,
+    style_overlay: Vec<(StyleProperty<'static, T>, Range<usize>)>,
     #[cfg(feature = "accesskit")]
     layout_access: LayoutAccessibility,
     selection: Selection,
@@ -130,6 +132,7 @@ where
     pub fn new(font_size: f32) -> Self {
         Self {
             default_style: StyleSet::new(font_size),
+            style_overlay: Vec::new(),
             buffer: String::default(),
             layout: Layout::default(),
             #[cfg(feature = "accesskit")]
@@ -1039,6 +1042,23 @@ where
         &self.default_style
     }
 
+    /// Modify the ranged style overrides applied on top of the default styles,
+    /// e.g. for syntax highlighting or spellcheck squiggles.
+    ///
+    /// Later entries win where they overlap, and the IME preedit underline
+    /// takes precedence over all of them. The byte ranges are not adjusted
+    /// when the text is edited (invalid ranges are ignored), so recompute
+    /// the overlay after an edit.
+    pub fn edit_style_overlay(&mut self) -> &mut Vec<(StyleProperty<'static, T>, Range<usize>)> {
+        self.layout_dirty = true;
+        &mut self.style_overlay
+    }
+
+    /// Get the current style overlay.
+    pub fn get_style_overlay(&self) -> &[(StyleProperty<'static, T>, Range<usize>)] {
+        &self.style_overlay
+    }
+
     /// Whether the editor is currently in IME composing mode.
     pub fn is_composing(&self) -> bool {
         self.compose.is_some()
@@ -1231,6 +1251,20 @@ where
         for prop in self.default_style.inner().values() {
             builder.push_default(prop.to_owned());
         }
+        for (prop, range) in &self.style_overlay {
+            // Clamp to the buffer and skip entries that no longer align to
+            // char boundaries (stale after an edit).
+            let start = range.start.min(self.buffer.len());
+            let end = range.end.min(self.buffer.len());
+            if start >= end
+                || !self.buffer.is_char_boundary(start)
+                || !self.buffer.is_char_boundary(end)
+            {
+                continue;
+            }
+            builder.push(prop.clone(), start..end);
+        }
+        // Pushed after the overlay so it wins where they overlap.
         if let Some(preedit_range) = &self.compose {
             builder.push(StyleProperty::Underline(true), preedit_range.clone());
         }
