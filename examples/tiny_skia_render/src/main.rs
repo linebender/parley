@@ -9,6 +9,7 @@
 
 #![expect(clippy::cast_possible_truncation, reason = "Deferred")]
 
+use parley::VerticalAlign;
 use parley::{
     Alignment, AlignmentOptions, FontContext, FontWeight, GenericFamily, GlyphRun, InlineBox,
     InlineBoxKind, Layout, LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty,
@@ -93,6 +94,7 @@ fn main() {
         width: 50.0,
         height: 50.0,
         baseline: None,
+        vertical_align: VerticalAlign::BASELINE,
     });
 
     // Build the builder into a Layout
