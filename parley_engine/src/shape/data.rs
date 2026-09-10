@@ -98,11 +98,8 @@ impl ShapedClusterFlags {
 /// [harfbuzz]: https://harfbuzz.github.io/working-with-harfbuzz-clusters.html
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ShapedCluster {
-    /// The first character of this cluster, as an index into [`ShapedText::characters`](crate::ShapedText::characters).
-    ///
-    /// Note this is not a character index into the source text: the shaped character array only
-    /// contains the characters of runs that were actually shaped. Mapping back to the source text
-    /// goes through [`Character::text_byte_start`].
+    /// The characters of this cluster, as a range into
+    /// [`ShapedText::characters`](crate::ShapedText::characters).
     //
     // TODO: this currently stores the full range, but perhaps we could store only the start index.
     // See <https://github.com/linebender/parley/pull/715#discussion_r3693794119>.
@@ -126,9 +123,10 @@ pub struct ShapedCluster {
 }
 
 impl ShapedCluster {
-    /// The character range of this slice.
+    /// The characters of this cluster, as a range into [`ShapedText::characters`](crate::ShapedText::characters).
     ///
-    /// This indexes into [`ShapedText::characters`][crate::ShapedText::characters].
+    /// This is also the range of character positions in the source text (in the Unicode scalar
+    /// value sense).
     #[inline(always)]
     pub fn chars_range(&self) -> Range<u32> {
         self.chars_range.0..self.chars_range.1
