@@ -48,6 +48,22 @@ impl<B: Brush> Layout<B> {
         Self::default()
     }
 
+    /// Clears the layout.
+    ///
+    /// When using a pool of [`Layout`] to reduce allocations for text layout,
+    /// [`Layout::clear`] is useful to ensure that no [`Layout`] maintains a strong reference
+    /// to an underlying font, which would prevent that fonts freeing.
+    pub fn clear(&mut self) {
+        self.data.clear();
+        self.data.layout_max_advance = 0.0;
+        self.data.indent_amount = 0.0;
+        self.data.indent_options = IndentOptions::default();
+        #[cfg(feature = "accesskit")]
+        {
+            self.data.alignment = None;
+        }
+    }
+
     /// Returns the scale factor provided when creating the layout.
     pub fn scale(&self) -> f32 {
         self.data.scale
