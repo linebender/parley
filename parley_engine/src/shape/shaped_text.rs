@@ -234,9 +234,6 @@ impl ShapedText {
         );
 
         let glyph_infos = glyph_buffer.glyph_infos();
-        if glyph_infos.is_empty() {
-            return;
-        }
 
         let normalized_coords_range = {
             let start = self.normalized_coords.len();
@@ -545,6 +542,9 @@ mod tests {
         include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
     const NOTO_KUFI_ARABIC: &[u8] =
         include_bytes!("../../../parley_dev/assets/fonts/noto_fonts/NotoKufiArabic-Regular.otf");
+    const NOTO_COLOR_EMOJI: &[u8] = include_bytes!(
+        "../../../parley_dev/assets/fonts/noto_color_emoji/NotoColorEmoji-Subset.ttf"
+    );
 
     /// A [`FontSelector`] shaping everything with a single font.
     struct SingleFont(FontInstance);
@@ -557,6 +557,29 @@ mod tests {
             _cluster: &mut CharCluster,
         ) -> Option<FontInstance> {
             Some(self.0.clone())
+        }
+    }
+
+    /// A [`FontSelector`] shaping clusters starting with a particular character with one font, and
+    /// all other clusters with another, to split the text into runs at that character.
+    struct FontForChar {
+        ch: char,
+        font: FontInstance,
+        other_font: FontInstance,
+    }
+
+    impl FontSelector for FontForChar {
+        fn select_font(
+            &mut self,
+            _segment: &Segment,
+            _options: &ShapeOptions<'_>,
+            cluster: &mut CharCluster,
+        ) -> Option<FontInstance> {
+            if cluster.chars()[0].ch == self.ch {
+                Some(self.font.clone())
+            } else {
+                Some(self.other_font.clone())
+            }
         }
     }
 
@@ -582,8 +605,11 @@ mod tests {
     }
 
     fn shape_with_font(text: &str, font_data: &'static [u8]) -> ShapedText {
+        shape_with_font_selector(text, SingleFont(font_instance(font_data)))
+    }
+
+    fn shape_with_font_selector(text: &str, select_font: impl FontSelector) -> ShapedText {
         let analysis = analyze(text);
-        let font = font_instance(font_data);
         let mut shaper = Shaper::default();
         let mut shaped = ShapedText::new();
 
@@ -602,10 +628,51 @@ mod tests {
             &analysis,
             &char_style_indices,
             items,
-            SingleFont(font),
+            select_font,
             &mut shaped,
         );
         shaped
+    }
+
+    /// A run can shape into no glyphs at all: `HarfRust` normally shapes `default-ignorable`
+    /// characters (like a soft-hyphen) into a space glyph with zero advance, but if the space glyph
+    /// is not available, it just deletes the character.
+    ///
+    /// This checks whether we handle that.
+    #[test]
+    fn run_without_glyphs_is_kept() {
+        // The soft hyphen is `default-ignorable`, and is a grapheme of its own, so font selection
+        // gives it a run of its own.
+        let shaped = shape_with_font_selector(
+            "a\u{00AD}b",
+            FontForChar {
+                ch: '\u{00AD}',
+                // Our Noto Color Emoji subset has no space character.
+                font: font_instance(NOTO_COLOR_EMOJI),
+                other_font: font_instance(ROBOTO),
+            },
+        );
+
+        assert_eq!(
+            shaped.characters().iter().count(),
+            3,
+            "the characters of a run without glyphs are shaped"
+        );
+        let [a, soft_hyphen, b] = shaped.runs() else {
+            panic!("expected three runs, got {}", shaped.runs().len());
+        };
+        assert_eq!(a.characters_range, 0..1);
+        assert_eq!(soft_hyphen.characters_range, 1..2);
+        assert_eq!(b.characters_range, 2..3);
+
+        assert!(soft_hyphen.glyphs_range.is_empty());
+        assert_eq!(soft_hyphen.advance, 0.);
+
+        // The soft-hyphen's run should have a single cluster, and it must be without glyphs.
+        let clusters = shaped.run_slice(1).shaped_clusters();
+        assert_eq!(clusters.len(), 1);
+        assert_eq!(clusters[0].glyph_len(), 0);
+        assert_eq!(clusters[0].chars_range(), 1..2);
     }
 
     #[test]

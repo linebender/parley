@@ -176,6 +176,11 @@ impl Shaper {
             previous_item_end as usize, char_count,
             "`items` does not cover the entire source text"
         );
+        debug_assert_eq!(
+            shaped_text.characters().len(),
+            char_count,
+            "All characters must have been processed"
+        );
     }
 }
 
