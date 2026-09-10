@@ -44,27 +44,7 @@ fn spread_cursors(layout: &Layout<ColorBrush>, text: &str, count: usize) -> Vec<
         .collect()
 }
 
-/// Move each cursor of `starts` `steps` times using `step`.
-///
-/// Returns a value derived from what the cursors landed on, to `black_box`.
-fn walk_cursors(
-    layout: &Layout<ColorBrush>,
-    starts: &[Cursor],
-    steps: usize,
-    step: impl Fn(&Cursor, &Layout<ColorBrush>) -> Cursor,
-) -> usize {
-    let mut indices = 0;
-    for start in starts {
-        let mut cursor = *start;
-        for _ in 0..steps {
-            cursor = step(&cursor, layout);
-        }
-        indices += cursor.index();
-    }
-    indices
-}
-
-/// Move each cursor of `starts` down `lines` number of lines down and back up again.
+/// Move each cursor of `starts` down `lines` number of lines and back up again.
 ///
 /// Returns a value derived from what the cursors landed on, to `black_box`.
 fn walk_lines(layout: &Layout<ColorBrush>, starts: &[Cursor], lines: usize) -> usize {
@@ -107,12 +87,15 @@ pub fn caret_navigation() -> Vec<Benchmark> {
                 let layout = build_and_break(&sample.text, Some(MAX_ADVANCE));
                 let starts = spread_cursors(&layout, &sample.text, STARTS);
                 b.iter(move || {
-                    black_box(walk_cursors(
-                        &layout,
-                        &starts,
-                        CLUSTER_STEPS,
-                        |cursor, layout| cursor.next_visual(layout),
-                    ))
+                    let mut indices = 0;
+                    for &start in &starts {
+                        let mut cursor = start;
+                        for _ in 0..CLUSTER_STEPS {
+                            cursor = cursor.next_visual(&layout);
+                        }
+                        indices += cursor.index();
+                    }
+                    black_box(indices)
                 })
             },
         ));
