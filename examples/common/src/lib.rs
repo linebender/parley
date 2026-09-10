@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 
+use parley::VerticalAlign;
 use parley::fontique::Blob;
 use parley::{
     Alignment, AlignmentOptions, FontContext, FontFamily, FontWeight, GenericFamily, InlineBox,
@@ -207,6 +208,7 @@ pub fn build_rich_layout(
         width: 50.0,
         height: 50.0,
         baseline: None,
+        vertical_align: VerticalAlign::BASELINE,
     });
 
     let mut layout = builder.build(&config.text);

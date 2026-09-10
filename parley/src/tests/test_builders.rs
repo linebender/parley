@@ -13,14 +13,14 @@ use super::utils::{ColorBrush, asserts::assert_eq_layout_data};
 use crate::{
     BaseDirection, BreakReason, FontContext, FontFamily, FontFeatures, FontVariations, Layout,
     LayoutContext, LineHeight, OverflowWrap, RangedBuilder, StyleProperty, StyleRunBuilder,
-    TextStyle, TextWrapMode, TreeBuilder, WordBreak,
+    TextStyle, TextWrapMode, TreeBuilder, VerticalAlign, WordBreak,
 };
 
 // TODO: `FONT_FAMILY_LIST`, `load_fonts`, and `create_font_context` are
 // duplicated between this crate and `parley_test`. We can't move the builder
 // tests into `parley_test` because they use private APIs, but should eventually
 // figure out some way to reduce the duplication.
-const FONT_FAMILY_LIST: &[FontFamilyName<'_>] = &[
+pub(crate) const FONT_FAMILY_LIST: &[FontFamilyName<'_>] = &[
     FontFamilyName::Named(Cow::Borrowed("Roboto")),
     FontFamilyName::Named(Cow::Borrowed("Noto Kufi Arabic")),
 ];
@@ -51,7 +51,7 @@ pub(crate) fn load_fonts(
     Ok(())
 }
 
-fn create_font_context() -> FontContext {
+pub(crate) fn create_font_context() -> FontContext {
     let mut collection = Collection::new(CollectionOptions {
         shared: false,
         system_fonts: false,
@@ -276,6 +276,9 @@ fn create_root_style() -> TextStyle<'static, 'static, ColorBrush> {
         strikethrough_size: Some(1.7),
         strikethrough_brush: Some(ColorBrush::new(palette::css::BEIGE)),
         line_height: LineHeight::Absolute(30.),
+        // Parent-relative, so it compounds through nested tree spans but not through ranged
+        // styles; keep it at the default so both builders agree.
+        vertical_align: VerticalAlign::BASELINE,
         word_spacing: 2.,
         letter_spacing: 1.5,
         word_break: WordBreak::BreakAll,
@@ -310,6 +313,7 @@ fn set_root_style(rb: &mut RangedBuilder<'_, ColorBrush>) {
         palette::css::BEIGE,
     ))));
     rb.push_default(LineHeight::Absolute(30.));
+    rb.push_default(VerticalAlign::BASELINE);
     rb.push_default(StyleProperty::WordSpacing(2.));
     rb.push_default(StyleProperty::LetterSpacing(1.5));
     rb.push_default(StyleProperty::WordBreak(WordBreak::BreakAll));
@@ -722,4 +726,28 @@ fn builders_newline_inside_complex_script_run_is_hard_break() {
             "{text:?} should produce exactly two lines with an explicit break",
         );
     }
+}
+
+#[test]
+fn builders_empty_text_after_styled_layout_reuses_context() {
+    let mut fcx = FontContext::default();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+
+    let root = TextStyle::default();
+    let mut builder = lcx.tree_builder(&mut fcx, 1.0, true, &root);
+    builder.push_style_span(TextStyle {
+        font_size: 20.,
+        ..Default::default()
+    });
+    builder.push_text("a");
+    builder.pop_style_span();
+    let (layout, _) = builder.build();
+    assert_eq!(layout.styles().len(), 2);
+
+    // The empty layout is shaped with a substitute space, which must use the root style rather
+    // than a stale style index left over from the previous layout.
+    let builder = lcx.ranged_builder(&mut fcx, "", 1.0, true);
+    let mut layout = builder.build("");
+    layout.break_all_lines(None);
+    assert_eq!(layout.lines().count(), 1);
 }

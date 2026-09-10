@@ -5,6 +5,7 @@
 
 use crate::test_name;
 use crate::util::TestEnv;
+use parley::VerticalAlign;
 use parley::{
     Alignment, AlignmentOptions, FontFamily, InlineBox, InlineBoxKind, PositionedLayoutItem,
     StyleProperty, TextWrapMode,
@@ -136,6 +137,7 @@ fn issue_752() {
         width: 10.0,
         height: 10.0,
         baseline: None,
+        vertical_align: VerticalAlign::BASELINE,
     });
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(100.0));
@@ -190,6 +192,7 @@ fn inline_boxes_after_newline_max_content_width() {
             width: 14.0,
             height: 30.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
     }
     let mut layout = builder.build(text);

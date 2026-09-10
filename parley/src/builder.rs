@@ -15,7 +15,7 @@ use parlance::BaseDirection;
 use parley_engine::break_overrides::LineBreakOverrideFn;
 
 use crate::InlineBoxKind;
-use crate::inline_box::InlineBox;
+use crate::inline_box::{InlineBox, LayoutInlineBox};
 use crate::resolve::{ResolvedStyle, StyleRun, tree::ItemKind};
 
 #[derive(Clone, Copy)]
@@ -67,7 +67,10 @@ impl<'b, B: Brush> RangedBuilder<'b, B> {
     }
 
     pub fn push_inline_box(&mut self, inline_box: InlineBox) {
-        self.lcx.inline_boxes.push(inline_box);
+        self.lcx.inline_boxes.push(LayoutInlineBox {
+            inline_box,
+            style_index: 0,
+        });
     }
 
     /// Sets the paragraph's base direction.
@@ -165,7 +168,10 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
     }
 
     pub fn push_inline_box(&mut self, inline_box: InlineBox) {
-        self.lcx.inline_boxes.push(inline_box);
+        self.lcx.inline_boxes.push(LayoutInlineBox {
+            inline_box,
+            style_index: 0,
+        });
     }
 
     /// Sets the paragraph's base direction.
@@ -265,7 +271,11 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
 
         // TODO: arrange type better here to factor out the index
         inline_box.index = self.lcx.tree_style_builder.current_text_len();
-        self.lcx.inline_boxes.push(inline_box);
+        let style_index = self.lcx.tree_style_builder.resolve_current_style_id();
+        self.lcx.inline_boxes.push(LayoutInlineBox {
+            inline_box,
+            style_index,
+        });
     }
 
     pub fn set_white_space_mode(&mut self, white_space_collapse: WhiteSpaceCollapse) {
@@ -342,6 +352,9 @@ fn build_into_layout<B: Brush>(
     layout.data.base_level = lcx.analysis.paragraph_level();
     layout.data.text_len = text.len();
 
+    // Characters not covered by any style run (e.g. the space substituted for empty text during
+    // analysis) use the root style.
+    lcx.char_style_indices.clear();
     lcx.char_style_indices
         .resize(lcx.analysis.char_info().len(), 0);
     let mut char_index = 0;
@@ -360,7 +373,7 @@ fn build_into_layout<B: Brush>(
 
     // Sort the inline boxes as subsequent code assumes that they are in text index order.
     // Note: It's important that this is a stable sort to allow users to control the order of contiguous inline boxes
-    lcx.inline_boxes.sort_by_key(|b| b.index);
+    sort_inline_boxes(&mut lcx.inline_boxes);
 
     {
         super::shape::shape_text(
@@ -377,9 +390,28 @@ fn build_into_layout<B: Brush>(
         );
     }
 
+    // After shaping, so that the metrics of fonts used for shaping can be reused.
+    crate::layout::style_metrics::resolve_style_metrics(
+        &lcx.rcx,
+        fcx,
+        &lcx.style_table,
+        &layout.data.shaped_text,
+        options.quantize,
+        &mut layout.data.style_metrics,
+    );
+
     // Move inline boxes into the layout
     layout.data.inline_boxes.clear();
     core::mem::swap(&mut layout.data.inline_boxes, &mut lcx.inline_boxes);
+}
+
+/// Stably sort inline boxes by text index.
+///
+/// TODO: consider dropping the sort and instead requiring `push_inline_box` callers to push boxes
+/// in text index order (as `TreeBuilder` already does, and as styles are required to be
+/// parent-first), which would reduce this to an assertion.
+fn sort_inline_boxes(boxes: &mut [LayoutInlineBox]) {
+    boxes.sort_by_key(|b| b.inline_box.index);
 }
 
 fn resolve_range(range: impl RangeBounds<usize>, len: usize) -> Range<usize> {

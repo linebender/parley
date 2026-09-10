@@ -126,12 +126,14 @@ impl<B: Brush> Layout<B> {
         self.data.base_level.is_rtl()
     }
 
-    pub fn inline_boxes(&self) -> &[InlineBox] {
-        &self.data.inline_boxes
+    /// Returns the inline boxes in text index order.
+    pub fn inline_boxes(&self) -> impl ExactSizeIterator<Item = &InlineBox> + '_ {
+        self.data.inline_boxes.iter().map(|b| &b.inline_box)
     }
 
-    pub fn inline_boxes_mut(&mut self) -> &mut [InlineBox] {
-        &mut self.data.inline_boxes
+    /// Returns the inline boxes in text index order, mutably.
+    pub fn inline_boxes_mut(&mut self) -> impl ExactSizeIterator<Item = &mut InlineBox> + '_ {
+        self.data.inline_boxes.iter_mut().map(|b| &mut b.inline_box)
     }
 
     /// Returns an iterator over the lines in the layout.
