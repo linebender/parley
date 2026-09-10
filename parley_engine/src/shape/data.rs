@@ -98,7 +98,7 @@ impl ShapedClusterFlags {
 /// [harfbuzz]: https://harfbuzz.github.io/working-with-harfbuzz-clusters.html
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct ShapedCluster {
-    /// This characters of this cluster, as a range into
+    /// The characters of this cluster, as a range into
     /// [`ShapedText::characters`](crate::ShapedText::characters).
     //
     // TODO: this currently stores the full range, but perhaps we could store only the start index.
