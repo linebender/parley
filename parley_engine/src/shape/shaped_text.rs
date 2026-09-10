@@ -234,9 +234,6 @@ impl ShapedText {
         );
 
         let glyph_infos = glyph_buffer.glyph_infos();
-        if glyph_infos.is_empty() {
-            return;
-        }
 
         let normalized_coords_range = {
             let start = self.normalized_coords.len();
