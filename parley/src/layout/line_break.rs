@@ -1599,7 +1599,7 @@ fn hanging_whitespace<B: Brush>(
                     );
                     hanging_whitespace_advance += hanging;
                     // Justification can't stretch within an atom, so it stops at the start of the
-                    // last atom that hangs atom hangs in its entirety or only partially.
+                    // last atom that hangs in its entirety or only partially.
                     justification_end_cluster = atom.shaped_clusters_range().start;
                     if is_word_separator(atom.characters()[0].info.whitespace()) {
                         hanging_opportunities += 1;
