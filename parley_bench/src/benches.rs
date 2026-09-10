@@ -424,7 +424,7 @@ pub fn content_widths() -> Vec<Benchmark> {
 /// Build `text` into a layout. Each style of `styles` is applied to its given byte range.
 ///
 /// This doesn't break the layout into lines.
-fn build_layout<'a>(
+pub(crate) fn build_layout<'a>(
     text: &str,
     styles: impl IntoIterator<Item = (StyleProperty<'a, ColorBrush>, Range<usize>)>,
 ) -> Layout<ColorBrush> {
