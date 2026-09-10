@@ -1,7 +1,7 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Benchmarks for queries against finished [`Layout`]s, like caret placement.
+//! Benchmarks for queries against finished [`Layout`]s, like cursor movement.
 
 use crate::benches::build_layout;
 use crate::{ColorBrush, get_samples};
@@ -50,7 +50,7 @@ fn spread_cursors(layout: &Layout<ColorBrush>, text: &str, count: usize) -> Vec<
 fn walk_lines(layout: &Layout<ColorBrush>, starts: &[Cursor], lines: usize) -> usize {
     let mut indices = 0;
     for start in starts {
-        // Uses a [`Selection`], as that retains the caret's horizontal position across lines.
+        // Uses a [`Selection`], as that retains the cursor's horizontal position across lines.
         let mut selection = Selection::from(*start);
         for _ in 0..lines {
             selection = selection.next_line(layout, false);
@@ -63,8 +63,8 @@ fn walk_lines(layout: &Layout<ColorBrush>, starts: &[Cursor], lines: usize) -> u
     indices
 }
 
-/// Benchmark caret movement.
-pub fn caret_navigation() -> Vec<Benchmark> {
+/// Benchmark cursor building and movement.
+pub fn cursor() -> Vec<Benchmark> {
     /// The number of start positions to operate from.
     const STARTS: usize = 16;
     /// The number of clusters moved over per start position.
@@ -80,7 +80,7 @@ pub fn caret_navigation() -> Vec<Benchmark> {
     {
         benchmarks.push(benchmark_fn(
             format!(
-                "Query Caret - {} {}, next visual",
+                "Query Cursor - {} {}, next visual",
                 sample.name, sample.modification
             ),
             move |b| {
@@ -107,7 +107,7 @@ pub fn caret_navigation() -> Vec<Benchmark> {
     {
         benchmarks.push(benchmark_fn(
             format!(
-                "Query Caret - {} {}, line down + up",
+                "Query Cursor - {} {}, line down + up",
                 sample.name, sample.modification
             ),
             move |b| {
@@ -126,10 +126,10 @@ pub fn caret_navigation() -> Vec<Benchmark> {
         .find(|sample| sample.name == "latin" && sample.modification == "8000 characters")
         .expect("the Latin 8000-character benchmark sample should exist");
 
-    // With longer lines, finding the caret's horizontal position walks more clusters per move.
+    // With longer lines, finding the cursor's horizontal position walks more clusters per move.
     benchmarks.push(benchmark_fn(
         format!(
-            "Query Caret - {} {}, line down + up, long lines",
+            "Query Cursor - {} {}, line down + up, long lines",
             latin.name, latin.modification
         ),
         move |b| {
@@ -141,7 +141,7 @@ pub fn caret_navigation() -> Vec<Benchmark> {
 
     benchmarks.push(benchmark_fn(
         format!(
-            "Query Caret - {} {}, from byte index",
+            "Query Cursor - {} {}, from byte index",
             latin.name, latin.modification
         ),
         move |b| {

@@ -10,7 +10,7 @@ use parley_bench::benches::{
     repeated_justification, spacing, styled,
 };
 use parley_bench::fontique_benches::system_fonts_init;
-use parley_bench::query_benches::caret_navigation;
+use parley_bench::query_benches::cursor;
 
 tango_benchmarks!(
     defaults(),
@@ -22,6 +22,6 @@ tango_benchmarks!(
     line_breaking(),
     long_line(),
     page(),
-    caret_navigation(),
+    cursor(),
     system_fonts_init()
 );
