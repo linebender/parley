@@ -9,13 +9,13 @@ use crate::text_range::validate_range;
 use crate::{Error, TextChunk, TextRange, TextStorage};
 
 /// A block of text with attributes applied to ranges within the text.
-#[derive(Debug)]
-pub struct AttributedText<T: Debug + TextStorage, Attr: Debug> {
+#[derive(Clone, Debug)]
+pub struct AttributedText<T: Clone + Debug + TextStorage, Attr: Clone + Debug> {
     text: T,
     attributes: Vec<(TextRange, Attr)>,
 }
 
-impl<T: Debug + TextStorage, Attr: Debug> AttributedText<T, Attr> {
+impl<T: Clone + Debug + TextStorage, Attr: Clone + Debug> AttributedText<T, Attr> {
     /// Create an `AttributedText` with no attributes applied.
     pub fn new(text: T) -> Self {
         Self {
@@ -166,7 +166,7 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
 
-    #[derive(Debug, PartialEq)]
+    #[derive(Clone, Debug, PartialEq)]
     enum TestAttribute {
         Keep,
         Remove,

@@ -3,8 +3,10 @@
 
 mod cursor;
 mod editor;
+mod rich_editor;
 mod selection;
 
 pub use self::cursor::*;
 pub use self::editor::*;
+pub use self::rich_editor::*;
 pub use self::selection::*;
