@@ -55,13 +55,6 @@ impl<B: Brush> Layout<B> {
     /// to an underlying font, which would prevent that fonts freeing.
     pub fn clear(&mut self) {
         self.data.clear();
-        self.data.layout_max_advance = 0.0;
-        self.data.indent_amount = 0.0;
-        self.data.indent_options = IndentOptions::default();
-        #[cfg(feature = "accesskit")]
-        {
-            self.data.alignment = None;
-        }
     }
 
     /// Returns the scale factor provided when creating the layout.
