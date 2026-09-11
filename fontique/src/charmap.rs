@@ -8,14 +8,18 @@
 
 use read_fonts::{
     FontData, FontRead, FontRef, TableProvider, TopLevelTable,
-    tables::cmap::{Cmap, CmapSubtable},
+    tables::cmap::{Cmap, Cmap14, CmapSubtable},
     types::GlyphId,
 };
+
+pub use read_fonts::tables::cmap::MapVariant;
 
 /// Metadata for constructing a character map from font data.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct CharmapIndex {
     subtable_offset: u32,
+    /// Offset of the format 14 subtable, or 0 when the font has none.
+    uvs_subtable_offset: u32,
     is_symbol: bool,
     is_mac_roman: bool,
 }
@@ -31,8 +35,14 @@ impl CharmapIndex {
             .map(|rec| rec.offset())?;
         let (_, rec, _) = cmap.best_subtable()?;
         let subtable_offset = cmap_offset.checked_add(rec.subtable_offset().to_u32())?;
+        let uvs_subtable_offset = cmap
+            .uvs_subtable()
+            .and_then(|(index, _)| cmap.encoding_records().get(index as usize))
+            .and_then(|rec| cmap_offset.checked_add(rec.subtable_offset().to_u32()))
+            .unwrap_or_default();
         Some(Self {
             subtable_offset,
+            uvs_subtable_offset,
             is_symbol: rec.is_symbol(),
             is_mac_roman: rec.is_mac_roman(),
         })
@@ -42,8 +52,13 @@ impl CharmapIndex {
     pub fn charmap<'a>(&self, font_data: &'a [u8]) -> Option<Charmap<'a>> {
         let subtable_data = font_data.get(self.subtable_offset as usize..)?;
         let subtable = CmapSubtable::read(FontData::new(subtable_data)).ok()?;
+        let uvs_subtable = (self.uvs_subtable_offset != 0)
+            .then(|| font_data.get(self.uvs_subtable_offset as usize..))
+            .flatten()
+            .and_then(|data| Cmap14::read(FontData::new(data)).ok());
         Some(Charmap {
             subtable,
+            uvs_subtable,
             is_symbol: self.is_symbol,
             is_mac_roman: self.is_mac_roman,
         })
@@ -54,6 +69,7 @@ impl CharmapIndex {
 #[derive(Clone)]
 pub struct Charmap<'a> {
     subtable: CmapSubtable<'a>,
+    uvs_subtable: Option<Cmap14<'a>>,
     is_symbol: bool,
     is_mac_roman: bool,
 }
@@ -95,6 +111,21 @@ impl Charmap<'_> {
             return self.map(0xF000 + c);
         }
         result.map(|gid| gid.to_u32())
+    }
+
+    /// Maps a [variation sequence] to a glyph identifier using the format 14 subtable.
+    ///
+    /// [`MapVariant::UseDefault`] means the nominal glyph for `codepoint` is the right one.
+    ///
+    /// [variation sequence]: https://www.unicode.org/reports/tr51/#Emoji_Variation_Sequences
+    pub fn map_variant(
+        &self,
+        codepoint: impl Into<u32>,
+        selector: impl Into<u32>,
+    ) -> Option<MapVariant> {
+        self.uvs_subtable
+            .as_ref()?
+            .map_variant(codepoint.into(), selector.into())
     }
 }
 
