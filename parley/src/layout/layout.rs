@@ -48,11 +48,10 @@ impl<B: Brush> Layout<B> {
         Self::default()
     }
 
-    /// Clears the layout.
+    /// Clears the layout while retaining capacity.
     ///
-    /// When using a pool of [`Layout`] to reduce allocations for text layout,
-    /// [`Layout::clear`] is useful to ensure that no [`Layout`] maintains a strong reference
-    /// to an underlying font, which would prevent that fonts freeing.
+    /// This clears underlying strong references to fonts, which would otherwise
+    /// prevent those fonts from being freed until dropping or reusing this layout.
     pub fn clear(&mut self) {
         self.data.clear();
     }
