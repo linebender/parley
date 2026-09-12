@@ -4,6 +4,7 @@
 use peniko::Color;
 
 pub(crate) mod asserts;
+pub(crate) mod fonts;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct ColorBrush {

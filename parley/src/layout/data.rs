@@ -214,6 +214,13 @@ impl<B: Brush> LayoutData<B> {
         self.width = 0.;
         self.full_width = 0.;
         self.height = 0.;
+        self.layout_max_advance = 0.0;
+        self.indent_amount = 0.0;
+        self.indent_options = IndentOptions::default();
+        #[cfg(feature = "accesskit")]
+        {
+            self.alignment = None;
+        }
         self.styles.clear();
         self.inline_boxes.clear();
         self.shaped_text.clear();

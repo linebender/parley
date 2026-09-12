@@ -48,6 +48,14 @@ impl<B: Brush> Layout<B> {
         Self::default()
     }
 
+    /// Clears the layout while retaining capacity.
+    ///
+    /// This clears underlying strong references to fonts, which would otherwise
+    /// prevent those fonts from being freed until dropping or reusing this layout.
+    pub fn clear(&mut self) {
+        self.data.clear();
+    }
+
     /// Returns the scale factor provided when creating the layout.
     pub fn scale(&self) -> f32 {
         self.data.scale
