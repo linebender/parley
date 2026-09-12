@@ -123,8 +123,9 @@ impl<B: Brush> TreeStyleBuilder<B> {
         match self.white_space_collapse {
             WhiteSpaceCollapse::Preserve => {
                 if uncommitted_text.starts_with(is_segment_break) {
-                    // Collapsible whitespace immediately preceding a preserved segment break is
-                    // removed.
+                    // Pending whitespace is always from a `WhiteSpaceCollapse::Collapse` span,
+                    // and following CSS Text 4 § 4.3.1 Rule 1 must be removed if it immediately precedes
+                    // a preserved segment break.
                     self.pending_whitespace = None;
                 }
                 self.flush_pending_whitespace();
