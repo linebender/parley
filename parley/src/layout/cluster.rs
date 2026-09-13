@@ -22,7 +22,6 @@ use parley_engine::{Atom, Glyph, Grapheme, shape::Whitespace};
 ///
 /// [uax-grapheme]: https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries
 pub struct Cluster<'a, B: Brush> {
-    pub(crate) path: ClusterPath,
     pub(crate) run: Run<'a, B>,
     /// The atom containing this grapheme.
     pub(crate) atom: Atom<'a>,
@@ -52,19 +51,10 @@ pub enum ClusterSide {
 impl<'a, B: Brush> Cluster<'a, B> {
     /// Returns the cluster for the given layout and byte index.
     pub fn from_byte_index(layout: &'a Layout<B>, byte_index: usize) -> Option<Self> {
-        if let Some((_, line)) = layout.line_for_byte_index(byte_index) {
-            for run in line.runs() {
-                if !run.text_range().contains(&byte_index) {
-                    continue;
-                }
-                for cluster in run.clusters() {
-                    if cluster.text_range().contains(&byte_index) {
-                        return Some(cluster);
-                    }
-                }
-            }
-        }
-        None
+        let (_, line) = layout.line_for_byte_index(byte_index)?;
+        line.runs()
+            .filter(|run| run.text_range().contains(&byte_index))
+            .find_map(|run| run.cluster_at_text_byte(byte_index))
     }
 
     /// Returns the cluster and side which is at the specified position in the given layout. If no cluster is
@@ -90,9 +80,9 @@ impl<'a, B: Brush> Cluster<'a, B> {
         y: f32,
         exact: bool,
     ) -> Option<(Self, ClusterSide)> {
-        let mut path = ClusterPath::default();
-        if let Some((line_index, line)) = layout.line_for_offset(y) {
-            path.line_index = line_index as u32;
+        let mut line_index = 0;
+        if let Some((index, line)) = layout.line_for_offset(y) {
+            line_index = index;
             let mut offset = line.metrics().offset + line.metrics().inline_min_coord;
             let last_run_index = line.len().saturating_sub(1);
             for item in line.items_nonpositioned() {
@@ -100,17 +90,12 @@ impl<'a, B: Brush> Cluster<'a, B> {
                     LineItem::Run(run) => {
                         let is_last_run = run.index as usize == last_run_index;
                         let run_advance = run.advance();
-                        path.run_index = run.index;
-                        path.logical_index = 0;
                         if x > offset + run_advance && (exact || !is_last_run) {
                             offset += run_advance;
                             continue;
                         }
-                        let last_cluster_index = run.cluster_range().len().saturating_sub(1);
-                        for (visual_index, cluster) in run.visual_clusters().enumerate() {
-                            let is_last_cluster = is_last_run && visual_index == last_cluster_index;
-                            path.logical_index =
-                                run.visual_to_logical(visual_index).unwrap_or_default() as u32;
+                        for cluster in run.visual_clusters() {
+                            let is_last_cluster = is_last_run && cluster.is_visual_last_in_run();
                             let cluster_advance = cluster.advance();
                             let edge = offset;
                             offset += cluster_advance;
@@ -135,7 +120,9 @@ impl<'a, B: Brush> Cluster<'a, B> {
             }
         }
         if y <= 0.0 && !exact {
-            Some((path.cluster(layout)?, ClusterSide::Left))
+            // Fall back to the first cluster of the line's first run.
+            let cluster = layout.get(line_index)?.item(0)?.run()?.clusters().next()?;
+            Some((cluster, ClusterSide::Left))
         } else {
             None
         }
@@ -151,10 +138,13 @@ impl<'a, B: Brush> Cluster<'a, B> {
         self.run
     }
 
-    /// Returns the path that contains the set of indices to reach the cluster
-    /// from a layout.
+    /// Returns the path to reach the cluster from a layout.
     pub fn path(&self) -> ClusterPath {
-        self.path
+        ClusterPath::new(
+            self.run.line_index,
+            self.run.index,
+            self.grapheme.char_range().start,
+        )
     }
 
     /// The first (logical) character of this cluster.
@@ -257,16 +247,35 @@ impl<'a, B: Brush> Cluster<'a, B> {
             .flatten()
     }
 
+    /// Whether this is the visually first cluster of its run.
+    fn is_visual_first_in_run(&self) -> bool {
+        let chars = self.run.line_slice().char_range();
+        if self.is_rtl() {
+            self.grapheme.char_range().end == chars.end
+        } else {
+            self.grapheme.char_range().start == chars.start
+        }
+    }
+
+    /// Whether this is the visually last cluster of its run.
+    fn is_visual_last_in_run(&self) -> bool {
+        let chars = self.run.line_slice().char_range();
+        if self.is_rtl() {
+            self.grapheme.char_range().start == chars.start
+        } else {
+            self.grapheme.char_range().end == chars.end
+        }
+    }
+
     /// Returns `true` if this cluster is at the beginning of a line.
     pub fn is_start_of_line(&self) -> bool {
-        self.path.run_index == 0 && self.run.logical_to_visual(self.path.logical_index()) == Some(0)
+        self.run.index == 0 && self.is_visual_first_in_run()
     }
 
     /// Returns `true` if this cluster is at the end of a line.
     pub fn is_end_of_line(&self) -> bool {
-        self.line().len().saturating_sub(1) == self.path.run_index()
-            && self.run.logical_to_visual(self.path.logical_index())
-                == Some(self.run.cluster_range().len().saturating_sub(1))
+        self.line().len().saturating_sub(1) == self.run.index as usize
+            && self.is_visual_last_in_run()
     }
 
     /// If the cluster as at the end of the line, returns the reason
@@ -279,16 +288,23 @@ impl<'a, B: Brush> Cluster<'a, B> {
         }
     }
 
+    /// The cluster logically following this one within the same run, if any.
+    fn next_in_run(&self) -> Option<Self> {
+        self.run
+            .cluster_containing_char(self.grapheme.char_range().end)
+    }
+
+    /// The cluster logically preceding this one within the same run, if any.
+    fn previous_in_run(&self) -> Option<Self> {
+        self.run
+            .cluster_containing_char(self.grapheme.char_range().start.checked_sub(1)?)
+    }
+
     /// Returns the cluster that follows this one in logical order.
     pub fn next_logical(&self) -> Option<Self> {
-        if self.path.logical_index() + 1 < self.run.cluster_range().len() {
+        if let Some(next) = self.next_in_run() {
             // Fast path: next cluster is in the same run
-            ClusterPath {
-                line_index: self.path.line_index,
-                run_index: self.path.run_index,
-                logical_index: self.path.logical_index + 1,
-            }
-            .cluster(self.run.layout)
+            Some(next)
         } else {
             let index = self.text_range().end;
             if index >= self.run.layout.data.text_len {
@@ -301,14 +317,9 @@ impl<'a, B: Brush> Cluster<'a, B> {
 
     /// Returns the cluster that precedes this one in logical order.
     pub fn previous_logical(&self) -> Option<Self> {
-        if self.path.logical_index > 0 {
+        if let Some(previous) = self.previous_in_run() {
             // Fast path: previous cluster is in the same run
-            ClusterPath {
-                line_index: self.path.line_index,
-                run_index: self.path.run_index,
-                logical_index: self.path.logical_index - 1,
-            }
-            .cluster(self.run.layout)
+            Some(previous)
         } else {
             Self::from_byte_index(self.run.layout, self.text_range().start.checked_sub(1)?)
         }
@@ -316,28 +327,28 @@ impl<'a, B: Brush> Cluster<'a, B> {
 
     /// Returns the cluster that follows this one in visual order.
     pub fn next_visual(&self) -> Option<Self> {
-        let layout = self.run.layout;
-        let run = self.run;
-        let visual_index = run.logical_to_visual(self.path.logical_index())?;
-        if let Some(cluster_index) = run.visual_to_logical(visual_index + 1) {
-            // Fast path: next visual cluster is in the same run
-            run.get(cluster_index)
+        // Fast path: next visual cluster is in the same run
+        let next = if self.is_rtl() {
+            self.previous_in_run()
+        } else {
+            self.next_in_run()
+        };
+        if let Some(next) = next {
+            Some(next)
         } else {
             // We just want to find the first line/run following this one that
             // contains any cluster.
-            let mut run_index = self.path.run_index() + 1;
-            for line_index in self.path.line_index()..layout.len() {
+            let layout = self.run.layout;
+            let mut run_index = self.run.index as usize + 1;
+            for line_index in self.run.line_index as usize..layout.len() {
                 let line = layout.get(line_index)?;
                 for run_index in run_index..line.len() {
-                    if let Some(run) = line.item(run_index).and_then(|item| item.run())
-                        && !run.cluster_range().is_empty()
+                    if let Some(cluster) = line
+                        .item(run_index)
+                        .and_then(|item| item.run())
+                        .and_then(|run| run.visual_clusters().next())
                     {
-                        return ClusterPath {
-                            line_index: line_index as u32,
-                            run_index: run_index as u32,
-                            logical_index: run.visual_to_logical(0)? as u32,
-                        }
-                        .cluster(layout);
+                        return Some(cluster);
                     }
                 }
                 // Restart at first run on next line
@@ -349,37 +360,28 @@ impl<'a, B: Brush> Cluster<'a, B> {
 
     /// Returns the cluster that precedes this one in visual order.
     pub fn previous_visual(&self) -> Option<Self> {
-        let visual_index = self.run.logical_to_visual(self.path.logical_index())?;
-        if let Some(cluster_index) = visual_index
-            .checked_sub(1)
-            .and_then(|visual_index| self.run.visual_to_logical(visual_index))
-        {
-            // Fast path: previous visual cluster is in the same run
-            ClusterPath {
-                line_index: self.path.line_index,
-                run_index: self.path.run_index,
-                logical_index: cluster_index as u32,
-            }
-            .cluster(self.run.layout)
+        // Fast path: previous visual cluster is in the same run
+        let previous = if self.is_rtl() {
+            self.next_in_run()
         } else {
-            // We just want to find the first line/run preceding this one that
-            // contains any cluster.
+            self.previous_in_run()
+        };
+        if let Some(previous) = previous {
+            Some(previous)
+        } else {
+            // To find the first line/run preceding this one that contains any cluster.
             let layout = self.run.layout;
-            let mut run_index = Some(self.path.run_index());
-            for line_index in (0..=self.path.line_index()).rev() {
+            let mut run_index = Some(self.run.index as usize);
+            for line_index in (0..=self.run.line_index as usize).rev() {
                 let line = layout.get(line_index)?;
                 let first_run = run_index.unwrap_or(line.len());
                 for run_index in (0..first_run).rev() {
-                    if let Some(run) = line.item(run_index).and_then(|item| item.run()) {
-                        let range = run.cluster_range();
-                        if !range.is_empty() {
-                            return ClusterPath {
-                                line_index: line_index as u32,
-                                run_index: run_index as u32,
-                                logical_index: run.visual_to_logical(range.len() - 1)? as u32,
-                            }
-                            .cluster(layout);
-                        }
+                    if let Some(cluster) = line
+                        .item(run_index)
+                        .and_then(|item| item.run())
+                        .and_then(|run| run.visual_clusters_rev().next())
+                    {
+                        return Some(cluster);
                     }
                 }
                 run_index = None;
@@ -441,17 +443,21 @@ impl<'a, B: Brush> Cluster<'a, B> {
     /// This cost of this function is roughly linear in the number of clusters
     /// on the containing line.
     pub fn visual_offset(&self) -> Option<f32> {
-        let line = self.path.line(self.run.layout)?;
+        let line = self.line();
         let mut offset = line.metrics().offset;
-        for run_index in 0..=self.path.run_index() {
+        for run_index in 0..=self.run.index as usize {
             let item = line.item(run_index)?;
             match item {
                 LineItem::Run(run) => {
-                    if run_index != self.path.run_index() {
+                    if run_index != self.run.index as usize {
                         offset += run.advance();
                     } else {
-                        let visual_index = run.logical_to_visual(self.path.logical_index())?;
-                        for cluster in run.visual_clusters().take(visual_index) {
+                        for cluster in run.visual_clusters() {
+                            if cluster.grapheme.char_range().start
+                                == self.grapheme.char_range().start
+                            {
+                                break;
+                            }
                             offset += cluster.advance();
                         }
                     }
@@ -496,15 +502,16 @@ impl Affinity {
 pub struct ClusterPath {
     pub(crate) line_index: u32,
     pub(crate) run_index: u32,
-    pub(crate) logical_index: u32,
+    /// The cluster's first (logical) character index.
+    pub(crate) char_index: u32,
 }
 
 impl ClusterPath {
-    pub(crate) fn new(line_index: u32, run_index: u32, logical_index: u32) -> Self {
+    pub(crate) fn new(line_index: u32, run_index: u32, char_index: u32) -> Self {
         Self {
             line_index,
             run_index,
-            logical_index,
+            char_index,
         }
     }
 
@@ -519,11 +526,6 @@ impl ClusterPath {
         self.run_index as usize
     }
 
-    /// Returns the logical index of the cluster within the owning run.
-    pub fn logical_index(&self) -> usize {
-        self.logical_index as usize
-    }
-
     /// Returns the line for this path and the specified layout.
     pub fn line<'a, B: Brush>(&self, layout: &'a Layout<B>) -> Option<Line<'a, B>> {
         layout.get(self.line_index())
@@ -536,7 +538,7 @@ impl ClusterPath {
 
     /// Returns the cluster for this path and the specified layout.
     pub fn cluster<'a, B: Brush>(&self, layout: &'a Layout<B>) -> Option<Cluster<'a, B>> {
-        self.run(layout)?.get(self.logical_index())
+        self.run(layout)?.cluster_containing_char(self.char_index)
     }
 }
 
