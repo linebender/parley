@@ -3,7 +3,7 @@
 
 use crate::inline_box::InlineBox;
 use crate::layout::spacing::{EffectiveSpacing, Justification, Spacing};
-use crate::layout::whitespace::{Hanging, HangingAdvance, atom_hanging_advance};
+use crate::layout::whitespace::{Hanging, HangingAdvance, atom_hanging_advance, soft_line_break};
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
@@ -12,8 +12,8 @@ use core::ops::Range;
 
 use alloc::vec::Vec;
 use parlance::BidiLevel;
+use parley_engine::ShapedText;
 use parley_engine::shape::Whitespace;
-use parley_engine::{Boundary, ShapedText};
 
 /// `HarfRust`-based run data
 #[derive(Clone, Debug, PartialEq)]
@@ -309,13 +309,15 @@ impl<B: Brush> LayoutData<B> {
                         let characters = atom.characters();
                         let first_character = characters[0];
                         let whitespace = first_character.info.whitespace();
-                        let boundary = first_character.info.boundary();
                         let style = &self.styles[first_character.style_index as usize];
                         let prev_text_wrap_mode = text_wrap_mode;
                         text_wrap_mode = style.text_wrap_mode;
                         if prev_text_wrap_mode == TextWrapMode::Wrap
-                            && (boundary == Boundary::Line
-                                || style.overflow_wrap == OverflowWrap::Anywhere)
+                            && (soft_line_break(
+                                self.shaped_text.characters(),
+                                atom.char_range().start as usize,
+                                &self.styles,
+                            ) || style.overflow_wrap == OverflowWrap::Anywhere)
                         {
                             min_width =
                                 min_width.max(running_min_width - running_hanging_whitespace.total);

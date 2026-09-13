@@ -33,6 +33,8 @@ pub enum WhiteSpaceCollapse {
     Preserve,
     /// Collapse spaces and tabs while preserving segment breaks.
     PreserveBreaks,
+    /// Preserve whitespace without hanging, allowing wrapping after each space or tab.
+    BreakSpaces,
 }
 
 /// The height that this text takes up. The default is `MetricsRelative(1.0)`, which is the given

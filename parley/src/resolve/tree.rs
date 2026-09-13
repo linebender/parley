@@ -111,7 +111,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
 
         let span = self.current_span;
         match self.tree[span].style.white_space_collapse {
-            WhiteSpaceCollapse::Preserve => {
+            WhiteSpaceCollapse::Preserve | WhiteSpaceCollapse::BreakSpaces => {
                 if uncommitted_text.starts_with(is_segment_break) {
                     // Pending whitespace is always from a `WhiteSpaceCollapse::Collapse` or
                     // `WhiteSpaceCollapse::PreserveBreaks` span, and following CSS Text 4 § 4.3.1 Rule 1
