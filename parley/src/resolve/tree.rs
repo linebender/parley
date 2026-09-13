@@ -153,6 +153,12 @@ impl<B: Brush> TreeStyleBuilder<B> {
                     let text_len = rest
                         .find(|c: char| c.is_ascii_whitespace())
                         .unwrap_or(rest.len());
+                    if rest.starts_with(is_segment_break) {
+                        // Collapsible whitespace immediately preceding a segment break is removed.
+                        // ASCII `CR` and `LF` newlines are collapsed as whitespace, but `LS` and
+                        // `PS` are treated as forced breaks.
+                        self.pending_whitespace = None;
+                    }
                     self.flush_pending_whitespace();
                     self.commit_text(span, &rest[..text_len]);
                     rest = &rest[text_len..];
