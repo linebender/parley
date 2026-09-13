@@ -14,9 +14,9 @@ use super::utils::{
     fonts::{FONT_FAMILY_LIST, create_font_context},
 };
 use crate::{
-    BaseDirection, BreakReason, FontContext, FontFamily, FontFeatures, FontVariations, Layout,
-    LayoutContext, LineHeight, OverflowWrap, RangedBuilder, StyleProperty, StyleRunBuilder,
-    TextStyle, TextWrapMode, TreeBuilder, WordBreak,
+    BaseDirection, BreakReason, FontContext, FontFamily, FontFeatures, FontVariations, InlineBox,
+    InlineBoxKind, Layout, LayoutContext, LineHeight, OverflowWrap, RangedBuilder, StyleProperty,
+    StyleRunBuilder, TextStyle, TextWrapMode, TreeBuilder, WhiteSpaceCollapse, WordBreak,
 };
 
 /// Set of options for [`build_layout_with_ranged`].
@@ -75,6 +75,49 @@ fn build_layout_with_style_runs(
     let mut layout = rb.build(opts.text);
     layout.break_all_lines(opts.max_advance);
     layout
+}
+
+#[test]
+fn tree_out_of_flow_boxes_commit_text_without_splitting_words_or_whitespace() {
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+    let style = TextStyle {
+        font_family: FontFamily::from(FONT_FAMILY_LIST),
+        white_space_collapse: WhiteSpaceCollapse::Collapse,
+        ..TextStyle::default()
+    };
+    for split in 0..=7 {
+        let mut tree = lcx.tree_builder(&mut fcx, 1., true, &style);
+        tree.push_text(&"XXXXXXX"[..split]);
+        tree.push_inline_box(InlineBox {
+            id: 0,
+            index: 0,
+            kind: InlineBoxKind::OutOfFlow,
+            width: 100.,
+            height: 100.,
+            baseline: None,
+        });
+        tree.push_text(&"XXXXXXX"[split..]);
+        let (mut layout, text) = tree.build();
+        assert_eq!(text, "XXXXXXX");
+        assert_eq!(layout.inline_boxes()[0].index, split);
+        layout.break_all_lines(Some(1.));
+        assert_eq!(layout.len(), 1, "box at {split}");
+    }
+    for suffix in ["  b", "\nb"] {
+        let mut tree = lcx.tree_builder(&mut fcx, 1., true, &style);
+        tree.push_text("a  ");
+        tree.push_inline_box(InlineBox {
+            id: 0,
+            index: 0,
+            kind: InlineBoxKind::OutOfFlow,
+            width: 0.,
+            height: 0.,
+            baseline: None,
+        });
+        tree.push_text(suffix);
+        assert_eq!(tree.build().1, "a b");
+    }
 }
 
 #[test]
@@ -230,6 +273,7 @@ fn create_root_style() -> TextStyle<'static, 'static, ColorBrush> {
         word_break: WordBreak::BreakAll,
         overflow_wrap: OverflowWrap::Anywhere,
         text_wrap_mode: TextWrapMode::Wrap,
+        white_space_collapse: WhiteSpaceCollapse::PreserveBreaks,
     }
 }
 
@@ -263,6 +307,9 @@ fn set_root_style(rb: &mut RangedBuilder<'_, ColorBrush>) {
     rb.push_default(StyleProperty::LetterSpacing(1.5));
     rb.push_default(StyleProperty::WordBreak(WordBreak::BreakAll));
     rb.push_default(StyleProperty::OverflowWrap(OverflowWrap::Anywhere));
+    rb.push_default(StyleProperty::WhiteSpaceCollapse(
+        WhiteSpaceCollapse::PreserveBreaks,
+    ));
 }
 
 /// Test that all the builders have the same default behavior.
