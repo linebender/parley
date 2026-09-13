@@ -6,8 +6,9 @@
 use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
-    Alignment, AlignmentOptions, BreakReason, ContentWidths, FontFamily, InlineBox, InlineBoxKind,
-    Layout, LineHeight, PositionedLayoutItem, StyleProperty, TextStyle, WhiteSpaceCollapse,
+    Alignment, AlignmentOptions, BreakReason, ContentWidths, FontFamily, FontWeight, InlineBox,
+    InlineBoxKind, Layout, LineHeight, PositionedLayoutItem, StyleProperty, TextStyle,
+    TextWrapMode, WhiteSpaceCollapse,
 };
 use peniko::color::{AlphaColor, Srgb, palette};
 use peniko::kurbo::Size;
@@ -438,6 +439,162 @@ fn leading_whitespace() {
         layout.align(Alignment::Start, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
+}
+
+#[test]
+fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let inline_box = || InlineBox {
+        id: 0,
+        index: 0,
+        width: 10.,
+        height: 10.,
+        baseline: None,
+        kind: InlineBoxKind::InFlow,
+    };
+
+    // Trailing whitespace of a span collapses with the content following the span.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_style_modification_span(None);
+    builder.push_text("Hello ");
+    builder.pop_style_span();
+    builder.push_text("world");
+    assert_eq!(builder.build().1, "Hello world");
+
+    // A whitespace-only span collapses into a single space.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text("Hello");
+    builder.push_style_modification_span(None);
+    builder.push_text("  ");
+    builder.pop_style_span();
+    builder.push_text("  world");
+    assert_eq!(builder.build().1, "Hello world");
+
+    // Whitespace collapses across nested span boundaries.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text("a ");
+    builder.push_style_modification_span(None);
+    builder.push_style_modification_span(None);
+    builder.push_text(" ");
+    builder.pop_style_span();
+    builder.pop_style_span();
+    builder.push_text(" b");
+    assert_eq!(builder.build().1, "a b");
+
+    // Whitespace surrounding an inline box collapses into a single space on each side. The box is
+    // not whitespace, so the two spaces do not collapse with each other.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text("a  ");
+    builder.push_inline_box(inline_box());
+    builder.push_text("  b");
+    let (layout, text) = builder.build();
+    assert_eq!(text, "a  b");
+    assert_eq!(layout.inline_boxes()[0].index, 2);
+
+    // Whitespace at the start and end of the text is removed, including in enclosing spans.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_style_modification_span(None);
+    builder.push_text("  ");
+    builder.pop_style_span();
+    builder.push_text("a");
+    builder.push_style_modification_span(None);
+    builder.push_text("  ");
+    builder.pop_style_span();
+    assert_eq!(builder.build().1, "a");
+
+    // An inline box is not whitespace: whitespace before it is kept.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text("a ");
+    builder.push_inline_box(inline_box());
+    let (layout, text) = builder.build();
+    assert_eq!(text, "a ");
+    assert_eq!(layout.inline_boxes()[0].index, 2);
+
+    // Collapsible whitespace on either side of a preserved segment break (e.g. a `<br>`) is
+    // removed, while whitespace following a preserved space is kept.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text("a ");
+    builder.set_white_space_mode(WhiteSpaceCollapse::Preserve);
+    builder.push_text("\n");
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text(" b ");
+    builder.set_white_space_mode(WhiteSpaceCollapse::Preserve);
+    builder.push_text(" ");
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text(" c");
+    assert_eq!(builder.build().1, "a\nb   c");
+}
+
+#[test]
+fn collapsed_space_belongs_to_first_span() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Whitespace spanning a span boundary collapses into a single space, which belongs to the span
+    // the whitespace sequence started in.
+    let mut builder = env.tree_builder();
+    builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+    builder.push_text("aa ");
+    builder.push_style_modification_span(&[StyleProperty::FontWeight(FontWeight::BOLD)]);
+    builder.push_text(" bb");
+    builder.pop_style_span();
+    let (mut layout, text) = builder.build();
+    layout.break_all_lines(None);
+    assert_eq!(text, "aa bb");
+
+    let style_indices: Vec<u16> = layout
+        .get(0)
+        .unwrap()
+        .runs()
+        .flat_map(|run| run.clusters().map(|cluster| cluster.style_index()))
+        .collect();
+    let space_style = style_indices[2];
+    assert_eq!(space_style, style_indices[0], "space is not bold");
+    assert_ne!(space_style, style_indices[3], "\"bb\" is not bold");
+}
+
+#[test]
+fn collapsed_space_wraps_if_any_collapsed_span_wraps() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Number of lines the given text is broken into at a width that only fits one word, where
+    // `nowrap` selects which of the two spans disables wrapping.
+    let mut line_count = |first: &str, second: &str, nowrap: [bool; 2]| {
+        let mut builder = env.tree_builder();
+        builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+        for (text, nowrap) in [first, second].into_iter().zip(nowrap) {
+            let mode = if nowrap {
+                TextWrapMode::NoWrap
+            } else {
+                TextWrapMode::Wrap
+            };
+            builder.push_style_modification_span(&[StyleProperty::TextWrapMode(mode)]);
+            builder.push_text(text);
+            builder.pop_style_span();
+        }
+        let (mut layout, _) = builder.build();
+        layout.break_all_lines(Some(30.));
+        layout.len()
+    };
+
+    // The collapsed space is a wrap opportunity if any of the whitespace it collapses comes from a
+    // span that allows wrapping, even when it is attributed to a span that does not.
+    assert_eq!(line_count("aa ", " bb", [true, false]), 2);
+    assert_eq!(line_count("aa ", " bb", [false, true]), 2);
+    assert_eq!(line_count("aa ", " bb", [false, false]), 2);
+    assert_eq!(line_count("aa ", " bb", [true, true]), 1);
+
+    // Whitespace from a single span keeps that span's wrapping behaviour.
+    assert_eq!(line_count("aa ", "bb", [true, false]), 1);
+    assert_eq!(line_count("aa", " bb", [false, true]), 1);
+    assert_eq!(line_count("aa ", "bb", [false, true]), 2);
 }
 
 #[test]
