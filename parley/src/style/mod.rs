@@ -20,10 +20,15 @@ pub use styleset::StyleSet;
 
 use crate::util::nearly_eq;
 
-#[derive(Debug, Clone, Copy)]
+/// How whitespace is collapsed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WhiteSpaceCollapse {
+    /// Collapse whitespace, including ASCII segment breaks, to a space.
     Collapse,
+    /// Preserve spaces, tabs, and segment breaks.
     Preserve,
+    /// Collapse spaces and tabs while preserving segment breaks.
+    PreserveBreaks,
 }
 
 /// The height that this text takes up. The default is `MetricsRelative(1.0)`, which is the given
