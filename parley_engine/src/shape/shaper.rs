@@ -34,6 +34,13 @@ pub struct ShapeOptions<'a> {
     pub features: &'a [FontFeature],
     /// The font variations that are constant over an item.
     pub variations: &'a [FontVariation],
+    /// If set, every grapheme cluster is shaped as this character instead of its actual text.
+    ///
+    /// This masks the text (e.g. for password fields) while preserving the character structure of
+    /// the shaped result: the output contains exactly one shaped cluster per grapheme, and every
+    /// cluster keeps its source characters. [`FontSelector::select_font`] should select a font
+    /// covering this character rather than the cluster's own characters.
+    pub grapheme_replacement: Option<char>,
 }
 
 /// The font instance to shape an item with.
@@ -353,20 +360,35 @@ fn shape_segment(
 
         // Use the entire segment text including newlines
         buffer.reserve(segment_text.len());
+        let segment_char_count = segment_text.chars().count();
         #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
-        for (i, ch) in segment_text.chars().enumerate() {
-            // Ensure that each cluster's index matches the index into `infos`. This is required
-            // for efficient cluster lookup within `data.rs`.
-            //
-            // In other words, instead of using `buffer.push_str`, which iterates `segment_text`
-            // with `char_indices`, push each char individually via `.chars` with a cluster index
-            // that matches its `infos` counterpart. This allows us to lookup `infos` via cluster
-            // index in `data.rs`.
-            buffer.add(ch, i as u32);
+        if let Some(replacement) = options.grapheme_replacement {
+            // Shape one replacement character per grapheme. Characters that aren't grapheme
+            // starts are not shaped at all; they are absorbed into the preceding cluster. The
+            // first character of a run is always treated as a grapheme start.
+            let segment_char_info =
+                &item_char_info[char_start - char_range.start..][..segment_char_count];
+            for (i, info) in segment_char_info.iter().enumerate() {
+                if i == 0 || info.is_grapheme_start() {
+                    buffer.add(replacement, i as u32);
+                }
+            }
+        } else {
+            for (i, ch) in segment_text.chars().enumerate() {
+                // Ensure that each cluster's index matches the index into `infos`. This is required
+                // for efficient cluster lookup within `data.rs`.
+                //
+                // In other words, instead of using `buffer.push_str`, which iterates `segment_text`
+                // with `char_indices`, push each char individually via `.chars` with a cluster index
+                // that matches its `infos` counterpart. This allows us to lookup `infos` via cluster
+                // index in `data.rs`.
+                buffer.add(ch, i as u32);
+            }
+
+            buffer.set_pre_context(&text[..text_range.start + segment_start_offset]);
+            buffer.set_post_context(&text[text_range.start + segment_end_offset..]);
         }
 
-        buffer.set_pre_context(&text[..text_range.start + segment_start_offset]);
-        buffer.set_post_context(&text[text_range.start + segment_end_offset..]);
         buffer.set_direction(direction);
         buffer.set_script(hb_script);
 
@@ -382,7 +404,6 @@ fn shape_segment(
                 .point_size(Some(options.font_size)),
         );
 
-        let segment_char_count = segment_text.chars().count();
         let range = TextRange {
             byte_range: (item.range.byte_range.start + segment_start_offset)
                 ..(item.range.byte_range.start + segment_end_offset),
