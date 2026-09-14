@@ -8,7 +8,8 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-parley = { workspace = true, default-features = true }
+parley = { workspace = true, default-features = true, features = ["bytemuck"] }
+bytemuck = { workspace = true }
 parley_examples_common = { path = "../common" }
 peniko = { workspace = true }
 vello_cpu = { workspace = true, default-features = false, features = ["std", "png", "text"] }

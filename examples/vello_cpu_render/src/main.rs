@@ -89,8 +89,7 @@ fn render_frame(
                     let run = glyph_run.run();
 
                     stats.start("fill_glyphs");
-                    let normalized_coords =
-                        &Vec::from_iter(run.normalized_coords().iter().map(|c| c.to_bits()));
+                    let normalized_coords = bytemuck::cast_slice::<_, i16>(run.normalized_coords());
                     renderer.set_paint(glyph_run.style().brush.color);
                     renderer
                         .glyph_run(&run.font().font)
