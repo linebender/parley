@@ -28,11 +28,6 @@ This release has an [MSRV] of 1.88.
 
 - `Collection::family_ids` to iterate over unique font family identifiers. ([#725][] by [@tomcur][])
 
-#### Parley Engine
-
-- A `bytemuck` feature implementing `Pod`, `Zeroable` and `TransparentWrapper<i16>` for `NormalizedCoord`, allowing zero-copy casts to and from `[i16]`. ([#PLACEHOLDER][] by [@nicoburns][])  
-  Parley forwards this via its own `bytemuck` feature.
-
 ### Changed
 
 #### Parley
