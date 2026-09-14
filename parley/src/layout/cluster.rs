@@ -53,8 +53,8 @@ impl<'a, B: Brush> Cluster<'a, B> {
     pub fn from_byte_index(layout: &'a Layout<B>, byte_index: usize) -> Option<Self> {
         let (_, line) = layout.line_for_byte_index(byte_index)?;
         line.runs()
-            .filter(|run| run.text_range().contains(&byte_index))
-            .find_map(|run| run.cluster_at_text_byte(byte_index))
+            .find(|run| run.text_range().contains(&byte_index))?
+            .cluster_at_text_byte(byte_index)
     }
 
     /// Returns the cluster and side which is at the specified position in the given layout. If no cluster is
