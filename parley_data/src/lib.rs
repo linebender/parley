@@ -165,7 +165,7 @@ impl From<Properties> for u32 {
 mod tests {
     use super::Properties;
     use icu_properties::props::{
-        BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak,
+        BidiClass, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak,
         RegionalIndicator, Script, VariationSelector,
     };
     use icu_properties::{CodePointMapData, CodePointSetData};
@@ -176,8 +176,7 @@ mod tests {
             CodePointMapData::<GeneralCategory>::new().get32(cp),
             CodePointMapData::<GraphemeClusterBreak>::new().get32(cp),
             CodePointMapData::<BidiClass>::new().get32(cp),
-            CodePointSetData::new::<Emoji>().contains32(cp)
-                || CodePointSetData::new::<ExtendedPictographic>().contains32(cp),
+            CodePointSetData::new::<ExtendedPictographic>().contains32(cp),
             CodePointSetData::new::<VariationSelector>().contains32(cp),
             CodePointSetData::new::<RegionalIndicator>().contains32(cp),
             matches!(

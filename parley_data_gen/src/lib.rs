@@ -6,9 +6,7 @@
 use icu_properties::props::{GeneralCategory, GraphemeClusterBreak, Script};
 use icu_properties::{
     CodePointMapData, CodePointSetData,
-    props::{
-        BidiClass, Emoji, ExtendedPictographic, LineBreak, RegionalIndicator, VariationSelector,
-    },
+    props::{BidiClass, ExtendedPictographic, LineBreak, RegionalIndicator, VariationSelector},
 };
 use parley_data::Properties;
 use std::fmt::Write as _;
@@ -38,8 +36,7 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
                 CodePointMapData::<GeneralCategory>::new().get32(cp),
                 CodePointMapData::<GraphemeClusterBreak>::new().get32(cp),
                 CodePointMapData::<BidiClass>::new().get32(cp),
-                CodePointSetData::new::<Emoji>().contains32(cp)
-                    || CodePointSetData::new::<ExtendedPictographic>().contains32(cp),
+                CodePointSetData::new::<ExtendedPictographic>().contains32(cp),
                 CodePointSetData::new::<VariationSelector>().contains32(cp),
                 CodePointSetData::new::<RegionalIndicator>().contains32(cp),
                 // See: https://github.com/unicode-org/icu4x/blob/ee5399a77a6b94efb5d4b60678bb458c5eedb25d/components/segmenter/src/line.rs#L338-L351
