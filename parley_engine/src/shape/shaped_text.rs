@@ -22,6 +22,9 @@ use super::{
 ///
 /// This is a 16-bit fixed-point number with a 14-bit fractional part. For font coordinates, its
 /// useful values are in the range -1.0..=1.0.
+//
+// NOTICE: If the representation changes, be sure to check the `bytemuck` marker trait
+// implementations.
 #[repr(transparent)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub struct NormalizedCoord(i16);

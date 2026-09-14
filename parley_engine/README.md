@@ -90,6 +90,7 @@ for (run_idx, run) in shaped_text.runs().iter().enumerate() {
 ## Features
 
 - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
+- `bytemuck`: Implement traits from `bytemuck` on [`NormalizedCoord`](https://docs.rs/parley_engine/latest/parley_engine/struct.NormalizedCoord.html).
 
 [parley]: https://docs.rs/parley
 
