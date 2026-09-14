@@ -497,12 +497,12 @@ impl Affinity {
     }
 }
 
-/// Index based path to a cluster.
+/// Index-based path to a cluster.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Default, Debug)]
 pub struct ClusterPath {
     pub(crate) line_index: u32,
     pub(crate) run_index: u32,
-    /// The cluster's first (logical) character index.
+    /// The index of the cluster's first logical character.
     pub(crate) char_index: u32,
 }
 
