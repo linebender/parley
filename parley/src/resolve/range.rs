@@ -153,12 +153,20 @@ impl<B: Brush> RangedStyleBuilder<B> {
         }
         styles.truncate(styles.len() - merged_count);
 
-        style_table.reserve(styles.len());
+        // The root style is always at index 0 and is the parent of every other style.
+        style_table.reserve(styles.len() + 1);
         style_runs.reserve(styles.len());
-        for (style_index, style) in styles.drain(..).enumerate() {
-            style_table.push(style.style);
+        style_table.push(self.root_style.clone());
+        for style in styles.drain(..) {
+            let style_index = if style.style == style_table[0] {
+                0
+            } else {
+                assert!(style_table.len() <= u16::MAX as usize, "too many styles");
+                style_table.push(style.style);
+                (style_table.len() - 1) as u16
+            };
             style_runs.push(StyleRun {
-                style_index: style_index as u16,
+                style_index,
                 range: style.range,
             });
         }
