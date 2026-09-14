@@ -6,10 +6,21 @@
 use parley_engine::shape::Whitespace;
 use parley_engine::{Atom, ShapedSlice};
 
-use crate::TextWrapMode;
 use crate::layout::Style;
 use crate::layout::spacing::EffectiveSpacing;
 use crate::style::Brush;
+use crate::{TextWrapMode, WhiteSpaceCollapse};
+
+impl WhiteSpaceCollapse {
+    /// Whether `c` is whitespace that this mode collapses.
+    pub(crate) fn is_collapsible(self, c: char) -> bool {
+        match self {
+            Self::Collapse => c.is_ascii_whitespace(),
+            Self::Preserve => false,
+            Self::PreserveBreaks => matches!(c, ' ' | '\t'),
+        }
+    }
+}
 
 /// Whether this is whitespace that is allowed to hang past the line.
 ///
