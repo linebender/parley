@@ -13,7 +13,7 @@ use core::ops::Range;
 use alloc::vec::Vec;
 use parlance::BidiLevel;
 use parley_engine::shape::Whitespace;
-use parley_engine::{Boundary, ShapedSlice, ShapedText};
+use parley_engine::{Boundary, ShapedText};
 
 /// `HarfRust`-based run data
 #[derive(Clone, Debug, PartialEq)]
@@ -90,31 +90,13 @@ pub(crate) struct LineItemData {
     ///
     /// The bounds are atom-aligned.
     pub(crate) shaped_cluster_range: Range<u32>,
-    /// This run's grapheme clusters on this line, as a range of grapheme indices relative to the
-    /// owning [`parley_engine::ShapedRun`].
-    pub(crate) grapheme_range: Range<usize>,
 }
 
 impl LineItemData {
-    pub(crate) fn is_text_run(&self) -> bool {
-        self.kind == LayoutItemKind::TextRun
-    }
-
     #[inline(always)]
     pub(crate) fn is_rtl(&self) -> bool {
         self.bidi_level.is_rtl()
     }
-}
-
-/// The number of graphemes in `slice`.
-///
-/// This is `O(n)` in the slice's characters.
-pub(crate) fn count_graphemes(slice: ShapedSlice<'_>) -> usize {
-    slice
-        .characters_in(slice.char_range())
-        .iter()
-        .filter(|character| character.grapheme_start)
-        .count()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

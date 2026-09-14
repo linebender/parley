@@ -10,7 +10,6 @@ use alloc::vec::Vec;
 use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
-use crate::layout::data::count_graphemes;
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
 use crate::layout::whitespace::{atom_hanging_advance, whitespace_can_hang};
 use crate::layout::{
@@ -1174,7 +1173,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         {
             line.text_range = 0..0;
             line.shaped_cluster_range = 0..0;
-            line.grapheme_range = 0..0;
         }
     }
 
@@ -1249,8 +1247,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             {
                 let run_index = self.lines.line_items.len();
                 let cluster = run.shaped_clusters_range.end;
-                let grapheme =
-                    count_graphemes(self.layout.data.shaped_text.run_slice(index as u32));
                 let text = run.range.byte_range.end;
                 self.lines.line_items.push(LineItemData {
                     kind: LayoutItemKind::TextRun,
@@ -1258,7 +1254,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     bidi_level: BidiLevel::new(0),
                     advance: 0.,
                     shaped_cluster_range: cluster..cluster,
-                    grapheme_range: grapheme..grapheme,
                     text_range: text..text,
                 });
                 line.item_range = run_index..run_index + 1;
@@ -1393,7 +1388,6 @@ fn commit_line<B: Brush>(
 
                     // These properties are ignored for inline boxes. So we just put a dummy value.
                     shaped_cluster_range: 0..0,
-                    grapheme_range: 0..0,
                     text_range: 0..0,
                 });
 
@@ -1422,38 +1416,15 @@ fn commit_line<B: Brush>(
                 last_item_kind = item.kind;
                 committed_text_run = true;
 
-                // Map the cluster range to source-text and grapheme ranges. Line boundaries are
-                // always aligned to `Atom`s, i.e., line bounds are always grapheme bounds.
-                //
-                // Because counting graphemes is `O(n)`, and for runs that are split across lines we
-                // would recount the prefix every time, we first check whether this line continues
-                // the run committed to the previous line. In that case, use its grapheme range end
-                // as our start.
-                //
-                // Perhaps this can be improved...
+                // Map the cluster range to the source-text range. Line boundaries are always
+                // aligned to `Atom`s, i.e., line bounds are always grapheme bounds.
                 let slice = shaped_text.run_slice(item.index as u32);
-                let grapheme_start =
-                    lines
-                        .line_items
-                        .iter()
-                        .rev()
-                        .find(|prev| prev.is_text_run())
-                        .filter(|prev| {
-                            prev.index == item.index
-                                && prev.shaped_cluster_range.end == cluster_range.start
-                        })
-                        .map(|prev| prev.grapheme_range.end)
-                        .unwrap_or_else(|| {
-                            count_graphemes(slice.narrow(
-                                shaped_run.shaped_clusters_range.start..cluster_range.start,
-                            ))
-                        });
-                let (item_text_range, grapheme_range) = if cluster_range.is_empty() {
+                let item_text_range = if cluster_range.is_empty() {
                     let char_pos = shaped_clusters[cluster_range.start as usize]
                         .chars_range()
                         .start;
                     let text_pos = slice.text_byte_at(char_pos);
-                    (text_pos..text_pos, grapheme_start..grapheme_start)
+                    text_pos..text_pos
                 } else {
                     let char_range = shaped_clusters[cluster_range.start as usize]
                         .chars_range()
@@ -1461,9 +1432,7 @@ fn commit_line<B: Brush>(
                         ..shaped_clusters[cluster_range.end as usize - 1]
                             .chars_range()
                             .end;
-                    let text_range = slice.text_byte_range(char_range.clone());
-                    let grapheme_len = count_graphemes(slice.narrow(cluster_range.clone()));
-                    (text_range, grapheme_start..grapheme_start + grapheme_len)
+                    slice.text_byte_range(char_range)
                 };
 
                 // Compute the text range for the line
@@ -1486,7 +1455,6 @@ fn commit_line<B: Brush>(
                     bidi_level: shaped_run.bidi_level,
                     advance,
                     shaped_cluster_range: cluster_range,
-                    grapheme_range,
                     text_range: item_text_range,
                 });
             }

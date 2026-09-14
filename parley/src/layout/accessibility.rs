@@ -7,7 +7,7 @@ use alloc::{
 };
 
 use accesskit::{Node, NodeId, Role, TextAlign, TextDirection, TreeUpdate};
-use hashbrown::{HashMap, HashSet};
+use hashbrown::HashMap;
 use skrifa::{
     FontRef,
     raw::{TableProvider, types::NameId},
@@ -58,44 +58,58 @@ pub struct LayoutAccessibility {
     // We define a span as a sequence of clusters, in logical order, that all
     // have an identical style. For each span we create an AccessKit node
     // with the `TextRun` role, and these nodes are in logical order.
-    // The following two fields maintain a two-way mapping between spans
-    // and AccessKit node IDs, where each span is identified by the path to
-    // its first cluster, or a span path for short. These maps are maintained by
-    // `LayoutAccess::build_nodes`, which ensures that removed spans are removed
-    // from the maps on the next accessibility pass.
-    pub(crate) access_ids_by_span_path: HashMap<ClusterPath, NodeId>,
+    //
+    // The following two fields maintain a mapping between spans and AccessKit
+    // node IDs. Each span is identified by its index in the logical order of
+    // spans. The nth span is given the nth ID from the following list, which
+    // is kept across accessibility passes.
+    span_ids: Vec<NodeId>,
+    // Map from node ID to the path of the span's first cluster.
     pub(crate) span_paths_by_access_id: HashMap<NodeId, ClusterPath>,
-    // Map from cluster path to span path. This allows `Cursor::to_access_position`
-    // to complete in O(1), rather than worst-case O(n) where n is the length
-    // of the run. It also means that the logic for when to start a new span,
-    // including the limitation on the number of characters per span,
-    // only needs to live in `LayoutAccess::build_nodes`.
-    pub(crate) span_paths_by_cluster_path: HashMap<ClusterPath, ClusterPath>,
+    // Map from cluster path to the cluster's position within its span. This
+    // allows `Cursor::to_access_position` to complete in O(1), rather than
+    // worst-case O(n) where n is the length of the run. It also means that the
+    // logic for when to start a new span, including the limitation on the
+    // number of characters per span, only needs to live in
+    // `LayoutAccess::build_nodes`.
+    pub(crate) span_positions_by_cluster_path: HashMap<ClusterPath, SpanPosition>,
+}
+
+/// The position of a cluster within its accessibility span.
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct SpanPosition {
+    /// The index of the span in logical order.
+    pub(crate) span_index: usize,
+    /// The index of the cluster within the span's characters.
+    pub(crate) character_index: usize,
 }
 
 impl LayoutAccessibility {
+    /// Returns the node ID of the span with the given logical index.
+    pub(crate) fn span_id(&self, span_index: usize) -> Option<NodeId> {
+        self.span_ids.get(span_index).copied()
+    }
+
     fn span_id_and_node<B: Brush>(
         &mut self,
         next_node_id: &mut impl FnMut() -> NodeId,
-        ids: &mut HashSet<NodeId>,
+        span_index: usize,
         run: &Run<'_, B>,
         span_path: ClusterPath,
     ) -> (NodeId, Node) {
-        // If we encountered this same span path in the previous
+        // If we encountered this same span index in the previous
         // accessibility pass, reuse the same AccessKit ID. Otherwise,
         // allocate a new one. This enables stable node IDs when merely
         // updating the content of existing spans.
-        let id = self
-            .access_ids_by_span_path
-            .get(&span_path)
-            .copied()
-            .unwrap_or_else(|| {
+        let id = match self.span_ids.get(span_index) {
+            Some(id) => *id,
+            None => {
                 let id = (*next_node_id)();
-                self.access_ids_by_span_path.insert(span_path, id);
-                self.span_paths_by_access_id.insert(id, span_path);
+                self.span_ids.push(id);
                 id
-            });
-        ids.insert(id);
+            }
+        };
+        self.span_paths_by_access_id.insert(id, span_path);
         let mut node = Node::new(Role::TextRun);
         node.set_text_direction(if run.is_rtl() {
             TextDirection::RightToLeft
@@ -160,13 +174,15 @@ impl LayoutAccessibility {
         y_offset: f64,
         set_brush_properties: impl Fn(&mut Node, &Style<B>),
     ) {
-        self.span_paths_by_cluster_path.clear();
-        // Build a set of node IDs for the runs encountered in this pass.
-        let mut ids = HashSet::<NodeId>::new();
+        self.span_paths_by_access_id.clear();
+        self.span_positions_by_cluster_path.clear();
+        // The number of spans started so far, which is also the logical index
+        // of the next span to start.
+        let mut spans_started = 0;
         // Reuse scratch space for storing a sorted list of runs.
         let mut runs = Vec::new();
 
-        for (line_index, line) in layout.lines().enumerate() {
+        for line in layout.lines() {
             let metrics = line.metrics();
             // Defer adding each run node until we reach either the next run
             // or the end of the line. That way, we can set relations between
@@ -189,9 +205,21 @@ impl LayoutAccessibility {
             runs.sort_by_key(|(r, _)| r.text_range().start);
 
             for (run, run_offset) in runs.drain(..) {
-                let mut span_path = ClusterPath::new(line_index as u32, run.index() as u32, 0);
+                let mut span_path = run_start_path(&run);
                 let (mut id, mut node) =
-                    self.span_id_and_node(&mut next_node_id, &mut ids, &run, span_path);
+                    self.span_id_and_node(&mut next_node_id, spans_started, &run, span_path);
+                spans_started += 1;
+                if run.is_empty() {
+                    // For empty runs, record the run's start so that a cursor in it can still be
+                    // addressed.
+                    self.span_positions_by_cluster_path.insert(
+                        span_path,
+                        SpanPosition {
+                            span_index: spans_started - 1,
+                            character_index: 0,
+                        },
+                    );
+                }
 
                 if let Some((last_id, mut last_node)) = last_node.take() {
                     link_spans(last_id, &mut last_node, id, &mut node);
@@ -240,10 +268,11 @@ impl LayoutAccessibility {
                                 span_path = cluster.path();
                                 let (new_id, mut new_node) = self.span_id_and_node(
                                     &mut next_node_id,
-                                    &mut ids,
+                                    spans_started,
                                     &run,
                                     span_path,
                                 );
+                                spans_started += 1;
                                 link_spans(old_id, &mut old_node, new_id, &mut new_node);
                                 add_span(update, parent_node, old_id, old_node);
                                 (new_id, new_node)
@@ -265,12 +294,19 @@ impl LayoutAccessibility {
                     if cluster.is_word_boundary() && !cluster.is_space_or_nbsp() {
                         word_starts.push(character_lengths.len() as _);
                     }
+                    let character_index = character_lengths.len();
                     character_lengths.push(cluster_text.len() as _);
                     character_positions.push(span_advance);
                     character_widths.push(cluster.advance());
                     span_advance += cluster.advance();
-                    self.span_paths_by_cluster_path
-                        .insert(cluster.path(), span_path);
+                    self.span_positions_by_cluster_path.insert(
+                        cluster.path(),
+                        SpanPosition {
+                            // The current span is the last one started.
+                            span_index: spans_started - 1,
+                            character_index,
+                        },
+                    );
                 }
 
                 finish_span(
@@ -294,14 +330,14 @@ impl LayoutAccessibility {
                 add_span(update, parent_node, id, node);
             }
         }
-
-        // Remove mappings for spans that no longer exist.
-        self.span_paths_by_access_id.retain(|access_id, span_path| {
-            let keep = ids.contains(access_id);
-            if !keep {
-                self.access_ids_by_span_path.remove(span_path);
-            }
-            keep
-        });
     }
+}
+
+/// The path of `run`'s first cluster, used as the path of its first accessibility span.
+pub(crate) fn run_start_path<B: Brush>(run: &Run<'_, B>) -> ClusterPath {
+    ClusterPath::new(
+        run.line_index,
+        run.index,
+        run.line_slice().char_range().start,
+    )
 }

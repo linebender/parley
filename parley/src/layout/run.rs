@@ -1,8 +1,8 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::layout::cluster::{Cluster, ClusterPath};
-use crate::layout::data::{LineItemData, RunData, count_graphemes};
+use crate::layout::cluster::Cluster;
+use crate::layout::data::{LineItemData, RunData};
 use crate::layout::layout::Layout;
 use crate::layout::spacing::{EffectiveSpacing, Gaps, Justification};
 use crate::style::Brush;
@@ -165,23 +165,33 @@ impl<'a, B: Brush> Run<'a, B> {
     /// The indices are grapheme cluster indices, relative to the shaped run this [`Run`] belongs
     /// to: for a run scoped to a line, this is the sub-range of the shaped run's clusters that fall
     /// on that line; otherwise it covers all of the shaped run's clusters.
+    ///
+    /// Note this counts the shaped run's clusters, so the cost is linear in the shaped run's
+    /// length.
     pub fn cluster_range(&self) -> Range<usize> {
-        self.line_data
-            .map(|d| d.grapheme_range.clone())
-            .unwrap_or_else(|| 0..count_graphemes(self.full_slice()))
+        let start = match self.line_data {
+            Some(line_data) => count_graphemes(self.full_slice().narrow(
+                self.shaped.shaped_clusters_range.start..line_data.shaped_cluster_range.start,
+            )),
+            None => 0,
+        };
+        start..start + self.len()
     }
 
     /// Returns the number of clusters in the run.
+    ///
+    /// Note this counts the run's clusters, so the cost is linear in the run's length. To check
+    /// whether the run has any clusters, use [`Self::is_empty`].
     pub fn len(&self) -> usize {
-        self.cluster_range().len()
+        count_graphemes(self.line_slice())
     }
 
     /// Returns `true` if the run is empty.
     pub fn is_empty(&self) -> bool {
-        self.len() == 0
+        self.line_slice().shaped_clusters_range().is_empty()
     }
 
-    /// Returns the cluster at the specified index.
+    /// Returns the cluster at the specified logical index.
     ///
     /// Note this walks the run's clusters, so the cost is `O(index)`.
     pub fn get(&self, index: usize) -> Option<Cluster<'a, B>> {
@@ -193,41 +203,47 @@ impl<'a, B: Brush> Run<'a, B> {
         Clusters::new(*self, false)
     }
 
-    /// Returns the visual cluster index for the specified logical cluster index.
-    pub fn logical_to_visual(&self, logical_index: usize) -> Option<usize> {
-        let num_clusters = self.len();
-        if logical_index >= num_clusters {
-            return None;
-        }
-
-        let visual_index = if self.is_rtl() {
-            num_clusters - 1 - logical_index
-        } else {
-            logical_index
-        };
-
-        Some(visual_index)
-    }
-
-    /// Returns the logical cluster index for the specified visual cluster index.
-    pub fn visual_to_logical(&self, visual_index: usize) -> Option<usize> {
-        let num_clusters = self.len();
-        if visual_index >= num_clusters {
-            return None;
-        }
-
-        let logical_index = if self.is_rtl() {
-            num_clusters - 1 - visual_index
-        } else {
-            visual_index
-        };
-
-        Some(logical_index)
-    }
-
     /// Returns an iterator over the clusters in visual order.
     pub fn visual_clusters(&self) -> impl Iterator<Item = Cluster<'a, B>> + Clone + use<'a, B> {
         Clusters::new(*self, self.is_rtl())
+    }
+
+    /// Returns an iterator over the clusters in reverse visual order.
+    pub(crate) fn visual_clusters_rev(
+        &self,
+    ) -> impl Iterator<Item = Cluster<'a, B>> + Clone + use<'a, B> {
+        Clusters::new(*self, !self.is_rtl())
+    }
+
+    /// The cluster containing the character at `char_index`.
+    ///
+    /// Returns `None` if `char_index` is not within this run.
+    pub(crate) fn cluster_containing_char(&self, char_index: u32) -> Option<Cluster<'a, B>> {
+        let atom = self.line_slice().atom_at_char(char_index)?;
+        let grapheme = atom
+            .graphemes_start()
+            .find(|grapheme| grapheme.char_range().contains(&char_index))?;
+        Some(Cluster {
+            run: *self,
+            atom,
+            grapheme,
+        })
+    }
+
+    /// The cluster containing the source text byte at `text_byte`.
+    ///
+    /// Returns `None` if `text_byte` is not within this run.
+    pub(crate) fn cluster_at_text_byte(&self, text_byte: usize) -> Option<Cluster<'a, B>> {
+        let slice = self.line_slice();
+        let atom = slice.atom_at_text_byte(u32::try_from(text_byte).ok()?)?;
+        let grapheme = atom
+            .graphemes_start()
+            .find(|grapheme| slice.text_byte_range(grapheme.char_range()).end > text_byte)?;
+        Some(Cluster {
+            run: *self,
+            atom,
+            grapheme,
+        })
     }
 
     /// An iterator over the glyphs in `shaped_clusters` in visual left-to-right order.
@@ -356,9 +372,6 @@ struct Clusters<'a, B: Brush> {
     graphemes: Graphemes<'a>,
     /// The atom containing the most recently yielded grapheme; `None` before the first grapheme.
     atom: Option<Atom<'a>>,
-    /// In forward iteration, the logical index of the cluster yielded next; in reverse
-    /// iteration, one past that index.
-    logical_index: usize,
     /// Whether iteration is in reverse logical order.
     rev: bool,
 }
@@ -379,7 +392,6 @@ impl<'a, B: Brush> Clusters<'a, B> {
                 slice.graphemes_start()
             },
             atom: None,
-            logical_index: if rev { run.len() } else { 0 },
             rev,
         }
     }
@@ -392,7 +404,6 @@ impl<B: Brush> Clone for Clusters<'_, B> {
             atoms: self.atoms,
             graphemes: self.graphemes,
             atom: self.atom,
-            logical_index: self.logical_index,
             rev: self.rev,
         }
     }
@@ -401,7 +412,6 @@ impl<B: Brush> Clone for Clusters<'_, B> {
 impl<'a, B: Brush> Iterator for Clusters<'a, B> {
     type Item = Cluster<'a, B>;
 
-    #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     fn next(&mut self) -> Option<Self::Item> {
         let grapheme = if self.rev {
             self.graphemes.prev()?
@@ -423,19 +433,21 @@ impl<'a, B: Brush> Iterator for Clusters<'a, B> {
         let atom = self.atom.expect(
             "The first call to `next` should always be an atom edge, so this should always be set at this point.",
         );
-        let logical_index = if self.rev {
-            self.logical_index -= 1;
-            self.logical_index
-        } else {
-            let index = self.logical_index;
-            self.logical_index += 1;
-            index
-        };
         Some(Cluster {
-            path: ClusterPath::new(self.run.line_index, self.run.index, logical_index as u32),
             run: self.run,
             atom,
             grapheme,
         })
     }
+}
+
+/// The number of graphemes in `slice`.
+///
+/// This is `O(n)` in the slice's characters.
+fn count_graphemes(slice: ShapedSlice<'_>) -> usize {
+    slice
+        .characters()
+        .iter()
+        .filter(|character| character.grapheme_start)
+        .count()
 }
