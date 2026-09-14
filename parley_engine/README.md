@@ -90,7 +90,8 @@ for (run_idx, run) in shaped_text.runs().iter().enumerate() {
 ## Features
 
 - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
-- `bytemuck`: Implement traits from `bytemuck` on [`NormalizedCoord`] (via `parlance`).
+- `bytemuck`: Forwarded to [`parlance`], which then implements traits from `bytemuck` on its
+  types.
 
 [parley]: https://docs.rs/parley
 

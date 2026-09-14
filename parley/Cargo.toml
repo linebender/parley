@@ -20,14 +20,13 @@ workspace = true
 default = ["system"]
 std = ["fontique/std", "parley_engine/std", "peniko/std", "skrifa?/std", "parlance/std"]
 libm = ["fontique/libm", "parley_engine/libm", "peniko/libm", "skrifa?/libm", "dep:core_maths"]
+bytemuck = ["fontique/bytemuck", "parlance/bytemuck", "parley_engine/bytemuck"]
 # Enables support for system font backends
 system = ["std", "fontique/system"]
 accesskit = ["dep:accesskit", "dep:skrifa"]
 # Enables dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
 # When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
 complex-scripts = ["parley_engine/complex-scripts"]
-# Implement traits from `bytemuck` on `NormalizedCoord`.
-bytemuck = ["parley_engine/bytemuck"]
 
 [dependencies]
 skrifa = { workspace = true, optional = true }
