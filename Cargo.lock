@@ -1100,6 +1100,7 @@ dependencies = [
  "accesskit",
  "accesskit_winit",
  "anyhow",
+ "bytemuck",
  "clipboard-rs",
  "parley",
  "peniko",
@@ -3054,6 +3055,7 @@ dependencies = [
 name = "parley_tests"
 version = "0.0.0"
 dependencies = [
+ "bytemuck",
  "fontique",
  "glifo",
  "oxipng",
@@ -3948,6 +3950,7 @@ dependencies = [
 name = "swash_render"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "image",
  "parley",
  "skrifa 0.44.0",
@@ -4140,6 +4143,7 @@ dependencies = [
 name = "tiny_skia_render"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "parley",
  "skrifa 0.44.0",
  "tiny-skia",
@@ -4392,6 +4396,7 @@ dependencies = [
 name = "vello_cpu_render"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "parley",
  "parley_examples_common",
  "peniko",

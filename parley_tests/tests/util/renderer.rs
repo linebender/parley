@@ -412,7 +412,7 @@ fn render_glyph_run_impl(
     renderer.set_paint(glyph_run.style().brush.color);
     let run = glyph_run.run();
 
-    let normalized_coords = &Vec::from_iter(run.normalized_coords().iter().map(|c| c.to_bits()));
+    let normalized_coords = bytemuck::cast_slice::<_, i16>(run.normalized_coords());
     let mut builder = GlyphRunBuilder::new(run.font().font.clone(), *renderer.transform())
         .font_size(run.font_size())
         .hint(config.hint)
