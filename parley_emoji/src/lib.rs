@@ -29,7 +29,7 @@
 //!
 //! - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
 //!
-//! Note that Parley Emoji currently requires that an allocator is available (i.e. it uses [`alloc`][]).
+//! Note that Parley Emoji currently requires that an allocator is available (i.e. it uses [`alloc`][_alloc]).
 //!
 //! [c-emoji]: <https://github.com/chansen/c-emoji>
 //! [UTS51]: <https://www.unicode.org/reports/tr51/>
@@ -47,7 +47,7 @@
 #![no_std]
 
 // Avoid adding alloc in the future being a breaking change.
-extern crate alloc as _;
+extern crate alloc as _alloc;
 // Ensure that we don't compile if you're using the std feature on a platform without `std`
 #[cfg(feature = "std")]
 extern crate std as _;

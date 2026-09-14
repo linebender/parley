@@ -21,7 +21,7 @@ Full documentation at https://github.com/orium/cargo-rdme -->
 
 <!-- Intra-doc links used in lib.rs should be evaluated here.
 See https://linebender.org/blog/doc-include/ for related discussion. -->
-[`alloc`]: https://doc.rust-lang.org/stable/alloc/
+[_alloc]: https://doc.rust-lang.org/stable/alloc/
 
 <!-- cargo-rdme start -->
 
@@ -48,7 +48,7 @@ The following crate [feature flags](https://doc.rust-lang.org/cargo/reference/fe
 
 - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
 
-Note that Parley Emoji currently requires that an allocator is available (i.e. it uses [`alloc`][]).
+Note that Parley Emoji currently requires that an allocator is available (i.e. it uses [`alloc`][_alloc]).
 
 [c-emoji]: <https://github.com/chansen/c-emoji>
 [UTS51]: <https://www.unicode.org/reports/tr51/>
