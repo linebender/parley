@@ -55,6 +55,7 @@
 //!             language: None,
 //!             features: &[],
 //!             variations: &[],
+//!             grapheme_replacement: None,
 //!         },
 //!      }],
 //!      select_font, // Selects fonts covering each cluster.

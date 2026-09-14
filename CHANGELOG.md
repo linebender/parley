@@ -731,8 +731,8 @@ This release has an [MSRV][] of 1.70.
 [#640]: https://github.com/linebender/parley/pull/640
 [#643]: https://github.com/linebender/parley/pull/643
 [#650]: https://github.com/linebender/parley/pull/650
-[#661]: https://github.com/linebender/parley/pull/661
 [#657]: https://github.com/linebender/parley/pull/657
+[#661]: https://github.com/linebender/parley/pull/661
 [#671]: https://github.com/linebender/parley/pull/671
 [#697]: https://github.com/linebender/parley/pull/697
 [#710]: https://github.com/linebender/parley/pull/710
