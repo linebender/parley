@@ -3,7 +3,7 @@
 
 use crate::inline_box::InlineBox;
 use crate::layout::spacing::{EffectiveSpacing, Justification, Spacing};
-use crate::layout::whitespace::{atom_hanging_advance, whitespace_can_hang};
+use crate::layout::whitespace::{Hanging, HangingAdvance, atom_hanging_advance};
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
@@ -288,9 +288,7 @@ impl<B: Brush> LayoutData<B> {
         // The running advance of whitespace that would hang if a line ended here. Can exceed
         // `running_min_width` when the hanging whitespace started before the last break
         // opportunity, in which case the line consists entirely of hanging whitespace.
-        //
-        // Note whitespace only hangs with `TextWrapMode::Wrap`, following CSS Text 4 § 4.3.2.
-        let mut running_hanging_whitespace = 0.0;
+        let mut running_hanging_whitespace = HangingAdvance::default();
 
         let mut text_wrap_mode = TextWrapMode::Wrap;
 
@@ -320,7 +318,7 @@ impl<B: Brush> LayoutData<B> {
                                 || style.overflow_wrap == OverflowWrap::Anywhere)
                         {
                             min_width =
-                                min_width.max(running_min_width - running_hanging_whitespace);
+                                min_width.max(running_min_width - running_hanging_whitespace.total);
                             running_min_width = 0.0;
                         }
 
@@ -337,12 +335,12 @@ impl<B: Brush> LayoutData<B> {
                         if whitespace == Whitespace::Newline {
                             // Newlines hang, so whitespace before them keeps hanging.
                             min_width =
-                                min_width.max(running_min_width - running_hanging_whitespace);
-                            max_width =
-                                max_width.max(running_max_width - running_hanging_whitespace);
+                                min_width.max(running_min_width - running_hanging_whitespace.total);
+                            max_width = max_width
+                                .max(running_max_width - running_hanging_whitespace.unconditional);
                             running_min_width = 0.0;
                             running_max_width = 0.0;
-                            running_hanging_whitespace = 0.0;
+                            running_hanging_whitespace = HangingAdvance::default();
                             continue;
                         }
 
@@ -355,24 +353,46 @@ impl<B: Brush> LayoutData<B> {
                         running_max_width += advance;
 
                         if !can_hang {
-                            running_hanging_whitespace = 0.0;
+                            running_hanging_whitespace = HangingAdvance::default();
                         } else if characters.len() == 1 {
                             // Fast path for the common-case that the atom is a single character,
                             // and so a single shaped cluster.
-                            if whitespace_can_hang(whitespace)
-                                && text_wrap_mode == TextWrapMode::Wrap
-                            {
-                                running_hanging_whitespace += advance;
+                            let policy = Hanging::for_character(whitespace, style);
+                            if policy != Hanging::Never {
+                                running_hanging_whitespace.add(policy, advance);
                             } else {
-                                running_hanging_whitespace = 0.0;
+                                running_hanging_whitespace = HangingAdvance::default();
                             }
                         } else {
-                            let (hanging, all_hang) =
-                                atom_hanging_advance(slice, &atom, &self.styles, spacing, is_rtl);
+                            let (hanging, all_hang) = atom_hanging_advance(
+                                slice,
+                                &atom,
+                                &self.styles,
+                                spacing,
+                                is_rtl,
+                                &mut None,
+                            );
+                            let mut overflow = Some(0.);
+                            let (unconditional, all_unconditional) = atom_hanging_advance(
+                                slice,
+                                &atom,
+                                &self.styles,
+                                spacing,
+                                is_rtl,
+                                &mut overflow,
+                            );
                             if all_hang {
-                                running_hanging_whitespace += hanging;
+                                running_hanging_whitespace.total += hanging;
                             } else {
-                                running_hanging_whitespace = hanging;
+                                running_hanging_whitespace.total = hanging;
+                            }
+                            if all_hang && overflow.is_none() {
+                                running_hanging_whitespace.unconditional =
+                                    running_hanging_whitespace.total;
+                            } else if all_unconditional {
+                                running_hanging_whitespace.unconditional += unconditional;
+                            } else {
+                                running_hanging_whitespace.unconditional = unconditional;
                             }
                         }
                     }
@@ -383,21 +403,21 @@ impl<B: Brush> LayoutData<B> {
                         running_max_width += ibox.width;
                         if text_wrap_mode == TextWrapMode::Wrap {
                             min_width =
-                                min_width.max(running_min_width - running_hanging_whitespace);
+                                min_width.max(running_min_width - running_hanging_whitespace.total);
                             min_width = min_width.max(ibox.width);
                             running_min_width = 0.0;
                         } else {
                             running_min_width += ibox.width;
                         }
                         // Inline boxes don't hang.
-                        running_hanging_whitespace = 0.0;
+                        running_hanging_whitespace = HangingAdvance::default();
                     }
                 }
             }
         }
 
-        min_width = min_width.max(running_min_width - running_hanging_whitespace);
-        max_width = max_width.max(running_max_width - running_hanging_whitespace);
+        min_width = min_width.max(running_min_width - running_hanging_whitespace.total);
+        max_width = max_width.max(running_max_width - running_hanging_whitespace.unconditional);
 
         ContentWidths {
             min: min_width,
