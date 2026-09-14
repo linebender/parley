@@ -255,8 +255,9 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
     }
 
     pub fn push_inline_box(&mut self, mut inline_box: InlineBox) {
+        self.lcx.tree_style_builder.commit_uncommitted_text();
+
         if inline_box.kind == InlineBoxKind::InFlow {
-            self.lcx.tree_style_builder.commit_uncommitted_text();
             self.lcx.tree_style_builder.flush_pending_whitespace();
             self.lcx.tree_style_builder.set_last_item_is_inline_box();
         }

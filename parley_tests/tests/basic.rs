@@ -534,6 +534,44 @@ fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
 }
 
 #[test]
+fn inline_box_index() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Boxes of every kind are indexed after the text pushed before them, in the current span or
+    // an enclosing one.
+    let mut builder = env.tree_builder();
+    for (id, kind) in [
+        InlineBoxKind::InFlow,
+        InlineBoxKind::OutOfFlow,
+        InlineBoxKind::CustomOutOfFlow,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        builder.push_text("ab");
+        builder.push_style_modification_span(None);
+        builder.push_text("cd");
+        builder.push_inline_box(InlineBox {
+            id: id as u64,
+            index: 0,
+            width: 10.,
+            height: 10.,
+            baseline: None,
+            kind,
+        });
+        builder.pop_style_span();
+    }
+    let (layout, text) = builder.build();
+    assert_eq!(text, "abcdabcdabcd");
+    let boxes: Vec<_> = layout
+        .inline_boxes()
+        .iter()
+        .map(|b| (b.id, b.index))
+        .collect();
+    assert_eq!(boxes, [(0, 4), (1, 8), (2, 12)]);
+}
+
+#[test]
 fn collapsed_space_belongs_to_first_span() {
     let mut env = TestEnv::new(test_name!(), None);
 
