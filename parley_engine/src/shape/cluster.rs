@@ -438,7 +438,10 @@ impl CharCluster {
                 emoji_dfa.step_record(category);
             }
 
-            let contributes_to_shaping = info.contributes_to_shaping();
+            // Variation selectors don't impact font coverage, and are default ignorable.
+            // TODO: Is there a default ignorable flag we should be using instead?
+            let contributes_to_shaping =
+                info.contributes_to_shaping() && !is_emoji_presentation_selector;
             if contributes_to_shaping {
                 map_len = map_len.saturating_add(1);
             }
