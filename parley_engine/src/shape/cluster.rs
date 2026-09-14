@@ -8,19 +8,20 @@ use core::cmp::Ordering;
 
 use alloc::vec::Vec;
 use icu_normalizer::properties::Decomposed;
+use parley_emoji::{EmojiDFA, EmojiPresentationStyle, EmojiSegmentationCategory};
 
 use crate::{CharInfo, analysis::AnalysisDataSources};
 
 #[derive(Debug, Default)]
 pub struct CharCluster {
     chars: Vec<Char>,
-    is_emoji: bool,
     map_len: u8,
     start: u32,
     end: u32,
     force_normalize: bool,
     comp: Form,
     decomp: Form,
+    emoji_presentation_style: EmojiPresentationStyle,
 }
 
 impl CharCluster {
@@ -39,7 +40,7 @@ impl CharCluster {
 
     #[inline(always)]
     pub fn is_emoji(&self) -> bool {
-        self.is_emoji
+        self.emoji_presentation_style.is_emoji()
     }
 }
 
@@ -61,6 +62,8 @@ pub struct Char {
     /// Indexes into the list of styles for the containing text run, to find the style applicable
     /// to this character.
     pub style_index: u16,
+    /// True if the character is an emoji presentation selector (VS15 or VS16).
+    pub is_emoji_presentation_selector: bool,
 }
 
 /// Whitespace class of a character.
@@ -228,13 +231,13 @@ impl CharCluster {
     #[inline]
     pub(crate) fn clear(&mut self) {
         self.chars.clear();
-        self.is_emoji = false;
         self.map_len = 0;
         self.start = 0;
         self.end = 0;
         self.force_normalize = false;
         self.comp.clear();
         self.decomp.clear();
+        self.emoji_presentation_style = EmojiPresentationStyle::Default;
     }
 
     #[inline(always)]
@@ -400,40 +403,45 @@ impl CharCluster {
         self.clear();
 
         let mut force_normalize = false;
-        let mut is_emoji_or_pictograph = false;
+        let mut is_emoji = false;
         let mut map_len: u8 = 0;
+        let mut emoji_dfa = EmojiDFA::new();
+        let mut leading_is_emoji_presentation = false;
         let start = *code_unit_offset_in_string as u32;
 
-        for ((_, ch), (info, style_index)) in
+        for ((i, ch), (info, style_index)) in
             segment_text.char_indices().zip(item_infos_iter.by_ref())
         {
-            force_normalize |= info.force_normalize();
-            // TODO - make emoji detection more complete, as per (except using composite Trie tables as
-            //  much as possible:
-            //  https://github.com/conor-93/parley/blob/4637d826732a1a82bbb3c904c7f47a16a21cceec/parley/src/shape/mod.rs#L221-L269
-            is_emoji_or_pictograph |= info.is_emoji_or_pictograph();
             *code_unit_offset_in_string += ch.len_utf8();
+            force_normalize |= info.force_normalize();
 
-            // TODO: Explore ignoring other modifiers in determining `contributes_to_shaping`:
-            //  regional indicators, subdivision flag tag sequences, skin tone modifiers
-            //  See also: https://github.com/google/emoji-segmenter
+            is_emoji |= info.is_emoji_or_pictograph();
 
-            // If the color emoji has a non-printing variation selector, ignore the variation selector.
-            // Its presentation depends on the platform and font.
-            //
-            // e.g.
-            //  - `U+270C + U+FE0E`: `✌`, force text presentation
-            //  - `U+270C + U+FE0F`: `✌️`, force emoji presentation
-            //
-            // See <https://www.unicode.org/reports/tr51/#Emoji_Variation_Sequences> for emoji
-            // variation sequences and
-            // <https://www.unicode.org/versions/Unicode17.0.0/core-spec/chapter-23/#G19053> for
-            // variation selectors more generally.
-            let is_emoji_with_non_printing_variation_selector =
-                is_emoji_or_pictograph && info.is_variation_selector();
+            let mut is_emoji_presentation_selector = false;
 
+            if is_emoji {
+                if i == 0 {
+                    leading_is_emoji_presentation = info.is_emoji_presentation();
+                }
+
+                let category = EmojiSegmentationCategory::from_codepoint(
+                    ch as u32,
+                    info.is_emoji(),
+                    info.is_emoji_presentation(),
+                    info.is_emoji_modifier(),
+                    info.is_emoji_modifier_base(),
+                    info.is_region_indicator(),
+                );
+
+                is_emoji_presentation_selector = category.is_presentation_selector();
+
+                emoji_dfa.step_record(category);
+            }
+
+            // Variation selectors don't impact font coverage, and are default ignorable.
+            // TODO: Is there a default ignorable flag we should be using instead?
             let contributes_to_shaping =
-                info.contributes_to_shaping() && !is_emoji_with_non_printing_variation_selector;
+                info.contributes_to_shaping() && !is_emoji_presentation_selector;
             if contributes_to_shaping {
                 map_len = map_len.saturating_add(1);
             }
@@ -443,16 +451,21 @@ impl CharCluster {
                 contributes_to_shaping,
                 style_index,
                 is_control_character: info.is_control(),
+                is_emoji_presentation_selector,
             });
         }
 
         // Finalize cluster metadata
         let end = *code_unit_offset_in_string as u32;
-        self.is_emoji = is_emoji_or_pictograph;
         self.map_len = map_len;
         self.start = start;
         self.end = end;
         self.force_normalize = force_normalize;
+
+        if is_emoji {
+            self.emoji_presentation_style =
+                emoji_dfa.presentation_style(leading_is_emoji_presentation);
+        }
     }
 }
 

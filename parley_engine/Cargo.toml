@@ -14,7 +14,7 @@ all-features = true
 
 [features]
 default = ["std"]
-std = ["fontique/std", "harfrust/std", "parlance/std", "skrifa/std"]
+std = ["fontique/std", "harfrust/std", "parlance/std", "parley_emoji/std", "skrifa/std"]
 libm = ["fontique/libm", "harfrust/libm", "skrifa/libm"]
 # Enables dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
 # When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
@@ -24,6 +24,7 @@ complex-scripts = []
 fontique = { workspace = true }
 parlance = { workspace = true }
 parley_data = { workspace = true, features = ["baked"] }
+parley_emoji = { workspace = true }
 
 harfrust = { workspace = true }
 hashbrown = { workspace = true }

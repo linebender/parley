@@ -25,6 +25,10 @@ impl Properties {
     const IS_VARIATION_SELECTOR_BITS: u32 = 1;
     const IS_REGION_INDICATOR_BITS: u32 = 1;
     const IS_MANDATORY_LINE_BREAK_BITS: u32 = 1;
+    const IS_EMOJI_BITS: u32 = 1;
+    const IS_EMOJI_PRESENTATION_BITS: u32 = 1;
+    const IS_EMOJI_MODIFIER_BITS: u32 = 1;
+    const IS_EMOJI_MODIFIER_BASE_BITS: u32 = 1;
 
     const SCRIPT_SHIFT: u32 = 0;
     const GC_SHIFT: u32 = Self::SCRIPT_SHIFT + Self::SCRIPT_BITS;
@@ -37,6 +41,13 @@ impl Properties {
         Self::IS_VARIATION_SELECTOR_SHIFT + Self::IS_VARIATION_SELECTOR_BITS;
     const IS_MANDATORY_LINE_BREAK_SHIFT: u32 =
         Self::IS_REGION_INDICATOR_SHIFT + Self::IS_REGION_INDICATOR_BITS;
+    const IS_EMOJI_SHIFT: u32 =
+        Self::IS_MANDATORY_LINE_BREAK_SHIFT + Self::IS_MANDATORY_LINE_BREAK_BITS;
+    const IS_EMOJI_PRESENTATION_SHIFT: u32 = Self::IS_EMOJI_SHIFT + Self::IS_EMOJI_BITS;
+    const IS_EMOJI_MODIFIER_SHIFT: u32 =
+        Self::IS_EMOJI_PRESENTATION_SHIFT + Self::IS_EMOJI_PRESENTATION_BITS;
+    const IS_EMOJI_MODIFIER_BASE_SHIFT: u32 =
+        Self::IS_EMOJI_MODIFIER_SHIFT + Self::IS_EMOJI_MODIFIER_BITS;
 
     #[cfg(feature = "baked")]
     #[inline(always)]
@@ -46,6 +57,10 @@ impl Properties {
     }
 
     /// Creates a new [`Properties`] from the given properties
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "one argument per packed property; only called from the data generator and tests"
+    )]
     pub fn new(
         script: Script,
         gc: GeneralCategory,
@@ -55,6 +70,10 @@ impl Properties {
         is_variation_selector: bool,
         is_region_indicator: bool,
         is_mandatory_linebreak: bool,
+        is_emoji: bool,
+        is_emoji_presentation: bool,
+        is_emoji_modifier: bool,
+        is_emoji_modifier_base: bool,
     ) -> Self {
         let s = script.to_icu4c_value() as u32;
         let gc = gc as u32;
@@ -69,7 +88,11 @@ impl Properties {
                 | ((is_emoji_or_pictographic as u32) << Self::IS_EMOJI_OR_PICTOGRAPH_SHIFT)
                 | ((is_variation_selector as u32) << Self::IS_VARIATION_SELECTOR_SHIFT)
                 | ((is_region_indicator as u32) << Self::IS_REGION_INDICATOR_SHIFT)
-                | ((is_mandatory_linebreak as u32) << Self::IS_MANDATORY_LINE_BREAK_SHIFT),
+                | ((is_mandatory_linebreak as u32) << Self::IS_MANDATORY_LINE_BREAK_SHIFT)
+                | ((is_emoji as u32) << Self::IS_EMOJI_SHIFT)
+                | ((is_emoji_presentation as u32) << Self::IS_EMOJI_PRESENTATION_SHIFT)
+                | ((is_emoji_modifier as u32) << Self::IS_EMOJI_MODIFIER_SHIFT)
+                | ((is_emoji_modifier_base as u32) << Self::IS_EMOJI_MODIFIER_BASE_SHIFT),
         )
     }
 
@@ -153,6 +176,50 @@ impl Properties {
             Self::IS_MANDATORY_LINE_BREAK_BITS,
         ) != 0
     }
+
+    /// Returns whether the character has the `Emoji` property ([UTS #51][]).
+    ///
+    /// Unlike [`is_emoji_or_pictograph`](Self::is_emoji_or_pictograph), this excludes
+    /// characters which are only `Extended_Pictographic`.
+    ///
+    /// [UTS #51]: https://www.unicode.org/reports/tr51/tr51-29.html#Emoji_Properties
+    #[inline(always)]
+    pub fn is_emoji(&self) -> bool {
+        self.bits(Self::IS_EMOJI_SHIFT, Self::IS_EMOJI_BITS) != 0
+    }
+
+    /// Returns whether the character has the `Emoji_Presentation` property ([UTS #51][]), i.e.
+    /// it is displayed as an emoji by default.
+    ///
+    /// [UTS #51]: https://www.unicode.org/reports/tr51/tr51-29.html#Emoji_Properties
+    #[inline(always)]
+    pub fn is_emoji_presentation(&self) -> bool {
+        self.bits(
+            Self::IS_EMOJI_PRESENTATION_SHIFT,
+            Self::IS_EMOJI_PRESENTATION_BITS,
+        ) != 0
+    }
+
+    /// Returns whether the character has the `Emoji_Modifier` property ([UTS #51][]), i.e. it is
+    /// a skin tone modifier.
+    ///
+    /// [UTS #51]: https://www.unicode.org/reports/tr51/tr51-29.html#Emoji_Properties
+    #[inline(always)]
+    pub fn is_emoji_modifier(&self) -> bool {
+        self.bits(Self::IS_EMOJI_MODIFIER_SHIFT, Self::IS_EMOJI_MODIFIER_BITS) != 0
+    }
+
+    /// Returns whether the character has the `Emoji_Modifier_Base` property ([UTS #51][]), i.e.
+    /// it can be followed by a skin tone modifier.
+    ///
+    /// [UTS #51]: https://www.unicode.org/reports/tr51/tr51-29.html#Emoji_Properties
+    #[inline(always)]
+    pub fn is_emoji_modifier_base(&self) -> bool {
+        self.bits(
+            Self::IS_EMOJI_MODIFIER_BASE_SHIFT,
+            Self::IS_EMOJI_MODIFIER_BASE_BITS,
+        ) != 0
+    }
 }
 
 impl From<Properties> for u32 {
@@ -165,8 +232,9 @@ impl From<Properties> for u32 {
 mod tests {
     use super::Properties;
     use icu_properties::props::{
-        BidiClass, Emoji, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak,
-        RegionalIndicator, Script, VariationSelector,
+        BidiClass, Emoji, EmojiModifier, EmojiModifierBase, EmojiPresentation,
+        ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, RegionalIndicator,
+        Script, VariationSelector,
     };
     use icu_properties::{CodePointMapData, CodePointSetData};
 
@@ -187,6 +255,10 @@ mod tests {
                     | LineBreak::LineFeed
                     | LineBreak::NextLine
             ),
+            CodePointSetData::new::<Emoji>().contains32(cp),
+            CodePointSetData::new::<EmojiPresentation>().contains32(cp),
+            CodePointSetData::new::<EmojiModifier>().contains32(cp),
+            CodePointSetData::new::<EmojiModifierBase>().contains32(cp),
         )
     }
 
