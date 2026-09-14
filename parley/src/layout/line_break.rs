@@ -11,7 +11,7 @@ use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
-use crate::layout::whitespace::{atom_hanging_advance, whitespace_can_hang};
+use crate::layout::whitespace::{hanging_whitespace, whitespace_can_hang};
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -1459,22 +1459,38 @@ fn commit_line<B: Brush>(
     // let end_run_idx = lines.line_items.last().map(|item| item.index).unwrap_or(0);
     let end_item_idx = lines.line_items.len();
 
-    let (hanging_advance, justification_end_cluster, hanging_opportunities) =
-        hanging_whitespace(layout, &lines.line_items[start_item_idx..end_item_idx]);
-    // Trailing whitespace before a forced break hangs conditionally (CSS Text 4 § 4.3.2): only
-    // the part that doesn't fit hangs. Whitespace that fits, stays inside the line box, and
-    // counts towards alignment and the layout width. The end of the layout is considered to be
-    // a forced line break as well (CSS Text 4 § 5). Trailing whitespace before a soft break
-    // hangs unconditionally.
-    let hanging_advance = if matches!(break_reason, BreakReason::Explicit | BreakReason::None) {
-        let overflow = state.x - max_advance;
-        hanging_advance.min(overflow).max(0.)
-    } else {
-        hanging_advance
+    let trailing = hanging_whitespace(
+        &layout.data,
+        lines.line_items[start_item_idx..end_item_idx]
+            .iter()
+            .rev()
+            .map(|item| {
+                let layout_item = LayoutItem {
+                    kind: item.kind,
+                    index: item.index,
+                    bidi_level: item.bidi_level,
+                };
+                (layout_item, item.shaped_cluster_range.clone())
+            }),
+    );
+    let hanging_advance = {
+        // Trailing preserved whitespace before a forced break hangs conditionally (CSS Text 4 § 4.3.2):
+        // only the part that doesn't fit hangs. Whitespace that fits, stays inside the line box,
+        // and counts towards alignment and the layout width. The end of the layout is considered to
+        // be a forced line break as well (CSS Text 4 § 5). Other trailing whitespace hangs
+        // unconditionally.
+        let hanging = trailing.advance;
+        if matches!(break_reason, BreakReason::Explicit | BreakReason::None) {
+            let overflow = state.x - hanging.unconditional - max_advance;
+            hanging.unconditional + hanging.conditional.min(overflow).max(0.)
+        } else {
+            hanging.total()
+        }
     };
     // The word separators counted as the line was built include the line's hanging whitespace, and
     // hanging whitespace is not stretched by justification.
-    let num_justification_opportunities = state.num_word_separators - hanging_opportunities;
+    let num_justification_opportunities =
+        state.num_word_separators - trailing.hanging_justification_opportunities;
 
     // Reorder the items within the line (if required). Reordering is required if the line contains
     // a mix of bidi levels (a mix of LTR and RTL text)
@@ -1489,7 +1505,7 @@ fn commit_line<B: Brush>(
         break_reason,
         num_justification_opportunities,
         justification: Justification {
-            justification_end_cluster,
+            justification_end_cluster: trailing.justification_end_cluster,
             ..Justification::NONE
         },
         indent: line_indent,
@@ -1518,84 +1534,6 @@ fn commit_line<B: Brush>(
     };
 
     true
-}
-
-/// Returns the advance of the whitespace hanging past the end of the line made up of `line_items`,
-/// the index one past its logically last shaped cluster that's eligible for justification (see
-/// [`Justification::justification_end_cluster`]), and the number of justification opportunities
-/// that are no longer eligible, as they are at or beyond that cluster.
-///
-/// `line_items` must be in logical order.
-fn hanging_whitespace<B: Brush>(
-    layout: &Layout<B>,
-    line_items: &[LineItemData],
-) -> (f32, u32, u32) {
-    let mut hanging_whitespace_advance = 0.;
-    // Atoms with shaped clusters before this index may be stretched by justification.
-    let mut justification_end_cluster = u32::MAX;
-    let mut hanging_opportunities = 0;
-
-    for line_item in line_items.iter().rev() {
-        match line_item.kind {
-            LayoutItemKind::InlineBox => {
-                let item = &layout.data.inline_boxes[line_item.index];
-
-                // Inline boxes don't hang.
-                if item.kind == InlineBoxKind::InFlow {
-                    break;
-                }
-            }
-            LayoutItemKind::TextRun => {
-                // Trailing whitespace can only hang if it ends up at the line's end edge after bidi
-                // reordering. We don't currently apply UAX #9 L1 (resetting trailing whitespace to
-                // paragraph level), so only logically-last items that match the paragraph level are
-                // guaranteed to be at that edge.
-                if line_item.bidi_level != layout.data.base_level {
-                    break;
-                }
-
-                let effective_spacing = EffectiveSpacing::new(
-                    layout.data.runs[line_item.index].spacing,
-                    Justification::NONE,
-                );
-                let slice = layout
-                    .data
-                    .shaped_text
-                    .run_slice(line_item.index as u32)
-                    .narrow(line_item.shaped_cluster_range.clone());
-
-                for atom in slice.atoms_end().rev() {
-                    let (hanging, all_hang) = atom_hanging_advance(
-                        slice,
-                        &atom,
-                        &layout.data.styles,
-                        effective_spacing,
-                        line_item.is_rtl(),
-                    );
-                    hanging_whitespace_advance += hanging;
-                    // Justification can't stretch within an atom, so it stops at the start of the
-                    // last atom that hangs in its entirety or only partially.
-                    justification_end_cluster = atom.shaped_clusters_range().start;
-                    if is_word_separator(atom.characters()[0].info.whitespace()) {
-                        hanging_opportunities += 1;
-                    }
-                    if !all_hang {
-                        return (
-                            hanging_whitespace_advance,
-                            justification_end_cluster,
-                            hanging_opportunities,
-                        );
-                    }
-                }
-            }
-        }
-    }
-
-    (
-        hanging_whitespace_advance,
-        justification_end_cluster,
-        hanging_opportunities,
-    )
 }
 
 /// Reorder items within line according to the bidi levels of the items

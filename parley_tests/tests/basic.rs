@@ -1213,3 +1213,45 @@ fn shaping_context_across_items() {
         "Glyphs must be identical"
     );
 }
+
+#[test]
+fn trailing_whitespace_alignment_by_collapse_mode() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Following CSS Text 4 § 4.3.2, trailing whitespace before a forced line break (including the
+    // end of the layout) hangs conditionally when whitespace is preserved: the part that fits
+    // stays inside the line box and is aligned along with the text. In the collapsing modes the
+    // whitespace hangs unconditionally, so the text is flush with the line's end edge. Note the
+    // ranged builder doesn't collapse whitespace itself, so the spaces reach layout.
+    let text = "AA   \nBB  ";
+    let mut word_layout = env.ranged_builder("AA").build("AA");
+    word_layout.break_all_lines(None);
+    let word_width = word_layout.width();
+    for (mode, test_case_name, hangs_unconditionally) in [
+        (WhiteSpaceCollapse::Preserve, "preserve", false),
+        (WhiteSpaceCollapse::Collapse, "collapse", true),
+        (WhiteSpaceCollapse::PreserveBreaks, "preserve_breaks", true),
+    ] {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::WhiteSpaceCollapse(mode));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(60.0));
+        layout.align(Alignment::End, AlignmentOptions::default());
+        env.with_name(test_case_name).check_layout_snapshot(&layout);
+
+        let first_line_advance = layout.get(0).unwrap().metrics().advance;
+        if hangs_unconditionally {
+            assert!(
+                (layout.width() - word_width).abs() < 1e-3,
+                "Layout width {} should exclude the hanging spaces for {mode:?}",
+                layout.width()
+            );
+        } else {
+            assert!(
+                (layout.width() - first_line_advance).abs() < 1e-3,
+                "Layout width {} should include the fitting spaces for {mode:?}",
+                layout.width()
+            );
+        }
+    }
+}
