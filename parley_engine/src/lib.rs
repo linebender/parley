@@ -85,6 +85,7 @@
 //! ## Features
 //!
 //! - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
+//! - `bytemuck`: Implement traits from `bytemuck` on [`NormalizedCoord`] (via `parlance`).
 //!
 //! [parley]: https://docs.rs/parley
 
@@ -114,11 +115,11 @@ mod lru_cache;
 pub mod shape;
 
 pub use linebender_resource_handle::FontData;
-pub use parlance::BaseDirection;
+pub use parlance::{BaseDirection, NormalizedCoord};
 
 pub use analysis::{Analysis, AnalysisDataSources, Boundary, CharInfo};
 pub use analyzer::{AnalysisOptions, Analyzer};
 pub use glyph::Glyph;
 pub use shape::atom::{Atom, Atoms, Grapheme, Graphemes, ShapedClusterGlyphs, ShapedSlice};
-pub use shape::shaped_text::{FontMetrics, NormalizedCoord, ShapedRun, ShapedText};
+pub use shape::shaped_text::{FontMetrics, ShapedRun, ShapedText};
 pub use shape::shaper::{FontInstance, FontSelector, ShapeOptions, Shaper};

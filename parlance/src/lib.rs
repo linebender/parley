@@ -10,7 +10,8 @@
 //! ## Features
 //!
 //! - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
-//! - `bytemuck`: Implement traits from `bytemuck` on [`GenericFamily`].
+//! - `bytemuck`: Implement traits from `bytemuck` on [`GenericFamily`], [`BidiLevel`] and
+//!   [`NormalizedCoord`].
 //!
 //! ## Example
 //!
@@ -45,6 +46,7 @@ mod generic_family;
 #[cfg(feature = "bytemuck")]
 mod impl_bytemuck;
 mod language;
+mod normalized_coord;
 mod script;
 mod tag;
 mod text;
@@ -54,6 +56,7 @@ pub use font::{FontStyle, FontWeight, FontWidth};
 pub use font_family::{FontFamily, FontFamilyName, ParseFontFamilyError, ParseFontFamilyErrorKind};
 pub use generic_family::GenericFamily;
 pub use language::{Language, ParseLanguageError};
+pub use normalized_coord::NormalizedCoord;
 pub use script::{ParseScriptError, Script};
 pub use tag::{FontFeature, FontVariation, ParseSettingsError, ParseSettingsErrorKind, Tag};
 pub use text::{BaseDirection, OverflowWrap, TextWrapMode, WordBreak};
