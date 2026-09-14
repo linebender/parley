@@ -35,6 +35,5 @@ icu_segmenter = { workspace = true, features = ["compiled_data"] }
 linebender_resource_handle = { workspace = true }
 skrifa = { workspace = true }
 
-
 [lints]
 workspace = true
