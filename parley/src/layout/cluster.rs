@@ -49,7 +49,7 @@ pub enum ClusterSide {
 }
 
 impl<'a, B: Brush> Cluster<'a, B> {
-    /// Returns the cluster for the given layout and byte index.
+    /// Returns the cluster for the given layout and byte index in the source text.
     pub fn from_byte_index(layout: &'a Layout<B>, byte_index: usize) -> Option<Self> {
         let (_, line) = layout.line_for_byte_index(byte_index)?;
         line.runs()
@@ -95,7 +95,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
                             continue;
                         }
                         for cluster in run.visual_clusters() {
-                            let is_last_cluster = is_last_run && cluster.is_visual_last_in_run();
+                            let is_last_cluster = is_last_run && cluster.is_line_right_end_of_run();
                             let cluster_advance = cluster.advance();
                             let edge = offset;
                             offset += cluster_advance;
@@ -247,8 +247,8 @@ impl<'a, B: Brush> Cluster<'a, B> {
             .flatten()
     }
 
-    /// Whether this is the visually first cluster of its run.
-    fn is_visual_first_in_run(&self) -> bool {
+    /// Whether this cluster is at the line-left end of the run.
+    fn is_line_left_end_of_run(&self) -> bool {
         let chars = self.run.line_slice().char_range();
         if self.is_rtl() {
             self.grapheme.char_range().end == chars.end
@@ -257,8 +257,8 @@ impl<'a, B: Brush> Cluster<'a, B> {
         }
     }
 
-    /// Whether this is the visually last cluster of its run.
-    fn is_visual_last_in_run(&self) -> bool {
+    /// Whether this cluster is at the line-right end of the run.
+    fn is_line_right_end_of_run(&self) -> bool {
         let chars = self.run.line_slice().char_range();
         if self.is_rtl() {
             self.grapheme.char_range().start == chars.start
@@ -269,13 +269,13 @@ impl<'a, B: Brush> Cluster<'a, B> {
 
     /// Returns `true` if this cluster is at the beginning of a line.
     pub fn is_start_of_line(&self) -> bool {
-        self.run.index == 0 && self.is_visual_first_in_run()
+        self.run.index == 0 && self.is_line_left_end_of_run()
     }
 
     /// Returns `true` if this cluster is at the end of a line.
     pub fn is_end_of_line(&self) -> bool {
         self.line().len().saturating_sub(1) == self.run.index as usize
-            && self.is_visual_last_in_run()
+            && self.is_line_right_end_of_run()
     }
 
     /// If the cluster as at the end of the line, returns the reason
@@ -289,20 +289,20 @@ impl<'a, B: Brush> Cluster<'a, B> {
     }
 
     /// The cluster logically following this one within the same run, if any.
-    fn next_in_run(&self) -> Option<Self> {
+    fn next_logical_in_run(&self) -> Option<Self> {
         self.run
             .cluster_containing_char(self.grapheme.char_range().end)
     }
 
     /// The cluster logically preceding this one within the same run, if any.
-    fn previous_in_run(&self) -> Option<Self> {
+    fn previous_logical_in_run(&self) -> Option<Self> {
         self.run
             .cluster_containing_char(self.grapheme.char_range().start.checked_sub(1)?)
     }
 
     /// Returns the cluster that follows this one in logical order.
     pub fn next_logical(&self) -> Option<Self> {
-        if let Some(next) = self.next_in_run() {
+        if let Some(next) = self.next_logical_in_run() {
             // Fast path: next cluster is in the same run
             Some(next)
         } else {
@@ -317,7 +317,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
 
     /// Returns the cluster that precedes this one in logical order.
     pub fn previous_logical(&self) -> Option<Self> {
-        if let Some(previous) = self.previous_in_run() {
+        if let Some(previous) = self.previous_logical_in_run() {
             // Fast path: previous cluster is in the same run
             Some(previous)
         } else {
@@ -329,9 +329,9 @@ impl<'a, B: Brush> Cluster<'a, B> {
     pub fn next_visual(&self) -> Option<Self> {
         // Fast path: next visual cluster is in the same run
         let next = if self.is_rtl() {
-            self.previous_in_run()
+            self.previous_logical_in_run()
         } else {
-            self.next_in_run()
+            self.next_logical_in_run()
         };
         if let Some(next) = next {
             Some(next)
@@ -362,9 +362,9 @@ impl<'a, B: Brush> Cluster<'a, B> {
     pub fn previous_visual(&self) -> Option<Self> {
         // Fast path: previous visual cluster is in the same run
         let previous = if self.is_rtl() {
-            self.next_in_run()
+            self.next_logical_in_run()
         } else {
-            self.previous_in_run()
+            self.previous_logical_in_run()
         };
         if let Some(previous) = previous {
             Some(previous)
