@@ -58,53 +58,18 @@ pub(crate) fn whitespace_hangs<B: Brush>(whitespace: Whitespace, style: &Style<B
             || style.text_wrap_mode == TextWrapMode::Wrap)
 }
 
-/// The advance of whitespace hanging past a line's end edge, split by whether it's hanging
-/// conditionally or unconditionally.
-#[derive(Copy, Clone, Debug, Default, PartialEq)]
-pub(crate) struct HangingAdvance {
-    /// The advance of whitespace that hangs unconditionally.
-    pub(crate) unconditional: f32,
-
-    /// The advance of whitespace that hangs conditionally when followed by a forced line break.
-    ///
-    /// If followed by a forced line break, only the part that does not fit on a line hangs. If not
-    /// followed by a forced line break, this part also hangs unconditionally.
-    pub(crate) conditional: f32,
-}
-
-impl HangingAdvance {
-    /// Add `advance` to the conditionally or unconditionally hanging advance.
-    #[inline(always)]
-    pub(crate) fn add(&mut self, conditional: bool, advance: f32) {
-        if conditional {
-            self.conditional += advance;
-        } else {
-            self.unconditional += advance;
-        }
-    }
-
-    /// The advance that hangs when the line is not followed by a forced line break.
-    #[inline(always)]
-    pub(crate) fn total(self) -> f32 {
-        self.unconditional + self.conditional
-    }
-}
-
-impl core::ops::AddAssign for HangingAdvance {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Self) {
-        self.unconditional += rhs.unconditional;
-        self.conditional += rhs.conditional;
-    }
-}
-
-/// The advance of the logically trailing clusters of `atom` that can hang past the line's end, and
+/// The advance of the logically trailing clusters of `atom` that hang past the line's end, and
 /// whether that is the atom in its entirety.
 ///
 /// An atom can hang partially: e.g., a prepend character followed by a space is a single atom (as
 /// it's a grapheme), but may consist of multiple shaped clusters, of which the spaces can hang.
 /// The atom's spacing at its logical end hangs along with the clusters, and if the atom hangs in
 /// its entirety does its spacing at its logical start hang as well.
+///
+/// `overflow` is the advance by which the line's content overflows the available width (excluding
+/// any whitespace already determined to be hanging). Following CSS Text 4 § 4.3.2, this limits
+/// conditionally hanging whitespace to only hangs as far as it overflows the available width. Pass
+/// [`f32::INFINITY`] to hang conditional whitespace in full.
 #[inline(always)]
 pub(crate) fn atom_hanging_advance<B: Brush>(
     slice: ShapedSlice<'_>,
@@ -112,19 +77,17 @@ pub(crate) fn atom_hanging_advance<B: Brush>(
     styles: &[Style<B>],
     spacing: EffectiveSpacing,
     is_rtl: bool,
-) -> (HangingAdvance, bool) {
+    mut overflow: f32,
+) -> (f32, bool) {
     let gaps = spacing.gaps(atom);
     let (gap_start, gap_end) = if is_rtl {
         (gaps.after, gaps.before)
     } else {
         (gaps.before, gaps.after)
     };
-    let mut last_cluster = true;
-    let mut all_hang = true;
-    let mut hanging = HangingAdvance::default();
-    // Whether the last visited shaped cluster hangs conditionally.
-    let mut conditional = false;
-    for cluster in atom.shaped_clusters().iter().rev() {
+    let mut hanging = 0.;
+    let clusters = atom.shaped_clusters();
+    for (index, cluster) in clusters.iter().enumerate().rev() {
         // Note, as a somewhat esoteric edge case, an atom's shaped whitespace clusters may
         // flip-flop between hanging conditionally and unconditionally when the `WhiteSpaceCollapse`
         // style changes inside that atom.
@@ -133,38 +96,50 @@ pub(crate) fn atom_hanging_advance<B: Brush>(
         // sequence hangs conditionally or unconditionally, and § 1.4 leaves style changes inside a
         // grapheme as being undefined. We choose here to follow what § 4.3.1 does for collapsing,
         // by classifying each character by its own mode.
-        conditional = false;
+        let mut conditional = false;
         let cluster_hangs = slice
             .characters_in(cluster.chars_range())
             .iter()
             .all(|character| {
                 let style = &styles[character.style_index as usize];
+                let whitespace = character.info.whitespace();
                 // Following CSS Text 4 § 4.3.2, only preserved whitespace can hang conditionally.
-                conditional |= style.white_space_collapse == WhiteSpaceCollapse::Preserve;
-                whitespace_hangs(character.info.whitespace(), style)
+                // A newline has no advance and always fits, so it doesn't end the sequence.
+                conditional |= style.white_space_collapse == WhiteSpaceCollapse::Preserve
+                    && whitespace != Whitespace::Newline;
+                whitespace_hangs(whitespace, style)
             });
         if !cluster_hangs {
-            all_hang = false;
-            break;
+            return (hanging, false);
         }
-        if last_cluster {
-            hanging.add(conditional, gap_end);
-            last_cluster = false;
+
+        let mut advance = cluster.advance;
+        if index == clusters.len() - 1 {
+            advance += gap_end;
         }
-        hanging.add(conditional, cluster.advance);
+        if index == 0 {
+            advance += gap_start;
+        }
+
+        // A conditionally hanging cluster only hangs as far as the line overflows. One that fits,
+        // even partially, ends the sequence.
+        if conditional && advance > overflow {
+            hanging += overflow.max(0.);
+            return (hanging, false);
+        }
+        // Hanging whitespace is excluded from the line's measurement, so the whitespace before it
+        // overflows by that much less.
+        hanging += advance;
+        overflow -= advance;
     }
 
-    if all_hang {
-        hanging.add(conditional, gap_start);
-    }
-
-    (hanging, all_hang)
+    (hanging, true)
 }
 
 /// The whitespace hanging past the end of a line.
 pub(crate) struct HangingWhitespace {
     /// The advance of the hanging whitespace.
-    pub(crate) advance: HangingAdvance,
+    pub(crate) advance: f32,
     /// The index one past the line's logically last shaped cluster that's eligible for
     /// justification (see [`Justification::justification_end_cluster`]).
     pub(crate) justification_end_cluster: u32,
@@ -179,12 +154,18 @@ pub(crate) struct HangingWhitespace {
 /// that are no longer eligible, as they are at or beyond that cluster.
 ///
 /// Each item in `items` is paired with its range of the run's shaped clusters.
+///
+/// `overflow` is the advance by which the line's content overflows the available width (excluding
+/// any whitespace already determined to be hanging). Following CSS Text 4 § 4.3.2, this limits
+/// conditionally hanging whitespace to only hangs as far as it overflows the available width. Pass
+/// [`f32::INFINITY`] to hang conditional whitespace in full.
 pub(crate) fn hanging_whitespace<B: Brush>(
     layout: &LayoutData<B>,
     items: impl Iterator<Item = (LayoutItem, Range<u32>)>,
+    mut overflow: f32,
 ) -> HangingWhitespace {
     let mut trailing = HangingWhitespace {
-        advance: HangingAdvance::default(),
+        advance: 0.,
         // Atoms with shaped clusters before this index may be stretched by justification.
         justification_end_cluster: u32::MAX,
         hanging_justification_opportunities: 0,
@@ -221,8 +202,11 @@ pub(crate) fn hanging_whitespace<B: Brush>(
                         &layout.styles,
                         effective_spacing,
                         item.bidi_level.is_rtl(),
+                        overflow,
                     );
                     trailing.advance += hanging;
+                    // What hangs no longer overflows.
+                    overflow -= hanging;
                     // Justification can't stretch within an atom, so it stops at the start of the
                     // last atom that hangs in its entirety or only partially.
                     trailing.justification_end_cluster = atom.shaped_clusters_range().start;
