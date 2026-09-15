@@ -11,7 +11,7 @@ use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
-use crate::layout::whitespace::{atom_hanging_advance, whitespace_can_hang};
+use crate::layout::whitespace::{atom_hanging_advance, soft_line_break};
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -21,7 +21,7 @@ use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
 
 use core::ops::Range;
 use parley_engine::shape::Whitespace;
-use parley_engine::{Atom, Boundary, FontMetrics};
+use parley_engine::{Atom, FontMetrics};
 
 #[derive(Default)]
 struct LineLayout {
@@ -785,11 +785,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let first_character = &atom.characters()[0];
                         let whitespace = first_character.info.whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
-                        // Whether this is a space that is allowed to hang past the line.
-                        let is_space = whitespace_can_hang(whitespace);
                         // Whether this atom is a justification opportunity.
                         let is_separator = is_word_separator(whitespace);
-                        let boundary = first_character.info.boundary();
                         let max_height_exceeded = self.state.line.max_height_exceeded;
                         let style = &self.layout.data.styles[first_character.style_index as usize];
 
@@ -851,7 +848,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 max_advance,
                                 line_indent,
                             );
-                        } else if boundary == Boundary::Line && text_wrap_mode == TextWrapMode::Wrap
+                        } else if text_wrap_mode == TextWrapMode::Wrap
+                            && soft_line_break(
+                                self.layout.data.shaped_text.characters(),
+                                atom.char_range().start as usize,
+                                &self.layout.data.styles,
+                            )
                         {
                             // We don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
                             // line breaks. We should accept the overflowing fragment in that scenario.
@@ -898,10 +900,15 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // in the line. If there is no such line-breaking opportunity (such as if wrapping is disabled), then
                         // we fall back to appending the content to the line anyway.
                         else {
-                            // Case: the atom is a space character (and wrapping is enabled)
-                            //
-                            // We hang any overflowing whitespace and then line-break.
-                            if is_space && style.text_wrap_mode == TextWrapMode::Wrap {
+                            let (hanging, all_hang) = atom_hanging_advance(
+                                slice,
+                                &atom,
+                                &self.layout.data.styles,
+                                spacing,
+                                item.bidi_level.is_rtl(),
+                                &mut None,
+                            );
+                            if all_hang || (hanging > 0. && next_x - hanging <= max_advance) {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
@@ -910,11 +917,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     next_x,
                                     text_metrics,
                                     is_separator,
-                                );
-                                return self.start_new_line(
-                                    BreakReason::Regular,
-                                    max_advance,
-                                    line_indent,
                                 );
                             }
                             // Case: we have previously encountered a REGULAR line-breaking opportunity in the current line
@@ -1463,8 +1465,15 @@ fn commit_line<B: Brush>(
     // let end_run_idx = lines.line_items.last().map(|item| item.index).unwrap_or(0);
     let end_item_idx = lines.line_items.len();
 
-    let (hanging_advance, justification_end_cluster, hanging_opportunities) =
-        hanging_whitespace(layout, &lines.line_items[start_item_idx..end_item_idx]);
+    let overflow = match break_reason {
+        BreakReason::Regular | BreakReason::Emergency => None,
+        BreakReason::Explicit | BreakReason::None => Some(state.x - max_advance),
+    };
+    let (hanging_advance, justification_end_cluster, hanging_opportunities) = hanging_whitespace(
+        layout,
+        &lines.line_items[start_item_idx..end_item_idx],
+        overflow,
+    );
     // The word separators counted as the line was built include the line's hanging whitespace, and
     // hanging whitespace is not stretched by justification.
     let num_justification_opportunities = state.num_word_separators - hanging_opportunities;
@@ -1522,6 +1531,7 @@ fn commit_line<B: Brush>(
 fn hanging_whitespace<B: Brush>(
     layout: &Layout<B>,
     line_items: &[LineItemData],
+    mut overflow: Option<f32>,
 ) -> (f32, u32, u32) {
     let mut hanging_whitespace_advance = 0.;
     // Atoms with shaped clusters before this index may be stretched by justification.
@@ -1564,6 +1574,7 @@ fn hanging_whitespace<B: Brush>(
                         &layout.data.styles,
                         effective_spacing,
                         line_item.is_rtl(),
+                        &mut overflow,
                     );
                     hanging_whitespace_advance += hanging;
                     // Justification can't stretch within an atom, so it stops at the start of the
