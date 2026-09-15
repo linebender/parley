@@ -122,13 +122,9 @@ impl<'a> Query<'a> {
 
     /// Sets the characters that fallback fonts are expected to cover.
     ///
-    /// When set, if none of the families or fallback families provide glyph
-    /// coverage for these characters, the query is extended with fonts
-    /// suggested by the platform for the specific characters and, if
-    /// [`exhaustive_fallback`] is enabled, with any font in the collection
-    /// that covers them.
-    ///
-    /// [`exhaustive_fallback`]: crate::CollectionOptions::exhaustive_fallback
+    /// When set, after the families and fallback families have been
+    /// visited, the query is extended with the fonts suggested by the
+    /// platform for these specific characters.
     pub fn set_fallback_chars(&mut self, chars: impl IntoIterator<Item = char>) {
         self.state.scratch_chars.clear();
         self.state.scratch_chars.extend(chars);
@@ -154,12 +150,11 @@ impl<'a> Query<'a> {
             .iter_mut()
             .chain(self.state.fallback_families.iter_mut())
         {
-            let (status, _) = visit_family(
+            let status = visit_family(
                 self.collection,
                 self.source_cache,
                 self.attributes,
                 family,
-                None,
                 &mut f,
             );
             if status == QueryStatus::Stop {
@@ -170,114 +165,62 @@ impl<'a> Query<'a> {
             return;
         }
         // None of the requested or fallback families matched, so extend the
-        // search with fonts that cover the specific fallback characters,
-        // asking the platform first.
-        let locale = self.fallbacks.and_then(|key| key.locale());
+        // search with the families the platform suggests for the specific
+        // fallback characters.
         if !self.state.char_fallback_synced {
-            let (families, _) = self
+            let locale = self.fallbacks.and_then(|key| key.locale());
+            let families = self
                 .collection
                 .fallback_families_for_chars(&self.state.fallback_chars, locale);
-            let mut new_families: SmallVec<[FamilyId; 2]> = SmallVec::new();
             for id in families {
                 if !contains_family(&self.state.families, id)
                     && !contains_family(&self.state.fallback_families, id)
                     && !contains_family(&self.state.char_fallback_families, id)
                 {
-                    new_families.push(id);
+                    self.state
+                        .char_fallback_families
+                        .push(CachedFamily::new(id));
                 }
             }
-            self.state
-                .char_fallback_families
-                .extend(new_families.into_iter().map(CachedFamily::new));
             self.state.char_fallback_synced = true;
         }
         for family in self.state.char_fallback_families.iter_mut() {
-            let (status, _) = visit_family(
+            let status = visit_family(
                 self.collection,
                 self.source_cache,
                 self.attributes,
                 family,
-                None,
                 &mut f,
             );
             if status == QueryStatus::Stop {
                 return;
             }
         }
-        // As a last resort, scan the entire collection for a font that
-        // covers the fallback characters. The results are cached in the
-        // collection so this scan only happens once per set of characters.
-        if !self.collection.exhaustive_fallback() {
-            return;
-        }
-        let (_, scanned) = self
-            .collection
-            .fallback_families_for_chars(&self.state.fallback_chars, locale);
-        if scanned {
-            return;
-        }
-        for id in self.collection.all_family_ids_by_name() {
-            if contains_family(&self.state.families, id)
-                || contains_family(&self.state.fallback_families, id)
-                || contains_family(&self.state.char_fallback_families, id)
-            {
-                continue;
-            }
-            let mut family = CachedFamily::new(id);
-            let (status, matched) = visit_family(
-                self.collection,
-                self.source_cache,
-                self.attributes,
-                &mut family,
-                Some(&self.state.fallback_chars),
-                &mut f,
-            );
-            if matched {
-                self.collection.add_fallback_family_for_chars(
-                    &self.state.fallback_chars,
-                    locale,
-                    id,
-                );
-                self.state.char_fallback_families.push(family);
-            }
-            if status == QueryStatus::Stop {
-                return;
-            }
-        }
-        self.collection
-            .mark_chars_scanned(&self.state.fallback_chars, locale);
     }
 }
 
-/// Loads the fonts for a family and invokes the callback with each one,
-/// optionally requiring the fonts to provide glyph coverage for a set
-/// of characters.
-///
-/// Returns the resulting status and whether any font was passed to the
-/// callback.
+/// Loads the fonts for a family and invokes the callback with each one.
 fn visit_family(
     collection: &mut Inner,
     source_cache: &mut SourceCache,
     attributes: Attributes,
     family: &mut CachedFamily,
-    required_chars: Option<&[char]>,
     f: &mut impl FnMut(&QueryFont) -> QueryStatus,
-) -> (QueryStatus, bool) {
-    let mut matched = false;
+) -> QueryStatus {
     match &mut family.family {
-        Entry::Error => return (QueryStatus::Continue, false),
+        Entry::Error => return QueryStatus::Continue,
         Entry::Ok(..) => {}
         status @ Entry::Vacant => {
             if let Some(info) = collection.family(family.id) {
                 *status = Entry::Ok(info);
             } else {
                 *status = Entry::Error;
-                return (QueryStatus::Continue, false);
+                return QueryStatus::Continue;
             }
         }
     }
     let Entry::Ok(family_info) = &family.family else {
-        return (QueryStatus::Continue, false);
+        return QueryStatus::Continue;
     };
     let bucket = load_bucket(family_info, attributes, &mut family.best, source_cache);
     let mut yielded_default = false;
@@ -285,39 +228,19 @@ fn visit_family(
         if font.family.1 == family_info.default_font_index() {
             yielded_default = true;
         }
-        if covers(font, required_chars) {
-            matched = true;
-            if f(font) == QueryStatus::Stop {
-                return (QueryStatus::Stop, matched);
-            }
+        if f(font) == QueryStatus::Stop {
+            return QueryStatus::Stop;
         }
     }
     if yielded_default {
-        return (QueryStatus::Continue, matched);
+        return QueryStatus::Continue;
     }
     if let Some(font) = load_font(family_info, attributes, &mut family.default, source_cache)
-        && covers(font, required_chars)
+        && f(font) == QueryStatus::Stop
     {
-        matched = true;
-        if f(font) == QueryStatus::Stop {
-            return (QueryStatus::Stop, matched);
-        }
+        return QueryStatus::Stop;
     }
-    (QueryStatus::Continue, matched)
-}
-
-/// Returns true if the font provides a glyph for each of the required
-/// characters (or if no characters are required).
-fn covers(font: &QueryFont, required_chars: Option<&[char]>) -> bool {
-    let Some(chars) = required_chars else {
-        return true;
-    };
-    let Some(charmap) = font.charmap() else {
-        return false;
-    };
-    chars
-        .iter()
-        .all(|&ch| charmap.map(ch).is_some_and(|glyph| glyph != 0))
+    QueryStatus::Continue
 }
 
 fn contains_family(families: &[CachedFamily], id: FamilyId) -> bool {

@@ -222,8 +222,7 @@ impl SystemFonts {
 
     pub(crate) fn fallback_for_text(&self, _text: &str, _locale: Option<&str>) -> Option<FamilyId> {
         // Android has no system API for per-character fallback; coverage
-        // is provided by the fallback chains above and by the exhaustive
-        // scan in `Query::matches_with`.
+        // is provided by the full fallback chains above.
         None
     }
 }

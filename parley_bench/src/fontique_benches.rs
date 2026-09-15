@@ -31,7 +31,6 @@ pub fn system_fonts_init() -> Vec<Benchmark> {
                 let mut collection = Collection::new(CollectionOptions {
                     shared: false,
                     system_fonts: true,
-                    exhaustive_fallback: true,
                 });
 
                 // Force a read to prevent the optimizer from treating initialization as unused.

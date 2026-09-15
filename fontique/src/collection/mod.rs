@@ -51,19 +51,6 @@ pub struct CollectionOptions {
     ///
     /// The default value is `true`.
     pub system_fonts: bool,
-
-    /// If true, when a query provides fallback characters (see
-    /// [`Query::set_fallback_chars`]) and neither the requested families nor
-    /// the script fallback families cover them, the query will scan all
-    /// available fonts for one that does, guaranteeing that a glyph is found
-    /// if any font provides one.
-    ///
-    /// The scan requires loading font data to inspect character coverage.
-    /// Results (including negative results) are cached, so this cost is only
-    /// paid once per unique set of fallback characters.
-    ///
-    /// The default value is `true`.
-    pub exhaustive_fallback: bool,
 }
 
 impl Default for CollectionOptions {
@@ -71,7 +58,6 @@ impl Default for CollectionOptions {
         Self {
             shared: false,
             system_fonts: true,
-            exhaustive_fallback: true,
         }
     }
 }
@@ -268,7 +254,6 @@ struct Inner {
     shared_version: CounterInt,
     fallback_cache: FallbackCache,
     text_fallback_cache: TextFallbackCache,
-    exhaustive_fallback: bool,
 }
 
 impl Inner {
@@ -283,7 +268,6 @@ impl Inner {
             shared_version: 0,
             fallback_cache: FallbackCache::default(),
             text_fallback_cache: TextFallbackCache::default(),
-            exhaustive_fallback: options.exhaustive_fallback,
         }
     }
 
@@ -535,22 +519,21 @@ impl Inner {
         self.data.fallbacks.append(key, families)
     }
 
-    /// Returns the fallback families that cover the given characters,
-    /// querying the system font backend if the result isn't cached, along
-    /// with a flag indicating whether an exhaustive scan of the collection
-    /// has already been performed for these characters.
+    /// Returns the fallback families the platform suggests for the given
+    /// characters, querying the system font backend if the result isn't
+    /// cached.
     pub fn fallback_families_for_chars(
         &mut self,
         chars: &[char],
         locale: Option<Language>,
-    ) -> (SmallVec<[FamilyId; 2]>, bool) {
+    ) -> SmallVec<[FamilyId; 2]> {
         self.sync_shared();
         let key = TextFallbackKey {
             chars: chars.into(),
             locale,
         };
-        if let Some(entry) = self.text_fallback_cache.entries.get(&key) {
-            return (entry.families.clone(), entry.scanned);
+        if let Some(families) = self.text_fallback_cache.entries.get(&key) {
+            return families.clone();
         }
         #[allow(unused_mut)]
         let mut families = SmallVec::new();
@@ -567,61 +550,7 @@ impl Inner {
             }
         }
         self.text_fallback_cache.insert(key, families.clone());
-        (families, false)
-    }
-
-    /// Records that the given family covers the given characters.
-    pub fn add_fallback_family_for_chars(
-        &mut self,
-        chars: &[char],
-        locale: Option<Language>,
-        family: FamilyId,
-    ) {
-        let entry = self.text_fallback_cache.entry_mut(chars, locale);
-        if !entry.families.contains(&family) {
-            entry.families.push(family);
-        }
-    }
-
-    /// Records that an exhaustive scan has been performed for the given
-    /// characters, so all covering families are present in the cache.
-    pub fn mark_chars_scanned(&mut self, chars: &[char], locale: Option<Language>) {
-        self.text_fallback_cache.entry_mut(chars, locale).scanned = true;
-    }
-
-    /// Returns whether queries may scan the entire collection for glyph
-    /// coverage as a last resort.
-    pub fn exhaustive_fallback(&self) -> bool {
-        self.exhaustive_fallback
-    }
-
-    /// Returns the identifiers of all families in the collection, ordered
-    /// by family name for determinism.
-    ///
-    /// Hidden families (those whose name starts with `.`, such as macOS
-    /// system fonts) are ordered last, and the macOS `LastResort` font is
-    /// excluded entirely since it claims coverage of all codepoints while
-    /// only rendering placeholder glyphs.
-    pub fn all_family_ids_by_name(&mut self) -> Vec<FamilyId> {
-        self.sync_shared();
-        let mut names: Vec<&FamilyName> = FamilyNames {
-            ours: self.data.family_names.iter(),
-            system: self.system.as_ref().map(|sys| sys.family_names.iter()),
-        }
-        .filter(|name| {
-            let name = name.name();
-            !name.eq_ignore_ascii_case(".LastResort") && !name.eq_ignore_ascii_case("LastResort")
-        })
-        .collect();
-        names.sort_by_key(|name| (name.name().starts_with('.'), name.name()));
-        // A family can be registered under multiple names (aliases), so
-        // dedupe the identifiers.
-        let mut seen = hashbrown::HashSet::with_capacity(names.len());
-        names
-            .iter()
-            .filter(|name| seen.insert(name.id()))
-            .map(|name| name.id())
-            .collect()
+        families
     }
 
     /// Loads all fonts that exist in the specified directory(s)
@@ -795,10 +724,11 @@ impl FallbackCache {
 /// Maximum number of entries in [`TextFallbackCache`] before it is cleared.
 const TEXT_FALLBACK_CACHE_MAX_ENTRIES: usize = 1024;
 
-/// Cache of fallback families for specific sets of characters.
+/// Cache of platform-suggested fallback families for specific sets of
+/// characters.
 #[derive(Clone, Default)]
 struct TextFallbackCache {
-    entries: HashMap<TextFallbackKey, TextFallbackEntry>,
+    entries: HashMap<TextFallbackKey, SmallVec<[FamilyId; 2]>>,
 }
 
 impl TextFallbackCache {
@@ -810,25 +740,7 @@ impl TextFallbackCache {
         if self.entries.len() >= TEXT_FALLBACK_CACHE_MAX_ENTRIES {
             self.entries.clear();
         }
-        self.entries.insert(
-            key,
-            TextFallbackEntry {
-                families,
-                scanned: false,
-            },
-        );
-    }
-
-    fn entry_mut(&mut self, chars: &[char], locale: Option<Language>) -> &mut TextFallbackEntry {
-        if self.entries.len() >= TEXT_FALLBACK_CACHE_MAX_ENTRIES {
-            self.entries.clear();
-        }
-        self.entries
-            .entry(TextFallbackKey {
-                chars: chars.into(),
-                locale,
-            })
-            .or_default()
+        self.entries.insert(key, families);
     }
 }
 
@@ -836,15 +748,6 @@ impl TextFallbackCache {
 struct TextFallbackKey {
     chars: SmallVec<[char; 8]>,
     locale: Option<Language>,
-}
-
-#[derive(Clone, Default)]
-struct TextFallbackEntry {
-    /// Families known to cover the characters, in priority order.
-    families: SmallVec<[FamilyId; 2]>,
-    /// True if the entire collection has been scanned for coverage of the
-    /// characters, meaning `families` is exhaustive.
-    scanned: bool,
 }
 
 /// Data taken from the system font collection.
@@ -1042,11 +945,10 @@ mod tests {
         Blob::new(Arc::new(std::fs::read(path).unwrap()))
     }
 
-    fn test_collection(exhaustive_fallback: bool) -> Collection {
+    fn test_collection() -> Collection {
         let mut collection = Collection::new(CollectionOptions {
             shared: false,
             system_fonts: false,
-            exhaustive_fallback,
         });
         collection.register_fonts(
             load_font("parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf"),
@@ -1084,32 +986,25 @@ mod tests {
     }
 
     #[test]
-    fn exhaustive_fallback_finds_covering_font() {
-        let mut collection = test_collection(true);
-        // There are no fallback families registered for Arabic and no system
-        // fonts, so only the exhaustive scan can find this font.
+    fn fallback_chars_use_script_fallback_families() {
+        let mut collection = test_collection();
+        let arabic = collection.family_id("Noto Kufi Arabic").unwrap();
+        collection.append_fallbacks(Script::from_bytes(*b"Arab"), [arabic].into_iter());
         let family = select_covering_family(&mut collection, 'م')
-            .expect("exhaustive fallback should find a font with Arabic coverage");
-        assert_eq!(collection.family_name(family), Some("Noto Kufi Arabic"));
+            .expect("script fallback should find a font with Arabic coverage");
+        assert_eq!(family, arabic);
         // Run the query again to exercise the cached path.
-        let family = select_covering_family(&mut collection, 'م')
-            .expect("cached fallback should find a font with Arabic coverage");
-        assert_eq!(collection.family_name(family), Some("Noto Kufi Arabic"));
+        let family = select_covering_family(&mut collection, 'م').unwrap();
+        assert_eq!(family, arabic);
     }
 
     #[test]
-    fn exhaustive_fallback_negative_result_is_cached() {
-        let mut collection = test_collection(true);
-        // No registered font covers this character; the query should
-        // complete without a match both before and after the negative
-        // result is cached.
-        assert_eq!(select_covering_family(&mut collection, '\u{10FFFD}'), None);
-        assert_eq!(select_covering_family(&mut collection, '\u{10FFFD}'), None);
-    }
-
-    #[test]
-    fn exhaustive_fallback_can_be_disabled() {
-        let mut collection = test_collection(false);
+    fn fallback_chars_without_system_fonts_add_no_families() {
+        let mut collection = test_collection();
+        // With no system fonts and no fallback families registered for
+        // Arabic, fallback characters must not cause the query to reach
+        // into unrelated registered fonts.
+        assert_eq!(select_covering_family(&mut collection, 'م'), None);
         assert_eq!(select_covering_family(&mut collection, 'م'), None);
     }
 }
@@ -1130,7 +1025,6 @@ fn make_shared_matches_local() {
     let mut collection = Collection::new(CollectionOptions {
         shared: false,
         system_fonts: false,
-        exhaustive_fallback: true,
     });
 
     let font_dirs: Vec<std::path::PathBuf> = [
