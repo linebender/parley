@@ -183,15 +183,17 @@ impl ShapedCluster {
 pub struct ClusterInfo {
     boundary: Boundary,
     whitespace: Whitespace,
+    is_word_boundary: bool,
     source_char: char,
 }
 
 impl ClusterInfo {
     #[inline(always)]
-    pub fn new(boundary: Boundary, source_char: char) -> Self {
+    pub fn new(boundary: Boundary, is_word_boundary: bool, source_char: char) -> Self {
         Self {
             boundary,
             whitespace: Whitespace::from_char(source_char),
+            is_word_boundary,
             source_char,
         }
     }
@@ -208,10 +210,16 @@ impl ClusterInfo {
         self.whitespace
     }
 
-    /// Returns if the cluster is a line boundary.
+    /// Returns if the cluster is a line break opportunity (soft or mandatory).
     #[inline]
     pub fn is_boundary(self) -> bool {
         self.boundary != Boundary::None
+    }
+
+    /// Returns if the cluster is a word boundary.
+    #[inline]
+    pub fn is_word_boundary(self) -> bool {
+        self.is_word_boundary
     }
 
     /// Returns if the cluster is an emoji.

@@ -191,6 +191,7 @@ impl CharInfo {
     const CONTRIBUTES_TO_SHAPING_SHIFT: u8 = 4;
     const FORCE_NORMALIZE_SHIFT: u8 = 5;
     const GRAPHEME_START_SHIFT: u8 = 6;
+    const WORD_BOUNDARY_SHIFT: u8 = 7;
 
     #[allow(
         dead_code,
@@ -207,6 +208,7 @@ impl CharInfo {
     const CONTRIBUTES_TO_SHAPING_MASK: u8 = 1 << Self::CONTRIBUTES_TO_SHAPING_SHIFT;
     const FORCE_NORMALIZE_MASK: u8 = 1 << Self::FORCE_NORMALIZE_SHIFT;
     const GRAPHEME_START_MASK: u8 = 1 << Self::GRAPHEME_START_SHIFT;
+    const WORD_BOUNDARY_MASK: u8 = 1 << Self::WORD_BOUNDARY_SHIFT;
 
     fn new(
         boundary: Boundary,
@@ -220,6 +222,7 @@ impl CharInfo {
         contributes_to_shaping: bool,
         force_normalize: bool,
         is_grapheme_start: bool,
+        is_word_boundary: bool,
     ) -> Self {
         Self {
             boundary,
@@ -232,7 +235,8 @@ impl CharInfo {
                 | (is_emoji_or_pictograph as u8) << Self::EMOJI_OR_PICTOGRAPH_SHIFT
                 | (contributes_to_shaping as u8) << Self::CONTRIBUTES_TO_SHAPING_SHIFT
                 | (force_normalize as u8) << Self::FORCE_NORMALIZE_SHIFT
-                | (is_grapheme_start as u8) << Self::GRAPHEME_START_SHIFT,
+                | (is_grapheme_start as u8) << Self::GRAPHEME_START_SHIFT
+                | (is_word_boundary as u8) << Self::WORD_BOUNDARY_SHIFT,
         }
     }
 
@@ -279,6 +283,14 @@ impl CharInfo {
     #[inline(always)]
     pub fn is_grapheme_start(self) -> bool {
         self.flags & Self::GRAPHEME_START_MASK != 0
+    }
+
+    /// Whether there is a word boundary before this character ([UAX #29 § 4][words]).
+    ///
+    /// [words]: https://www.unicode.org/reports/tr29/#Word_Boundaries
+    #[inline(always)]
+    pub fn is_word_boundary(self) -> bool {
+        self.flags & Self::WORD_BOUNDARY_MASK != 0
     }
 }
 
@@ -611,7 +623,7 @@ pub(crate) fn analyze_text(
             Boundary::None
         };
 
-        (boundary, is_grapheme_start, ch, properties)
+        (boundary, is_word, is_grapheme_start, ch, properties)
     });
 
     let mut needs_bidi_resolution = false;
@@ -624,7 +636,7 @@ pub(crate) fn analyze_text(
         // character-indexed.
         .fold(
             false,
-            |is_mandatory_linebreak, (boundary, is_grapheme_start, ch, properties)| {
+            |is_mandatory_linebreak, (boundary, is_word, is_grapheme_start, ch, properties)| {
                 let script = properties.script();
                 let grapheme_cluster_break = properties.grapheme_cluster_break();
                 let bidi_class = properties.bidi_class();
@@ -669,6 +681,7 @@ pub(crate) fn analyze_text(
                     contributes_to_shaping(general_category, script),
                     force_normalize,
                     is_grapheme_start,
+                    is_word,
                 ));
 
                 next_mandatory_linebreak

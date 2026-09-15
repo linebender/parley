@@ -277,7 +277,7 @@ impl ShapedText {
         {
             self.characters.push(Character {
                 text_byte_start: (range.byte_range.start + byte_offset) as u32,
-                info: ClusterInfo::new(info.boundary, ch),
+                info: ClusterInfo::new(info.boundary, info.is_word_boundary(), ch),
                 style_index: *style_index,
                 grapheme_start: info.is_grapheme_start(),
             });
