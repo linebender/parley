@@ -20,6 +20,9 @@ pub(super) struct QueryState {
     families: Vec<CachedFamily>,
     fallback_families: Vec<CachedFamily>,
     fallback_chars: SmallVec<[char; 8]>,
+    /// Scratch buffer used to compare incoming fallback characters against
+    /// `fallback_chars` without allocating.
+    scratch_chars: SmallVec<[char; 8]>,
     char_fallback_families: Vec<CachedFamily>,
     char_fallback_synced: bool,
 }
@@ -29,6 +32,7 @@ impl QueryState {
         self.families.clear();
         self.fallback_families.clear();
         self.fallback_chars.clear();
+        self.scratch_chars.clear();
         self.char_fallback_families.clear();
         self.char_fallback_synced = false;
     }
@@ -126,9 +130,13 @@ impl<'a> Query<'a> {
     ///
     /// [`exhaustive_fallback`]: crate::CollectionOptions::exhaustive_fallback
     pub fn set_fallback_chars(&mut self, chars: impl IntoIterator<Item = char>) {
-        let chars: SmallVec<[char; 8]> = chars.into_iter().collect();
-        if self.state.fallback_chars != chars {
-            self.state.fallback_chars = chars;
+        self.state.scratch_chars.clear();
+        self.state.scratch_chars.extend(chars);
+        if self.state.fallback_chars != self.state.scratch_chars {
+            core::mem::swap(
+                &mut self.state.fallback_chars,
+                &mut self.state.scratch_chars,
+            );
             self.state.char_fallback_families.clear();
             self.state.char_fallback_synced = false;
         }
