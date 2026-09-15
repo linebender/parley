@@ -1463,10 +1463,11 @@ fn commit_line<B: Brush>(
     // let end_run_idx = lines.line_items.last().map(|item| item.index).unwrap_or(0);
     let end_item_idx = lines.line_items.len();
 
-    // Trailing preserved whitespace before a forced break hangs conditionally (CSS Text 4 § 4.3.2):
-    // only the part that doesn't fit hangs. Whitespace that fits, stays inside the line box, and
-    // counts towards alignment and the layout width. The end of the layout is considered to be a
-    // forced line break as well (CSS Text 4 § 5). Other trailing whitespace hangs unconditionally.
+    // Trailing whitespace under `WhiteSpaceCollapse::Preserve` directly preceding a forced break
+    // hangs conditionally (CSS Text 4 § 4.3.2): only the part that doesn't fit hangs. Whitespace
+    // that fits, stays inside the line box, and counts towards alignment and the layout width. The
+    // end of the layout is considered to be a forced line break as well (CSS Text 4 § 5). Other
+    // trailing whitespace hangs unconditionally.
     let overflow = match break_reason {
         BreakReason::Regular | BreakReason::Emergency => f32::INFINITY,
         BreakReason::Explicit | BreakReason::None => state.x - max_advance,
@@ -1532,8 +1533,8 @@ fn commit_line<B: Brush>(
 /// `line_items` must be in logical order.
 ///
 /// `overflow` is the advance by which the line's content overflows the available width (excluding
-/// any whitespace already determined to be hanging). Following CSS Text 4 § 4.3.2, this limits
-/// conditionally hanging whitespace to only hangs as far as it overflows the available width. Pass
+/// any whitespace already determined to be hanging). Following CSS Text 4 § 9.2, this limits
+/// conditionally hanging whitespace to only hang as far as it overflows the available width. Pass
 /// [`f32::INFINITY`] to hang conditional whitespace in full.
 //
 // Note: This runs once per line, but it called in the line breaker's per-atom loop. The compiler
@@ -1548,9 +1549,15 @@ fn hanging_whitespace<B: Brush>(
     // Atoms with shaped clusters before this index may be stretched by justification.
     let mut justification_end_cluster = u32::MAX;
     let mut hanging_opportunities = 0;
-    // Conditionally hanging whitespace hangst as far as it overflows. Unconditionally hanging
-    // whitespace before it hangs, but only if the conditional whitespace hangs in
-    // full (CSS Text 4 § 9.2). Newlines have no advance and don't take part in this.
+    // Following CSS Text 4 § 4.3.2, a sequence of whitespace with `WhiteSpaceCollapse::Preserve`
+    // directly preceding a forced line break hangs conditionally. All other whitespace hangs
+    // unconditionally. Note that, in particular, a sequence of `WhiteSpaceCollapse::Preserve`
+    // preceding a sequence of unconditionally hanging whitespace, also hangs unconditionally.
+    //
+    // Conditionally hanging whitespace hangs only as far as it overflows.
+    //
+    // Following CSS Text 4 § 9.2, unconditionally hanging whitespace before conditionally hanging
+    // whitespace, hangs only if the conditionally hanging whitespace hangs in full.
     let mut in_conditional_suffix = true;
     let mut conditional_advance: Option<f32> = None;
 
@@ -1601,9 +1608,9 @@ fn hanging_whitespace<B: Brush>(
                             *conditional_advance.get_or_insert(0.) += hanging;
                         } else {
                             in_conditional_suffix = false;
-                            // A conditionally hanging glyph that fits (including one with a
-                            // non-positive advance) doesn't hang, and so whitespace before it
-                            // isn't at the line's end.
+                            // A conditionally hanging atom that fits (including one with a
+                            // non-positive advance) doesn't hang, and so whitespace before it isn't
+                            // at the line's end.
                             if conditional_advance
                                 .is_some_and(|advance| advance <= 0. || advance > overflow)
                             {

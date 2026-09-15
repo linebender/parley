@@ -30,11 +30,13 @@ fn advance(env: &mut TestEnv, text: &str) -> f32 {
 fn hanging_across_collapse_mode_boundary() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    // A `white-space-collapse` boundary inside the trailing whitespace before a forced break.
-    // Collapsible whitespace at the end hangs unconditionally, and so does the preserved whitespace
-    // before it (CSS Text 4 § 4.3.2 doesn't say). Preserved whitespace at the end hangs
-    // conditionally, and the collapsible whitespace before it hangs only if the preserved
-    // whitespace hangs in full (CSS Text 4 § 9.2).
+    // This tests changing `white-space-collapse` inside the trailing whitespace before a forced
+    // break. Collapsible whitespace at the end hangs unconditionally, and the preserved whitespace
+    // before it also hangs (CSS Text 4 § 4.3.2 says to hang conditionally only if the preserved
+    // whitespace sequence is followed by a forced line break).
+    //
+    // Preserved whitespace at the end hangs conditionally, and the collapsible whitespace before it
+    // hangs only if the preserved whitespace hangs in full (CSS Text 4 § 9.2).
     let word = advance(&mut env, "X");
     let space = advance(&mut env, " ");
     let ideographic_space = advance(&mut env, "\u{3000}");

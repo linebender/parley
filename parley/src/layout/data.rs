@@ -291,6 +291,7 @@ impl<B: Brush> LayoutData<B> {
         // `running_min_width` when the hanging whitespace started before the last break
         // opportunity, in which case the line consists entirely of hanging whitespace.
         let mut running_hanging_whitespace = 0.0;
+
         // Whether that running whitespace hangs conditionally before a forced break (following CSS
         // Text 4 § 4.3.2, that's the case for `WhiteSpaceCollapse::Preserve`). Conditional
         // whitespace only hangs if it doesn't fit, which here means it counts towards the
