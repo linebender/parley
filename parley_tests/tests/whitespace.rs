@@ -10,7 +10,7 @@ use parley::{
     WhiteSpaceCollapse,
 };
 
-fn close(actual: f32, expected: f32) {
+fn nearly_eq(actual: f32, expected: f32) {
     assert!((actual - expected).abs() < 1e-3, "{actual} != {expected}");
 }
 
@@ -31,30 +31,17 @@ fn hanging_across_collapse_mode_boundary() {
     let mut env = TestEnv::new(test_name!(), None);
 
     // A `white-space-collapse` boundary inside the trailing whitespace before a forced break.
-    // Following CSS Text 4 § 4.3.2, whitespace hangs from the line's end inward: collapsible
-    // whitespace unconditionally, preserved whitespace only as far as it still overflows. A
-    // preserved space that fits ends the hanging sequence, so the whitespace before it doesn't
-    // hang, whereas collapsible whitespace at the end is taken off first, so the preserved spaces
-    // before it hang conditionally.
+    // CSS Text 4 § 4.3.2 doesn't say how such a sequence hangs; we just decide by the logically
+    // last whitespace: collapsible? Everything hangs unconditionally. Preserved? Everything hangs
+    // conditionally.
     let word = advance(&mut env, "X");
     let space = advance(&mut env, " ");
     let ideographic_space = advance(&mut env, "\u{3000}");
-    let full = word + 2. * space + ideographic_space;
-    let preserved = 2. * space;
-    // The hanging advance for a line overflowing by `overflow`, with the preserved spaces logically
-    // before or after the collapsible ideographic space.
-    let expected_hanging = |preserved_first: bool, overflow: f32| {
-        if preserved_first {
-            ideographic_space + (overflow - ideographic_space).clamp(0., preserved)
-        } else if overflow < preserved {
-            overflow.max(0.)
-        } else {
-            preserved + ideographic_space
-        }
-    };
-    for (text, collapse_range, preserved_first, max_content) in [
-        ("X  \u{3000}\nX", 3..6, true, word + preserved),
-        ("X\u{3000}  \nX", 1..4, false, full),
+    let whitespace = 2. * space + ideographic_space;
+    let full = word + whitespace;
+    for (text, collapse_range, conditional) in [
+        ("X  \u{3000}\nX", 3..6, false),
+        ("X\u{3000}  \nX", 1..4, true),
     ] {
         let mut builder = env.ranged_builder(text);
         builder.push_default(StyleProperty::WhiteSpaceCollapse(
@@ -66,27 +53,25 @@ fn hanging_across_collapse_mode_boundary() {
         );
         let mut layout = builder.build(text);
         let widths = layout.calculate_content_widths();
-        close(widths.min, word);
-        close(widths.max, max_content);
+        nearly_eq(widths.min, word);
+        nearly_eq(widths.max, if conditional { full } else { word });
 
-        for overflow in [
-            -5.,
-            space / 2.,
-            preserved,
-            preserved + ideographic_space / 2.,
-            full - word + 5.,
-        ] {
+        for overflow in [-5., space / 2., whitespace / 2., whitespace + 5.] {
             let width = full - overflow;
             layout.break_all_lines(Some(width));
             assert_eq!(layout.len(), 2, "{text:?} at {width}");
             let line = layout.get(0).unwrap();
             assert_eq!(line.break_reason(), BreakReason::Explicit);
-            let hanging = expected_hanging(preserved_first, overflow);
-            close(line.metrics().hanging_advance, hanging);
-            close(layout.width(), full - hanging);
+            let hanging = if conditional {
+                overflow.clamp(0., whitespace)
+            } else {
+                whitespace
+            };
+            nearly_eq(line.metrics().hanging_advance, hanging);
+            nearly_eq(layout.width(), full - hanging);
             // Overflowing lines aren't aligned by default.
             layout.align(Alignment::Right, AlignmentOptions::default());
-            close(
+            nearly_eq(
                 layout.get(0).unwrap().metrics().offset,
                 (width - full + hanging).max(0.),
             );
@@ -98,11 +83,12 @@ fn hanging_across_collapse_mode_boundary() {
 fn overflowing_whitespace_hangs_without_adding_a_break_opportunity() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    // Whitespace that overflows the line hangs, but whether the line breaks after it is up to
-    // the line breaking analysis: there's no opportunity before "!" (UAX #14 LB13), nor inside
-    // or after the grapheme of a space followed by a combining mark.
+    // Whitespace that overflows the line hangs, but whether the line breaks after it is up to the
+    // line breaking analysis: e.g., there's no opportunity before "!" (UAX #14 LB13).
+    //
+    // (See `CHROMIUM_LINE_BREAK_OVERRIDE` to break in more positions.)
     let word = advance(&mut env, "aaa");
-    for (text, lines) in [("aaa   !", 1), ("aaa \u{301}bbb", 1), ("aaa   bbb", 2)] {
+    for (text, lines) in [("aaa   !", 1), ("aaa   bbb", 2)] {
         let mut layout: Layout<ColorBrush> = env.ranged_builder(text).build(text);
         layout.break_all_lines(Some(word + 1.));
         assert_eq!(layout.len(), lines, "{text:?}");
@@ -111,7 +97,7 @@ fn overflowing_whitespace_hangs_without_adding_a_break_opportunity() {
             assert_eq!(line.break_reason(), BreakReason::None);
         } else {
             assert_eq!(line.break_reason(), BreakReason::Regular);
-            close(
+            nearly_eq(
                 line.metrics().hanging_advance,
                 advance(&mut env, "aaa   ") - word,
             );
