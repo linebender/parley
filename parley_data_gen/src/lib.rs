@@ -3,11 +3,12 @@
 
 //! See `./main.rs`.
 
-use icu_properties::props::{GeneralCategory, GraphemeClusterBreak, Script};
 use icu_properties::{
     CodePointMapData, CodePointSetData,
     props::{
-        BidiClass, Emoji, ExtendedPictographic, LineBreak, RegionalIndicator, VariationSelector,
+        BidiClass, Emoji, EmojiModifier, EmojiModifierBase, EmojiPresentation,
+        ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, RegionalIndicator,
+        Script, VariationSelector,
     },
 };
 use parley_data::Properties;
@@ -28,36 +29,55 @@ pub struct Config {
 
 /// Exports ICU data as `PackTab` lookup tables + generated Rust code into the `out` directory.
 pub fn generate(out: std::path::PathBuf, config: &Config) {
-    // Generate the data required for `CompositeProps`.
-    let values = {
-        // Dense values table for 0..=0x10FFFF
-        let mut values = Vec::<u32>::with_capacity(0x110000);
-        for cp in 0_u32..=0x10FFFF {
-            let v = Properties::new(
-                CodePointMapData::<Script>::new().get32(cp),
-                CodePointMapData::<GeneralCategory>::new().get32(cp),
-                CodePointMapData::<GraphemeClusterBreak>::new().get32(cp),
-                CodePointMapData::<BidiClass>::new().get32(cp),
-                CodePointSetData::new::<Emoji>().contains32(cp)
-                    || CodePointSetData::new::<ExtendedPictographic>().contains32(cp),
-                CodePointSetData::new::<VariationSelector>().contains32(cp),
-                CodePointSetData::new::<RegionalIndicator>().contains32(cp),
-                // See: https://github.com/unicode-org/icu4x/blob/ee5399a77a6b94efb5d4b60678bb458c5eedb25d/components/segmenter/src/line.rs#L338-L351
-                matches!(
-                    CodePointMapData::<LineBreak>::new().get32(cp),
-                    LineBreak::MandatoryBreak
-                        | LineBreak::CarriageReturn
-                        | LineBreak::LineFeed
-                        | LineBreak::NextLine
-                ),
-            );
-            values.push(v.into());
-        }
-        values
-    };
-    let scalar_data: Vec<i64> = values.iter().map(|&v| v as i64).collect();
+    let emoji_data = CodePointSetData::new::<Emoji>();
+    let extended_pictographic_data = CodePointSetData::new::<ExtendedPictographic>();
+    let regional_indicator_data = CodePointSetData::new::<RegionalIndicator>();
 
-    let (info, best) = packtab::pack_table(&scalar_data, Some(0), config.compression);
+    let script_data = CodePointMapData::<Script>::new();
+    let general_category_data = CodePointMapData::<GeneralCategory>::new();
+    let grapheme_cluster_break_data = CodePointMapData::<GraphemeClusterBreak>::new();
+    let bidi_class_data = CodePointMapData::<BidiClass>::new();
+
+    let variation_selector_data = CodePointSetData::new::<VariationSelector>();
+    let line_break_data = CodePointMapData::<LineBreak>::new();
+
+    let emoji_presentation_data = CodePointSetData::new::<EmojiPresentation>();
+    let emoji_modifier_data = CodePointSetData::new::<EmojiModifier>();
+    let emoji_modifier_base_data = CodePointSetData::new::<EmojiModifierBase>();
+
+    // Generate the data required for `CompositeProps`.
+    // Dense characters table for 0..=0x10FFFF
+    let mut characters = Vec::with_capacity(0x110000);
+
+    for cp in 0_u32..=0x10FFFF {
+        let is_emoji = emoji_data.contains32(cp);
+        let is_extended_pictographic = extended_pictographic_data.contains32(cp);
+
+        let v = Properties::new(
+            script_data.get32(cp),
+            general_category_data.get32(cp),
+            grapheme_cluster_break_data.get32(cp),
+            bidi_class_data.get32(cp),
+            is_emoji || is_extended_pictographic,
+            variation_selector_data.contains32(cp),
+            regional_indicator_data.contains32(cp),
+            // See: https://github.com/unicode-org/icu4x/blob/ee5399a77a6b94efb5d4b60678bb458c5eedb25d/components/segmenter/src/line.rs#L338-L351
+            matches!(
+                line_break_data.get32(cp),
+                LineBreak::MandatoryBreak
+                    | LineBreak::CarriageReturn
+                    | LineBreak::LineFeed
+                    | LineBreak::NextLine
+            ),
+            is_emoji,
+            emoji_presentation_data.contains32(cp),
+            emoji_modifier_data.contains32(cp),
+            emoji_modifier_base_data.contains32(cp),
+        );
+        characters.push(u32::from(v) as i64);
+    }
+
+    let (info, best) = packtab::pack_table(&characters, Some(0), config.compression);
 
     let namespace = "composite_packtab";
     let mut code = packtab::generate(

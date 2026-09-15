@@ -3,5 +3,6 @@
 
 mod test_analysis;
 mod test_builders;
+mod test_emoji;
 mod test_layout;
 mod utils;
