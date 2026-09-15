@@ -36,11 +36,14 @@ impl WhiteSpaceCollapse {
 // https://github.com/linebender/parley/pull/762#discussion_r3923722770.
 #[inline(always)]
 pub(crate) fn whitespace_hangs<B: Brush>(whitespace: Whitespace, style: &Style<B>) -> bool {
-    matches!(
-        whitespace,
-        Whitespace::Space | Whitespace::IdeographicSpace | Whitespace::Tab | Whitespace::Newline
-    ) && (style.white_space_collapse != WhiteSpaceCollapse::Preserve
-        || style.text_wrap_mode == TextWrapMode::Wrap)
+    match whitespace {
+        Whitespace::Newline => true,
+        Whitespace::Space | Whitespace::IdeographicSpace | Whitespace::Tab => {
+            style.white_space_collapse != WhiteSpaceCollapse::Preserve
+                || style.text_wrap_mode == TextWrapMode::Wrap
+        }
+        _ => false,
+    }
 }
 
 /// The advance of the logically trailing clusters of `atom` that hang past the line's end, and

@@ -31,9 +31,10 @@ fn hanging_across_collapse_mode_boundary() {
     let mut env = TestEnv::new(test_name!(), None);
 
     // A `white-space-collapse` boundary inside the trailing whitespace before a forced break.
-    // CSS Text 4 § 4.3.2 doesn't say how such a sequence hangs; we just decide by the logically
-    // last whitespace: collapsible? Everything hangs unconditionally. Preserved? Everything hangs
-    // conditionally.
+    // Collapsible whitespace at the end hangs unconditionally, and so does the preserved whitespace
+    // before it (CSS Text 4 § 4.3.2 doesn't say). Preserved whitespace at the end hangs
+    // conditionally, and the collapsible whitespace before it hangs only if the preserved
+    // whitespace hangs in full (CSS Text 4 § 9.2).
     let word = advance(&mut env, "X");
     let space = advance(&mut env, " ");
     let ideographic_space = advance(&mut env, "\u{3000}");
@@ -62,8 +63,8 @@ fn hanging_across_collapse_mode_boundary() {
             assert_eq!(layout.len(), 2, "{text:?} at {width}");
             let line = layout.get(0).unwrap();
             assert_eq!(line.break_reason(), BreakReason::Explicit);
-            let hanging = if conditional {
-                overflow.clamp(0., whitespace)
+            let hanging = if conditional && overflow < 2. * space {
+                overflow.max(0.)
             } else {
                 whitespace
             };
