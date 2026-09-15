@@ -3,11 +3,13 @@
 
 use crate::inline_box::InlineBox;
 use crate::layout::spacing::{EffectiveSpacing, Justification, Spacing};
-use crate::layout::whitespace::{atom_hanging_advance, hanging_whitespace, whitespace_hangs};
+use crate::layout::whitespace::{atom_hanging_advance, whitespace_hangs};
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
-use crate::{IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode};
+use crate::{
+    IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode, WhiteSpaceCollapse,
+};
 use core::ops::Range;
 
 use alloc::vec::Vec;
@@ -92,13 +94,20 @@ pub(crate) struct LineItemData {
     pub(crate) shaped_cluster_range: Range<u32>,
 }
 
+impl LineItemData {
+    #[inline(always)]
+    pub(crate) fn is_rtl(&self) -> bool {
+        self.bidi_level.is_rtl()
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LayoutItemKind {
     TextRun,
     InlineBox,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LayoutItem {
     /// Whether the item is a run or an inline box
     pub(crate) kind: LayoutItemKind,
@@ -281,15 +290,16 @@ impl<B: Brush> LayoutData<B> {
         // The running advance of whitespace that would hang if a line ended here. Can exceed
         // `running_min_width` when the hanging whitespace started before the last break
         // opportunity, in which case the line consists entirely of hanging whitespace.
-        //
-        // This is the whitespace's full advance. How much of it hangs at the max-content width
-        // depends on whether whitespace hangs conditionally, and is determined when a forced break
-        // is reached.
         let mut running_hanging_whitespace = 0.0;
+        // Whether that running whitespace hangs conditionally before a forced break (following CSS
+        // Text 4 § 4.3.2, that's the case for `WhiteSpaceCollapse::Preserve`). Conditional
+        // whitespace only hangs if it doesn't fit, which here means it counts towards the
+        // max-content width, but not the min-content width.
+        let mut hangs_conditionally = false;
 
         let mut text_wrap_mode = TextWrapMode::Wrap;
 
-        for (item_idx, item) in self.items.iter().enumerate() {
+        for item in &self.items {
             match item.kind {
                 LayoutItemKind::TextRun => {
                     let slice = self.shaped_text.run_slice(item.index as u32);
@@ -330,20 +340,13 @@ impl<B: Brush> LayoutData<B> {
                         //
                         // Note newlines have no advance.
                         if whitespace == Whitespace::Newline {
-                            // Following CSS Text 4 § 4.3.2, preserved whitespace before a newline
-                            // hangs conditionally, meaning it only hangs if it doesn't fit. It
-                            // counts towards the max-content width, but not the min-content width.
+                            // Newlines hang, so whitespace before them keeps hanging.
                             min_width =
                                 min_width.max(running_min_width - running_hanging_whitespace);
-                            let hanging = if running_hanging_whitespace > 0.0 {
-                                self.unconditional_hanging_advance(
-                                    item_idx,
-                                    atom.shaped_clusters_range().start,
-                                )
-                            } else {
-                                0.0
-                            };
-                            max_width = max_width.max(running_max_width - hanging);
+                            if !hangs_conditionally {
+                                running_max_width -= running_hanging_whitespace;
+                            }
+                            max_width = max_width.max(running_max_width);
                             running_min_width = 0.0;
                             running_max_width = 0.0;
                             running_hanging_whitespace = 0.0;
@@ -365,23 +368,21 @@ impl<B: Brush> LayoutData<B> {
                             // and so a single shaped cluster.
                             if whitespace_hangs(whitespace, style) {
                                 running_hanging_whitespace += advance;
+                                hangs_conditionally =
+                                    style.white_space_collapse == WhiteSpaceCollapse::Preserve;
                             } else {
                                 running_hanging_whitespace = 0.0;
                             }
                         } else {
-                            let (hanging, all_hang) = atom_hanging_advance(
-                                slice,
-                                &atom,
-                                &self.styles,
-                                spacing,
-                                is_rtl,
-                                f32::INFINITY,
-                            );
+                            let (hanging, all_hang) =
+                                atom_hanging_advance(slice, &atom, &self.styles, spacing, is_rtl);
                             if all_hang {
                                 running_hanging_whitespace += hanging;
                             } else {
                                 running_hanging_whitespace = hanging;
                             }
+                            hangs_conditionally =
+                                style.white_space_collapse == WhiteSpaceCollapse::Preserve;
                         }
                     }
                 }
@@ -404,57 +405,17 @@ impl<B: Brush> LayoutData<B> {
             }
         }
 
-        // Like before a newline, preserved whitespace at the end of the layout hangs
-        // conditionally: the end of the layout is considered to be a forced line break as per
-        // CSS Text 4 § 5.
+        // The end of a layout is considered to be a forced line break as per CSS Text 4 § 5, so
+        // whitespace can hang conditionally.
         min_width = min_width.max(running_min_width - running_hanging_whitespace);
-        let hanging = if running_hanging_whitespace > 0.0 {
-            self.unconditional_hanging_advance(self.items.len(), 0)
-        } else {
-            0.0
-        };
-        max_width = max_width.max(running_max_width - hanging);
+        if !hangs_conditionally {
+            running_max_width -= running_hanging_whitespace;
+        }
+        max_width = max_width.max(running_max_width);
 
         ContentWidths {
             min: min_width,
             max: max_width,
-        }
-    }
-
-    /// The advance of the whitespace hanging at the end of a line that doesn't overflow.
-    ///
-    /// Whitespace that hangs unconditionally hangs here as it does anywhere. Whitespace that hangs
-    /// conditionally only hangs as far as it overflows, so here it fits and counts towards the
-    /// line's width instead. This means it impacts the max-content width.
-    ///
-    /// The line considered by this method are all items (in reverse order) before `item_idx` in
-    /// full, plus the item at `item_idx` up to `cluster_end`.
-    fn unconditional_hanging_advance(&self, item_idx: usize, cluster_end: u32) -> f32 {
-        // The item the trailing whitespace ends in, up to `cluster_end`, followed by the whole
-        // items before it, all in reverse logical order.
-        let partial_item = self.items.get(item_idx).map(|item| {
-            let mut cluster_range = self.item_cluster_range(item);
-            if item.kind == LayoutItemKind::TextRun {
-                cluster_range.end = cluster_end;
-            }
-            (*item, cluster_range)
-        });
-        let whole_items = self.items[..item_idx.min(self.items.len())]
-            .iter()
-            .rev()
-            .map(|item| (*item, self.item_cluster_range(item)));
-        let items = partial_item.into_iter().chain(whole_items);
-        hanging_whitespace(self, items, 0.).advance
-    }
-
-    /// The range of `item`'s shaped clusters (empty for inline boxes).
-    fn item_cluster_range(&self, item: &LayoutItem) -> Range<u32> {
-        match item.kind {
-            LayoutItemKind::TextRun => self
-                .shaped_text
-                .run_slice(item.index as u32)
-                .shaped_clusters_range(),
-            LayoutItemKind::InlineBox => 0..0,
         }
     }
 }
