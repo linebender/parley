@@ -1548,9 +1548,11 @@ fn hanging_whitespace<B: Brush>(
     // Atoms with shaped clusters before this index may be stretched by justification.
     let mut justification_end_cluster = u32::MAX;
     let mut hanging_opportunities = 0;
-    // Whether the trailing whitespace hangs conditionally, as decided by its logically last
-    // whitespace (a newline has no advance and always fits, so it doesn't decide).
-    let mut conditional = None;
+    // Conditionally hanging whitespace hangst as far as it overflows. Unconditionally hanging
+    // whitespace before it hangs, but only if the conditional whitespace hangs in
+    // full (CSS Text 4 § 9.2). Newlines have no advance and don't take part in this.
+    let mut in_conditional_suffix = true;
+    let mut conditional_advance: Option<f32> = None;
 
     'items: for line_item in line_items.iter().rev() {
         match line_item.kind {
@@ -1589,21 +1591,32 @@ fn hanging_whitespace<B: Brush>(
                         effective_spacing,
                         line_item.is_rtl(),
                     );
+                    let first_character = &atom.characters()[0];
+                    let whitespace = first_character.info.whitespace();
+                    if in_conditional_suffix && whitespace != Whitespace::Newline {
+                        if layout.data.styles[first_character.style_index as usize]
+                            .white_space_collapse
+                            == WhiteSpaceCollapse::Preserve
+                        {
+                            *conditional_advance.get_or_insert(0.) += hanging;
+                        } else {
+                            in_conditional_suffix = false;
+                            // A conditionally hanging glyph that fits (including one with a
+                            // non-positive advance) doesn't hang, and so whitespace before it
+                            // isn't at the line's end.
+                            if conditional_advance
+                                .is_some_and(|advance| advance <= 0. || advance > overflow)
+                            {
+                                break 'items;
+                            }
+                        }
+                    }
                     hanging_whitespace_advance += hanging;
                     // Justification can't stretch within an atom, so it stops at the start of the
                     // last atom that hangs in its entirety or only partially.
                     justification_end_cluster = atom.shaped_clusters_range().start;
-                    let first_character = &atom.characters()[0];
-                    let whitespace = first_character.info.whitespace();
                     if is_word_separator(whitespace) {
                         hanging_opportunities += 1;
-                    }
-                    if conditional.is_none() && whitespace != Whitespace::Newline {
-                        conditional = Some(
-                            layout.data.styles[first_character.style_index as usize]
-                                .white_space_collapse
-                                == WhiteSpaceCollapse::Preserve,
-                        );
                     }
                     if !all_hang {
                         break 'items;
@@ -1613,8 +1626,8 @@ fn hanging_whitespace<B: Brush>(
         }
     }
 
-    if conditional == Some(true) {
-        hanging_whitespace_advance = hanging_whitespace_advance.min(overflow).max(0.);
+    if let Some(advance) = conditional_advance {
+        hanging_whitespace_advance -= advance - advance.min(overflow).max(0.);
     }
 
     (
