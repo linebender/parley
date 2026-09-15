@@ -93,7 +93,7 @@ fn text_presentation_default() {
 
 // Lone keycap base; Encoded: 1
 #[test]
-fn long_keycap_base() {
+fn lone_keycap_base() {
     assert_emoji(TestEntity {
         sequence: &[
             0x0031, // DIGIT ONE
