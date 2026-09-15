@@ -18,6 +18,7 @@ members = [
     "examples/tiny_skia_render",
     "examples/vello_cpu_render",
     "examples/editor",
+    "examples/rich_editor",
     "xtask",
 ]
 
@@ -33,6 +34,7 @@ repository = "https://github.com/linebender/parley"
 
 [workspace.dependencies]
 # Local crates
+attributed_text = { version = "0.1.0", default-features = false, path = "attributed_text" }
 parlance = { version = "0.1.0", default-features = false, path = "parlance" }
 fontique = { version = "0.11.0", default-features = false, path = "fontique" }
 parley = { version = "0.11.0", default-features = false, path = "parley" }
