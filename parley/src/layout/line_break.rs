@@ -11,7 +11,7 @@ use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
-use crate::layout::whitespace::{hanging_whitespace, whitespace_can_hang};
+use crate::layout::whitespace::{atom_hanging_advance, hanging_whitespace};
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -785,8 +785,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let first_character = &atom.characters()[0];
                         let whitespace = first_character.info.whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
-                        // Whether this is a space that is allowed to hang past the line.
-                        let is_space = whitespace_can_hang(whitespace);
                         // Whether this atom is a justification opportunity.
                         let is_separator = is_word_separator(whitespace);
                         let boundary = first_character.info.boundary();
@@ -898,10 +896,16 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // in the line. If there is no such line-breaking opportunity (such as if wrapping is disabled), then
                         // we fall back to appending the content to the line anyway.
                         else {
-                            // Case: the atom is a space character (and wrapping is enabled)
-                            //
                             // We hang any overflowing whitespace and then line-break.
-                            if is_space && style.text_wrap_mode == TextWrapMode::Wrap {
+                            let (hanging, all_hang) = atom_hanging_advance(
+                                slice,
+                                &atom,
+                                &self.layout.data.styles,
+                                spacing,
+                                item.bidi_level.is_rtl(),
+                                f32::INFINITY,
+                            );
+                            if all_hang || (hanging > 0. && next_x - hanging <= max_advance) {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
@@ -911,7 +915,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     text_metrics,
                                     is_separator,
                                 );
-                                self.state.mark_line_break_opportunity();
                             }
                             // Case: we have previously encountered a REGULAR line-breaking opportunity in the current line
                             //
@@ -1459,6 +1462,14 @@ fn commit_line<B: Brush>(
     // let end_run_idx = lines.line_items.last().map(|item| item.index).unwrap_or(0);
     let end_item_idx = lines.line_items.len();
 
+    // Trailing preserved whitespace before a forced break hangs conditionally (CSS Text 4 § 4.3.2):
+    // only the part that doesn't fit hangs. Whitespace that fits, stays inside the line box, and
+    // counts towards alignment and the layout width. The end of the layout is considered to be a
+    // forced line break as well (CSS Text 4 § 5). Other trailing whitespace hangs unconditionally.
+    let overflow = match break_reason {
+        BreakReason::Regular | BreakReason::Emergency => f32::INFINITY,
+        BreakReason::Explicit | BreakReason::None => state.x - max_advance,
+    };
     let trailing = hanging_whitespace(
         &layout.data,
         lines.line_items[start_item_idx..end_item_idx]
@@ -1472,21 +1483,9 @@ fn commit_line<B: Brush>(
                 };
                 (layout_item, item.shaped_cluster_range.clone())
             }),
+        overflow,
     );
-    let hanging_advance = {
-        // Trailing preserved whitespace before a forced break hangs conditionally (CSS Text 4 § 4.3.2):
-        // only the part that doesn't fit hangs. Whitespace that fits, stays inside the line box,
-        // and counts towards alignment and the layout width. The end of the layout is considered to
-        // be a forced line break as well (CSS Text 4 § 5). Other trailing whitespace hangs
-        // unconditionally.
-        let hanging = trailing.advance;
-        if matches!(break_reason, BreakReason::Explicit | BreakReason::None) {
-            let overflow = state.x - hanging.unconditional - max_advance;
-            hanging.unconditional + hanging.conditional.min(overflow).max(0.)
-        } else {
-            hanging.total()
-        }
-    };
+    let hanging_advance = trailing.advance;
     // The word separators counted as the line was built include the line's hanging whitespace, and
     // hanging whitespace is not stretched by justification.
     let num_justification_opportunities =
