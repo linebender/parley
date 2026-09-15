@@ -269,16 +269,18 @@ impl CharInfo {
         self.flags & Self::CONTROL_MASK != 0
     }
 
-    /// Whether this character is an emoji or pictograph.
+    /// Returns whether the character has either of the `Emoji` or`Extended_Pictographic` properties.
+    ///
+    /// Parley Engine uses this to determine whether a character might be part of an Emoji, and so whether to do
+    /// more stringent checks.
+    ///
+    /// [UTS #51]: https://www.unicode.org/reports/tr51/tr51-29.html#Emoji_Properties
     #[inline(always)]
     pub fn is_emoji_or_pictograph(self) -> bool {
         self.flags & Self::EMOJI_OR_PICTOGRAPH_MASK != 0
     }
 
     /// Whether this character has the `Emoji` property ([UTS #51][]).
-    ///
-    /// Unlike [`is_emoji_or_pictograph`](Self::is_emoji_or_pictograph), this excludes
-    /// characters which are only `Extended_Pictographic`.
     ///
     /// [UTS #51]: https://www.unicode.org/reports/tr51/tr51-29.html#Emoji_Properties
     #[inline(always)]

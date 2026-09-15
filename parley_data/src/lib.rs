@@ -141,7 +141,9 @@ impl Properties {
         BidiClass::from_icu4c_value(self.bits(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8)
     }
 
-    /// Returns whether the character is an emoji or pictograph.
+    /// Returns whether the character has either of the `Emoji` or`Extended_Pictographic` properties ([UTS #51][]).
+    ///
+    /// [UTS #51]: https://www.unicode.org/reports/tr51/tr51-29.html#Emoji_Properties
     #[inline(always)]
     pub fn is_emoji_or_pictograph(&self) -> bool {
         self.bits(
@@ -178,9 +180,6 @@ impl Properties {
     }
 
     /// Returns whether the character has the `Emoji` property ([UTS #51][]).
-    ///
-    /// Unlike [`is_emoji_or_pictograph`](Self::is_emoji_or_pictograph), this excludes
-    /// characters which are only `Extended_Pictographic`.
     ///
     /// [UTS #51]: https://www.unicode.org/reports/tr51/tr51-29.html#Emoji_Properties
     #[inline(always)]
