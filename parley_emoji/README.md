@@ -48,7 +48,9 @@ The following crate [feature flags](https://doc.rust-lang.org/cargo/reference/fe
 
 - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
 
-Note that Parley Emoji currently requires that an allocator is available (i.e. it uses [`alloc`][_alloc]).
+Note that Parley Emoji currently requires that an allocator is available (i.e. it depends on [`alloc`][_alloc]).
+Currently, Parley Emoji does not actually allocate, but the dependency is kept so starting to allocate
+in the future is not a breaking change.
 
 [c-emoji]: <https://github.com/chansen/c-emoji>
 [UTS51]: <https://www.unicode.org/reports/tr51/>

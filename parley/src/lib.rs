@@ -125,9 +125,11 @@ pub mod style;
 #[cfg(test)]
 mod tests;
 
+// Used by tests; retain an anonymous import while this is a regular dependency.
+use parley_emoji as _;
+
 pub use linebender_resource_handle::FontData;
 pub use parlance::BaseDirection;
-pub use parley_emoji as emoji;
 pub use parley_engine::break_overrides::{
     AsciiLineBreakTable, AsciiLineBreakTableBuilder, CHROMIUM_LINE_BREAK_OVERRIDE,
     LineBreakContext, LineBreakOverrideFn,

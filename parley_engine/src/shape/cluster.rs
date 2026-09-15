@@ -62,8 +62,6 @@ pub struct Char {
     /// Indexes into the list of styles for the containing text run, to find the style applicable
     /// to this character.
     pub style_index: u16,
-    /// True if the character is an emoji presentation selector (VS15 or VS16).
-    pub is_emoji_presentation_selector: bool,
 }
 
 /// Whitespace class of a character.
@@ -451,7 +449,6 @@ impl CharCluster {
                 contributes_to_shaping,
                 style_index,
                 is_control_character: info.is_control(),
-                is_emoji_presentation_selector,
             });
         }
 
