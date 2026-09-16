@@ -1,11 +1,10 @@
-// Copyright 2026 the Parley Authors
-// SPDX-License-Identifier: Apache-2.0 OR MIT
+// Copyright 2026 the Parley Authors and Google LLC
+// SPDX-License-Identifier: Apache-2.0
 
-use alloc::vec::Vec;
 use core::char;
 
+use parley_data::Properties;
 use parley_emoji::{EmojiDFA, EmojiPresentationStyle, EmojiSegmentationCategory};
-use parley_engine::AnalysisDataSources;
 
 struct TestEntity<'a> {
     sequence: &'a [u32],
@@ -16,8 +15,6 @@ struct TestEntity<'a> {
 }
 
 fn assert_emoji(entity: TestEntity<'_>) {
-    let analysis = AnalysisDataSources::new();
-
     let mut emoji_dfa = EmojiDFA::new();
     let mut leading_is_emoji_presentation = false;
 
@@ -28,7 +25,7 @@ fn assert_emoji(entity: TestEntity<'_>) {
         .enumerate()
         .map(|(i, cp)| {
             let ch = char::from_u32(cp).unwrap();
-            let properties = analysis.properties(ch);
+            let properties = Properties::get(ch);
 
             if i == 0 {
                 leading_is_emoji_presentation = properties.is_emoji_presentation();

@@ -27,6 +27,7 @@ mod content_widths;
 mod cursor;
 mod draw;
 mod editor;
+mod emoji;
 mod exclusions;
 mod floats;
 mod issues;
