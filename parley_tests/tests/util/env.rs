@@ -236,12 +236,17 @@ impl TestEnv {
         }
     }
 
-    fn check_images(&self, current_img: &Pixmap, snapshot_path: &Path) -> Result<(), String> {
+    fn check_images(&self, current_png: &[u8], snapshot_path: &Path) -> Result<(), String> {
         if !snapshot_path.is_file() {
             return Err(format!("Cannot find snapshot {}", snapshot_path.display()));
         }
         let snapshot_file = File::open(snapshot_path).unwrap();
         let snapshot_img = Pixmap::from_png(BufReader::new(snapshot_file)).unwrap();
+        // `Pixmap::into_png` unpremultiplies with rounding but `Pixmap::from_png`
+        // re-premultiplies with truncation, so a decoded snapshot is not bit-identical
+        // to the pixmap it was written from. Compare the decoded form of the PNG we
+        // would save, so both sides carry the same (deterministic) error.
+        let current_img = Pixmap::from_png(Cursor::new(current_png)).unwrap();
         if snapshot_img.width() != current_img.width()
             || snapshot_img.height() != current_img.height()
         {
@@ -253,13 +258,6 @@ impl TestEnv {
                 current_img.height()
             ));
         }
-
-        // `Pixmap::into_png` unpremultiplies with rounding but `Pixmap::from_png`
-        // re-premultiplies with truncation, so a decoded snapshot is not bit-identical
-        // to the pixmap it was written from. Pass the current image through the same
-        // round-trip so both sides carry the same (deterministic) error.
-        let current_img =
-            Pixmap::from_png(Cursor::new(current_img.clone().into_png().unwrap())).unwrap();
 
         let mut n_different_pixels = 0;
         let mut color_cumulative_difference = 0.0;
@@ -353,12 +351,10 @@ impl TestEnv {
 
         #[cfg(not(target_os = "android"))]
         #[track_caller]
-        fn save_image(image: &Pixmap, path: &PathBuf, max_size: Option<usize>) {
+        fn save_image(image_data: &[u8], path: &PathBuf, max_size: Option<usize>) {
             use oxipng::{Options, optimize_from_memory};
 
-            let image_data = image.clone().into_png().unwrap();
-
-            let data = optimize_from_memory(&image_data, &Options::from_preset(5)).unwrap();
+            let data = optimize_from_memory(image_data, &Options::from_preset(5)).unwrap();
             let saved_len = data.len();
 
             // Whenever we save a file, we optimise it just in case.
@@ -377,21 +373,22 @@ impl TestEnv {
 
         // We special-case android targets because oxipng doesn't build in Android CI.
         #[cfg(target_os = "android")]
-        fn save_image(_image: &Pixmap, _path: &PathBuf, _max_size: Option<usize>) {
+        fn save_image(_image_data: &[u8], _path: &PathBuf, _max_size: Option<usize>) {
             panic!("Saving screenshots is not supported on Android targets");
         }
 
         // Max size a screenshot can have, in bytes.
         let max_size = self.max_screenshot_size;
-        if let Err(e) = self.check_images(img, &snapshot_path) {
+        let png = img.clone().into_png().unwrap();
+        if let Err(e) = self.check_images(&png, &snapshot_path) {
             if is_accept_mode() {
-                save_image(img, &snapshot_path, max_size);
+                save_image(&png, &snapshot_path, max_size);
             } else {
-                save_image(img, &comparison_path, max_size);
+                save_image(&png, &comparison_path, max_size);
                 self.errors.push((comparison_path, e));
             }
         } else if is_generate_all_mode() {
-            save_image(img, &comparison_path, max_size);
+            save_image(&png, &comparison_path, max_size);
         } else {
             let reference_size = snapshot_path.metadata().unwrap().len() as usize;
             if let Some(max_size) = max_size
