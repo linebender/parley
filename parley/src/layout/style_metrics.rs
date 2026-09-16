@@ -234,7 +234,10 @@ impl StyleMetrics {
     /// [`resolve_style_metrics`].
     fn from_font(font: &FontMetrics, line_height: f32, quantize: bool) -> Self {
         let box_metrics = BoxMetrics::from_font(font, line_height, quantize);
-        let x_height = font.x_height.unwrap_or(box_metrics.ascent * 0.5);
+        // Fonts without an `OS/2.sxHeight` get the same estimate Gecko and Blink use
+        // (`DEFAULT_XHEIGHT_FACTOR`); css-inline-3 §A.2 suggests measuring the `x` glyph or
+        // `0.5em` instead, but this keeps us in line with browsers.
+        let x_height = font.x_height.unwrap_or(box_metrics.ascent * 0.56);
         Self {
             ascent: box_metrics.ascent,
             descent: box_metrics.descent,
