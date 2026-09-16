@@ -105,7 +105,7 @@ Some code in this repository is not available under these licenses:
   See `./parley_emoji/README.md` for details.
 - `parley_tests/tests/emoji` is licensed only under the Apache License, Version 2.0 (and not the MIT license).
   See `./parley_tests/tests/emoji/README.md` for details.
-- Additionally, some files used for tests and benchmarks are under different licenses.
+- Some other files used for tests and benchmarks are under different licenses.
   See `./parley_dev/README.md` for details.
 
 [Rust code of conduct]: https://www.rust-lang.org/policies/code-of-conduct

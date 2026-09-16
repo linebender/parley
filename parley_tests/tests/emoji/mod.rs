@@ -1,4 +1,4 @@
-// Copyright 2026 the Parley Authors and Google LLC
+// Copyright 2026 Christian Hansen and the Parley Authors and Google LLC
 // SPDX-License-Identifier: Apache-2.0
 
 use core::char;
