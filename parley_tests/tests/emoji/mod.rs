@@ -14,6 +14,10 @@ struct TestEntity<'a> {
     has_vs: bool,
 }
 
+#[expect(
+    clippy::missing_assert_message,
+    reason = "Test function, despite not #[test]."
+)]
 fn assert_emoji(entity: TestEntity<'_>) {
     let mut emoji_dfa = EmojiDFA::new();
     let mut leading_is_emoji_presentation = false;
