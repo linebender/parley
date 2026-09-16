@@ -20,12 +20,17 @@ pub use styleset::StyleSet;
 
 use crate::util::nearly_eq;
 
-/// How whitespace is collapsed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Whitespace collapsing and hanging behavior.
+///
+/// Note: Currently only the [`TreeBuilder`](crate::TreeBuilder) collapses white space. The
+/// [`RangedBuilder`](crate::RangedBuilder) and [`StyleRunBuilder`](crate::StyleRunBuilder)
+/// builders expect already-transformed text and use this property only to influence whitespace hanging behaviour.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum WhiteSpaceCollapse {
     /// Collapse whitespace, including ASCII segment breaks, to a space.
     Collapse,
     /// Preserve spaces, tabs, and segment breaks.
+    #[default]
     Preserve,
     /// Collapse spaces and tabs while preserving segment breaks.
     PreserveBreaks,
@@ -122,6 +127,8 @@ pub enum StyleProperty<'a, B: Brush> {
     OverflowWrap(OverflowWrap),
     /// Control over non-"emergency" line-breaking.
     TextWrapMode(TextWrapMode),
+    /// Whitespace collapsing and hanging behavior.
+    WhiteSpaceCollapse(WhiteSpaceCollapse),
 }
 
 /// Unresolved styles.
@@ -173,6 +180,8 @@ pub struct TextStyle<'family, 'settings, B: Brush> {
     pub overflow_wrap: OverflowWrap,
     /// Control over non-"emergency" line-breaking.
     pub text_wrap_mode: TextWrapMode,
+    /// Whitespace collapsing and hanging behavior.
+    pub white_space_collapse: WhiteSpaceCollapse,
 }
 
 impl<B: Brush> Default for TextStyle<'static, 'static, B> {
@@ -201,6 +210,7 @@ impl<B: Brush> Default for TextStyle<'static, 'static, B> {
             word_break: WordBreak::default(),
             overflow_wrap: OverflowWrap::default(),
             text_wrap_mode: TextWrapMode::default(),
+            white_space_collapse: WhiteSpaceCollapse::default(),
         }
     }
 }

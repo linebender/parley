@@ -18,7 +18,7 @@ use crate::font::FontContext;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
 use crate::{LineHeight, OverflowWrap, layout};
-use crate::{TextWrapMode, WordBreak};
+use crate::{TextWrapMode, WhiteSpaceCollapse, WordBreak};
 use core::borrow::Borrow;
 use core::ops::Range;
 use fontique::FamilyId;
@@ -166,6 +166,7 @@ impl ResolveContext {
             StyleProperty::WordBreak(value) => WordBreak(*value),
             StyleProperty::OverflowWrap(value) => OverflowWrap(*value),
             StyleProperty::TextWrapMode(value) => TextWrapMode(*value),
+            StyleProperty::WhiteSpaceCollapse(value) => WhiteSpaceCollapse(*value),
         }
     }
 
@@ -203,6 +204,7 @@ impl ResolveContext {
             word_break: raw_style.word_break,
             overflow_wrap: raw_style.overflow_wrap,
             text_wrap_mode: raw_style.text_wrap_mode,
+            white_space_collapse: raw_style.white_space_collapse,
         }
     }
 
@@ -387,6 +389,8 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     OverflowWrap(OverflowWrap),
     /// Control over non-"emergency" line-breaking.
     TextWrapMode(TextWrapMode),
+    /// Whitespace collapsing and hanging behavior.
+    WhiteSpaceCollapse(WhiteSpaceCollapse),
 }
 
 /// Flattened group of style properties.
@@ -426,6 +430,8 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     pub(crate) overflow_wrap: OverflowWrap,
     /// Control over non-"emergency" line-breaking.
     pub(crate) text_wrap_mode: TextWrapMode,
+    /// Whitespace collapsing and hanging behavior.
+    pub(crate) white_space_collapse: WhiteSpaceCollapse,
 }
 
 impl<B: Brush> ResolvedStyle<B> {
@@ -456,6 +462,7 @@ impl<B: Brush> ResolvedStyle<B> {
             WordBreak(value) => self.word_break = value,
             OverflowWrap(value) => self.overflow_wrap = value,
             TextWrapMode(value) => self.text_wrap_mode = value,
+            WhiteSpaceCollapse(value) => self.white_space_collapse = value,
         }
     }
 
@@ -485,6 +492,7 @@ impl<B: Brush> ResolvedStyle<B> {
             WordBreak(value) => self.word_break == *value,
             OverflowWrap(value) => self.overflow_wrap == *value,
             TextWrapMode(value) => self.text_wrap_mode == *value,
+            WhiteSpaceCollapse(value) => self.white_space_collapse == *value,
         }
     }
 
@@ -496,6 +504,7 @@ impl<B: Brush> ResolvedStyle<B> {
             line_height: self.line_height,
             overflow_wrap: self.overflow_wrap,
             text_wrap_mode: self.text_wrap_mode,
+            white_space_collapse: self.white_space_collapse,
             #[cfg(feature = "accesskit")]
             locale: self.locale,
         }
