@@ -102,8 +102,11 @@ impl ShapedClusterFlags {
         match (self.0 & Self::WHITESPACE_MASK) >> Self::WHITESPACE_SHIFT {
             1 => Whitespace::Space,
             2 => Whitespace::NoBreakSpace,
-            3 => Whitespace::Tab,
-            4 => Whitespace::Newline,
+            3 => Whitespace::IdeographicSpace,
+            4 => Whitespace::OtherSpaceSeparator,
+            5 => Whitespace::Tab,
+            6 => Whitespace::Newline,
+            7 => Whitespace::ControlWhitespace,
             _ => Whitespace::None,
         }
     }
