@@ -322,9 +322,7 @@ pub(crate) fn inline_box_placement(
     }
 }
 
-/// Query the [first available font] of `style`: the first face of its font stack that is
-/// available. CSS additionally requires the face's `unicode-range` to include U+0020 SPACE; Parley
-/// has no `unicode-range`, so every available face qualifies.
+/// The [first available font] of `style`.
 ///
 /// [first available font]: https://drafts.csswg.org/css-fonts-4/#first-available-font
 fn first_available_font<B: Brush>(
@@ -339,16 +337,12 @@ fn first_available_font<B: Brush>(
         weight: style.font_weight,
         style: style.font_style,
     });
-    let mut found = None;
-    query.matches_with(|font| {
-        found = Some(FontInstance {
-            font: FontData {
-                data: font.blob.clone(),
-                index: font.index,
-            },
-            synthesis: font.synthesis,
-        });
-        fontique::QueryStatus::Stop
-    });
-    found
+    let font = query.first_available_font()?;
+    Some(FontInstance {
+        font: FontData {
+            data: font.blob,
+            index: font.index,
+        },
+        synthesis: font.synthesis,
+    })
 }
