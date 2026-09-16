@@ -1,7 +1,7 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Tests for glyph and decoration drawing via `glifo`.
+//! Tests for glyph and decoration drawing via `vello_cpu`.
 //!
 //! These tests focus on the interaction between transforms, hinting, and
 //! decoration rendering (especially ink-skipping underlines).
@@ -137,7 +137,6 @@ fn draw_underline_descenders() {
 #[ignore]
 fn draw_bitmap_emoji() {
     let mut env = TestEnv::new(test_name!(), None);
-    env.set_tolerance(5.0);
     let text = "\u{2705}\u{1f440}\u{1f389}\u{1f920}";
 
     test_with_configs(&mut env, |env| {
@@ -157,7 +156,6 @@ fn draw_bitmap_emoji() {
 #[test]
 fn draw_colr_emoji() {
     let mut env = TestEnv::new(test_name!(), None);
-    env.set_tolerance(5.0);
     let text = "\u{2705}\u{1f440}\u{1f389}\u{1f920}";
 
     test_with_configs(&mut env, |env| {
@@ -182,7 +180,6 @@ fn draw_colr_emoji() {
 #[test]
 fn draw_colr_emoji_with_presentation_style() {
     let mut env = TestEnv::new(test_name!(), None);
-    env.set_tolerance(5.0);
 
     let collection = &mut env.font_context().collection;
     collection.load_system_fonts();
@@ -218,7 +215,6 @@ fn draw_colr_emoji_with_presentation_style() {
 #[test]
 fn draw_colr_emoji_with_presentation_style_without_setting_default_font() {
     let mut env = TestEnv::new(test_name!(), None);
-    env.set_tolerance(5.0);
 
     let collection = &mut env.font_context().collection;
     collection.load_system_fonts();
