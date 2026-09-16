@@ -52,6 +52,24 @@ pub struct FontMetrics {
 }
 
 impl FontMetrics {
+    /// Metrics to use when no font is available at all.
+    ///
+    /// These roughly match common Latin fonts, so that a layout without fonts still has plausible
+    /// line heights.
+    pub const fn fallback(font_size: f32) -> Self {
+        Self {
+            ascent: font_size * 0.8,
+            descent: font_size * 0.2,
+            leading: 0.,
+            underline_offset: 0.,
+            underline_size: 0.,
+            strikethrough_offset: 0.,
+            strikethrough_size: 0.,
+            cap_height: None,
+            x_height: None,
+        }
+    }
+
     /// Compute the metrics of `font` at `font_size`, positioned at the variable font location
     /// given by the `synthesis` and `variations` axis settings.
     ///
