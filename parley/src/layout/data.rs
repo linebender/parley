@@ -62,17 +62,20 @@ pub(crate) struct LineData {
     pub(crate) justification: Justification,
     /// Text indent applied to this line.
     pub(crate) indent: f32,
-    /// This line's entries in [`LayoutData::aligned_subtree_offsets`]. Empty for lines with only
-    /// baseline-relative content.
+    /// This line's entries in [`LayoutData::aligned_subtree_offsets`].
+    ///
+    /// Empty for lines with only baseline-relative content because the top-level aligned
+    /// subtree for each line trivially has an offset of 0
     pub(crate) aligned_subtree_offsets: Range<u32>,
 }
 
 /// Position of an [aligned subtree] (rooted at a `vertical-align: top | bottom` style) on a line.
+/// Computed for each non-top-level aligned subtree on the line in `BreakLines::finish_line`.
 ///
 /// [aligned subtree]: crate::layout::style_metrics#aligned-subtrees
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AlignedSubtreeOffset {
-    /// Style index of the subtree root.
+    /// Style index of the subtree root (a span with `vertical-align: top | bottom`)
     pub(crate) root: u16,
     /// Offset from the line's baseline to the subtree's baseline (positive upwards).
     pub(crate) baseline_offset: f32,
@@ -97,8 +100,8 @@ impl LineData {
             .map_or(0., |subtree| subtree.baseline_offset)
     }
 
-    /// Block-axis coordinate of the baseline of the given style's span box. `offsets` is
-    /// [`LayoutData::aligned_subtree_offsets`].
+    /// Absolute block-axis coordinate (offset from the top of the layout) of the baseline of the given style's span box.
+    // `offsets` is [`LayoutData::aligned_subtree_offsets`].
     pub(crate) fn style_baseline(
         &self,
         offsets: &[AlignedSubtreeOffset],
@@ -176,7 +179,6 @@ pub(crate) struct LayoutData<B: Brush> {
 
     // Output of style resolution (input to line breaking)
     pub(crate) styles: Vec<Style<B>>,
-    /// Span box metrics of each entry of `styles`.
     pub(crate) style_metrics: Vec<StyleMetrics>,
     pub(crate) inline_boxes: Vec<LayoutInlineBox>,
 

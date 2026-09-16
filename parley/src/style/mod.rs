@@ -60,7 +60,7 @@ impl Default for LineHeight {
 }
 
 impl LineHeight {
-    /// The font's preferred line height (ascent + descent + line gap), as CSS `line-height: normal`.
+    /// The recommended `LineHeight` for CSS's `line-height: normal`.
     pub const NORMAL: Self = Self::MetricsRelative(1.0);
 
     pub(crate) fn nearly_eq(self, other: Self) -> bool {
