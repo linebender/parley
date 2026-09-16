@@ -142,7 +142,13 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
             } else {
                 let shift = shift_from_parent(align, metrics.over, metrics.under, parent);
                 metrics.exact_baseline_offset = parent.exact_baseline_offset + shift;
-                metrics.baseline_offset = quantize_offset(metrics.exact_baseline_offset, quantize);
+                // Rounded once from the accumulated offset (not per level) so the total error
+                // stays within half a pixel.
+                metrics.baseline_offset = if quantize {
+                    metrics.exact_baseline_offset.round()
+                } else {
+                    metrics.exact_baseline_offset
+                };
                 metrics.aligned_subtree = parent.aligned_subtree;
             }
         }
@@ -271,12 +277,6 @@ pub(crate) fn shift_from_parent(
     alignment + shift
 }
 
-/// Round a baseline offset to whole pixels when `quantize` is set. Applied once to the
-/// accumulated offset (not per level) so the total error stays within half a pixel.
-pub(crate) fn quantize_offset(offset: f32, quantize: bool) -> f32 {
-    if quantize { offset.round() } else { offset }
-}
-
 /// Where an in-flow [`InlineBox`] sits relative to the baseline of its aligned subtree.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct InlineBoxPlacement {
@@ -309,9 +309,14 @@ pub(crate) fn inline_box_placement(
         .copied()
         .unwrap_or_default();
     let shift = shift_from_parent(inline_box.vertical_align, ascent, descent, &parent);
+    let baseline_offset = parent.exact_baseline_offset + shift;
     InlineBoxPlacement {
         aligned_subtree: parent.aligned_subtree,
-        baseline_offset: quantize_offset(parent.exact_baseline_offset + shift, quantize),
+        baseline_offset: if quantize {
+            baseline_offset.round()
+        } else {
+            baseline_offset
+        },
         ascent,
         descent,
     }
