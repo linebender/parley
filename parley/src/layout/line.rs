@@ -67,7 +67,7 @@ impl<'a, B: Brush> Line<'a, B> {
                 line_data: Some(item),
             }),
             LayoutItemKind::InlineBox => {
-                LineItem::InlineBox(self.layout.data.inline_boxes.get(item.index)?)
+                LineItem::InlineBox(&self.layout.data.inline_boxes.get(item.index)?.inline_box)
             }
         })
     }
@@ -85,18 +85,13 @@ impl<'a, B: Brush> Line<'a, B> {
 
     /// Block-axis coordinate of the top edge of the layout's inline box `index`.
     pub(crate) fn inline_box_top(&self, index: usize) -> f32 {
-        let inline_box = &self.layout.data.inline_boxes[index];
+        let layout_box = &self.layout.data.inline_boxes[index];
+        let inline_box = &layout_box.inline_box;
         match inline_box.vertical_align.shift {
             BaselineShift::Top => self.data.metrics.block_min_coord,
             BaselineShift::Bottom => self.data.metrics.block_max_coord - inline_box.height,
             _ => {
-                let parent_style = self
-                    .layout
-                    .data
-                    .inline_box_styles
-                    .get(index)
-                    .copied()
-                    .unwrap_or(0);
+                let parent_style = layout_box.style_index;
                 let placement = inline_box_placement(
                     inline_box,
                     parent_style,
@@ -139,7 +134,7 @@ impl<'a, B: Brush> Line<'a, B> {
                     line_data: Some(line_data),
                 }),
                 LayoutItemKind::InlineBox => {
-                    LineItem::InlineBox(&copy.layout.data.inline_boxes[line_data.index])
+                    LineItem::InlineBox(&copy.layout.data.inline_boxes[line_data.index].inline_box)
                 }
             })
     }
