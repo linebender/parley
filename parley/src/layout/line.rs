@@ -7,7 +7,6 @@ use crate::layout::data::{LayoutItemKind, LineData};
 use crate::layout::layout::Layout;
 use crate::layout::run::Run;
 use crate::layout::spacing::EffectiveSpacing;
-use crate::layout::style_metrics::inline_box_placement;
 use crate::style::Brush;
 use crate::{BaselineShift, InlineBox, InlineBoxKind};
 
@@ -91,20 +90,20 @@ impl<'a, B: Brush> Line<'a, B> {
             BaselineShift::Top => self.data.metrics.block_min_coord,
             BaselineShift::Bottom => self.data.metrics.block_max_coord - inline_box.height,
             _ => {
-                let parent_style = layout_box.parent_style_index;
-                let placement = inline_box_placement(
-                    inline_box,
-                    parent_style,
-                    &self.layout.data.style_metrics,
-                    self.layout.data.quantize,
-                );
+                let aligned_subtree = self
+                    .layout
+                    .data
+                    .style_metrics
+                    .get(usize::from(layout_box.parent_style_index))
+                    .map_or(0, |m| m.aligned_subtree);
+                let ascent = inline_box.baseline.unwrap_or(inline_box.height);
                 self.data.metrics.baseline
                     - self.data.aligned_subtree_offset(
                         &self.layout.data.aligned_subtree_offsets,
-                        placement.aligned_subtree,
+                        aligned_subtree,
                     )
-                    - placement.baseline_offset
-                    - placement.ascent
+                    - layout_box.baseline_offset
+                    - ascent
             }
         }
     }

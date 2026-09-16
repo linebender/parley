@@ -190,9 +190,11 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) lines: Vec<LineData>,
     /// Items within each line
     pub(crate) line_items: Vec<LineItemData>,
-    /// Position of each aligned subtree rooted at a `vertical-align: top | bottom` style on each
-    /// line. Each line owns a contiguous range ([`LineData::aligned_subtree_offsets`]), in line
-    /// order.
+    /// Position of each aligned subtree rooted at a `vertical-align: top | bottom` style on each line.
+    /// The top-level aligned subtree of each line doesn't have an entry as it's offset is trivially zero.
+    ///
+    /// Stored here to amortise the allocation (and avoid cloning it when cloning `LineData`).
+    /// Each line owns a contiguous slice ([`LineData::aligned_subtree_offsets`]).
     pub(crate) aligned_subtree_offsets: Vec<AlignedSubtreeOffset>,
     /// The width constraint that was used to line break the layout
     pub(crate) layout_max_advance: f32,
