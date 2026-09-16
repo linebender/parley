@@ -586,6 +586,7 @@ mod tests {
                 language: None,
                 features: &[],
                 variations: &[],
+                grapheme_replacement: None,
             },
         }];
         shaper.shape_text(
@@ -744,6 +745,7 @@ mod tests {
                     language: None,
                     features: &[],
                     variations: &[],
+                    grapheme_replacement: None,
                 },
             },
             Item {
@@ -753,6 +755,7 @@ mod tests {
                     language: None,
                     features: &[],
                     variations: &[],
+                    grapheme_replacement: None,
                 },
             },
         ];

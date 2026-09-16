@@ -230,6 +230,7 @@ fn create_root_style() -> TextStyle<'static, 'static, ColorBrush> {
         word_break: WordBreak::BreakAll,
         overflow_wrap: OverflowWrap::Anywhere,
         text_wrap_mode: TextWrapMode::Wrap,
+        grapheme_replacement: None,
     }
 }
 

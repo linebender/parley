@@ -122,6 +122,14 @@ pub enum StyleProperty<'a, B: Brush> {
     OverflowWrap(OverflowWrap),
     /// Control over non-"emergency" line-breaking.
     TextWrapMode(TextWrapMode),
+    /// Replacement character used to mask every grapheme cluster (e.g. for password fields).
+    ///
+    /// When set to `Some`, every grapheme cluster is shaped and rendered as the given character
+    /// (in a font that has a glyph for it) instead of its actual text, yielding exactly one glyph
+    /// per grapheme. The underlying text is left untouched, so cursor movement, hit-testing and
+    /// selection continue to operate on the real text. Line breaking and whitespace handling
+    /// also still follow the real text.
+    GraphemeReplacement(Option<char>),
 }
 
 /// Unresolved styles.
@@ -173,6 +181,8 @@ pub struct TextStyle<'family, 'settings, B: Brush> {
     pub overflow_wrap: OverflowWrap,
     /// Control over non-"emergency" line-breaking.
     pub text_wrap_mode: TextWrapMode,
+    /// Replacement character used to mask every grapheme cluster (e.g. for password fields).
+    pub grapheme_replacement: Option<char>,
 }
 
 impl<B: Brush> Default for TextStyle<'static, 'static, B> {
@@ -201,6 +211,7 @@ impl<B: Brush> Default for TextStyle<'static, 'static, B> {
             word_break: WordBreak::default(),
             overflow_wrap: OverflowWrap::default(),
             text_wrap_mode: TextWrapMode::default(),
+            grapheme_replacement: None,
         }
     }
 }

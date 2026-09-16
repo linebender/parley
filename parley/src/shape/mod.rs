@@ -155,7 +155,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
                         || style.font_variations != item_style.font_variations
                         || style.font_features != item_style.font_features
                         || !nearly_eq(style.letter_spacing, item_style.letter_spacing)
-                        || !nearly_eq(style.word_spacing, item_style.word_spacing);
+                        || !nearly_eq(style.word_spacing, item_style.word_spacing)
+                        || style.grapheme_replacement != item_style.grapheme_replacement;
                 }
 
                 if split {
@@ -173,6 +174,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
                     font_size: item_style.font_size,
                     features: &style_features[item_style_index as usize],
                     variations: rcx.variations(item_style.font_variations).unwrap_or(&[]),
+                    grapheme_replacement: item_style.grapheme_replacement,
                 },
             })
         })
@@ -311,11 +313,13 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
     fn select_font(
         &mut self,
         _item: &parley_engine::itemize::Segment,
-        _options: &ShapeOptions<'_>,
+        options: &ShapeOptions<'_>,
         cluster: &mut CharCluster,
     ) -> Option<FontInstance> {
         let style_index = cluster.style_index();
-        let is_emoji = cluster.is_emoji();
+        // When masking, the cluster is shaped as the replacement character, so the font must
+        // cover that rather than the cluster's own characters.
+        let is_emoji = options.grapheme_replacement.is_none() && cluster.is_emoji();
 
         if style_index != self.style_index || is_emoji || self.fonts_id.is_none() {
             self.style_index = style_index;
@@ -355,18 +359,17 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
                 return fontique::QueryStatus::Continue;
             };
 
-            let coverage = cluster.calculate_coverage(
-                |ch| {
-                    charmap
-                        .map(ch)
-                        .map(|g| {
-                            // Any non-zero value indicates the existence of a glyph.
-                            g != 0
-                        })
-                        .unwrap_or_default()
-                },
-                self.analysis_data_sources,
-            );
+            // Any non-zero value indicates the existence of a glyph.
+            let covers = |ch| charmap.map(ch).is_some_and(|g| g != 0);
+            let coverage = if let Some(replacement) = options.grapheme_replacement {
+                if covers(replacement) {
+                    Coverage::COMPLETE
+                } else {
+                    Coverage::NONE
+                }
+            } else {
+                cluster.calculate_coverage(covers, self.analysis_data_sources)
+            };
             if coverage > best_coverage {
                 selected_font = Some(SelectedFont { font: font.clone() });
                 best_coverage = coverage;

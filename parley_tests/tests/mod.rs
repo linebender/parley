@@ -34,6 +34,7 @@ mod issues;
 mod line_break;
 mod linebreaking_matches_chrome;
 mod lines;
+mod masking;
 mod out_of_flow_boxes;
 mod styles;
 mod text_indent;
