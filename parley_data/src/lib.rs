@@ -57,7 +57,7 @@ impl Properties {
     }
 
     /// Creates a new [`Properties`] from the given properties
-    #[allow(
+    #[expect(
         clippy::too_many_arguments,
         reason = "one argument per packed property; only called from the data generator and tests"
     )]
