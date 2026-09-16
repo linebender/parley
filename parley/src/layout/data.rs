@@ -313,6 +313,77 @@ impl<B: Brush> LayoutData<B> {
                     let can_hang = item.bidi_level == self.base_level;
                     let is_rtl = item.bidi_level.is_rtl();
 
+                    if run_spacing.is_zero() {
+                        // Without letter/word spacing there are no per-atom gaps, so the run can be
+                        // scanned one shaped cluster at a time instead of materializing atoms:
+                        // atoms start at grapheme-start clusters, so break opportunities are only
+                        // considered there, and the hanging-whitespace accumulator is updated per
+                        // cluster (a cluster that doesn't hang resets it, one that does extends
+                        // it), which is equivalent to the per-atom "hangs entirely / hangs
+                        // partially from the logical end" rule of `atom_hanging_advance`.
+                        let clusters = slice.shaped_clusters();
+                        let mut skip_atom = false;
+                        for (i, cluster) in clusters.iter().enumerate() {
+                            let whitespace = cluster.whitespace();
+                            let style = &self.styles[cluster.style_index as usize];
+                            if i == 0 || cluster.is_grapheme_start() {
+                                skip_atom = false;
+                                let boundary = cluster.boundary_before();
+                                let prev_text_wrap_mode = text_wrap_mode;
+                                text_wrap_mode = style.text_wrap_mode;
+                                if prev_text_wrap_mode == TextWrapMode::Wrap
+                                    && (boundary == Boundary::Line
+                                        || style.overflow_wrap == OverflowWrap::Anywhere)
+                                {
+                                    min_width = min_width
+                                        .max(running_min_width - running_hanging_whitespace);
+                                    running_min_width = 0.0;
+                                }
+                                // See the newline handling below.
+                                if whitespace == Whitespace::Newline {
+                                    min_width = min_width
+                                        .max(running_min_width - running_hanging_whitespace);
+                                    if !hangs_conditionally {
+                                        running_max_width -= running_hanging_whitespace;
+                                    }
+                                    max_width = max_width.max(running_max_width);
+                                    running_min_width = 0.0;
+                                    running_max_width = 0.0;
+                                    running_hanging_whitespace = 0.0;
+                                    skip_atom = true;
+                                    continue;
+                                }
+                            } else if skip_atom {
+                                continue;
+                            }
+                            let advance = cluster.advance;
+                            running_min_width += advance;
+                            running_max_width += advance;
+                            // A cluster hangs if all of its characters hang. Its first character is
+                            // checked via the cached flags so the common case never touches
+                            // `characters`.
+                            let hangs = can_hang
+                                && whitespace_hangs(whitespace, style)
+                                && (cluster.char_len() == 1
+                                    || slice.characters_in(cluster.chars_range()).iter().all(
+                                        |character| {
+                                            whitespace_hangs(
+                                                character.info.whitespace(),
+                                                &self.styles[character.style_index as usize],
+                                            )
+                                        },
+                                    ));
+                            if hangs {
+                                running_hanging_whitespace += advance;
+                                hangs_conditionally =
+                                    style.white_space_collapse == WhiteSpaceCollapse::Preserve;
+                            } else {
+                                running_hanging_whitespace = 0.0;
+                            }
+                        }
+                        continue;
+                    }
+
                     for atom in slice.atoms_start() {
                         let characters = atom.characters();
                         let first_character = characters[0];
