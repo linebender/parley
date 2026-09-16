@@ -19,6 +19,8 @@ system = ["parley/system"]
 
 [dependencies]
 parley = { workspace = true, features = ["std"] }
+parley_data = { workspace = true, features = ["baked"] }
+parley_emoji = { workspace = true }
 parley_dev = { workspace = true }
 parley_linebreaking_cases = { workspace = true }
 glifo = { workspace = true, features = ["std", "vello_cpu", "png"] }

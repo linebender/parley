@@ -10,6 +10,7 @@ members = [
     "parley_data_gen",
     "parley_dev",
     "parley_engine",
+    "parley_emoji",
     "parley_tests",
     "parley_tests/linebreaking_cases",
     "parley_tests/linebreaking_browser_recorder",
@@ -40,6 +41,7 @@ parley_data = { version = "0.11.0", path = "parley_data", default-features = fal
 parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
 parley_engine = { version = "0.11.0", default-features = false, path = "parley_engine" }
+parley_emoji = { version = "0.11.0", default-features = false, path = "parley_emoji" }
 parley_linebreaking_cases = { path = "parley_tests/linebreaking_cases" }
 
 # External dependencies

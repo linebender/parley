@@ -3007,6 +3007,10 @@ name = "parley_dev"
 version = "0.0.0"
 
 [[package]]
+name = "parley_emoji"
+version = "0.11.0"
+
+[[package]]
 name = "parley_engine"
 version = "0.11.0"
 dependencies = [
@@ -3019,6 +3023,7 @@ dependencies = [
  "linebender_resource_handle",
  "parlance",
  "parley_data",
+ "parley_emoji",
  "skrifa 0.44.0",
 ]
 
@@ -3058,7 +3063,9 @@ dependencies = [
  "glifo",
  "oxipng",
  "parley",
+ "parley_data",
  "parley_dev",
+ "parley_emoji",
  "parley_linebreaking_cases",
  "peniko",
  "taffy",
