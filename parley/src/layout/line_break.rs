@@ -737,7 +737,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         let layout_box = &self.layout.data.inline_boxes[index];
         let inline_box = &layout_box.inline_box;
         if inline_box.kind == InlineBoxKind::InFlow {
-            let parent_style = layout_box.style_index;
+            let parent_style = layout_box.parent_style_index;
             self.state.append_aligned_inline_box_to_line(
                 next_x,
                 inline_box,

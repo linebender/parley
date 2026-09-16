@@ -91,7 +91,7 @@ impl<'a, B: Brush> Line<'a, B> {
             BaselineShift::Top => self.data.metrics.block_min_coord,
             BaselineShift::Bottom => self.data.metrics.block_max_coord - inline_box.height,
             _ => {
-                let parent_style = layout_box.style_index;
+                let parent_style = layout_box.parent_style_index;
                 let placement = inline_box_placement(
                     inline_box,
                     parent_style,
