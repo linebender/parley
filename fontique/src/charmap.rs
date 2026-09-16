@@ -52,13 +52,13 @@ impl CharmapIndex {
     pub fn charmap<'a>(&self, font_data: &'a [u8]) -> Option<Charmap<'a>> {
         let subtable_data = font_data.get(self.subtable_offset as usize..)?;
         let subtable = CmapSubtable::read(FontData::new(subtable_data)).ok()?;
-        let uvs_subtable = (self.uvs_subtable_offset != 0)
+        let uvs_subtable_data = (self.uvs_subtable_offset != 0)
             .then(|| font_data.get(self.uvs_subtable_offset as usize..))
             .flatten()
-            .and_then(|data| Cmap14::read(FontData::new(data)).ok());
+            .map(FontData::new);
         Some(Charmap {
             subtable,
-            uvs_subtable,
+            uvs_subtable_data,
             is_symbol: self.is_symbol,
             is_mac_roman: self.is_mac_roman,
         })
@@ -69,7 +69,7 @@ impl CharmapIndex {
 #[derive(Clone)]
 pub struct Charmap<'a> {
     subtable: CmapSubtable<'a>,
-    uvs_subtable: Option<Cmap14<'a>>,
+    uvs_subtable_data: Option<FontData<'a>>,
     is_symbol: bool,
     is_mac_roman: bool,
 }
@@ -123,8 +123,8 @@ impl Charmap<'_> {
         codepoint: impl Into<u32>,
         selector: impl Into<u32>,
     ) -> Option<MapVariant> {
-        self.uvs_subtable
-            .as_ref()?
+        Cmap14::read(self.uvs_subtable_data?)
+            .ok()?
             .map_variant(codepoint.into(), selector.into())
     }
 }
