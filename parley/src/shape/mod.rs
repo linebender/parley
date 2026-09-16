@@ -348,10 +348,6 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
         }
 
         // `U+FE0F` requests a color glyph and `U+FE0E` a monochrome one.
-        // Within each font, an exact cmap format 14 mapping beats the
-        // color-table heuristic. Fonts with the matching glyph style come
-        // first, and mismatched fonts stay as a fallback so the base
-        // character still renders.
         // See <https://www.unicode.org/reports/tr51/#Presentation_Style>.
         let chars = cluster.chars();
         let variation_sequences: SmallVec<[VariationSequence; 2]> = chars
@@ -394,8 +390,6 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
 
             let coverage = cluster.calculate_coverage(
                 |ch| {
-                    // A variant mapping covers its base character even when
-                    // the nominal character map does not encode it.
                     variant_bases.contains(&ch)
                         || charmap
                             .map(ch)
@@ -426,8 +420,7 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
             fontique::QueryStatus::Continue
         });
 
-        // A zero-coverage font must not shadow one that can render the base
-        // character, whichever bucket each landed in.
+        // Presentation only outranks coverage while there is any coverage to compare.
         let selected_font = if best_coverage > Coverage::NONE {
             selected_font
         } else if mismatched_coverage > Coverage::NONE {
@@ -507,7 +500,8 @@ fn any_font(query: &mut Query<'_>) -> Option<QueryFont> {
 struct VariationSequence {
     base: char,
     selector: char,
-    /// Whether `base` occurs only once in the cluster.
+    /// Coverage is matched by character value, so a variant mapping only proves
+    /// coverage of an unrepeated base.
     base_is_unique: bool,
 }
 
