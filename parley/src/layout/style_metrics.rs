@@ -101,7 +101,7 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
                 shaped_run_metrics(shaped_text, &font, style.font_size, variations)
                     .or_else(|| FontMetrics::from_font_instance(&font, style.font_size, variations))
             })
-            .unwrap_or_else(|| fallback_metrics(style.font_size));
+            .unwrap_or_else(|| FontMetrics::fallback(style.font_size));
 
         let line_height = match style.line_height {
             LineHeight::Absolute(value) => value,
@@ -346,22 +346,4 @@ fn first_available_font<B: Brush>(
         fontique::QueryStatus::Stop
     });
     found
-}
-
-/// Metrics to use when no font is available at all.
-///
-/// These roughly match common Latin fonts, so that a layout without fonts still has plausible
-/// line heights.
-fn fallback_metrics(font_size: f32) -> FontMetrics {
-    FontMetrics {
-        ascent: font_size * 0.8,
-        descent: font_size * 0.2,
-        leading: 0.,
-        underline_offset: 0.,
-        underline_size: 0.,
-        strikethrough_offset: 0.,
-        strikethrough_size: 0.,
-        cap_height: None,
-        x_height: None,
-    }
 }
