@@ -518,7 +518,7 @@ fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
     builder.push_text("  b");
     let (layout, text) = builder.build();
     assert_eq!(text, "a  b");
-    assert_eq!(layout.inline_boxes()[0].index, 2);
+    assert_eq!(layout.inline_boxes().next().unwrap().index, 2);
 
     // Whitespace at the start and end of the text is removed, including in enclosing spans.
     let mut builder = env.tree_builder();
@@ -543,7 +543,7 @@ fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
     builder.push_inline_box(inline_box());
     let (layout, text) = builder.build();
     assert_eq!(text, "a ");
-    assert_eq!(layout.inline_boxes()[0].index, 2);
+    assert_eq!(layout.inline_boxes().next().unwrap().index, 2);
 
     // Collapsible whitespace on either side of a preserved segment break (e.g. a `<br>`) is
     // removed, while whitespace following a preserved space is kept.
@@ -584,7 +584,7 @@ fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
         builder.push_text(&"XXXXXXX"[split..]);
         let (mut layout, text) = builder.build();
         assert_eq!(text, "XXXXXXX");
-        assert_eq!(layout.inline_boxes()[0].index, split);
+        assert_eq!(layout.inline_boxes().next().unwrap().index, split);
         layout.break_all_lines(Some(1.));
         assert_eq!(layout.len(), 1, "box at {split}");
     }
@@ -631,11 +631,7 @@ fn inline_box_index() {
     }
     let (layout, text) = builder.build();
     assert_eq!(text, "abcdabcdabcd");
-    let boxes: Vec<_> = layout
-        .inline_boxes()
-        .iter()
-        .map(|b| (b.id, b.index))
-        .collect();
+    let boxes: Vec<_> = layout.inline_boxes().map(|b| (b.id, b.index)).collect();
     assert_eq!(boxes, [(0, 4), (1, 8), (2, 12)]);
 }
 
