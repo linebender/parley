@@ -202,10 +202,7 @@ pub(crate) fn draw_layout(
     }
 }
 
-/// Render the layout to a [`Pixmap`].
-///
-/// If given [`RenderingConfig::size`] is not specified, [`Layout::width`] and [`Layout::height`]
-/// are used.
+/// Rasterize everything drawn into the [`Renderer`] to a [`Pixmap`] of the renderer's size.
 pub(crate) fn render_to_pixmap(renderer: Renderer) -> Pixmap {
     let Renderer {
         mut ctx,
