@@ -71,7 +71,7 @@ impl<'b, B: Brush> RangedBuilder<'b, B> {
     pub fn push_inline_box(&mut self, inline_box: InlineBox) {
         self.lcx.inline_boxes.push(LayoutInlineBox {
             inline_box,
-            style_index: 0,
+            parent_style_index: 0,
         });
     }
 
@@ -174,7 +174,7 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
     pub fn push_inline_box(&mut self, inline_box: InlineBox) {
         self.lcx.inline_boxes.push(LayoutInlineBox {
             inline_box,
-            style_index: 0,
+            parent_style_index: 0,
         });
     }
 
@@ -274,10 +274,10 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
 
         // TODO: arrange type better here to factor out the index
         inline_box.index = self.lcx.tree_style_builder.committed_text_len();
-        let style_index = self.lcx.tree_style_builder.resolve_current_style_id();
+        let parent_style_index = self.lcx.tree_style_builder.resolve_current_style_id();
         self.lcx.inline_boxes.push(LayoutInlineBox {
             inline_box,
-            style_index,
+            parent_style_index,
         });
     }
 
