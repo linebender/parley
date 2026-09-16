@@ -349,16 +349,20 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
 
         // `U+FE0F` requests a color glyph and `U+FE0E` a monochrome one.
         // See <https://www.unicode.org/reports/tr51/#Presentation_Style>.
-        let chars = cluster.chars();
-        let variation_sequences: SmallVec<[VariationSequence; 2]> = chars
-            .windows(2)
-            .filter(|pair| matches!(pair[1].ch, '\u{FE0E}' | '\u{FE0F}'))
-            .map(|pair| VariationSequence {
-                base: pair[0].ch,
-                selector: pair[1].ch,
-                base_is_unique: chars.iter().filter(|c| c.ch == pair[0].ch).count() == 1,
-            })
-            .collect();
+        let mut variation_sequences: SmallVec<[VariationSequence; 2]> = SmallVec::new();
+        if cluster.has_presentation_selector() {
+            let chars = cluster.chars();
+            variation_sequences.extend(
+                chars
+                    .windows(2)
+                    .filter(|pair| matches!(pair[1].ch, '\u{FE0E}' | '\u{FE0F}'))
+                    .map(|pair| VariationSequence {
+                        base: pair[0].ch,
+                        selector: pair[1].ch,
+                        base_is_unique: chars.iter().filter(|c| c.ch == pair[0].ch).count() == 1,
+                    }),
+            );
+        }
 
         let mut selected_font = None;
         let mut best_coverage = Coverage::NONE;
