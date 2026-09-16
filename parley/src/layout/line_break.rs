@@ -12,7 +12,9 @@ use parlance::BidiLevel;
 
 use crate::layout::data::AlignedSubtreeOffset;
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
-use crate::layout::style_metrics::{BoxMetrics, StyleMetrics, inline_box_placement};
+use crate::layout::style_metrics::{
+    BoxMetrics, InlineBoxPlacement, StyleMetrics, inline_box_placement,
+};
 use crate::layout::whitespace::atom_hanging_advance;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
@@ -578,14 +580,13 @@ impl BreakerState {
         self.update_max_height_exceeded();
     }
 
-    /// Add an in-flow inline box to the line, aligned according to its `vertical_align` relative
-    /// to the span box of its containing style `parent_style`.
+    /// Add an in-flow inline box to the line at its resolved `placement` (ignored for
+    /// `vertical-align: top | bottom`, which only constrains the line box).
     fn append_aligned_inline_box_to_line(
         &mut self,
         next_x: f32,
         inline_box: &InlineBox,
-        parent_style: u16,
-        style_metrics: &[StyleMetrics],
+        placement: InlineBoxPlacement,
         quantize: bool,
     ) {
         self.item_idx += 1;
@@ -598,7 +599,6 @@ impl BreakerState {
                 quantize,
             );
         } else {
-            let placement = inline_box_placement(inline_box, parent_style, style_metrics, quantize);
             self.line.box_metrics.add_inline_box(
                 placement.aligned_subtree,
                 placement.baseline_offset,
@@ -734,17 +734,19 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     /// Add the layout's inline box `index` to the current line. Out-of-flow boxes contribute
     /// nothing to the line's metrics.
     fn append_layout_inline_box(&mut self, index: usize, next_x: f32) {
-        let layout_box = &self.layout.data.inline_boxes[index];
+        let quantize = self.layout.data.quantize;
+        let layout_box = &mut self.layout.data.inline_boxes[index];
         let inline_box = &layout_box.inline_box;
         if inline_box.kind == InlineBoxKind::InFlow {
-            let parent_style = layout_box.parent_style_index;
-            self.state.append_aligned_inline_box_to_line(
-                next_x,
+            let placement = inline_box_placement(
                 inline_box,
-                parent_style,
+                layout_box.parent_style_index,
                 &self.layout.data.style_metrics,
-                self.layout.data.quantize,
+                quantize,
             );
+            layout_box.baseline_offset = placement.baseline_offset;
+            self.state
+                .append_aligned_inline_box_to_line(next_x, inline_box, placement, quantize);
         } else {
             self.state.append_inline_box_to_line(
                 next_x,

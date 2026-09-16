@@ -72,6 +72,7 @@ impl<'b, B: Brush> RangedBuilder<'b, B> {
         self.lcx.inline_boxes.push(LayoutInlineBox {
             inline_box,
             parent_style_index: 0,
+            baseline_offset: 0.,
         });
     }
 
@@ -175,6 +176,7 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
         self.lcx.inline_boxes.push(LayoutInlineBox {
             inline_box,
             parent_style_index: 0,
+            baseline_offset: 0.,
         });
     }
 
@@ -278,6 +280,7 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
         self.lcx.inline_boxes.push(LayoutInlineBox {
             inline_box,
             parent_style_index,
+            baseline_offset: 0.,
         });
     }
 
