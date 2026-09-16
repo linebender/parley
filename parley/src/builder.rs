@@ -39,7 +39,7 @@ impl BuilderOptions<'_> {
 
 /// Builder for constructing a text layout with ranged attributes.
 ///
-/// Text must already be whitespace-processed; source text and byte ranges are preserved.
+/// This builder does not collapse whitespace. For whitespace collapsing, use the [`TreeBuilder`]
 #[must_use]
 pub struct RangedBuilder<'a, B: Brush> {
     pub(crate) options: BuilderOptions<'a>,
@@ -106,7 +106,7 @@ impl<'b, B: Brush> RangedBuilder<'b, B> {
 /// Builder for constructing a text layout from a style table and
 /// indexed style runs.
 ///
-/// Text must already be whitespace-processed; source text and byte ranges are preserved.
+/// This builder does not collapse whitespace. For whitespace collapsing, use the [`TreeBuilder`]
 #[must_use]
 pub struct StyleRunBuilder<'a, B: Brush> {
     pub(crate) options: BuilderOptions<'a>,

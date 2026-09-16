@@ -22,8 +22,8 @@ use crate::util::nearly_eq;
 
 /// Whitespace collapsing and hanging behavior.
 ///
-/// Tree builders transform source text. Ranged and style-run builders accept already
-/// transformed text and use this property only during layout.
+/// Note: Currently only the `TreeBuilder` collapses white space. The `RangedBuilder` and `StyleRunBuilder`
+/// builders expect already transformed text and use only this property to influence whitespace hanging behaviour
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum WhiteSpaceCollapse {
     /// Collapse whitespace, including ASCII segment breaks, to a space.
