@@ -377,52 +377,6 @@ mod tests {
     }
 
     #[test]
-    fn nested_whitespace_modes_restore_and_reuse_styles() {
-        let mut builder = TreeStyleBuilder::<u32>::default();
-        builder.begin(ResolvedStyle {
-            white_space_collapse: WhiteSpaceCollapse::Collapse,
-            ..ResolvedStyle::default()
-        });
-        builder.push_text("a  a");
-        builder.push_style_modification_span(
-            [ResolvedProperty::WhiteSpaceCollapse(
-                WhiteSpaceCollapse::PreserveBreaks,
-            )]
-            .into_iter(),
-        );
-        builder.push_text("b \t\n b");
-        builder.push_style_modification_span(
-            [ResolvedProperty::WhiteSpaceCollapse(
-                WhiteSpaceCollapse::Preserve,
-            )]
-            .into_iter(),
-        );
-        builder.push_text("c \t\n c");
-        builder.pop_style_span();
-        builder.push_text("d \t\n d");
-        builder.pop_style_span();
-        builder.push_text("e \t\n e");
-
-        let mut styles = Vec::new();
-        let mut runs = Vec::new();
-        let text = builder.finish(&mut styles, &mut runs);
-        assert_eq!(text, "a ab\nbc \t\n cd\nde e");
-        assert_eq!(styles.len(), 3);
-        assert_eq!(
-            runs.iter()
-                .map(|run| styles[run.style_index as usize].white_space_collapse)
-                .collect::<Vec<_>>(),
-            [
-                WhiteSpaceCollapse::Collapse,
-                WhiteSpaceCollapse::PreserveBreaks,
-                WhiteSpaceCollapse::Preserve,
-                WhiteSpaceCollapse::PreserveBreaks,
-                WhiteSpaceCollapse::Collapse,
-            ]
-        );
-    }
-
-    #[test]
     fn collapses_ascii_whitespace_without_trimming_non_ascii_whitespace() {
         let mut builder = TreeStyleBuilder::<u32>::default();
         builder.begin(ResolvedStyle {

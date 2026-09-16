@@ -549,6 +549,39 @@ fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
     builder.pop_style_span();
     builder.push_text(" c");
     assert_eq!(builder.build().1, "a\nb   c");
+
+    // An out-of-flow box is not content: it neither splits a word nor prevents the whitespace on
+    // either side of it from collapsing together.
+    let out_of_flow_box = |width| InlineBox {
+        kind: InlineBoxKind::OutOfFlow,
+        width,
+        height: width,
+        ..inline_box()
+    };
+    for split in 0..=7 {
+        let mut builder = env.tree_builder();
+        builder.push_style_modification_span(&[StyleProperty::WhiteSpaceCollapse(
+            WhiteSpaceCollapse::Collapse,
+        )]);
+        builder.push_text(&"XXXXXXX"[..split]);
+        builder.push_inline_box(out_of_flow_box(100.));
+        builder.push_text(&"XXXXXXX"[split..]);
+        let (mut layout, text) = builder.build();
+        assert_eq!(text, "XXXXXXX");
+        assert_eq!(layout.inline_boxes()[0].index, split);
+        layout.break_all_lines(Some(1.));
+        assert_eq!(layout.len(), 1, "box at {split}");
+    }
+    for suffix in ["  b", "\nb"] {
+        let mut builder = env.tree_builder();
+        builder.push_style_modification_span(&[StyleProperty::WhiteSpaceCollapse(
+            WhiteSpaceCollapse::Collapse,
+        )]);
+        builder.push_text("a  ");
+        builder.push_inline_box(out_of_flow_box(0.));
+        builder.push_text(suffix);
+        assert_eq!(builder.build().1, "a b");
+    }
 }
 
 #[test]
