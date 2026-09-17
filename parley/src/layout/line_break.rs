@@ -11,13 +11,13 @@ use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
-use crate::layout::whitespace::{atom_hanging_advance, whitespace_can_hang};
+use crate::layout::whitespace::atom_hanging_advance;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
 };
 use crate::style::Brush;
-use crate::{InlineBoxKind, OverflowWrap, TextWrapMode};
+use crate::{InlineBoxKind, OverflowWrap, TextWrapMode, WhiteSpaceCollapse};
 
 use core::ops::Range;
 use parley_engine::shape::Whitespace;
@@ -785,8 +785,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let first_character = &atom.characters()[0];
                         let whitespace = first_character.info.whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
-                        // Whether this is a space that is allowed to hang past the line.
-                        let is_space = whitespace_can_hang(whitespace);
                         // Whether this atom is a justification opportunity.
                         let is_separator = is_word_separator(whitespace);
                         let boundary = first_character.info.boundary();
@@ -898,10 +896,17 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // in the line. If there is no such line-breaking opportunity (such as if wrapping is disabled), then
                         // we fall back to appending the content to the line anyway.
                         else {
-                            // Case: the atom is a space character (and wrapping is enabled)
+                            // Case: the atom fits once its hanging whitespace is excluded.
                             //
-                            // We hang any overflowing whitespace and then line-break.
-                            if is_space && style.text_wrap_mode == TextWrapMode::Wrap {
+                            // We append it to the line, with the whitespace hanging past the end.
+                            let (hanging, all_hang) = atom_hanging_advance(
+                                slice,
+                                &atom,
+                                &self.layout.data.styles,
+                                spacing,
+                                item.bidi_level.is_rtl(),
+                            );
+                            if all_hang || next_x - hanging <= max_advance {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
@@ -910,11 +915,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     next_x,
                                     text_metrics,
                                     is_separator,
-                                );
-                                return self.start_new_line(
-                                    BreakReason::Regular,
-                                    max_advance,
-                                    line_indent,
                                 );
                             }
                             // Case: we have previously encountered a REGULAR line-breaking opportunity in the current line
@@ -1289,7 +1289,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 impl<B: Brush> Drop for BreakLines<'_, B> {
     fn drop(&mut self) {
         // Compute the overall width and height of the entire layout
-        // The "width" excludes trailing whitespace. The "full_width" includes it.
+        // The "width" excludes hanging whitespace. The "full_width" includes it.
         let mut layout_width = 0_f32;
         let mut layout_full_width = 0_f32;
         let mut height = 0_f64; // f32 causes test failures due to accumulated error
@@ -1463,8 +1463,24 @@ fn commit_line<B: Brush>(
     // let end_run_idx = lines.line_items.last().map(|item| item.index).unwrap_or(0);
     let end_item_idx = lines.line_items.len();
 
-    let (hanging_advance, justification_end_cluster, hanging_opportunities) =
-        hanging_whitespace(layout, &lines.line_items[start_item_idx..end_item_idx]);
+    // Trailing whitespace under `WhiteSpaceCollapse::Preserve` directly preceding a forced break
+    // hangs conditionally (CSS Text 4 § 4.3.2): only the part that doesn't fit hangs. Whitespace
+    // that fits, stays inside the line box, and counts towards alignment and the layout width. The
+    // end of the layout is considered to be a forced line break as well (CSS Text 4 § 5). Other
+    // trailing whitespace hangs unconditionally.
+    //
+    // When a line wrapped (i.e., not because of a forced line break), whitespace always hangs
+    // unconditionally. That's equivalent to considering that whitespace to be overflowing fully.
+    // Hence an `overflow` of `f32::INFINITY` can be used to model that case.
+    let overflow = match break_reason {
+        BreakReason::Regular | BreakReason::Emergency => f32::INFINITY,
+        BreakReason::Explicit | BreakReason::None => state.x - max_advance,
+    };
+    let (hanging_advance, justification_end_cluster, hanging_opportunities) = hanging_whitespace(
+        layout,
+        &lines.line_items[start_item_idx..end_item_idx],
+        overflow,
+    );
     // The word separators counted as the line was built include the line's hanging whitespace, and
     // hanging whitespace is not stretched by justification.
     let num_justification_opportunities = state.num_word_separators - hanging_opportunities;
@@ -1519,16 +1535,37 @@ fn commit_line<B: Brush>(
 /// that are no longer eligible, as they are at or beyond that cluster.
 ///
 /// `line_items` must be in logical order.
+///
+/// `overflow` is the advance by which the line's content overflows the available width (including
+/// all of its trailing whitespace). Following CSS Text 4 § 9.2, conditionally hanging whitespace
+/// only hangs as far as it overflows the available width. Pass [`f32::INFINITY`] to hang
+/// conditional whitespace in full.
+//
+// Note: This runs once per line, but it called in the line breaker's per-atom loop. The compiler
+// sometimes decides to inline it, which (as of writing) makes the line breaker 5-10% slower.
+#[inline(never)]
 fn hanging_whitespace<B: Brush>(
     layout: &Layout<B>,
     line_items: &[LineItemData],
+    overflow: f32,
 ) -> (f32, u32, u32) {
     let mut hanging_whitespace_advance = 0.;
     // Atoms with shaped clusters before this index may be stretched by justification.
     let mut justification_end_cluster = u32::MAX;
     let mut hanging_opportunities = 0;
+    // Following CSS Text 4 § 4.3.2, a sequence of whitespace with `WhiteSpaceCollapse::Preserve`
+    // directly preceding a forced line break hangs conditionally. All other whitespace hangs
+    // unconditionally. Note that, in particular, a sequence of `WhiteSpaceCollapse::Preserve`
+    // preceding a sequence of unconditionally hanging whitespace, also hangs unconditionally.
+    //
+    // Conditionally hanging whitespace hangs only as far as it overflows.
+    //
+    // Following CSS Text 4 § 9.2, unconditionally hanging whitespace before conditionally hanging
+    // whitespace, hangs only if the conditionally hanging whitespace hangs in full.
+    let mut in_conditional_suffix = true;
+    let mut conditional_advance: Option<f32> = None;
 
-    for line_item in line_items.iter().rev() {
+    'items: for line_item in line_items.iter().rev() {
         match line_item.kind {
             LayoutItemKind::InlineBox => {
                 let item = &layout.data.inline_boxes[line_item.index];
@@ -1565,23 +1602,43 @@ fn hanging_whitespace<B: Brush>(
                         effective_spacing,
                         line_item.is_rtl(),
                     );
+                    let first_character = &atom.characters()[0];
+                    let whitespace = first_character.info.whitespace();
+                    if in_conditional_suffix && whitespace != Whitespace::Newline {
+                        if layout.data.styles[first_character.style_index as usize]
+                            .white_space_collapse
+                            == WhiteSpaceCollapse::Preserve
+                        {
+                            *conditional_advance.get_or_insert(0.) += hanging;
+                        } else {
+                            in_conditional_suffix = false;
+                            // A conditionally hanging atom that fits (including one with a
+                            // non-positive advance) doesn't hang, and so whitespace before it isn't
+                            // at the line's end.
+                            if conditional_advance
+                                .is_some_and(|advance| advance <= 0. || advance > overflow)
+                            {
+                                break 'items;
+                            }
+                        }
+                    }
                     hanging_whitespace_advance += hanging;
                     // Justification can't stretch within an atom, so it stops at the start of the
                     // last atom that hangs in its entirety or only partially.
                     justification_end_cluster = atom.shaped_clusters_range().start;
-                    if is_word_separator(atom.characters()[0].info.whitespace()) {
+                    if is_word_separator(whitespace) {
                         hanging_opportunities += 1;
                     }
                     if !all_hang {
-                        return (
-                            hanging_whitespace_advance,
-                            justification_end_cluster,
-                            hanging_opportunities,
-                        );
+                        break 'items;
                     }
                 }
             }
         }
+    }
+
+    if let Some(advance) = conditional_advance {
+        hanging_whitespace_advance -= advance - advance.min(overflow).max(0.);
     }
 
     (

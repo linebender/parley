@@ -3,11 +3,13 @@
 
 use crate::inline_box::InlineBox;
 use crate::layout::spacing::{EffectiveSpacing, Justification, Spacing};
-use crate::layout::whitespace::{atom_hanging_advance, whitespace_can_hang};
+use crate::layout::whitespace::{atom_hanging_advance, whitespace_hangs};
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
-use crate::{IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode};
+use crate::{
+    IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode, WhiteSpaceCollapse,
+};
 use core::ops::Range;
 
 use alloc::vec::Vec;
@@ -288,9 +290,13 @@ impl<B: Brush> LayoutData<B> {
         // The running advance of whitespace that would hang if a line ended here. Can exceed
         // `running_min_width` when the hanging whitespace started before the last break
         // opportunity, in which case the line consists entirely of hanging whitespace.
-        //
-        // Note whitespace only hangs with `TextWrapMode::Wrap`, following CSS Text 4 § 4.3.2.
         let mut running_hanging_whitespace = 0.0;
+
+        // Whether that running whitespace hangs conditionally before a forced break (following CSS
+        // Text 4 § 4.3.2, that's the case for `WhiteSpaceCollapse::Preserve`). Conditionally
+        // hanging whitespace only hangs if it doesn't fit, which here means it counts towards the
+        // max-content width, but not the min-content width.
+        let mut hangs_conditionally = false;
 
         let mut text_wrap_mode = TextWrapMode::Wrap;
 
@@ -338,8 +344,10 @@ impl<B: Brush> LayoutData<B> {
                             // Newlines hang, so whitespace before them keeps hanging.
                             min_width =
                                 min_width.max(running_min_width - running_hanging_whitespace);
-                            max_width =
-                                max_width.max(running_max_width - running_hanging_whitespace);
+                            if !hangs_conditionally {
+                                running_max_width -= running_hanging_whitespace;
+                            }
+                            max_width = max_width.max(running_max_width);
                             running_min_width = 0.0;
                             running_max_width = 0.0;
                             running_hanging_whitespace = 0.0;
@@ -359,10 +367,10 @@ impl<B: Brush> LayoutData<B> {
                         } else if characters.len() == 1 {
                             // Fast path for the common-case that the atom is a single character,
                             // and so a single shaped cluster.
-                            if whitespace_can_hang(whitespace)
-                                && text_wrap_mode == TextWrapMode::Wrap
-                            {
+                            if whitespace_hangs(whitespace, style) {
                                 running_hanging_whitespace += advance;
+                                hangs_conditionally =
+                                    style.white_space_collapse == WhiteSpaceCollapse::Preserve;
                             } else {
                                 running_hanging_whitespace = 0.0;
                             }
@@ -374,6 +382,8 @@ impl<B: Brush> LayoutData<B> {
                             } else {
                                 running_hanging_whitespace = hanging;
                             }
+                            hangs_conditionally =
+                                style.white_space_collapse == WhiteSpaceCollapse::Preserve;
                         }
                     }
                 }
@@ -396,8 +406,13 @@ impl<B: Brush> LayoutData<B> {
             }
         }
 
+        // The end of a layout is considered to be a forced line break as per CSS Text 4 § 5, so
+        // whitespace can hang conditionally.
         min_width = min_width.max(running_min_width - running_hanging_whitespace);
-        max_width = max_width.max(running_max_width - running_hanging_whitespace);
+        if !hangs_conditionally {
+            running_max_width -= running_hanging_whitespace;
+        }
+        max_width = max_width.max(running_max_width);
 
         ContentWidths {
             min: min_width,
