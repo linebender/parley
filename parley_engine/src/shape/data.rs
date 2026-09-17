@@ -37,6 +37,12 @@ impl ShapedClusterFlags {
     const INLINE_GLYPH: u16 = 1 << 8;
     const GRAPHEME_START: u16 = 1 << 9;
     const SAFE_TO_BREAK_BEFORE: u16 = 1 << 10;
+    /// [`Boundary`] before the cluster's first character (2 bits).
+    const BOUNDARY_SHIFT: u16 = 11;
+    const BOUNDARY_MASK: u16 = 0b11 << Self::BOUNDARY_SHIFT;
+    /// [`Whitespace`] class of the cluster's first character (3 bits).
+    const WHITESPACE_SHIFT: u16 = 13;
+    const WHITESPACE_MASK: u16 = 0b111 << Self::WHITESPACE_SHIFT;
 
     #[inline(always)]
     pub(crate) const fn new(glyph_len: u8) -> Self {
@@ -60,6 +66,42 @@ impl ShapedClusterFlags {
         self.0 =
             self.0 & !Self::SAFE_TO_BREAK_BEFORE | if set { Self::SAFE_TO_BREAK_BEFORE } else { 0 };
         self
+    }
+
+    #[inline(always)]
+    pub(crate) const fn with_first_char(
+        mut self,
+        boundary: Boundary,
+        whitespace: Whitespace,
+    ) -> Self {
+        self.0 = self.0 & !(Self::BOUNDARY_MASK | Self::WHITESPACE_MASK)
+            | ((boundary as u16) << Self::BOUNDARY_SHIFT)
+            | ((whitespace as u16) << Self::WHITESPACE_SHIFT);
+        self
+    }
+
+    #[inline(always)]
+    const fn boundary(self) -> Boundary {
+        match (self.0 & Self::BOUNDARY_MASK) >> Self::BOUNDARY_SHIFT {
+            0 => Boundary::None,
+            1 => Boundary::Word,
+            2 => Boundary::Line,
+            _ => Boundary::Mandatory,
+        }
+    }
+
+    #[inline(always)]
+    const fn whitespace(self) -> Whitespace {
+        match (self.0 & Self::WHITESPACE_MASK) >> Self::WHITESPACE_SHIFT {
+            1 => Whitespace::Space,
+            2 => Whitespace::NoBreakSpace,
+            3 => Whitespace::IdeographicSpace,
+            4 => Whitespace::OtherSpaceSeparator,
+            5 => Whitespace::Tab,
+            6 => Whitespace::Newline,
+            7 => Whitespace::ControlWhitespace,
+            _ => Whitespace::None,
+        }
     }
 
     #[inline(always)]
@@ -167,6 +209,29 @@ impl ShapedCluster {
         self.flags.is_safe_to_break_before()
     }
 
+    /// The [`Boundary`] before this cluster's first character.
+    ///
+    /// This is [`Character::info`]'s boundary of the first character of [`Self::chars_range`], cached
+    /// here so that measuring text does not need to touch the character array.
+    #[inline(always)]
+    pub fn boundary_before(self) -> Boundary {
+        self.flags.boundary()
+    }
+
+    /// The [`Whitespace`] class of this cluster's first character.
+    ///
+    /// See [`Self::boundary_before`].
+    #[inline(always)]
+    pub fn whitespace(self) -> Whitespace {
+        self.flags.whitespace()
+    }
+
+    /// The number of characters in this cluster.
+    #[inline(always)]
+    pub fn char_len(self) -> u32 {
+        self.chars_range.1 - self.chars_range.0
+    }
+
     /// The number of graphemes this cluster overlaps.
     pub(crate) fn graphemes_overlapped(&self, characters: &[Character]) -> u32 {
         let start = self.chars_range().start as usize + 1;
@@ -231,5 +296,41 @@ impl ClusterInfo {
     #[inline(always)]
     pub fn source_char(self) -> char {
         self.source_char
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn first_char_flags_round_trip() {
+        let boundaries = [
+            Boundary::None,
+            Boundary::Word,
+            Boundary::Line,
+            Boundary::Mandatory,
+        ];
+        let whitespaces = [
+            Whitespace::None,
+            Whitespace::Space,
+            Whitespace::NoBreakSpace,
+            Whitespace::IdeographicSpace,
+            Whitespace::OtherSpaceSeparator,
+            Whitespace::Tab,
+            Whitespace::Newline,
+            Whitespace::ControlWhitespace,
+        ];
+        for boundary in boundaries {
+            for whitespace in whitespaces {
+                let flags = ShapedClusterFlags::new(3)
+                    .with_grapheme_start(true)
+                    .with_first_char(boundary, whitespace);
+                assert_eq!(flags.boundary(), boundary);
+                assert_eq!(flags.whitespace(), whitespace);
+                assert_eq!(flags.glyph_len(), 3);
+                assert!(flags.is_grapheme_start());
+            }
+        }
     }
 }
