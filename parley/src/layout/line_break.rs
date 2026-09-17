@@ -1536,10 +1536,10 @@ fn commit_line<B: Brush>(
 ///
 /// `line_items` must be in logical order.
 ///
-/// `overflow` is the advance by which the line's content overflows the available width (excluding
-/// any whitespace already determined to be hanging). Following CSS Text 4 § 9.2, this limits
-/// conditionally hanging whitespace to only hang as far as it overflows the available width. Pass
-/// [`f32::INFINITY`] to hang conditional whitespace in full.
+/// `overflow` is the advance by which the line's content overflows the available width (including
+/// all of its trailing whitespace). Following CSS Text 4 § 9.2, conditionally hanging whitespace
+/// only hangs as far as it overflows the available width. Pass [`f32::INFINITY`] to hang
+/// conditional whitespace in full.
 //
 // Note: This runs once per line, but it called in the line breaker's per-atom loop. The compiler
 // sometimes decides to inline it, which (as of writing) makes the line breaker 5-10% slower.
