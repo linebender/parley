@@ -394,6 +394,16 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
             };
         }
 
+        // Provide the characters that fallback fonts should cover so that
+        // the query can extend the search beyond the script fallback
+        // families if none of them has coverage.
+        self.query.set_fallback_chars(
+            cluster
+                .chars()
+                .iter()
+                .filter(|ch| ch.contributes_to_shaping)
+                .map(|ch| ch.ch),
+        );
         let mut selected_font = None;
         let mut best_coverage = Coverage::NONE;
 
