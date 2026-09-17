@@ -11,7 +11,7 @@ use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
-use crate::layout::whitespace::atom_hanging_advance;
+use crate::layout::whitespace::{atom_hanging_advance, soft_line_break};
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -21,7 +21,7 @@ use crate::{InlineBoxKind, OverflowWrap, TextWrapMode, WhiteSpaceCollapse};
 
 use core::ops::Range;
 use parley_engine::shape::Whitespace;
-use parley_engine::{Atom, Boundary, FontMetrics};
+use parley_engine::{Atom, FontMetrics};
 
 #[derive(Default)]
 struct LineLayout {
@@ -787,7 +787,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let is_newline = whitespace == Whitespace::Newline;
                         // Whether this atom is a justification opportunity.
                         let is_separator = is_word_separator(whitespace);
-                        let boundary = first_character.info.boundary();
                         let max_height_exceeded = self.state.line.max_height_exceeded;
                         let style = &self.layout.data.styles[first_character.style_index as usize];
 
@@ -849,7 +848,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 max_advance,
                                 line_indent,
                             );
-                        } else if boundary == Boundary::Line && text_wrap_mode == TextWrapMode::Wrap
+                        } else if text_wrap_mode == TextWrapMode::Wrap
+                            && soft_line_break(
+                                self.layout.data.shaped_text.characters(),
+                                atom.char_range().start as usize,
+                                &self.layout.data.styles,
+                            )
                         {
                             // We don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
                             // line breaks. We should accept the overflowing fragment in that scenario.
