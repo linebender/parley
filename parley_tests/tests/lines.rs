@@ -712,3 +712,76 @@ fn lines_revert_restores_line_height() {
     let heights: Vec<f32> = layout.lines().map(|l| l.metrics().line_height).collect();
     assert_eq!(heights, [16.0, 64.0]);
 }
+
+/// Like [`lines_revert_restores_line_height`], but the reverted content is in a
+/// `vertical-align: top` span, i.e. in a non-root aligned subtree.
+#[test]
+fn lines_revert_restores_aligned_subtree_line_height() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "aaa BBB";
+    let mut builder = env.ranged_builder(text);
+    builder.push(StyleProperty::FontSize(64.0), 4..7);
+    builder.push(StyleProperty::VerticalAlign(VerticalAlign::TOP), 4..7);
+    let mut layout = builder.build(text);
+
+    layout.break_all_lines(Some(95.0));
+    layout.align(Alignment::Start, AlignmentOptions::default());
+
+    assert_eq!(layout.len(), 2);
+    let heights: Vec<f32> = layout.lines().map(|l| l.metrics().line_height).collect();
+    assert_eq!(heights, [16.0, 64.0]);
+}
+
+/// A `top` and a `bottom` aligned subtree spanning several words each, whose extents grow word
+/// by word across line-breaking opportunities and reverts, on lines with both of them.
+#[test]
+fn lines_aligned_subtrees_grow_across_breaks() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let mut builder = env.tree_builder();
+    for (i, align) in [
+        VerticalAlign::TOP,
+        VerticalAlign::BOTTOM,
+        VerticalAlign::TOP,
+        VerticalAlign::BOTTOM,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        builder.push_style_modification_span(&[StyleProperty::VerticalAlign(align)]);
+        for (j, word) in ["aa ", "bbb ", "cc ", "ddd ", "ee "]
+            .into_iter()
+            .enumerate()
+        {
+            let size = 12.0 + 4.0 * ((i + j) % 4) as f32;
+            // `vertical-align` is inherited, so reset it to keep the word in the outer subtree.
+            builder.push_style_modification_span(&[
+                StyleProperty::FontSize(size),
+                StyleProperty::VerticalAlign(VerticalAlign::BASELINE),
+            ]);
+            builder.push_text(word);
+            builder.pop_style_span();
+        }
+        builder.pop_style_span();
+    }
+    let (mut layout, _) = builder.build();
+    layout.break_all_lines(Some(130.0));
+    layout.align(Alignment::Start, AlignmentOptions::default());
+
+    let metrics: Vec<(f32, f32)> = layout
+        .lines()
+        .map(|l| (l.metrics().line_height, l.metrics().baseline))
+        .collect();
+    assert_eq!(
+        metrics,
+        [
+            (24.0, 13.0),
+            (24.0, 45.0),
+            (24.0, 61.0),
+            (24.0, 89.0),
+            (24.0, 117.0)
+        ]
+    );
+    env.check_layout_snapshot(&layout);
+}
