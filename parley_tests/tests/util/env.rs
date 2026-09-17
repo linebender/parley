@@ -4,7 +4,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Cursor};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -48,11 +48,6 @@ pub(crate) struct TestEnv {
     text_color: Color,
     rendering_config: RenderingConfig,
     cursor_size: f32,
-    // TODO: tolerance should be 0 once vello's `Pixmap::from_png` uses rounded
-    // premultiplication (`(e * a + 127) / 255` instead of `(e * a) / 255`).
-    // The current truncation causes a ±1 drift per channel on pixels with
-    // non-255 alpha after a PNG round-trip.
-    tolerance: f32,
     // TODO: Add core::panic::Location for case.
     errors: Vec<(PathBuf, String)>,
     next_test_case_name: String,
@@ -136,7 +131,6 @@ impl TestEnv {
             test_name: test_name.to_string(),
             check_counter: 0,
             font_cx: create_font_context(),
-            tolerance: 0.0,
             layout_cx: LayoutContext::new(),
             text_color: Color::BLACK,
             rendering_config: RenderingConfig {
@@ -171,10 +165,6 @@ impl TestEnv {
 
     pub(crate) fn rendering_config(&mut self) -> &mut RenderingConfig {
         &mut self.rendering_config
-    }
-
-    pub(crate) fn set_tolerance(&mut self, tolerance: f32) {
-        self.tolerance = tolerance;
     }
 
     #[allow(dead_code, reason = "this may be useful for future tests")]
@@ -246,12 +236,17 @@ impl TestEnv {
         }
     }
 
-    fn check_images(&self, current_img: &Pixmap, snapshot_path: &Path) -> Result<(), String> {
+    fn check_images(&self, current_png: &[u8], snapshot_path: &Path) -> Result<(), String> {
         if !snapshot_path.is_file() {
             return Err(format!("Cannot find snapshot {}", snapshot_path.display()));
         }
         let snapshot_file = File::open(snapshot_path).unwrap();
         let snapshot_img = Pixmap::from_png(BufReader::new(snapshot_file)).unwrap();
+        // `Pixmap::into_png` unpremultiplies with rounding but `Pixmap::from_png`
+        // re-premultiplies with truncation, so a decoded snapshot is not bit-identical
+        // to the pixmap it was written from. Compare the decoded form of the PNG we
+        // would save, so both sides carry the same (deterministic) error.
+        let current_img = Pixmap::from_png(Cursor::new(current_png)).unwrap();
         if snapshot_img.width() != current_img.width()
             || snapshot_img.height() != current_img.height()
         {
@@ -275,7 +270,7 @@ impl TestEnv {
             let diff_b = (pixel1.b as f32 - pixel2.b as f32).abs();
             color_cumulative_difference += diff_r.max(diff_g).max(diff_b);
         }
-        if color_cumulative_difference > self.tolerance {
+        if n_different_pixels > 0 {
             return Err(format!(
                 "Testing image differs in {n_different_pixels} pixels (color difference = {color_cumulative_difference})",
             ));
@@ -356,12 +351,10 @@ impl TestEnv {
 
         #[cfg(not(target_os = "android"))]
         #[track_caller]
-        fn save_image(image: &Pixmap, path: &PathBuf, max_size: Option<usize>) {
+        fn save_image(image_data: &[u8], path: &PathBuf, max_size: Option<usize>) {
             use oxipng::{Options, optimize_from_memory};
 
-            let image_data = image.clone().into_png().unwrap();
-
-            let data = optimize_from_memory(&image_data, &Options::from_preset(5)).unwrap();
+            let data = optimize_from_memory(image_data, &Options::from_preset(5)).unwrap();
             let saved_len = data.len();
 
             // Whenever we save a file, we optimise it just in case.
@@ -380,21 +373,22 @@ impl TestEnv {
 
         // We special-case android targets because oxipng doesn't build in Android CI.
         #[cfg(target_os = "android")]
-        fn save_image(_image: &Pixmap, _path: &PathBuf, _max_size: Option<usize>) {
+        fn save_image(_image_data: &[u8], _path: &PathBuf, _max_size: Option<usize>) {
             panic!("Saving screenshots is not supported on Android targets");
         }
 
         // Max size a screenshot can have, in bytes.
         let max_size = self.max_screenshot_size;
-        if let Err(e) = self.check_images(img, &snapshot_path) {
+        let png = img.clone().into_png().unwrap();
+        if let Err(e) = self.check_images(&png, &snapshot_path) {
             if is_accept_mode() {
-                save_image(img, &snapshot_path, max_size);
+                save_image(&png, &snapshot_path, max_size);
             } else {
-                save_image(img, &comparison_path, max_size);
+                save_image(&png, &comparison_path, max_size);
                 self.errors.push((comparison_path, e));
             }
         } else if is_generate_all_mode() {
-            save_image(img, &comparison_path, max_size);
+            save_image(&png, &comparison_path, max_size);
         } else {
             let reference_size = snapshot_path.metadata().unwrap().len() as usize;
             if let Some(max_size) = max_size

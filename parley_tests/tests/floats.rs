@@ -76,12 +76,12 @@ fn render_and_check_float_layout(
     floated_boxes: &[TestFloatedBox],
 ) {
     let mut renderer = draw_layout(&*env.rendering_config(), layout, None, &[]);
-    renderer.set_paint(Color::from_rgb8(255, 105, 180));
+    renderer.ctx.set_paint(Color::from_rgb8(255, 105, 180));
 
     for fbox in floated_boxes {
         let x = fbox.x as f64;
         let y = fbox.y as f64;
-        renderer.fill_rect(&Rect::new(
+        renderer.ctx.fill_rect(&Rect::new(
             x,
             y,
             x + fbox.width as f64,
