@@ -24,8 +24,7 @@ impl Character {
     /// The byte range of this character in the source text.
     #[inline(always)]
     pub fn text_byte_range(&self) -> Range<usize> {
-        self.text_byte_start as usize
-            ..self.text_byte_start as usize + self.info.source_char().len_utf8()
+        self.text_byte_start as usize..self.text_byte_start as usize + self.info.len_utf8()
     }
 }
 
@@ -227,9 +226,43 @@ impl ClusterInfo {
         self.whitespace() != Whitespace::None
     }
 
+    /// Returns the number of bytes the source character would need if encoded in UTF-8.
+    ///
+    /// That number of bytes is always between 1 and 4, inclusive.
+    #[inline(always)]
+    pub fn len_utf8(self) -> usize {
+        self.source_char.len_utf8()
+    }
+
     /// Returns the cluster's original character.
     #[inline(always)]
     pub fn source_char(self) -> char {
         self.source_char
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cluster_info() {
+        for (ch, len, emoji) in [
+            ('a', 1, false),
+            (' ', 1, false),
+            ('\t', 1, false),
+            ('\r', 1, false),
+            ('\n', 1, false),
+            ('\u{00e9}', 2, false),
+            ('\u{2028}', 3, false),
+            ('\u{2600}', 3, true),
+            ('\u{1F600}', 4, true),
+        ] {
+            let info = ClusterInfo::new(Boundary::Line, ch);
+            assert_eq!(info.boundary(), Boundary::Line, "{ch:?}");
+            assert_eq!(info.whitespace(), Whitespace::from_char(ch), "{ch:?}");
+            assert_eq!(info.len_utf8(), len, "{ch:?}");
+            assert_eq!(info.is_emoji(), emoji, "{ch:?}");
+        }
     }
 }
