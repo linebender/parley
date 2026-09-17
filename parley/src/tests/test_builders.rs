@@ -602,43 +602,6 @@ fn builders_crlf_counts_as_single_line_break() {
     );
 }
 
-/// A CRLF whose `\r` and `\n` land in different shaped runs (because a style
-/// change starts at the `\n`) must still coalesce into a single hard break.
-#[test]
-fn builders_crlf_across_run_boundary_counts_as_single_line_break() {
-    let mut fcx = create_font_context();
-    let styled_line_count =
-        |fcx: &mut FontContext, text: &str, style_range: std::ops::Range<usize>| -> usize {
-            let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
-            let ropts = RangedOptions {
-                scale: 1.0,
-                quantize: false,
-                max_advance: None,
-                text,
-            };
-            let layout = build_layout_with_ranged(fcx, &mut lcx, &ropts, |rb| {
-                set_root_style(rb);
-                // A style change starting at the `\n` forces shaping to split the
-                // CRLF pair across two runs.
-                rb.push(StyleProperty::FontSize(40.), style_range.clone());
-            });
-            layout.lines().len()
-        };
-
-    // The `\n` in "a\r\nb" is byte 2.
-    let split_crlf = styled_line_count(&mut fcx, "a\r\nb", 2..3);
-    let split_lf = styled_line_count(&mut fcx, "a\nb", 2..3);
-
-    assert_eq!(
-        split_crlf, 2,
-        "a style boundary at the LF must not turn CRLF into two hard breaks"
-    );
-    assert_eq!(
-        split_crlf, split_lf,
-        "styled CRLF should match styled LF line count"
-    );
-}
-
 /// ICU4X's line segmenter emits a soft break opportunity at the end of a
 /// complex-script (Thai, Khmer, Lao, ...) run even when the next character is a
 /// mandatory break, which must not shadow the hard break.

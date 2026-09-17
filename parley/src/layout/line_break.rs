@@ -760,11 +760,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 }
                 LayoutItemKind::TextRun => {
                     let run_idx = item.index;
-                    let shaped_run = &self.layout.data.shaped_text.runs()[run_idx];
-
                     let run = Run::new(self.layout, 0, 0, run_idx, None);
                     let slice = run.full_slice();
-                    let cluster_end = shaped_run.shaped_clusters_range.end;
 
                     // Additional spacing to apply between atoms.
                     let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
@@ -801,48 +798,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 return self.max_height_break_data(line_height);
                             }
 
-                            // A CRLF sequence is a single grapheme cluster and must produce
-                            // exactly one hard line break (UAX#14: CR × LF, do not break
-                            // between). Normally, this will be a single atom. However, if
-                            // itemization splits the CR and LF into separate runs (e.g. a
-                            // style boundary at the LF), the characters each form an atom of
-                            // their own. In that case, append the CR to the current line but
-                            // suppress the break here and let the LF emit the single break, so CR
-                            // and LF share one line. The lookahead reads the global character list.
-                            // The LF must be item-adjacent to the CR: if it lands in a later run it
-                            // only coalesces when the next item is that run (not an inline box
-                            // sitting between the two), so an inline box at the LF offset keeps the
-                            // CR's break. Lone CR, lone LF, LS, and PS are unaffected.
-                            let atom_chars = atom.char_range();
-                            let lf_is_item_adjacent = atom.shaped_clusters_range().end
-                                < cluster_end
-                                || self
-                                    .layout
-                                    .data
-                                    .items
-                                    .get(self.state.item_idx + 1)
-                                    .is_some_and(|item| item.kind == LayoutItemKind::TextRun);
-                            let characters = self.layout.data.shaped_text.characters();
-                            let is_cr_before_lf = characters[atom_chars.end as usize - 1]
-                                .info
-                                .source_char()
-                                == '\r'
-                                && lf_is_item_adjacent
-                                && characters.get(atom_chars.end as usize).is_some_and(|next| {
-                                    next.info.whitespace() == Whitespace::Newline
-                                        && next.info.source_char() == '\n'
-                                });
-
                             self.state.append_atom_to_line(
                                 &atom,
                                 self.state.line.x,
                                 text_metrics,
                                 is_separator,
                             );
-
-                            if is_cr_before_lf {
-                                continue;
-                            }
 
                             return self.start_new_line(
                                 BreakReason::Explicit,
