@@ -55,6 +55,7 @@ This release has an [MSRV] of 1.88.
 
 - Fix compilation on 32-bit platforms without 64-bit atomics (e.g. `mipsel-unknown-linux-gnu`). ([#671][] by [@nicoburns][])
 - Don't panic when fontconfig exposes no fonts. ([#717][] by [@ogoffart][])
+- `Collection::load_fonts_from_paths` no longer registers duplicate faces. ([#754][] by [@ChrisJr404][])
 
 ## [0.11.0] - 2026-06-24
 
@@ -550,6 +551,7 @@ This release has an [MSRV][] of 1.70.
 [MSRV]: README.md#minimum-supported-rust-version-msrv
 
 [@areopagitics]: https://github.com/areopagitics
+[@ChrisJr404]: https://github.com/ChrisJr404
 [@conor-93]: https://github.com/conor-93
 [@devunt]: https://github.com/devunt
 [@dfrg]: https://github.com/dfrg
@@ -735,6 +737,7 @@ This release has an [MSRV][] of 1.70.
 [#725]: https://github.com/linebender/parley/pull/725
 [#728]: https://github.com/linebender/parley/pull/728
 [#731]: https://github.com/linebender/parley/pull/731
+[#754]: https://github.com/linebender/parley/pull/754
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.11.0...HEAD
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0
