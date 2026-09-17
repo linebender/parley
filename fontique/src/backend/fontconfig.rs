@@ -26,11 +26,11 @@ use fontconfig_sys::{
 #[cfg(not(feature = "fontconfig-dlopen"))]
 use fontconfig_sys::{
     FcCharSetAddChar, FcCharSetCopy, FcCharSetCreate, FcCharSetDestroy, FcConfigBuildFonts,
-    FcConfigDestroy, FcConfigGetFonts, FcConfigReference, FcConfigSubstitute, FcFontRenderPrepare,
-    FcFontSetDestroy, FcFontSort, FcInitLoadConfig, FcLangSetAdd, FcLangSetCopy, FcLangSetCreate,
-    FcLangSetDestroy, FcNameUnparse, FcPatternAddCharSet, FcPatternAddLangSet, FcPatternAddString,
-    FcPatternCreate, FcPatternDestroy, FcPatternGetInteger, FcPatternGetString, FcPatternReference,
-    FcStrFree,
+    FcConfigDestroy, FcConfigGetFonts, FcConfigReference, FcConfigSubstitute, FcFontMatch,
+    FcFontRenderPrepare, FcFontSetDestroy, FcFontSort, FcInitLoadConfig, FcLangSetAdd,
+    FcLangSetCopy, FcLangSetCreate, FcLangSetDestroy, FcNameUnparse, FcPatternAddCharSet,
+    FcPatternAddLangSet, FcPatternAddString, FcPatternCreate, FcPatternDestroy,
+    FcPatternGetInteger, FcPatternGetString, FcPatternReference, FcStrFree,
 };
 
 use hashbrown::{HashMap, HashSet, hash_map::Entry};
@@ -39,8 +39,10 @@ use smallvec::SmallVec;
 use super::FallbackFamilies;
 use crate::{
     FallbackKey, FamilyId, FamilyInfo, FontInfo, FontStyle, FontWeight, FontWidth,
-    FromFontconfig as _, GenericFamily, Script, ScriptExt, family_name::FamilyNameMap,
-    generic::GenericFamilyMap, source::SourcePathMap,
+    FromFontconfig as _, GenericFamily, Script, ScriptExt,
+    family_name::{FamilyName, FamilyNameMap},
+    generic::GenericFamilyMap,
+    source::SourcePathMap,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -496,6 +498,29 @@ impl Config {
         Ok(font_set)
     }
 
+    fn font_match(&self, pattern: &Pattern) -> MatchResult<Pattern> {
+        let mut result = 0;
+        let pattern = unsafe {
+            Pattern::from_raw(
+                ffi_dispatch!(
+                    feature = "fontconfig-dlopen",
+                    LIB,
+                    FcFontMatch,
+                    self.inner.as_ptr(),
+                    pattern.inner.as_ptr(),
+                    &raw mut result
+                ),
+                Ownership::Application,
+            )
+        }
+        .ok_or(MatchErr::Other)?;
+        if result != FcResultMatch {
+            return Err(MatchErr::from_raw(result));
+        }
+
+        Ok(pattern)
+    }
+
     fn font_render_prepare(&self, pat: &Pattern, font: &Pattern) -> Option<Pattern> {
         unsafe {
             Pattern::from_raw(
@@ -762,6 +787,35 @@ impl SystemFonts {
             }
         }
         families
+    }
+
+    pub(crate) fn fallback_for_text(
+        &mut self,
+        text: &str,
+        locale: Option<&str>,
+    ) -> Option<FamilyId> {
+        let config = self.config.as_ref()?;
+
+        let mut pattern = Pattern::new()?;
+
+        let mut charset = CharSet::new()?;
+        for ch in text.chars() {
+            charset.add(ch);
+        }
+        pattern.add_charset(FC_CHARSET, &charset);
+        if let Some(locale) = locale {
+            let mut lang_set = LangSet::new()?;
+            lang_set.add(CString::new(locale).ok()?.as_c_str());
+            pattern.add_langset(FC_LANG, &lang_set);
+        }
+
+        config.substitute(&mut pattern, FcMatchPattern);
+
+        // This calls FcFontRenderPrepare for us.
+        let font = config.font_match(&pattern).ok()?;
+
+        let family_name = font.get_string(FC_FAMILY, 0).ok()?;
+        self.name_map.get(&family_name).map(FamilyName::id)
     }
 }
 

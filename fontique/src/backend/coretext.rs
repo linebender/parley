@@ -134,6 +134,24 @@ impl SystemFonts {
         }
         families
     }
+
+    pub(crate) fn fallback_for_text(
+        &mut self,
+        text: &str,
+        locale: Option<&str>,
+    ) -> Option<FamilyId> {
+        let font = create_fallback_font_for_text(text, locale, false)?;
+        let family_name = unsafe { font.family_name() }.to_string();
+        // The LastResort font claims coverage of all codepoints while only
+        // rendering placeholder glyphs, so ignore it to give fonts with
+        // real glyphs a chance.
+        if family_name.eq_ignore_ascii_case(".LastResort")
+            || family_name.eq_ignore_ascii_case("LastResort")
+        {
+            return None;
+        }
+        self.name_map.get(&family_name).map(|family| family.id())
+    }
 }
 
 /// Discover system fonts by combining CoreText enumeration with a directory scan of all

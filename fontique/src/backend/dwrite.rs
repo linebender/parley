@@ -127,6 +127,15 @@ impl SystemFonts {
         }
         families
     }
+
+    pub(crate) fn fallback_for_text(
+        &mut self,
+        text: &str,
+        locale: Option<&str>,
+    ) -> Option<FamilyId> {
+        let family_name = self.dwrite_fonts.family_name_for_text(text, locale)?;
+        self.name_map.get(&family_name).map(|name| name.id())
+    }
 }
 
 impl FontInfo {

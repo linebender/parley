@@ -219,4 +219,10 @@ impl SystemFonts {
         }
         families
     }
+
+    pub(crate) fn fallback_for_text(&self, _text: &str, _locale: Option<&str>) -> Option<FamilyId> {
+        // Android has no system API for per-character fallback; coverage
+        // is provided by the full fallback chains above.
+        None
+    }
 }
