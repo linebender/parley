@@ -35,6 +35,7 @@ mod line_break;
 mod linebreaking_matches_chrome;
 mod lines;
 mod out_of_flow_boxes;
+mod soft_hyphen;
 mod styles;
 mod text_indent;
 mod whitespace;

@@ -50,6 +50,7 @@ This release has an [MSRV] of 1.88.
 #### Parley
 
 - Applying letter spacing now stops optional ligatures from forming. ([#731][] by [@tomcur][])
+- A line broken at a soft hyphen (U+00AD) now renders a hyphen at the end of the line. ([#704][] by [@sawy3r][])
 
 #### Fontique
 
@@ -574,6 +575,7 @@ This release has an [MSRV][] of 1.70.
 [@PoignardAzur]: https://github.com/@PoignardAzur
 [@raiscui]: https://github.com/raiscui
 [@richardhozak]: https://github.com/richardhozak
+[@sawy3r]: https://github.com/sawy3r
 [@spirali]: https://github.com/spirali
 [@taj-p]: https://github.com/taj-p
 [@tomcur]: https://github.com/tomcur
@@ -729,6 +731,7 @@ This release has an [MSRV][] of 1.70.
 [#661]: https://github.com/linebender/parley/pull/661
 [#671]: https://github.com/linebender/parley/pull/671
 [#697]: https://github.com/linebender/parley/pull/697
+[#704]: https://github.com/linebender/parley/issues/704
 [#710]: https://github.com/linebender/parley/pull/710
 [#715]: https://github.com/linebender/parley/pull/715
 [#717]: https://github.com/linebender/parley/pull/717

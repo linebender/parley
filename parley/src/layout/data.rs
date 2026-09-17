@@ -15,7 +15,7 @@ use core::ops::Range;
 use alloc::vec::Vec;
 use parlance::BidiLevel;
 use parley_engine::shape::Whitespace;
-use parley_engine::{Boundary, ShapedText};
+use parley_engine::{Boundary, Glyph, ShapedText};
 
 /// `HarfRust`-based run data
 #[derive(Clone, Debug, PartialEq)]
@@ -92,6 +92,11 @@ pub(crate) struct LineItemData {
     ///
     /// The bounds are atom-aligned.
     pub(crate) shaped_cluster_range: Range<u32>,
+    /// The hyphen rendered after the run's last atom on this line, when the line was broken at
+    /// a soft hyphen (U+00AD) ending the run. Its advance is included in [`Self::advance`].
+    ///
+    /// Only ever set on the last text run of a line. See [`parley_engine::hyphen_glyph`].
+    pub(crate) hyphen: Option<Glyph>,
 }
 
 impl LineItemData {
