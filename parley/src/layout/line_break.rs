@@ -1468,6 +1468,10 @@ fn commit_line<B: Brush>(
     // that fits, stays inside the line box, and counts towards alignment and the layout width. The
     // end of the layout is considered to be a forced line break as well (CSS Text 4 § 5). Other
     // trailing whitespace hangs unconditionally.
+    //
+    // When a line wrapped (i.e., not because of a forced line break), whitespace always hangs
+    // unconditionally. That's equivalent to considering that whitespace to be overflowing fully.
+    // Hence an `overflow` of `f32::INFINITY` can be used to model that case.
     let overflow = match break_reason {
         BreakReason::Regular | BreakReason::Emergency => f32::INFINITY,
         BreakReason::Explicit | BreakReason::None => state.x - max_advance,
