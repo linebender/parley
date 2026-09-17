@@ -30,6 +30,10 @@ This release has an [MSRV] of 1.88.
 
 ### Changed
 
+#### Fontique
+
+- Script/locale fallback now produces an ordered list of families (the CoreText cascade list, fontconfig's sorted coverage list, and all matching Android fallback chain entries) rather than a single family. ([#689][] by [@nicoburns][])
+
 #### Parley
 
 - Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. ([#661][] by [@tomcur][])
@@ -55,6 +59,10 @@ This release has an [MSRV] of 1.88.
 
 - Fix compilation on 32-bit platforms without 64-bit atomics (e.g. `mipsel-unknown-linux-gnu`). ([#671][] by [@nicoburns][])
 - Don't panic when fontconfig exposes no fonts. ([#717][] by [@ogoffart][])
+
+#### Parley
+
+- Empty layouts now shape their cursor-metrics run with the resolved default style instead of a zero font size. ([#689][] by [@nicoburns][])
 
 ## [0.11.0] - 2026-06-24
 
@@ -728,6 +736,7 @@ This release has an [MSRV][] of 1.70.
 [#650]: https://github.com/linebender/parley/pull/650
 [#661]: https://github.com/linebender/parley/pull/661
 [#671]: https://github.com/linebender/parley/pull/671
+[#689]: https://github.com/linebender/parley/pull/689
 [#697]: https://github.com/linebender/parley/pull/697
 [#710]: https://github.com/linebender/parley/pull/710
 [#715]: https://github.com/linebender/parley/pull/715

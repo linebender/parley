@@ -281,6 +281,7 @@ impl Inner {
     /// Load system fonts. If system fonts are already loaded then they will be reloaded.
     pub fn load_system_fonts(&mut self) {
         self.system = Some(System::new());
+        self.fallback_cache.reset();
     }
 
     /// Returns an iterator over all available family names in the collection.
@@ -446,12 +447,23 @@ impl Inner {
             if let Some(families) = self.data.fallbacks.get(selector) {
                 self.fallback_cache.set(script, lang_key, families);
             } else if let Some(system) = self.system.as_ref() {
-                // Some platforms don't need mut System
-                #[allow(unused_mut)]
-                let mut system = system.fonts.lock().unwrap();
-                if let Some(family) = system.fallback(selector) {
-                    self.data.fallbacks.set(selector, core::iter::once(family));
-                    self.fallback_cache.set(script, lang_key, &[family]);
+                let families = {
+                    // Some platforms don't need mut System
+                    #[allow(unused_mut)]
+                    let mut system = system.fonts.lock().unwrap();
+                    system.fallback(selector)
+                };
+                if !families.is_empty() {
+                    if !self.data.fallbacks.set(selector, families.iter().copied()) {
+                        // The script and locale pair isn't tracked by the
+                        // fallback map, so store the families under the
+                        // script alone (which is always tracked) to avoid
+                        // querying the system again.
+                        self.data
+                            .fallbacks
+                            .set(selector.script(), families.iter().copied());
+                    }
+                    self.fallback_cache.set(script, lang_key, &families);
                 }
             }
             #[cfg(not(feature = "system"))]
@@ -576,6 +588,7 @@ impl Inner {
     /// [`Self::register_fonts`], and unsets all previously-set generic families
     /// and fallbacks. This will not remove any system fonts.
     pub fn clear(&mut self) {
+        self.fallback_cache.reset();
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             shared.data.lock().unwrap().clear();
