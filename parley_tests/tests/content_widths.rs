@@ -7,7 +7,7 @@ use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
     Alignment, AlignmentOptions, ContentWidths, InlineBox, InlineBoxKind, Layout, StyleProperty,
-    TextWrapMode, WhiteSpaceCollapse,
+    TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
 };
 
 /// Checks that calculated content widths agree with actual line breaking.
@@ -127,6 +127,7 @@ fn inbox_content_width() {
             width: 100.0,
             height: 10.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
         let mut layout = builder.build(text);
         let ContentWidths {
@@ -149,6 +150,7 @@ fn inbox_content_width() {
             width: 10.0,
             height: 10.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
         let mut layout = builder.build(text);
         let ContentWidths {
