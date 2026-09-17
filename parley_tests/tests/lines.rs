@@ -691,3 +691,24 @@ fn lines_line_height_absolute() {
     layout.align(Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
+
+/// Metrics contributed by content that is moved to the next line when a word does not fit must
+/// not leak into the line it was reverted from.
+#[test]
+fn lines_revert_restores_line_height() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "aaa BBB";
+    let mut builder = env.ranged_builder(text);
+    builder.push(StyleProperty::FontSize(64.0), 4..7);
+    let mut layout = builder.build(text);
+
+    // "aaa B" fits, so the large glyphs are added to the first line before the line breaker
+    // reverts to the break opportunity after the space.
+    layout.break_all_lines(Some(95.0));
+    layout.align(Alignment::Start, AlignmentOptions::default());
+
+    assert_eq!(layout.len(), 2);
+    let heights: Vec<f32> = layout.lines().map(|l| l.metrics().line_height).collect();
+    assert_eq!(heights, [16.0, 64.0]);
+}
