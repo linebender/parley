@@ -443,8 +443,7 @@ impl Editor {
                     .skew()
                     .map(|angle| Affine::skew(angle.to_radians().tan() as f64, 0.0));
                 set_brush(renderer, &style.brush);
-                let normalized_coords =
-                    &Vec::from_iter(run.normalized_coords().iter().map(|c| c.to_bits()));
+                let normalized_coords = bytemuck::cast_slice::<_, i16>(run.normalized_coords());
                 let mut builder = renderer
                     .glyph_run(resources, &font.font)
                     .font_size(font_size)

@@ -14,7 +14,8 @@ anyhow = "1.0.102"
 ui-events-winit = "0.3"
 ui-events = "0.3"
 winit = "0.30.13"
-parley = { workspace = true, default-features = true, features = ["accesskit"] }
+parley = { workspace = true, default-features = true, features = ["accesskit", "bytemuck"] }
+bytemuck = { workspace = true }
 peniko = { workspace = true, default-features = false, features = ["std"] }
 accesskit = { workspace = true }
 accesskit_winit = "0.32.2"
