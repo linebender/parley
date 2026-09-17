@@ -293,8 +293,8 @@ impl<B: Brush> LayoutData<B> {
         let mut running_hanging_whitespace = 0.0;
 
         // Whether that running whitespace hangs conditionally before a forced break (following CSS
-        // Text 4 § 4.3.2, that's the case for `WhiteSpaceCollapse::Preserve`). Conditional
-        // whitespace only hangs if it doesn't fit, which here means it counts towards the
+        // Text 4 § 4.3.2, that's the case for `WhiteSpaceCollapse::Preserve`). Conditionally
+        // hanging whitespace only hangs if it doesn't fit, which here means it counts towards the
         // max-content width, but not the min-content width.
         let mut hangs_conditionally = false;
 
