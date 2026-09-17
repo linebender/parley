@@ -288,6 +288,7 @@ impl Inner {
     /// Load system fonts. If system fonts are already loaded then they will be reloaded.
     pub fn load_system_fonts(&mut self) {
         self.system = Some(System::new());
+        self.fallback_cache.reset();
     }
 
     /// Returns an iterator over all available family names in the collection.
@@ -453,9 +454,17 @@ impl Inner {
             if let Some(families) = self.data.fallbacks.get(selector) {
                 self.fallback_cache.set(script, lang_key, families);
             } else if let Some(system) = self.system.as_ref() {
-                let family = system.fonts.lock().unwrap().fallback(selector);
-                self.data.fallbacks.set(selector, family.into_iter());
-                self.fallback_cache.set(script, lang_key, family.as_slice());
+                let families = system.fonts.lock().unwrap().fallback(selector);
+                if !self.data.fallbacks.set(selector, families.iter().copied()) {
+                    // The script and locale pair isn't tracked by the
+                    // fallback map, so store the families under the
+                    // script alone (which is always tracked) to avoid
+                    // querying the system again.
+                    self.data
+                        .fallbacks
+                        .set(selector.script(), families.iter().copied());
+                }
+                self.fallback_cache.set(script, lang_key, &families);
             }
             #[cfg(not(feature = "system"))]
             if let Some(families) = self.data.fallbacks.get(selector) {
@@ -579,6 +588,7 @@ impl Inner {
     /// [`Self::register_fonts`], and unsets all previously-set generic families
     /// and fallbacks. This will not remove any system fonts.
     pub fn clear(&mut self) {
+        self.fallback_cache.reset();
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             shared.data.lock().unwrap().clear();

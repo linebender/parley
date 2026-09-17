@@ -37,6 +37,10 @@ use super::{
 #[allow(unused_imports)]
 use super::source::SourcePathMap;
 
+/// An ordered list of fallback families returned by a system font backend.
+#[cfg(feature = "system")]
+pub(crate) type FallbackFamilies = smallvec::SmallVec<[FamilyId; 4]>;
+
 pub(crate) use system::SystemFonts;
 
 // Dummy system font backend for targets like wasm32-unknown-unknown
@@ -53,7 +57,7 @@ pub(crate) use system::SystemFonts;
 ))]
 mod system {
     #[cfg(feature = "system")]
-    use super::{FallbackKey, FamilyId, FamilyInfo};
+    use super::{FallbackFamilies, FallbackKey, FamilyId, FamilyInfo};
     use super::{FamilyNameMap, GenericFamilyMap};
     use alloc::sync::Arc;
 
@@ -74,8 +78,8 @@ mod system {
         }
 
         #[cfg(feature = "system")]
-        pub(crate) fn fallback(&mut self, _key: impl Into<FallbackKey>) -> Option<FamilyId> {
-            None
+        pub(crate) fn fallback(&mut self, _key: impl Into<FallbackKey>) -> FallbackFamilies {
+            FallbackFamilies::new()
         }
     }
 }

@@ -16,6 +16,18 @@ Every change to this file must be written by a human.
 
 This release has an [MSRV] of 1.96.
 
+### Changed
+
+#### Fontique
+
+- Script/locale fallback now produces an ordered list of families (the CoreText cascade list, fontconfig's sorted coverage list, and all matching Android fallback chain entries) rather than a single family. ([#689][] by [@nicoburns][])
+
+### Fixed
+
+#### Parley
+
+- Empty layouts now shape their cursor-metrics run with the resolved default style instead of a zero font size. ([#689][] by [@nicoburns][])
+
 ## [0.13.0] - 2026-11-06
 
 This release has an [MSRV] of 1.88.
@@ -958,6 +970,7 @@ This release has an [MSRV][] of 1.70.
 [#672]: https://github.com/linebender/parley/pull/672
 [#676]: https://github.com/linebender/parley/pull/676
 [#679]: https://github.com/linebender/parley/pull/679
+[#689]: https://github.com/linebender/parley/pull/689
 [#697]: https://github.com/linebender/parley/pull/697
 [#708]: https://github.com/linebender/parley/pull/708
 [#715]: https://github.com/linebender/parley/pull/715
