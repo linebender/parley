@@ -3,7 +3,9 @@
 
 use crate::inline_box::InlineBox;
 use crate::layout::spacing::{EffectiveSpacing, Justification, Spacing};
-use crate::layout::whitespace::{atom_hanging_advance, soft_line_break, whitespace_hangs};
+use crate::layout::whitespace::{
+    atom_hanging_advance, is_break_space, is_break_space_class, soft_line_break, whitespace_hangs,
+};
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
@@ -14,8 +16,8 @@ use core::ops::Range;
 
 use alloc::vec::Vec;
 use parlance::BidiLevel;
-use parley_engine::ShapedText;
 use parley_engine::shape::Whitespace;
+use parley_engine::{Boundary, ShapedText};
 
 /// `HarfRust`-based run data
 #[derive(Clone, Debug, PartialEq)]
@@ -300,6 +302,13 @@ impl<B: Brush> LayoutData<B> {
 
         let mut text_wrap_mode = TextWrapMode::Wrap;
 
+        // `break-spaces` adds soft break opportunities after preserved spaces, which the flat
+        // per-cluster scan below only has to check for when a style actually uses it.
+        let any_break_spaces = self
+            .styles
+            .iter()
+            .any(|style| style.white_space_collapse == WhiteSpaceCollapse::BreakSpaces);
+
         for item in &self.items {
             match item.kind {
                 LayoutItemKind::TextRun => {
@@ -322,18 +331,31 @@ impl<B: Brush> LayoutData<B> {
                         // it), which is equivalent to the per-atom "hangs entirely / hangs
                         // partially from the logical end" rule of `atom_hanging_advance`.
                         let clusters = slice.shaped_clusters();
+                        let all_characters = self.shaped_text.characters();
                         let mut skip_atom = false;
                         for (i, cluster) in clusters.iter().enumerate() {
                             let whitespace = cluster.whitespace();
                             let style = &self.styles[cluster.style_index as usize];
                             if i == 0 || cluster.is_grapheme_start() {
                                 skip_atom = false;
-                                let boundary = cluster.boundary_before();
                                 let prev_text_wrap_mode = text_wrap_mode;
                                 text_wrap_mode = style.text_wrap_mode;
+                                // Mirrors `soft_line_break`, using the cached cluster flags for the
+                                // cluster's first character.
+                                let soft_break = if any_break_spaces {
+                                    let start = cluster.chars_range().start as usize;
+                                    (cluster.boundary_before() == Boundary::Line
+                                        && !is_break_space_class(whitespace, style))
+                                        || (start > 0
+                                            && is_break_space(
+                                                all_characters[start - 1],
+                                                &self.styles,
+                                            ))
+                                } else {
+                                    cluster.boundary_before() == Boundary::Line
+                                };
                                 if prev_text_wrap_mode == TextWrapMode::Wrap
-                                    && (boundary == Boundary::Line
-                                        || style.overflow_wrap == OverflowWrap::Anywhere)
+                                    && (soft_break || style.overflow_wrap == OverflowWrap::Anywhere)
                                 {
                                     min_width = min_width
                                         .max(running_min_width - running_hanging_whitespace);

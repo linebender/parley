@@ -49,12 +49,22 @@ pub(crate) fn whitespace_hangs<B: Brush>(whitespace: Whitespace, style: &Style<B
     }
 }
 
-fn is_break_space<B: Brush>(character: Character, styles: &[Style<B>]) -> bool {
-    styles[character.style_index as usize].white_space_collapse == WhiteSpaceCollapse::BreakSpaces
-        && matches!(
-            character.info.whitespace(),
-            Whitespace::Space | Whitespace::Tab | Whitespace::IdeographicSpace
-        )
+/// Whether whitespace of the given class and style is a preserved `break-spaces` space, i.e.
+/// one that creates a soft break opportunity after it.
+#[inline(always)]
+pub(crate) fn is_break_space_class<B: Brush>(whitespace: Whitespace, style: &Style<B>) -> bool {
+    matches!(
+        whitespace,
+        Whitespace::Space | Whitespace::Tab | Whitespace::IdeographicSpace
+    ) && style.white_space_collapse == WhiteSpaceCollapse::BreakSpaces
+}
+
+#[inline(always)]
+pub(crate) fn is_break_space<B: Brush>(character: Character, styles: &[Style<B>]) -> bool {
+    is_break_space_class(
+        character.info.whitespace(),
+        &styles[character.style_index as usize],
+    )
 }
 
 /// Whether a soft line break opportunity exists before the character at `index`.
