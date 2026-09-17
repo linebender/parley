@@ -8,6 +8,7 @@
 
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
+use parley::VerticalAlign;
 use parley::{
     Affinity, Alignment, AlignmentOptions, BoundingBox, Brush, Cursor, InlineBox, InlineBoxKind,
     Layout, Line, LineHeight, Selection, StyleProperty,
@@ -141,6 +142,7 @@ fn build_layout<A: Into<Option<f32>>>(
         width: 50.0,
         height: 5.0,
         baseline: None,
+        vertical_align: VerticalAlign::BASELINE,
     });
     builder.push_inline_box(InlineBox {
         id: 1,
@@ -149,6 +151,7 @@ fn build_layout<A: Into<Option<f32>>>(
         width: 50.0,
         height: 3.0,
         baseline: None,
+        vertical_align: VerticalAlign::BASELINE,
     });
 
     let mut layout = builder.build(TEXT);
@@ -527,6 +530,7 @@ fn lines_negative_leading_inline_box_grows_line_box() {
         width: 12.0,
         height: box_height,
         baseline: None,
+        vertical_align: VerticalAlign::BASELINE,
     });
     let mut layout: Layout<ColorBrush> = builder.build(text);
     layout.break_all_lines(None);
@@ -685,5 +689,99 @@ fn lines_line_height_absolute() {
 
     layout.break_all_lines(None);
     layout.align(Alignment::Start, AlignmentOptions::default());
+    env.check_layout_snapshot(&layout);
+}
+
+/// Metrics contributed by content that is moved to the next line when a word does not fit must
+/// not leak into the line it was reverted from.
+#[test]
+fn lines_revert_restores_line_height() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "aaa BBB";
+    let mut builder = env.ranged_builder(text);
+    builder.push(StyleProperty::FontSize(64.0), 4..7);
+    let mut layout = builder.build(text);
+
+    // "aaa B" fits, so the large glyphs are added to the first line before the line breaker
+    // reverts to the break opportunity after the space.
+    layout.break_all_lines(Some(95.0));
+    layout.align(Alignment::Start, AlignmentOptions::default());
+
+    assert_eq!(layout.len(), 2);
+    let heights: Vec<f32> = layout.lines().map(|l| l.metrics().line_height).collect();
+    assert_eq!(heights, [16.0, 64.0]);
+}
+
+/// Like [`lines_revert_restores_line_height`], but the reverted content is in a
+/// `vertical-align: top` span, i.e. in a non-root aligned subtree.
+#[test]
+fn lines_revert_restores_aligned_subtree_line_height() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "aaa BBB";
+    let mut builder = env.ranged_builder(text);
+    builder.push(StyleProperty::FontSize(64.0), 4..7);
+    builder.push(StyleProperty::VerticalAlign(VerticalAlign::TOP), 4..7);
+    let mut layout = builder.build(text);
+
+    layout.break_all_lines(Some(95.0));
+    layout.align(Alignment::Start, AlignmentOptions::default());
+
+    assert_eq!(layout.len(), 2);
+    let heights: Vec<f32> = layout.lines().map(|l| l.metrics().line_height).collect();
+    assert_eq!(heights, [16.0, 64.0]);
+}
+
+/// A `top` and a `bottom` aligned subtree spanning several words each, whose extents grow word
+/// by word across line-breaking opportunities and reverts, on lines with both of them.
+#[test]
+fn lines_aligned_subtrees_grow_across_breaks() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let mut builder = env.tree_builder();
+    for (i, align) in [
+        VerticalAlign::TOP,
+        VerticalAlign::BOTTOM,
+        VerticalAlign::TOP,
+        VerticalAlign::BOTTOM,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        builder.push_style_modification_span(&[StyleProperty::VerticalAlign(align)]);
+        for (j, word) in ["aa ", "bbb ", "cc ", "ddd ", "ee "]
+            .into_iter()
+            .enumerate()
+        {
+            let size = 12.0 + 4.0 * ((i + j) % 4) as f32;
+            // `vertical-align` is inherited, so reset it to keep the word in the outer subtree.
+            builder.push_style_modification_span(&[
+                StyleProperty::FontSize(size),
+                StyleProperty::VerticalAlign(VerticalAlign::BASELINE),
+            ]);
+            builder.push_text(word);
+            builder.pop_style_span();
+        }
+        builder.pop_style_span();
+    }
+    let (mut layout, _) = builder.build();
+    layout.break_all_lines(Some(130.0));
+    layout.align(Alignment::Start, AlignmentOptions::default());
+
+    let metrics: Vec<(f32, f32)> = layout
+        .lines()
+        .map(|l| (l.metrics().line_height, l.metrics().baseline))
+        .collect();
+    assert_eq!(
+        metrics,
+        [
+            (24.0, 13.0),
+            (24.0, 45.0),
+            (24.0, 61.0),
+            (24.0, 89.0),
+            (24.0, 117.0)
+        ]
+    );
     env.check_layout_snapshot(&layout);
 }

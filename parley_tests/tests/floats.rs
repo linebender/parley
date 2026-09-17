@@ -6,6 +6,7 @@ use crate::{
     test_name,
     util::{ColorBrush, draw_layout, render_to_pixmap, samples::LOREM_IPSUM},
 };
+use parley::VerticalAlign;
 use parley::{Alignment, AlignmentOptions, InlineBox, InlineBoxKind, Layout, YieldData};
 use peniko::{Color, kurbo::Rect};
 use taffy::{Clear, FloatContext, FloatDirection};
@@ -59,6 +60,7 @@ fn float_simple() {
             width: 0.0,
             height: 0.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
     }
 
