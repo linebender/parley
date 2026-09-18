@@ -155,7 +155,12 @@ pub(crate) fn shape_text<'a, B: Brush>(
                         || style.font_variations != item_style.font_variations
                         || style.font_features != item_style.font_features
                         || !nearly_eq(style.letter_spacing, item_style.letter_spacing)
-                        || !nearly_eq(style.word_spacing, item_style.word_spacing);
+                        || !nearly_eq(style.word_spacing, item_style.word_spacing)
+                        // A run's line height comes from its own style, so a
+                        // change of line height must start a new run;
+                        // otherwise the text before the change is laid out
+                        // with the later style's line height.
+                        || !style.line_height.nearly_eq(item_style.line_height);
                 }
 
                 if split {
