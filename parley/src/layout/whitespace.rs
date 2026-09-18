@@ -15,7 +15,8 @@
 //! unconditionally hanging.
 //!
 //! Under CSS Text 4 § 9.2, unconditionally hanging whitespace followed by conditionally hanging
-//! whitespace, hangs in full, but only if the conditionally-hanging whitespace hangs in full.
+//! whitespace, hangs in full, but only if the conditionally-hanging whitespace hangs in full. See
+//! <https://github.com/linebender/parley/pull/831> for an HTML sample.
 //!
 //! So, in effect, the only behaviorally observable case of conditional vs. unconditional hanging
 //! can be represented as a suffix of conditionally hanging whitespace, preceded by unconditionally
