@@ -182,16 +182,32 @@ impl ShapedCluster {
 pub struct ClusterInfo {
     boundary: Boundary,
     whitespace: Whitespace,
-    source_char: char,
+    /// Properties derived from the source character; see the `*_FLAG` constants.
+    flags: u8,
 }
 
 impl ClusterInfo {
+    /// Bits 0..2: the UTF-8 length of the source character minus one.
+    ///
+    /// (Note the UTF-8 length of any character is between 1 and 4 inclusive.)
+    const LEN_UTF8_MASK: u8 = 0b11;
+    /// Whether the source character is an emoji.
+    const EMOJI_FLAG: u8 = 1 << 2;
+
     #[inline(always)]
     pub fn new(boundary: Boundary, source_char: char) -> Self {
+        // TODO: Defer to ICU4X properties (see: https://docs.rs/icu/latest/icu/properties/props/struct.Emoji.html).
+        let is_emoji = matches!(source_char as u32, 0x1F600..=0x1F64F | 0x1F300..=0x1F5FF | 0x1F680..=0x1F6FF | 0x2600..=0x26FF | 0x2700..=0x27BF);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "`len_utf8` is between 1 and 4 inclusive"
+        )]
+        let len_utf8 = source_char.len_utf8() as u8;
+        let flags = (len_utf8 - 1) | if is_emoji { Self::EMOJI_FLAG } else { 0 };
         Self {
             boundary,
             whitespace: Whitespace::from_char(source_char),
-            source_char,
+            flags,
         }
     }
 
@@ -216,8 +232,7 @@ impl ClusterInfo {
     /// Returns if the cluster is an emoji.
     #[inline]
     pub fn is_emoji(self) -> bool {
-        // TODO: Defer to ICU4X properties (see: https://docs.rs/icu/latest/icu/properties/props/struct.Emoji.html).
-        matches!(self.source_char as u32, 0x1F600..=0x1F64F | 0x1F300..=0x1F5FF | 0x1F680..=0x1F6FF | 0x2600..=0x26FF | 0x2700..=0x27BF)
+        self.flags & Self::EMOJI_FLAG != 0
     }
 
     /// Returns if the cluster is any whitespace.
@@ -231,13 +246,7 @@ impl ClusterInfo {
     /// That number of bytes is always between 1 and 4, inclusive.
     #[inline(always)]
     pub fn len_utf8(self) -> usize {
-        self.source_char.len_utf8()
-    }
-
-    /// Returns the cluster's original character.
-    #[inline(always)]
-    pub fn source_char(self) -> char {
-        self.source_char
+        (self.flags & Self::LEN_UTF8_MASK) as usize + 1
     }
 }
 
