@@ -21,7 +21,7 @@ use crate::{InlineBoxKind, OverflowWrap, TextWrapMode, WhiteSpaceCollapse};
 
 use core::ops::Range;
 use parley_engine::shape::Whitespace;
-use parley_engine::{Atom, Boundary, FontMetrics};
+use parley_engine::{Atom, Boundary, FontMetrics, Glyph, hyphen_glyph};
 
 #[derive(Default)]
 struct LineLayout {
@@ -60,6 +60,10 @@ struct LineState {
     /// These are the line's justification opportunities, before subtracting those that end up in
     /// the line's hanging whitespace.
     num_word_separators: u32,
+
+    /// The hyphen closing the line, when the line ends at a soft hyphen break opportunity that
+    /// was taken. Its advance is already included in `x`. See [`LineItemData::hyphen`].
+    hyphen: Option<Glyph>,
 }
 
 impl LineState {
@@ -68,6 +72,7 @@ impl LineState {
         self.x = 0.0;
         self.box_metrics = LineBoxMetrics::default();
         self.num_word_separators = 0;
+        self.hyphen = None;
     }
 }
 
@@ -392,6 +397,20 @@ impl BreakerState {
             run_idx: self.run_idx,
             cluster_idx: self.cluster_idx,
             state: self.line.clone(),
+        });
+    }
+
+    /// Store the current iteration state as a soft hyphen break opportunity: taking it closes
+    /// the line with `hyphen`, whose advance the line then includes.
+    fn mark_hyphen_break_opportunity(&mut self, hyphen: Glyph) {
+        let mut state = self.line.clone();
+        state.x += hyphen.advance;
+        state.hyphen = Some(hyphen);
+        self.prev_boundary = Some(PrevBoundaryState {
+            item_idx: self.item_idx,
+            run_idx: self.run_idx,
+            cluster_idx: self.cluster_idx,
+            state,
         });
     }
 
@@ -815,7 +834,18 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             // We don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
                             // line breaks. We should accept the overflowing fragment in that scenario.
                             if self.state.line.x != 0.0 {
-                                self.state.mark_line_break_opportunity();
+                                // A break right after a soft hyphen renders a hyphen at the end
+                                // of the line, which has to fit as well: an opportunity whose
+                                // hyphen does not fit is no opportunity. The hyphen comes from
+                                // the font of the run the soft hyphen was shaped with.
+                                match self.soft_hyphen_before(&atom) {
+                                    Some(Some(hyphen)) => {
+                                        if self.state.line.x + hyphen.advance <= max_advance {
+                                            self.state.mark_hyphen_break_opportunity(hyphen);
+                                        }
+                                    }
+                                    _ => self.state.mark_line_break_opportunity(),
+                                }
                                 // break_opportunity = true;
                             }
                         } else if
@@ -1137,6 +1167,28 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
     }
 
+    /// If the character right before `atom` is a soft hyphen (U+00AD), returns the hyphen glyph
+    /// to render for a line break taken there: `None` if the font of the soft hyphen's run has no
+    /// hyphen. Returns `None` if the character is not a soft hyphen.
+    fn soft_hyphen_before(&self, atom: &Atom<'_>) -> Option<Option<Glyph>> {
+        let shaped_text = &self.layout.data.shaped_text;
+        let char_idx = atom.char_range().start.checked_sub(1)?;
+        let character = &shaped_text.characters()[char_idx as usize];
+        if character.info.source_char() != '\u{AD}' {
+            return None;
+        }
+        let run = shaped_text
+            .runs()
+            .iter()
+            .find(|run| run.characters_range.contains(&char_idx))?;
+        let font = &shaped_text.fonts()[run.font_index];
+        let coords = shaped_text
+            .normalized_coords()
+            .get(run.normalized_coords_range.clone())
+            .unwrap_or(&[]);
+        Some(hyphen_glyph(font, run.font_size, coords))
+    }
+
     #[inline]
     fn resolve_indent(&self) -> f32 {
         let should_indent = {
@@ -1216,6 +1268,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     advance: 0.,
                     shaped_cluster_range: cluster..cluster,
                     text_range: text..text,
+                    hyphen: None,
                 });
                 line.item_range = run_index..run_index + 1;
             }
@@ -1350,6 +1403,7 @@ fn commit_line<B: Brush>(
                     // These properties are ignored for inline boxes. So we just put a dummy value.
                     shaped_cluster_range: 0..0,
                     text_range: 0..0,
+                    hyphen: None,
                 });
 
                 last_item_kind = item.kind;
@@ -1417,12 +1471,24 @@ fn commit_line<B: Brush>(
                     advance,
                     shaped_cluster_range: cluster_range,
                     text_range: item_text_range,
+                    hyphen: None,
                 });
             }
         }
     }
     // let end_run_idx = lines.line_items.last().map(|item| item.index).unwrap_or(0);
     let end_item_idx = lines.line_items.len();
+
+    // A line broken at a soft hyphen closes with a hyphen: it belongs to the line's logically
+    // last text run, which is the one the soft hyphen ends.
+    if let Some(hyphen) = state.hyphen.take()
+        && let Some(item) = lines.line_items[start_item_idx..end_item_idx]
+            .iter_mut()
+            .rfind(|item| item.kind == LayoutItemKind::TextRun)
+    {
+        item.hyphen = Some(hyphen);
+        item.advance += hyphen.advance;
+    }
 
     // Trailing whitespace under `WhiteSpaceCollapse::Preserve` directly preceding a forced break
     // hangs conditionally (CSS Text 4 § 4.3.2): only the part that doesn't fit hangs. Whitespace

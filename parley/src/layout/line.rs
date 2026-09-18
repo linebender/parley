@@ -314,6 +314,9 @@ struct AtomIter<'a> {
     is_rtl: bool,
     /// The next atom in visual order, if it has been peeked but not yet consumed.
     peeked: Option<Atom<'a>>,
+    /// The hyphen closing the line after the run's last atom, if any, with that atom's shaped
+    /// cluster end. It counts as a glyph of that atom; see [`Run::glyphs_in`].
+    hyphen: Option<(u32, Glyph)>,
 }
 
 impl<'a> AtomIter<'a> {
@@ -329,6 +332,9 @@ impl<'a> AtomIter<'a> {
             spacing: run.line_spacing(),
             is_rtl,
             peeked: None,
+            hyphen: run
+                .hyphen()
+                .map(|hyphen| (slice.shaped_clusters_range().end, hyphen)),
         }
     }
 
@@ -354,7 +360,7 @@ impl<'a> AtomIter<'a> {
     /// matching what [`Run::glyphs_in`] yields for the atom's clusters.
     #[inline]
     fn measure(&self, atom: &Atom<'a>) -> (usize, f32) {
-        let glyph_count: usize = atom
+        let mut glyph_count: usize = atom
             .shaped_clusters()
             .iter()
             .map(|cluster| usize::from(cluster.glyph_len()))
@@ -362,6 +368,12 @@ impl<'a> AtomIter<'a> {
         let mut advance = atom.advance();
         if glyph_count != 0 && !self.spacing.is_zero() {
             advance += self.spacing.gaps(atom).total();
+        }
+        if let Some((end, hyphen)) = self.hyphen
+            && atom.shaped_clusters_range().end == end
+        {
+            glyph_count += 1;
+            advance += hyphen.advance;
         }
         (glyph_count, advance)
     }

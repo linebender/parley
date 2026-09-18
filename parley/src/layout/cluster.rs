@@ -187,7 +187,14 @@ impl<'a, B: Brush> Cluster<'a, B> {
     /// clusters it overlaps.
     pub fn advance(&self) -> f32 {
         let spacing = self.run.line_spacing();
-        spacing.grapheme_advance(&self.atom, self.grapheme, self.is_rtl())
+        let hyphen = if self.grapheme.is_atom_end() {
+            self.run
+                .hyphen_after(&self.atom.shaped_clusters_range())
+                .map_or(0., |hyphen| hyphen.advance)
+        } else {
+            0.
+        };
+        spacing.grapheme_advance(&self.atom, self.grapheme, self.is_rtl()) + hyphen
     }
 
     /// Returns `true` if this is a right-to-left cluster.
