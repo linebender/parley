@@ -3,8 +3,8 @@
 
 //! Some whitespace-related utilities.
 
-use parley_engine::shape::Whitespace;
-use parley_engine::{Atom, ShapedSlice};
+use parley_engine::shape::{Character, Whitespace};
+use parley_engine::{Atom, Boundary, ShapedSlice};
 
 use crate::layout::Style;
 use crate::layout::spacing::EffectiveSpacing;
@@ -16,7 +16,7 @@ impl WhiteSpaceCollapse {
     pub(crate) fn is_collapsible(self, c: char) -> bool {
         match self {
             Self::Collapse => c.is_ascii_whitespace(),
-            Self::Preserve => false,
+            Self::Preserve | Self::BreakSpaces => false,
             Self::PreserveBreaks => matches!(c, ' ' | '\t'),
         }
     }
@@ -39,11 +39,41 @@ pub(crate) fn whitespace_hangs<B: Brush>(whitespace: Whitespace, style: &Style<B
     match whitespace {
         Whitespace::Newline => true,
         Whitespace::Space | Whitespace::IdeographicSpace | Whitespace::Tab => {
-            style.white_space_collapse != WhiteSpaceCollapse::Preserve
-                || style.text_wrap_mode == TextWrapMode::Wrap
+            match style.white_space_collapse {
+                WhiteSpaceCollapse::BreakSpaces => false,
+                WhiteSpaceCollapse::Preserve => style.text_wrap_mode == TextWrapMode::Wrap,
+                _ => true,
+            }
         }
         _ => false,
     }
+}
+
+fn is_break_space<B: Brush>(character: Character, styles: &[Style<B>]) -> bool {
+    styles[character.style_index as usize].white_space_collapse == WhiteSpaceCollapse::BreakSpaces
+        && matches!(
+            character.info.whitespace(),
+            Whitespace::Space | Whitespace::Tab | Whitespace::IdeographicSpace
+        )
+}
+
+/// Whether a soft line break opportunity exists before the character at `index`.
+///
+/// Following [CSS Text 4 § 5.1][css-break-spaces], `white-space-collapse: break-spaces` permits
+/// wrapping after each preserved space or tab, but not before the first one. Other Unicode
+/// separators retain their UAX #14 opportunities.
+///
+/// [css-break-spaces]: https://www.w3.org/TR/css-text-4/#white-space-collapsing
+pub(crate) fn soft_line_break<B: Brush>(
+    characters: &[Character],
+    index: usize,
+    styles: &[Style<B>],
+) -> bool {
+    if index > 0 && is_break_space(characters[index - 1], styles) {
+        return true;
+    }
+    let character = characters[index];
+    character.info.boundary() == Boundary::Line && !is_break_space(character, styles)
 }
 
 /// The advance of the logically trailing clusters of `atom` that hang past the line's end, and
