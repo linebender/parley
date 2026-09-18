@@ -8,7 +8,6 @@ use crate::{Charmap, CharmapIndex};
 use super::super::{Collection, SourceCache, matching::match_fonts};
 
 use alloc::vec::Vec;
-use parlance::Script;
 use smallvec::SmallVec;
 
 use super::{
@@ -20,12 +19,22 @@ use super::{
 pub(super) struct QueryState {
     families: Vec<CachedFamily>,
     fallback_families: Vec<CachedFamily>,
+    fallback_chars: SmallVec<[char; 8]>,
+    /// Scratch buffer used to compare incoming fallback characters against
+    /// `fallback_chars` without allocating.
+    scratch_chars: SmallVec<[char; 8]>,
+    char_fallback_families: Vec<CachedFamily>,
+    char_fallback_synced: bool,
 }
 
 impl QueryState {
     fn clear(&mut self) {
         self.families.clear();
         self.fallback_families.clear();
+        self.fallback_chars.clear();
+        self.scratch_chars.clear();
+        self.char_fallback_families.clear();
+        self.char_fallback_synced = false;
     }
 }
 
@@ -88,6 +97,9 @@ impl<'a> Query<'a> {
             for family in &mut self.state.fallback_families {
                 family.clear_fonts();
             }
+            for family in &mut self.state.char_fallback_families {
+                family.clear_fonts();
+            }
             self.attributes = attributes;
         }
     }
@@ -102,15 +114,27 @@ impl<'a> Query<'a> {
                     .fallback_families(key)
                     .map(CachedFamily::new),
             );
-            // HACK: always add a Han font to the fallback list to capture
-            // punctuation in the common script
-            // See <https://github.com/linebender/parley/issues/597>
-            self.state.fallback_families.extend(
-                self.collection
-                    .fallback_families(FallbackKey::new(Script::from_bytes(*b"Hani"), None))
-                    .map(CachedFamily::new),
-            );
+            self.state.char_fallback_families.clear();
+            self.state.char_fallback_synced = false;
             self.fallbacks = Some(key);
+        }
+    }
+
+    /// Sets the characters that fallback fonts are expected to cover.
+    ///
+    /// When set, after the families and fallback families have been
+    /// visited, the query is extended with the fonts suggested by the
+    /// platform for these specific characters.
+    pub fn set_fallback_chars(&mut self, chars: impl IntoIterator<Item = char>) {
+        self.state.scratch_chars.clear();
+        self.state.scratch_chars.extend(chars);
+        if self.state.fallback_chars != self.state.scratch_chars {
+            core::mem::swap(
+                &mut self.state.fallback_chars,
+                &mut self.state.scratch_chars,
+            );
+            self.state.char_fallback_families.clear();
+            self.state.char_fallback_synced = false;
         }
     }
 
@@ -126,50 +150,101 @@ impl<'a> Query<'a> {
             .iter_mut()
             .chain(self.state.fallback_families.iter_mut())
         {
-            match &mut family.family {
-                Entry::Error => continue,
-                Entry::Ok(..) => {}
-                status @ Entry::Vacant => {
-                    if let Some(info) = self.collection.family(family.id) {
-                        *status = Entry::Ok(info);
-                    } else {
-                        *status = Entry::Error;
-                        continue;
-                    }
-                }
-            }
-            let Entry::Ok(family_info) = &family.family else {
-                continue;
-            };
-            let bucket = load_bucket(
-                family_info,
-                self.attributes,
-                &mut family.best,
+            let status = visit_family(
+                self.collection,
                 self.source_cache,
+                self.attributes,
+                family,
+                &mut f,
             );
-            let mut yielded_default = false;
-            for font in bucket {
-                if font.family.1 == family_info.default_font_index() {
-                    yielded_default = true;
-                }
-                if f(font) == QueryStatus::Stop {
-                    return;
+            if status == QueryStatus::Stop {
+                return;
+            }
+        }
+        if self.state.fallback_chars.is_empty() {
+            return;
+        }
+        // None of the requested or fallback families matched, so extend the
+        // search with the families the platform suggests for the specific
+        // fallback characters.
+        if !self.state.char_fallback_synced {
+            let locale = self.fallbacks.and_then(|key| key.locale());
+            let families = self
+                .collection
+                .fallback_families_for_chars(&self.state.fallback_chars, locale);
+            for id in families {
+                if !contains_family(&self.state.families, id)
+                    && !contains_family(&self.state.fallback_families, id)
+                    && !contains_family(&self.state.char_fallback_families, id)
+                {
+                    self.state
+                        .char_fallback_families
+                        .push(CachedFamily::new(id));
                 }
             }
-            if yielded_default {
-                continue;
-            }
-            if let Some(font) = load_font(
-                family_info,
-                self.attributes,
-                &mut family.default,
+            self.state.char_fallback_synced = true;
+        }
+        for family in self.state.char_fallback_families.iter_mut() {
+            let status = visit_family(
+                self.collection,
                 self.source_cache,
-            ) && f(font) == QueryStatus::Stop
-            {
+                self.attributes,
+                family,
+                &mut f,
+            );
+            if status == QueryStatus::Stop {
                 return;
             }
         }
     }
+}
+
+/// Loads the fonts for a family and invokes the callback with each one.
+fn visit_family(
+    collection: &mut Inner,
+    source_cache: &mut SourceCache,
+    attributes: Attributes,
+    family: &mut CachedFamily,
+    f: &mut impl FnMut(&QueryFont) -> QueryStatus,
+) -> QueryStatus {
+    match &mut family.family {
+        Entry::Error => return QueryStatus::Continue,
+        Entry::Ok(..) => {}
+        status @ Entry::Vacant => {
+            if let Some(info) = collection.family(family.id) {
+                *status = Entry::Ok(info);
+            } else {
+                *status = Entry::Error;
+                return QueryStatus::Continue;
+            }
+        }
+    }
+    let Entry::Ok(family_info) = &family.family else {
+        return QueryStatus::Continue;
+    };
+    let bucket = load_bucket(family_info, attributes, &mut family.best, source_cache);
+    let mut yielded_default = false;
+    for font in bucket {
+        if font.family.1 == family_info.default_font_index() {
+            yielded_default = true;
+        }
+        if f(font) == QueryStatus::Stop {
+            return QueryStatus::Stop;
+        }
+    }
+    if yielded_default {
+        return QueryStatus::Continue;
+    }
+    if let Some(font) = load_font(family_info, attributes, &mut family.default, source_cache)
+        && f(font) == QueryStatus::Stop
+    {
+        return QueryStatus::Stop;
+    }
+    QueryStatus::Continue
+}
+
+fn contains_family(families: &[CachedFamily], id: FamilyId) -> bool {
+    families.iter().any(|family| family.id == id)
 }
 
 impl Drop for Query<'_> {
