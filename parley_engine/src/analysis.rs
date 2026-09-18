@@ -813,3 +813,27 @@ fn has_word_dictionary(script: Script) -> bool {
                 | Script::Myanmar
         )
 }
+
+#[cfg(test)]
+mod test {
+    use alloc::vec::Vec;
+    use icu_segmenter::WordSegmenter;
+    use icu_segmenter::options::WordBreakInvariantOptions;
+
+    /// For some characters, determining word boundaries requires a dictionary lookup.
+    ///
+    /// Without dictionaries, ICU4X reports such runs as being a single word. But note
+    /// UAX #29 Rule WB999 says that, without a dictionary, there should be word boundaries.
+    ///
+    /// We do that patchup ourselves. Once this test starts failing, it's likely ICU4X now follows
+    /// that rule, and we can drop the patchup (the code calling [`super::has_word_dictionary`]).
+    /// Once that's the case, [`parley_data::Properties::needs_dictionary_word_break`] can also be
+    /// dropped.
+    #[test]
+    fn icu4x_word_segmentation_patchup_required() {
+        let segmenter =
+            WordSegmenter::new_for_non_complex_scripts(WordBreakInvariantOptions::default());
+        let breaks: Vec<_> = segmenter.segment_str("中文文本测试").collect();
+        assert_eq!(breaks, &[0, 18]);
+    }
+}
