@@ -645,6 +645,17 @@ pub(crate) fn analyze_text(
             _ = gb_iter.next();
         }
         let properties = data_sources.properties(ch);
+
+        // For characters requiring a dictionary for deciding word boundaries, apply
+        // UAX #29 Rule WB999 in case there's no dictionary (because ICU4X does not).
+        if !is_word
+            && is_grapheme_start
+            && properties.needs_dictionary_word_break()
+            && !has_word_dictionary(properties.script())
+        {
+            is_word = true;
+        }
+
         let mut is_line = false;
         if let Some(&l) = lb_iter.peek()
             && *l == byte_pos
@@ -777,4 +788,28 @@ pub(crate) fn contributes_to_shaping(general_category: GeneralCategory, script: 
     }
 
     !(general_category == GeneralCategory::Format && script != Script::Inherited)
+}
+
+/// Whether ICU4X has a word-segmentation dictionary for this script.
+///
+/// If it does not, we need to apply UAX #29 Rule WB999 manually, because ICU4X does not.
+///
+/// This is approximate, because ICU4X actually decides based on a table of code point ranges: e.g.,
+/// some Han characters do not get a dictionary check. That's only a problem if there's a run of
+/// repeated such characters, which is probably not too likely to be a problem in practice.
+///
+/// If ICU4X does implement WB999 in the future, we can stop doing it manually (and this method can
+/// be removed).
+#[inline(always)]
+fn has_word_dictionary(script: Script) -> bool {
+    cfg!(feature = "complex-scripts")
+        && matches!(
+            script,
+            Script::Han
+                | Script::Hiragana
+                | Script::Thai
+                | Script::Lao
+                | Script::Khmer
+                | Script::Myanmar
+        )
 }

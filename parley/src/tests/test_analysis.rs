@@ -285,13 +285,21 @@ fn test_mandatory_break_after_complex_script_run() {
         .collect();
     assert_eq!(icu_breaks, vec![0, 6, 7, 13]);
 
+    // Orthogonal to this test, but without a dictionary, UAX #29 WB999 gives a word boundary at
+    // every grapheme.
+    let inner = if cfg!(feature = "complex-scripts") {
+        Boundary::None
+    } else {
+        Boundary::Word
+    };
+
     // Thai
     verify_analysis("กก\nกก", |_| {}).expect_boundary_list(vec![
         Boundary::Word,
-        Boundary::None,
+        inner,
         Boundary::Word,
         Boundary::Mandatory,
-        Boundary::None,
+        inner,
     ]);
     // Khmer
     verify_analysis("ក្ម\nក្ម", |_| {}).expect_boundary_list(vec![
@@ -306,10 +314,10 @@ fn test_mandatory_break_after_complex_script_run() {
     // Lao
     verify_analysis("ກກ\nກກ", |_| {}).expect_boundary_list(vec![
         Boundary::Word,
-        Boundary::None,
+        inner,
         Boundary::Word,
         Boundary::Mandatory,
-        Boundary::None,
+        inner,
     ]);
 }
 
