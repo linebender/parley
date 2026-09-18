@@ -155,7 +155,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
                         || style.font_variations != item_style.font_variations
                         || style.font_features != item_style.font_features
                         || !nearly_eq(style.letter_spacing, item_style.letter_spacing)
-                        || !nearly_eq(style.word_spacing, item_style.word_spacing);
+                        || !nearly_eq(style.word_spacing, item_style.word_spacing)
+                        || !style.line_height.nearly_eq(item_style.line_height);
                 }
 
                 if split {
