@@ -39,7 +39,6 @@ pub(crate) struct TreeStyleBuilder<B: Brush> {
     tree: Vec<StyleTreeNode<B>>,
     style_table: Vec<ResolvedStyle<B>>,
     style_runs: Vec<StyleRun>,
-    white_space_collapse: WhiteSpaceCollapse,
     text: String,
     uncommitted_text: String,
     current_span: usize,
@@ -60,7 +59,6 @@ impl<B: Brush> Default for TreeStyleBuilder<B> {
             tree: Vec::new(),
             style_table: Vec::new(),
             style_runs: Vec::new(),
-            white_space_collapse: WhiteSpaceCollapse::Preserve,
             text: String::new(),
             uncommitted_text: String::new(),
             current_span: usize::MAX,
@@ -83,7 +81,6 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.tree.clear();
         self.style_table.clear();
         self.style_runs.clear();
-        self.white_space_collapse = WhiteSpaceCollapse::Preserve;
         self.text.clear();
         self.uncommitted_text.clear();
         self.pending_whitespace = None;
@@ -96,13 +93,6 @@ impl<B: Brush> TreeStyleBuilder<B> {
             wrappable_style_id: None,
         });
         self.current_span = 0;
-    }
-
-    /// Sets the white space collapsing mode applied to subsequently pushed text.
-    pub(crate) fn set_white_space_mode(&mut self, white_space_collapse: WhiteSpaceCollapse) {
-        // Text pushed so far is processed with the mode that was in effect when it was pushed.
-        self.commit_uncommitted_text();
-        self.white_space_collapse = white_space_collapse;
     }
 
     /// Records that an inline box has been pushed, so that following collapsible whitespace is not
@@ -120,23 +110,22 @@ impl<B: Brush> TreeStyleBuilder<B> {
         }
 
         let span = self.current_span;
-        match self.white_space_collapse {
+        match self.tree[span].style.white_space_collapse {
             WhiteSpaceCollapse::Preserve => {
                 if uncommitted_text.starts_with(is_segment_break) {
-                    // Pending whitespace is always from a `WhiteSpaceCollapse::Collapse` span,
-                    // and following CSS Text 4 § 4.3.1 Rule 1 must be removed if it immediately precedes
-                    // a preserved segment break.
+                    // Pending whitespace is always from a `WhiteSpaceCollapse::Collapse` or
+                    // `WhiteSpaceCollapse::PreserveBreaks` span, and following CSS Text 4 § 4.3.1 Rule 1
+                    // must be removed if it immediately precedes a preserved segment break.
                     self.pending_whitespace = None;
                 }
                 self.flush_pending_whitespace();
                 self.commit_text(span, &uncommitted_text);
             }
-            WhiteSpaceCollapse::Collapse => {
+            mode @ (WhiteSpaceCollapse::Collapse | WhiteSpaceCollapse::PreserveBreaks) => {
                 let mut rest = uncommitted_text.as_str();
                 while !rest.is_empty() {
-                    let whitespace_len = rest
-                        .find(|c: char| !c.is_ascii_whitespace())
-                        .unwrap_or(rest.len());
+                    let whitespace_len =
+                        rest.find(|c| !mode.is_collapsible(c)).unwrap_or(rest.len());
                     if whitespace_len > 0 {
                         // The collapsed space is attributed to the span the whitespace sequence
                         // started in, but is a wrap opportunity if any of the spans it collapses
@@ -150,15 +139,21 @@ impl<B: Brush> TreeStyleBuilder<B> {
                         continue;
                     }
 
-                    let text_len = rest
-                        .find(|c: char| c.is_ascii_whitespace())
-                        .unwrap_or(rest.len());
                     if rest.starts_with(is_segment_break) {
                         // Collapsible whitespace immediately preceding a segment break is removed.
-                        // ASCII `CR` and `LF` newlines are collapsed as whitespace, but `LS` and
-                        // `PS` are treated as forced breaks.
+                        // In `Collapse` mode ASCII `CR` and `LF` newlines are collapsible and never
+                        // reach this point, so only `LS` and `PS` are treated as forced breaks. In
+                        // `PreserveBreaks` mode `CR` and `LF` are not collapsible and are also
+                        // preserved as forced breaks.
                         self.pending_whitespace = None;
+                        let break_len = rest.chars().next().unwrap().len_utf8();
+                        self.commit_text(span, &rest[..break_len]);
+                        rest = &rest[break_len..];
+                        continue;
                     }
+                    let text_len = rest
+                        .find(|c| mode.is_collapsible(c) || is_segment_break(c))
+                        .unwrap_or(rest.len());
                     self.flush_pending_whitespace();
                     self.commit_text(span, &rest[..text_len]);
                     rest = &rest[text_len..];
@@ -320,10 +315,74 @@ mod tests {
     use core::ops::Range;
 
     #[test]
+    fn preserve_breaks_collapses_across_text_and_style_boundaries() {
+        for (input, expected) in [
+            ("a \t b\n  c", "a b\nc"),
+            (" \ta \t\r \t\n \tb \t", "a\r\nb"),
+            ("\n \t\n \t", "\n\n"),
+            (" \t", ""),
+            ("a \u{2028} \tb \u{2029} c", "a\u{2028}b\u{2029}c"),
+            ("a \u{00a0} \u{3000} b", "a \u{00a0} \u{3000} b"),
+            ("a\u{000b}\u{000c}\u{0085}b", "a\u{000b}\u{000c}\u{0085}b"),
+        ] {
+            for split in (0..=input.len()).filter(|&i| input.is_char_boundary(i)) {
+                let mut builder = TreeStyleBuilder::<u32>::default();
+                builder.begin(ResolvedStyle {
+                    white_space_collapse: WhiteSpaceCollapse::PreserveBreaks,
+                    ..ResolvedStyle::default()
+                });
+                builder.push_text(&input[..split]);
+                builder.push_style_modification_span([ResolvedProperty::FontSize(20.)].into_iter());
+                builder.push_text(&input[split..]);
+                builder.pop_style_span();
+                let text = builder.finish(&mut Vec::new(), &mut Vec::new());
+                assert_eq!(text, expected, "{input:?} split at {split}");
+            }
+        }
+    }
+
+    #[test]
+    fn preserve_breaks_keeps_pending_whitespace_provenance_across_modes() {
+        let mut builder = TreeStyleBuilder::<u32>::default();
+        builder.begin(ResolvedStyle {
+            white_space_collapse: WhiteSpaceCollapse::Collapse,
+            ..ResolvedStyle::default()
+        });
+        builder.push_style_modification_span(
+            [
+                ResolvedProperty::Brush(1),
+                ResolvedProperty::TextWrapMode(TextWrapMode::NoWrap),
+            ]
+            .into_iter(),
+        );
+        builder.push_text("a ");
+        builder.pop_style_span();
+        builder.push_style_modification_span(
+            [ResolvedProperty::WhiteSpaceCollapse(
+                WhiteSpaceCollapse::PreserveBreaks,
+            )]
+            .into_iter(),
+        );
+        builder.push_text("\tb \t\n \tc");
+
+        let mut styles = Vec::new();
+        let mut runs = Vec::new();
+        let text = builder.finish(&mut styles, &mut runs);
+        assert_eq!(text, "a b\nc");
+        let space = runs.iter().find(|run| run.range.contains(&1)).unwrap();
+        let style = &styles[space.style_index as usize];
+        assert_eq!(style.brush, 1);
+        assert_eq!(style.text_wrap_mode, TextWrapMode::Wrap);
+        assert_eq!(style.white_space_collapse, WhiteSpaceCollapse::Collapse);
+    }
+
+    #[test]
     fn collapses_ascii_whitespace_without_trimming_non_ascii_whitespace() {
         let mut builder = TreeStyleBuilder::<u32>::default();
-        builder.begin(ResolvedStyle::default());
-        builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+        builder.begin(ResolvedStyle {
+            white_space_collapse: WhiteSpaceCollapse::Collapse,
+            ..ResolvedStyle::default()
+        });
         builder.push_text(" \u{00a0}text\u{00a0} ");
 
         let mut style_table = Vec::new();
@@ -336,8 +395,10 @@ mod tests {
     #[test]
     fn collapsible_whitespace_at_span_end_is_committed_with_the_span_style() {
         let mut builder = TreeStyleBuilder::<u32>::default();
-        builder.begin(ResolvedStyle::default());
-        builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+        builder.begin(ResolvedStyle {
+            white_space_collapse: WhiteSpaceCollapse::Collapse,
+            ..ResolvedStyle::default()
+        });
         builder.push_style_modification_span([ResolvedProperty::FontSize(20.)].into_iter());
         builder.push_text("A ");
         builder.pop_style_span();
@@ -358,14 +419,19 @@ mod tests {
     #[test]
     fn collapsible_whitespace_before_preserved_text_is_committed() {
         let mut builder = TreeStyleBuilder::<u32>::default();
-        builder.begin(ResolvedStyle::default());
-        builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+        builder.begin(ResolvedStyle {
+            white_space_collapse: WhiteSpaceCollapse::Collapse,
+            ..ResolvedStyle::default()
+        });
         builder.push_text("A ");
-        builder.push_style_modification_span([].into_iter());
-        builder.set_white_space_mode(WhiteSpaceCollapse::Preserve);
+        builder.push_style_modification_span(
+            [ResolvedProperty::WhiteSpaceCollapse(
+                WhiteSpaceCollapse::Preserve,
+            )]
+            .into_iter(),
+        );
         builder.push_text("  B  ");
         builder.pop_style_span();
-        builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
         builder.push_text("  C");
 
         let mut style_table = Vec::new();
@@ -378,14 +444,19 @@ mod tests {
     #[test]
     fn collapsible_whitespace_around_a_preserved_segment_break_is_removed() {
         let mut builder = TreeStyleBuilder::<u32>::default();
-        builder.begin(ResolvedStyle::default());
-        builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
+        builder.begin(ResolvedStyle {
+            white_space_collapse: WhiteSpaceCollapse::Collapse,
+            ..ResolvedStyle::default()
+        });
         builder.push_text("A  ");
-        builder.push_style_modification_span([].into_iter());
-        builder.set_white_space_mode(WhiteSpaceCollapse::Preserve);
+        builder.push_style_modification_span(
+            [ResolvedProperty::WhiteSpaceCollapse(
+                WhiteSpaceCollapse::Preserve,
+            )]
+            .into_iter(),
+        );
         builder.push_text("\n");
         builder.pop_style_span();
-        builder.set_white_space_mode(WhiteSpaceCollapse::Collapse);
         builder.push_text("  B");
 
         let mut style_table = Vec::new();

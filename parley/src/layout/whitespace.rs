@@ -6,14 +6,27 @@
 use parley_engine::shape::Whitespace;
 use parley_engine::{Atom, ShapedSlice};
 
-use crate::TextWrapMode;
 use crate::layout::Style;
 use crate::layout::spacing::EffectiveSpacing;
 use crate::style::Brush;
+use crate::{TextWrapMode, WhiteSpaceCollapse};
 
-/// Whether this is whitespace that is allowed to hang past the line.
+impl WhiteSpaceCollapse {
+    /// Whether `c` is whitespace that this mode collapses.
+    pub(crate) fn is_collapsible(self, c: char) -> bool {
+        match self {
+            Self::Collapse => c.is_ascii_whitespace(),
+            Self::Preserve => false,
+            Self::PreserveBreaks => matches!(c, ' ' | '\t'),
+        }
+    }
+}
+
+/// Whether whitespace with the given style hangs past the line's end edge.
 ///
-/// Following [CSS Text 4 § 4.3.2][css-hanging], non-breaking spaces don't hang.
+/// Following [CSS Text 4 § 4.3.2][css-hanging], non-breaking spaces don't hang, preserved
+/// whitespace only hangs when wrapping is enabled, and whitespace in a collapsing mode always
+/// hangs.
 ///
 /// [css-hanging]: https://www.w3.org/TR/css-text-4/#white-space-phase-2
 ///
@@ -22,14 +35,18 @@ use crate::style::Brush;
 // ideographic space from the "space separators". See
 // https://github.com/linebender/parley/pull/762#discussion_r3923722770.
 #[inline(always)]
-pub(crate) const fn whitespace_can_hang(whitespace: Whitespace) -> bool {
-    matches!(
-        whitespace,
-        Whitespace::Space | Whitespace::IdeographicSpace | Whitespace::Tab | Whitespace::Newline
-    )
+pub(crate) fn whitespace_hangs<B: Brush>(whitespace: Whitespace, style: &Style<B>) -> bool {
+    match whitespace {
+        Whitespace::Newline => true,
+        Whitespace::Space | Whitespace::IdeographicSpace | Whitespace::Tab => {
+            style.white_space_collapse != WhiteSpaceCollapse::Preserve
+                || style.text_wrap_mode == TextWrapMode::Wrap
+        }
+        _ => false,
+    }
 }
 
-/// The advance of the logically trailing clusters of `atom` that can hang past the line's end, and
+/// The advance of the logically trailing clusters of `atom` that hang past the line's end, and
 /// whether that is the atom in its entirety.
 ///
 /// An atom can hang partially: e.g., a prepend character followed by a space is a single atom (as
@@ -58,10 +75,10 @@ pub(crate) fn atom_hanging_advance<B: Brush>(
             .characters_in(cluster.chars_range())
             .iter()
             .all(|character| {
-                // Note whitespace only hangs with `TextWrapMode::Wrap`, following
-                // CSS Text 4 § 4.3.2.
-                whitespace_can_hang(character.info.whitespace())
-                    && styles[character.style_index as usize].text_wrap_mode == TextWrapMode::Wrap
+                whitespace_hangs(
+                    character.info.whitespace(),
+                    &styles[character.style_index as usize],
+                )
             });
         if !cluster_hangs {
             all_hang = false;

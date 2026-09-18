@@ -24,8 +24,7 @@ impl Character {
     /// The byte range of this character in the source text.
     #[inline(always)]
     pub fn text_byte_range(&self) -> Range<usize> {
-        self.text_byte_start as usize
-            ..self.text_byte_start as usize + self.info.source_char().len_utf8()
+        self.text_byte_start as usize..self.text_byte_start as usize + self.info.len_utf8()
     }
 }
 
@@ -184,17 +183,33 @@ pub struct ClusterInfo {
     boundary: Boundary,
     whitespace: Whitespace,
     is_word_boundary: bool,
-    source_char: char,
+    /// Properties derived from the source character; see the `*_FLAG` constants.
+    flags: u8,
 }
 
 impl ClusterInfo {
+    /// Bits 0..2: the UTF-8 length of the source character minus one.
+    ///
+    /// (Note the UTF-8 length of any character is between 1 and 4 inclusive.)
+    const LEN_UTF8_MASK: u8 = 0b11;
+    /// Whether the source character is an emoji.
+    const EMOJI_FLAG: u8 = 1 << 2;
+
     #[inline(always)]
     pub fn new(boundary: Boundary, is_word_boundary: bool, source_char: char) -> Self {
+        // TODO: Defer to ICU4X properties (see: https://docs.rs/icu/latest/icu/properties/props/struct.Emoji.html).
+        let is_emoji = matches!(source_char as u32, 0x1F600..=0x1F64F | 0x1F300..=0x1F5FF | 0x1F680..=0x1F6FF | 0x2600..=0x26FF | 0x2700..=0x27BF);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "`len_utf8` is between 1 and 4 inclusive"
+        )]
+        let len_utf8 = source_char.len_utf8() as u8;
+        let flags = (len_utf8 - 1) | if is_emoji { Self::EMOJI_FLAG } else { 0 };
         Self {
             boundary,
             whitespace: Whitespace::from_char(source_char),
             is_word_boundary,
-            source_char,
+            flags,
         }
     }
 
@@ -225,8 +240,7 @@ impl ClusterInfo {
     /// Returns if the cluster is an emoji.
     #[inline]
     pub fn is_emoji(self) -> bool {
-        // TODO: Defer to ICU4X properties (see: https://docs.rs/icu/latest/icu/properties/props/struct.Emoji.html).
-        matches!(self.source_char as u32, 0x1F600..=0x1F64F | 0x1F300..=0x1F5FF | 0x1F680..=0x1F6FF | 0x2600..=0x26FF | 0x2700..=0x27BF)
+        self.flags & Self::EMOJI_FLAG != 0
     }
 
     /// Returns if the cluster is any whitespace.
@@ -235,9 +249,38 @@ impl ClusterInfo {
         self.whitespace() != Whitespace::None
     }
 
-    /// Returns the cluster's original character.
+    /// Returns the number of bytes the source character would need if encoded in UTF-8.
+    ///
+    /// That number of bytes is always between 1 and 4, inclusive.
     #[inline(always)]
-    pub fn source_char(self) -> char {
-        self.source_char
+    pub fn len_utf8(self) -> usize {
+        (self.flags & Self::LEN_UTF8_MASK) as usize + 1
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cluster_info() {
+        for (ch, len, emoji) in [
+            ('a', 1, false),
+            (' ', 1, false),
+            ('\t', 1, false),
+            ('\r', 1, false),
+            ('\n', 1, false),
+            ('\u{00e9}', 2, false),
+            ('\u{2028}', 3, false),
+            ('\u{2600}', 3, true),
+            ('\u{1F600}', 4, true),
+        ] {
+            let info = ClusterInfo::new(Boundary::Line, false, ch);
+            assert_eq!(info.boundary(), Boundary::Line, "{ch:?}");
+            assert_eq!(info.is_word_boundary(), false, "{ch:?}");
+            assert_eq!(info.whitespace(), Whitespace::from_char(ch), "{ch:?}");
+            assert_eq!(info.len_utf8(), len, "{ch:?}");
+            assert_eq!(info.is_emoji(), emoji, "{ch:?}");
+        }
     }
 }

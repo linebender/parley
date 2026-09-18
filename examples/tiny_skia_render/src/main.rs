@@ -160,11 +160,7 @@ fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<
     let font = run.font();
     let font_size = run.font_size();
 
-    let normalized_coords = run
-        .normalized_coords()
-        .iter()
-        .map(|coord| NormalizedCoord::from_bits(coord.to_bits()))
-        .collect::<Vec<_>>();
+    let normalized_coords = bytemuck::cast_slice::<_, NormalizedCoord>(run.normalized_coords());
 
     // Get glyph outlines using Skrifa. This can be cached in production code.
     let font_collection_ref = font.font.data.as_ref();
@@ -181,7 +177,7 @@ fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<
         if let Some(glyph_outline) = outlines.get(glyph_id) {
             pen.set_origin(glyph_x, glyph_y);
             pen.set_color(brush.color);
-            pen.draw_glyph(&glyph_outline, font_size, &normalized_coords);
+            pen.draw_glyph(&glyph_outline, font_size, normalized_coords);
         }
     }
 

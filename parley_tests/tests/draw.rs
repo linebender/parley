@@ -1,7 +1,7 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Tests for glyph and decoration drawing via `glifo`.
+//! Tests for glyph and decoration drawing via `vello_cpu`.
 //!
 //! These tests focus on the interaction between transforms, hinting, and
 //! decoration rendering (especially ink-skipping underlines).
@@ -137,7 +137,6 @@ fn draw_underline_descenders() {
 #[ignore]
 fn draw_bitmap_emoji() {
     let mut env = TestEnv::new(test_name!(), None);
-    env.set_tolerance(5.0);
     let text = "\u{2705}\u{1f440}\u{1f389}\u{1f920}";
 
     test_with_configs(&mut env, |env| {
@@ -157,7 +156,6 @@ fn draw_bitmap_emoji() {
 #[test]
 fn draw_colr_emoji() {
     let mut env = TestEnv::new(test_name!(), None);
-    env.set_tolerance(5.0);
     let text = "\u{2705}\u{1f440}\u{1f389}\u{1f920}";
 
     test_with_configs(&mut env, |env| {
@@ -173,13 +171,15 @@ fn draw_colr_emoji() {
     });
 }
 
-/// Test COLR emoji with non printing variation selector 16 rendering across different hinting,
-/// per-glyph transform, and scale configurations.
+/// Test COLR emoji rendering across different hinting, per-glyph transform, and scale configurations.
+///
+/// The COLR emoji with presentation style(VS16).
+///
+/// The default color emoji is different for each system, so only macOS was added for testing.
 #[cfg(all(target_os = "macos", feature = "system"))]
 #[test]
-fn draw_colr_emoji_with_non_printing_variation_selector_16() {
+fn draw_colr_emoji_with_presentation_style() {
     let mut env = TestEnv::new(test_name!(), None);
-    env.set_tolerance(5.0);
 
     let collection = &mut env.font_context().collection;
     collection.load_system_fonts();
@@ -189,9 +189,41 @@ fn draw_colr_emoji_with_non_printing_variation_selector_16() {
     test_with_configs(&mut env, |env| {
         let mut builder = env.ranged_builder(text);
         builder.push_default(StyleProperty::FontSize(24.0));
-        builder.push_default(StyleProperty::FontFamily(FontFamily::named(
-            "Apple Color Emoji",
-        )));
+        // Following <fontique/src/backend/coretext.rs#L33>
+        builder.push_default(StyleProperty::FontFamily(
+            parley::GenericFamily::Emoji.into(),
+        ));
+        builder.push(
+            StyleProperty::FontFamily(FontFamily::named("Noto Color Emoji")),
+            0..9,
+        );
+
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout.align(Alignment::Start, AlignmentOptions::default());
+        layout
+    });
+}
+
+/// Test COLR emoji rendering across different hinting, per-glyph transform, and scale configurations.
+///
+/// The COLR emoji with presentation style without setting the default font,
+/// and should fallback to the system default color emoji font.
+///
+/// The default color emoji is different for each system, so only macOS was added for testing.
+#[cfg(all(target_os = "macos", feature = "system"))]
+#[test]
+fn draw_colr_emoji_with_presentation_style_without_setting_default_font() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let collection = &mut env.font_context().collection;
+    collection.load_system_fonts();
+
+    let text = "\u{270c}\u{fe0f}\u{2705}\u{270c}\u{fe0f}";
+
+    test_with_configs(&mut env, |env| {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::FontSize(24.0));
         builder.push(
             StyleProperty::FontFamily(FontFamily::named("Noto Color Emoji")),
             0..9,

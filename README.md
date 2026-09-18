@@ -99,7 +99,13 @@ Licensed under either of
 
 at your option.
 
-Some files used for tests and benchmarks are under different licenses. See `./parley_dev/README.md` for details.
+Some code in this repository is not available under these licenses:
 
+- `parley_emoji` is licensed only under its MIT license (which has a different attribution to Parley's MIT License).
+  See `./parley_emoji/README.md` for details.
+- `parley_tests/tests/emoji` is licensed only under the Apache License, Version 2.0 (and not the MIT license).
+  See `./parley_tests/tests/emoji/README.md` for details.
+- Some other files used for tests and benchmarks are under different licenses.
+  See `./parley_dev/README.md` for details.
 
 [Rust code of conduct]: https://www.rust-lang.org/policies/code-of-conduct

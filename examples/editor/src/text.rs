@@ -22,7 +22,7 @@ use ui_events::{
     keyboard::{Key, KeyboardEvent, NamedKey},
     pointer::{PointerButtonEvent, PointerEvent, PointerInfo, PointerState, PointerType},
 };
-use vello_cpu::{Glyph, RenderContext};
+use vello_cpu::{Glyph, RenderContext, Resources};
 use winit::event::{Ime, WindowEvent};
 
 pub use parley::editing::Generation;
@@ -387,7 +387,7 @@ impl Editor {
     /// Draw into the `vello_cpu` render context.
     ///
     /// Returns drawn `Generation`.
-    pub fn draw(&mut self, renderer: &mut RenderContext) -> Generation {
+    pub fn draw(&mut self, renderer: &mut RenderContext, resources: &mut Resources) -> Generation {
         let transform = Affine::translate((INSET as f64, INSET as f64));
         renderer.set_transform(transform);
         renderer.set_fill_rule(Fill::NonZero);
@@ -443,10 +443,9 @@ impl Editor {
                     .skew()
                     .map(|angle| Affine::skew(angle.to_radians().tan() as f64, 0.0));
                 set_brush(renderer, &style.brush);
-                let normalized_coords =
-                    &Vec::from_iter(run.normalized_coords().iter().map(|c| c.to_bits()));
+                let normalized_coords = bytemuck::cast_slice::<_, i16>(run.normalized_coords());
                 let mut builder = renderer
-                    .glyph_run(&font.font)
+                    .glyph_run(resources, &font.font)
                     .font_size(font_size)
                     .hint(true)
                     .normalized_coords(normalized_coords);

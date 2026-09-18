@@ -7,6 +7,7 @@ use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
     Alignment, AlignmentOptions, ContentWidths, InlineBox, InlineBoxKind, Layout, StyleProperty,
+    TextWrapMode, WhiteSpaceCollapse,
 };
 
 /// Checks that calculated content widths agree with actual line breaking.
@@ -165,4 +166,68 @@ fn inbox_content_width() {
         env.with_name("trailing_whitespace")
             .check_layout_snapshot(&layout);
     }
+}
+
+#[test]
+fn content_widths_trailing_whitespace_by_collapse_mode() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Following CSS Text 4 § 4.3.2, trailing whitespace before a forced line break hangs
+    // conditionally when whitespace is preserved: it counts towards the max-content width. When
+    // whitespace is collapsed, it hangs unconditionally, so it never counts.
+    //
+    // Ideographic spaces are used as they are not collapsible: whitespace processing would have
+    // removed other spaces before the forced break.
+    let text = "AA\u{3000}\u{3000}\u{3000}\nB\u{3000}\u{3000}";
+    let word_width = single_line_width(&mut env, "AA");
+    let word_with_spaces_width = single_line_width(&mut env, "AA\u{3000}\u{3000}\u{3000}");
+    for (mode, wrap_mode, expected_max) in [
+        (
+            WhiteSpaceCollapse::Preserve,
+            TextWrapMode::Wrap,
+            word_with_spaces_width,
+        ),
+        (WhiteSpaceCollapse::Collapse, TextWrapMode::Wrap, word_width),
+        (
+            WhiteSpaceCollapse::PreserveBreaks,
+            TextWrapMode::Wrap,
+            word_width,
+        ),
+        (
+            WhiteSpaceCollapse::Collapse,
+            TextWrapMode::NoWrap,
+            word_width,
+        ),
+    ] {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::WhiteSpaceCollapse(mode));
+        builder.push_default(StyleProperty::TextWrapMode(wrap_mode));
+        let mut layout = builder.build(text);
+
+        let widths = assert_content_widths_match_layout(&mut layout);
+        assert!(
+            (widths.max - expected_max).abs() < 1e-3,
+            "Max content width {} should be {expected_max} for {mode:?} and {wrap_mode:?}",
+            widths.max,
+        );
+        assert!(
+            (widths.min - word_width).abs() < 1e-3,
+            "Min content width {} should be {word_width} for {mode:?} and {wrap_mode:?}",
+            widths.min,
+        );
+    }
+
+    // The ideographic spaces survive the tree builder's whitespace collapsing.
+    let mut builder = env.tree_builder();
+    builder.push_style_modification_span(&[StyleProperty::WhiteSpaceCollapse(
+        WhiteSpaceCollapse::PreserveBreaks,
+    )]);
+    builder.push_text(text);
+    let (mut layout, _) = builder.build();
+    let widths = assert_content_widths_match_layout(&mut layout);
+    assert!(
+        (widths.max - word_width).abs() < 1e-3,
+        "Max content width {} should be the widest word's width {word_width}",
+        widths.max,
+    );
 }
