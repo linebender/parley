@@ -190,10 +190,11 @@ impl CharInfo {
     const CONTRIBUTES_TO_SHAPING_SHIFT: u16 = 4;
     const FORCE_NORMALIZE_SHIFT: u16 = 5;
     const GRAPHEME_START_SHIFT: u16 = 6;
-    const EMOJI_SHIFT: u16 = 7;
-    const EMOJI_PRESENTATION_SHIFT: u16 = 8;
-    const EMOJI_MODIFIER_SHIFT: u16 = 9;
-    const EMOJI_MODIFIER_BASE_SHIFT: u16 = 10;
+    const WORD_BOUNDARY_SHIFT: u8 = 7;
+    const EMOJI_SHIFT: u16 = 8;
+    const EMOJI_PRESENTATION_SHIFT: u16 = 9;
+    const EMOJI_MODIFIER_SHIFT: u16 = 10;
+    const EMOJI_MODIFIER_BASE_SHIFT: u16 = 11;
 
     #[allow(
         dead_code,
@@ -210,6 +211,7 @@ impl CharInfo {
     const CONTRIBUTES_TO_SHAPING_MASK: u16 = 1 << Self::CONTRIBUTES_TO_SHAPING_SHIFT;
     const FORCE_NORMALIZE_MASK: u16 = 1 << Self::FORCE_NORMALIZE_SHIFT;
     const GRAPHEME_START_MASK: u16 = 1 << Self::GRAPHEME_START_SHIFT;
+    const WORD_BOUNDARY_MASK: u16 = 1 << Self::WORD_BOUNDARY_SHIFT;
     const EMOJI_MASK: u16 = 1 << Self::EMOJI_SHIFT;
     const EMOJI_PRESENTATION_MASK: u16 = 1 << Self::EMOJI_PRESENTATION_SHIFT;
     const EMOJI_MODIFIER_MASK: u16 = 1 << Self::EMOJI_MODIFIER_SHIFT;
@@ -227,6 +229,7 @@ impl CharInfo {
         contributes_to_shaping: bool,
         force_normalize: bool,
         is_grapheme_start: bool,
+        is_word_boundary: bool,
         is_emoji: bool,
         is_emoji_presentation: bool,
         is_emoji_modifier: bool,
@@ -244,6 +247,7 @@ impl CharInfo {
                 | (contributes_to_shaping as u16) << Self::CONTRIBUTES_TO_SHAPING_SHIFT
                 | (force_normalize as u16) << Self::FORCE_NORMALIZE_SHIFT
                 | (is_grapheme_start as u16) << Self::GRAPHEME_START_SHIFT
+                | (is_word_boundary as u16) << Self::WORD_BOUNDARY_SHIFT
                 | (is_emoji as u16) << Self::EMOJI_SHIFT
                 | (is_emoji_presentation as u16) << Self::EMOJI_PRESENTATION_SHIFT
                 | (is_emoji_modifier as u16) << Self::EMOJI_MODIFIER_SHIFT
@@ -334,6 +338,14 @@ impl CharInfo {
     #[inline(always)]
     pub fn is_grapheme_start(self) -> bool {
         self.flags & Self::GRAPHEME_START_MASK != 0
+    }
+
+    /// Whether there is a word boundary before this character ([UAX #29 § 4][words]).
+    ///
+    /// [words]: https://www.unicode.org/reports/tr29/#Word_Boundaries
+    #[inline(always)]
+    pub fn is_word_boundary(self) -> bool {
+        self.flags & Self::WORD_BOUNDARY_MASK != 0
     }
 }
 
@@ -666,7 +678,7 @@ pub(crate) fn analyze_text(
             Boundary::None
         };
 
-        (boundary, is_grapheme_start, ch, properties)
+        (boundary, is_word, is_grapheme_start, ch, properties)
     });
 
     let mut needs_bidi_resolution = false;
@@ -679,7 +691,7 @@ pub(crate) fn analyze_text(
         // character-indexed.
         .fold(
             false,
-            |is_mandatory_linebreak, (boundary, is_grapheme_start, ch, properties)| {
+            |is_mandatory_linebreak, (boundary, is_word, is_grapheme_start, ch, properties)| {
                 let script = properties.script();
                 let grapheme_cluster_break = properties.grapheme_cluster_break();
                 let bidi_class = properties.bidi_class();
@@ -724,6 +736,7 @@ pub(crate) fn analyze_text(
                     contributes_to_shaping(general_category, script),
                     force_normalize,
                     is_grapheme_start,
+                    is_word,
                     properties.is_emoji(),
                     properties.is_emoji_presentation(),
                     properties.is_emoji_modifier(),

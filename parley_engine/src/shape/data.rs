@@ -182,6 +182,7 @@ impl ShapedCluster {
 pub struct ClusterInfo {
     boundary: Boundary,
     whitespace: Whitespace,
+    is_word_boundary: bool,
     /// Properties derived from the source character; see the `*_FLAG` constants.
     flags: u8,
 }
@@ -195,7 +196,7 @@ impl ClusterInfo {
     const EMOJI_FLAG: u8 = 1 << 2;
 
     #[inline(always)]
-    pub fn new(boundary: Boundary, source_char: char) -> Self {
+    pub fn new(boundary: Boundary, is_word_boundary: bool, source_char: char) -> Self {
         // TODO: Defer to ICU4X properties (see: https://docs.rs/icu/latest/icu/properties/props/struct.Emoji.html).
         let is_emoji = matches!(source_char as u32, 0x1F600..=0x1F64F | 0x1F300..=0x1F5FF | 0x1F680..=0x1F6FF | 0x2600..=0x26FF | 0x2700..=0x27BF);
         #[expect(
@@ -207,6 +208,7 @@ impl ClusterInfo {
         Self {
             boundary,
             whitespace: Whitespace::from_char(source_char),
+            is_word_boundary,
             flags,
         }
     }
@@ -223,10 +225,16 @@ impl ClusterInfo {
         self.whitespace
     }
 
-    /// Returns if the cluster is a line boundary.
+    /// Returns if the cluster is a line break opportunity (soft or mandatory).
     #[inline]
     pub fn is_boundary(self) -> bool {
         self.boundary != Boundary::None
+    }
+
+    /// Returns if the cluster is a word boundary.
+    #[inline]
+    pub fn is_word_boundary(self) -> bool {
+        self.is_word_boundary
     }
 
     /// Returns if the cluster is an emoji.
@@ -267,8 +275,9 @@ mod tests {
             ('\u{2600}', 3, true),
             ('\u{1F600}', 4, true),
         ] {
-            let info = ClusterInfo::new(Boundary::Line, ch);
+            let info = ClusterInfo::new(Boundary::Line, false, ch);
             assert_eq!(info.boundary(), Boundary::Line, "{ch:?}");
+            assert!(!info.is_word_boundary(), "{ch:?}");
             assert_eq!(info.whitespace(), Whitespace::from_char(ch), "{ch:?}");
             assert_eq!(info.len_utf8(), len, "{ch:?}");
             assert_eq!(info.is_emoji(), emoji, "{ch:?}");
