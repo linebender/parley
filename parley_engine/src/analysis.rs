@@ -355,12 +355,10 @@ impl CharInfo {
 pub enum Boundary {
     /// Not a boundary.
     None = 0,
-    /// Start of a word.
-    Word = 1,
     /// Potential line break.
-    Line = 2,
+    Line = 1,
     /// Mandatory line break.
-    Mandatory = 3,
+    Mandatory = 2,
 }
 
 pub(crate) fn analyze_text(
@@ -683,8 +681,6 @@ pub(crate) fn analyze_text(
 
         let boundary = if is_line {
             Boundary::Line
-        } else if is_word {
-            Boundary::Word
         } else {
             Boundary::None
         };
