@@ -277,7 +277,7 @@ mod tests {
         ] {
             let info = ClusterInfo::new(Boundary::Line, false, ch);
             assert_eq!(info.boundary(), Boundary::Line, "{ch:?}");
-            assert!(info.is_word_boundary(), "{ch:?}");
+            assert!(!info.is_word_boundary(), "{ch:?}");
             assert_eq!(info.whitespace(), Whitespace::from_char(ch), "{ch:?}");
             assert_eq!(info.len_utf8(), len, "{ch:?}");
             assert_eq!(info.is_emoji(), emoji, "{ch:?}");
