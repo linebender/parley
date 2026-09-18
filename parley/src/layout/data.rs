@@ -279,6 +279,16 @@ impl<B: Brush> LayoutData<B> {
     ///
     /// This should mirror the line breaker in terms of layout decisions like hanging whitespace (if
     /// it doesn't, one of the calculations is buggy).
+    ///
+    /// Hanging whitespace is not considered when measuring the line's content for fit, but some
+    /// whitespace hangs *conditionally*. See the module-level docs of [`crate::layout::whitespace`]
+    /// for an explanation of how conditionally and unconditionally hanging whitespace are
+    /// determined. For the content widths this means:
+    ///
+    /// - max-content width: if there's a conditionally-hanging suffix of whitespace, it fits, so
+    ///   nothing hangs; without one, the unconditionally hanging whitespace hangs in full.
+    /// - min-content width: any conditionally-hanging suffix hangs in full, so all hanging
+    ///   whitespace hangs in full.
     #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
         let mut min_width = 0.0_f32;
