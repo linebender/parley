@@ -8,6 +8,9 @@ use icu_properties::props::Script;
 use icu_segmenter::{LineSegmenter, options::LineBreakOptions};
 use parley_engine::Boundary;
 
+/// Whether we have complex script dictionaries compiled-in, which ICU4X then uses for segmentation.
+const HAS_DICTIONARIES: bool = cfg!(feature = "complex-scripts");
+
 #[derive(Default)]
 struct TestContext {
     pub layout_context: LayoutContext,
@@ -58,6 +61,18 @@ impl TestContext {
             .map(|info| info.is_grapheme_start())
             .collect();
         assert_eq!(actual, expected, "Grapheme start list mismatch");
+        self
+    }
+
+    fn expect_word_boundary_list(self, expected: Vec<bool>) -> Self {
+        let actual: Vec<_> = self
+            .layout_context
+            .analysis
+            .char_info()
+            .iter()
+            .map(|info| info.is_word_boundary())
+            .collect();
+        assert_eq!(actual, expected, "Word boundary list mismatch");
         self
     }
 
@@ -285,13 +300,21 @@ fn test_mandatory_break_after_complex_script_run() {
         .collect();
     assert_eq!(icu_breaks, vec![0, 6, 7, 13]);
 
+    // Orthogonal to this test, but without a dictionary, UAX #29 WB999 gives a word boundary at
+    // every grapheme.
+    let inner = if HAS_DICTIONARIES {
+        Boundary::None
+    } else {
+        Boundary::Word
+    };
+
     // Thai
     verify_analysis("กก\nกก", |_| {}).expect_boundary_list(vec![
         Boundary::Word,
-        Boundary::None,
+        inner,
         Boundary::Word,
         Boundary::Mandatory,
-        Boundary::None,
+        inner,
     ]);
     // Khmer
     verify_analysis("ក្ម\nក្ម", |_| {}).expect_boundary_list(vec![
@@ -306,11 +329,46 @@ fn test_mandatory_break_after_complex_script_run() {
     // Lao
     verify_analysis("ກກ\nກກ", |_| {}).expect_boundary_list(vec![
         Boundary::Word,
-        Boundary::None,
+        inner,
         Boundary::Word,
         Boundary::Mandatory,
-        Boundary::None,
+        inner,
     ]);
+}
+
+#[test]
+fn test_word_boundaries_complex_scripts() {
+    // 中文|文本|测试 with a dictionary, 中|文|文|本|测|试 without.
+    verify_analysis("中文文本测试", |_| {}).expect_word_boundary_list(if HAS_DICTIONARIES {
+        vec![true, false, true, false, true, false]
+    } else {
+        vec![true, true, true, true, true, true]
+    });
+    // สวัสดี|ครับ with a dictionary, one word per grapheme cluster without.
+    verify_analysis("สวัสดีครับ", |_| {})
+        .expect_grapheme_start_list(vec![
+            true, true, false, true, true, false, true, true, false, true,
+        ])
+        .expect_word_boundary_list(if HAS_DICTIONARIES {
+            vec![
+                true, false, false, false, false, false, true, false, false, false,
+            ]
+        } else {
+            vec![
+                true, true, false, true, true, false, true, true, false, true,
+            ]
+        });
+    verify_analysis("カタカナ", |_| {}).expect_word_boundary_list(vec![true, false, false, false]);
+}
+
+/// Scripts that need a dictionary, but for which we don't have one even under `complex-scripts` get
+/// UAX #29 WB999 boundaries.
+#[test]
+fn test_word_boundaries_complex_script_without_dictionary() {
+    // Ahom letters (U+11700, U+11701) and a combining vowel sign (U+1171D).
+    verify_analysis("\u{11700}\u{1171d}\u{11701} \u{11700}", |_| {})
+        .expect_grapheme_start_list(vec![true, false, true, true, true])
+        .expect_word_boundary_list(vec![true, false, true, true, true]);
 }
 
 #[test]

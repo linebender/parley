@@ -25,6 +25,7 @@ impl Properties {
     const IS_VARIATION_SELECTOR_BITS: u32 = 1;
     const IS_REGION_INDICATOR_BITS: u32 = 1;
     const IS_MANDATORY_LINE_BREAK_BITS: u32 = 1;
+    const NEEDS_DICTIONARY_WORD_BREAK_BITS: u32 = 1;
     const IS_EMOJI_BITS: u32 = 1;
     const IS_EMOJI_PRESENTATION_BITS: u32 = 1;
     const IS_EMOJI_MODIFIER_BITS: u32 = 1;
@@ -41,8 +42,10 @@ impl Properties {
         Self::IS_VARIATION_SELECTOR_SHIFT + Self::IS_VARIATION_SELECTOR_BITS;
     const IS_MANDATORY_LINE_BREAK_SHIFT: u32 =
         Self::IS_REGION_INDICATOR_SHIFT + Self::IS_REGION_INDICATOR_BITS;
-    const IS_EMOJI_SHIFT: u32 =
+    const NEEDS_DICTIONARY_WORD_BREAK_SHIFT: u32 =
         Self::IS_MANDATORY_LINE_BREAK_SHIFT + Self::IS_MANDATORY_LINE_BREAK_BITS;
+    const IS_EMOJI_SHIFT: u32 =
+        Self::NEEDS_DICTIONARY_WORD_BREAK_SHIFT + Self::NEEDS_DICTIONARY_WORD_BREAK_BITS;
     const IS_EMOJI_PRESENTATION_SHIFT: u32 = Self::IS_EMOJI_SHIFT + Self::IS_EMOJI_BITS;
     const IS_EMOJI_MODIFIER_SHIFT: u32 =
         Self::IS_EMOJI_PRESENTATION_SHIFT + Self::IS_EMOJI_PRESENTATION_BITS;
@@ -70,6 +73,7 @@ impl Properties {
         is_variation_selector: bool,
         is_region_indicator: bool,
         is_mandatory_linebreak: bool,
+        needs_dictionary_word_break: bool,
         is_emoji: bool,
         is_emoji_presentation: bool,
         is_emoji_modifier: bool,
@@ -89,6 +93,7 @@ impl Properties {
                 | ((is_variation_selector as u32) << Self::IS_VARIATION_SELECTOR_SHIFT)
                 | ((is_region_indicator as u32) << Self::IS_REGION_INDICATOR_SHIFT)
                 | ((is_mandatory_linebreak as u32) << Self::IS_MANDATORY_LINE_BREAK_SHIFT)
+                | ((needs_dictionary_word_break as u32) << Self::NEEDS_DICTIONARY_WORD_BREAK_SHIFT)
                 | ((is_emoji as u32) << Self::IS_EMOJI_SHIFT)
                 | ((is_emoji_presentation as u32) << Self::IS_EMOJI_PRESENTATION_SHIFT)
                 | ((is_emoji_modifier as u32) << Self::IS_EMOJI_MODIFIER_SHIFT)
@@ -179,6 +184,18 @@ impl Properties {
         ) != 0
     }
 
+    /// Returns whether the ICU4X word segmenter defers this character to a dictionary to determine
+    /// the word break boundaries.
+    ///
+    /// Without the dictionary, ICU4X reports a run of such characters as a single word.
+    #[inline(always)]
+    pub fn needs_dictionary_word_break(&self) -> bool {
+        self.bits(
+            Self::NEEDS_DICTIONARY_WORD_BREAK_SHIFT,
+            Self::NEEDS_DICTIONARY_WORD_BREAK_BITS,
+        ) != 0
+    }
+
     /// Returns whether the character has the `Emoji` property ([UTS #51][]).
     ///
     /// [UTS #51]: https://www.unicode.org/reports/tr51/tr51-29.html#Emoji_Properties
@@ -254,6 +271,11 @@ mod tests {
                     | LineBreak::LineFeed
                     | LineBreak::NextLine
             ),
+            CodePointMapData::<LineBreak>::new().get32(cp) == LineBreak::ComplexContext
+                || matches!(
+                    CodePointMapData::<Script>::new().get32(cp),
+                    Script::Han | Script::Hiragana
+                ),
             CodePointSetData::new::<Emoji>().contains32(cp),
             CodePointSetData::new::<EmojiPresentation>().contains32(cp),
             CodePointSetData::new::<EmojiModifier>().contains32(cp),
