@@ -347,42 +347,91 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
             self.features = self.rcx.features(style.font_features).unwrap_or(&[]);
         }
 
+        // `U+FE0F` requests a color glyph and `U+FE0E` a monochrome one.
+        // See <https://www.unicode.org/reports/tr51/#Presentation_Style>.
+        let mut variation_sequences: SmallVec<[VariationSequence; 2]> = SmallVec::new();
+        if cluster.has_presentation_selector() {
+            let chars = cluster.chars();
+            variation_sequences.extend(
+                chars
+                    .windows(2)
+                    .filter(|pair| matches!(pair[1].ch, '\u{FE0E}' | '\u{FE0F}'))
+                    .map(|pair| VariationSequence {
+                        base: pair[0].ch,
+                        selector: pair[1].ch,
+                        base_is_unique: chars.iter().filter(|c| c.ch == pair[0].ch).count() == 1,
+                    }),
+            );
+        }
+
         let mut selected_font = None;
         let mut best_coverage = Coverage::NONE;
+        let mut mismatched_font = None;
+        let mut mismatched_coverage = Coverage::NONE;
 
         self.query.matches_with(|font| {
             let Some(charmap) = font.charmap() else {
                 return fontique::QueryStatus::Continue;
             };
 
+            let mut matches_presentation = true;
+            let mut variant_bases: SmallVec<[char; 2]> = SmallVec::new();
+            for sequence in &variation_sequences {
+                match charmap.map_variant(sequence.base, sequence.selector) {
+                    Some(fontique::MapVariant::Variant(glyph)) if glyph.to_u32() != 0 => {
+                        if sequence.base_is_unique {
+                            variant_bases.push(sequence.base);
+                        }
+                    }
+                    // The nominal glyph is declared correct for this sequence.
+                    Some(fontique::MapVariant::UseDefault) => {}
+                    _ => {
+                        matches_presentation &=
+                            font.has_color_tables == (sequence.selector == '\u{FE0F}');
+                    }
+                }
+            }
+
             let coverage = cluster.calculate_coverage(
                 |ch| {
-                    charmap
-                        .map(ch)
-                        .map(|g| {
-                            // Any non-zero value indicates the existence of a glyph.
-                            g != 0
-                        })
-                        .unwrap_or_default()
+                    variant_bases.contains(&ch)
+                        || charmap
+                            .map(ch)
+                            .map(|g| {
+                                // Any non-zero value indicates the existence of a glyph.
+                                g != 0
+                            })
+                            .unwrap_or_default()
                 },
                 self.analysis_data_sources,
             );
-            if coverage > best_coverage {
-                selected_font = Some(SelectedFont { font: font.clone() });
-                best_coverage = coverage;
-
-                if coverage.is_complete() {
-                    fontique::QueryStatus::Stop
-                } else {
-                    fontique::QueryStatus::Continue
-                }
-            } else {
-                if selected_font.is_none() {
+            if matches_presentation {
+                if coverage > best_coverage {
+                    selected_font = Some(SelectedFont { font: font.clone() });
+                    best_coverage = coverage;
+                    if coverage.is_complete() {
+                        return fontique::QueryStatus::Stop;
+                    }
+                } else if selected_font.is_none() {
                     selected_font = Some(SelectedFont { font: font.clone() });
                 }
-                fontique::QueryStatus::Continue
+            } else if coverage > mismatched_coverage {
+                mismatched_font = Some(SelectedFont { font: font.clone() });
+                mismatched_coverage = coverage;
+            } else if mismatched_font.is_none() {
+                mismatched_font = Some(SelectedFont { font: font.clone() });
             }
+            fontique::QueryStatus::Continue
         });
+
+        // Presentation only outranks coverage while there is any coverage to compare.
+        let selected_font = if best_coverage > Coverage::NONE {
+            selected_font
+        } else if mismatched_coverage > Coverage::NONE {
+            mismatched_font
+        } else {
+            selected_font.or(mismatched_font)
+        };
 
         selected_font
             .map(|selected_font| selected_font.font)
@@ -449,6 +498,15 @@ fn any_font(query: &mut Query<'_>) -> Option<QueryFont> {
     );
 
     found
+}
+
+/// A base character followed by an emoji variation selector.
+struct VariationSequence {
+    base: char,
+    selector: char,
+    /// Coverage is matched by character value, so a variant mapping only proves
+    /// coverage of an unrepeated base.
+    base_is_unique: bool,
 }
 
 struct SelectedFont {

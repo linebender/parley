@@ -22,6 +22,7 @@ pub struct CharCluster {
     comp: Form,
     decomp: Form,
     emoji_presentation_style: EmojiPresentationStyle,
+    has_presentation_selector: bool,
 }
 
 impl CharCluster {
@@ -41,6 +42,11 @@ impl CharCluster {
     #[inline(always)]
     pub fn is_emoji(&self) -> bool {
         self.emoji_presentation_style.is_emoji()
+    }
+
+    #[inline(always)]
+    pub fn has_presentation_selector(&self) -> bool {
+        self.has_presentation_selector
     }
 }
 
@@ -236,6 +242,7 @@ impl CharCluster {
         self.comp.clear();
         self.decomp.clear();
         self.emoji_presentation_style = EmojiPresentationStyle::Default;
+        self.has_presentation_selector = false;
     }
 
     #[inline(always)]
@@ -432,6 +439,7 @@ impl CharCluster {
                 );
 
                 is_emoji_presentation_selector = category.is_presentation_selector();
+                self.has_presentation_selector |= is_emoji_presentation_selector;
 
                 emoji_dfa.step_record(category);
             }
