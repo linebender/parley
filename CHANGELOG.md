@@ -28,6 +28,10 @@ This release has an [MSRV] of 1.88.
 
 - `Collection::family_ids` to iterate over unique font family identifiers. ([#725][] by [@tomcur][])
 
+#### Parley
+
+- `PlainEditor::{edit_style_overlay, get_style_overlay}` to apply ranged style overrides on top of the default styles, e.g. for syntax highlighting, spellcheck squiggles, or find-match emphasis. ([#730][] by [@AdrianEddy][])
+
 ### Changed
 
 #### Parley
@@ -549,6 +553,7 @@ This release has an [MSRV][] of 1.70.
 
 [MSRV]: README.md#minimum-supported-rust-version-msrv
 
+[@AdrianEddy]: https://github.com/AdrianEddy
 [@areopagitics]: https://github.com/areopagitics
 [@conor-93]: https://github.com/conor-93
 [@devunt]: https://github.com/devunt
@@ -734,6 +739,7 @@ This release has an [MSRV][] of 1.70.
 [#717]: https://github.com/linebender/parley/pull/717
 [#725]: https://github.com/linebender/parley/pull/725
 [#728]: https://github.com/linebender/parley/pull/728
+[#730]: https://github.com/linebender/parley/pull/730
 [#731]: https://github.com/linebender/parley/pull/731
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.11.0...HEAD
