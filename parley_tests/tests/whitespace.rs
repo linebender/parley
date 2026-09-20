@@ -142,7 +142,10 @@ fn break_spaces_preserves_source_across_spans() {
         let (mut layout, text) = builder.build();
         assert_eq!(text, source);
         layout.break_all_lines(None);
-        assert_eq!(layout.len(), 3);
+        // A style boundary between the `\r` and the `\n` splits the CRLF into two atoms, each of
+        // which forces its own break.
+        let crlf_split = source[..split].ends_with('\r');
+        assert_eq!(layout.len(), if crlf_split { 4 } else { 3 });
         for line in layout.lines() {
             nearly_eq(line.metrics().hanging_advance, 0.);
         }
