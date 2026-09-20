@@ -17,26 +17,23 @@ pub(crate) fn analyze_text<B: Brush>(
 ) {
     let text = if text.is_empty() { " " } else { text };
 
-    // Collect the style runs' word breaks. Gaps are `WordBreak::Normal`, so only non-`Normal`s need
-    // an entry.
+    // Collect the style runs' word breaks, and the runs which allow wrapping after each preserved
+    // space or tab. Word break gaps are `WordBreak::Normal`, so only non-`Normal`s need an entry.
+    // Adjacent `break-spaces` runs are merged, so that an opportunity is not created before the
+    // first space of a sequence spanning a style boundary.
     lcx.word_break.clear();
-    lcx.word_break
-        .extend(lcx.style_runs.iter().filter_map(|sr| {
-            let word_break = lcx.style_table[sr.style_index as usize].word_break;
-            (word_break != WordBreak::Normal).then(|| (sr.range.clone(), word_break))
-        }));
-
-    // Collect the style runs which allow wrapping after each preserved space or tab. Adjacent
-    // runs are merged, so that an opportunity is not created before the first space of a sequence
-    // spanning a style boundary.
     lcx.break_spaces.clear();
-    for style_run in lcx.style_runs.iter().filter(|sr| {
-        lcx.style_table[sr.style_index as usize].white_space_collapse
-            == WhiteSpaceCollapse::BreakSpaces
-    }) {
-        match lcx.break_spaces.last_mut() {
-            Some(last) if last.end == style_run.range.start => last.end = style_run.range.end,
-            _ => lcx.break_spaces.push(style_run.range.clone()),
+    for style_run in lcx.style_runs.iter() {
+        let style = &lcx.style_table[style_run.style_index as usize];
+        if style.word_break != WordBreak::Normal {
+            lcx.word_break
+                .push((style_run.range.clone(), style.word_break));
+        }
+        if style.white_space_collapse == WhiteSpaceCollapse::BreakSpaces {
+            match lcx.break_spaces.last_mut() {
+                Some(last) if last.end == style_run.range.start => last.end = style_run.range.end,
+                _ => lcx.break_spaces.push(style_run.range.clone()),
+            }
         }
     }
 
