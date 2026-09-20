@@ -1,7 +1,9 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::{FontContext, LayoutContext, RangedBuilder, StyleProperty, WordBreak};
+use crate::{
+    FontContext, LayoutContext, RangedBuilder, StyleProperty, WhiteSpaceCollapse, WordBreak,
+};
 use alloc::{vec, vec::Vec};
 use fontique::FontWeight;
 use icu_properties::props::Script;
@@ -1188,4 +1190,100 @@ fn test_color_emoji_with_presentation() {
     verify_analysis("\u{270c}\u{fe0f}", |_| {})
         .expect_is_emoji_or_pictograph_list(vec![true, false])
         .expect_force_normalize_list(vec![false, false]);
+}
+
+#[test]
+fn test_break_spaces_suppresses_opportunity_before_first_space() {
+    verify_analysis("A  B", |builder| {
+        builder.push(
+            StyleProperty::WhiteSpaceCollapse(WhiteSpaceCollapse::BreakSpaces),
+            0..4,
+        );
+    })
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::Line,
+    ]);
+}
+
+#[test]
+fn test_break_spaces_preserve_has_no_extra_opportunities() {
+    verify_analysis("A  B", |builder| {
+        builder.push(
+            StyleProperty::WhiteSpaceCollapse(WhiteSpaceCollapse::Preserve),
+            0..4,
+        );
+    })
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::None,
+        Boundary::Line,
+    ]);
+}
+
+#[test]
+fn test_break_spaces_tab_and_ideographic_space() {
+    verify_analysis("A \t\u{3000}B", |builder| {
+        builder.push(
+            StyleProperty::WhiteSpaceCollapse(WhiteSpaceCollapse::BreakSpaces),
+            0..6,
+        );
+    })
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::Line,
+        Boundary::Line,
+    ]);
+}
+
+#[test]
+fn test_break_spaces_mandatory_break_takes_precedence() {
+    verify_analysis("A \n B", |builder| {
+        builder.push(
+            StyleProperty::WhiteSpaceCollapse(WhiteSpaceCollapse::BreakSpaces),
+            0..5,
+        );
+    })
+    .expect_boundary_list(vec![
+        Boundary::Word,
+        Boundary::Word,
+        Boundary::Line,
+        Boundary::Mandatory,
+        Boundary::Line,
+    ]);
+}
+
+#[test]
+fn test_break_spaces_across_style_boundary() {
+    // The opportunity after a preserved space applies even when the following character is in
+    // another style run, and no opportunity is created before the first space of a sequence
+    // spanning a style boundary.
+    verify_analysis("A B", |builder| {
+        builder.push(
+            StyleProperty::WhiteSpaceCollapse(WhiteSpaceCollapse::BreakSpaces),
+            0..2,
+        );
+        builder.push(
+            StyleProperty::WhiteSpaceCollapse(WhiteSpaceCollapse::Preserve),
+            2..3,
+        );
+    })
+    .expect_boundary_list(vec![Boundary::Word, Boundary::Word, Boundary::Line]);
+
+    verify_analysis("A B", |builder| {
+        builder.push(
+            StyleProperty::WhiteSpaceCollapse(WhiteSpaceCollapse::Preserve),
+            0..1,
+        );
+        builder.push(
+            StyleProperty::WhiteSpaceCollapse(WhiteSpaceCollapse::BreakSpaces),
+            1..3,
+        );
+    })
+    .expect_boundary_list(vec![Boundary::Word, Boundary::Word, Boundary::Line]);
 }
