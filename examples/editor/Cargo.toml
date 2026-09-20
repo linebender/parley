@@ -18,8 +18,8 @@ parley = { workspace = true, default-features = true, features = ["bytemuck"] }
 bytemuck = { workspace = true }
 peniko = { workspace = true, default-features = false, features = ["std"] }
 skrifa = { workspace = true }
-accesskit = "0.24.0"
-accesskit_winit = "0.32.2"
+accesskit = "0.25.0"
+accesskit_winit = "0.34.0"
 
 [lints]
 workspace = true
