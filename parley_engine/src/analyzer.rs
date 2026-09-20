@@ -52,6 +52,13 @@ pub struct AnalysisOptions<'a> {
     /// the text. Empty ranges are ignored. Gaps use [`WordBreak::Normal`].
     pub word_break: &'a [(Range<usize>, WordBreak)],
 
+    /// Ranges of the source text in which spaces and tabs are preserved and a soft wrap
+    /// opportunity follows each of them, i.e. CSS `white-space-collapse: break-spaces`.
+    ///
+    /// Ranges must be sorted and non-overlapping, and must start and end on character boundaries
+    /// of the text. Empty ranges are ignored.
+    pub break_spaces: &'a [Range<usize>],
+
     /// The callback which will be called as a first provider of line breaking decisions.
     ///
     /// See [`LineBreakOverrideFn`] for more details.
@@ -63,6 +70,7 @@ impl core::fmt::Debug for AnalysisOptions<'_> {
         f.debug_struct("AnalysisOptions")
             .field("base_direction", &self.base_direction)
             .field("word_break", &self.word_break)
+            .field("break_spaces", &self.break_spaces)
             .finish_non_exhaustive()
     }
 }
