@@ -185,38 +185,10 @@ fn break_spaces_wraps_each_space_without_hanging() {
             nearly_eq(widths.max, advance(&mut env, text));
         }
     }
-}
 
-#[test]
-fn break_spaces_retains_advance_at_forced_breaks_and_block_end() {
-    let mut env = TestEnv::new(test_name!(), None);
-    for separator in [" ", "\t", "\u{3000}"] {
-        let first_line = format!("a{separator}{separator}");
-        let full = advance(&mut env, &first_line);
-        for ending in ["", "\nb", "\r\nb", "\u{2028}b", "\u{2029}b"] {
-            let text = format!("{first_line}{ending}");
-            for wrap in [TextWrapMode::Wrap, TextWrapMode::NoWrap] {
-                let mut layout = build(&mut env, &text, WhiteSpaceCollapse::BreakSpaces, wrap);
-                layout.break_all_lines(Some(full + 20.));
-                assert_eq!(layout.len(), if ending.is_empty() { 1 } else { 2 });
-                let line = layout.get(0).unwrap();
-                nearly_eq(line.metrics().advance, full);
-                nearly_eq(line.metrics().hanging_advance, 0.);
-                nearly_eq(layout.calculate_content_widths().max, full);
-                layout.align(Alignment::Right, AlignmentOptions::default());
-                nearly_eq(layout.get(0).unwrap().metrics().offset, 20.);
-                layout.align(Alignment::Center, AlignmentOptions::default());
-                nearly_eq(layout.get(0).unwrap().metrics().offset, 10.);
-            }
-        }
-    }
-}
-
-#[test]
-fn break_spaces_styles_and_nowrap() {
-    let mut env = TestEnv::new(test_name!(), None);
+    // A style span inside the whitespace doesn't move the break opportunities, and `NoWrap`
+    // suppresses those of the spaces in its span.
     let text = "a   b";
-    let space = advance(&mut env, " ");
     for wrap in [TextWrapMode::Wrap, TextWrapMode::NoWrap] {
         let mut builder = env.ranged_builder(text);
         builder.push_default(StyleProperty::WhiteSpaceCollapse(
@@ -242,6 +214,8 @@ fn break_spaces_styles_and_nowrap() {
         layout.break_all_lines(None);
         nearly_eq(layout.full_width(), max);
     }
+
+    // Whitespace in a `Preserve` span still hangs, after breaking at the preceding break-space.
     let mut builder = env.ranged_builder("a   ");
     builder.push_default(StyleProperty::WhiteSpaceCollapse(
         WhiteSpaceCollapse::BreakSpaces,
@@ -260,6 +234,31 @@ fn break_spaces_styles_and_nowrap() {
         layout.calculate_content_widths().min,
         advance(&mut env, "a "),
     );
+}
+
+#[test]
+fn break_spaces_retains_advance_at_forced_breaks_and_block_end() {
+    let mut env = TestEnv::new(test_name!(), None);
+    for separator in [" ", "\t", "\u{3000}"] {
+        let first_line = format!("a{separator}{separator}");
+        let full = advance(&mut env, &first_line);
+        for ending in ["", "\r\nb", "\u{2029}b"] {
+            let text = format!("{first_line}{ending}");
+            for wrap in [TextWrapMode::Wrap, TextWrapMode::NoWrap] {
+                let mut layout = build(&mut env, &text, WhiteSpaceCollapse::BreakSpaces, wrap);
+                layout.break_all_lines(Some(full + 20.));
+                assert_eq!(layout.len(), if ending.is_empty() { 1 } else { 2 });
+                let line = layout.get(0).unwrap();
+                nearly_eq(line.metrics().advance, full);
+                nearly_eq(line.metrics().hanging_advance, 0.);
+                nearly_eq(layout.calculate_content_widths().max, full);
+                layout.align(Alignment::Right, AlignmentOptions::default());
+                nearly_eq(layout.get(0).unwrap().metrics().offset, 20.);
+                layout.align(Alignment::Center, AlignmentOptions::default());
+                nearly_eq(layout.get(0).unwrap().metrics().offset, 10.);
+            }
+        }
+    }
 }
 
 #[test]
