@@ -3,8 +3,6 @@
 
 use crate::BoundingBox;
 use crate::editing::Cursor;
-#[cfg(feature = "accesskit")]
-use crate::layout::LayoutAccessibility;
 use crate::layout::{Affinity, BreakReason, Cluster, Layout, LineItem};
 use crate::style::Brush;
 
@@ -101,17 +99,6 @@ impl Selection {
             anchor_base: AnchorBase::Line(anchor, focus),
             h_pos: None,
         }
-    }
-
-    #[cfg(feature = "accesskit")]
-    pub fn from_access_selection<B: Brush>(
-        selection: &accesskit::TextSelection,
-        layout: &Layout<B>,
-        layout_access: &LayoutAccessibility,
-    ) -> Option<Self> {
-        let anchor = Cursor::from_access_position(&selection.anchor, layout, layout_access)?;
-        let focus = Cursor::from_access_position(&selection.focus, layout, layout_access)?;
-        Some(Self::new(anchor, focus))
     }
 
     /// Returns `true` if the anchor and focus of the selection are the same.
@@ -641,17 +628,6 @@ impl Selection {
         } else {
             focus.into()
         }
-    }
-
-    #[cfg(feature = "accesskit")]
-    pub fn to_access_selection<B: Brush>(
-        &self,
-        layout: &Layout<B>,
-        layout_access: &LayoutAccessibility,
-    ) -> Option<accesskit::TextSelection> {
-        let anchor = self.anchor.to_access_position(layout, layout_access)?;
-        let focus = self.focus.to_access_position(layout, layout_access)?;
-        Some(accesskit::TextSelection { anchor, focus })
     }
 }
 

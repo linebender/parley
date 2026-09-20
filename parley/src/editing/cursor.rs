@@ -3,14 +3,7 @@
 
 use crate::BoundingBox;
 use crate::layout::{Affinity, BreakReason, Cluster, ClusterSide, Layout, Line};
-#[cfg(feature = "accesskit")]
-use crate::layout::{LayoutAccessibility, accessibility::run_start_path};
 use crate::style::Brush;
-
-#[cfg(feature = "accesskit")]
-use accesskit::TextPosition;
-#[cfg(feature = "accesskit")]
-use parley_engine::shape::Whitespace;
 
 /// Defines a position with a text layout.
 #[derive(Copy, Clone, PartialEq, Eq, Default, Debug)]
@@ -65,23 +58,6 @@ impl Cursor {
             (layout.data.text_len, Affinity::Downstream)
         };
         Self { index, affinity }
-    }
-
-    #[cfg(feature = "accesskit")]
-    pub fn from_access_position<B: Brush>(
-        pos: &TextPosition,
-        layout: &Layout<B>,
-        layout_access: &LayoutAccessibility,
-    ) -> Option<Self> {
-        let span_path = layout_access.span_paths_by_access_id.get(&pos.node)?;
-        let run = span_path.run(layout)?;
-        let index = run
-            .clusters()
-            .skip_while(|cluster| cluster.path().char_index < span_path.char_index)
-            .nth(pos.character_index)
-            .map(|cluster| cluster.text_range().start)
-            .unwrap_or(layout.data.text_len);
-        Some(Self::from_byte_index(layout, index, Affinity::Downstream))
     }
 
     pub(crate) fn from_cluster<B: Brush>(
@@ -392,72 +368,16 @@ impl Cursor {
         layout.line_for_offset(((geometry.y0 + geometry.y1) / 2.) as f32)
     }
 
-    pub(crate) fn upstream_cluster<B: Brush>(self, layout: &Layout<B>) -> Option<Cluster<'_, B>> {
+    /// Returns the cluster that logically precedes this cursor, if any.
+    pub fn upstream_cluster<B: Brush>(self, layout: &Layout<B>) -> Option<Cluster<'_, B>> {
         self.index
             .checked_sub(1)
             .and_then(|index| Cluster::from_byte_index(layout, index))
     }
 
-    pub(crate) fn downstream_cluster<B: Brush>(self, layout: &Layout<B>) -> Option<Cluster<'_, B>> {
+    /// Returns the cluster that logically follows this cursor, if any.
+    pub fn downstream_cluster<B: Brush>(self, layout: &Layout<B>) -> Option<Cluster<'_, B>> {
         Cluster::from_byte_index(layout, self.index)
-    }
-
-    #[cfg(feature = "accesskit")]
-    pub fn to_access_position<B: Brush>(
-        &self,
-        layout: &Layout<B>,
-        layout_access: &LayoutAccessibility,
-    ) -> Option<TextPosition> {
-        if layout.data.text_len == 0 {
-            // If the text is empty, just return the first node with a
-            // character index of 0.
-            let span_path = run_start_path(&layout.get(0)?.item(0)?.run()?);
-            let position = layout_access
-                .span_positions_by_cluster_path
-                .get(&span_path)?;
-            return Some(TextPosition {
-                node: layout_access.span_id(position.span_index)?,
-                character_index: 0,
-            });
-        }
-        // Prefer the downstream cluster except at the end of the text
-        // where we'll choose the upstream cluster and add 1 to the
-        // character index.
-        let (offset, path) = self
-            .downstream_cluster(layout)
-            .map(|cluster| (0, cluster.path()))
-            .or_else(|| {
-                self.upstream_cluster(layout)
-                    .map(|cluster| (1, cluster.path()))
-            })?;
-        // If we're at the end of the layout and the layout ends with a newline
-        // then make sure we use the "phantom" run at the end so that
-        // AccessKit has correct visual geometry for the cursor.
-        let (span_index, character_index) = if self.index == layout.data.text_len
-            && layout
-                .data
-                .shaped_text
-                .characters()
-                .last()
-                .map(|character| character.info.whitespace() == Whitespace::Newline)
-                .unwrap_or_default()
-        {
-            let run = layout.get(path.line_index() + 1)?.item(0)?.run()?;
-            let position = layout_access
-                .span_positions_by_cluster_path
-                .get(&run_start_path(&run))?;
-            (position.span_index, 0)
-        } else {
-            let position = layout_access
-                .span_positions_by_cluster_path
-                .get(&path)
-                .unwrap();
-            (position.span_index, position.character_index + offset)
-        };
-        Some(TextPosition {
-            node: layout_access.span_id(span_index)?,
-            character_index,
-        })
     }
 }
 

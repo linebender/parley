@@ -57,10 +57,7 @@ pub(crate) fn align<B: Brush>(
     alignment: Alignment,
     options: AlignmentOptions,
 ) {
-    #[cfg(feature = "accesskit")]
-    {
-        layout.alignment = Some(alignment);
-    }
+    layout.alignment = Some(alignment);
 
     let is_rtl = layout.base_level.is_rtl();
 
