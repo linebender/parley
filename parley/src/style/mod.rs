@@ -9,6 +9,11 @@ mod styleset;
 
 use alloc::borrow::Cow;
 
+#[cfg(feature = "libm")]
+#[allow(unused_imports)]
+use core_maths::CoreFloat;
+use parley_engine::FontMetrics;
+
 pub use brush::*;
 pub use font::{
     FontFamily, FontFamilyName, FontFeature, FontFeatures, FontStyle, FontVariation,
@@ -79,6 +84,24 @@ impl LineHeight {
             Self::Absolute(value) => Self::Absolute(value * scale),
             // The other variants are relative to the font size, so scaling here needn't do anything
             value => value,
+        }
+    }
+
+    /// The line height in layout units for text set in a font with `metrics` at `font_size`.
+    ///
+    /// With `quantize`, the font's ascent, descent and leading are each rounded to whole pixels
+    /// before being summed for [`MetricsRelative`](Self::MetricsRelative), as browsers do for
+    /// `line-height: normal`, so that such lines are a whole number of pixels tall.
+    pub(crate) fn resolve(self, font_size: f32, metrics: &FontMetrics, quantize: bool) -> f32 {
+        match self {
+            Self::Absolute(value) => value,
+            Self::FontSizeRelative(value) => value * font_size,
+            Self::MetricsRelative(value) if quantize => {
+                (metrics.ascent.round() + metrics.descent.round() + metrics.leading.round()) * value
+            }
+            Self::MetricsRelative(value) => {
+                (metrics.ascent + metrics.descent + metrics.leading) * value
+            }
         }
     }
 }

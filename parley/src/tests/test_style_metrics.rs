@@ -289,6 +289,8 @@ fn quantized_metrics_are_whole_pixels() {
     assert_eq!(root.ascent.fract(), 0.);
     assert_eq!(root.descent.fract(), 0.);
     assert_eq!(root.over.fract(), 0.);
+    assert_eq!(root.line_height.fract(), 0.);
+    assert_eq!(root.under.fract(), 0.);
 }
 
 #[test]

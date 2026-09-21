@@ -8,9 +8,7 @@ use crate::layout::whitespace::{atom_hanging_advance, whitespace_hangs};
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
-use crate::{
-    IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode, WhiteSpaceCollapse,
-};
+use crate::{IndentOptions, InlineBoxKind, OverflowWrap, TextWrapMode, WhiteSpaceCollapse};
 use core::ops::Range;
 
 use alloc::vec::Vec;
@@ -284,20 +282,11 @@ impl<B: Brush> LayoutData<B> {
         let style_index =
             self.shaped_text.characters()[shaped_run.characters_range.start as usize].style_index;
 
-        let line_height = {
-            // Compute line height
-            let style = &self.styles[style_index as usize];
-            match style.line_height {
-                LineHeight::Absolute(value) => value,
-                LineHeight::FontSizeRelative(value) => value * shaped_run.font_size,
-                LineHeight::MetricsRelative(value) => {
-                    (shaped_run.font_metrics.ascent
-                        + shaped_run.font_metrics.descent
-                        + shaped_run.font_metrics.leading)
-                        * value
-                }
-            }
-        };
+        let line_height = self.styles[style_index as usize].line_height.resolve(
+            shaped_run.font_size,
+            &shaped_run.font_metrics,
+            self.quantize,
+        );
 
         let font = &self.shaped_text.fonts()[shaped_run.font_index];
         let run = RunData {
