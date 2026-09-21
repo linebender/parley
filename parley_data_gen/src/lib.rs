@@ -53,8 +53,10 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
         let is_emoji = emoji_data.contains32(cp);
         let is_extended_pictographic = extended_pictographic_data.contains32(cp);
 
-        // This encodes in which instances ICU4X uses a dictionary to determine a word break. (And
-        // deviates slightly from Unicode.)
+        // This encodes in which instances ICU4X uses a dictionary to determine a word break instead
+        // of applying default UAX #29 rules; if ICU4X lacks a dictionary, it emits a sequence as a
+        // single word. Unicode recommends tailoring for those code points, but which exact set this
+        // tracks is an ICU4X implementation detail that we try to match.
         let needs_dictionary_word_break = line_break_data.get32(cp) == LineBreak::ComplexContext
             || matches!(script_data.get32(cp), Script::Han | Script::Hiragana);
 
