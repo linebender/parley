@@ -1193,7 +1193,7 @@ fn test_color_emoji_with_presentation() {
 }
 
 #[test]
-fn test_break_spaces_suppresses_opportunity_before_first_space() {
+fn test_break_spaces_adds_opportunity_between_spaces() {
     verify_analysis("A  B", |builder| {
         builder.push(
             StyleProperty::WhiteSpaceCollapse(WhiteSpaceCollapse::BreakSpaces),
@@ -1209,7 +1209,7 @@ fn test_break_spaces_suppresses_opportunity_before_first_space() {
 }
 
 #[test]
-fn test_break_spaces_preserve_has_no_extra_opportunities() {
+fn test_break_spaces_not_applied_under_preserve() {
     verify_analysis("A  B", |builder| {
         builder.push(
             StyleProperty::WhiteSpaceCollapse(WhiteSpaceCollapse::Preserve),
@@ -1261,8 +1261,7 @@ fn test_break_spaces_mandatory_break_takes_precedence() {
 #[test]
 fn test_break_spaces_across_style_boundary() {
     // The opportunity after a preserved space applies even when the following character is in
-    // another style run, and no opportunity is created before the first space of a sequence
-    // spanning a style boundary.
+    // another style run.
     verify_analysis("A B", |builder| {
         builder.push(
             StyleProperty::WhiteSpaceCollapse(WhiteSpaceCollapse::BreakSpaces),
