@@ -408,6 +408,11 @@ impl<B: Brush> LayoutData<B> {
         }
         max_width = max_width.max(running_max_width);
 
+        // Negative-width inline boxes (e.g. negative margins) can make the max-content width
+        // smaller than the min-content width. CSS Sizing 3 requires the max-content size to be
+        // floored by the min-content size.
+        max_width = max_width.max(min_width);
+
         ContentWidths {
             min: min_width,
             max: max_width,
