@@ -604,6 +604,10 @@ pub(crate) fn analyze_text(
     let mut lb_iter = line_boundary_positions.iter().peekable();
     let mut prev_char = None;
     let mut prev_prev_char = None;
+    // Whether the preceding character is a break-space, i.e. a space, tab or ideographic space in
+    // a `break_spaces` range.
+    let mut prev_is_break_space = false;
+    let mut break_spaces_iter = options.break_spaces.iter().peekable();
     let boundary_iter = text.char_indices().map(|(byte_pos, ch)| {
         // advance any stale word boundary positions
         while let Some(&w) = wb_iter.peek() {
@@ -666,6 +670,23 @@ pub(crate) fn analyze_text(
             is_line = !properties.is_mandatory_linebreak();
             _ = lb_iter.next();
         }
+
+        // CSS Text 4 § 4.3.1 `break-spaces`: a soft wrap opportunity exists after each preserved
+        // space or tab (but never directly before a mandatory break, UAX #14 LB6).
+        while break_spaces_iter
+            .peek()
+            .is_some_and(|range| range.end <= byte_pos)
+        {
+            _ = break_spaces_iter.next();
+        }
+        let is_break_space = break_spaces_iter
+            .peek()
+            .is_some_and(|range| range.contains(&byte_pos))
+            && matches!(ch, ' ' | '\t' | '\u{3000}');
+        if prev_is_break_space && !properties.is_mandatory_linebreak() {
+            is_line = true;
+        }
+        prev_is_break_space = is_break_space;
 
         // This leaves word boundaries intact. Consumers can only impact line boundaries.
         if let (Some(prev), Some(lb_override)) = (prev_char, options.line_break_override) {

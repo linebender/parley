@@ -52,6 +52,25 @@ pub struct AnalysisOptions<'a> {
     /// the text. Empty ranges are ignored. Gaps use [`WordBreak::Normal`].
     pub word_break: &'a [(Range<usize>, WordBreak)],
 
+    /// Ranges of the source text in which a soft wrap opportunity follows every space, tab, and
+    /// ideographic space.
+    ///
+    /// This implements the additional soft wrap opportunities of
+    /// [CSS's white-space-collapse: break-spaces][css-break-spaces].
+    ///
+    /// Outside these ranges, [UAX #14 § 6][uax-14-algorithm] is followed, which defines where soft
+    /// wrap opportunities exist. For example, rules LB7 and LB18 give a sequence of spaces an
+    /// opportunity only at its end. The ranges specified here add an opportunity after every space,
+    /// tab, and ideographic space, except directly before a mandatory break. This overrides the
+    /// "non-tailorable" UAX #14 Rule LB7, and so deviates from Unicode's line breaking algorithm.
+    ///
+    /// Ranges must be sorted and non-overlapping, and must start and end on character boundaries
+    /// of the text. Empty ranges are ignored. Gaps apply the default rules.
+    ///
+    /// [css-break-spaces]: https://www.w3.org/TR/css-text-4/#valdef-white-space-collapse-break-spaces
+    /// [uax-14-algorithm]: https://unicode.org/reports/tr14/#Algorithm
+    pub break_spaces: &'a [Range<usize>],
+
     /// The callback which will be called as a first provider of line breaking decisions.
     ///
     /// See [`LineBreakOverrideFn`] for more details.
@@ -63,6 +82,7 @@ impl core::fmt::Debug for AnalysisOptions<'_> {
         f.debug_struct("AnalysisOptions")
             .field("base_direction", &self.base_direction)
             .field("word_break", &self.word_break)
+            .field("break_spaces", &self.break_spaces)
             .finish_non_exhaustive()
     }
 }

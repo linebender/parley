@@ -16,7 +16,7 @@ impl WhiteSpaceCollapse {
     pub(crate) fn is_collapsible(self, c: char) -> bool {
         match self {
             Self::Collapse => c.is_ascii_whitespace(),
-            Self::Preserve => false,
+            Self::Preserve | Self::BreakSpaces => false,
             Self::PreserveBreaks => matches!(c, ' ' | '\t'),
         }
     }
@@ -39,8 +39,11 @@ pub(crate) fn whitespace_hangs<B: Brush>(whitespace: Whitespace, style: &Style<B
     match whitespace {
         Whitespace::Newline => true,
         Whitespace::Space | Whitespace::IdeographicSpace | Whitespace::Tab => {
-            style.white_space_collapse != WhiteSpaceCollapse::Preserve
-                || style.text_wrap_mode == TextWrapMode::Wrap
+            match style.white_space_collapse {
+                WhiteSpaceCollapse::BreakSpaces => false,
+                WhiteSpaceCollapse::Preserve => style.text_wrap_mode == TextWrapMode::Wrap,
+                _ => true,
+            }
         }
         _ => false,
     }
