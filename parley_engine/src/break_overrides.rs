@@ -73,9 +73,6 @@ fn chromium_override(cx: LineBreakContext) -> Option<bool> {
     //
     // See `LazyLineBreakIterator::NextBreakablePosition`
     // <https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/platform/text/text_break_iterator.cc;l=282-303>
-    //
-    // Note that we'd need different handling in the `after == ' '` case if we ever get the equivalent of
-    // CSS's whitespace-collapse: break-spaces.
     if before == ' ' && after != ' '
         // Mandatory break characters. A soft wrap opportunity is never valid
         // immediately before one (see UAX-14 rule LB6).
