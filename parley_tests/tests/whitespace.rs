@@ -7,7 +7,7 @@ use crate::{
 };
 use parley::{
     Alignment, AlignmentOptions, BaseDirection, BreakReason, InlineBox, InlineBoxKind, Layout,
-    OverflowWrap, StyleProperty, TextWrapMode, WhiteSpaceCollapse, WordBreak,
+    OverflowWrap, StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse, WordBreak,
 };
 
 fn nearly_eq(actual: f32, expected: f32) {
@@ -362,6 +362,7 @@ fn break_spaces_inline_boxes_and_rtl() {
                 width,
                 height: 10.,
                 baseline: None,
+                vertical_align: VerticalAlign::BASELINE,
                 kind,
             });
             let mut layout = builder.build(text);
