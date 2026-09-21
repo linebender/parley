@@ -1252,7 +1252,7 @@ fn test_break_spaces_mandatory_break_takes_precedence() {
     .expect_boundary_list(vec![
         Boundary::Word,
         Boundary::Word,
-        Boundary::Line,
+        Boundary::Word,
         Boundary::Mandatory,
         Boundary::Line,
     ]);

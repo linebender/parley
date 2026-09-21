@@ -661,8 +661,7 @@ pub(crate) fn analyze_text(
         }
 
         // CSS Text 4 § 4.3.1 `break-spaces`: a soft wrap opportunity exists after each preserved
-        // space or tab, but not before the first one of a sequence. Breaking before the first
-        // space is specific to `line-break: anywhere` (CSS Text 4 § 6.2).
+        // space or tab (but never directly before a mandatory break, UAX #14 LB6).
         while break_spaces_iter
             .peek()
             .is_some_and(|range| range.end <= byte_pos)
@@ -673,10 +672,8 @@ pub(crate) fn analyze_text(
             .peek()
             .is_some_and(|range| range.contains(&byte_pos))
             && matches!(ch, ' ' | '\t' | '\u{3000}');
-        if prev_is_break_space {
+        if prev_is_break_space && !properties.is_mandatory_linebreak() {
             is_line = true;
-        } else if is_break_space {
-            is_line = false;
         }
         prev_is_break_space = is_break_space;
 
