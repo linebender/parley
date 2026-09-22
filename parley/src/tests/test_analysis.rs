@@ -195,11 +195,10 @@ fn test_line_break_override_suppresses_break_after_slash() {
 }
 
 #[test]
-fn test_line_break_override_doesnt_add_soft_wrap_opportunity_after_mandatory_break() {
+fn test_line_break_override_doesnt_add_soft_wrap_opportunity_around_mandatory_break() {
     let overridden =
         verify_analysis_with_override("a\nb", &|_| Some(true)).soft_wrap_opportunity_list();
 
-    // The positions right before or after a mandatory break aren't a soft wrap opportunity.
     assert_eq!(overridden, vec![false, false, false]);
 }
 
