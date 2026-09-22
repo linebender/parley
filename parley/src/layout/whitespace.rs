@@ -102,7 +102,7 @@ pub(crate) fn atom_hanging_advance<B: Brush>(
             .iter()
             .all(|character| {
                 whitespace_hangs(
-                    character.info.whitespace(),
+                    character.whitespace,
                     &styles[character.style_index as usize],
                 )
             });

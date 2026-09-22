@@ -9,7 +9,7 @@ use crate::layout::run::Run;
 use crate::style::Brush;
 
 use core::ops::Range;
-use parley_engine::shape::{Character, ClusterInfo};
+use parley_engine::shape::Character;
 use parley_engine::{Atom, Glyph, Grapheme, shape::Whitespace};
 
 /// Atomic unit of text.
@@ -148,7 +148,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
     }
 
     /// The first (logical) character of this cluster.
-    fn first_character(&self) -> &'a Character {
+    pub(crate) fn first_character(&self) -> &'a Character {
         &self
             .run
             .full_slice()
@@ -207,7 +207,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
 
     /// Returns `true` if the cluster is a word boundary.
     pub fn is_word_boundary(&self) -> bool {
-        self.info().is_word_boundary()
+        self.first_character().flags.is_word_boundary()
     }
 
     /// Returns `true` if the cluster is a soft line break.
@@ -221,17 +221,17 @@ impl<'a, B: Brush> Cluster<'a, B> {
 
     /// Returns `true` if the cluster is a hard line break.
     pub fn is_hard_line_break(&self) -> bool {
-        self.info().whitespace() == Whitespace::Newline
+        self.first_character().whitespace == Whitespace::Newline
     }
 
     /// Returns `true` if the cluster is a space or no-break space.
     pub fn is_space_or_nbsp(&self) -> bool {
-        self.info().whitespace().is_space_or_nbsp()
+        self.first_character().whitespace.is_space_or_nbsp()
     }
 
     /// Returns `true` if the cluster is an emoji sequence.
     pub fn is_emoji(&self) -> bool {
-        self.info().is_emoji()
+        self.first_character().flags.is_emoji()
     }
 
     /// Returns an iterator over the glyphs in the cluster.
@@ -468,10 +468,6 @@ impl<'a, B: Brush> Cluster<'a, B> {
             }
         }
         Some(offset)
-    }
-
-    pub(crate) fn info(&self) -> ClusterInfo {
-        self.first_character().info
     }
 }
 

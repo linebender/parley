@@ -460,3 +460,24 @@ fn wrap_url_override_no_break_after_slash() {
 
     env.check_layout_snapshot(&layout);
 }
+
+#[test]
+fn line_break_override_does_not_affect_forced_breaks() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let text = "a\nb";
+
+    for forced in [false, true] {
+        let line_break_override = move |_| Some(forced);
+        let mut builder = env.ranged_builder(text);
+        builder.set_line_break_override(Some(&line_break_override));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+
+        let lines: Vec<_> = layout
+            .lines()
+            .map(|line| &text[line.text_range()])
+            .collect();
+        assert_eq!(lines, ["a\n", "b"], "override returning Some({forced})");
+    }
+}

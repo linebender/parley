@@ -151,7 +151,7 @@ impl EffectiveSpacing {
     /// The gaps around `atom`.
     #[inline(always)]
     pub(crate) fn gaps(self, atom: &Atom<'_>) -> Gaps {
-        let whitespace = atom.characters()[0].info.whitespace();
+        let whitespace = atom.characters()[0].whitespace;
 
         if whitespace == Whitespace::Newline {
             return Gaps::ZERO;
