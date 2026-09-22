@@ -171,8 +171,6 @@ fn line_segmenter_impl(opt: LineBreakOptions<'_>) -> LineSegmenterBorrowed<'stat
 /// Per-character analysis info.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct CharInfo {
-    /// The line/word breaking boundary classification of this character.
-    pub boundary: Boundary,
     /// The Unicode script this character belongs to.
     pub script: Script,
     /// The impact this character has on directionality.
@@ -191,10 +189,11 @@ impl CharInfo {
     const FORCE_NORMALIZE_SHIFT: u16 = 5;
     const GRAPHEME_START_SHIFT: u16 = 6;
     const WORD_BOUNDARY_SHIFT: u8 = 7;
-    const EMOJI_SHIFT: u16 = 8;
-    const EMOJI_PRESENTATION_SHIFT: u16 = 9;
-    const EMOJI_MODIFIER_SHIFT: u16 = 10;
-    const EMOJI_MODIFIER_BASE_SHIFT: u16 = 11;
+    const SOFT_WRAP_OPPORTUNITY_SHIFT: u16 = 8;
+    const EMOJI_SHIFT: u16 = 9;
+    const EMOJI_PRESENTATION_SHIFT: u16 = 10;
+    const EMOJI_MODIFIER_SHIFT: u16 = 11;
+    const EMOJI_MODIFIER_BASE_SHIFT: u16 = 12;
 
     #[allow(
         dead_code,
@@ -212,13 +211,13 @@ impl CharInfo {
     const FORCE_NORMALIZE_MASK: u16 = 1 << Self::FORCE_NORMALIZE_SHIFT;
     const GRAPHEME_START_MASK: u16 = 1 << Self::GRAPHEME_START_SHIFT;
     const WORD_BOUNDARY_MASK: u16 = 1 << Self::WORD_BOUNDARY_SHIFT;
+    const SOFT_WRAP_OPPORTUNITY_MASK: u16 = 1 << Self::SOFT_WRAP_OPPORTUNITY_SHIFT;
     const EMOJI_MASK: u16 = 1 << Self::EMOJI_SHIFT;
     const EMOJI_PRESENTATION_MASK: u16 = 1 << Self::EMOJI_PRESENTATION_SHIFT;
     const EMOJI_MODIFIER_MASK: u16 = 1 << Self::EMOJI_MODIFIER_SHIFT;
     const EMOJI_MODIFIER_BASE_MASK: u16 = 1 << Self::EMOJI_MODIFIER_BASE_SHIFT;
 
     fn new(
-        boundary: Boundary,
         script: Script,
         bidi_class: icu_properties::props::BidiClass,
         bracket: BidiMirroringGlyph,
@@ -230,13 +229,13 @@ impl CharInfo {
         force_normalize: bool,
         is_grapheme_start: bool,
         is_word_boundary: bool,
+        is_soft_wrap_opportunity: bool,
         is_emoji: bool,
         is_emoji_presentation: bool,
         is_emoji_modifier: bool,
         is_emoji_modifier_base: bool,
     ) -> Self {
         Self {
-            boundary,
             script,
             bidi_class,
             bracket,
@@ -248,6 +247,7 @@ impl CharInfo {
                 | (force_normalize as u16) << Self::FORCE_NORMALIZE_SHIFT
                 | (is_grapheme_start as u16) << Self::GRAPHEME_START_SHIFT
                 | (is_word_boundary as u16) << Self::WORD_BOUNDARY_SHIFT
+                | (is_soft_wrap_opportunity as u16) << Self::SOFT_WRAP_OPPORTUNITY_SHIFT
                 | (is_emoji as u16) << Self::EMOJI_SHIFT
                 | (is_emoji_presentation as u16) << Self::EMOJI_PRESENTATION_SHIFT
                 | (is_emoji_modifier as u16) << Self::EMOJI_MODIFIER_SHIFT
@@ -347,18 +347,16 @@ impl CharInfo {
     pub fn is_word_boundary(self) -> bool {
         self.flags & Self::WORD_BOUNDARY_MASK != 0
     }
-}
 
-/// Boundary type of a character or cluster.
-#[derive(Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
-#[repr(u8)]
-pub enum Boundary {
-    /// Not a boundary.
-    None = 0,
-    /// Potential line break.
-    Line = 1,
-    /// Mandatory line break.
-    Mandatory = 2,
+    /// Whether there is a soft wrap opportunity before this character ([UAX #14][line-breaking]).
+    ///
+    /// Note mandatory breaks (like `\n`) are encoded as [`Whitespace`](crate::shape::Whitespace).
+    ///
+    /// [line-breaking]: https://www.unicode.org/reports/tr14/
+    #[inline(always)]
+    pub fn is_soft_wrap_opportunity(self) -> bool {
+        self.flags & Self::SOFT_WRAP_OPPORTUNITY_MASK != 0
+    }
 }
 
 pub(crate) fn analyze_text(
@@ -700,26 +698,19 @@ pub(crate) fn analyze_text(
         prev_prev_char = prev_char;
         prev_char = Some(ch);
 
-        let boundary = if is_line {
-            Boundary::Line
-        } else {
-            Boundary::None
-        };
-
-        (boundary, is_word, is_grapheme_start, ch, properties)
+        (is_line, is_word, is_grapheme_start, ch, properties)
     });
 
     let mut needs_bidi_resolution = false;
 
     analysis.info.reserve(text.len());
     boundary_iter
-        // Shift line break data forward one, as line boundaries corresponding with line-breaking
-        // characters (like '\n') exist at an index position one higher than the respective
-        // character's index, but we need our iterators to align, and the rest are simply
-        // character-indexed.
+        // Note the line segmenter reports a break position after a forced break (like '\n'). We
+        // don't consider that to be a soft wrap opportunity, so we ignore it if the preceding
+        // character was a forced break (i.e., if `after_mandatory_linebreak` is `true`).
         .fold(
             false,
-            |is_mandatory_linebreak, (boundary, is_word, is_grapheme_start, ch, properties)| {
+            |after_mandatory_linebreak, (is_line, is_word, is_grapheme_start, ch, properties)| {
                 let script = properties.script();
                 let grapheme_cluster_break = properties.grapheme_cluster_break();
                 let bidi_class = properties.bidi_class();
@@ -727,13 +718,8 @@ pub(crate) fn analyze_text(
                 let is_emoji_or_pictograph = properties.is_emoji_or_pictograph();
                 let is_variation_selector = properties.is_variation_selector();
                 let is_region_indicator = properties.is_region_indicator();
-                let next_mandatory_linebreak = properties.is_mandatory_linebreak();
-
-                let boundary = if is_mandatory_linebreak {
-                    Boundary::Mandatory
-                } else {
-                    boundary
-                };
+                let is_mandatory_linebreak = properties.is_mandatory_linebreak();
+                let is_soft_wrap_opportunity = is_line && !after_mandatory_linebreak;
 
                 let force_normalize = {
                     // "Extend" break chars should be normalized first, with two exceptions
@@ -753,7 +739,6 @@ pub(crate) fn analyze_text(
                 let bracket = data_sources.brackets().get(ch);
 
                 analysis.info.push(CharInfo::new(
-                    boundary,
                     script,
                     bidi_class,
                     bracket,
@@ -765,13 +750,14 @@ pub(crate) fn analyze_text(
                     force_normalize,
                     is_grapheme_start,
                     is_word,
+                    is_soft_wrap_opportunity,
                     properties.is_emoji(),
                     properties.is_emoji_presentation(),
                     properties.is_emoji_modifier(),
                     properties.is_emoji_modifier_base(),
                 ));
 
-                next_mandatory_linebreak
+                is_mandatory_linebreak
             },
         );
 

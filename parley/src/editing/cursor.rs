@@ -237,7 +237,7 @@ impl Cursor {
                     return Self::from_byte_index(layout, usize::MAX, Affinity::Downstream);
                 };
                 cluster = next;
-                if !cluster.info().is_whitespace() {
+                if !cluster.first_character().is_whitespace() {
                     break;
                 }
             }
@@ -261,7 +261,7 @@ impl Cursor {
             // on the start of the preceding "actual" word.
             while let Some(prev) = cluster.previous_logical_word() {
                 cluster = prev;
-                if !cluster.info().is_whitespace() {
+                if !cluster.first_character().is_whitespace() {
                     break;
                 }
             }

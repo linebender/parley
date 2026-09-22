@@ -5,7 +5,7 @@
 
 use core::ops::Range;
 
-use crate::{Boundary, shape::Whitespace};
+use crate::shape::Whitespace;
 
 /// Data for a single character of the source text.
 ///
@@ -14,9 +14,13 @@ use crate::{Boundary, shape::Whitespace};
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Character {
     pub text_byte_start: u32,
-    pub info: ClusterInfo,
     /// Style index for this character.
     pub style_index: u16,
+    /// The whitespace class of this character.
+    pub whitespace: Whitespace,
+    /// Properties of this character.
+    pub flags: CharacterFlags,
+    /// Whether this character begins a grapheme cluster.
     pub grapheme_start: bool,
 }
 
@@ -24,7 +28,13 @@ impl Character {
     /// The byte range of this character in the source text.
     #[inline(always)]
     pub fn text_byte_range(&self) -> Range<usize> {
-        self.text_byte_start as usize..self.text_byte_start as usize + self.info.len_utf8()
+        self.text_byte_start as usize..self.text_byte_start as usize + self.flags.len_utf8()
+    }
+
+    /// Returns if this character is any whitespace.
+    #[inline(always)]
+    pub fn is_whitespace(self) -> bool {
+        self.whitespace != Whitespace::None
     }
 }
 
@@ -178,25 +188,24 @@ impl ShapedCluster {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct ClusterInfo {
-    boundary: Boundary,
-    whitespace: Whitespace,
-    is_word_boundary: bool,
-    /// Properties derived from the source character; see the `*_FLAG` constants.
-    flags: u8,
-}
+/// Properties of a [`Character`].
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct CharacterFlags(u8);
 
-impl ClusterInfo {
+impl CharacterFlags {
     /// Bits 0..2: the UTF-8 length of the source character minus one.
     ///
     /// (Note the UTF-8 length of any character is between 1 and 4 inclusive.)
     const LEN_UTF8_MASK: u8 = 0b11;
     /// Whether the source character is an emoji.
-    const EMOJI_FLAG: u8 = 1 << 2;
+    const EMOJI: u8 = 1 << 2;
+    /// Whether there is a word boundary before the character.
+    const WORD_BOUNDARY: u8 = 1 << 3;
+    /// Whether there is a soft wrap opportunity before the character.
+    const SOFT_WRAP_OPPORTUNITY: u8 = 1 << 4;
 
     #[inline(always)]
-    pub fn new(boundary: Boundary, is_word_boundary: bool, source_char: char) -> Self {
+    pub fn new(source_char: char, is_word_boundary: bool, is_soft_wrap_opportunity: bool) -> Self {
         // TODO: Defer to ICU4X properties (see: https://docs.rs/icu/latest/icu/properties/props/struct.Emoji.html).
         let is_emoji = matches!(source_char as u32, 0x1F600..=0x1F64F | 0x1F300..=0x1F5FF | 0x1F680..=0x1F6FF | 0x2600..=0x26FF | 0x2700..=0x27BF);
         #[expect(
@@ -204,49 +213,42 @@ impl ClusterInfo {
             reason = "`len_utf8` is between 1 and 4 inclusive"
         )]
         let len_utf8 = source_char.len_utf8() as u8;
-        let flags = (len_utf8 - 1) | if is_emoji { Self::EMOJI_FLAG } else { 0 };
-        Self {
-            boundary,
-            whitespace: Whitespace::from_char(source_char),
-            is_word_boundary,
-            flags,
-        }
+        Self(
+            (len_utf8 - 1)
+                | if is_emoji { Self::EMOJI } else { 0 }
+                | if is_word_boundary {
+                    Self::WORD_BOUNDARY
+                } else {
+                    0
+                }
+                | if is_soft_wrap_opportunity {
+                    Self::SOFT_WRAP_OPPORTUNITY
+                } else {
+                    0
+                },
+        )
     }
 
-    // Returns the boundary type of the cluster.
+    /// Whether there is a soft wrap opportunity before this character ([UAX #14][line-breaking]).
+    ///
+    /// Note mandatory breaks (like `\n`) are encoded as [`Whitespace`].
+    ///
+    /// [line-breaking]: https://www.unicode.org/reports/tr14/
     #[inline(always)]
-    pub fn boundary(self) -> Boundary {
-        self.boundary
+    pub fn is_soft_wrap_opportunity(self) -> bool {
+        self.0 & Self::SOFT_WRAP_OPPORTUNITY != 0
     }
 
-    // Returns the whitespace type of the cluster.
+    /// Returns if there is a word boundary before the character.
     #[inline(always)]
-    pub fn whitespace(self) -> Whitespace {
-        self.whitespace
-    }
-
-    /// Returns if the cluster is a line break opportunity (soft or mandatory).
-    #[inline]
-    pub fn is_boundary(self) -> bool {
-        self.boundary != Boundary::None
-    }
-
-    /// Returns if the cluster is a word boundary.
-    #[inline]
     pub fn is_word_boundary(self) -> bool {
-        self.is_word_boundary
+        self.0 & Self::WORD_BOUNDARY != 0
     }
 
-    /// Returns if the cluster is an emoji.
-    #[inline]
-    pub fn is_emoji(self) -> bool {
-        self.flags & Self::EMOJI_FLAG != 0
-    }
-
-    /// Returns if the cluster is any whitespace.
+    /// Returns if the character is an emoji.
     #[inline(always)]
-    pub fn is_whitespace(self) -> bool {
-        self.whitespace() != Whitespace::None
+    pub fn is_emoji(self) -> bool {
+        self.0 & Self::EMOJI != 0
     }
 
     /// Returns the number of bytes the source character would need if encoded in UTF-8.
@@ -254,7 +256,7 @@ impl ClusterInfo {
     /// That number of bytes is always between 1 and 4, inclusive.
     #[inline(always)]
     pub fn len_utf8(self) -> usize {
-        (self.flags & Self::LEN_UTF8_MASK) as usize + 1
+        (self.0 & Self::LEN_UTF8_MASK) as usize + 1
     }
 }
 
@@ -263,7 +265,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cluster_info() {
+    fn character_flags() {
         for (ch, len, emoji) in [
             ('a', 1, false),
             (' ', 1, false),
@@ -275,12 +277,28 @@ mod tests {
             ('\u{2600}', 3, true),
             ('\u{1F600}', 4, true),
         ] {
-            let info = ClusterInfo::new(Boundary::Line, false, ch);
-            assert_eq!(info.boundary(), Boundary::Line, "{ch:?}");
-            assert!(!info.is_word_boundary(), "{ch:?}");
-            assert_eq!(info.whitespace(), Whitespace::from_char(ch), "{ch:?}");
-            assert_eq!(info.len_utf8(), len, "{ch:?}");
-            assert_eq!(info.is_emoji(), emoji, "{ch:?}");
+            for (is_word_boundary, is_soft_wrap_opportunity) in
+                [(false, false), (true, false), (false, true), (true, true)]
+            {
+                let flags = CharacterFlags::new(ch, is_word_boundary, is_soft_wrap_opportunity);
+                assert_eq!(flags.len_utf8(), len, "{ch:?}");
+                assert_eq!(flags.is_emoji(), emoji, "{ch:?}");
+                assert_eq!(flags.is_word_boundary(), is_word_boundary, "{ch:?}");
+                assert_eq!(
+                    flags.is_soft_wrap_opportunity(),
+                    is_soft_wrap_opportunity,
+                    "{ch:?}"
+                );
+            }
+
+            let character = Character {
+                text_byte_start: 3,
+                style_index: 7,
+                whitespace: Whitespace::from_char(ch),
+                flags: CharacterFlags::new(ch, false, false),
+                grapheme_start: true,
+            };
+            assert_eq!(character.text_byte_range(), 3..3 + len, "{ch:?}");
         }
     }
 }

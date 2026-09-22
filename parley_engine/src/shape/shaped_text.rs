@@ -14,7 +14,7 @@ use crate::{
 };
 
 use super::{
-    Character, ClusterInfo, ShapedCluster, ShapedClusterFlags, Whitespace, atom::ShapedSlice,
+    Character, CharacterFlags, ShapedCluster, ShapedClusterFlags, Whitespace, atom::ShapedSlice,
     shaper::ShapeOptions,
 };
 
@@ -277,8 +277,13 @@ impl ShapedText {
         {
             self.characters.push(Character {
                 text_byte_start: (range.byte_range.start + byte_offset) as u32,
-                info: ClusterInfo::new(info.boundary, info.is_word_boundary(), ch),
                 style_index: *style_index,
+                whitespace: Whitespace::from_char(ch),
+                flags: CharacterFlags::new(
+                    ch,
+                    info.is_word_boundary(),
+                    info.is_soft_wrap_opportunity(),
+                ),
                 grapheme_start: info.is_grapheme_start(),
             });
         }
@@ -412,7 +417,7 @@ fn process_shaped_clusters<'a>(
         shaped_clusters: &mut Vec<ShapedCluster>,
     ) {
         let first_character = &characters[cluster.characters_start];
-        let is_newline = first_character.info.whitespace() == Whitespace::Newline;
+        let is_newline = first_character.whitespace == Whitespace::Newline;
         let (glyph_offset, glyph_len, inline_glyph, advance) = if is_newline {
             // Elide glyphs of newlines.
             (cluster.glyphs_start as u32, 0, false, 0.)

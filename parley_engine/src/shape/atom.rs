@@ -3,7 +3,7 @@
 
 use core::ops::Range;
 
-use crate::{Boundary, Glyph, shape::Whitespace};
+use crate::{Glyph, shape::Whitespace};
 
 use super::data::{Character, ShapedCluster};
 
@@ -537,10 +537,12 @@ impl<'a> Atom<'a> {
         self.slice().graphemes_end()
     }
 
-    /// Whether the atom can be broken
+    /// Whether there is a soft wrap opportunity logically before this atom.
     #[inline(always)]
-    pub fn boundary_before(&self) -> Boundary {
-        self.slice.characters[self.chars.0 as usize].info.boundary()
+    pub fn is_soft_wrap_opportunity_before(&self) -> bool {
+        self.slice.characters[self.chars.0 as usize]
+            .flags
+            .is_soft_wrap_opportunity()
     }
 
     /// Whether the atom can be broken
@@ -640,8 +642,8 @@ impl<'a> Graphemes<'a> {
             chars: (idx, grapheme_end),
             advance,
             flags: GraphemeFlags::new(
-                first_char.info.boundary(),
-                first_char.info.whitespace(),
+                first_char.flags.is_soft_wrap_opportunity(),
+                first_char.whitespace,
                 is_atom_start,
                 is_atom_end,
             ),
@@ -703,8 +705,8 @@ impl<'a> Iterator for Graphemes<'a> {
             chars: (grapheme_start, idx),
             advance,
             flags: GraphemeFlags::new(
-                first_char.info.boundary(),
-                first_char.info.whitespace(),
+                first_char.flags.is_soft_wrap_opportunity(),
+                first_char.whitespace,
                 is_atom_start,
                 is_atom_end,
             ),
@@ -724,35 +726,38 @@ impl<'a> Iterator for Graphemes<'a> {
 struct GraphemeFlags(u16);
 
 impl GraphemeFlags {
-    const BOUNDARY_MASK: u16 = 0b11;
-    const WHITESPACE_SHIFT: u16 = 2;
+    const SOFT_WRAP_OPPORTUNITY: u16 = 1 << 0;
+    const WHITESPACE_SHIFT: u16 = 1;
     const WHITESPACE_MASK: u16 = 0b111 << Self::WHITESPACE_SHIFT;
-    const ATOM_START: u16 = 1 << 5;
-    const ATOM_END: u16 = 1 << 6;
+    const ATOM_START: u16 = 1 << 4;
+    const ATOM_END: u16 = 1 << 5;
 
     // TODO: do we want to expose safe to break?
-    // const SAFE_TO_BREAK_BEFORE: u16 = 1 << 7;
+    // const SAFE_TO_BREAK_BEFORE: u16 = 1 << 6;
 }
 
 impl GraphemeFlags {
     #[inline(always)]
-    fn new(boundary: Boundary, whitespace: Whitespace, atom_start: bool, atom_end: bool) -> Self {
+    fn new(
+        is_soft_wrap_opportunity: bool,
+        whitespace: Whitespace,
+        atom_start: bool,
+        atom_end: bool,
+    ) -> Self {
         Self(
-            boundary as u16
-                + ((whitespace as u16) << Self::WHITESPACE_SHIFT)
-                + if atom_start { Self::ATOM_START } else { 0 }
-                + if atom_end { Self::ATOM_END } else { 0 },
+            if is_soft_wrap_opportunity {
+                Self::SOFT_WRAP_OPPORTUNITY
+            } else {
+                0
+            } | ((whitespace as u16) << Self::WHITESPACE_SHIFT)
+                | if atom_start { Self::ATOM_START } else { 0 }
+                | if atom_end { Self::ATOM_END } else { 0 },
         )
     }
 
     #[inline(always)]
-    fn boundary_before(self) -> Boundary {
-        match self.0 & Self::BOUNDARY_MASK {
-            0 => Boundary::None,
-            1 => Boundary::Line,
-            2 => Boundary::Mandatory,
-            _ => unreachable!("0..3 are the only valid values"),
-        }
+    fn is_soft_wrap_opportunity_before(self) -> bool {
+        self.0 & Self::SOFT_WRAP_OPPORTUNITY != 0
     }
 
     #[inline(always)]
@@ -824,10 +829,10 @@ impl Grapheme {
         self.advance
     }
 
-    /// The boundary at the logical start of this grapheme.
+    /// Whether there is a soft wrap opportunity logically before this grapheme.
     #[inline(always)]
-    pub fn boundary_before(&self) -> Boundary {
-        self.flags.boundary_before()
+    pub fn is_soft_wrap_opportunity_before(&self) -> bool {
+        self.flags.is_soft_wrap_opportunity_before()
     }
 
     /// The whitespace class of this grapheme's first logical character.
