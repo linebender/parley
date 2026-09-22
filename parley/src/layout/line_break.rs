@@ -1501,6 +1501,12 @@ fn commit_line<B: Brush>(
 /// all of its trailing whitespace). Following CSS Text 4 § 9.2, conditionally hanging whitespace
 /// only hangs as far as it overflows the available width. Pass [`f32::INFINITY`] to hang
 /// conditional whitespace in full.
+///
+/// See the module-level docs of [`crate::layout::whitespace`] for an explanation of how
+/// conditionally and unconditionally hanging whitespace are determined; in short, we can treat the
+/// trailing whitespace as being a suffix of conditionally hanging whitespace preceded by
+/// unconditionally hanging whitespace (and either can be empty). If the conditionally hanging
+/// suffix hangs in full, the unconditionally hanging whitespace hangs in full.
 //
 // Note: This runs once per line, but it called in the line breaker's per-atom loop. The compiler
 // sometimes decides to inline it, which (as of writing) makes the line breaker 5-10% slower.
