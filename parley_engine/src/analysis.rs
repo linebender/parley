@@ -720,53 +720,51 @@ pub(crate) fn analyze_text(
     let mut needs_bidi_resolution = false;
 
     analysis.info.reserve(text.len());
-    boundary_iter.for_each(
-        |(is_soft_wrap_opportunity, is_word, is_grapheme_start, ch, properties)| {
-            let script = properties.script();
-            let grapheme_cluster_break = properties.grapheme_cluster_break();
-            let bidi_class = properties.bidi_class();
-            let general_category = properties.general_category();
-            let is_emoji_or_pictograph = properties.is_emoji_or_pictograph();
-            let is_variation_selector = properties.is_variation_selector();
-            let is_region_indicator = properties.is_region_indicator();
+    for (is_soft_wrap_opportunity, is_word, is_grapheme_start, ch, properties) in boundary_iter {
+        let script = properties.script();
+        let grapheme_cluster_break = properties.grapheme_cluster_break();
+        let bidi_class = properties.bidi_class();
+        let general_category = properties.general_category();
+        let is_emoji_or_pictograph = properties.is_emoji_or_pictograph();
+        let is_variation_selector = properties.is_variation_selector();
+        let is_region_indicator = properties.is_region_indicator();
 
-            let force_normalize = {
-                // "Extend" break chars should be normalized first, with two exceptions
-                if matches!(grapheme_cluster_break, GraphemeClusterBreak::Extend) &&
+        let force_normalize = {
+            // "Extend" break chars should be normalized first, with two exceptions
+            if matches!(grapheme_cluster_break, GraphemeClusterBreak::Extend) &&
                     ch as u32 != 0x200C && // Is not a Zero Width Non-Joiner &&
                     !is_variation_selector
-                {
-                    true
-                } else {
-                    // All spacing mark break chars should be normalized first.
-                    matches!(grapheme_cluster_break, GraphemeClusterBreak::SpacingMark)
-                }
-            };
+            {
+                true
+            } else {
+                // All spacing mark break chars should be normalized first.
+                matches!(grapheme_cluster_break, GraphemeClusterBreak::SpacingMark)
+            }
+        };
 
-            needs_bidi_resolution |= bidi::needs_bidi_resolution(bidi_class);
-            // TODO: maybe extend Properties to u64 to fit BidiMirroringGlyph
-            let bracket = data_sources.brackets().get(ch);
+        needs_bidi_resolution |= bidi::needs_bidi_resolution(bidi_class);
+        // TODO: maybe extend Properties to u64 to fit BidiMirroringGlyph
+        let bracket = data_sources.brackets().get(ch);
 
-            analysis.info.push(CharInfo::new(
-                script,
-                bidi_class,
-                bracket,
-                is_variation_selector,
-                is_region_indicator,
-                general_category == GeneralCategory::Control,
-                is_emoji_or_pictograph,
-                contributes_to_shaping(general_category, script),
-                force_normalize,
-                is_grapheme_start,
-                is_word,
-                is_soft_wrap_opportunity,
-                properties.is_emoji(),
-                properties.is_emoji_presentation(),
-                properties.is_emoji_modifier(),
-                properties.is_emoji_modifier_base(),
-            ));
-        },
-    );
+        analysis.info.push(CharInfo::new(
+            script,
+            bidi_class,
+            bracket,
+            is_variation_selector,
+            is_region_indicator,
+            general_category == GeneralCategory::Control,
+            is_emoji_or_pictograph,
+            contributes_to_shaping(general_category, script),
+            force_normalize,
+            is_grapheme_start,
+            is_word,
+            is_soft_wrap_opportunity,
+            properties.is_emoji(),
+            properties.is_emoji_presentation(),
+            properties.is_emoji_modifier(),
+            properties.is_emoji_modifier_base(),
+        ));
+    }
 
     if needs_bidi_resolution || options.base_direction == BaseDirection::Rtl {
         analyzer.bidi.resolve(
