@@ -19,15 +19,16 @@ pub struct LineBreakContext {
 
 /// Line break opportunity override.
 ///
-/// Called for each adjacent pair of Unicode code points in the text, in order,
-/// with a [`LineBreakContext`] describing the potential break.
+/// Called for each adjacent pair of Unicode code points in the text, in order, except for pairs
+/// containing a mandatory break character. The [`LineBreakContext`] describes the potential break.
 ///
 /// Returning:
 ///    - `Some(true)`  : forces a line break opportunity between the pair
 ///    - `Some(false)` : suppresses any opportunity
 ///    - `None`        : defers to the default (ICU) behavior
 ///
-/// Mandatory breaks are unaffected (e.g. `\n`).
+/// Note that pairs with a mandatory break are never a soft wrap opportunity: mandatory breaks are
+/// reported as [`Whitespace`][crate::shape::Whitespace].
 ///
 /// This is typically used to force preferential line breaking decisions when it
 /// comes to ASCII punctuation like `/`, `-`, etc. For example, to prevent break
@@ -73,11 +74,7 @@ fn chromium_override(cx: LineBreakContext) -> Option<bool> {
     //
     // See `LazyLineBreakIterator::NextBreakablePosition`
     // <https://source.chromium.org/chromium/chromium/src/+/main:third_party/blink/renderer/platform/text/text_break_iterator.cc;l=282-303>
-    if before == ' ' && after != ' '
-        // Mandatory break characters. A soft wrap opportunity is never valid
-        // immediately before one (see UAX-14 rule LB6).
-        && !matches!(after, '\n' | '\u{0B}' | '\u{0C}' | '\r' | '\u{85}' | '\u{2028}' | '\u{2029}')
-    {
+    if before == ' ' && after != ' ' {
         return Some(true);
     }
     // Before consulting 'before' / 'after' pair table, check for the special "-" case.

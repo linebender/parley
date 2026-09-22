@@ -199,12 +199,8 @@ fn test_line_break_override_doesnt_add_soft_wrap_opportunity_after_mandatory_bre
     let overridden =
         verify_analysis_with_override("a\nb", &|_| Some(true)).soft_wrap_opportunity_list();
 
-    // The position after a mandatory break isn't a soft wrap opportunity.
-    //
-    // TODO: The soft wrap opportunity right before the mandatory break violates UAX #14 Rule LB6:
-    // <https://www.unicode.org/reports/tr14/#LB6>. Perhaps we should ensure that's also not an
-    // opportunity.
-    assert_eq!(overridden, vec![false, true, false]);
+    // The positions right before or after a mandatory break aren't a soft wrap opportunity.
+    assert_eq!(overridden, vec![false, false, false]);
 }
 
 #[test]
@@ -276,10 +272,10 @@ fn test_paragraph_separator_is_hard_break() {
 /// regular wrap opportunity. See <https://github.com/linebender/parley/issues/768>.
 #[test]
 fn test_mandatory_break_after_complex_script_run() {
-    // Check that the ICU4X bug still reproduces: a break opportunity is reported at byte 6,
-    // between the second Thai character and the `\n`. Once this assertion fails, ICU4X has
-    // been fixed and the `is_line = !properties.is_mandatory_linebreak()` workaround in
-    // `parley_engine::analysis` can be reverted to `is_line = true`.
+    // Check that the ICU4X bug still reproduces: a break opportunity is reported at byte 6, between
+    // the second Thai character and the `\n`. Once this assertion fails, ICU4X has been fixed and
+    // this test as well as `builders_newline_inside_complex_script_run_is_hard_break` can be
+    // dropped.
     let icu_breaks: Vec<usize> = LineSegmenter::new_dictionary(LineBreakOptions::default())
         .segment_str("กก\nกก")
         .collect();
