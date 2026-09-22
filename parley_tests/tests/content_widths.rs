@@ -169,6 +169,32 @@ fn inbox_content_width() {
 }
 
 #[test]
+fn content_widths_max_floored_by_min() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // A negative-width inline box (e.g. an inline-block with a negative margin) reduces the
+    // max-content width, but the max-content width can never be smaller than the min-content
+    // width.
+    let text = "";
+    let mut builder = env.ranged_builder(text);
+    for (id, width) in [(0, 100.0), (1, -50.0)] {
+        builder.push_inline_box(InlineBox {
+            id,
+            kind: InlineBoxKind::InFlow,
+            index: 0,
+            width,
+            height: 10.0,
+            baseline: None,
+        });
+    }
+    let layout = builder.build(text);
+
+    let widths = layout.calculate_content_widths();
+    assert_eq!(widths.min, 100.0);
+    assert_eq!(widths.max, 100.0);
+}
+
+#[test]
 fn content_widths_trailing_whitespace_by_collapse_mode() {
     let mut env = TestEnv::new(test_name!(), None);
 
