@@ -1094,18 +1094,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     /// Breaks all remaining lines with the specified maximum advance. This
     /// consumes the line breaker.
     pub fn break_remaining(mut self, max_advance: f32) {
-        // println!("\nDEBUG ITEMS");
-        // for item in &self.layout.items {
-        //     match item.kind {
-        //         LayoutItemKind::InlineBox => println!("{:?}", item.kind),
-        //         LayoutItemKind::TextRun => {
-        //             let run_data = &self.layout.runs[item.index];
-        //             println!("{:?} ({:?})", item.kind, &run_data.text_range);
-        //         }
-        //     }
-        // }
-
-        // println!("\nBREAK ALL");
         self.state.layout_max_advance = max_advance;
         self.state.line_max_advance = max_advance;
         while let Some(yield_data) = self.break_next() {
