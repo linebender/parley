@@ -144,7 +144,22 @@ impl<'a, B: Brush> Run<'a, B> {
     /// justification.
     pub fn advance(&self) -> f32 {
         let spacing = self.line_spacing();
-        spacing.slice_advance(self.line_slice())
+        spacing.slice_advance(self.line_slice()) + self.hyphen().map_or(0., |hyphen| hyphen.advance)
+    }
+
+    /// The hyphen closing this run's line, if the line was broken at a soft hyphen ending the
+    /// run; see [`LineItemData::hyphen`]. It is rendered after the run's last atom on the line.
+    pub(crate) fn hyphen(&self) -> Option<Glyph> {
+        self.line_data.and_then(|line_data| line_data.hyphen)
+    }
+
+    /// Whether the given atom-aligned shaped cluster range ends where this run ends on its line,
+    /// so that the glyphs of the range are followed by the line's hyphen, if any.
+    pub(crate) fn hyphen_after(&self, shaped_clusters: &Range<u32>) -> Option<Glyph> {
+        let line_data = self.line_data?;
+        (shaped_clusters.end == line_data.shaped_cluster_range.end)
+            .then_some(line_data.hyphen)
+            .flatten()
     }
 
     /// Returns the original text range for the run.
@@ -253,10 +268,12 @@ impl<'a, B: Brush> Run<'a, B> {
     /// `shaped_clusters` indexes into the shaped run this [`Run`] belongs to, and must be
     /// atom-aligned.
     pub(crate) fn glyphs_in(self, shaped_clusters: Range<u32>) -> Glyphs<'a> {
+        let hyphen = self.hyphen_after(&shaped_clusters);
         Glyphs::new(
             self.full_slice().narrow(shaped_clusters),
             self.is_rtl(),
             self.line_spacing(),
+            hyphen,
         )
     }
 }
@@ -283,12 +300,21 @@ pub(crate) struct Glyphs<'a> {
     atom_glyph: usize,
     /// The number of glyphs of the current atom. The last one gets `gaps.after`.
     atom_glyph_count: usize,
+    /// The hyphen closing the line after these clusters, not yet yielded. It sits at the line's
+    /// end edge: visually last for LTR text and first for RTL text.
+    hyphen: Option<Glyph>,
 }
 
 impl<'a> Glyphs<'a> {
-    fn new(slice: ShapedSlice<'a>, is_rtl: bool, spacing: EffectiveSpacing) -> Self {
+    fn new(
+        slice: ShapedSlice<'a>,
+        is_rtl: bool,
+        spacing: EffectiveSpacing,
+        hyphen: Option<Glyph>,
+    ) -> Self {
         let clusters = slice.shaped_clusters_range();
         Self {
+            hyphen,
             slice,
             is_rtl,
             spacing: (!spacing.is_zero()).then_some(spacing),
@@ -316,6 +342,11 @@ impl Iterator for Glyphs<'_> {
 
     #[inline]
     fn next(&mut self) -> Option<Glyph> {
+        if self.is_rtl
+            && let Some(hyphen) = self.hyphen.take()
+        {
+            return Some(hyphen);
+        }
         loop {
             if let Some(mut glyph) = self.glyphs.next() {
                 if self.spacing.is_some() {
@@ -342,13 +373,19 @@ impl Iterator for Glyphs<'_> {
             }
 
             // Without spacing, that was the last cluster. With spacing, it was the last cluster of
-            // the current atom; move on to the next atom.
-            let spacing = self.spacing?;
+            // the current atom; move on to the next atom. Once the clusters are exhausted, the
+            // line's hyphen, if any, closes the LTR sequence.
+            let Some(spacing) = self.spacing else {
+                return self.hyphen.take();
+            };
             let atom = if self.is_rtl {
                 self.slice.atoms_from(self.shaped_clusters.start).prev()
             } else {
                 self.slice.atoms_from(self.shaped_clusters.end).next()
-            }?;
+            };
+            let Some(atom) = atom else {
+                return self.hyphen.take();
+            };
             self.shaped_clusters = atom.shaped_clusters_range();
             self.gaps = spacing.gaps(&atom);
             self.atom_glyph = 0;
