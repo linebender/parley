@@ -21,7 +21,7 @@ use crate::{InlineBoxKind, OverflowWrap, TextWrapMode, WhiteSpaceCollapse};
 
 use core::ops::Range;
 use parley_engine::shape::Whitespace;
-use parley_engine::{Atom, FontMetrics};
+use parley_engine::{Atom, Atoms, FontMetrics, ShapedSlice};
 
 #[derive(Default)]
 struct LineLayout {
@@ -199,6 +199,40 @@ impl LineBoxMetrics {
         self.content_box.over = self.content_box.over.max(content.content_box.over);
         self.content_box.under = self.content_box.under.max(content.content_box.under);
     }
+}
+
+/// The atoms of `run` to process next, starting at `shaped_cluster` up to where the run's line
+/// height next changes (and in particular, if there is no next line height change, up to the end of
+/// the run).
+///
+/// This returns a tuple of the atoms, their line height, and whether they reach the run's end.
+///
+/// See also [`crate::layout::data::LayoutData::line_heights`].
+#[inline(always)]
+fn atoms_until_line_height_change<'a, B: Brush>(
+    layout: &'a LayoutData<B>,
+    run: &Run<'a, B>,
+    slice: ShapedSlice<'a>,
+    shaped_cluster: u32,
+) -> (Atoms<'a>, f32, bool) {
+    let line_heights = &run.data.line_heights;
+    let line_heights = &layout.line_heights[line_heights.start as usize..line_heights.end as usize];
+
+    // The line heights are ordered by shaped cluster; the one in effect at `shaped_cluster` is the
+    // last line height starting at or before it.
+    let current =
+        line_heights[1..].partition_point(|change| change.shaped_cluster <= shaped_cluster);
+    let line_height = line_heights[current].line_height;
+    let (end, is_last) = match line_heights.get(current + 1) {
+        Some(change) => (change.shaped_cluster, false),
+        None => (run.shaped.shaped_clusters_range.end, true),
+    };
+
+    (
+        slice.narrow(shaped_cluster..end).atoms_start(),
+        line_height,
+        is_last,
+    )
 }
 
 #[derive(Clone, Default)]
@@ -766,18 +800,25 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // Additional spacing to apply between atoms.
                     let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
 
-                    // Note that, within a run, all the atoms' text metrics are the same.
-                    let line_height = run.data.line_height;
-                    // TODO: perhaps precompute these text metrics and store them in `RunMetrics`,
-                    // as we currently calculate them for each line a run is on.
+                    // The line height can change within the run, so we process the run one line
+                    // height at a time.
+                    //
+                    // The atoms yielded all have the same font and line height, so their text
+                    // metrics are all the same.
+                    let (atoms, line_height, reaches_run_end) = atoms_until_line_height_change(
+                        &self.layout.data,
+                        &run,
+                        slice,
+                        self.state.cluster_idx,
+                    );
                     let text_metrics = LineBoxMetrics::for_text(
                         run.font_metrics(),
                         line_height,
                         self.layout.data.quantize,
                     );
 
-                    // Iterate over the remaining atoms in the Run
-                    for atom in slice.atoms_from(self.state.cluster_idx) {
+                    // Iterate over the atoms
+                    for atom in atoms {
                         // Retrieve metadata about the atom
                         let first_character = &atom.characters()[0];
                         let whitespace = first_character.whitespace;
@@ -923,6 +964,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             }
                         }
                     }
+                    if !reaches_run_end {
+                        continue;
+                    }
                     self.state.run_idx += 1;
                     self.state.item_idx += 1;
                 }
@@ -1021,14 +1065,22 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let spacing = run.line_spacing();
                     let cluster_end = shaped_run.shaped_clusters_range.end;
 
-                    // Note that, within a run, all the atoms' text metrics are the same.
+                    // The line height can change within the run, so we process the run one line
+                    // height at a time.
+                    let (atoms, line_height, reaches_run_end) = atoms_until_line_height_change(
+                        &self.layout.data,
+                        &run,
+                        slice,
+                        self.state.cluster_idx,
+                    );
+                    // Note that these atoms' text metrics are all the same.
                     let text_metrics = LineBoxMetrics::for_text(
                         run.font_metrics(),
-                        run.data.line_height,
+                        line_height,
                         self.layout.data.quantize,
                     );
 
-                    for atom in slice.atoms_from(self.state.cluster_idx) {
+                    for atom in atoms {
                         // Check if we should break before this atom
                         if char_count >= max_chars && max_chars != 0 {
                             self.start_new_line(BreakReason::Regular, f32::MAX, line_indent);
@@ -1075,6 +1127,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.start_new_line(break_reason, f32::MAX, line_indent);
                             return Some(());
                         }
+                    }
+                    if !reaches_run_end {
+                        continue;
                     }
                     self.state.run_idx += 1;
                     self.state.item_idx += 1;

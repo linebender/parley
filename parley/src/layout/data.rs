@@ -7,15 +7,14 @@ use crate::layout::whitespace::{atom_hanging_advance, whitespace_hangs};
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
-use crate::{
-    IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode, WhiteSpaceCollapse,
-};
+use crate::util::nearly_eq;
+use crate::{IndentOptions, InlineBoxKind, OverflowWrap, TextWrapMode, WhiteSpaceCollapse};
 use core::ops::Range;
 
 use alloc::vec::Vec;
 use parlance::BidiLevel;
-use parley_engine::ShapedText;
 use parley_engine::shape::Whitespace;
+use parley_engine::{Atom, ShapedText};
 
 /// `HarfRust`-based run data
 #[derive(Clone, Debug, PartialEq)]
@@ -24,8 +23,8 @@ pub(crate) struct RunData {
     pub(crate) font_attrs: fontique::Attributes,
     /// Synthesis for rendering (contains variation settings)
     pub(crate) synthesis: fontique::Synthesis,
-    /// The line height
-    pub line_height: f32,
+    /// The run's line heights, as a range into [`LayoutData::line_heights`].
+    pub(crate) line_heights: Range<u32>,
     /// Additional spacing inserted between this run's atoms.
     ///
     /// TODO: Letter spacing in the form of gaps should not be applied between cursive scripts, see
@@ -33,6 +32,18 @@ pub(crate) struct RunData {
     ///
     /// [css-spacing-cursive]: https://www.w3.org/TR/css-text-4/#cursive-tracking
     pub(crate) spacing: Spacing,
+}
+
+/// A point within a run where its line height becomes [`Self::line_height`].
+///
+/// See [`LayoutData::line_heights`].
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct LineHeightChange {
+    /// The first shaped cluster with this line height, as an index into
+    /// [`ShapedText::shaped_clusters`]. This is always an atom boundary.
+    pub(crate) shaped_cluster: u32,
+    /// The line height.
+    pub(crate) line_height: f32,
 }
 
 #[derive(Copy, Clone, Default, PartialEq, Debug)]
@@ -136,6 +147,15 @@ pub(crate) struct LayoutData<B: Brush> {
     // Output of shaping (input to line breaking)
     pub(crate) shaped_text: ShapedText,
     pub(crate) runs: Vec<RunData>,
+    /// The runs' line heights, see [`RunData::line_heights`].
+    ///
+    /// Because line height impacts the line box, line heights must be known during line breaking.
+    /// Storing the points at which line height changes helps us look the heights up efficiently.
+    ///
+    /// There may be styles we implement in the future that similarly impact the line box (e.g.,
+    /// `text-emphasis` or the draft `line-fit-edge`). This could then generalize to tracking `over`
+    /// and `under`.
+    pub(crate) line_heights: Vec<LineHeightChange>,
     pub(crate) items: Vec<LayoutItem>,
 
     // Output of line breaking
@@ -175,6 +195,7 @@ impl<B: Brush> Default for LayoutData<B> {
             inline_boxes: Vec::new(),
             shaped_text: ShapedText::new(),
             runs: Vec::new(),
+            line_heights: Vec::new(),
             items: Vec::new(),
             lines: Vec::new(),
             line_items: Vec::new(),
@@ -202,6 +223,7 @@ impl<B: Brush> LayoutData<B> {
         self.inline_boxes.clear();
         self.shaped_text.clear();
         self.runs.clear();
+        self.line_heights.clear();
         self.items.clear();
         self.lines.clear();
         self.line_items.clear();
@@ -216,36 +238,25 @@ impl<B: Brush> LayoutData<B> {
             bidi_level,
         });
     }
-    #[allow(clippy::too_many_arguments)]
+
+    /// Processes a shaped run into [`RunData`] and a [`LayoutItem`].
+    ///
+    /// As an optimization, set `uniform_line_height` to `true` if it is known that all of the
+    /// layout's styles have the same line height.
     pub(crate) fn process_shaped_run(
         &mut self,
         shaped_run_idx: usize,
         run_style: &ResolvedStyle<B>,
         spacing: Spacing,
+        uniform_line_height: bool,
     ) {
         let shaped_run = &self.shaped_text.runs()[shaped_run_idx];
         debug_assert!(
             !shaped_run.shaped_clusters_range.is_empty(),
             "Shaped runs returned by `parley_engine` must be non-empty"
         );
-        let style_index =
-            self.shaped_text.characters()[shaped_run.characters_range.start as usize].style_index;
-
-        let line_height = {
-            // Compute line height
-            let style = &self.styles[style_index as usize];
-            match style.line_height {
-                LineHeight::Absolute(value) => value,
-                LineHeight::FontSizeRelative(value) => value * shaped_run.font_size,
-                LineHeight::MetricsRelative(value) => {
-                    (shaped_run.font_metrics.ascent
-                        + shaped_run.font_metrics.descent
-                        + shaped_run.font_metrics.leading)
-                        * value
-                }
-            }
-        };
-
+        let line_heights = self.resolve_line_heights(shaped_run_idx, uniform_line_height);
+        let shaped_run = &self.shaped_text.runs()[shaped_run_idx];
         let font = &self.shaped_text.fonts()[shaped_run.font_index];
         let run = RunData {
             font_attrs: fontique::Attributes {
@@ -254,7 +265,7 @@ impl<B: Brush> LayoutData<B> {
                 style: run_style.font_style,
             },
             synthesis: font.synthesis,
-            line_height,
+            line_heights,
             spacing,
         };
 
@@ -264,6 +275,66 @@ impl<B: Brush> LayoutData<B> {
             index: self.runs.len() - 1,
             bidi_level: shaped_run.bidi_level,
         });
+    }
+
+    /// Resolves the line heights of a shaped run, returning their range in [`Self::line_heights`].
+    /// See [`RunData::line_heights`].
+    ///
+    /// An atom's line height is the largest line height of its characters' styles.
+    #[expect(clippy::cast_possible_truncation, reason = "deferred")]
+    fn resolve_line_heights(
+        &mut self,
+        shaped_run_idx: usize,
+        uniform_line_height: bool,
+    ) -> Range<u32> {
+        let Self {
+            styles,
+            shaped_text,
+            line_heights,
+            ..
+        } = self;
+        let shaped_run = &shaped_text.runs()[shaped_run_idx];
+        let resolve = |style_index: u16| {
+            styles[usize::from(style_index)]
+                .line_height
+                .resolve(shaped_run.font_size, &shaped_run.font_metrics)
+        };
+        let start = line_heights.len();
+
+        let first_style_index =
+            shaped_text.characters()[shaped_run.characters_range.start as usize].style_index;
+        if uniform_line_height {
+            line_heights.push(LineHeightChange {
+                shaped_cluster: shaped_run.shaped_clusters_range.start,
+                line_height: resolve(first_style_index),
+            });
+        } else {
+            let mut style = (first_style_index, resolve(first_style_index));
+            let mut atom_line_height = |atom: &Atom<'_>| {
+                atom.characters()
+                    .iter()
+                    .fold(f32::NEG_INFINITY, |line_height, character| {
+                        if character.style_index != style.0 {
+                            style = (character.style_index, resolve(character.style_index));
+                        }
+                        line_height.max(style.1)
+                    })
+            };
+            for atom in shaped_text.run_slice(shaped_run_idx as u32).atoms_start() {
+                let line_height = atom_line_height(&atom);
+                if line_heights[start..]
+                    .last()
+                    .is_none_or(|last| !nearly_eq(last.line_height, line_height))
+                {
+                    line_heights.push(LineHeightChange {
+                        shaped_cluster: atom.shaped_clusters_range().start,
+                        line_height,
+                    });
+                }
+            }
+        }
+
+        start as u32..line_heights.len() as u32
     }
 
     /// Calculates the min- and max-content widths of the layout.
