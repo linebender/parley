@@ -235,6 +235,7 @@ fn content_widths_max_floored_by_min() {
             width,
             height: 10.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
     }
     let layout = builder.build(text);
