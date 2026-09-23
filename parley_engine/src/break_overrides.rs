@@ -27,7 +27,7 @@ pub struct LineBreakContext {
 ///    - `Some(false)` : suppresses any opportunity
 ///    - `None`        : defers to the default (ICU) behavior
 ///
-/// Note that pairs with a mandatory break are never a soft wrap opportunity: mandatory breaks are
+/// Note that pairs with a mandatory break aren't soft wrap opportunities. Mandatory breaks are
 /// reported as [`Whitespace`][crate::shape::Whitespace].
 ///
 /// This is typically used to force preferential line breaking decisions when it
