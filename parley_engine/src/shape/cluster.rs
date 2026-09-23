@@ -381,8 +381,9 @@ impl CharCluster {
         best_coverage
     }
 
-    /// Rebuilds `self` in-place using the existing allocation for the grapheme whose characters,
-    /// analysis info, and style index `chars` yields.
+    /// Rebuilds `self` in-place using the existing allocation for the given grapheme.
+    ///
+    /// `chars` must yield the grapheme's characters with associated analysis info, and style index.
     ///
     /// `code_unit_offset_in_string` must be the byte offset of the grapheme's first character in the
     /// source string. When this method returns, its value is the byte offset just past the end of
