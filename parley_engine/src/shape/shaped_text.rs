@@ -184,7 +184,7 @@ impl ShapedText {
         &mut self,
         text: &str,
         range: TextRange,
-        item: &Segment,
+        segment: &Segment,
         options: &ShapeOptions<'_>,
         char_info: &[CharInfo],
         char_style_indices: &[u16],
@@ -293,7 +293,7 @@ impl ShapedText {
         self.characters[characters_start].grapheme_start = true;
 
         let glyphs_start = self.glyphs.len();
-        if item.bidi_level.is_ltr() {
+        if segment.bidi_level.is_ltr() {
             process_shaped_clusters(
                 &mut self.shaped_clusters,
                 &mut self.glyphs,
@@ -338,7 +338,7 @@ impl ShapedText {
             shaped_clusters_range,
             glyphs_range: glyphs_start..self.glyphs.len(),
             normalized_coords_range,
-            bidi_level: item.bidi_level,
+            bidi_level: segment.bidi_level,
             advance: run_advance,
             font_metrics,
         });

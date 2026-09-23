@@ -299,18 +299,18 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
 impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
     fn begin_segment(
         &mut self,
-        item: &parley_engine::itemize::Segment,
+        segment: &parley_engine::itemize::Segment,
         options: &ShapeOptions<'_>,
     ) {
         self.query.set_fallbacks(fontique::FallbackKey::new(
-            item.script,
+            segment.script,
             options.language.as_ref(),
         ));
     }
 
     fn select_font(
         &mut self,
-        _item: &parley_engine::itemize::Segment,
+        _segment: &parley_engine::itemize::Segment,
         _options: &ShapeOptions<'_>,
         cluster: &mut CharCluster,
     ) -> Option<FontInstance> {
