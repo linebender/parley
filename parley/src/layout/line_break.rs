@@ -27,8 +27,8 @@ use crate::{
 };
 
 use core::ops::Range;
-use parley_engine::shape::Whitespace;
 use parley_engine::Atom;
+use parley_engine::shape::Whitespace;
 use smallvec::SmallVec;
 
 #[derive(Default)]
