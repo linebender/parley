@@ -4,7 +4,7 @@
 //! Shaping of text.
 
 use alloc::vec::Vec;
-use core::{mem, ops::Range};
+use core::mem;
 use harfrust::ShapeOptions as HarfShapeOptions;
 use linebender_resource_handle::FontData;
 use parlance::{FontFeature, FontVariation, Language};
@@ -213,11 +213,6 @@ fn shape_segment(
         return Ok(()); // No clusters
     }
 
-    let mut segment_infos_iter = segment_char_info
-        .iter()
-        .copied()
-        .zip(segment_char_style_indices.iter().copied());
-    let mut code_unit_offset_in_string = text_range.start;
     let char_cluster = &mut scx.char_cluster;
 
     // Shaping inputs that are constant over the segment.
@@ -240,12 +235,8 @@ fn shape_segment(
         )
     }));
 
-    // The character offset of the current font run's start, accumulated per run.
-    let mut char_start = char_range.start;
-
-    // Shape a run of the segment with a single font, appending it to `shaped_text`. `run_range` is
-    // the run's byte range relative to the segment.
-    let mut shape_run = |font: &FontInstance, run_range: Range<usize>| {
+    // Shape a run of the segment with a single font, appending it to `shaped_text`.
+    let mut shape_run = |font: &FontInstance, range: TextRange| {
         // TODO: How do we want to handle errors like this?
         let font_ref =
             harfrust::FontRef::from_index(font.font.data.as_ref(), font.font.index).unwrap();
@@ -302,7 +293,7 @@ fn shape_segment(
         buffer.set_cluster_level(harfrust::BufferClusterLevel::MonotoneCharacters);
 
         // Use the entire run text including newlines.
-        let run_text = &segment_text[run_range.clone()];
+        let run_text = &text[range.byte_range.clone()];
         buffer.reserve(run_text.len());
         #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
         for (i, ch) in run_text.chars().enumerate() {
@@ -316,8 +307,8 @@ fn shape_segment(
             buffer.add(ch, i as u32);
         }
 
-        buffer.set_pre_context(&text[..text_range.start + run_range.start]);
-        buffer.set_post_context(&text[text_range.start + run_range.end..]);
+        buffer.set_pre_context(&text[..range.byte_range.start]);
+        buffer.set_post_context(&text[range.byte_range.end..]);
         buffer.set_direction(direction);
         buffer.set_script(hb_script);
 
@@ -333,12 +324,6 @@ fn shape_segment(
                 .point_size(Some(options.font_size)),
         );
 
-        let run_char_count = run_text.chars().count();
-        let range = TextRange {
-            byte_range: (text_range.start + run_range.start)..(text_range.start + run_range.end),
-            char_range: char_start..char_start + run_char_count,
-        };
-        char_start += run_char_count;
         shaped_text.push_run(
             text,
             range,
@@ -356,27 +341,34 @@ fn shape_segment(
     };
 
     // This is the run being accumulated, i.e., consecutive graphemes for which `select_font`
-    // returns the same font. Its byte range is relative to the segment.
-    let mut run: Option<(FontInstance, Range<usize>)> = None;
+    // returns the same font.
+    let mut run: Option<(FontInstance, TextRange)> = None;
 
-    // Build an iterator of grapheme boundaries
-    let boundaries_iter = segment_text
-        .char_indices()
-        .zip(segment_char_info.iter())
-        .skip(1)
-        .filter_map(|((byte_pos, _), info)| info.is_grapheme_start().then_some(byte_pos))
-        .chain(core::iter::once(segment_text.len()));
+    // The segment's characters with their analysis data and style indices.
+    let mut chars = segment_text
+        .chars()
+        .zip(segment_char_info)
+        .zip(segment_char_style_indices)
+        .map(|((ch, &info), &style_index)| (ch, info, style_index));
 
-    let mut grapheme_start = 0;
-    for grapheme_end in boundaries_iter {
-        let grapheme = grapheme_start..grapheme_end;
-        grapheme_start = grapheme_end;
+    // The lengths of the segment's graphemes in characters.
+    let grapheme_lengths = segment_char_info
+        .chunk_by(|_, info| !info.is_grapheme_start())
+        .map(<[_]>::len);
 
-        char_cluster.fill(
-            &segment_text[grapheme.clone()],
-            &mut segment_infos_iter,
-            &mut code_unit_offset_in_string,
-        );
+    // The end of the previous grapheme.
+    let mut byte_end = text_range.start;
+    let mut char_end = char_range.start;
+
+    for grapheme_length in grapheme_lengths {
+        let (byte_start, char_start) = (byte_end, char_end);
+        char_cluster.fill(chars.by_ref().take(grapheme_length), &mut byte_end);
+        char_end += grapheme_length;
+        let grapheme = TextRange {
+            byte_range: byte_start..byte_end,
+            char_range: char_start..char_end,
+        };
+
         let font = select_font
             .select_font(segment, options, char_cluster)
             .ok_or(())?;
@@ -384,7 +376,8 @@ fn shape_segment(
         if let Some((run_font, run_range)) = &mut run
             && *run_font == font
         {
-            run_range.end = grapheme.end;
+            run_range.byte_range.end = byte_end;
+            run_range.char_range.end = char_end;
         } else if let Some((run_font, run_range)) = run.replace((font, grapheme)) {
             // The font changed: shape the previous run.
             shape_run(&run_font, run_range);
