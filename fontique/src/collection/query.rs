@@ -119,7 +119,7 @@ impl<'a> Query<'a> {
     ///
     /// Return [`QueryStatus::Stop`] to end iterating over the matching
     /// fonts or [`QueryStatus::Continue`] to continue iterating.
-    pub fn matches_with(&mut self, mut f: impl FnMut(&QueryFont) -> QueryStatus) {
+    pub fn matches_with<'q>(&'q mut self, mut f: impl FnMut(&'q QueryFont) -> QueryStatus) {
         for family in self
             .state
             .families

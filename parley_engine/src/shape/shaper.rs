@@ -6,7 +6,7 @@
 use alloc::vec::Vec;
 use core::mem;
 use harfrust::ShapeOptions as HarfShapeOptions;
-use linebender_resource_handle::FontData;
+use linebender_resource_handle::{Blob, FontData};
 use parlance::{FontFeature, FontVariation, Language};
 
 use crate::{
@@ -45,6 +45,42 @@ pub struct FontInstance {
     // TODO: Synthesis carries more than we need, and ties us to `fontique`. We can likely change
     // this to opaque user data.
     pub synthesis: fontique::Synthesis,
+}
+
+impl FontInstance {
+    /// Borrow this font instance.
+    #[inline]
+    pub fn as_ref(&self) -> FontInstanceRef<'_> {
+        FontInstanceRef {
+            data: &self.font.data,
+            index: self.font.index,
+            synthesis: &self.synthesis,
+        }
+    }
+}
+
+/// A borrowed [`FontInstance`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FontInstanceRef<'a> {
+    /// Blob containing the content of the font file.
+    pub data: &'a Blob<u8>,
+    /// Index of the font in a collection, or 0 for a single font.
+    pub index: u32,
+    /// Font synthesis suggestions.
+    pub synthesis: &'a fontique::Synthesis,
+}
+
+impl From<FontInstanceRef<'_>> for FontInstance {
+    #[inline]
+    fn from(font: FontInstanceRef<'_>) -> Self {
+        Self {
+            font: FontData {
+                data: font.data.clone(),
+                index: font.index,
+            },
+            synthesis: *font.synthesis,
+        }
+    }
 }
 
 /// Reusable scratch to shape text using [`Self::shape_text`].
@@ -374,7 +410,7 @@ fn shape_segment(
             .ok_or(())?;
 
         if let Some((run_font, run_range)) = &mut run
-            && *run_font == font
+            && run_font.as_ref() == font
         {
             run_range.byte_range.end = byte_end;
             run_range.char_range.end = char_end;
@@ -383,7 +419,7 @@ fn shape_segment(
                 // The font changed: shape the previous run.
                 shape_run(&run_font, run_range);
             }
-            run = Some((font, grapheme));
+            run = Some((font.into(), grapheme));
         }
     }
     if let Some((run_font, run_range)) = run {
@@ -436,5 +472,5 @@ pub trait FontSelector {
         segment: &Segment,
         options: &ShapeOptions<'_>,
         cluster: &mut CharCluster,
-    ) -> Option<FontInstance>;
+    ) -> Option<FontInstanceRef<'_>>;
 }
