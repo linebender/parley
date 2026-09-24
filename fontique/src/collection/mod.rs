@@ -710,14 +710,20 @@ impl CommonData {
                 kind: SourceKind::Path(Arc::from(scanned_font.path.unwrap())),
             };
 
-            let font_data = scanned_font.font.data().as_bytes();
-            self.register_font_impl(
-                font_data,
-                source,
+            // `scan_paths` already yields one fully parsed font per callback (a
+            // single face, or each face of a collection in turn), so register it
+            // directly. The previous code re-scanned the whole file here, which
+            // re-added every font in it on each callback and so duplicated faces
+            // (and multiplied them further for collection files).
+            families.clear();
+            self.register_scanned_font(
+                scanned_font,
+                &source,
                 None,
                 &mut scratch_family_name,
                 &mut families,
             );
+            self.merge_families(&families);
         });
     }
 
@@ -734,13 +740,17 @@ impl CommonData {
             kind: SourceKind::Memory(data.clone()),
         };
 
-        self.register_font_impl(
-            data.as_ref(),
-            source,
-            info_override,
-            &mut scratch_family_name,
-            &mut families,
-        );
+        super::scan::scan_memory(data.as_ref(), |scanned_font| {
+            self.register_scanned_font(
+                scanned_font,
+                &source,
+                info_override,
+                &mut scratch_family_name,
+                &mut families,
+            );
+        });
+
+        self.merge_families(&families);
 
         families
             .into_iter()
@@ -748,55 +758,56 @@ impl CommonData {
             .collect()
     }
 
-    fn register_font_impl(
+    fn register_scanned_font(
         &mut self,
-        font_data: &[u8],
-        source: SourceInfo,
+        scanned_font: &crate::scan::ScannedFont<'_>,
+        source: &SourceInfo,
         info_override: Option<FontInfoOverride<'_>>,
         scratch_family_name: &mut String,
         families: &mut HashMap<FamilyId, (FamilyName, Vec<FontInfo>)>,
     ) {
-        super::scan::scan_memory(font_data, |scanned_font| {
-            scratch_family_name.clear();
+        scratch_family_name.clear();
 
-            let family_name =
-                if let Some(override_family_name) = info_override.and_then(|o| o.family_name) {
-                    override_family_name
-                } else {
-                    let family_chars = scanned_font
-                        .english_or_first_name(NameId::TYPOGRAPHIC_FAMILY_NAME)
-                        .or_else(|| scanned_font.english_or_first_name(NameId::FAMILY_NAME))
-                        .map(|name| name.chars());
-                    let Some(family_chars) = family_chars else {
-                        return;
-                    };
-                    scratch_family_name.extend(family_chars);
-
-                    #[allow(clippy::needless_borrow)] // false positive
-                    &scratch_family_name
+        let family_name =
+            if let Some(override_family_name) = info_override.and_then(|o| o.family_name) {
+                override_family_name
+            } else {
+                let family_chars = scanned_font
+                    .english_or_first_name(NameId::TYPOGRAPHIC_FAMILY_NAME)
+                    .or_else(|| scanned_font.english_or_first_name(NameId::FAMILY_NAME))
+                    .map(|name| name.chars());
+                let Some(family_chars) = family_chars else {
+                    return;
                 };
+                scratch_family_name.extend(family_chars);
 
-            if family_name.is_empty() {
-                return;
-            }
-
-            let Some(mut font) =
-                FontInfo::from_font_ref(&scanned_font.font, source.clone(), scanned_font.index)
-            else {
-                return;
+                #[allow(clippy::needless_borrow)] // false positive
+                &scratch_family_name
             };
 
-            if let Some(info_override) = info_override.as_ref() {
-                font.apply_override(info_override);
-            }
+        if family_name.is_empty() {
+            return;
+        }
 
-            let name = self.family_names.get_or_insert(family_name);
-            families
-                .entry(name.id())
-                .or_insert_with(|| (name, Vec::default()))
-                .1
-                .push(font);
-        });
+        let Some(mut font) =
+            FontInfo::from_font_ref(&scanned_font.font, source.clone(), scanned_font.index)
+        else {
+            return;
+        };
+
+        if let Some(info_override) = info_override.as_ref() {
+            font.apply_override(info_override);
+        }
+
+        let name = self.family_names.get_or_insert(family_name);
+        families
+            .entry(name.id())
+            .or_insert_with(|| (name, Vec::default()))
+            .1
+            .push(font);
+    }
+
+    fn merge_families(&mut self, families: &HashMap<FamilyId, (FamilyName, Vec<FontInfo>)>) {
         for (id, (name, fonts)) in families.iter() {
             if let Some(Some(family)) = self.families.get_mut(id) {
                 let new_fonts = family.fonts().iter().chain(fonts).cloned();
@@ -896,4 +907,65 @@ fn make_shared_matches_local() {
     let names_after: Vec<String> = collection.family_names().map(String::from).collect();
 
     assert_eq!(names_before.len(), names_after.len());
+}
+
+// Regression test for https://github.com/linebender/parley/issues/683: loading
+// fonts from a directory used to register the same face several times because a
+// shared accumulator was never cleared and every callback re-scanned the whole
+// file. Each face should appear exactly once, identified by its source and index.
+#[test]
+#[cfg(all(
+    feature = "std",
+    any(
+        target_os = "linux",
+        target_os = "freebsd",
+        target_os = "macos",
+        target_os = "windows"
+    )
+))]
+fn load_fonts_from_paths_registers_each_face_once() {
+    use crate::{Collection, CollectionOptions};
+    use std::collections::HashSet;
+
+    let mut collection = Collection::new(CollectionOptions {
+        shared: false,
+        system_fonts: false,
+    });
+
+    let font_dirs: Vec<std::path::PathBuf> = [
+        #[cfg(target_os = "macos")]
+        "/Library/Fonts",
+        #[cfg(target_os = "linux")]
+        "/usr/share/fonts",
+        #[cfg(target_os = "freebsd")]
+        "/usr/local/share/fonts",
+        #[cfg(target_os = "windows")]
+        "C:\\Windows\\Fonts",
+    ]
+    .iter()
+    .map(std::path::PathBuf::from)
+    .filter(|p| p.is_dir())
+    .collect();
+
+    if font_dirs.is_empty() {
+        return;
+    }
+
+    collection.load_fonts_from_paths(&font_dirs);
+
+    let family_ids: Vec<_> = collection.family_ids().collect();
+    for id in family_ids {
+        let Some(family) = collection.family(id) else {
+            continue;
+        };
+        let mut seen = HashSet::new();
+        for font in family.fonts() {
+            let face = (font.source().id(), font.index());
+            assert!(
+                seen.insert(face),
+                "family {:?} contains a duplicate face {face:?}",
+                collection.family_name(id),
+            );
+        }
+    }
 }
