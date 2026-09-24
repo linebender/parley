@@ -378,9 +378,12 @@ fn shape_segment(
         {
             run_range.byte_range.end = byte_end;
             run_range.char_range.end = char_end;
-        } else if let Some((run_font, run_range)) = run.replace((font, grapheme)) {
-            // The font changed: shape the previous run.
-            shape_run(&run_font, run_range);
+        } else {
+            if let Some((run_font, run_range)) = run.take() {
+                // The font changed: shape the previous run.
+                shape_run(&run_font, run_range);
+            }
+            run = Some((font, grapheme));
         }
     }
     if let Some((run_font, run_range)) = run {
