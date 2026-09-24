@@ -381,20 +381,18 @@ impl CharCluster {
         best_coverage
     }
 
-    /// Rebuilds `self` in-place using the existing allocation for the given grapheme
-    /// `segment_text` and consuming items from `item_infos_iter`.
+    /// Rebuilds `self` in-place using the existing allocation for the given grapheme.
     ///
-    /// The iterator must yield one item for each character in `segment_text`.
+    /// `chars` must yield the grapheme's characters with associated analysis info, and style index.
     ///
-    /// `code_unit_offset_in_string` must be the byte offset of the start of `segment_text` in the
+    /// `code_unit_offset_in_string` must be the byte offset of the grapheme's first character in the
     /// source string. When this method returns, its value is the byte offset just past the end of
-    /// `segment_text` in the source string.
+    /// the grapheme in the source string.
     #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     #[inline]
     pub(crate) fn fill(
         &mut self,
-        segment_text: &str,
-        item_infos_iter: &mut impl Iterator<Item = (CharInfo, u16)>,
+        chars: impl Iterator<Item = (char, CharInfo, u16)>,
         code_unit_offset_in_string: &mut usize,
     ) {
         // Reset cluster but keep allocation
@@ -407,9 +405,7 @@ impl CharCluster {
         let mut leading_is_emoji_presentation = false;
         let start = *code_unit_offset_in_string as u32;
 
-        for ((i, ch), (info, style_index)) in
-            segment_text.char_indices().zip(item_infos_iter.by_ref())
-        {
+        for (i, (ch, info, style_index)) in chars.enumerate() {
             *code_unit_offset_in_string += ch.len_utf8();
             force_normalize |= info.force_normalize();
 

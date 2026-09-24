@@ -213,71 +213,30 @@ fn shape_segment(
         return Ok(()); // No clusters
     }
 
-    let mut segment_infos_iter = segment_char_info
-        .iter()
-        .copied()
-        .zip(segment_char_style_indices.iter().copied());
-    let mut code_unit_offset_in_string = text_range.start;
     let char_cluster = &mut scx.char_cluster;
 
-    // Build an iterator of grapheme boundaries and consume the first to seed the loop
-    let mut boundaries_iter = segment_text
-        .char_indices()
-        .zip(segment_char_info.iter())
-        .skip(1)
-        .filter_map(|((byte_pos, _), info)| info.is_grapheme_start().then_some(byte_pos))
-        .chain(core::iter::once(segment_text.len()));
-    let mut last_boundary = 0_usize;
-    let mut current_boundary = boundaries_iter.next().unwrap();
-
-    char_cluster.fill(
-        &segment_text[last_boundary..current_boundary],
-        &mut segment_infos_iter,
-        &mut code_unit_offset_in_string,
-    );
-
-    let Some(next_font) = select_font.select_font(segment, options, char_cluster) else {
-        return Err(());
+    // Shaping inputs that are constant over the segment.
+    let direction = if segment.bidi_level.is_rtl() {
+        harfrust::Direction::RightToLeft
+    } else {
+        harfrust::Direction::LeftToRight
     };
-    let mut current_font = Some(next_font);
+    let hb_script = script_to_harfrust(segment.script);
+    let language = options
+        .language
+        .as_ref()
+        .and_then(|lang| lang.as_str().parse::<harfrust::Language>().ok());
+    scx.features.clear();
+    scx.features.extend(options.features.iter().map(|feature| {
+        harfrust::Feature::new(
+            harfrust::Tag::new(&feature.tag.to_bytes()),
+            feature.value as u32,
+            ..,
+        )
+    }));
 
-    // The character offset of the current font run's start, accumulated per run.
-    let mut char_start = char_range.start;
-
-    // Main segmentation loop (based on swash shape_clusters) - only within current segment
-    while let Some(font) = current_font.take() {
-        // Collect all clusters for this font run
-        let cluster_range = char_cluster.range();
-        let run_start_offset = cluster_range.start as usize - text_range.start;
-        let mut run_end_offset = cluster_range.end as usize - text_range.start;
-
-        for next_boundary in boundaries_iter.by_ref() {
-            // Build next cluster in-place
-            last_boundary = current_boundary;
-            current_boundary = next_boundary;
-            char_cluster.fill(
-                &segment_text[last_boundary..current_boundary],
-                &mut segment_infos_iter,
-                &mut code_unit_offset_in_string,
-            );
-
-            let Some(next_font) = select_font.select_font(segment, options, char_cluster) else {
-                return Err(());
-            };
-            if next_font != font {
-                current_font = Some(next_font);
-                break;
-            } else {
-                // Same font - add to current run
-                run_end_offset = char_cluster.range().end as usize - text_range.start;
-            }
-        }
-
-        // Shape this font run with harfrust
-        let run_text = &segment_text[run_start_offset..run_end_offset];
-        // Shape the entire run text including newlines
-        // The line breaking algorithm will handle newlines automatically
-
+    // Shape a run of the segment with a single font, appending it to `shaped_text`.
+    let mut shape_run = |font: &FontInstance, range: TextRange| {
         // TODO: How do we want to handle errors like this?
         let font_ref =
             harfrust::FontRef::from_index(font.font.data.as_ref(), font.font.index).unwrap();
@@ -302,24 +261,6 @@ fn shape_segment(
             },
         );
 
-        let direction = if segment.bidi_level.is_rtl() {
-            harfrust::Direction::RightToLeft
-        } else {
-            harfrust::Direction::LeftToRight
-        };
-        let hb_script = script_to_harfrust(segment.script);
-        let language = options
-            .language
-            .as_ref()
-            .and_then(|lang| lang.as_str().parse::<harfrust::Language>().ok());
-        scx.features.clear();
-        for feature in options.features {
-            scx.features.push(harfrust::Feature::new(
-                harfrust::Tag::new(&feature.tag.to_bytes()),
-                feature.value as u32,
-                ..,
-            ));
-        }
         let harf_shaper = shaper_data
             .shaper(&font_ref)
             .instance(Some(instance))
@@ -351,7 +292,8 @@ fn shape_segment(
         buffer.clear();
         buffer.set_cluster_level(harfrust::BufferClusterLevel::MonotoneCharacters);
 
-        // Use the entire run text including newlines
+        // Use the entire run text including newlines.
+        let run_text = &text[range.byte_range.clone()];
         buffer.reserve(run_text.len());
         #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
         for (i, ch) in run_text.chars().enumerate() {
@@ -365,13 +307,13 @@ fn shape_segment(
             buffer.add(ch, i as u32);
         }
 
-        buffer.set_pre_context(&text[..text_range.start + run_start_offset]);
-        buffer.set_post_context(&text[text_range.start + run_end_offset..]);
+        buffer.set_pre_context(&text[..range.byte_range.start]);
+        buffer.set_post_context(&text[range.byte_range.end..]);
         buffer.set_direction(direction);
         buffer.set_script(hb_script);
 
-        if let Some(lang) = language {
-            buffer.set_language(lang);
+        if let Some(lang) = &language {
+            buffer.set_language(lang.clone());
         }
 
         let glyph_buffer = harf_shaper.shape(
@@ -382,13 +324,6 @@ fn shape_segment(
                 .point_size(Some(options.font_size)),
         );
 
-        let run_char_count = run_text.chars().count();
-        let range = TextRange {
-            byte_range: (segment.range.byte_range.start + run_start_offset)
-                ..(segment.range.byte_range.start + run_end_offset),
-            char_range: char_start..char_start + run_char_count,
-        };
-        char_start += run_char_count;
         shaped_text.push_run(
             text,
             range,
@@ -396,13 +331,63 @@ fn shape_segment(
             options,
             char_info,
             char_style_indices,
-            &font,
+            font,
             &glyph_buffer,
             harf_shaper.coords(),
         );
 
-        // Replace buffer to reuse allocation in next iteration.
+        // Replace buffer to reuse allocation in the next run.
         scx.unicode_buffer = Some(glyph_buffer.clear());
+    };
+
+    // This is the run being accumulated, i.e., consecutive graphemes for which `select_font`
+    // returns the same font.
+    let mut run: Option<(FontInstance, TextRange)> = None;
+
+    // The segment's characters with their analysis data and style indices.
+    let mut chars = segment_text
+        .chars()
+        .zip(segment_char_info)
+        .zip(segment_char_style_indices)
+        .map(|((ch, &info), &style_index)| (ch, info, style_index));
+
+    // The lengths of the segment's graphemes in characters.
+    let grapheme_lengths = segment_char_info
+        .chunk_by(|_, info| !info.is_grapheme_start())
+        .map(<[_]>::len);
+
+    // The end of the previous grapheme.
+    let mut byte_end = text_range.start;
+    let mut char_end = char_range.start;
+
+    for grapheme_length in grapheme_lengths {
+        let (byte_start, char_start) = (byte_end, char_end);
+        char_cluster.fill(chars.by_ref().take(grapheme_length), &mut byte_end);
+        char_end += grapheme_length;
+        let grapheme = TextRange {
+            byte_range: byte_start..byte_end,
+            char_range: char_start..char_end,
+        };
+
+        let font = select_font
+            .select_font(segment, options, char_cluster)
+            .ok_or(())?;
+
+        if let Some((run_font, run_range)) = &mut run
+            && *run_font == font
+        {
+            run_range.byte_range.end = byte_end;
+            run_range.char_range.end = char_end;
+        } else {
+            if let Some((run_font, run_range)) = run.take() {
+                // The font changed: shape the previous run.
+                shape_run(&run_font, run_range);
+            }
+            run = Some((font, grapheme));
+        }
+    }
+    if let Some((run_font, run_range)) = run {
+        shape_run(&run_font, run_range);
     }
 
     Ok(())
