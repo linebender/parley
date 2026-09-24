@@ -6,8 +6,8 @@
 use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
-    Alignment, AlignmentOptions, ContentWidths, InlineBox, InlineBoxKind, Layout, StyleProperty,
-    TextWrapMode, WhiteSpaceCollapse,
+    Alignment, AlignmentOptions, ContentWidths, InlineBox, InlineBoxKind, Layout, LineBreak,
+    StyleProperty, TextWrapMode, WhiteSpaceCollapse,
 };
 
 /// Checks that calculated content widths agree with actual line breaking.
@@ -94,6 +94,29 @@ fn content_widths_partially_hanging_atom() {
         "Min content width {} should equal the widest word's width {} (excluding the space)",
         widths.min,
         word_width
+    );
+}
+
+#[test]
+fn content_widths_line_break_anywhere() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // With `line-break: anywhere` there is a soft wrap opportunity between every character, so
+    // the min-content width is the width of the widest character.
+    let text = "WWW WW";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::LineBreak(LineBreak::Anywhere));
+    let mut layout = builder.build(text);
+
+    let widths = assert_content_widths_match_layout(&mut layout);
+    assert_eq!(layout.len(), 5, "one character per line (the space hangs)");
+
+    let char_width = single_line_width(&mut env, "W");
+    assert!(
+        (widths.min - char_width).abs() < 1e-3,
+        "Min content width {} should equal a single character's width {}",
+        widths.min,
+        char_width
     );
 }
 

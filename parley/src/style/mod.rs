@@ -15,7 +15,7 @@ pub use font::{
     FontVariations, FontWeight, FontWidth, GenericFamily,
 };
 pub use fontique::Language;
-pub use parlance::{OverflowWrap, TextWrapMode, WordBreak};
+pub use parlance::{LineBreak, OverflowWrap, TextWrapMode, WordBreak};
 pub use styleset::StyleSet;
 
 use crate::util::nearly_eq;
@@ -125,6 +125,8 @@ pub enum StyleProperty<'a, B: Brush> {
     LetterSpacing(f32),
     /// Control over where words can wrap.
     WordBreak(WordBreak),
+    /// Strictness of line-breaking rules.
+    LineBreak(LineBreak),
     /// Control over "emergency" line-breaking.
     OverflowWrap(OverflowWrap),
     /// Control over non-"emergency" line-breaking.
@@ -178,6 +180,8 @@ pub struct TextStyle<'family, 'settings, B: Brush> {
     pub letter_spacing: f32,
     /// Control over where words can wrap.
     pub word_break: WordBreak,
+    /// Strictness of line-breaking rules.
+    pub line_break: LineBreak,
     /// Control over "emergency" line-breaking.
     pub overflow_wrap: OverflowWrap,
     /// Control over non-"emergency" line-breaking.
@@ -210,6 +214,7 @@ impl<B: Brush> Default for TextStyle<'static, 'static, B> {
             word_spacing: 0.0,
             letter_spacing: 0.0,
             word_break: WordBreak::default(),
+            line_break: LineBreak::default(),
             overflow_wrap: OverflowWrap::default(),
             text_wrap_mode: TextWrapMode::default(),
             white_space_collapse: WhiteSpaceCollapse::default(),
@@ -280,6 +285,12 @@ impl<B: Brush> From<FontWeight> for StyleProperty<'_, B> {
 impl<B: Brush> From<WordBreak> for StyleProperty<'_, B> {
     fn from(value: WordBreak) -> Self {
         StyleProperty::WordBreak(value)
+    }
+}
+
+impl<B: Brush> From<LineBreak> for StyleProperty<'_, B> {
+    fn from(value: LineBreak) -> Self {
+        StyleProperty::LineBreak(value)
     }
 }
 

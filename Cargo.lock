@@ -2712,6 +2712,7 @@ dependencies = [
  "fontique",
  "harfrust",
  "hashbrown",
+ "icu_locale_core",
  "icu_normalizer",
  "icu_properties",
  "icu_segmenter",
