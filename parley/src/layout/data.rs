@@ -450,8 +450,12 @@ impl<B: Brush> LayoutData<B> {
                             } else {
                                 running_hanging_whitespace = hanging;
                             }
-                            hangs_conditionally =
-                                style.white_space_collapse == WhiteSpaceCollapse::Preserve;
+                            // The atom hangs from its logical end, so use the last cluster's style
+                            // to decide whether it hangs conditionally.
+                            let last_cluster = atom.shaped_clusters().last().unwrap();
+                            hangs_conditionally = self.styles[last_cluster.style_index as usize]
+                                .white_space_collapse
+                                == WhiteSpaceCollapse::Preserve;
                         }
                     }
                 }

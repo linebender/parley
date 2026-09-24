@@ -1557,10 +1557,12 @@ fn hanging_whitespace<B: Brush>(
                         effective_spacing,
                         line_item.is_rtl(),
                     );
-                    let first_character = &atom.characters()[0];
-                    let whitespace = first_character.whitespace;
+                    let whitespace = atom.characters()[0].whitespace;
                     if in_conditional_suffix && whitespace != Whitespace::Newline {
-                        if layout.data.styles[first_character.style_index as usize]
+                        // The atom hangs from its logical end, so use the last cluster's style to
+                        // decide whether it hangs conditionally.
+                        let last_cluster = atom.shaped_clusters().last().unwrap();
+                        if layout.data.styles[last_cluster.style_index as usize]
                             .white_space_collapse
                             == WhiteSpaceCollapse::Preserve
                         {
