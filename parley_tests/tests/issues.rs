@@ -207,3 +207,26 @@ fn inline_boxes_after_newline_max_content_width() {
     env.with_name("inline_boxes_after_newline")
         .check_layout_snapshot(&layout);
 }
+
+/// Test that there is no soft wrap opportunity after an inline box when wrapping is disabled.
+#[test]
+fn no_break_after_inline_box_with_nowrap() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // "A[box]\u{A0}B" with a no-break space after the box.
+    let text = "A\u{A0}B";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::TextWrapMode(TextWrapMode::NoWrap));
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        kind: InlineBoxKind::InFlow,
+        index: 1,
+        width: 10.0,
+        height: 10.0,
+        baseline: None,
+    });
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(0.0));
+
+    assert_eq!(layout.len(), 1, "Expected a single line");
+}
