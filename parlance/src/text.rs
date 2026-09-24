@@ -29,17 +29,18 @@ pub enum WordBreak {
 
 /// Strictness of line-breaking rules, named for the CSS property.
 ///
+/// CSS `line-break: auto` lets the user agent choose the rules, so it has no equivalent here: map it
+/// to whichever of these values is appropriate.
+///
 /// See: <https://www.w3.org/TR/css-text-3/#line-break-property>
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum LineBreak {
-    /// The implementation chooses the rules. Parley uses the same rules as [`LineBreak::Strict`].
-    #[default]
-    Auto,
     /// The least restrictive set of line-breaking rules.
     Loose,
     /// The most common set of line-breaking rules.
     Normal,
     /// The most stringent set of line-breaking rules.
+    #[default]
     Strict,
     /// A soft wrap opportunity around every typographic character unit, disregarding any
     /// prohibition against line breaks.

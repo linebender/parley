@@ -181,7 +181,7 @@ impl SegmenterKey {
 
     fn new(config: &LineBreakConfig) -> Self {
         let strictness = match config.line_break {
-            LineBreak::Auto | LineBreak::Strict => LineBreakStrictness::Strict,
+            LineBreak::Strict => LineBreakStrictness::Strict,
             LineBreak::Normal => LineBreakStrictness::Normal,
             LineBreak::Loose => LineBreakStrictness::Loose,
             LineBreak::Anywhere => LineBreakStrictness::Anywhere,

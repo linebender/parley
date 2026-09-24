@@ -1152,7 +1152,6 @@ fn test_line_break_small_kana() {
     // line under `normal` and `loose`.
     let text = "文ぁ文";
     for (line_break, expected) in [
-        (LineBreak::Auto, false),
         (LineBreak::Strict, false),
         (LineBreak::Normal, true),
         (LineBreak::Loose, true),
