@@ -27,6 +27,7 @@ This release has an [MSRV] of 1.88.
 #### Fontique
 
 - `Collection::family_ids` to iterate over unique font family identifiers. ([#725][] by [@tomcur][])
+- Per-character font fallback. `Query::set_fallback_chars` lets a query specify the characters that fallback fonts are expected to cover. When none of the requested or script fallback families provide coverage, the query now asks the platform for a font covering those specific characters (CoreText, DirectWrite, and fontconfig). Results are cached per set of characters. ([#689][] by [@nicoburns][])
 
 #### Parley
 
@@ -35,6 +36,10 @@ This release has an [MSRV] of 1.88.
   Together these make it possible to build an accessibility integration outside of Parley.
 
 ### Changed
+
+#### Fontique
+
+- Script/locale fallback now produces an ordered list of families (the CoreText cascade list, fontconfig's sorted coverage list, and all matching Android fallback chain entries) rather than a single family. ([#689][] by [@nicoburns][])
 
 #### Parley
 
@@ -64,6 +69,11 @@ This release has an [MSRV] of 1.88.
 
 - Fix compilation on 32-bit platforms without 64-bit atomics (e.g. `mipsel-unknown-linux-gnu`). ([#671][] by [@nicoburns][])
 - Don't panic when fontconfig exposes no fonts. ([#717][] by [@ogoffart][])
+- Font fallback no longer fails to find a glyph when the platform can suggest a font for the specific characters. Punctuation shared between scripts (e.g. `。` in Latin text) is now handled by per-character fallback rather than the previous Han-specific workaround for [#597][]. ([#689][] by [@nicoburns][])
+
+#### Parley
+
+- Empty layouts now shape their cursor-metrics run with the resolved default style instead of a zero font size. ([#689][] by [@nicoburns][])
 
 ## [0.11.0] - 2026-06-24
 
@@ -721,6 +731,7 @@ This release has an [MSRV][] of 1.70.
 [#575]: https://github.com/linebender/parley/pull/575
 [#589]: https://github.com/linebender/parley/pull/589
 [#594]: https://github.com/linebender/parley/pull/594
+[#597]: https://github.com/linebender/parley/issues/597
 [#598]: https://github.com/linebender/parley/pull/598
 [#600]: https://github.com/linebender/parley/pull/600
 [#609]: https://github.com/linebender/parley/pull/609
@@ -738,6 +749,7 @@ This release has an [MSRV][] of 1.70.
 [#650]: https://github.com/linebender/parley/pull/650
 [#661]: https://github.com/linebender/parley/pull/661
 [#671]: https://github.com/linebender/parley/pull/671
+[#689]: https://github.com/linebender/parley/pull/689
 [#697]: https://github.com/linebender/parley/pull/697
 [#710]: https://github.com/linebender/parley/pull/710
 [#715]: https://github.com/linebender/parley/pull/715
