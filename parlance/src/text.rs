@@ -27,6 +27,25 @@ pub enum WordBreak {
     KeepAll,
 }
 
+/// Strictness of line-breaking rules, named for the CSS property.
+///
+/// See: <https://www.w3.org/TR/css-text-3/#line-break-property>
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum LineBreak {
+    /// The implementation chooses the rules. Parley uses the same rules as [`LineBreak::Strict`].
+    #[default]
+    Auto,
+    /// The least restrictive set of line-breaking rules.
+    Loose,
+    /// The most common set of line-breaking rules.
+    Normal,
+    /// The most stringent set of line-breaking rules.
+    Strict,
+    /// A soft wrap opportunity around every typographic character unit, disregarding any
+    /// prohibition against line breaks.
+    Anywhere,
+}
+
 /// Control over "emergency" line-breaking.
 ///
 /// See: <https://www.w3.org/TR/css-text-3/#overflow-wrap-property>

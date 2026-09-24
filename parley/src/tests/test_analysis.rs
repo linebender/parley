@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::{
-    FontContext, LayoutContext, RangedBuilder, StyleProperty, WhiteSpaceCollapse, WordBreak,
+    FontContext, Language, LayoutContext, LineBreak, RangedBuilder, StyleProperty,
+    WhiteSpaceCollapse, WordBreak,
 };
 use alloc::{vec, vec::Vec};
 use fontique::FontWeight;
@@ -1133,4 +1134,130 @@ fn test_break_spaces_across_style_boundary() {
     })
     .expect_soft_wrap_opportunity_list(vec![false, false, true])
     .expect_word_boundary_list(vec![true, true, true]);
+}
+
+fn soft_wrap_opportunities(text: &str, line_break: LineBreak, language: Option<&str>) -> Vec<bool> {
+    verify_analysis(text, |builder| {
+        builder.push_default(StyleProperty::LineBreak(line_break));
+        builder.push_default(StyleProperty::Locale(
+            language.map(|language| Language::parse(language).unwrap()),
+        ));
+    })
+    .soft_wrap_opportunity_list()
+}
+
+#[test]
+fn test_line_break_small_kana() {
+    // U+3041 HIRAGANA LETTER SMALL A is a conditional Japanese starter (CJ), which may only start a
+    // line under `normal` and `loose`.
+    let text = "文ぁ文";
+    for (line_break, expected) in [
+        (LineBreak::Auto, false),
+        (LineBreak::Strict, false),
+        (LineBreak::Normal, true),
+        (LineBreak::Loose, true),
+    ] {
+        assert_eq!(
+            soft_wrap_opportunities(text, line_break, None)[1],
+            expected,
+            "{line_break:?}"
+        );
+    }
+}
+
+#[test]
+fn test_line_break_hyphen_after_ideograph() {
+    // A break before U+2010 HYPHEN after an ideograph (ID) is only allowed under `loose`.
+    let text = "文‐文";
+    for (line_break, expected) in [
+        (LineBreak::Strict, false),
+        (LineBreak::Normal, false),
+        (LineBreak::Loose, true),
+    ] {
+        assert_eq!(
+            soft_wrap_opportunities(text, line_break, None)[1],
+            expected,
+            "{line_break:?}"
+        );
+    }
+}
+
+#[test]
+fn test_line_break_iteration_mark() {
+    // U+3005 IDEOGRAPHIC ITERATION MARK may only start a line under `loose`.
+    let text = "文々文";
+    assert!(!soft_wrap_opportunities(text, LineBreak::Normal, None)[1]);
+    assert!(soft_wrap_opportunities(text, LineBreak::Loose, None)[1]);
+}
+
+#[test]
+fn test_line_break_chinese_japanese_tailoring() {
+    // A break before U+301C WAVE DASH under `normal` is only allowed for Chinese or Japanese.
+    let text = "文〜文";
+    assert!(!soft_wrap_opportunities(text, LineBreak::Normal, None)[1]);
+    assert!(!soft_wrap_opportunities(text, LineBreak::Normal, Some("en"))[1]);
+    assert!(soft_wrap_opportunities(text, LineBreak::Normal, Some("ja"))[1]);
+    assert!(soft_wrap_opportunities(text, LineBreak::Normal, Some("zh-Hant"))[1]);
+
+    // A break before U+FF04 FULLWIDTH DOLLAR SIGN (PR with East Asian Width F) under `loose`
+    // is only allowed for Chinese or Japanese.
+    let text = "文＄文";
+    assert!(!soft_wrap_opportunities(text, LineBreak::Loose, Some("en"))[2]);
+    assert!(soft_wrap_opportunities(text, LineBreak::Loose, Some("ja"))[2]);
+}
+
+#[test]
+fn test_line_break_anywhere() {
+    // Opportunities around every character, including those with the GL (U+00A0 NO-BREAK SPACE)
+    // and WJ (U+2060 WORD JOINER) classes, and punctuation.
+    assert_eq!(
+        soft_wrap_opportunities("ab\u{a0}c\u{2060}d/e", LineBreak::Anywhere, None),
+        vec![false, true, true, true, true, true, true, true]
+    );
+    // But not before a combining mark, nor before a mandatory break.
+    assert_eq!(
+        soft_wrap_opportunities("ae\u{301}\nb", LineBreak::Anywhere, None),
+        vec![false, true, false, false, false]
+    );
+}
+
+#[test]
+fn test_line_break_anywhere_overrides_keep_all() {
+    verify_analysis("abc", |builder| {
+        builder.push_default(StyleProperty::WordBreak(WordBreak::KeepAll));
+        builder.push_default(StyleProperty::LineBreak(LineBreak::Anywhere));
+    })
+    .expect_soft_wrap_opportunity_list(vec![false, true, true]);
+}
+
+#[test]
+fn test_line_break_anywhere_ignores_line_break_override() {
+    let mut test_context = TestContext::default();
+    {
+        let text = "a b/c";
+        let mut builder = test_context.layout_context.ranged_builder(
+            &mut test_context.font_context,
+            text,
+            1.,
+            true,
+        );
+        builder.push_default(StyleProperty::LineBreak(LineBreak::Anywhere));
+        builder.push(StyleProperty::LineBreak(LineBreak::Normal), 4..5);
+        builder.set_line_break_override(Some(&|_| Some(false)));
+        _ = builder.build(text);
+    }
+    assert_eq!(
+        test_context.soft_wrap_opportunity_list(),
+        vec![false, true, true, true, false]
+    );
+}
+
+#[test]
+fn test_line_break_mixed_runs() {
+    // The opportunity before a character is decided by that character's configuration.
+    verify_analysis("abcdef", |builder| {
+        builder.push(StyleProperty::LineBreak(LineBreak::Anywhere), 0..2);
+        builder.push(StyleProperty::LineBreak(LineBreak::Anywhere), 4..6);
+    })
+    .expect_soft_wrap_opportunity_list(vec![false, true, false, false, true, true]);
 }
