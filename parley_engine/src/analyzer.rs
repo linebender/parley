@@ -47,8 +47,9 @@ pub struct LineBreakConfig {
     pub line_break: LineBreak,
     /// The content language.
     ///
-    /// Chinese and Japanese content allows some additional soft wrap opportunities under
-    /// [`LineBreak::Normal`] and [`LineBreak::Loose`], and fewer under [`LineBreak::Strict`].
+    /// Chinese and Japanese content uses tailored line breaking rules, which for example allow
+    /// breaks before small kana and some punctuation under [`LineBreak::Normal`] and
+    /// [`LineBreak::Loose`].
     pub language: Option<Language>,
 }
 
