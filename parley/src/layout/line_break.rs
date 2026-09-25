@@ -738,8 +738,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.layout.data.quantize,
                         );
 
-                        // We can always line break after an inline box
-                        self.state.mark_line_break_opportunity();
+                        // There is a soft wrap opportunity after an inline box, unless wrapping
+                        // is disabled
+                        if self.state.line.text_wrap_mode == TextWrapMode::Wrap {
+                            self.state.mark_line_break_opportunity();
+                        }
                     } else {
                         // If we're at the start of the line, this box will never fit, so consume it and accept the overflow.
                         let reason = if self.state.line.x == 0.0 {
