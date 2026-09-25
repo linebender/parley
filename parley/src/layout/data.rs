@@ -442,7 +442,7 @@ impl ContentWidthsState {
                     continue;
                 }
                 if SPACED {
-                    gap = spacing.atom_gap(whitespace);
+                    gap = spacing.gaps(whitespace).after;
                 }
             } else if skip_atom {
                 continue;
