@@ -927,7 +927,10 @@ const fn mask(t: BidiClass) -> u32 {
         BidiClass::LeftToRightIsolate => 20,
         BidiClass::RightToLeftIsolate => 21,
         BidiClass::PopDirectionalIsolate => 22,
-        _ => return 0,
+        _ => {
+            debug_assert!(false, "unhandled Bidi_Class");
+            return 0;
+        }
     };
     1 << bit
 }
