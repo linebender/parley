@@ -738,8 +738,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             self.layout.data.quantize,
                         );
 
-                        // We can always line break after an inline box
-                        self.state.mark_line_break_opportunity();
+                        // There is a soft wrap opportunity after an inline box, unless wrapping
+                        // is disabled
+                        if self.state.line.text_wrap_mode == TextWrapMode::Wrap {
+                            self.state.mark_line_break_opportunity();
+                        }
                     } else {
                         // If we're at the start of the line, this box will never fit, so consume it and accept the overflow.
                         let reason = if self.state.line.x == 0.0 {
@@ -1201,7 +1204,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     kind: LayoutItemKind::TextRun,
                     index,
                     bidi_level: BidiLevel::new(0),
-                    advance: 0.,
                     shaped_cluster_range: cluster..cluster,
                     text_range: text..text,
                 });
@@ -1327,13 +1329,10 @@ fn commit_line<B: Brush>(
 
         match item.kind {
             LayoutItemKind::InlineBox => {
-                let inline_box = &layout.data.inline_boxes[item.index];
-
                 lines.line_items.push(LineItemData {
                     kind: LayoutItemKind::InlineBox,
                     index: item.index,
                     bidi_level: item.bidi_level,
-                    advance: inline_box.width,
 
                     // These properties are ignored for inline boxes. So we just put a dummy value.
                     shaped_cluster_range: 0..0,
@@ -1390,19 +1389,10 @@ fn commit_line<B: Brush>(
                 text_end = text_end.max(item_text_range.end);
                 needs_reorder |= shaped_run.bidi_level != BidiLevel::new(0);
 
-                // Calculate the run's advance including any word/letter spacing. This doesn't
-                // include justification, as that's applied after lines are broken.
-                let effective_spacing = EffectiveSpacing::new(
-                    layout.data.runs[item.index].spacing,
-                    Justification::NONE,
-                );
-                let advance = effective_spacing.slice_advance(slice.narrow(cluster_range.clone()));
-
                 lines.line_items.push(LineItemData {
                     kind: LayoutItemKind::TextRun,
                     index: item.index,
                     bidi_level: shaped_run.bidi_level,
-                    advance,
                     shaped_cluster_range: cluster_range,
                     text_range: item_text_range,
                 });
@@ -1557,10 +1547,12 @@ fn hanging_whitespace<B: Brush>(
                         effective_spacing,
                         line_item.is_rtl(),
                     );
-                    let first_character = &atom.characters()[0];
-                    let whitespace = first_character.whitespace;
+                    let whitespace = atom.characters()[0].whitespace;
                     if in_conditional_suffix && whitespace != Whitespace::Newline {
-                        if layout.data.styles[first_character.style_index as usize]
+                        // The atom hangs from its logical end, so use the last cluster's style to
+                        // decide whether it hangs conditionally.
+                        let last_cluster = atom.shaped_clusters().last().unwrap();
+                        if layout.data.styles[last_cluster.style_index as usize]
                             .white_space_collapse
                             == WhiteSpaceCollapse::Preserve
                         {
