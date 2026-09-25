@@ -17,11 +17,12 @@ pub(crate) fn analyze_text<B: Brush>(
 ) {
     let text = if text.is_empty() { " " } else { text };
 
-    // Collect the style runs' line break configurations, and the runs which allow wrapping after
-    // each preserved space or tab. Line break gaps use the default configuration, so only
-    // non-default configurations need an entry, and adjacent equal configurations are merged.
-    // Adjacent `break-spaces` runs are merged, so that an opportunity is not created before the
-    // first space of a sequence spanning a style boundary.
+    // Collect the style runs' line break configurations. Gaps use the default configuration, so
+    // only non-default configurations need an entry, and adjacent equal configurations are merged.
+    //
+    // Separately, collect the `break-spaces` runs, which allow wrapping after each preserved space
+    // or tab. Adjacent runs are merged, so that an opportunity is not created before the first
+    // space of a sequence spanning a style boundary.
     lcx.line_break.clear();
     lcx.break_spaces.clear();
     for style_run in lcx.style_runs.iter() {

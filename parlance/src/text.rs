@@ -29,9 +29,6 @@ pub enum WordBreak {
 
 /// Strictness of line-breaking rules, named for the CSS property.
 ///
-/// CSS `line-break: auto` lets the user agent choose the rules, so it has no equivalent here: map it
-/// to whichever of these values is appropriate.
-///
 /// See: <https://www.w3.org/TR/css-text-3/#line-break-property>
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum LineBreak {
@@ -39,11 +36,15 @@ pub enum LineBreak {
     Loose,
     /// The most common set of line-breaking rules.
     Normal,
-    /// The most stringent set of line-breaking rules.
+    /// The most stringent set of line-breaking rules. This is the default.
     #[default]
     Strict,
-    /// A soft wrap opportunity around every typographic character unit, disregarding any
-    /// prohibition against line breaks.
+    /// A soft wrap opportunity around every typographic character unit (grapheme cluster).
+    ///
+    /// This disregards the prohibitions of the Unicode line breaking algorithm (such as around
+    /// U+00A0 NO-BREAK SPACE, U+2060 WORD JOINER and punctuation) and of [`WordBreak::KeepAll`].
+    /// There is still no opportunity directly before a mandatory break, soft wrapping must be
+    /// enabled by [`TextWrapMode`], and a line break override can still suppress opportunities.
     Anywhere,
 }
 
