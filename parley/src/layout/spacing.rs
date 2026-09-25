@@ -96,19 +96,25 @@ impl Spacing {
         self.word == 0. && self.letter == 0.
     }
 
-    /// The gap at the line-right side of an atom whose first character has the given whitespace
-    /// class.
+    /// The gaps around an atom whose first character has the given whitespace class.
     ///
-    /// This is equivalent to [`EffectiveSpacing::gaps`]'s `after` under [`Justification::NONE`].
+    /// This is [`EffectiveSpacing::gaps`] under [`Justification::NONE`].
     #[inline(always)]
-    pub(crate) fn atom_gap(self, whitespace: Whitespace) -> f32 {
+    pub(crate) fn gaps(self, whitespace: Whitespace) -> Gaps {
         if whitespace == Whitespace::Newline {
-            0.
-        } else if is_word_separator(whitespace) {
-            self.letter + self.word
-        } else {
-            self.letter
+            return Gaps::ZERO;
         }
+
+        let mut gaps = Gaps {
+            before: 0.,
+            after: self.letter,
+        };
+
+        if is_word_separator(whitespace) {
+            gaps.after += self.word;
+        }
+
+        gaps
     }
 }
 
@@ -167,22 +173,12 @@ impl EffectiveSpacing {
     #[inline(always)]
     pub(crate) fn gaps(self, atom: &Atom<'_>) -> Gaps {
         let whitespace = atom.characters()[0].whitespace;
+        let mut gaps = self.spacing.gaps(whitespace);
 
-        if whitespace == Whitespace::Newline {
-            return Gaps::ZERO;
-        }
-
-        let mut gaps = Gaps {
-            before: 0.,
-            after: self.spacing.letter,
-        };
-
-        if is_word_separator(whitespace) {
-            gaps.after += self.spacing.word;
-
-            if atom.shaped_clusters_range().end <= self.justification.justification_end_cluster {
-                gaps.after += self.justification.amount_per_opportunity;
-            }
+        if is_word_separator(whitespace)
+            && atom.shaped_clusters_range().end <= self.justification.justification_end_cluster
+        {
+            gaps.after += self.justification.amount_per_opportunity;
         }
 
         gaps
