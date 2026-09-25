@@ -27,6 +27,27 @@ pub enum WordBreak {
     KeepAll,
 }
 
+/// Strictness of line-breaking rules, named for the CSS property.
+///
+/// See: <https://www.w3.org/TR/css-text-3/#line-break-property>
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum LineBreak {
+    /// The least restrictive set of line-breaking rules.
+    Loose,
+    /// The most common set of line-breaking rules.
+    Normal,
+    /// The most stringent set of line-breaking rules. This is the default.
+    #[default]
+    Strict,
+    /// A soft wrap opportunity around every typographic character unit (grapheme cluster).
+    ///
+    /// This disregards the prohibitions of the Unicode line breaking algorithm (such as around
+    /// U+00A0 NO-BREAK SPACE, U+2060 WORD JOINER and punctuation) and of [`WordBreak::KeepAll`].
+    /// There is still no opportunity directly before a mandatory break, soft wrapping must be
+    /// enabled by [`TextWrapMode`], and a line break override can still suppress opportunities.
+    Anywhere,
+}
+
 /// Control over "emergency" line-breaking.
 ///
 /// See: <https://www.w3.org/TR/css-text-3/#overflow-wrap-property>

@@ -5,9 +5,9 @@ use crate::{Brush, LayoutContext, WhiteSpaceCollapse};
 
 use parley_engine::break_overrides::LineBreakOverrideFn;
 
-use parley_engine::AnalysisOptions;
+use parley_engine::{AnalysisOptions, LineBreakConfig};
 
-use parlance::{BaseDirection, WordBreak};
+use parlance::BaseDirection;
 
 pub(crate) fn analyze_text<B: Brush>(
     lcx: &mut LayoutContext<B>,
@@ -17,17 +17,30 @@ pub(crate) fn analyze_text<B: Brush>(
 ) {
     let text = if text.is_empty() { " " } else { text };
 
-    // Collect the style runs' word breaks, and the runs which allow wrapping after each preserved
-    // space or tab. Word break gaps are `WordBreak::Normal`, so only non-`Normal`s need an entry.
-    // Adjacent `break-spaces` runs are merged, so that an opportunity is not created before the
-    // first space of a sequence spanning a style boundary.
-    lcx.word_break.clear();
+    // Collect the style runs' line break configurations. Gaps use the default configuration, so
+    // only non-default configurations need an entry, and adjacent equal configurations are merged.
+    //
+    // Separately, collect the `break-spaces` runs, which allow wrapping after each preserved space
+    // or tab. Adjacent runs are merged, so that an opportunity is not created before the first
+    // space of a sequence spanning a style boundary.
+    lcx.line_break.clear();
     lcx.break_spaces.clear();
     for style_run in lcx.style_runs.iter() {
         let style = &lcx.style_table[style_run.style_index as usize];
-        if style.word_break != WordBreak::Normal {
-            lcx.word_break
-                .push((style_run.range.clone(), style.word_break));
+        let line_break = LineBreakConfig {
+            word_break: style.word_break,
+            line_break: style.line_break,
+            language: style.locale,
+        };
+        if line_break != LineBreakConfig::default() {
+            match lcx.line_break.last_mut() {
+                Some((range, last))
+                    if range.end == style_run.range.start && *last == line_break =>
+                {
+                    range.end = style_run.range.end;
+                }
+                _ => lcx.line_break.push((style_run.range.clone(), line_break)),
+            }
         }
         if style.white_space_collapse == WhiteSpaceCollapse::BreakSpaces {
             match lcx.break_spaces.last_mut() {
@@ -39,7 +52,7 @@ pub(crate) fn analyze_text<B: Brush>(
 
     let options = AnalysisOptions {
         base_direction,
-        word_break: &lcx.word_break,
+        line_break: &lcx.line_break,
         break_spaces: &lcx.break_spaces,
         line_break_override,
     };

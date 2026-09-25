@@ -5,7 +5,7 @@
 
 use core::ops::Range;
 
-use parlance::{BaseDirection, WordBreak};
+use parlance::{BaseDirection, Language, LineBreak, WordBreak};
 
 use crate::{bidi::BidiResolver, break_overrides::LineBreakOverrideFn};
 
@@ -38,6 +38,21 @@ impl Analyzer {
     }
 }
 
+/// Configuration of line break opportunities for a range of text.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub struct LineBreakConfig {
+    /// CSS `word-break`.
+    pub word_break: WordBreak,
+    /// CSS `line-break`.
+    pub line_break: LineBreak,
+    /// The content language.
+    ///
+    /// Chinese and Japanese content uses tailored line breaking rules, which for example allow
+    /// breaks before small kana and some punctuation under [`LineBreak::Normal`] and
+    /// [`LineBreak::Loose`].
+    pub language: Option<Language>,
+}
+
 /// Options controlling [`Analyzer::analyze`].
 #[derive(Clone, Copy, Default)]
 pub struct AnalysisOptions<'a> {
@@ -46,11 +61,11 @@ pub struct AnalysisOptions<'a> {
     /// Defaults to [`BaseDirection::Auto`], which infers the direction from the text.
     pub base_direction: BaseDirection,
 
-    /// Word break configuration for ranges of the source text.
+    /// Line breaking configuration for ranges of the source text.
     ///
     /// Ranges must be sorted and non-overlapping, and must start and end on character boundaries of
-    /// the text. Empty ranges are ignored. Gaps use [`WordBreak::Normal`].
-    pub word_break: &'a [(Range<usize>, WordBreak)],
+    /// the text. Empty ranges are ignored. Gaps use [`LineBreakConfig::default`].
+    pub line_break: &'a [(Range<usize>, LineBreakConfig)],
 
     /// Ranges of the source text in which a soft wrap opportunity follows every space, tab, and
     /// ideographic space.
@@ -81,7 +96,7 @@ impl core::fmt::Debug for AnalysisOptions<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("AnalysisOptions")
             .field("base_direction", &self.base_direction)
-            .field("word_break", &self.word_break)
+            .field("line_break", &self.line_break)
             .field("break_spaces", &self.break_spaces)
             .finish_non_exhaustive()
     }

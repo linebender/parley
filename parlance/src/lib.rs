@@ -59,4 +59,4 @@ pub use language::{Language, ParseLanguageError};
 pub use normalized_coord::NormalizedCoord;
 pub use script::{ParseScriptError, Script};
 pub use tag::{FontFeature, FontVariation, ParseSettingsError, ParseSettingsErrorKind, Tag};
-pub use text::{BaseDirection, OverflowWrap, TextWrapMode, WordBreak};
+pub use text::{BaseDirection, LineBreak, OverflowWrap, TextWrapMode, WordBreak};

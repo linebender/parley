@@ -17,8 +17,8 @@ use super::style::{
 use crate::font::FontContext;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
+use crate::{LineBreak, TextWrapMode, WhiteSpaceCollapse, WordBreak};
 use crate::{LineHeight, OverflowWrap, layout};
-use crate::{TextWrapMode, WhiteSpaceCollapse, WordBreak};
 use core::borrow::Borrow;
 use core::ops::Range;
 use fontique::FamilyId;
@@ -164,6 +164,7 @@ impl ResolveContext {
             StyleProperty::WordSpacing(value) => WordSpacing(*value * scale),
             StyleProperty::LetterSpacing(value) => LetterSpacing(*value * scale),
             StyleProperty::WordBreak(value) => WordBreak(*value),
+            StyleProperty::LineBreak(value) => LineBreak(*value),
             StyleProperty::OverflowWrap(value) => OverflowWrap(*value),
             StyleProperty::TextWrapMode(value) => TextWrapMode(*value),
             StyleProperty::WhiteSpaceCollapse(value) => WhiteSpaceCollapse(*value),
@@ -202,6 +203,7 @@ impl ResolveContext {
             word_spacing: raw_style.word_spacing * scale,
             letter_spacing: raw_style.letter_spacing * scale,
             word_break: raw_style.word_break,
+            line_break: raw_style.line_break,
             overflow_wrap: raw_style.overflow_wrap,
             text_wrap_mode: raw_style.text_wrap_mode,
             white_space_collapse: raw_style.white_space_collapse,
@@ -385,6 +387,8 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     LetterSpacing(f32),
     /// Control over where words can wrap.
     WordBreak(WordBreak),
+    /// Strictness of line-breaking rules.
+    LineBreak(LineBreak),
     /// Control over "emergency" line-breaking.
     OverflowWrap(OverflowWrap),
     /// Control over non-"emergency" line-breaking.
@@ -426,6 +430,8 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     pub(crate) letter_spacing: f32,
     /// Control over where words can wrap.
     pub(crate) word_break: WordBreak,
+    /// Strictness of line-breaking rules.
+    pub(crate) line_break: LineBreak,
     /// Control over "emergency" line-breaking.
     pub(crate) overflow_wrap: OverflowWrap,
     /// Control over non-"emergency" line-breaking.
@@ -460,6 +466,7 @@ impl<B: Brush> ResolvedStyle<B> {
             WordSpacing(value) => self.word_spacing = value,
             LetterSpacing(value) => self.letter_spacing = value,
             WordBreak(value) => self.word_break = value,
+            LineBreak(value) => self.line_break = value,
             OverflowWrap(value) => self.overflow_wrap = value,
             TextWrapMode(value) => self.text_wrap_mode = value,
             WhiteSpaceCollapse(value) => self.white_space_collapse = value,
@@ -490,6 +497,7 @@ impl<B: Brush> ResolvedStyle<B> {
             WordSpacing(value) => nearly_eq(self.word_spacing, *value),
             LetterSpacing(value) => nearly_eq(self.letter_spacing, *value),
             WordBreak(value) => self.word_break == *value,
+            LineBreak(value) => self.line_break == *value,
             OverflowWrap(value) => self.overflow_wrap == *value,
             TextWrapMode(value) => self.text_wrap_mode == *value,
             WhiteSpaceCollapse(value) => self.white_space_collapse == *value,

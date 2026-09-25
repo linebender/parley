@@ -9,6 +9,7 @@
 use alloc::vec::Vec;
 use core::ops::Range;
 
+use icu_locale_core::{LanguageIdentifier, langid};
 use icu_normalizer::properties::{
     CanonicalComposition, CanonicalCompositionBorrowed, CanonicalDecomposition,
     CanonicalDecompositionBorrowed,
@@ -17,17 +18,19 @@ use icu_properties::props::{BidiMirroringGlyph, GeneralCategory, GraphemeCluster
 use icu_properties::{
     CodePointMapData, CodePointMapDataBorrowed, PropertyNamesShort, PropertyNamesShortBorrowed,
 };
-use icu_segmenter::options::{LineBreakOptions, LineBreakWordOption, WordBreakInvariantOptions};
+use icu_segmenter::options::{
+    LineBreakOptions, LineBreakStrictness, LineBreakWordOption, WordBreakInvariantOptions,
+};
 use icu_segmenter::{
     GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter,
     LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed,
 };
-use parlance::{BaseDirection, BidiLevel, WordBreak};
+use parlance::{BaseDirection, BidiLevel, LineBreak, WordBreak};
 use parley_data::Properties;
 
 use crate::bidi;
 use crate::break_overrides::LineBreakContext;
-use crate::{AnalysisOptions, Analyzer};
+use crate::{AnalysisOptions, Analyzer, LineBreakConfig};
 
 /// The result of [`Analyzer::analyze`].
 #[derive(Debug, Default)]
@@ -115,24 +118,15 @@ impl AnalysisDataSources {
     }
 
     #[inline(always)]
-    fn line_segmenter(&self, word_break_strength: WordBreak) -> LineSegmenterBorrowed<'static> {
-        match word_break_strength {
-            WordBreak::Normal => {
-                let mut opt = LineBreakOptions::default();
-                opt.word_option = Some(LineBreakWordOption::Normal);
-                line_segmenter_impl(opt)
-            }
-            WordBreak::BreakAll => {
-                let mut opt = LineBreakOptions::default();
-                opt.word_option = Some(LineBreakWordOption::BreakAll);
-                line_segmenter_impl(opt)
-            }
-            WordBreak::KeepAll => {
-                let mut opt = LineBreakOptions::default();
-                opt.word_option = Some(LineBreakWordOption::KeepAll);
-                line_segmenter_impl(opt)
-            }
-        }
+    fn line_segmenter(&self, key: SegmenterKey) -> LineSegmenterBorrowed<'static> {
+        // We use Japanese arbitrarily; see `SegmenterKey::ja_zh`.
+        static JA: LanguageIdentifier = langid!("ja");
+
+        let mut opt = LineBreakOptions::default();
+        opt.word_option = Some(key.word_option);
+        opt.strictness = Some(key.strictness);
+        opt.content_locale = key.ja_zh.then_some(&JA);
+        line_segmenter_impl(opt)
     }
 
     #[inline(always)]
@@ -166,6 +160,54 @@ fn line_segmenter_impl(opt: LineBreakOptions<'_>) -> LineSegmenterBorrowed<'stat
 #[inline(always)]
 fn line_segmenter_impl(opt: LineBreakOptions<'_>) -> LineSegmenterBorrowed<'static> {
     LineSegmenter::new_for_non_complex_scripts(opt)
+}
+
+/// The line segmenter configuration for a [`LineBreakConfig`].
+///
+/// Configurations which result in the same segmentation map to the same key.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct SegmenterKey {
+    word_option: LineBreakWordOption,
+    strictness: LineBreakStrictness,
+    /// See [`LineBreakConfig::language`]; the only languages which impact segmentation are
+    /// Chinese and Japanese. These impact it in the same way, and only under
+    /// [`LineBreak::Normal`] and [`LineBreak::Loose`], so we only track whether one of them
+    /// applies.
+    ja_zh: bool,
+}
+
+impl SegmenterKey {
+    const DEFAULT: Self = Self {
+        word_option: LineBreakWordOption::Normal,
+        strictness: LineBreakStrictness::Strict,
+        ja_zh: false,
+    };
+
+    fn new(config: &LineBreakConfig) -> Self {
+        let strictness = match config.line_break {
+            LineBreak::Strict => LineBreakStrictness::Strict,
+            LineBreak::Normal => LineBreakStrictness::Normal,
+            LineBreak::Loose => LineBreakStrictness::Loose,
+            // We add opportunities per grapheme ourselves.
+            LineBreak::Anywhere => return Self::DEFAULT,
+        };
+        let word_option = match config.word_break {
+            WordBreak::Normal => LineBreakWordOption::Normal,
+            WordBreak::BreakAll => LineBreakWordOption::BreakAll,
+            WordBreak::KeepAll => LineBreakWordOption::KeepAll,
+        };
+        let ja_zh = match strictness {
+            LineBreakStrictness::Normal | LineBreakStrictness::Loose => config
+                .language
+                .is_some_and(|language| matches!(language.language(), "ja" | "zh")),
+            _ => false,
+        };
+        Self {
+            word_option,
+            strictness,
+            ja_zh,
+        }
+    }
 }
 
 /// Per-character analysis info.
@@ -365,12 +407,12 @@ pub(crate) fn analyze_text(
     options: &AnalysisOptions<'_>,
     analysis: &mut Analysis,
 ) {
-    /// Turns the sparse, sorted, non-overlapping `options.word_break` into a contiguous sequence of
-    /// `(range, word-break)` segments covering all of `text`.
+    /// Turns the sparse, sorted, non-overlapping `options.line_break` into a contiguous sequence of
+    /// `(range, segmenter key)` segments covering all of `text`.
     ///
-    /// Any region not covered by an override takes the default `WordBreak::Normal`.
-    struct DenseWordBreaks<'a> {
-        word_break: &'a [(Range<usize>, WordBreak)],
+    /// Any region not covered by an override takes the default configuration.
+    struct DenseLineBreaks<'a> {
+        line_break: &'a [(Range<usize>, LineBreakConfig)],
         /// Index of the next word break to emit.
         next: usize,
         /// Start of the next segment to emit.
@@ -378,10 +420,10 @@ pub(crate) fn analyze_text(
         text_len: usize,
     }
 
-    impl<'a> DenseWordBreaks<'a> {
-        fn new(word_break: &'a [(Range<usize>, WordBreak)], text_len: usize) -> Self {
+    impl<'a> DenseLineBreaks<'a> {
+        fn new(line_break: &'a [(Range<usize>, LineBreakConfig)], text_len: usize) -> Self {
             Self {
-                word_break,
+                line_break,
                 next: 0,
                 cursor: 0,
                 text_len,
@@ -389,8 +431,8 @@ pub(crate) fn analyze_text(
         }
     }
 
-    impl Iterator for DenseWordBreaks<'_> {
-        type Item = (Range<usize>, WordBreak);
+    impl Iterator for DenseLineBreaks<'_> {
+        type Item = (Range<usize>, SegmenterKey);
 
         fn next(&mut self) -> Option<Self::Item> {
             if self.cursor >= self.text_len {
@@ -399,51 +441,51 @@ pub(crate) fn analyze_text(
 
             // Ignore empty ranges.
             while self
-                .word_break
+                .line_break
                 .get(self.next)
                 .is_some_and(|(range, _)| range.is_empty())
             {
                 self.next += 1;
             }
 
-            match self.word_break.get(self.next) {
+            match self.line_break.get(self.next) {
                 // A gap before the next override: fill it with the default up to its start.
                 Some((range, _)) if self.cursor < range.start => {
                     let segment = self.cursor..range.start;
                     self.cursor = range.start;
-                    Some((segment, WordBreak::Normal))
+                    Some((segment, SegmenterKey::DEFAULT))
                 }
                 // At the next override: emit it.
-                Some((range, word_break)) => {
+                Some((range, config)) => {
                     self.cursor = range.end;
                     self.next += 1;
-                    Some((range.start..range.end, *word_break))
+                    Some((range.start..range.end, SegmenterKey::new(config)))
                 }
                 // No overrides remain: fill the default to the end.
                 None => {
                     let segment = self.cursor..self.text_len;
                     self.cursor = self.text_len;
-                    Some((segment, WordBreak::Normal))
+                    Some((segment, SegmenterKey::DEFAULT))
                 }
             }
         }
     }
 
-    struct WordBreakSegmentIter<'a, I: Iterator> {
+    struct LineBreakSegmentIter<'a, I: Iterator> {
         text: &'a str,
         segments: I,
         char_indices: core::str::CharIndices<'a>,
         current_char: (usize, char),
         building_range_start: usize,
-        previous_word_break_style: WordBreak,
+        previous_key: SegmenterKey,
         done: bool,
     }
 
-    impl<'a, I> WordBreakSegmentIter<'a, I>
+    impl<'a, I> LineBreakSegmentIter<'a, I>
     where
-        I: Iterator<Item = (Range<usize>, WordBreak)>,
+        I: Iterator<Item = (Range<usize>, SegmenterKey)>,
     {
-        fn new(text: &'a str, segments: I, first_segment: (Range<usize>, WordBreak)) -> Self {
+        fn new(text: &'a str, segments: I, first_segment: (Range<usize>, SegmenterKey)) -> Self {
             let mut char_indices = text.char_indices();
             let current_char_len = char_indices.next().unwrap();
 
@@ -453,24 +495,24 @@ pub(crate) fn analyze_text(
                 char_indices,
                 current_char: current_char_len,
                 building_range_start: first_segment.0.start,
-                previous_word_break_style: first_segment.1,
+                previous_key: first_segment.1,
                 done: false,
             }
         }
     }
 
-    impl<'a, I> Iterator for WordBreakSegmentIter<'a, I>
+    impl<'a, I> Iterator for LineBreakSegmentIter<'a, I>
     where
-        I: Iterator<Item = (Range<usize>, WordBreak)>,
+        I: Iterator<Item = (Range<usize>, SegmenterKey)>,
     {
-        type Item = (&'a str, WordBreak, bool);
+        type Item = (&'a str, SegmenterKey, bool);
 
         fn next(&mut self) -> Option<Self::Item> {
             if self.done {
                 return None;
             }
 
-            for (range, word_break) in self.segments.by_ref() {
+            for (range, key) in self.segments.by_ref() {
                 assert!(range.start < range.end, "Segments must not be empty");
 
                 let style_start_index = range.start;
@@ -482,20 +524,20 @@ pub(crate) fn analyze_text(
                     self.current_char = self.char_indices.next().unwrap();
                 }
 
-                let current_word_break_style = word_break;
-                if self.previous_word_break_style == current_word_break_style {
+                let current_key = key;
+                if self.previous_key == current_key {
                     continue;
                 }
 
-                // Produce one substring for each different word break style run
+                // Produce one substring for each different segmenter key run
                 let prev_size = prev_char_index.1.len_utf8();
                 let size = self.current_char.1.len_utf8();
 
                 let substring = &self.text[self.building_range_start..style_start_index + size];
-                let result_style = self.previous_word_break_style;
+                let result_style = self.previous_key;
 
                 self.building_range_start = style_start_index - prev_size;
-                self.previous_word_break_style = current_word_break_style;
+                self.previous_key = current_key;
 
                 return Some((substring, result_style, false));
             }
@@ -503,7 +545,7 @@ pub(crate) fn analyze_text(
             // Final segment
             self.done = true;
             let last_substring = &self.text[self.building_range_start..self.text.len()];
-            Some((last_substring, self.previous_word_break_style, true))
+            Some((last_substring, self.previous_key, true))
         }
     }
 
@@ -519,23 +561,21 @@ pub(crate) fn analyze_text(
     //
     // This breaks text into sequences with similar line boundary config (part of style
     // information). If this config is consistent for all text, we use a fast path through this.
-    let mut segments = DenseWordBreaks::new(options.word_break, text.len());
+    let mut segments = DenseLineBreaks::new(options.line_break, text.len());
     // `text` is non-empty (checked above), so there is always at least one segment.
     let first_segment = segments.next().unwrap();
-    let contiguous_word_break_substrings = WordBreakSegmentIter::new(text, segments, first_segment);
+    let contiguous_substrings = LineBreakSegmentIter::new(text, segments, first_segment);
 
     let mut global_offset = 0;
     let mut line_boundary_positions: Vec<usize> = Vec::new();
 
     let data_sources = AnalysisDataSources::new();
 
-    for (substring_index, (substring, word_break_strength, last)) in
-        contiguous_word_break_substrings.enumerate()
-    {
-        // Fast path for text with a single word-break option.
+    for (substring_index, (substring, segmenter_key, last)) in contiguous_substrings.enumerate() {
+        // Fast path for text with a single segmenter configuration.
         if substring_index == 0 && last {
             let mut lb_iter = data_sources
-                .line_segmenter(word_break_strength)
+                .line_segmenter(segmenter_key)
                 .segment_str(substring);
 
             let _first = lb_iter.next();
@@ -557,7 +597,7 @@ pub(crate) fn analyze_text(
         }
 
         let line_boundaries_iter = data_sources
-            .line_segmenter(word_break_strength)
+            .line_segmenter(segmenter_key)
             .segment_str(substring);
 
         let mut substring_chars = substring.chars();
@@ -604,6 +644,12 @@ pub(crate) fn analyze_text(
     // a `break_spaces` range.
     let mut prev_is_break_space = false;
     let mut break_spaces_iter = options.break_spaces.iter().peekable();
+    let mut anywhere_iter = options
+        .line_break
+        .iter()
+        .filter(|(_, config)| config.line_break == LineBreak::Anywhere)
+        .map(|(range, _)| range)
+        .peekable();
     let boundary_iter = text.char_indices().map(|(byte_pos, ch)| {
         // advance any stale word boundary positions
         while let Some(&w) = wb_iter.peek() {
@@ -683,6 +729,21 @@ pub(crate) fn analyze_text(
             is_line = true;
         }
         prev_is_break_space = is_break_space;
+
+        while anywhere_iter
+            .peek()
+            .is_some_and(|range| range.end <= byte_pos)
+        {
+            _ = anywhere_iter.next();
+        }
+        if anywhere_iter
+            .peek()
+            .is_some_and(|range| range.contains(&byte_pos))
+        {
+            // `line-break: anywhere`: an opportunity around every grapheme.
+            is_line =
+                prev_char.is_some() && is_grapheme_start && !properties.is_mandatory_linebreak();
+        }
 
         // This leaves word boundaries intact. Consumers can only impact line boundaries.
         if let (Some(prev), Some(lb_override)) = (prev_char, options.line_break_override) {

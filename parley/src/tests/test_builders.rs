@@ -15,8 +15,8 @@ use super::utils::{
 };
 use crate::{
     BaseDirection, BreakReason, FontContext, FontFamily, FontFeatures, FontVariations, Layout,
-    LayoutContext, LineHeight, OverflowWrap, RangedBuilder, StyleProperty, StyleRunBuilder,
-    TextStyle, TextWrapMode, TreeBuilder, WhiteSpaceCollapse, WordBreak,
+    LayoutContext, LineBreak, LineHeight, OverflowWrap, RangedBuilder, StyleProperty,
+    StyleRunBuilder, TextStyle, TextWrapMode, TreeBuilder, WhiteSpaceCollapse, WordBreak,
 };
 
 /// Set of options for [`build_layout_with_ranged`].
@@ -228,6 +228,7 @@ fn create_root_style() -> TextStyle<'static, 'static, ColorBrush> {
         word_spacing: 2.,
         letter_spacing: 1.5,
         word_break: WordBreak::BreakAll,
+        line_break: LineBreak::Loose,
         overflow_wrap: OverflowWrap::Anywhere,
         text_wrap_mode: TextWrapMode::Wrap,
         white_space_collapse: WhiteSpaceCollapse::PreserveBreaks,
@@ -263,6 +264,7 @@ fn set_root_style(rb: &mut RangedBuilder<'_, ColorBrush>) {
     rb.push_default(StyleProperty::WordSpacing(2.));
     rb.push_default(StyleProperty::LetterSpacing(1.5));
     rb.push_default(StyleProperty::WordBreak(WordBreak::BreakAll));
+    rb.push_default(StyleProperty::LineBreak(LineBreak::Loose));
     rb.push_default(StyleProperty::OverflowWrap(OverflowWrap::Anywhere));
     rb.push_default(StyleProperty::WhiteSpaceCollapse(
         WhiteSpaceCollapse::PreserveBreaks,
