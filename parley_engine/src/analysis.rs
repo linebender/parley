@@ -119,7 +119,7 @@ impl AnalysisDataSources {
 
     #[inline(always)]
     fn line_segmenter(&self, key: SegmenterKey) -> LineSegmenterBorrowed<'static> {
-        // ICU4X only distinguishes Chinese and Japanese content, and treats them identically.
+        // We use Japanese arbitrarily; see `SegmenterKey::ja_zh`.
         static JA: LanguageIdentifier = langid!("ja");
 
         let mut opt = LineBreakOptions::default();
@@ -169,6 +169,10 @@ fn line_segmenter_impl(opt: LineBreakOptions<'_>) -> LineSegmenterBorrowed<'stat
 struct SegmenterKey {
     word_option: LineBreakWordOption,
     strictness: LineBreakStrictness,
+    /// See [`LineBreakConfig::language`]; the only languages which impact segmentation are
+    /// Chinese and Japanese. These impact it in the same way, and only under
+    /// [`LineBreak::Normal`] and [`LineBreak::Loose`], so we only track whether one of them
+    /// applies.
     ja_zh: bool,
 }
 
@@ -184,25 +188,20 @@ impl SegmenterKey {
             LineBreak::Strict => LineBreakStrictness::Strict,
             LineBreak::Normal => LineBreakStrictness::Normal,
             LineBreak::Loose => LineBreakStrictness::Loose,
-            LineBreak::Anywhere => LineBreakStrictness::Anywhere,
+            // We add opportunities per grapheme ourselves.
+            LineBreak::Anywhere => return Self::DEFAULT,
         };
-        if strictness == LineBreakStrictness::Anywhere {
-            // `line-break: anywhere` disregards the prohibitions of `word-break`, but ICU4X
-            // applies `keep-all` before considering strictness. The language is irrelevant.
-            return Self {
-                word_option: LineBreakWordOption::Normal,
-                strictness,
-                ja_zh: false,
-            };
-        }
         let word_option = match config.word_break {
             WordBreak::Normal => LineBreakWordOption::Normal,
             WordBreak::BreakAll => LineBreakWordOption::BreakAll,
             WordBreak::KeepAll => LineBreakWordOption::KeepAll,
         };
-        let ja_zh = config
-            .language
-            .is_some_and(|language| matches!(language.language(), "ja" | "zh"));
+        let ja_zh = match strictness {
+            LineBreakStrictness::Normal | LineBreakStrictness::Loose => config
+                .language
+                .is_some_and(|language| matches!(language.language(), "ja" | "zh")),
+            _ => false,
+        };
         Self {
             word_option,
             strictness,
@@ -731,22 +730,23 @@ pub(crate) fn analyze_text(
         }
         prev_is_break_space = is_break_space;
 
-        // `line-break: anywhere` disregards any prohibition against line breaks, so the override
-        // does not apply before characters it covers.
         while anywhere_iter
             .peek()
             .is_some_and(|range| range.end <= byte_pos)
         {
             _ = anywhere_iter.next();
         }
-        let is_anywhere = anywhere_iter
+        if anywhere_iter
             .peek()
-            .is_some_and(|range| range.contains(&byte_pos));
+            .is_some_and(|range| range.contains(&byte_pos))
+        {
+            // `line-break: anywhere`: an opportunity around every grapheme.
+            is_line =
+                prev_char.is_some() && is_grapheme_start && !properties.is_mandatory_linebreak();
+        }
 
         // This leaves word boundaries intact. Consumers can only impact line boundaries.
-        if let (Some(prev), Some(lb_override), false) =
-            (prev_char, options.line_break_override, is_anywhere)
-        {
+        if let (Some(prev), Some(lb_override)) = (prev_char, options.line_break_override) {
             let forced = lb_override(LineBreakContext {
                 before_before: prev_prev_char,
                 before: prev,

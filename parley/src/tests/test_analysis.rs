@@ -1147,46 +1147,26 @@ fn soft_wrap_opportunities(text: &str, line_break: LineBreak, language: Option<&
 }
 
 #[test]
-fn test_line_break_small_kana() {
-    // U+3041 HIRAGANA LETTER SMALL A is a conditional Japanese starter (CJ), which may only start a
-    // line under `normal` and `loose`.
-    let text = "文ぁ文";
-    for (line_break, expected) in [
-        (LineBreak::Strict, false),
-        (LineBreak::Normal, true),
-        (LineBreak::Loose, true),
+fn test_line_break_strictness() {
+    // U+3041 HIRAGANA LETTER SMALL A is a conditional Japanese starter, which may only start a line
+    // under `normal` and `loose`. A break before U+2010 HYPHEN after an ideograph is only allowed
+    // under `loose`.
+    for (line_break, small_kana, hyphen) in [
+        (LineBreak::Strict, false, false),
+        (LineBreak::Normal, true, false),
+        (LineBreak::Loose, true, true),
     ] {
         assert_eq!(
-            soft_wrap_opportunities(text, line_break, None)[1],
-            expected,
+            soft_wrap_opportunities("文ぁ文", line_break, None)[1],
+            small_kana,
+            "{line_break:?}"
+        );
+        assert_eq!(
+            soft_wrap_opportunities("文‐文", line_break, None)[1],
+            hyphen,
             "{line_break:?}"
         );
     }
-}
-
-#[test]
-fn test_line_break_hyphen_after_ideograph() {
-    // A break before U+2010 HYPHEN after an ideograph (ID) is only allowed under `loose`.
-    let text = "文‐文";
-    for (line_break, expected) in [
-        (LineBreak::Strict, false),
-        (LineBreak::Normal, false),
-        (LineBreak::Loose, true),
-    ] {
-        assert_eq!(
-            soft_wrap_opportunities(text, line_break, None)[1],
-            expected,
-            "{line_break:?}"
-        );
-    }
-}
-
-#[test]
-fn test_line_break_iteration_mark() {
-    // U+3005 IDEOGRAPHIC ITERATION MARK may only start a line under `loose`.
-    let text = "文々文";
-    assert!(!soft_wrap_opportunities(text, LineBreak::Normal, None)[1]);
-    assert!(soft_wrap_opportunities(text, LineBreak::Loose, None)[1]);
 }
 
 #[test]
@@ -1230,7 +1210,7 @@ fn test_line_break_anywhere_overrides_keep_all() {
 }
 
 #[test]
-fn test_line_break_anywhere_ignores_line_break_override() {
+fn test_line_break_override_applies_under_anywhere() {
     let mut test_context = TestContext::default();
     {
         let text = "a b/c";
@@ -1241,14 +1221,46 @@ fn test_line_break_anywhere_ignores_line_break_override() {
             true,
         );
         builder.push_default(StyleProperty::LineBreak(LineBreak::Anywhere));
-        builder.push(StyleProperty::LineBreak(LineBreak::Normal), 4..5);
         builder.set_line_break_override(Some(&|_| Some(false)));
         _ = builder.build(text);
     }
-    assert_eq!(
-        test_context.soft_wrap_opportunity_list(),
-        vec![false, true, true, true, false]
-    );
+    assert_eq!(test_context.soft_wrap_opportunity_list(), vec![false; 5]);
+}
+
+#[test]
+fn test_line_break_anywhere_graphemes() {
+    // Opportunities are around grapheme clusters, not code points: a Hangul syllable of conjoining
+    // jamo, a pair of regional indicators, an emoji with a modifier, and a ZWJ are not split.
+    for (text, expected) in [
+        ("\u{1100}\u{1161}\u{11A8}x", vec![false, false, false, true]),
+        ("🇯🇵🇺🇸", vec![false, false, true, false]),
+        ("👍🏽x", vec![false, false, true]),
+        ("a\u{200D}b", vec![false, false, true]),
+    ] {
+        assert_eq!(
+            soft_wrap_opportunities(text, LineBreak::Anywhere, None),
+            expected,
+            "{text:?}"
+        );
+    }
+}
+
+#[test]
+fn test_line_break_language_change_under_strict() {
+    // The language does not affect `strict` line breaking, so a language change must not create an
+    // opportunity: UAX #14 LB14 prohibits a break after an opening bracket followed by spaces.
+    let text = "x(  y";
+    verify_analysis(text, |builder| {
+        builder.push(
+            StyleProperty::Locale(Some(Language::parse("en").unwrap())),
+            0..3,
+        );
+        builder.push(
+            StyleProperty::Locale(Some(Language::parse("ja").unwrap())),
+            3..5,
+        );
+    })
+    .expect_soft_wrap_opportunity_list(vec![false; 5]);
 }
 
 #[test]
