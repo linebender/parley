@@ -59,17 +59,15 @@ fn line_text_metrics<B: Brush>(line: &Line<'_, B>) -> TextMetrics {
     // `LineMetrics`).
     let mut ascent = 0_f32;
     let mut descent = 0_f32;
-    let mut line_height = 0_f32;
     for run in line.runs() {
         let metrics = run.font_metrics();
         ascent = ascent.max(metrics.ascent);
         descent = descent.max(metrics.descent);
-        line_height = line_height.max(run.line_height());
     }
     TextMetrics {
         ascent,
         descent,
-        leading: line_height - (ascent + descent),
+        leading: line.metrics().line_height - (ascent + descent),
     }
 }
 
@@ -686,4 +684,55 @@ fn lines_line_height_absolute() {
     layout.break_all_lines(None);
     layout.align(Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
+}
+
+/// Test that a line height change within a run grows the lines it occurs on.
+#[test]
+fn line_height_changes_per_line() {
+    let text = "cat ray bat jay";
+    let small = 20.0;
+    let large = 40.0;
+
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(LineHeight::Absolute(small));
+    // The "a" of "ray".
+    builder.push(LineHeight::Absolute(large), 5..6);
+
+    // Narrow enough for one word per line.
+    let mut layout: Layout<ColorBrush> = builder.build(text);
+    layout.break_all_lines(Some(1.0));
+
+    let mut lines = layout.lines();
+    assert_eq!(lines.next().unwrap().metrics().line_height, small);
+    assert_eq!(lines.next().unwrap().metrics().line_height, large);
+    assert_eq!(lines.next().unwrap().metrics().line_height, small);
+    assert_eq!(lines.next().unwrap().metrics().line_height, small);
+    assert!(lines.next().is_none());
+
+    env.render_and_check_snapshot(&layout, None, &[]);
+}
+
+#[test]
+fn line_height_change_inside_ligature() {
+    let text = "ffi ffi";
+    let small = 20.0;
+    let large = 40.0;
+
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(LineHeight::Absolute(small));
+
+    // The ligature forms, and gets the bigger line height from the middle "f"
+    builder.push(LineHeight::Absolute(large), 5..6);
+
+    // Narrow enough for one word per line.
+    let mut layout: Layout<ColorBrush> = builder.build(text);
+    layout.break_all_lines(Some(1.0));
+
+    let mut lines = layout.lines();
+    assert_eq!(lines.next().unwrap().metrics().line_height, small);
+    assert_eq!(lines.next().unwrap().metrics().line_height, large);
+
+    env.render_and_check_snapshot(&layout, None, &[]);
 }

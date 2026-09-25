@@ -19,6 +19,7 @@ pub use parlance::{OverflowWrap, TextWrapMode, WordBreak};
 pub use styleset::StyleSet;
 
 use crate::util::nearly_eq;
+use parley_engine::FontMetrics;
 
 /// Whitespace collapsing and hanging behavior.
 ///
@@ -76,6 +77,17 @@ impl LineHeight {
             Self::Absolute(value) => Self::Absolute(value * scale),
             // The other variants are relative to the font size, so scaling here needn't do anything
             value => value,
+        }
+    }
+
+    /// Resolves the line height to layout units.
+    pub(crate) fn resolve(self, font_size: f32, metrics: &FontMetrics) -> f32 {
+        match self {
+            Self::Absolute(value) => value,
+            Self::FontSizeRelative(value) => value * font_size,
+            Self::MetricsRelative(value) => {
+                (metrics.ascent + metrics.descent + metrics.leading) * value
+            }
         }
     }
 }

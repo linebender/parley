@@ -192,6 +192,11 @@ pub(crate) fn shape_text<'a, B: Brush>(
     );
 
     let mut inline_box_iter = inline_boxes.iter().enumerate().peekable();
+    // In the common case of a single line height, it can't change within a run, which lets us skip
+    // some work.
+    let uniform_line_height = styles
+        .windows(2)
+        .all(|pair| pair[0].line_height == pair[1].line_height);
     for shaped_run_idx in 0..layout.data.shaped_text.runs().len() {
         let shaped_run = &layout.data.shaped_text.runs()[shaped_run_idx];
         let run_text_byte_start = shaped_run.range.byte_range.start;
@@ -226,6 +231,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             // they're non-zero).
             run_style,
             Spacing::new(run_style.word_spacing, run_style.letter_spacing),
+            uniform_line_height,
         );
     }
 
