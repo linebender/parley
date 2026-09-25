@@ -95,6 +95,21 @@ impl Spacing {
     pub(crate) const fn is_zero(self) -> bool {
         self.word == 0. && self.letter == 0.
     }
+
+    /// The gap at the line-right side of an atom whose first character has the given whitespace
+    /// class.
+    ///
+    /// This is equivalent to [`EffectiveSpacing::gaps`]'s `after` under [`Justification::NONE`].
+    #[inline(always)]
+    pub(crate) fn atom_gap(self, whitespace: Whitespace) -> f32 {
+        if whitespace == Whitespace::Newline {
+            0.
+        } else if is_word_separator(whitespace) {
+            self.letter + self.word
+        } else {
+            self.letter
+        }
+    }
 }
 
 /// Justification to apply to a single line.
