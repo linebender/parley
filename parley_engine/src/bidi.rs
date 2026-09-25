@@ -901,6 +901,33 @@ impl BracketStack {
     }
 }
 
+/// Turns a bidi class into a single bit, for cheap set membership testing.
 const fn mask(t: BidiClass) -> u32 {
-    1 << (t.to_icu4c_value() as u32)
+    let bit = match t {
+        BidiClass::LeftToRight => 0,
+        BidiClass::RightToLeft => 1,
+        BidiClass::EuropeanNumber => 2,
+        BidiClass::EuropeanSeparator => 3,
+        BidiClass::EuropeanTerminator => 4,
+        BidiClass::ArabicNumber => 5,
+        BidiClass::CommonSeparator => 6,
+        BidiClass::ParagraphSeparator => 7,
+        BidiClass::SegmentSeparator => 8,
+        BidiClass::WhiteSpace => 9,
+        BidiClass::OtherNeutral => 10,
+        BidiClass::LeftToRightEmbedding => 11,
+        BidiClass::LeftToRightOverride => 12,
+        BidiClass::ArabicLetter => 13,
+        BidiClass::RightToLeftEmbedding => 14,
+        BidiClass::RightToLeftOverride => 15,
+        BidiClass::PopDirectionalFormat => 16,
+        BidiClass::NonspacingMark => 17,
+        BidiClass::BoundaryNeutral => 18,
+        BidiClass::FirstStrongIsolate => 19,
+        BidiClass::LeftToRightIsolate => 20,
+        BidiClass::RightToLeftIsolate => 21,
+        BidiClass::PopDirectionalIsolate => 22,
+        _ => return 0,
+    };
+    1 << bit
 }
