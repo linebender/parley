@@ -213,20 +213,27 @@ fn inline_boxes_after_newline_max_content_width() {
 fn no_break_after_inline_box_with_nowrap() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    // "A[box]\u{A0}B" with a no-break space after the box.
-    let text = "A\u{A0}B";
-    let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TextWrapMode(TextWrapMode::NoWrap));
-    builder.push_inline_box(InlineBox {
-        id: 0,
-        kind: InlineBoxKind::InFlow,
-        index: 1,
-        width: 10.0,
-        height: 10.0,
-        baseline: None,
-    });
-    let mut layout = builder.build(text);
-    layout.break_all_lines(Some(0.0));
+    // "A[box]AA"
+    let text = "AAA";
+    let build_layout = |env: &mut TestEnv, text_wrap_mode| {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::TextWrapMode(text_wrap_mode));
+        builder.push_inline_box(InlineBox {
+            id: 0,
+            kind: InlineBoxKind::InFlow,
+            index: 1,
+            width: 10.0,
+            height: 10.0,
+            baseline: None,
+        });
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(0.0));
+        layout
+    };
 
+    let layout = build_layout(&mut env, TextWrapMode::Wrap);
+    assert_eq!(layout.len(), 3, "Expected breaks before and after the box");
+
+    let layout = build_layout(&mut env, TextWrapMode::NoWrap);
     assert_eq!(layout.len(), 1, "Expected a single line");
 }
