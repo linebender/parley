@@ -1204,7 +1204,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     kind: LayoutItemKind::TextRun,
                     index,
                     bidi_level: BidiLevel::new(0),
-                    advance: 0.,
                     shaped_cluster_range: cluster..cluster,
                     text_range: text..text,
                 });
@@ -1330,13 +1329,10 @@ fn commit_line<B: Brush>(
 
         match item.kind {
             LayoutItemKind::InlineBox => {
-                let inline_box = &layout.data.inline_boxes[item.index];
-
                 lines.line_items.push(LineItemData {
                     kind: LayoutItemKind::InlineBox,
                     index: item.index,
                     bidi_level: item.bidi_level,
-                    advance: inline_box.width,
 
                     // These properties are ignored for inline boxes. So we just put a dummy value.
                     shaped_cluster_range: 0..0,
@@ -1393,19 +1389,10 @@ fn commit_line<B: Brush>(
                 text_end = text_end.max(item_text_range.end);
                 needs_reorder |= shaped_run.bidi_level != BidiLevel::new(0);
 
-                // Calculate the run's advance including any word/letter spacing. This doesn't
-                // include justification, as that's applied after lines are broken.
-                let effective_spacing = EffectiveSpacing::new(
-                    layout.data.runs[item.index].spacing,
-                    Justification::NONE,
-                );
-                let advance = effective_spacing.slice_advance(slice.narrow(cluster_range.clone()));
-
                 lines.line_items.push(LineItemData {
                     kind: LayoutItemKind::TextRun,
                     index: item.index,
                     bidi_level: shaped_run.bidi_level,
-                    advance,
                     shaped_cluster_range: cluster_range,
                     text_range: item_text_range,
                 });

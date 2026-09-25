@@ -77,12 +77,6 @@ pub(crate) struct LineItemData {
     pub(crate) index: usize,
     /// Bidi level for the item (used for reordering)
     pub(crate) bidi_level: BidiLevel,
-    /// Advance (size in direction of text flow) for the run.
-    ///
-    /// This includes the run's [`Spacing`], but not the justification. Spacing is a property of
-    /// graphemes and shaped clusters, so can be known, whereas justification depends on a line's
-    /// free space.
-    pub(crate) advance: f32,
 
     // Fields that only apply to text runs (Ignored for boxes)
     // TODO: factor this out?
