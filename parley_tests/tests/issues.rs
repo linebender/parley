@@ -228,6 +228,7 @@ fn no_break_after_inline_box_with_nowrap() {
             width: 10.0,
             height: 10.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(0.0));
