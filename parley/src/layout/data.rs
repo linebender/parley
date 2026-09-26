@@ -1,15 +1,14 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::inline_box::InlineBox;
+use crate::inline_box::LayoutInlineBox;
 use crate::layout::spacing::{EffectiveSpacing, Justification, Spacing};
+use crate::layout::style_metrics::StyleMetrics;
 use crate::layout::whitespace::{atom_hanging_advance, whitespace_hangs};
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
-use crate::{
-    IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode, WhiteSpaceCollapse,
-};
+use crate::{IndentOptions, InlineBoxKind, OverflowWrap, TextWrapMode, WhiteSpaceCollapse};
 use core::ops::Range;
 
 use alloc::vec::Vec;
@@ -61,9 +60,56 @@ pub(crate) struct LineData {
     pub(crate) justification: Justification,
     /// Text indent applied to this line.
     pub(crate) indent: f32,
+    /// This line's entries in [`LayoutData::aligned_subtree_offsets`].
+    ///
+    /// Empty for lines with only baseline-relative content because the top-level aligned
+    /// subtree for each line trivially has an offset of 0
+    pub(crate) aligned_subtree_offsets: Range<u32>,
+}
+
+/// Position of an [aligned subtree] (rooted at a `vertical-align: top | bottom` style) on a line.
+/// Computed for each non-top-level aligned subtree on the line in `BreakLines::finish_line`.
+///
+/// [aligned subtree]: crate::layout::style_metrics#aligned-subtrees
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct AlignedSubtreeOffset {
+    /// Style index of the subtree root (a span with `vertical-align: top | bottom`)
+    pub(crate) root: u16,
+    /// Offset from the line's baseline to the subtree's baseline (positive upwards).
+    pub(crate) baseline_offset: f32,
 }
 
 impl LineData {
+    /// Offset from the line's baseline to the baseline of the aligned subtree rooted at style
+    /// `root` (positive upwards). `offsets` is [`LayoutData::aligned_subtree_offsets`].
+    pub(crate) fn aligned_subtree_offset(
+        &self,
+        offsets: &[AlignedSubtreeOffset],
+        root: u16,
+    ) -> f32 {
+        if root == 0 {
+            return 0.;
+        }
+        let range =
+            self.aligned_subtree_offsets.start as usize..self.aligned_subtree_offsets.end as usize;
+        offsets[range]
+            .iter()
+            .find(|subtree| subtree.root == root)
+            .map_or(0., |subtree| subtree.baseline_offset)
+    }
+
+    /// Absolute block-axis coordinate (offset from the top of the layout) of the baseline of the given style's span box.
+    // `offsets` is [`LayoutData::aligned_subtree_offsets`].
+    pub(crate) fn style_baseline(
+        &self,
+        offsets: &[AlignedSubtreeOffset],
+        metrics: &StyleMetrics,
+    ) -> f32 {
+        self.metrics.baseline
+            - self.aligned_subtree_offset(offsets, metrics.aligned_subtree)
+            - metrics.baseline_offset
+    }
+
     pub(crate) fn size(&self) -> f32 {
         self.metrics.line_height
     }
@@ -125,7 +171,8 @@ pub(crate) struct LayoutData<B: Brush> {
 
     // Output of style resolution (input to line breaking)
     pub(crate) styles: Vec<Style<B>>,
-    pub(crate) inline_boxes: Vec<InlineBox>,
+    pub(crate) style_metrics: Vec<StyleMetrics>,
+    pub(crate) inline_boxes: Vec<LayoutInlineBox>,
 
     // Output of shaping (input to line breaking)
     pub(crate) shaped_text: ShapedText,
@@ -137,6 +184,12 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) lines: Vec<LineData>,
     /// Items within each line
     pub(crate) line_items: Vec<LineItemData>,
+    /// Position of each aligned subtree rooted at a `vertical-align: top | bottom` style on each line.
+    /// The top-level aligned subtree of each line doesn't have an entry as it's offset is trivially zero.
+    ///
+    /// Stored here to amortise the allocation (and avoid cloning it when cloning `LineData`).
+    /// Each line owns a contiguous slice ([`LineData::aligned_subtree_offsets`]).
+    pub(crate) aligned_subtree_offsets: Vec<AlignedSubtreeOffset>,
     /// The width constraint that was used to line break the layout
     pub(crate) layout_max_advance: f32,
     /// The computed width of the layout excluding hanging whitespace
@@ -166,12 +219,14 @@ impl<B: Brush> Default for LayoutData<B> {
             full_width: 0.,
             height: 0.,
             styles: Vec::new(),
+            style_metrics: Vec::new(),
             inline_boxes: Vec::new(),
             shaped_text: ShapedText::new(),
             runs: Vec::new(),
             items: Vec::new(),
             lines: Vec::new(),
             line_items: Vec::new(),
+            aligned_subtree_offsets: Vec::new(),
             alignment: None,
             layout_max_advance: 0.0,
             indent_amount: 0.0,
@@ -193,12 +248,14 @@ impl<B: Brush> LayoutData<B> {
         self.indent_amount = 0.0;
         self.indent_options = IndentOptions::default();
         self.styles.clear();
+        self.style_metrics.clear();
         self.inline_boxes.clear();
         self.shaped_text.clear();
         self.runs.clear();
         self.items.clear();
         self.lines.clear();
         self.line_items.clear();
+        self.aligned_subtree_offsets.clear();
         self.alignment = None;
     }
 
@@ -225,20 +282,11 @@ impl<B: Brush> LayoutData<B> {
         let style_index =
             self.shaped_text.characters()[shaped_run.characters_range.start as usize].style_index;
 
-        let line_height = {
-            // Compute line height
-            let style = &self.styles[style_index as usize];
-            match style.line_height {
-                LineHeight::Absolute(value) => value,
-                LineHeight::FontSizeRelative(value) => value * shaped_run.font_size,
-                LineHeight::MetricsRelative(value) => {
-                    (shaped_run.font_metrics.ascent
-                        + shaped_run.font_metrics.descent
-                        + shaped_run.font_metrics.leading)
-                        * value
-                }
-            }
-        };
+        let line_height = self.styles[style_index as usize].line_height.resolve(
+            shaped_run.font_size,
+            &shaped_run.font_metrics,
+            self.quantize,
+        );
 
         let font = &self.shaped_text.fonts()[shaped_run.font_index];
         let run = RunData {
@@ -454,7 +502,7 @@ impl<B: Brush> LayoutData<B> {
                     }
                 }
                 LayoutItemKind::InlineBox => {
-                    let ibox = &self.inline_boxes[item.index];
+                    let ibox = &self.inline_boxes[item.index].inline_box;
                     if ibox.kind == InlineBoxKind::InFlow {
                         running_max_width += ibox.width;
                         if text_wrap_mode == TextWrapMode::Wrap {
