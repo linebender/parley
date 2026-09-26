@@ -8,6 +8,7 @@
 
 use crate::test_name;
 use crate::util::TestEnv;
+use parley::VerticalAlign;
 use parley::style::FontFamily;
 use parley::{Alignment, AlignmentOptions, InlineBox, InlineBoxKind, StyleProperty};
 
@@ -105,6 +106,7 @@ fn break_by_length_with_inline_box() {
         width: 10.0,
         height: 10.0,
         baseline: None,
+        vertical_align: VerticalAlign::BASELINE,
     });
     let mut layout = builder.build(text);
 
@@ -133,6 +135,7 @@ fn break_by_length_multiple_inline_boxes() {
             width: 10.0,
             height: 10.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
     }
     let mut layout = builder.build(text);

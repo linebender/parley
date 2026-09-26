@@ -234,6 +234,16 @@ impl Collection {
     pub fn clear(&mut self) {
         self.inner.clear();
     }
+
+    /// Returns a counter that changes whenever the set of fonts or the generic family and
+    /// fallback configuration of this collection changes.
+    ///
+    /// Callers caching the results of font queries can compare this against a previously
+    /// observed value to detect that their cache is stale. For shared collections this also
+    /// picks up changes made through other clones of the collection.
+    pub fn generation(&mut self) -> u64 {
+        self.inner.generation()
+    }
 }
 
 impl Default for Collection {
@@ -252,6 +262,7 @@ struct Inner {
     #[allow(unused)]
     shared_version: CounterInt,
     fallback_cache: FallbackCache,
+    generation: u64,
 }
 
 impl Inner {
@@ -265,7 +276,17 @@ impl Inner {
             shared,
             shared_version: 0,
             fallback_cache: FallbackCache::default(),
+            generation: 0,
         }
+    }
+
+    pub fn generation(&mut self) -> u64 {
+        self.sync_shared();
+        self.generation
+    }
+
+    fn bump_generation(&mut self) {
+        self.generation = self.generation.wrapping_add(1);
     }
 
     #[cfg(feature = "std")]
@@ -281,6 +302,7 @@ impl Inner {
     /// Load system fonts. If system fonts are already loaded then they will be reloaded.
     pub fn load_system_fonts(&mut self) {
         self.system = Some(System::new());
+        self.bump_generation();
     }
 
     /// Returns an iterator over all available family names in the collection.
@@ -391,6 +413,7 @@ impl Inner {
         families: impl Iterator<Item = FamilyId>,
     ) {
         self.sync_shared();
+        self.bump_generation();
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             shared
@@ -414,6 +437,7 @@ impl Inner {
         families: impl Iterator<Item = FamilyId>,
     ) {
         self.sync_shared();
+        self.bump_generation();
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             shared
@@ -471,6 +495,7 @@ impl Inner {
     ) -> bool {
         self.sync_shared();
         self.fallback_cache.reset();
+        self.bump_generation();
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             let result = shared.data.lock().unwrap().fallbacks.set(key, families);
@@ -491,6 +516,7 @@ impl Inner {
     ) -> bool {
         self.sync_shared();
         self.fallback_cache.reset();
+        self.bump_generation();
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             let result = shared.data.lock().unwrap().fallbacks.append(key, families);
@@ -506,6 +532,7 @@ impl Inner {
     /// Loads all fonts that exist in the specified directory(s)
     #[cfg(feature = "std")]
     pub fn load_fonts_from_paths(&mut self, paths: impl IntoIterator<Item = impl AsRef<Path>>) {
+        self.bump_generation();
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             shared.data.lock().unwrap().load_fonts_from_paths(paths);
@@ -526,6 +553,7 @@ impl Inner {
         data: Blob<u8>,
         info_override: Option<FontInfoOverride<'_>>,
     ) -> Vec<(FamilyId, Vec<FontInfo>)> {
+        self.bump_generation();
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             let result = shared
@@ -552,6 +580,7 @@ impl Inner {
         style: FontStyle,
         weight: FontWeight,
     ) -> bool {
+        self.bump_generation();
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             let result = shared
@@ -576,6 +605,7 @@ impl Inner {
     /// [`Self::register_fonts`], and unsets all previously-set generic families
     /// and fallbacks. This will not remove any system fonts.
     pub fn clear(&mut self) {
+        self.bump_generation();
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             shared.data.lock().unwrap().clear();
@@ -598,6 +628,7 @@ impl Inner {
                 self.data = shared.data.lock().unwrap().clone();
                 self.shared_version = version;
                 self.fallback_cache.reset();
+                self.generation = self.generation.wrapping_add(1);
             }
         }
     }
