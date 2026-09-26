@@ -132,7 +132,7 @@ pub use parley_engine::break_overrides::{
     LineBreakContext, LineBreakOverrideFn,
 };
 
-pub use builder::{RangedBuilder, StyleRunBuilder, TreeBuilder};
+pub use builder::{RangedBuilder, StyleRunBuilder, TextSoFar, TreeBuilder};
 pub use context::LayoutContext;
 pub use font::FontContext;
 pub use inline_box::{InlineBox, InlineBoxKind};

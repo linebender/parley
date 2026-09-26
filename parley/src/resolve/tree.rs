@@ -259,6 +259,13 @@ impl<B: Brush> TreeStyleBuilder<B> {
         style_id
     }
 
+    /// Commits any buffered text, returning the white space processed text so far and whether it
+    /// is followed by pending collapsible whitespace.
+    pub(crate) fn text_so_far(&mut self) -> (&str, bool) {
+        self.commit_uncommitted_text();
+        (&self.text, self.pending_whitespace.is_some())
+    }
+
     /// The length in bytes of the text committed so far, excluding buffered text.
     pub(crate) fn committed_text_len(&self) -> usize {
         self.text.len()
@@ -609,5 +616,63 @@ mod tests {
         assert_eq!(style_runs[2].style_index, 2);
         assert_eq!(style_runs[3].style_index, 1);
         assert_eq!(style_runs[4].style_index, 0);
+    }
+
+    #[test]
+    fn text_so_far_does_not_affect_white_space_processing() {
+        for mode in [
+            WhiteSpaceCollapse::Collapse,
+            WhiteSpaceCollapse::PreserveBreaks,
+            WhiteSpaceCollapse::Preserve,
+            WhiteSpaceCollapse::BreakSpaces,
+        ] {
+            let style = ResolvedStyle {
+                white_space_collapse: mode,
+                ..ResolvedStyle::default()
+            };
+            for input in [" a \t b\n  c ", " \ta \t\r \t\n \tb \t", "a \u{2028} \tb"] {
+                let mut builder = TreeStyleBuilder::<u32>::default();
+                builder.begin(style.clone());
+                builder.push_text(input);
+                let mut expected_runs = Vec::new();
+                let expected = builder.finish(&mut Vec::new(), &mut expected_runs);
+
+                for split in (0..=input.len()).filter(|&i| input.is_char_boundary(i)) {
+                    let mut builder = TreeStyleBuilder::<u32>::default();
+                    builder.begin(style.clone());
+                    builder.push_text(&input[..split]);
+                    let (text_so_far, _) = builder.text_so_far();
+                    assert!(expected.starts_with(text_so_far));
+                    builder.push_text(&input[split..]);
+                    let mut runs = Vec::new();
+                    let text = builder.finish(&mut Vec::new(), &mut runs);
+                    assert_eq!(text, expected, "{mode:?} {input:?} split at {split}");
+                    assert_eq!(
+                        runs.iter().map(|r| r.range.clone()).collect::<Vec<_>>(),
+                        expected_runs
+                            .iter()
+                            .map(|r| r.range.clone())
+                            .collect::<Vec<_>>(),
+                        "{mode:?} {input:?} split at {split}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn text_so_far_reports_pending_whitespace() {
+        let mut builder = TreeStyleBuilder::<u32>::default();
+        builder.begin(ResolvedStyle {
+            white_space_collapse: WhiteSpaceCollapse::Collapse,
+            ..ResolvedStyle::default()
+        });
+        assert_eq!(builder.text_so_far(), ("", false));
+        builder.push_text("  a  ");
+        assert_eq!(builder.text_so_far(), ("a", true));
+        builder.push_style_modification_span([ResolvedProperty::FontSize(20.)].into_iter());
+        builder.push_text(" b");
+        assert_eq!(builder.text_so_far(), ("a b", false));
+        builder.pop_style_span();
     }
 }
