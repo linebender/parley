@@ -80,8 +80,9 @@ impl Properties {
         is_emoji_modifier: bool,
         is_emoji_modifier_base: bool,
     ) -> Self {
-        // The TrieValue implementation is supposedly guaranteed to be stable.
-        // TODO: Where to point to prove that?
+        // The TrieValue implementation is guaranteed to be stable (strongly enough for our purposes, at least).
+        // See https://github.com/unicode-org/icu4x/issues/6067#issuecomment-5361908792 and
+        // https://github.com/linebender/parley/pull/845#discussion_r4102175970
         let s = script.to_u32();
         let gc = gc as u32;
         let gcb = gcb.to_u32();
