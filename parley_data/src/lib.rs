@@ -6,6 +6,7 @@
 
 #![no_std]
 
+use icu_collections::codepointtrie::TrieValue;
 use icu_properties::props::{BidiClass, GeneralCategory, GraphemeClusterBreak, Script};
 
 /// Baked data (`PackTab` tables).
@@ -79,10 +80,13 @@ impl Properties {
         is_emoji_modifier: bool,
         is_emoji_modifier_base: bool,
     ) -> Self {
-        let s = script.to_icu4c_value() as u32;
+        // The TrieValue implementation is guaranteed to be stable (strongly enough for our purposes, at least).
+        // See https://github.com/unicode-org/icu4x/issues/6067#issuecomment-5361908792 and
+        // https://github.com/linebender/parley/pull/845#discussion_r4102175970
+        let s = script.to_u32();
         let gc = gc as u32;
-        let gcb = gcb.to_icu4c_value() as u32;
-        let bidi = bidi.to_icu4c_value() as u32;
+        let gcb = gcb.to_u32();
+        let bidi = bidi.to_u32();
 
         Self(
             (s << Self::SCRIPT_SHIFT)
@@ -109,17 +113,13 @@ impl Properties {
     /// Returns the script for the character.
     #[inline(always)]
     pub fn script(&self) -> Script {
-        #[allow(
-            clippy::cast_possible_truncation,
-            reason = "script data only occupies SCRIPT_BITS bits; we cast to `u16` to fulfil the `from_icu4c_value` contract."
-        )]
-        Script::from_icu4c_value(self.bits(Self::SCRIPT_SHIFT, Self::SCRIPT_BITS) as u16)
+        Script::try_from_u32(self.bits(Self::SCRIPT_SHIFT, Self::SCRIPT_BITS)).unwrap_or_default()
     }
 
     /// Returns the general category for the character.
     #[inline(always)]
     pub fn general_category(&self) -> GeneralCategory {
-        #[allow(
+        #[expect(
             clippy::cast_possible_truncation,
             reason = "general category data only occupies GC_BITS bits."
         )]
@@ -129,21 +129,14 @@ impl Properties {
     /// Returns the grapheme cluster break for the character.
     #[inline(always)]
     pub fn grapheme_cluster_break(&self) -> GraphemeClusterBreak {
-        #[allow(
-            clippy::cast_possible_truncation,
-            reason = "cluster break data only occupies GCB_BITS bits"
-        )]
-        GraphemeClusterBreak::from_icu4c_value(self.bits(Self::GCB_SHIFT, Self::GCB_BITS) as u8)
+        GraphemeClusterBreak::try_from_u32(self.bits(Self::GCB_SHIFT, Self::GCB_BITS))
+            .unwrap_or_default()
     }
 
     /// Returns the bidirectional class for the character.
     #[inline(always)]
     pub fn bidi_class(&self) -> BidiClass {
-        #[allow(
-            clippy::cast_possible_truncation,
-            reason = "bidi class data only occupies BIDI_BITS bits"
-        )]
-        BidiClass::from_icu4c_value(self.bits(Self::BIDI_SHIFT, Self::BIDI_BITS) as u8)
+        BidiClass::try_from_u32(self.bits(Self::BIDI_SHIFT, Self::BIDI_BITS)).unwrap_or_default()
     }
 
     /// Returns whether the character has either of the `Emoji` or`Extended_Pictographic` properties ([UTS #51][]).
@@ -254,35 +247,6 @@ mod tests {
     };
     use icu_properties::{CodePointMapData, CodePointSetData};
 
-    fn expected_properties(cp: u32) -> Properties {
-        Properties::new(
-            CodePointMapData::<Script>::new().get32(cp),
-            CodePointMapData::<GeneralCategory>::new().get32(cp),
-            CodePointMapData::<GraphemeClusterBreak>::new().get32(cp),
-            CodePointMapData::<BidiClass>::new().get32(cp),
-            CodePointSetData::new::<Emoji>().contains32(cp)
-                || CodePointSetData::new::<ExtendedPictographic>().contains32(cp),
-            CodePointSetData::new::<VariationSelector>().contains32(cp),
-            CodePointSetData::new::<RegionalIndicator>().contains32(cp),
-            matches!(
-                CodePointMapData::<LineBreak>::new().get32(cp),
-                LineBreak::MandatoryBreak
-                    | LineBreak::CarriageReturn
-                    | LineBreak::LineFeed
-                    | LineBreak::NextLine
-            ),
-            CodePointMapData::<LineBreak>::new().get32(cp) == LineBreak::ComplexContext
-                || matches!(
-                    CodePointMapData::<Script>::new().get32(cp),
-                    Script::Han | Script::Hiragana
-                ),
-            CodePointSetData::new::<Emoji>().contains32(cp),
-            CodePointSetData::new::<EmojiPresentation>().contains32(cp),
-            CodePointSetData::new::<EmojiModifier>().contains32(cp),
-            CodePointSetData::new::<EmojiModifierBase>().contains32(cp),
-        )
-    }
-
     #[test]
     fn properties_match_icu4x() {
         // Asserts that every character's properties match ICU4X's canonical data.
@@ -291,12 +255,106 @@ mod tests {
                 continue;
             };
             let actual = Properties::get(ch);
-            let expected = expected_properties(cp);
+            let expected = UnclampedProperties::from_icu4x(cp);
+            assert_eq!(
+                UnclampedProperties::unpack(actual),
+                expected,
+                "roundtrip mismatch at U+{cp:04X}"
+            );
+            let packed = expected.pack();
             assert_eq!(
                 u32::from(actual),
-                u32::from(expected),
-                "mismatch at U+{cp:04X}: actual={actual:?}, expected={expected:?}"
+                u32::from(packed),
+                "packed mismatch at U+{cp:04X}: actual={actual:?}, expected={packed:?}"
             );
+        }
+    }
+
+    #[derive(Debug, PartialEq)]
+    /// [`Properties`] but not bitpacked for tests.
+    struct UnclampedProperties {
+        script: Script,
+        general_category: GeneralCategory,
+        grapheme_cluster_break: GraphemeClusterBreak,
+        bidi_class: BidiClass,
+        is_emoji_or_pictograph: bool,
+        is_variation_selector: bool,
+        is_region_indicator: bool,
+        is_mandatory_linebreak: bool,
+        needs_dictionary_word_break: bool,
+        is_emoji: bool,
+        is_emoji_presentation: bool,
+        is_emoji_modifier: bool,
+        is_emoji_modifier_base: bool,
+    }
+
+    impl UnclampedProperties {
+        fn from_icu4x(cp: u32) -> Self {
+            Self {
+                script: CodePointMapData::<Script>::new().get32(cp),
+                general_category: CodePointMapData::<GeneralCategory>::new().get32(cp),
+                grapheme_cluster_break: CodePointMapData::<GraphemeClusterBreak>::new().get32(cp),
+                bidi_class: CodePointMapData::<BidiClass>::new().get32(cp),
+                is_emoji_or_pictograph: CodePointSetData::new::<Emoji>().contains32(cp)
+                    || CodePointSetData::new::<ExtendedPictographic>().contains32(cp),
+                is_variation_selector: CodePointSetData::new::<VariationSelector>().contains32(cp),
+                is_region_indicator: CodePointSetData::new::<RegionalIndicator>().contains32(cp),
+                is_mandatory_linebreak: matches!(
+                    CodePointMapData::<LineBreak>::new().get32(cp),
+                    LineBreak::MandatoryBreak
+                        | LineBreak::CarriageReturn
+                        | LineBreak::LineFeed
+                        | LineBreak::NextLine
+                ),
+                needs_dictionary_word_break: CodePointMapData::<LineBreak>::new().get32(cp)
+                    == LineBreak::ComplexContext
+                    || matches!(
+                        CodePointMapData::<Script>::new().get32(cp),
+                        Script::Han | Script::Hiragana
+                    ),
+                is_emoji: CodePointSetData::new::<Emoji>().contains32(cp),
+                is_emoji_presentation: CodePointSetData::new::<EmojiPresentation>().contains32(cp),
+                is_emoji_modifier: CodePointSetData::new::<EmojiModifier>().contains32(cp),
+                is_emoji_modifier_base: CodePointSetData::new::<EmojiModifierBase>().contains32(cp),
+            }
+        }
+
+        /// Unpacks `properties` using its accessors.
+        fn unpack(properties: Properties) -> Self {
+            Self {
+                script: properties.script(),
+                general_category: properties.general_category(),
+                grapheme_cluster_break: properties.grapheme_cluster_break(),
+                bidi_class: properties.bidi_class(),
+                is_emoji_or_pictograph: properties.is_emoji_or_pictograph(),
+                is_variation_selector: properties.is_variation_selector(),
+                is_region_indicator: properties.is_region_indicator(),
+                is_mandatory_linebreak: properties.is_mandatory_linebreak(),
+                needs_dictionary_word_break: properties.needs_dictionary_word_break(),
+                is_emoji: properties.is_emoji(),
+                is_emoji_presentation: properties.is_emoji_presentation(),
+                is_emoji_modifier: properties.is_emoji_modifier(),
+                is_emoji_modifier_base: properties.is_emoji_modifier_base(),
+            }
+        }
+
+        /// Packs these properties using [`Properties::new`].
+        fn pack(&self) -> Properties {
+            Properties::new(
+                self.script,
+                self.general_category,
+                self.grapheme_cluster_break,
+                self.bidi_class,
+                self.is_emoji_or_pictograph,
+                self.is_variation_selector,
+                self.is_region_indicator,
+                self.is_mandatory_linebreak,
+                self.needs_dictionary_word_break,
+                self.is_emoji,
+                self.is_emoji_presentation,
+                self.is_emoji_modifier,
+                self.is_emoji_modifier_base,
+            )
         }
     }
 }
