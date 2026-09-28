@@ -481,3 +481,21 @@ fn line_break_override_does_not_affect_forced_breaks() {
         assert_eq!(lines, ["a\n", "b"], "override returning Some({forced})");
     }
 }
+
+#[test]
+fn text_wrap_mode_nowrap_with_leading_space() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    for text in [" !", "  !", " ! !"] {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::TextWrapMode(TextWrapMode::NoWrap));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(0.0));
+
+        let lines: Vec<_> = layout
+            .lines()
+            .map(|line| &text[line.text_range()])
+            .collect();
+        assert_eq!(lines, [text], "{text:?} shouldn't wrap");
+    }
+}
