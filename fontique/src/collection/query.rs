@@ -170,6 +170,22 @@ impl<'a> Query<'a> {
             }
         }
     }
+
+    /// Returns the [first available font] for the current settings: the first
+    /// font that [`matches_with`](Self::matches_with) would yield, if any.
+    ///
+    /// CSS additionally requires the font's `unicode-range` to include U+0020
+    /// SPACE; fontique has no `unicode-range`, so every available font qualifies.
+    ///
+    /// [first available font]: https://drafts.csswg.org/css-fonts-4/#first-available-font
+    pub fn first_available_font(&mut self) -> Option<QueryFont> {
+        let mut found = None;
+        self.matches_with(|font| {
+            found = Some(font.clone());
+            QueryStatus::Stop
+        });
+        found
+    }
 }
 
 impl Drop for Query<'_> {
