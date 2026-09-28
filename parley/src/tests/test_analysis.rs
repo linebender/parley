@@ -565,6 +565,14 @@ fn test_mixed_ltr_rtl() {
 }
 
 #[test]
+fn test_bidi_bracket_pairs() {
+    // In the following RTL paragraph, the `]!)` is sandwiched by LTR text, but pairs with the
+    // brackets in the strong RTL part (and note the neutral `!` therefore also becomes RTL).
+    verify_analysis("אב(גד[&e(b)f]!)gh", |_| {})
+        .expect_bidi_embed_level_list(&[1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 1, 1, 1, 2, 2]);
+}
+
+#[test]
 fn test_multi_byte_chars_alternating_break_all() {
     verify_analysis("€你€你AA", |builder| {
         builder.push(StyleProperty::WordBreak(WordBreak::BreakAll), 0..3);
