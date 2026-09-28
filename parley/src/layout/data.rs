@@ -279,7 +279,7 @@ impl<B: Brush> LayoutData<B> {
     ///   whitespace hangs in full.
     #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
-        let mut state = ContentWidthsState {
+        let mut state = ContentWidthsMeasurer {
             min_width: 0.,
             max_width: 0.,
             running_min_width: 0.,
@@ -320,21 +320,7 @@ impl<B: Brush> LayoutData<B> {
                     }
                 }
                 LayoutItemKind::InlineBox => {
-                    let ibox = &self.inline_boxes[item.index];
-                    if ibox.kind == InlineBoxKind::InFlow {
-                        state.running_max_width += ibox.width;
-                        if state.text_wrap_mode == TextWrapMode::Wrap {
-                            state.min_width = state
-                                .min_width
-                                .max(state.running_min_width - state.running_hanging_whitespace);
-                            state.min_width = state.min_width.max(ibox.width);
-                            state.running_min_width = 0.0;
-                        } else {
-                            state.running_min_width += ibox.width;
-                        }
-                        // Inline boxes don't hang.
-                        state.running_hanging_whitespace = 0.0;
-                    }
+                    state.measure_inline_box(&self.inline_boxes[item.index]);
                 }
             }
         }
@@ -361,7 +347,7 @@ impl<B: Brush> LayoutData<B> {
     }
 }
 
-struct ContentWidthsState {
+struct ContentWidthsMeasurer {
     min_width: f32,
     max_width: f32,
 
@@ -382,7 +368,7 @@ struct ContentWidthsState {
     text_wrap_mode: TextWrapMode,
 }
 
-impl ContentWidthsState {
+impl ContentWidthsMeasurer {
     /// Measures a text run.
     ///
     /// The run is scanned one shaped cluster at a time. break opportunities are only considered at
@@ -485,6 +471,23 @@ impl ContentWidthsState {
             } else {
                 self.running_hanging_whitespace = 0.0;
             }
+        }
+    }
+
+    fn measure_inline_box(&mut self, inline_box: &InlineBox) {
+        if inline_box.kind == InlineBoxKind::InFlow {
+            self.running_max_width += inline_box.width;
+            if self.text_wrap_mode == TextWrapMode::Wrap {
+                self.min_width = self
+                    .min_width
+                    .max(self.running_min_width - self.running_hanging_whitespace);
+                self.min_width = self.min_width.max(inline_box.width);
+                self.running_min_width = 0.0;
+            } else {
+                self.running_min_width += inline_box.width;
+            }
+            // Inline boxes don't hang.
+            self.running_hanging_whitespace = 0.0;
         }
     }
 }
