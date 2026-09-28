@@ -1440,11 +1440,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
         }
 
-        // Position the aligned subtrees against each other (CSS 2.2 §10.8.1). The root subtree
-        // determines the line's baseline. `top`/`bottom` subtrees are flush with the line box's
-        // top/bottom edge; if taller than the root subtree they grow the line box downwards
-        // (`top`) or upwards (`bottom`), which does not move the root baseline relative to the
-        // root subtree's content.
+        // Position the aligned subtrees against each other (CSS 2.2 §10.8.1).
+        //
+        // The root subtree determines the line's baseline. `top`/`bottom` aligned subtrees sit
+        // flush with the line box's top/bottom edge. If taller than the root subtree then top-aligned
+        // subtrees grow the line box downwards and bottom-aligned subtrees grow it upwards.
         let box_metrics = &self.state.line.box_metrics;
         let (mut line_box_extents, mut content_box_extents) = if invisible {
             (Extents::default().or_zero(), Extents::default().or_zero())
