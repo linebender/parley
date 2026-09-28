@@ -1896,9 +1896,9 @@ fn hanging_whitespace<B: Brush>(
     )
 }
 
-/// The inline box of a run: the box of its shaped font (which may be a fallback font and differ
-/// from the style's first available font) expanded to the style's `line-height`. Each of the
-/// run's atoms adds it to a line's extents.
+/// The post-shaping metrics of a run, if needed for line box resolution. This differs from the
+/// style derived box by taking into account any fallback fonts (rather than just using the first
+/// available font).
 ///
 /// Per [CSS Inline 3 § 4.1], glyphs from fonts other than the first available font only
 /// contribute to the line when the `line-height` is `normal` ([`LineHeight::MetricsRelative`]);
