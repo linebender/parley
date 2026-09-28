@@ -225,16 +225,6 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
     }
 }
 
-/// The text pushed to a [`TreeBuilder`] so far, as returned by [`TreeBuilder::text_so_far`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct TextSoFar<'a> {
-    /// The white space processed text.
-    pub text: &'a str,
-    /// Whether `text` is followed by collapsible whitespace, which will become a single space if
-    /// it is followed by more content, or be removed otherwise.
-    pub pending_whitespace: bool,
-}
-
 /// Builder for constructing a text layout with a tree of attributes.
 #[must_use]
 pub struct TreeBuilder<'a, B: Brush> {
@@ -278,15 +268,16 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
 
     /// Returns the text pushed so far, after white space processing.
     ///
-    /// This is the text that will be laid out, excluding any trailing collapsible whitespace:
-    /// whether that is kept (as a single space) depends on the content that follows it. Its
-    /// presence is indicated by [`TextSoFar::pending_whitespace`].
-    pub fn text_so_far(&self) -> TextSoFar<'_> {
-        let (text, pending_whitespace) = self.lcx.tree_style_builder.text_so_far();
-        TextSoFar {
-            text,
-            pending_whitespace,
-        }
+    /// This excludes any trailing collapsible whitespace, since whether that is kept (as a single
+    /// space) depends on the content that follows it. See [`Self::has_pending_whitespace`].
+    pub fn text(&self) -> &str {
+        self.lcx.tree_style_builder.text()
+    }
+
+    /// Returns whether [`Self::text`] is followed by collapsible whitespace, which will become a
+    /// single space if more content follows, or be removed otherwise.
+    pub fn has_pending_whitespace(&self) -> bool {
+        self.lcx.tree_style_builder.has_pending_whitespace()
     }
 
     pub fn push_inline_box(&mut self, mut inline_box: InlineBox) {
@@ -296,7 +287,7 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
         }
 
         // TODO: arrange type better here to factor out the index
-        inline_box.index = self.lcx.tree_style_builder.text_len();
+        inline_box.index = self.lcx.tree_style_builder.text().len();
         let parent_style_index = self.lcx.tree_style_builder.resolve_current_style_id();
         self.lcx.inline_boxes.push(LayoutInlineBox {
             inline_box,

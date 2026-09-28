@@ -255,15 +255,14 @@ impl<B: Brush> TreeStyleBuilder<B> {
         style_id
     }
 
-    /// The white space processed text so far and whether it is followed by pending collapsible
-    /// whitespace.
-    pub(crate) fn text_so_far(&self) -> (&str, bool) {
-        (&self.text, self.pending_whitespace.is_some())
+    /// The white space processed text so far.
+    pub(crate) fn text(&self) -> &str {
+        &self.text
     }
 
-    /// The length in bytes of the text committed so far.
-    pub(crate) fn text_len(&self) -> usize {
-        self.text.len()
+    /// Whether the text so far is followed by pending collapsible whitespace.
+    pub(crate) fn has_pending_whitespace(&self) -> bool {
+        self.pending_whitespace.is_some()
     }
 
     /// Begins a child span with the given style, which subsequent text is attributed to.
@@ -625,8 +624,7 @@ mod tests {
                     let mut builder = TreeStyleBuilder::<u32>::default();
                     builder.begin(style.clone());
                     builder.push_text(&input[..split]);
-                    let (text_so_far, _) = builder.text_so_far();
-                    assert!(expected.starts_with(text_so_far));
+                    assert!(expected.starts_with(builder.text()));
                     builder.push_text(&input[split..]);
                     let mut runs = Vec::new();
                     let text = builder.finish(&mut Vec::new(), &mut runs);
@@ -645,18 +643,21 @@ mod tests {
     }
 
     #[test]
-    fn text_so_far_reports_pending_whitespace() {
+    fn reports_pending_whitespace() {
         let mut builder = TreeStyleBuilder::<u32>::default();
         builder.begin(ResolvedStyle {
             white_space_collapse: WhiteSpaceCollapse::Collapse,
             ..ResolvedStyle::default()
         });
-        assert_eq!(builder.text_so_far(), ("", false));
+        assert_eq!(builder.text(), "");
+        assert!(!builder.has_pending_whitespace());
         builder.push_text("  a  ");
-        assert_eq!(builder.text_so_far(), ("a", true));
+        assert_eq!(builder.text(), "a");
+        assert!(builder.has_pending_whitespace());
         builder.push_style_modification_span([ResolvedProperty::FontSize(20.)].into_iter());
         builder.push_text(" b");
-        assert_eq!(builder.text_so_far(), ("a b", false));
+        assert_eq!(builder.text(), "a b");
+        assert!(!builder.has_pending_whitespace());
         builder.pop_style_span();
     }
 }
