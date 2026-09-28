@@ -647,6 +647,7 @@ impl BreakerState {
     /// Reset the per-line running state in preparation for building a new line.
     fn reset_line(&mut self, strut: Option<&StyleMetrics>) {
         self.line.reset(strut, &mut self.contributed);
+        self.update_max_height_exceeded();
     }
 
     #[inline(always)]
@@ -686,6 +687,7 @@ impl BreakerState {
     #[inline(always)]
     pub fn set_line_max_height(&mut self, height: f32) {
         self.line_max_height = height;
+        self.update_max_height_exceeded();
     }
 
     /// Get the x-offset of the current line
