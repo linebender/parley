@@ -86,10 +86,15 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.pending_whitespace = None;
         self.last_item_is_inline_box = false;
 
+        // The root style is always materialised at index 0 so that it can act as the parent of
+        // every other style (and as the strut for otherwise empty lines).
+        let mut root_style = root_style;
+        root_style.parent = 0;
+        self.style_table.push(root_style.clone());
         self.tree.push(StyleTreeNode {
             parent: None,
             style: root_style,
-            style_id: None,
+            style_id: Some(0),
             wrappable_style_id: None,
         });
         self.current_span = 0;
@@ -185,6 +190,11 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.commit_styled_text(style_index, " ");
     }
 
+    /// The style table index of the span that text is currently being pushed into.
+    pub(crate) fn resolve_current_style_id(&mut self) -> u16 {
+        self.resolve_style_id(self.current_span)
+    }
+
     /// Appends already white space processed `text` to the buffer, attributed to `span`.
     fn commit_text(&mut self, span: usize, text: &str) {
         let style_index = self.resolve_style_id(span);
@@ -207,15 +217,29 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.last_item_is_inline_box = false;
     }
 
-    /// The index of `span`'s style in the style table, adding it to the table if necessary.
+    /// The index of `span`'s style in the style table, adding it (and any ancestors that have not
+    /// yet been added) to the table if necessary. Ancestors are added first so that a style's
+    /// parent always has a lower index than the style itself.
     fn resolve_style_id(&mut self, span: usize) -> u16 {
         if let Some(style_id) = self.tree[span].style_id {
             return style_id;
         }
-        let style_id = self.style_table.len() as u16;
-        self.style_table.push(self.tree[span].style.clone());
+        let parent = self.tree[span]
+            .parent
+            .expect("root style is materialised in `begin`");
+        let parent_id = self.resolve_style_id(parent);
+        let mut style = self.tree[span].style.clone();
+        style.parent = parent_id;
+        let style_id = self.push_style(style);
         self.tree[span].style_id = Some(style_id);
         style_id
+    }
+
+    fn push_style(&mut self, style: ResolvedStyle<B>) -> u16 {
+        let style_id = self.style_table.len();
+        assert!(style_id <= u16::MAX as usize, "too many styles");
+        self.style_table.push(style);
+        style_id as u16
     }
 
     /// The index of `span`'s style with wrapping enabled, adding it to the table if necessary.
@@ -226,10 +250,11 @@ impl<B: Brush> TreeStyleBuilder<B> {
         if let Some(style_id) = self.tree[span].wrappable_style_id {
             return style_id;
         }
-        let mut style = self.tree[span].style.clone();
+        // Materialise the span itself first so the wrappable variant shares its parent.
+        let span_id = self.resolve_style_id(span);
+        let mut style = self.style_table[usize::from(span_id)].clone();
         style.text_wrap_mode = TextWrapMode::Wrap;
-        let style_id = self.style_table.len() as u16;
-        self.style_table.push(style);
+        let style_id = self.push_style(style);
         self.tree[span].wrappable_style_id = Some(style_id);
         style_id
     }
@@ -298,10 +323,9 @@ impl<B: Brush> TreeStyleBuilder<B> {
         if style_runs.is_empty() {
             // If there's no text, the layout still needs the root style, e.g., to size a cursor.
             style_runs.push(StyleRun {
-                style_index: style_table.len() as u16,
+                style_index: 0,
                 range: 0..0,
             });
-            style_table.push(self.current_style());
         }
 
         core::mem::take(&mut self.text)
@@ -410,9 +434,9 @@ mod tests {
 
         assert_eq!(text, "A B");
         assert_eq!(style_runs.len(), 2);
-        assert_eq!(style_runs[0].style_index, 0);
+        assert_eq!(style_runs[0].style_index, 1);
         assert_eq!(style_runs[0].range, Range { start: 0, end: 2 });
-        assert_eq!(style_runs[1].style_index, 1);
+        assert_eq!(style_runs[1].style_index, 0);
         assert_eq!(style_runs[1].range, Range { start: 2, end: 3 });
     }
 
@@ -517,6 +541,46 @@ mod tests {
         assert_eq!(style_runs[2].style_index, 0);
         assert_eq!(style_runs[3].style_index, 2);
         assert_eq!(style_runs[4].style_index, 0);
+    }
+
+    #[test]
+    fn materialises_ancestor_spans_without_text() {
+        let mut builder = TreeStyleBuilder::<u32>::default();
+        builder.begin(ResolvedStyle::default());
+        builder.push_style_modification_span([ResolvedProperty::FontSize(40.)].into_iter());
+        builder.push_style_modification_span([ResolvedProperty::FontSize(20.)].into_iter());
+        builder.push_text("B");
+        builder.pop_style_span();
+        builder.pop_style_span();
+
+        let mut style_table = Vec::new();
+        let mut style_runs = Vec::new();
+        let text = builder.finish(&mut style_table, &mut style_runs);
+
+        assert_eq!(text, "B");
+        assert_eq!(style_table.len(), 3);
+        assert_eq!(style_table[0].parent, 0);
+        assert_eq!(style_table[1].parent, 0);
+        assert_eq!(style_table[1].font_size, 40.);
+        assert_eq!(style_table[2].parent, 1);
+        assert_eq!(style_table[2].font_size, 20.);
+        assert_eq!(style_runs.len(), 1);
+        assert_eq!(style_runs[0].style_index, 2);
+    }
+
+    #[test]
+    fn empty_text_uses_root_style() {
+        let mut builder = TreeStyleBuilder::<u32>::default();
+        builder.begin(ResolvedStyle::default());
+
+        let mut style_table = Vec::new();
+        let mut style_runs = Vec::new();
+        builder.finish(&mut style_table, &mut style_runs);
+
+        assert_eq!(style_table.len(), 1);
+        assert_eq!(style_runs.len(), 1);
+        assert_eq!(style_runs[0].style_index, 0);
+        assert_eq!(style_runs[0].range, Range { start: 0, end: 0 });
     }
 
     #[test]

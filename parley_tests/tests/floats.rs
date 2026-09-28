@@ -6,6 +6,7 @@ use crate::{
     test_name,
     util::{ColorBrush, draw_layout, render_to_pixmap, samples::LOREM_IPSUM},
 };
+use parley::VerticalAlign;
 use parley::{Alignment, AlignmentOptions, InlineBox, InlineBoxKind, Layout, YieldData};
 use peniko::{Color, kurbo::Rect};
 use taffy::{Clear, FloatContext, FloatDirection};
@@ -59,6 +60,7 @@ fn float_simple() {
             width: 0.0,
             height: 0.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
     }
 
@@ -178,13 +180,7 @@ fn layout_floats(
                 state.set_line_x(next_slot.x);
                 state.set_line_y((next_slot.y) as f64);
 
-                state.append_inline_box_to_line(
-                    box_break_data.advance,
-                    0.0,
-                    0.0,
-                    true, // TODO: quantize is known to be `true` here, but perhaps we should expose
-                          // something like `Layout::quantized`.
-                );
+                state.append_inline_box_to_line(box_break_data.advance, 0.0, 0.0);
             }
         }
     }
