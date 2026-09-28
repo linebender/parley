@@ -796,10 +796,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         self.state.emergency_boundary = None;
 
         // `finish_line` reads the line's accumulated vertical metrics from `self.state.line`, so
-        // it must run before we reset the per-line running state.
-        self.finish_line(self.lines.lines.len() - 1, line_height, invisible);
-        // `finish_line` may grow the line (e.g. the trailing line after a final newline).
-        let line_height = self.lines.lines.last().unwrap().metrics.line_height;
+        // it must run before we reset the per-line running state. It may grow the line (e.g. the
+        // trailing line after a final newline), so use the returned height.
+        let line_height = self.finish_line(self.lines.lines.len() - 1, line_height, invisible);
         self.state
             .reset_line(self.layout.data.style_metrics.first());
 
@@ -1379,7 +1378,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
     }
 
-    fn finish_line(&mut self, line_idx: usize, line_height: f32, invisible: bool) {
+    fn finish_line(&mut self, line_idx: usize, line_height: f32, invisible: bool) -> f32 {
         let prev_line_metrics = match line_idx {
             0 => None,
             idx => Some(self.lines.lines[idx - 1].metrics),
@@ -1534,6 +1533,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         line.metrics.inline_min_coord = self.state.line_x;
         line.metrics.inline_max_coord = self.state.line_x + self.state.line_max_advance;
+        line.metrics.line_height
     }
 }
 
