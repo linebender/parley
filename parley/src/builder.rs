@@ -373,7 +373,10 @@ fn build_into_layout<B: Brush>(
 
     // Sort the inline boxes as subsequent code assumes that they are in text index order.
     // Note: It's important that this is a stable sort to allow users to control the order of contiguous inline boxes
-    sort_inline_boxes(&mut lcx.inline_boxes);
+    //
+    // TODO: consider dropping the sort and requiring `push_inline_box` callers to push boxes in text index order
+    // (as `TreeBuilder` already does).
+    lcx.inline_boxes.sort_by_key(|b| b.inline_box.index);
 
     {
         super::shape::shape_text(
@@ -403,15 +406,6 @@ fn build_into_layout<B: Brush>(
     // Move inline boxes into the layout
     layout.data.inline_boxes.clear();
     core::mem::swap(&mut layout.data.inline_boxes, &mut lcx.inline_boxes);
-}
-
-/// Stably sort inline boxes by text index.
-///
-/// TODO: consider dropping the sort and instead requiring `push_inline_box` callers to push boxes
-/// in text index order (as `TreeBuilder` already does, and as styles are required to be
-/// parent-first), which would reduce this to an assertion.
-fn sort_inline_boxes(boxes: &mut [LayoutInlineBox]) {
-    boxes.sort_by_key(|b| b.inline_box.index);
 }
 
 fn resolve_range(range: impl RangeBounds<usize>, len: usize) -> Range<usize> {
