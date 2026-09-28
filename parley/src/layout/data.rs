@@ -277,73 +277,8 @@ impl<B: Brush> LayoutData<B> {
     ///   nothing hangs; without one, the unconditionally hanging whitespace hangs in full.
     /// - min-content width: any conditionally-hanging suffix hangs in full, so all hanging
     ///   whitespace hangs in full.
-    #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
-        let mut state = ContentWidthsMeasurer {
-            min_width: 0.,
-            max_width: 0.,
-            running_min_width: 0.,
-            running_max_width: 0.,
-            running_hanging_whitespace: 0.,
-            hangs_conditionally: false,
-            text_wrap_mode: TextWrapMode::Wrap,
-        };
-
-        for item in &self.items {
-            match item.kind {
-                LayoutItemKind::TextRun => {
-                    let slice = self.shaped_text.run_slice(item.index as u32);
-                    let run_spacing = self.runs[item.index].spacing;
-                    // Trailing whitespace can only hang if it ends up at the line's end edge after
-                    // bidi reordering. We don't currently apply UAX #9 L1 (resetting trailing
-                    // whitespace to paragraph level), so only logically-last items that match the
-                    // paragraph level are guaranteed to be at that edge.
-                    let can_hang = item.bidi_level == self.base_level;
-                    let is_rtl = item.bidi_level.is_rtl();
-
-                    if run_spacing.is_zero() {
-                        state.measure_text_run::<B, false>(
-                            &self.styles,
-                            slice,
-                            run_spacing,
-                            can_hang,
-                            is_rtl,
-                        );
-                    } else {
-                        state.measure_text_run::<B, true>(
-                            &self.styles,
-                            slice,
-                            run_spacing,
-                            can_hang,
-                            is_rtl,
-                        );
-                    }
-                }
-                LayoutItemKind::InlineBox => {
-                    state.measure_inline_box(&self.inline_boxes[item.index]);
-                }
-            }
-        }
-
-        // The end of a layout is considered to be a forced line break as per CSS Text 4 § 5, so
-        // whitespace can hang conditionally.
-        state.min_width = state
-            .min_width
-            .max(state.running_min_width - state.running_hanging_whitespace);
-        if !state.hangs_conditionally {
-            state.running_max_width -= state.running_hanging_whitespace;
-        }
-        state.max_width = state.max_width.max(state.running_max_width);
-
-        // Negative-width inline boxes (e.g. negative margins) can make the max-content width
-        // smaller than the min-content width. CSS Sizing 3 § 2.1 requires the max-content size to
-        // be floored by the min-content size.
-        state.max_width = state.max_width.max(state.min_width);
-
-        ContentWidths {
-            min: state.min_width,
-            max: state.max_width,
-        }
+        ContentWidthsMeasurer::new().measure(self)
     }
 }
 
@@ -369,6 +304,78 @@ struct ContentWidthsMeasurer {
 }
 
 impl ContentWidthsMeasurer {
+    #[inline(always)]
+    fn new() -> Self {
+        Self {
+            min_width: 0.,
+            max_width: 0.,
+            running_min_width: 0.,
+            running_max_width: 0.,
+            running_hanging_whitespace: 0.,
+            hangs_conditionally: false,
+            text_wrap_mode: TextWrapMode::Wrap,
+        }
+    }
+
+    #[inline(always)]
+    fn measure<B: Brush>(mut self, layout_data: &LayoutData<B>) -> ContentWidths {
+        for item in &layout_data.items {
+            match item.kind {
+                LayoutItemKind::TextRun => {
+                    let slice = layout_data.shaped_text.run_slice(item.index as u32);
+                    let run_spacing = layout_data.runs[item.index].spacing;
+                    // Trailing whitespace can only hang if it ends up at the line's end edge after
+                    // bidi reordering. We don't currently apply UAX #9 L1 (resetting trailing
+                    // whitespace to paragraph level), so only logically-last items that match the
+                    // paragraph level are guaranteed to be at that edge.
+                    let can_hang = item.bidi_level == layout_data.base_level;
+                    let is_rtl = item.bidi_level.is_rtl();
+
+                    if run_spacing.is_zero() {
+                        self.measure_text_run::<B, false>(
+                            &layout_data.styles,
+                            slice,
+                            run_spacing,
+                            can_hang,
+                            is_rtl,
+                        );
+                    } else {
+                        self.measure_text_run::<B, true>(
+                            &layout_data.styles,
+                            slice,
+                            run_spacing,
+                            can_hang,
+                            is_rtl,
+                        );
+                    }
+                }
+                LayoutItemKind::InlineBox => {
+                    self.measure_inline_box(&layout_data.inline_boxes[item.index]);
+                }
+            }
+        }
+
+        // The end of a layout is considered to be a forced line break as per CSS Text 4 § 5, so
+        // whitespace can hang conditionally.
+        self.min_width = self
+            .min_width
+            .max(self.running_min_width - self.running_hanging_whitespace);
+        if !self.hangs_conditionally {
+            self.running_max_width -= self.running_hanging_whitespace;
+        }
+        self.max_width = self.max_width.max(self.running_max_width);
+
+        // Negative-width inline boxes (e.g. negative margins) can make the max-content width
+        // smaller than the min-content width. CSS Sizing 3 § 2.1 requires the max-content size to
+        // be floored by the min-content size.
+        self.max_width = self.max_width.max(self.min_width);
+
+        ContentWidths {
+            min: self.min_width,
+            max: self.max_width,
+        }
+    }
+
     /// Measures a text run.
     ///
     /// The run is scanned one shaped cluster at a time. break opportunities are only considered at
