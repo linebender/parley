@@ -78,23 +78,39 @@ fn content_widths_partially_hanging_atom() {
 
     // A prepend character followed by a space forms a single grapheme, and so a single atom, of
     // two shaped clusters. Only the space's cluster hangs.
-    let text = "a\u{0D4E} b c";
-    let mut layout = env.ranged_builder(text).build(text);
+    for (text, word) in [
+        // LTR
+        ("a\u{0D4E} b c", "a\u{0D4E}"),
+        // RTL
+        ("\u{0710}\u{070F} \u{0712} \u{0713}", "\u{0710}\u{070F}"),
+    ] {
+        let mut layout = env.ranged_builder(text).build(text);
+        let widths = assert_content_widths_match_layout(&mut layout);
+        assert_eq!(
+            layout.len(),
+            3,
+            "one word per line at the min content width"
+        );
 
-    let widths = assert_content_widths_match_layout(&mut layout);
-    assert_eq!(
-        layout.len(),
-        3,
-        "one word per line at the min content width"
-    );
+        let word_width = single_line_width(&mut env, word);
+        assert!(
+            (widths.min - word_width).abs() < 1e-3,
+            "Min content width {} should equal the widest word's width {} (excluding the space)",
+            widths.min,
+            word_width
+        );
 
-    let word_width = single_line_width(&mut env, "a\u{0D4E}");
-    assert!(
-        (widths.min - word_width).abs() < 1e-3,
-        "Min content width {} should equal the widest word's width {} (excluding the space)",
-        widths.min,
-        word_width
-    );
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::LetterSpacing(2.));
+        builder.push_default(StyleProperty::WordSpacing(3.));
+        let mut layout = builder.build(text);
+        assert_content_widths_match_layout(&mut layout);
+        assert_eq!(
+            layout.len(),
+            3,
+            "one word per line at the min content width"
+        );
+    }
 }
 
 #[test]
