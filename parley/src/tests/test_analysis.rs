@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::{
-    FontContext, LayoutContext, RangedBuilder, StyleProperty, WhiteSpaceCollapse, WordBreak,
+    FontContext, Language, LayoutContext, LineBreak, RangedBuilder, StyleProperty,
+    WhiteSpaceCollapse, WordBreak,
 };
 use alloc::{vec, vec::Vec};
 use fontique::FontWeight;
@@ -1133,4 +1134,141 @@ fn test_break_spaces_across_style_boundary() {
     })
     .expect_soft_wrap_opportunity_list(vec![false, false, true])
     .expect_word_boundary_list(vec![true, true, true]);
+}
+
+fn soft_wrap_opportunities(text: &str, line_break: LineBreak, language: Option<&str>) -> Vec<bool> {
+    verify_analysis(text, |builder| {
+        builder.push_default(StyleProperty::LineBreak(line_break));
+        builder.push_default(StyleProperty::Locale(
+            language.map(|language| Language::parse(language).unwrap()),
+        ));
+    })
+    .soft_wrap_opportunity_list()
+}
+
+#[test]
+fn test_line_break_strictness() {
+    // U+3041 HIRAGANA LETTER SMALL A is a conditional Japanese starter, which may only start a line
+    // under `normal` and `loose`. A break before U+2010 HYPHEN after an ideograph is only allowed
+    // under `loose`.
+    for (line_break, small_kana, hyphen) in [
+        (LineBreak::Strict, false, false),
+        (LineBreak::Normal, true, false),
+        (LineBreak::Loose, true, true),
+    ] {
+        assert_eq!(
+            soft_wrap_opportunities("文ぁ文", line_break, None)[1],
+            small_kana,
+            "{line_break:?}"
+        );
+        assert_eq!(
+            soft_wrap_opportunities("文‐文", line_break, None)[1],
+            hyphen,
+            "{line_break:?}"
+        );
+    }
+}
+
+#[test]
+fn test_line_break_chinese_japanese_tailoring() {
+    // A break before U+301C WAVE DASH under `normal` is only allowed for Chinese or Japanese.
+    let text = "文〜文";
+    assert!(!soft_wrap_opportunities(text, LineBreak::Normal, None)[1]);
+    assert!(!soft_wrap_opportunities(text, LineBreak::Normal, Some("en"))[1]);
+    assert!(soft_wrap_opportunities(text, LineBreak::Normal, Some("ja"))[1]);
+    assert!(soft_wrap_opportunities(text, LineBreak::Normal, Some("zh-Hant"))[1]);
+
+    // A break before U+FF04 FULLWIDTH DOLLAR SIGN (PR with East Asian Width F) under `loose`
+    // is only allowed for Chinese or Japanese.
+    let text = "文＄文";
+    assert!(!soft_wrap_opportunities(text, LineBreak::Loose, Some("en"))[2]);
+    assert!(soft_wrap_opportunities(text, LineBreak::Loose, Some("ja"))[2]);
+}
+
+#[test]
+fn test_line_break_anywhere() {
+    // Opportunities around every character, including those with the GL (U+00A0 NO-BREAK SPACE)
+    // and WJ (U+2060 WORD JOINER) classes, and punctuation.
+    assert_eq!(
+        soft_wrap_opportunities("ab\u{a0}c\u{2060}d/e", LineBreak::Anywhere, None),
+        vec![false, true, true, true, true, true, true, true]
+    );
+    // But not before a combining mark, nor before a mandatory break.
+    assert_eq!(
+        soft_wrap_opportunities("ae\u{301}\nb", LineBreak::Anywhere, None),
+        vec![false, true, false, false, false]
+    );
+}
+
+#[test]
+fn test_line_break_anywhere_overrides_keep_all() {
+    verify_analysis("abc", |builder| {
+        builder.push_default(StyleProperty::WordBreak(WordBreak::KeepAll));
+        builder.push_default(StyleProperty::LineBreak(LineBreak::Anywhere));
+    })
+    .expect_soft_wrap_opportunity_list(vec![false, true, true]);
+}
+
+#[test]
+fn test_line_break_override_applies_under_anywhere() {
+    let mut test_context = TestContext::default();
+    {
+        let text = "a b/c";
+        let mut builder = test_context.layout_context.ranged_builder(
+            &mut test_context.font_context,
+            text,
+            1.,
+            true,
+        );
+        builder.push_default(StyleProperty::LineBreak(LineBreak::Anywhere));
+        builder.set_line_break_override(Some(&|_| Some(false)));
+        _ = builder.build(text);
+    }
+    assert_eq!(test_context.soft_wrap_opportunity_list(), vec![false; 5]);
+}
+
+#[test]
+fn test_line_break_anywhere_graphemes() {
+    // Opportunities are around grapheme clusters, not code points: a Hangul syllable of conjoining
+    // jamo, a pair of regional indicators, an emoji with a modifier, and a ZWJ are not split.
+    for (text, expected) in [
+        ("\u{1100}\u{1161}\u{11A8}x", vec![false, false, false, true]),
+        ("🇯🇵🇺🇸", vec![false, false, true, false]),
+        ("👍🏽x", vec![false, false, true]),
+        ("a\u{200D}b", vec![false, false, true]),
+    ] {
+        assert_eq!(
+            soft_wrap_opportunities(text, LineBreak::Anywhere, None),
+            expected,
+            "{text:?}"
+        );
+    }
+}
+
+#[test]
+fn test_line_break_language_change_under_strict() {
+    // The language does not affect `strict` line breaking, so a language change must not create an
+    // opportunity: UAX #14 LB14 prohibits a break after an opening bracket followed by spaces.
+    let text = "x(  y";
+    verify_analysis(text, |builder| {
+        builder.push(
+            StyleProperty::Locale(Some(Language::parse("en").unwrap())),
+            0..3,
+        );
+        builder.push(
+            StyleProperty::Locale(Some(Language::parse("ja").unwrap())),
+            3..5,
+        );
+    })
+    .expect_soft_wrap_opportunity_list(vec![false; 5]);
+}
+
+#[test]
+fn test_line_break_mixed_runs() {
+    // The opportunity before a character is decided by that character's configuration.
+    verify_analysis("abcdef", |builder| {
+        builder.push(StyleProperty::LineBreak(LineBreak::Anywhere), 0..2);
+        builder.push(StyleProperty::LineBreak(LineBreak::Anywhere), 4..6);
+    })
+    .expect_soft_wrap_opportunity_list(vec![false, true, false, false, true, true]);
 }
