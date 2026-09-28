@@ -362,11 +362,9 @@ impl LineBoxMetrics {
         baseline_offset: f32,
         ascent: f32,
         descent: f32,
-        quantize: bool,
     ) {
         // Inline box extents are exact box sizes supplied by the caller, not font metrics;
         // rounding them would change the space the box reserves relative to its height.
-        let _ = quantize;
         // Negative margins can make the reserved space negative; the box is still content.
         // Out-of-flow boxes have infinitely negative extents and are not.
         if (ascent != 0. || descent != 0.) && ascent.is_finite() && descent.is_finite() {
@@ -575,19 +573,11 @@ impl BreakerState {
     /// `ascent` and `descent` are the distances the box extends above and below the line's root
     /// baseline respectively. A box with its bottom aligned to the baseline is simply one with a
     /// zero descent. The box grows the line only insofar as it extends beyond the text.
-    pub fn append_inline_box_to_line(
-        &mut self,
-        next_x: f32,
-        ascent: f32,
-        descent: f32,
-        quantize: bool,
-    ) {
+    pub fn append_inline_box_to_line(&mut self, next_x: f32, ascent: f32, descent: f32) {
         self.item_idx += 1;
         self.line.items.end += 1;
         self.line.x = next_x;
-        self.line
-            .box_metrics
-            .add_inline_box(0, 0., ascent, descent, quantize);
+        self.line.box_metrics.add_inline_box(0, 0., ascent, descent);
         self.update_max_height_exceeded();
     }
 
@@ -615,7 +605,6 @@ impl BreakerState {
                 placement.baseline_offset,
                 placement.ascent,
                 placement.descent,
-                quantize,
             );
         }
         self.update_max_height_exceeded();
@@ -767,12 +756,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             self.state
                 .append_aligned_inline_box_to_line(next_x, inline_box, placement, quantize);
         } else {
-            self.state.append_inline_box_to_line(
-                next_x,
-                f32::NEG_INFINITY,
-                f32::NEG_INFINITY,
-                self.layout.data.quantize,
-            );
+            self.state
+                .append_inline_box_to_line(next_x, f32::NEG_INFINITY, f32::NEG_INFINITY);
         }
     }
 
@@ -1356,12 +1341,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             //
             // So we place the box as a zero-sized out-of-flow box to guarantee progress.
             if let YieldData::InlineBoxBreak(_) = yield_data {
-                self.state.append_inline_box_to_line(
-                    self.state.line.x,
-                    0.0,
-                    0.0,
-                    self.layout.data.quantize,
-                );
+                self.state
+                    .append_inline_box_to_line(self.state.line.x, 0.0, 0.0);
             }
         }
         self.finish();
