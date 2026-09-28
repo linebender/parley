@@ -195,15 +195,7 @@ impl CharInfo {
     const EMOJI_MODIFIER_SHIFT: u16 = 11;
     const EMOJI_MODIFIER_BASE_SHIFT: u16 = 12;
 
-    #[allow(
-        dead_code,
-        reason = "To be used in more complete emoji checking, in select_font"
-    )]
     const VARIATION_SELECTOR_MASK: u16 = 1 << Self::VARIATION_SELECTOR_SHIFT;
-    #[allow(
-        dead_code,
-        reason = "To be used in more complete emoji checking, in select_font"
-    )]
     const REGION_INDICATOR_MASK: u16 = 1 << Self::REGION_INDICATOR_SHIFT;
     const CONTROL_MASK: u16 = 1 << Self::CONTROL_SHIFT;
     const EMOJI_OR_PICTOGRAPH_MASK: u16 = 1 << Self::EMOJI_OR_PICTOGRAPH_SHIFT;
