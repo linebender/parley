@@ -317,9 +317,10 @@ impl LineBoxMetrics {
     /// Add the glyphs of a text atom of `style_index` in layout item `item_idx`, a run whose own
     /// box is `run_box` (see [`run_box_metrics`]).
     ///
-    /// This adds the style's span box together with its ancestors, and the run's box if it has
-    /// one (the glyph font may be a fallback font and differ from the style's first available
-    /// font).
+    /// This adds the style's span box together with its ancestors. When the style's line height
+    /// is [`LineHeight::MetricsRelative`] (which corresponds to CSS `line-height: normal`), it also
+    /// adds the run's box, which matters when the run was shaped with a fallback font whose metrics
+    /// differ from the style's first available font, the font the span box is built from.
     #[inline]
     fn add_text(
         &mut self,
