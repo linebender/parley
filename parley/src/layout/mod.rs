@@ -46,7 +46,6 @@ pub use crate::editing::{Cursor, Selection};
 use crate::style::Brush;
 use crate::{LineHeight, OverflowWrap, TextWrapMode, VerticalAlign, WhiteSpaceCollapse};
 
-#[allow(clippy::partial_pub_fields)]
 /// Style properties.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Style<B: Brush> {

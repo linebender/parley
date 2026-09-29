@@ -83,10 +83,6 @@ impl LayoutAccessibility {
     /// previous pass. `set_brush_properties` is called once per span, and should map the
     /// span's brush onto AccessKit's color and text decoration properties; Parley's brush
     /// type is opaque, so only the caller can do this.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "the layout, the tree being built, and the caller's hooks are all needed"
-    )]
     pub fn build_nodes<B: Brush>(
         &mut self,
         text: &str,
@@ -454,10 +450,6 @@ impl PlainEditorAccessibility {
     /// `node` is the node for the text input itself; the spans are pushed onto `update`
     /// as its children. See [`LayoutAccessibility::build_nodes`] for the remaining
     /// arguments.
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "mirrors `LayoutAccessibility::build_nodes`"
-    )]
     pub fn build_nodes<B: Brush>(
         &mut self,
         driver: &mut PlainEditorDriver<'_, B>,
@@ -558,10 +550,6 @@ fn link_spans(prev_id: NodeId, prev: &mut Node, next_id: NodeId, next: &mut Node
     next.set_previous_on_line(prev_id);
 }
 
-#[allow(
-    clippy::too_many_arguments,
-    reason = "internal helper, split for clarity"
-)]
 fn finish_span(
     node: &mut Node,
     x_offset: f64,

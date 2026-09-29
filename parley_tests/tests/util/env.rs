@@ -167,7 +167,6 @@ impl TestEnv {
         &mut self.rendering_config
     }
 
-    #[allow(dead_code, reason = "this may be useful for future tests")]
     pub(crate) fn max_screenshot_size(&mut self) -> &mut Option<usize> {
         &mut self.max_screenshot_size
     }
