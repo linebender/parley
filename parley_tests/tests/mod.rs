@@ -19,6 +19,7 @@
 //!     better than `move_left_cursor`. This makes it easier to inspect the reference
 //!     snapshots by topic.
 
+#![allow(missing_docs, reason = "we don't need docs for testing")]
 #![allow(clippy::cast_possible_truncation, reason = "not critical for testing")]
 
 mod basic;
