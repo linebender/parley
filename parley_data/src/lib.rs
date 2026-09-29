@@ -61,10 +61,6 @@ impl Properties {
     }
 
     /// Creates a new [`Properties`] from the given properties
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "one argument per packed property; only called from the data generator and tests"
-    )]
     pub fn new(
         script: Script,
         gc: GeneralCategory,

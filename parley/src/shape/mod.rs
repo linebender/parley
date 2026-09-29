@@ -43,7 +43,6 @@ const OPTIONAL_LIGATURES_OFF: [FontFeature; 4] = [
     FontFeature::new(Tag::new(b"hlig"), 0),
 ];
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn shape_text<'a, B: Brush>(
     rcx: &'a ResolveContext,
     fcx: &'a mut FontContext,

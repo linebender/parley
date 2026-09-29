@@ -266,7 +266,6 @@ impl<B: Brush> LayoutData<B> {
             bidi_level,
         });
     }
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn process_shaped_run(
         &mut self,
         shaped_run_idx: usize,
