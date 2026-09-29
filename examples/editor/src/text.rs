@@ -169,7 +169,6 @@ impl Editor {
             } if !self.editor.is_composing() && state.is_down() => {
                 self.cursor_reset();
                 let mut drv = self.editor.driver(&mut self.font_cx, &mut self.layout_cx);
-                #[allow(unused)]
                 let action_mod = if cfg!(target_os = "macos") {
                     modifiers.meta()
                 } else {
