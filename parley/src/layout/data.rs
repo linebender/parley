@@ -324,7 +324,8 @@ impl<B: Brush> LayoutData<B> {
     /// - min-content width: any conditionally-hanging suffix hangs in full, so all hanging
     ///   whitespace hangs in full.
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
-        ContentWidthsMeasurer::new(self.indent_amount, self.indent_options).measure(self)
+        ContentWidthsMeasurer::new(IndentState::new(self.indent_amount, self.indent_options))
+            .measure(self)
     }
 }
 
@@ -348,51 +349,79 @@ struct ContentWidthsMeasurer {
 
     text_wrap_mode: TextWrapMode,
 
-    /// The text-indent amount.
-    indent_amount: f32,
-    /// The text-indent options.
-    indent_options: IndentOptions,
+    indent: IndentState,
+}
+
+/// The text-indent state of a [`ContentWidthsMeasurer`].
+///
+/// The indent is added eagerly when a line or min-content fragment starts, so empty lines and
+/// fragments are tracked to not count it for them.
+struct IndentState {
+    amount: f32,
+    options: IndentOptions,
     /// Whether the current line is the first line or, with `each-line`, follows a forced break.
     is_scope_line: bool,
-
-    // The indent is added eagerly when a line or min-content fragment starts, so empty lines and
-    // fragments are tracked to not count it for them.
     /// Whether the current min-content fragment is empty, between layout items.
     fragment_empty: bool,
     /// Whether the current line is empty, between layout items.
     line_empty: bool,
 }
 
-impl ContentWidthsMeasurer {
+impl IndentState {
     #[inline(always)]
-    fn new(indent_amount: f32, indent_options: IndentOptions) -> Self {
-        let mut measurer = Self {
-            min_width: 0.,
-            max_width: 0.,
-            running_min_width: 0.,
-            running_max_width: 0.,
-            running_hanging_whitespace: 0.,
-            hangs_conditionally: false,
-            text_wrap_mode: TextWrapMode::Wrap,
-            indent_amount,
-            indent_options,
+    fn new(amount: f32, options: IndentOptions) -> Self {
+        Self {
+            amount,
+            options,
             is_scope_line: true,
             fragment_empty: true,
             line_empty: true,
-        };
-        let indent = measurer.line_indent(true);
-        measurer.running_min_width = indent;
-        measurer.running_max_width = indent;
-        measurer
+        }
     }
 
-    /// The text-indent of a line, mirroring the line breaker's `resolve_indent`.
+    /// The indent of the current line, mirroring the line breaker's `resolve_indent`.
     #[inline(always)]
-    fn line_indent(&self, is_scope_line: bool) -> f32 {
-        if is_scope_line ^ self.indent_options.hanging {
-            self.indent_amount
+    fn line_indent(&self) -> f32 {
+        self.indent(self.is_scope_line)
+    }
+
+    /// The indent of a continuation line after a soft wrap.
+    #[inline(always)]
+    fn continuation_indent(&self) -> f32 {
+        self.indent(false)
+    }
+
+    #[inline(always)]
+    fn indent(&self, is_scope_line: bool) -> f32 {
+        if is_scope_line ^ self.options.hanging {
+            self.amount
         } else {
             0.0
+        }
+    }
+
+    /// Starts a new, empty line after a forced break.
+    #[inline(always)]
+    fn start_line(&mut self) {
+        self.is_scope_line = self.options.each_line;
+        self.fragment_empty = true;
+        self.line_empty = true;
+    }
+}
+
+impl ContentWidthsMeasurer {
+    #[inline(always)]
+    fn new(indent: IndentState) -> Self {
+        let line_indent = indent.line_indent();
+        Self {
+            min_width: 0.,
+            max_width: 0.,
+            running_min_width: line_indent,
+            running_max_width: line_indent,
+            running_hanging_whitespace: 0.,
+            hangs_conditionally: false,
+            text_wrap_mode: TextWrapMode::Wrap,
+            indent,
         }
     }
 
@@ -408,7 +437,7 @@ impl ContentWidthsMeasurer {
         self.min_width = self
             .min_width
             .max(self.running_min_width - self.running_hanging_whitespace);
-        self.running_min_width = self.line_indent(false);
+        self.running_min_width = self.indent.continuation_indent();
     }
 
     /// Ends the current line at a forced break or the end of the layout.
@@ -426,10 +455,8 @@ impl ContentWidthsMeasurer {
             self.max_width = self.max_width.max(self.running_max_width);
         }
         self.running_hanging_whitespace = 0.0;
-        self.is_scope_line = self.indent_options.each_line;
-        self.fragment_empty = true;
-        self.line_empty = true;
-        let indent = self.line_indent(self.is_scope_line);
+        self.indent.start_line();
+        let indent = self.indent.line_indent();
         self.running_min_width = indent;
         self.running_max_width = indent;
     }
@@ -474,7 +501,7 @@ impl ContentWidthsMeasurer {
 
         // The end of a layout is considered to be a forced line break as per CSS Text 4 § 5, so
         // whitespace can hang conditionally.
-        self.hard_break(self.fragment_empty, self.line_empty);
+        self.hard_break(self.indent.fragment_empty, self.indent.line_empty);
 
         // Negative-width inline boxes (e.g. negative margins) can make the max-content width
         // smaller than the min-content width. CSS Sizing 3 § 2.1 requires the max-content size to
@@ -509,8 +536,16 @@ impl ContentWidthsMeasurer {
     ) {
         let clusters = slice.shaped_clusters();
         // The cluster index at which the current fragment and line are still empty, if any.
-        let mut fragment_empty_at = if self.fragment_empty { 0 } else { usize::MAX };
-        let mut line_empty_at = if self.line_empty { 0 } else { usize::MAX };
+        let mut fragment_empty_at = if self.indent.fragment_empty {
+            0
+        } else {
+            usize::MAX
+        };
+        let mut line_empty_at = if self.indent.line_empty {
+            0
+        } else {
+            usize::MAX
+        };
 
         // The spacing gap of the current atom.
         let mut gap = 0.;
@@ -586,8 +621,8 @@ impl ContentWidthsMeasurer {
                 self.running_hanging_whitespace = 0.0;
             }
         }
-        self.fragment_empty = fragment_empty_at == clusters.len();
-        self.line_empty = line_empty_at == clusters.len();
+        self.indent.fragment_empty = fragment_empty_at == clusters.len();
+        self.indent.line_empty = line_empty_at == clusters.len();
     }
 
     fn measure_inline_box(&mut self, inline_box: &InlineBox) {
@@ -595,17 +630,17 @@ impl ContentWidthsMeasurer {
             // Inline boxes have soft wrap opportunities on both sides.
             let wraps = self.text_wrap_mode == TextWrapMode::Wrap;
             if wraps {
-                self.soft_break(self.fragment_empty);
+                self.soft_break(self.indent.fragment_empty);
             }
             // Inline boxes don't hang.
             self.running_hanging_whitespace = 0.0;
             self.running_min_width += inline_box.width;
             self.running_max_width += inline_box.width;
-            self.line_empty = false;
-            self.fragment_empty = false;
+            self.indent.line_empty = false;
+            self.indent.fragment_empty = false;
             if wraps {
                 self.soft_break(false);
-                self.fragment_empty = true;
+                self.indent.fragment_empty = true;
             }
         }
     }
