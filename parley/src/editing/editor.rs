@@ -946,9 +946,22 @@ where
     }
 
     /// Replace the whole text buffer.
+    ///
+    /// The selection keeps its byte offsets, clamped to the new text.
     pub fn set_text(&mut self, is: &str) {
         self.buffer.clear();
         self.buffer.push_str(is);
+        let clamp = |cursor: Cursor| {
+            let mut index = cursor.index.min(is.len());
+            while !is.is_char_boundary(index) {
+                index -= 1;
+            }
+            Cursor { index, ..cursor }
+        };
+        self.selection = Selection::new(
+            clamp(self.selection.anchor()),
+            clamp(self.selection.focus()),
+        );
         self.layout_dirty = true;
         self.compose = None;
     }

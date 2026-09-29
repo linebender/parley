@@ -7,6 +7,7 @@ use core::ops::Range;
 
 use alloc::vec::Vec;
 use parlance::{BidiLevel, NormalizedCoord};
+use skrifa::MetadataProvider;
 
 use crate::{
     CharInfo, FontInstance, Glyph,
@@ -48,6 +49,88 @@ pub struct FontMetrics {
     /// Distance from the baseline to the top of the lowercase "x" or
     /// similar character.
     pub x_height: Option<f32>,
+}
+
+impl FontMetrics {
+    /// Metrics to use when no font is available at all.
+    ///
+    /// These roughly match common Latin fonts, so that a layout without fonts still has plausible
+    /// line heights.
+    pub const fn fallback(font_size: f32) -> Self {
+        Self {
+            ascent: font_size * 0.8,
+            descent: font_size * 0.2,
+            leading: 0.,
+            underline_offset: 0.,
+            underline_size: 0.,
+            strikethrough_offset: 0.,
+            strikethrough_size: 0.,
+            cap_height: None,
+            x_height: None,
+        }
+    }
+
+    /// Compute the metrics of `font` at `font_size`, positioned at the variable font location
+    /// given by the `synthesis` and `variations` axis settings.
+    ///
+    /// Returns `None` if the font data cannot be parsed.
+    pub fn from_font_instance(
+        font: &FontInstance,
+        font_size: f32,
+        variations: &[parlance::FontVariation],
+    ) -> Option<Self> {
+        let font_ref =
+            skrifa::FontRef::from_index(font.font.data.as_ref(), font.font.index).ok()?;
+        let location = font_ref.axes().location(
+            font.synthesis
+                .variation_settings()
+                .iter()
+                .map(|(tag, value)| (skrifa::Tag::new(&tag.to_be_bytes()), *value))
+                .chain(
+                    variations
+                        .iter()
+                        .map(|v| (skrifa::Tag::new(&v.tag.to_bytes()), v.value)),
+                ),
+        );
+        Some(Self::from_skrifa_metrics(&skrifa::metrics::Metrics::new(
+            &font_ref,
+            skrifa::prelude::Size::new(font_size),
+            &location,
+        )))
+    }
+
+    fn from_skrifa_metrics(metrics: &skrifa::metrics::Metrics) -> Self {
+        let units_per_em = metrics.units_per_em as f32;
+
+        // TODO: The following seems to be in the wrong scale, as its staying in design units rather
+        // than scaled to the font size like the other fields for `FontMetrics`.
+        let (underline_offset, underline_size) = if let Some(underline) = metrics.underline {
+            (underline.offset, underline.thickness)
+        } else {
+            // Default values from Harfbuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334
+            let default = units_per_em / 18.0;
+            (default, default)
+        };
+        let (strikethrough_offset, strikethrough_size) = if let Some(strikeout) = metrics.strikeout
+        {
+            (strikeout.offset, strikeout.thickness)
+        } else {
+            // Default values from HarfBuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334-L347
+            (metrics.ascent / 2.0, units_per_em / 18.0)
+        };
+
+        Self {
+            ascent: metrics.ascent,
+            descent: -metrics.descent,
+            leading: metrics.leading,
+            underline_offset,
+            underline_size,
+            strikethrough_offset,
+            strikethrough_size,
+            x_height: metrics.x_height,
+            cap_height: metrics.cap_height,
+        }
+    }
 }
 
 /// The result of shaping.
@@ -184,7 +267,7 @@ impl ShapedText {
         &mut self,
         text: &str,
         range: TextRange,
-        item: &Segment,
+        segment: &Segment,
         options: &ShapeOptions<'_>,
         char_info: &[CharInfo],
         char_style_indices: &[u16],
@@ -231,35 +314,7 @@ impl ShapedText {
             )
         };
         let units_per_em = metrics.units_per_em as f32;
-
-        // TODO: The following seems to be in the wrong scale, as its staying in design units rather
-        // than scaled to the font size like the other fields for `FontMetrics`.
-        let (underline_offset, underline_size) = if let Some(underline) = metrics.underline {
-            (underline.offset, underline.thickness)
-        } else {
-            // Default values from Harfbuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334
-            let default = units_per_em / 18.0;
-            (default, default)
-        };
-        let (strikethrough_offset, strikethrough_size) = if let Some(strikeout) = metrics.strikeout
-        {
-            (strikeout.offset, strikeout.thickness)
-        } else {
-            // Default values from HarfBuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334-L347
-            (metrics.ascent / 2.0, units_per_em / 18.0)
-        };
-
-        let font_metrics = FontMetrics {
-            ascent: metrics.ascent,
-            descent: -metrics.descent,
-            leading: metrics.leading,
-            underline_offset,
-            underline_size,
-            strikethrough_offset,
-            strikethrough_size,
-            x_height: metrics.x_height,
-            cap_height: metrics.cap_height,
-        };
+        let font_metrics = FontMetrics::from_skrifa_metrics(&metrics);
 
         // `HarfRust` returns glyphs in visual order, so we need to process them as such while
         // maintaining logical ordering of clusters.
@@ -293,7 +348,7 @@ impl ShapedText {
         self.characters[characters_start].grapheme_start = true;
 
         let glyphs_start = self.glyphs.len();
-        if item.bidi_level.is_ltr() {
+        if segment.bidi_level.is_ltr() {
             process_shaped_clusters(
                 &mut self.shaped_clusters,
                 &mut self.glyphs,
@@ -338,7 +393,7 @@ impl ShapedText {
             shaped_clusters_range,
             glyphs_range: glyphs_start..self.glyphs.len(),
             normalized_coords_range,
-            bidi_level: item.bidi_level,
+            bidi_level: segment.bidi_level,
             advance: run_advance,
             font_metrics,
         });
@@ -439,7 +494,11 @@ fn process_shaped_clusters<'a>(
                 .with_grapheme_start(first_character.grapheme_start)
                 // TODO: fill with actual shaping data (`parley` currently just ignores this)
                 .with_safe_to_break_before(false)
-                .with_inline_glyph(inline_glyph),
+                .with_inline_glyph(inline_glyph)
+                .with_first_char(
+                    first_character.flags.is_soft_wrap_opportunity(),
+                    first_character.whitespace,
+                ),
             glyph_offset,
             advance,
         });
@@ -501,7 +560,8 @@ mod tests {
     use linebender_resource_handle::{Blob, FontData};
 
     use crate::{
-        Analysis, AnalysisOptions, Analyzer, FontInstance, FontSelector, ShapeOptions, Shaper,
+        Analysis, AnalysisOptions, Analyzer, FontInstance, FontInstanceRef, FontSelector,
+        ShapeOptions, Shaper,
         itemize::{Item, Segment},
         shape::CharCluster,
     };
@@ -525,8 +585,8 @@ mod tests {
             _item: &Segment,
             _options: &ShapeOptions<'_>,
             _cluster: &mut CharCluster,
-        ) -> Option<FontInstance> {
-            Some(self.0.clone())
+        ) -> Option<FontInstanceRef<'_>> {
+            Some(self.0.as_ref())
         }
     }
 
@@ -544,11 +604,11 @@ mod tests {
             _segment: &Segment,
             _options: &ShapeOptions<'_>,
             cluster: &mut CharCluster,
-        ) -> Option<FontInstance> {
+        ) -> Option<FontInstanceRef<'_>> {
             if cluster.chars()[0].ch == self.ch {
-                Some(self.font.clone())
+                Some(self.font.as_ref())
             } else {
-                Some(self.other_font.clone())
+                Some(self.other_font.as_ref())
             }
         }
     }
@@ -558,7 +618,7 @@ mod tests {
         Analyzer::new().analyze(
             text,
             &AnalysisOptions {
-                word_break: &[],
+                line_break: &[],
                 line_break_override: None,
                 ..AnalysisOptions::default()
             },

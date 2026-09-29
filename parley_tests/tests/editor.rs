@@ -116,3 +116,24 @@ fn editor_insert_regular_text_set_upstream_affinity() {
     assert_eq!(sel.focus().index(), 2);
     assert_eq!(sel.focus().affinity(), Affinity::Upstream);
 }
+
+#[test]
+fn editor_set_text_clamps_selection_to_shorter_text() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut editor = env.editor("hello world");
+    env.driver(&mut editor).move_to_text_end();
+    editor.set_text("");
+    env.driver(&mut editor).insert_or_replace_selection("x");
+    assert_eq!(editor.text(), "x");
+}
+
+#[test]
+fn editor_set_text_clamps_selection_to_char_boundary() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut editor = env.editor("ab");
+    env.driver(&mut editor).move_right();
+    // The cursor at byte 1 is inside the two-byte "é".
+    editor.set_text("é");
+    env.driver(&mut editor).insert_or_replace_selection("x");
+    assert_eq!(editor.text(), "xé");
+}

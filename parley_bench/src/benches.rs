@@ -388,6 +388,9 @@ fn walk_items(layout: &Layout<ColorBrush>) -> (usize, f32) {
 /// sequencing that'll likely be used by clients (i.e., measure possible sizes, and later on line
 /// break once the target size is known).
 pub fn content_widths() -> Vec<Benchmark> {
+    const WORD_SPACING: f32 = 2.;
+    const LETTER_SPACING: f32 = 1.;
+
     let samples = get_samples();
 
     let mut benchmarks = Vec::new();
@@ -413,6 +416,29 @@ pub fn content_widths() -> Vec<Benchmark> {
             ),
             |b| {
                 let layout = build_layout(&sample.text, styled_spans(&sample.text));
+                b.iter(move || black_box(layout.calculate_content_widths()))
+            },
+        ));
+    }
+
+    for sample in samples
+        .iter()
+        .filter(|sample| sample.modification == "8000 characters")
+    {
+        benchmarks.push(benchmark_fn(
+            format!(
+                "Content Widths - {} {}, spacing",
+                sample.name, sample.modification
+            ),
+            |b| {
+                let text_range = 0..sample.text.len();
+                let layout = build_layout(
+                    &sample.text,
+                    [
+                        (StyleProperty::WordSpacing(WORD_SPACING), text_range.clone()),
+                        (StyleProperty::LetterSpacing(LETTER_SPACING), text_range),
+                    ],
+                );
                 b.iter(move || black_box(layout.calculate_content_widths()))
             },
         ));

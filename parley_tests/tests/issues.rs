@@ -5,6 +5,7 @@
 
 use crate::test_name;
 use crate::util::TestEnv;
+use parley::VerticalAlign;
 use parley::{
     Alignment, AlignmentOptions, FontFamily, InlineBox, InlineBoxKind, PositionedLayoutItem,
     StyleProperty, TextWrapMode,
@@ -136,6 +137,7 @@ fn issue_752() {
         width: 10.0,
         height: 10.0,
         baseline: None,
+        vertical_align: VerticalAlign::BASELINE,
     });
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(100.0));
@@ -190,6 +192,7 @@ fn inline_boxes_after_newline_max_content_width() {
             width: 14.0,
             height: 30.0,
             baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
         });
     }
     let mut layout = builder.build(text);
@@ -206,4 +209,35 @@ fn inline_boxes_after_newline_max_content_width() {
     );
     env.with_name("inline_boxes_after_newline")
         .check_layout_snapshot(&layout);
+}
+
+/// Test that there is no soft wrap opportunity after an inline box when wrapping is disabled.
+#[test]
+fn no_break_after_inline_box_with_nowrap() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // "A[box]AA"
+    let text = "AAA";
+    let build_layout = |env: &mut TestEnv, text_wrap_mode| {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::TextWrapMode(text_wrap_mode));
+        builder.push_inline_box(InlineBox {
+            id: 0,
+            kind: InlineBoxKind::InFlow,
+            index: 1,
+            width: 10.0,
+            height: 10.0,
+            baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
+        });
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(0.0));
+        layout
+    };
+
+    let layout = build_layout(&mut env, TextWrapMode::Wrap);
+    assert_eq!(layout.len(), 3, "Expected breaks before and after the box");
+
+    let layout = build_layout(&mut env, TextWrapMode::NoWrap);
+    assert_eq!(layout.len(), 1, "Expected a single line");
 }

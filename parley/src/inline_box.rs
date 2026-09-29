@@ -1,6 +1,8 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::VerticalAlign;
+
 /// A box to be laid out inline with text
 #[derive(PartialEq, Debug, Clone)]
 pub struct InlineBox {
@@ -20,6 +22,22 @@ pub struct InlineBox {
     ///
     /// If `None`, the baseline is the box's bottom edge.
     pub baseline: Option<f32>,
+    /// Vertical alignment of the box within its line, relative to the enclosing style span.
+    pub vertical_align: VerticalAlign,
+}
+
+/// An [`InlineBox`] together with the style index of the span that contains it.
+#[derive(PartialEq, Debug, Clone)]
+pub(crate) struct LayoutInlineBox {
+    pub(crate) inline_box: InlineBox,
+    /// Style index of the span containing the box, against which the box's `vertical_align`
+    /// is resolved. The box itself has no style of its own.
+    pub(crate) parent_style_index: u16,
+    /// Offset of the box's baseline above the baseline of its aligned subtree (that of the
+    /// parent style), resolved when the box is placed on a line (box sizes may change between
+    /// building and line breaking). Unused for out-of-flow and `vertical-align: top | bottom`
+    /// boxes.
+    pub(crate) baseline_offset: f32,
 }
 
 /// Whether a box is in-flow (takes up space in the layout) or out-of-flow (e.g. absolutely positioned)

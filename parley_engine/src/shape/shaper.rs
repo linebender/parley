@@ -6,7 +6,7 @@
 use alloc::vec::Vec;
 use core::mem;
 use harfrust::ShapeOptions as HarfShapeOptions;
-use linebender_resource_handle::FontData;
+use linebender_resource_handle::{Blob, FontData};
 use parlance::{FontFeature, FontVariation, Language};
 
 use crate::{
@@ -45,6 +45,42 @@ pub struct FontInstance {
     // TODO: Synthesis carries more than we need, and ties us to `fontique`. We can likely change
     // this to opaque user data.
     pub synthesis: fontique::Synthesis,
+}
+
+impl FontInstance {
+    /// Borrow this font instance.
+    #[inline]
+    pub fn as_ref(&self) -> FontInstanceRef<'_> {
+        FontInstanceRef {
+            data: &self.font.data,
+            index: self.font.index,
+            synthesis: &self.synthesis,
+        }
+    }
+}
+
+/// A borrowed [`FontInstance`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FontInstanceRef<'a> {
+    /// Blob containing the content of the font file.
+    pub data: &'a Blob<u8>,
+    /// Index of the font in a collection, or 0 for a single font.
+    pub index: u32,
+    /// Font synthesis suggestions.
+    pub synthesis: &'a fontique::Synthesis,
+}
+
+impl From<FontInstanceRef<'_>> for FontInstance {
+    #[inline]
+    fn from(font: FontInstanceRef<'_>) -> Self {
+        Self {
+            font: FontData {
+                data: font.data.clone(),
+                index: font.index,
+            },
+            synthesis: *font.synthesis,
+        }
+    }
 }
 
 /// Reusable scratch to shape text using [`Self::shape_text`].
@@ -191,93 +227,52 @@ impl Shaper {
 fn shape_segment(
     scx: &mut Shaper,
     text: &str,
-    item: &Segment,
+    segment: &Segment,
     options: &ShapeOptions<'_>,
     select_font: &mut impl FontSelector,
     char_info: &[CharInfo],
     char_style_indices: &[u16],
     shaped_text: &mut ShapedText,
 ) -> Result<(), ()> {
-    select_font.begin_segment(item, options);
+    select_font.begin_segment(segment, options);
 
-    let text_range = &item.range.byte_range;
-    let char_range = &item.range.char_range;
+    let text_range = &segment.range.byte_range;
+    let char_range = &segment.range.char_range;
 
-    let item_text = &text[text_range.clone()];
+    let segment_text = &text[text_range.clone()];
 
-    // Only process current item
-    let item_char_info = &char_info[char_range.start..char_range.end];
-    let item_char_style_indices = &char_style_indices[char_range.start..char_range.end];
+    // Only process current segment
+    let segment_char_info = &char_info[char_range.start..char_range.end];
+    let segment_char_style_indices = &char_style_indices[char_range.start..char_range.end];
 
-    if item_text.is_empty() {
+    if segment_text.is_empty() {
         return Ok(()); // No clusters
     }
 
-    let mut item_infos_iter = item_char_info
-        .iter()
-        .copied()
-        .zip(item_char_style_indices.iter().copied());
-    let mut code_unit_offset_in_string = text_range.start;
     let char_cluster = &mut scx.char_cluster;
 
-    // Build an iterator of boundaries and consume the first segment to seed the loop
-    let mut boundaries_iter = item_text
-        .char_indices()
-        .zip(item_char_info.iter())
-        .skip(1)
-        .filter_map(|((byte_pos, _), info)| info.is_grapheme_start().then_some(byte_pos))
-        .chain(core::iter::once(item_text.len()));
-    let mut last_boundary = 0_usize;
-    let mut current_boundary = boundaries_iter.next().unwrap();
-
-    char_cluster.fill(
-        &item_text[last_boundary..current_boundary],
-        &mut item_infos_iter,
-        &mut code_unit_offset_in_string,
-    );
-
-    let Some(next_font) = select_font.select_font(item, options, char_cluster) else {
-        return Err(());
+    // Shaping inputs that are constant over the segment.
+    let direction = if segment.bidi_level.is_rtl() {
+        harfrust::Direction::RightToLeft
+    } else {
+        harfrust::Direction::LeftToRight
     };
-    let mut current_font = Some(next_font);
+    let hb_script = script_to_harfrust(segment.script);
+    let language = options
+        .language
+        .as_ref()
+        .and_then(|lang| lang.as_str().parse::<harfrust::Language>().ok());
+    scx.features.clear();
+    scx.features.extend(options.features.iter().map(|feature| {
+        harfrust::Feature::new(
+            harfrust::Tag::new(&feature.tag.to_bytes()),
+            feature.value as u32,
+            ..,
+        )
+    }));
 
-    // The character offset of the current font run's start, accumulated per run.
-    let mut char_start = char_range.start;
-
-    // Main segmentation loop (based on swash shape_clusters) - only within current item
-    while let Some(font) = current_font.take() {
-        // Collect all clusters for this font segment
-        let cluster_range = char_cluster.range();
-        let segment_start_offset = cluster_range.start as usize - text_range.start;
-        let mut segment_end_offset = cluster_range.end as usize - text_range.start;
-
-        for next_boundary in boundaries_iter.by_ref() {
-            // Build next cluster in-place
-            last_boundary = current_boundary;
-            current_boundary = next_boundary;
-            char_cluster.fill(
-                &item_text[last_boundary..current_boundary],
-                &mut item_infos_iter,
-                &mut code_unit_offset_in_string,
-            );
-
-            let Some(next_font) = select_font.select_font(item, options, char_cluster) else {
-                return Err(());
-            };
-            if next_font != font {
-                current_font = Some(next_font);
-                break;
-            } else {
-                // Same font - add to current segment
-                segment_end_offset = char_cluster.range().end as usize - text_range.start;
-            }
-        }
-
-        // Shape this font segment with harfrust
-        let segment_text = &item_text[segment_start_offset..segment_end_offset];
-        // Shape the entire segment text including newlines
-        // The line breaking algorithm will handle newlines automatically
-
+    // Shape a run of the segment with a single font, appending it to `shaped_text`.
+    let mut shape_run = |font: &FontInstance, range: TextRange| {
         // TODO: How do we want to handle errors like this?
         let font_ref =
             harfrust::FontRef::from_index(font.font.data.as_ref(), font.font.index).unwrap();
@@ -302,24 +297,6 @@ fn shape_segment(
             },
         );
 
-        let direction = if item.bidi_level.is_rtl() {
-            harfrust::Direction::RightToLeft
-        } else {
-            harfrust::Direction::LeftToRight
-        };
-        let hb_script = script_to_harfrust(item.script);
-        let language = options
-            .language
-            .as_ref()
-            .and_then(|lang| lang.as_str().parse::<harfrust::Language>().ok());
-        scx.features.clear();
-        for feature in options.features {
-            scx.features.push(harfrust::Feature::new(
-                harfrust::Tag::new(&feature.tag.to_bytes()),
-                feature.value as u32,
-                ..,
-            ));
-        }
         let harf_shaper = shaper_data
             .shaper(&font_ref)
             .instance(Some(instance))
@@ -351,27 +328,28 @@ fn shape_segment(
         buffer.clear();
         buffer.set_cluster_level(harfrust::BufferClusterLevel::MonotoneCharacters);
 
-        // Use the entire segment text including newlines
-        buffer.reserve(segment_text.len());
+        // Use the entire run text including newlines.
+        let run_text = &text[range.byte_range.clone()];
+        buffer.reserve(run_text.len());
         #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
-        for (i, ch) in segment_text.chars().enumerate() {
+        for (i, ch) in run_text.chars().enumerate() {
             // Ensure that each cluster's index matches the index into `infos`. This is required
             // for efficient cluster lookup within `data.rs`.
             //
-            // In other words, instead of using `buffer.push_str`, which iterates `segment_text`
+            // In other words, instead of using `buffer.push_str`, which iterates `run_text`
             // with `char_indices`, push each char individually via `.chars` with a cluster index
             // that matches its `infos` counterpart. This allows us to lookup `infos` via cluster
             // index in `data.rs`.
             buffer.add(ch, i as u32);
         }
 
-        buffer.set_pre_context(&text[..text_range.start + segment_start_offset]);
-        buffer.set_post_context(&text[text_range.start + segment_end_offset..]);
+        buffer.set_pre_context(&text[..range.byte_range.start]);
+        buffer.set_post_context(&text[range.byte_range.end..]);
         buffer.set_direction(direction);
         buffer.set_script(hb_script);
 
-        if let Some(lang) = language {
-            buffer.set_language(lang);
+        if let Some(lang) = &language {
+            buffer.set_language(lang.clone());
         }
 
         let glyph_buffer = harf_shaper.shape(
@@ -382,27 +360,70 @@ fn shape_segment(
                 .point_size(Some(options.font_size)),
         );
 
-        let segment_char_count = segment_text.chars().count();
-        let range = TextRange {
-            byte_range: (item.range.byte_range.start + segment_start_offset)
-                ..(item.range.byte_range.start + segment_end_offset),
-            char_range: char_start..char_start + segment_char_count,
-        };
-        char_start += segment_char_count;
         shaped_text.push_run(
             text,
             range,
-            item,
+            segment,
             options,
             char_info,
             char_style_indices,
-            &font,
+            font,
             &glyph_buffer,
             harf_shaper.coords(),
         );
 
-        // Replace buffer to reuse allocation in next iteration.
+        // Replace buffer to reuse allocation in the next run.
         scx.unicode_buffer = Some(glyph_buffer.clear());
+    };
+
+    // This is the run being accumulated, i.e., consecutive graphemes for which `select_font`
+    // returns the same font.
+    let mut run: Option<(FontInstance, TextRange)> = None;
+
+    // The segment's characters with their analysis data and style indices.
+    let mut chars = segment_text
+        .chars()
+        .zip(segment_char_info)
+        .zip(segment_char_style_indices)
+        .map(|((ch, &info), &style_index)| (ch, info, style_index));
+
+    // The lengths of the segment's graphemes in characters.
+    let grapheme_lengths = segment_char_info
+        .chunk_by(|_, info| !info.is_grapheme_start())
+        .map(<[_]>::len);
+
+    // The end of the previous grapheme.
+    let mut byte_end = text_range.start;
+    let mut char_end = char_range.start;
+
+    for grapheme_length in grapheme_lengths {
+        let (byte_start, char_start) = (byte_end, char_end);
+        char_cluster.fill(chars.by_ref().take(grapheme_length), &mut byte_end);
+        char_end += grapheme_length;
+        let grapheme = TextRange {
+            byte_range: byte_start..byte_end,
+            char_range: char_start..char_end,
+        };
+
+        let font = select_font
+            .select_font(segment, options, char_cluster)
+            .ok_or(())?;
+
+        if let Some((run_font, run_range)) = &mut run
+            && run_font.as_ref() == font
+        {
+            run_range.byte_range.end = byte_end;
+            run_range.char_range.end = char_end;
+        } else {
+            if let Some((run_font, run_range)) = run.take() {
+                // The font changed: shape the previous run.
+                shape_run(&run_font, run_range);
+            }
+            run = Some((font.into(), grapheme));
+        }
+    }
+    if let Some((run_font, run_range)) = run {
+        shape_run(&run_font, run_range);
     }
 
     Ok(())
@@ -433,11 +454,11 @@ pub(crate) fn script_to_harfrust(script: fontique::Script) -> harfrust::Script {
 
 /// Implements font selection for shaping.
 pub trait FontSelector {
-    /// Called when a new item starts.
+    /// Called when a new segment starts.
     ///
-    /// This can be useful to inspect, e.g., the item's script.
-    fn begin_segment(&mut self, item: &Segment, options: &ShapeOptions<'_>) {
-        let _ = (item, options);
+    /// This can be useful to inspect, e.g., the segment's script.
+    fn begin_segment(&mut self, segment: &Segment, options: &ShapeOptions<'_>) {
+        let _ = (segment, options);
     }
 
     /// Called once per character cluster within the current segment.
@@ -448,8 +469,8 @@ pub trait FontSelector {
     /// Shaping is aborted if this returns `None`; [`ShapedText`] then contains a partial result.
     fn select_font(
         &mut self,
-        item: &Segment,
+        segment: &Segment,
         options: &ShapeOptions<'_>,
         cluster: &mut CharCluster,
-    ) -> Option<FontInstance>;
+    ) -> Option<FontInstanceRef<'_>>;
 }

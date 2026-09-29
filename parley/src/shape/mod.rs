@@ -6,13 +6,15 @@
 
 use alloc::vec::Vec;
 use parley_engine::shape::{CharCluster, Coverage};
-use parley_engine::{Analysis, AnalysisDataSources, FontInstance, ShapeOptions, Shaper};
+use parley_engine::{
+    Analysis, AnalysisDataSources, FontInstance, FontInstanceRef, ShapeOptions, Shaper,
+};
 use smallvec::SmallVec;
 
 use super::layout::Layout;
 use super::resolve::{ResolveContext, ResolvedStyle};
 use super::style::{Brush, FontFeature, FontVariation};
-use crate::inline_box::InlineBox;
+use crate::inline_box::LayoutInlineBox;
 use crate::util::{nearly_eq, nearly_zero};
 use crate::{FontContext, FontData, Spacing};
 
@@ -46,7 +48,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     rcx: &'a ResolveContext,
     fcx: &'a mut FontContext,
     styles: &'a [ResolvedStyle<B>],
-    inline_boxes: &[InlineBox],
+    inline_boxes: &[LayoutInlineBox],
     analysis: &Analysis,
     char_style_indices: &[u16],
     scx: &mut Shaper,
@@ -72,7 +74,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
     let mut fq = fcx.collection.query(&mut fcx.source_cache);
 
-    let mut inline_box_iter = inline_boxes.iter().peekable();
+    let mut inline_box_iter = inline_boxes.iter().map(|b| &b.inline_box).peekable();
 
     // Merge font features with letter-spacing ligature suppression.
     //
@@ -189,7 +191,11 @@ pub(crate) fn shape_text<'a, B: Brush>(
         &mut layout.data.shaped_text,
     );
 
-    let mut inline_box_iter = inline_boxes.iter().enumerate().peekable();
+    let mut inline_box_iter = inline_boxes
+        .iter()
+        .map(|b| &b.inline_box)
+        .enumerate()
+        .peekable();
     for shaped_run_idx in 0..layout.data.shaped_text.runs().len() {
         let shaped_run = &layout.data.shaped_text.runs()[shaped_run_idx];
         let run_text_byte_start = shaped_run.range.byte_range.start;
@@ -261,6 +267,9 @@ struct FontSelector<'a, 'b, B: Brush> {
     variations: &'a [FontVariation],
     features: &'a [FontFeature],
 
+    /// Whether [`Self::query`] yields any font, cached.
+    query_yields_font: Option<bool>,
+
     /// The font to use if [`Self::query`] doesn't return any font.
     last_resort_font: LastResortFont,
 
@@ -289,6 +298,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             attrs,
             variations: &[],
             features: &[],
+            query_yields_font: None,
             last_resort_font: LastResortFont::Unresolved,
 
             analysis_data_sources,
@@ -299,21 +309,22 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
 impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
     fn begin_segment(
         &mut self,
-        item: &parley_engine::itemize::Segment,
+        segment: &parley_engine::itemize::Segment,
         options: &ShapeOptions<'_>,
     ) {
         self.query.set_fallbacks(fontique::FallbackKey::new(
-            item.script,
+            segment.script,
             options.language.as_ref(),
         ));
+        self.query_yields_font = None;
     }
 
     fn select_font(
         &mut self,
-        _item: &parley_engine::itemize::Segment,
+        _segment: &parley_engine::itemize::Segment,
         _options: &ShapeOptions<'_>,
         cluster: &mut CharCluster,
-    ) -> Option<FontInstance> {
+    ) -> Option<FontInstanceRef<'_>> {
         let style_index = cluster.style_index();
         let is_emoji = cluster.is_emoji();
 
@@ -329,9 +340,11 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
                 let emoji_family = QueryFamily::Generic(GenericFamily::Emoji);
                 self.query.set_families(fonts.chain(once(emoji_family)));
                 self.fonts_id = None;
+                self.query_yields_font = None;
             } else if self.fonts_id != Some(fonts_id) {
                 self.query.set_families(fonts);
                 self.fonts_id = Some(fonts_id);
+                self.query_yields_font = None;
             }
 
             let attrs = fontique::Attributes {
@@ -342,9 +355,52 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
             if self.attrs != attrs {
                 self.query.set_attributes(attrs);
                 self.attrs = attrs;
+                self.query_yields_font = None;
             }
             self.variations = self.rcx.variations(style.font_variations).unwrap_or(&[]);
             self.features = self.rcx.features(style.font_features).unwrap_or(&[]);
+        }
+
+        // Fall back to the last-resort font if the query doesn't yield a font (with a charmap) at
+        // all. This is checked before the actual query below due to lifetime issues. While this is
+        // not *too* expensive, once the new borrow checker (Polonius) is stable, we could remove
+        // this check and do the last-resort scan after the failed query:
+        // <https://blog.rust-lang.org/2026/08/04/enabling-polonius-alpha-on-nightly/>.
+        let query = &mut *self.query;
+        let query_yields_font = *self.query_yields_font.get_or_insert_with(|| {
+            let mut yields_font = false;
+            query.matches_with(|font| {
+                if font.charmap().is_some() {
+                    yields_font = true;
+                    fontique::QueryStatus::Stop
+                } else {
+                    fontique::QueryStatus::Continue
+                }
+            });
+            yields_font
+        });
+        if !query_yields_font {
+            if matches!(self.last_resort_font, LastResortFont::Unresolved) {
+                if let Some(font) = any_font(self.query) {
+                    self.last_resort_font = LastResortFont::Resolved(FontInstance {
+                        font: FontData {
+                            data: font.blob,
+                            index: font.index,
+                        },
+                        synthesis: font.synthesis,
+                    });
+                } else {
+                    self.last_resort_font = LastResortFont::Unavailable;
+                }
+
+                self.fonts_id = None;
+            }
+
+            return if let LastResortFont::Resolved(ref font) = self.last_resort_font {
+                Some(font.as_ref())
+            } else {
+                None
+            };
         }
 
         let mut selected_font = None;
@@ -368,7 +424,7 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
                 self.analysis_data_sources,
             );
             if coverage > best_coverage {
-                selected_font = Some(SelectedFont { font: font.clone() });
+                selected_font = Some(font);
                 best_coverage = coverage;
 
                 if coverage.is_complete() {
@@ -378,44 +434,17 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
                 }
             } else {
                 if selected_font.is_none() {
-                    selected_font = Some(SelectedFont { font: font.clone() });
+                    selected_font = Some(font);
                 }
                 fontique::QueryStatus::Continue
             }
         });
 
-        selected_font
-            .map(|selected_font| selected_font.font)
-            .map(|font| FontInstance {
-                font: FontData {
-                    data: font.blob,
-                    index: font.index,
-                },
-                synthesis: font.synthesis,
-            })
-            .or_else(|| {
-                if matches!(self.last_resort_font, LastResortFont::Unresolved) {
-                    if let Some(font) = any_font(self.query) {
-                        self.last_resort_font = LastResortFont::Resolved(FontInstance {
-                            font: FontData {
-                                data: font.blob,
-                                index: font.index,
-                            },
-                            synthesis: font.synthesis,
-                        });
-                    } else {
-                        self.last_resort_font = LastResortFont::Unavailable;
-                    }
-
-                    self.fonts_id = None;
-                }
-
-                if let LastResortFont::Resolved(ref font) = self.last_resort_font {
-                    Some(font.clone())
-                } else {
-                    None
-                }
-            })
+        selected_font.map(|font| FontInstanceRef {
+            data: &font.blob,
+            index: font.index,
+            synthesis: &font.synthesis,
+        })
     }
 }
 
@@ -449,14 +478,4 @@ fn any_font(query: &mut Query<'_>) -> Option<QueryFont> {
     );
 
     found
-}
-
-struct SelectedFont {
-    font: QueryFont,
-}
-
-impl PartialEq for SelectedFont {
-    fn eq(&self, other: &Self) -> bool {
-        self.font.family == other.font.family && self.font.synthesis == other.font.synthesis
-    }
 }
