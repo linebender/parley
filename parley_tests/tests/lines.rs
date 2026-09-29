@@ -692,6 +692,35 @@ fn lines_line_height_absolute() {
     env.check_layout_snapshot(&layout);
 }
 
+/// Test that line height changes within a run affects the lines they occur on.
+#[test]
+fn line_height_changes_per_line() {
+    let text = "cat ray bat jay";
+    let small = 10.;
+
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(LineHeight::Absolute(small));
+    // The "c" of "cat".
+    builder.push(LineHeight::MetricsRelative(1.5), 0..1);
+
+    // The "a" of "jay".
+    builder.push(LineHeight::MetricsRelative(2.5), 13..14);
+
+    // Narrow enough for one word per line.
+    let mut layout: Layout<ColorBrush> = builder.build(text);
+    layout.break_all_lines(Some(1.0));
+
+    env.render_and_check_snapshot(&layout, None, &[]);
+
+    let mut lines = layout.lines();
+    assert!(lines.next().unwrap().metrics().line_height > small);
+    assert_eq!(lines.next().unwrap().metrics().line_height, small);
+    assert_eq!(lines.next().unwrap().metrics().line_height, small);
+    assert!(lines.next().unwrap().metrics().line_height > small);
+    assert!(lines.next().is_none());
+}
+
 /// Metrics contributed by content that is moved to the next line when a word does not fit must
 /// not leak into the line it was reverted from.
 #[test]
