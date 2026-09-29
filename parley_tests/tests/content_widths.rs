@@ -6,8 +6,8 @@
 use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
-    Alignment, AlignmentOptions, ContentWidths, InlineBox, InlineBoxKind, Layout, LineBreak,
-    StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
+    Alignment, AlignmentOptions, ContentWidths, IndentOptions, InlineBox, InlineBoxKind, Layout,
+    LineBreak, StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
 };
 
 /// Checks that calculated content widths agree with actual line breaking.
@@ -345,5 +345,108 @@ fn content_widths_trailing_whitespace_by_collapse_mode() {
         (widths.max - word_width).abs() < 1e-3,
         "Max content width {} should be the widest word's width {word_width}",
         widths.max,
+    );
+}
+
+#[test]
+fn content_widths_text_indent() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let indent = 100.0;
+    let short = single_line_width(&mut env, "AA");
+    let long = single_line_width(&mut env, "BBBB");
+    let full = single_line_width(&mut env, "AA BBBB");
+
+    let mut measure = |text: &str, amount: f32, options: IndentOptions, check_layout: bool| {
+        let mut layout = env.ranged_builder(text).build(text);
+        layout.set_text_indent(amount, options);
+        if check_layout {
+            assert_content_widths_match_layout(&mut layout)
+        } else {
+            layout.calculate_content_widths()
+        }
+    };
+    let assert_widths = |widths: ContentWidths, min: f32, max: f32| {
+        assert!(
+            (widths.min - min).abs() < 1e-3 && (widths.max - max).abs() < 1e-3,
+            "Expected content widths {min}/{max}, got {}/{}",
+            widths.min,
+            widths.max
+        );
+    };
+
+    // Only the first line is indented. Under a min-content constraint, that's the first word.
+    assert_widths(
+        measure("AA BBBB", indent, IndentOptions::default(), true),
+        (indent + short).max(long),
+        indent + full,
+    );
+
+    // With `hanging`, every line but the first is indented. The min-content width then exceeds the
+    // unindented single line, so the max-content width is floored by it.
+    let hanging = IndentOptions {
+        hanging: true,
+        ..Default::default()
+    };
+    let hanging_min = short.max(indent + long);
+    assert_widths(
+        measure("AA BBBB", indent, hanging, false),
+        hanging_min,
+        full.max(hanging_min),
+    );
+
+    // A negative indent reduces the first line's contribution.
+    assert_widths(
+        measure("AA BBBB", -indent, IndentOptions::default(), false),
+        long,
+        (full - indent).max(long),
+    );
+
+    // Without `each-line`, lines after a forced break aren't indented.
+    assert_widths(
+        measure("AA\nBBBB", indent, IndentOptions::default(), true),
+        (indent + short).max(long),
+        (indent + short).max(long),
+    );
+
+    // With `each-line`, they are.
+    let each_line = IndentOptions {
+        each_line: true,
+        ..Default::default()
+    };
+    assert_widths(
+        measure("AA\nBBBB", indent, each_line, true),
+        indent + long,
+        indent + long,
+    );
+
+    // The empty line after a trailing forced break isn't indented.
+    assert_widths(measure("AA\n", indent, hanging, false), short, short);
+}
+
+#[test]
+fn content_widths_text_indent_inline_box() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let indent = 100.0;
+
+    // The indent applies to an inline box at the start of the first line.
+    let text = "AA";
+    let mut builder = env.ranged_builder(text);
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        kind: InlineBoxKind::InFlow,
+        index: 0,
+        width: 10.0,
+        height: 10.0,
+        baseline: None,
+        vertical_align: VerticalAlign::BASELINE,
+    });
+    let mut layout = builder.build(text);
+    layout.set_text_indent(indent, IndentOptions::default());
+    let widths = layout.calculate_content_widths();
+    assert!(
+        (widths.min - (indent + 10.0)).abs() < 1e-3,
+        "Min content width {} should be the indented inline box's width {}",
+        widths.min,
+        indent + 10.0
     );
 }
