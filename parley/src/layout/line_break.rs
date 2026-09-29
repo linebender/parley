@@ -26,7 +26,7 @@ use crate::{
 
 use core::ops::Range;
 use parley_engine::Atom;
-use parley_engine::shape::Whitespace;
+use parley_engine::shape::{Character, Whitespace};
 use smallvec::SmallVec;
 
 #[derive(Default)]
@@ -300,13 +300,14 @@ impl LineBoxMetrics {
     }
 
     /// Add the glyphs of a text atom of `style_index` in layout item `item_idx` and text run
-    /// `run_idx`.
+    /// `run_idx`. The atom's characters are `characters`, the first of which has style
+    /// `style_index`.
     ///
-    /// This adds the style's span box together with its ancestors. When the style's line height
-    /// is [`LineHeight::MetricsRelative`] (which corresponds to CSS `line-height: normal`), it also
-    /// adds the run's box, which matters when the run was shaped with a fallback font whose metrics
-    /// differ from the style's first available font, the font the span box is built from. See
-    /// [`run_box_metrics`].
+    /// This adds the span boxes of the atom's styles together with its ancestors. When the first
+    /// style's line height is [`LineHeight::MetricsRelative`] (which corresponds to CSS
+    /// `line-height: normal`), it also adds the run's box, which matters when the run was shaped
+    /// with a fallback font whose metrics differ from the style's first available font, the font
+    /// the span box is built from. See [`run_box_metrics`]
     ///
     /// [`LineHeight::MetricsRelative`]: crate::LineHeight::MetricsRelative
     #[inline]
@@ -315,6 +316,7 @@ impl LineBoxMetrics {
         item_idx: usize,
         run_idx: usize,
         style_index: u16,
+        characters: &[Character],
         data: &LayoutData<B>,
         contributed: &mut Vec<u16>,
     ) {
@@ -324,7 +326,14 @@ impl LineBoxMetrics {
         if self.last_text == (item_idx, style_index) {
             return;
         }
-        self.add_text_boxes(item_idx, run_idx, style_index, data, contributed);
+        self.add_text_boxes(
+            item_idx,
+            run_idx,
+            style_index,
+            characters,
+            data,
+            contributed,
+        );
     }
 
     /// The part of [`Self::add_text`] for atoms whose boxes may not be on the line yet.
@@ -336,12 +345,21 @@ impl LineBoxMetrics {
         item_idx: usize,
         run_idx: usize,
         style_index: u16,
+        characters: &[Character],
         data: &LayoutData<B>,
         contributed: &mut Vec<u16>,
     ) {
         self.last_text = (item_idx, style_index);
         if contributed.last() != Some(&style_index) {
             self.add_style(style_index, &data.style_metrics, contributed);
+        }
+        if data.runs[run_idx].has_mixed_style_atoms {
+            // Add the spans of all the atom's characters.
+            for character in characters.iter().skip(1) {
+                self.add_style(character.style_index, &data.style_metrics, contributed);
+            }
+            // Take this path for the run's next atom too, which could also have mixed styles.
+            self.last_text = (usize::MAX, 0);
         }
         let style = usize::from(style_index);
         let shaped_run = &data.shaped_text.runs()[run_idx];
@@ -549,9 +567,9 @@ impl Default for BreakerState {
 impl BreakerState {
     /// Add the atom currently being evaluated to the current line.
     ///
-    /// The box of the atom's run (see [`LineBoxMetrics::add_text`]) is added to the line box.
-    /// `style_index` is the atom's style, whose span box (and those of its ancestors) is added to
-    /// the line too. `is_word_separator` is `true` iff the atom is a
+    /// `style_index` is the style of the atom's first character. The span boxes of the atom's
+    /// styles (and those of their ancestors) are added to the line too, as is the box of the atom's
+    /// run, see [`LineBoxMetrics::add_text`]. `is_word_separator` is `true` iff the atom is a
     /// [word separator](`is_word_separator`), i.e., a justification opportunity.
     #[inline]
     fn append_atom_to_line<B: Brush>(
@@ -571,6 +589,7 @@ impl BreakerState {
             self.item_idx,
             self.run_idx,
             style_index,
+            atom.characters(),
             data,
             &mut self.contributed,
         );
@@ -1413,6 +1432,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     index,
                     index,
                     style_index,
+                    &[],
                     &self.layout.data,
                     &mut self.state.contributed,
                 );
