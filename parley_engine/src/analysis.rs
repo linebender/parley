@@ -688,22 +688,22 @@ pub(crate) fn analyze_text(
         // separately.
         let is_soft_wrap_opportunity = if is_mandatory_linebreak || prev_is_mandatory_linebreak {
             false
-        }else {
-                let mut opportunity = is_icu_line || after_break_space;
-                // Consumers can override soft wrap opportunities, except around a mandatory
-                // break.
-                if let (Some(prev), Some(lb_override)) = (prev_char, options.line_break_override) {
-                    let forced = lb_override(LineBreakContext {
-                        before_before: prev_prev_char,
-                        before: prev,
-                        after: ch,
-                    });
-                    if let Some(forced) = forced {
-                        opportunity = forced;
-                    }
+        } else {
+            let mut opportunity = is_icu_line || after_break_space;
+            // Consumers can override soft wrap opportunities, except around a mandatory
+            // break.
+            if let (Some(prev), Some(lb_override)) = (prev_char, options.line_break_override) {
+                let forced = lb_override(LineBreakContext {
+                    before_before: prev_prev_char,
+                    before: prev,
+                    after: ch,
+                });
+                if let Some(forced) = forced {
+                    opportunity = forced;
                 }
-                opportunity
-            };
+            }
+            opportunity
+        };
 
         prev_prev_char = prev_char;
         prev_char = Some(ch);
