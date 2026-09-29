@@ -10,7 +10,7 @@ use crate::test_name;
 use crate::util::TestEnv;
 use parley::VerticalAlign;
 use parley::style::FontFamily;
-use parley::{Alignment, AlignmentOptions, InlineBox, InlineBoxKind, StyleProperty};
+use parley::{Alignment, AlignmentOptions, InlineBox, InlineBoxKind, StyleProperty, YieldData};
 
 #[test]
 fn break_by_length_basic() {
@@ -459,4 +459,29 @@ fn break_by_length_justified_last_line_start_aligned() {
         .check_layout_snapshot(&layout_max_advance);
     env.with_name("by_length")
         .check_layout_snapshot(&layout_by_length);
+}
+
+#[test]
+fn raising_line_max_height_clears_max_height_exceeded() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "Hello world";
+    let builder = env.ranged_builder(text);
+    let mut layout = builder.build(text);
+
+    let mut breaker = layout.break_lines();
+    breaker.state_mut().set_line_max_height(1.0);
+
+    let mut max_height_exceeded_count = 0;
+    let mut iterations = 0;
+    while let Some(data) = breaker.break_next() {
+        iterations += 1;
+        assert!(iterations < 100, "Line breaking did not terminate");
+        if let YieldData::MaxHeightExceeded(_) = data {
+            max_height_exceeded_count += 1;
+            breaker.state_mut().set_line_max_height(f32::INFINITY);
+        }
+    }
+    breaker.finish();
+
+    assert_eq!(max_height_exceeded_count, 1);
 }
