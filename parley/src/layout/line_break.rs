@@ -926,21 +926,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         let max_advance = max_advance - line_indent;
 
-        // dbg!(&self.layout.items);
-
-        // println!("\nBREAK NEXT");
-        // dbg!(&self.state.line.items);
-
         // Iterate over remaining runs in the Layout
         let item_count = self.layout.data.items.len();
         while self.state.item_idx < item_count {
             let item = &self.layout.data.items[self.state.item_idx];
-
-            // println!(
-            //     "\nitem = {} {:?}. x: {}",
-            //     self.state.item_idx, item.kind, self.state.line.x
-            // );
-            // dbg!(&self.state.line.items);
 
             match item.kind {
                 LayoutItemKind::InlineBox => {
@@ -971,8 +960,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // Compute the x position of the content being currently processed
                     let next_x = self.state.line.x + width_contribution;
 
-                    // println!("BOX next_x: {}", next_x);
-
                     let box_will_be_appended = next_x <= max_advance || self.state.line.x == 0.0;
                     if height_contribution > self.state.line_max_height && box_will_be_appended {
                         return self.max_height_break_data(height_contribution);
@@ -982,8 +969,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // then simply move on to the next item
                     if next_x <= max_advance || self.state.line.text_wrap_mode != TextWrapMode::Wrap
                     {
-                        // println!("BOX FITS");
-
                         self.append_layout_inline_box(item.index, next_x);
 
                         // There is a soft wrap opportunity after an inline box, unless wrapping
@@ -994,11 +979,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     } else {
                         // If we're at the start of the line, this box will never fit, so consume it and accept the overflow.
                         let reason = if self.state.line.x == 0.0 {
-                            // println!("BOX EMERGENCY BREAK");
                             self.append_layout_inline_box(item.index, next_x);
                             BreakReason::Emergency
                         } else {
-                            // println!("BOX BREAK");
                             BreakReason::Regular
                         };
                         return self.start_new_line(reason, max_advance, line_indent);
@@ -1077,8 +1060,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         // Compute the x position of the content being currently processed
                         let next_x = self.state.line.x + advance;
-
-                        // println!("Cluster {} next_x: {}", self.state.cluster_idx, next_x);
 
                         // If the content fits (the x position does NOT exceed max_advance)
                         //
@@ -1575,14 +1556,6 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
         self.layout.data.height = height as f32;
         self.layout.data.layout_max_advance = self.state.layout_max_advance;
 
-        // for (i, line) in self.lines.lines.iter().enumerate() {
-        //     println!("LINE {i} (h:{})", line.metrics.line_height);
-        //     for item_idx in line.item_range.clone() {
-        //         let item = &self.lines.line_items[item_idx];
-        //         println!("  ITEM {:?} ({})", item.kind, item.advance);
-        //     }
-        // }
-
         // Save the computed lines to the layout
         self.lines.swap(&mut self.layout.data);
     }
@@ -1615,7 +1588,6 @@ fn commit_line<B: Brush>(
     let last_run_pos = items_to_commit.iter().rposition(is_text_run).unwrap_or(0);
 
     // Iterate over the items to commit
-    // println!("\nCOMMIT LINE");
     let mut last_item_kind = LayoutItemKind::TextRun;
     let mut committed_text_run = false;
     // The line's source text range, as the union of the ranges of the text runs committed to it.
@@ -1625,8 +1597,6 @@ fn commit_line<B: Brush>(
     // (zero is the default level, so this is equivalent to marking lines that have multiple levels)
     let mut needs_reorder = false;
     for (i, item) in items_to_commit.iter().enumerate() {
-        // println!("i = {} index = {} {:?}", i, item.index, item.kind);
-
         match item.kind {
             LayoutItemKind::InlineBox => {
                 lines.line_items.push(LineItemData {
@@ -1655,9 +1625,6 @@ fn commit_line<B: Brush>(
                 }
 
                 if cluster_range.start >= shaped_run.shaped_clusters_range.end {
-                    // println!("INVALID CLUSTER");
-                    // dbg!(&run_data.text_range);
-                    // dbg!(cluster_range);
                     continue;
                 }
 
