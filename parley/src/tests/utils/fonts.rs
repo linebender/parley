@@ -10,8 +10,8 @@ use peniko::Blob;
 use crate::FontContext;
 
 // TODO: `FONT_FAMILY_LIST`, `load_fonts`, and `create_font_context` are
-// duplicated between this crate and `parley_test`. We can't move the in-crate
-// tests into `parley_test` because they use private APIs, but should eventually
+// duplicated between this crate and `parley_tests`. We can't move the in-crate
+// tests into `parley_tests` because they use private APIs, but should eventually
 // figure out some way to reduce the duplication.
 pub(crate) const FONT_FAMILY_LIST: &[FontFamilyName<'_>] = &[
     FontFamilyName::Named(Cow::Borrowed("Roboto")),

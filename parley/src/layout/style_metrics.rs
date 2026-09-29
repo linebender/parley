@@ -292,7 +292,7 @@ pub(crate) struct InlineBoxPlacement {
 ///
 /// A box without an explicit baseline sits on the baseline, i.e. it is all ascent. For
 /// `vertical-align: top | bottom` the returned offset is relative to the parent's subtree, but
-/// such boxes are positioned against the line box instead (see `Line::inline_box_y`).
+/// such boxes are positioned against the line box instead (see [`crate::Line::inline_box_top`]).
 pub(crate) fn inline_box_placement(
     inline_box: &InlineBox,
     parent_style: u16,

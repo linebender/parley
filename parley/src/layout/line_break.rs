@@ -415,7 +415,7 @@ pub enum YieldData {
     ///
     /// Note: that by default no max height is set (and one is not required for laying out text into
     /// rectangular regions), so you will only encounter this if you explicitly set a max height
-    /// using `BreakLine::set_line_max_height`.
+    /// using [`BreakerState::set_line_max_height`].
     MaxHeightExceeded(MaxHeightBreakData),
     /// Control flow was yielded because an inline box with kind [`InlineBoxKind::CustomOutOfFlow`]
     /// was encountered.
