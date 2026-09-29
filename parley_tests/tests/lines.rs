@@ -719,6 +719,30 @@ fn line_height_changes_per_line() {
     assert!(lines.next().is_none());
 }
 
+#[test]
+fn line_height_change_inside_ligature() {
+    let text = "ffi ffi";
+    let small = 20.0;
+    let large = 40.0;
+
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(LineHeight::Absolute(small));
+
+    // The ligature forms, and gets the bigger line height from the middle "f"
+    builder.push(LineHeight::Absolute(large), 5..6);
+
+    // Narrow enough for one word per line.
+    let mut layout: Layout<ColorBrush> = builder.build(text);
+    layout.break_all_lines(Some(1.0));
+
+    env.render_and_check_snapshot(&layout, None, &[]);
+
+    let mut lines = layout.lines();
+    assert_eq!(lines.next().unwrap().metrics().line_height, small);
+    assert_eq!(lines.next().unwrap().metrics().line_height, large);
+}
+
 /// Metrics contributed by content that is moved to the next line when a word does not fit must
 /// not leak into the line it was reverted from.
 #[test]
