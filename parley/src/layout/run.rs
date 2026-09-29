@@ -122,11 +122,6 @@ impl<'a, B: Brush> Run<'a, B> {
         &self.shaped.font_metrics
     }
 
-    /// This run's line height.
-    pub fn line_height(&self) -> f32 {
-        self.data.line_height
-    }
-
     #[inline]
     pub(crate) fn line_spacing(&self) -> EffectiveSpacing {
         let justification = if self.line_data.is_some() {
