@@ -364,6 +364,32 @@ impl ContentWidthsMeasurer {
         }
     }
 
+    /// Ends the current min-content fragment at a soft wrap opportunity.
+    ///
+    /// Under a min-content constraint, every soft wrap opportunity is taken.
+    #[inline(always)]
+    fn soft_break(&mut self) {
+        self.min_width = self
+            .min_width
+            .max(self.running_min_width - self.running_hanging_whitespace);
+        self.running_min_width = 0.0;
+    }
+
+    /// Ends the current line at a forced break or the end of the layout.
+    #[inline(always)]
+    fn hard_break(&mut self) {
+        self.min_width = self
+            .min_width
+            .max(self.running_min_width - self.running_hanging_whitespace);
+        if !self.hangs_conditionally {
+            self.running_max_width -= self.running_hanging_whitespace;
+        }
+        self.max_width = self.max_width.max(self.running_max_width);
+        self.running_min_width = 0.0;
+        self.running_max_width = 0.0;
+        self.running_hanging_whitespace = 0.0;
+    }
+
     #[inline(always)]
     fn measure<B: Brush>(mut self, layout_data: &LayoutData<B>) -> ContentWidths {
         for item in &layout_data.items {
@@ -404,13 +430,7 @@ impl ContentWidthsMeasurer {
 
         // The end of a layout is considered to be a forced line break as per CSS Text 4 § 5, so
         // whitespace can hang conditionally.
-        self.min_width = self
-            .min_width
-            .max(self.running_min_width - self.running_hanging_whitespace);
-        if !self.hangs_conditionally {
-            self.running_max_width -= self.running_hanging_whitespace;
-        }
-        self.max_width = self.max_width.max(self.running_max_width);
+        self.hard_break();
 
         // Negative-width inline boxes (e.g. negative margins) can make the max-content width
         // smaller than the min-content width. CSS Sizing 3 § 2.1 requires the max-content size to
@@ -460,24 +480,12 @@ impl ContentWidthsMeasurer {
                     && (cluster.is_soft_wrap_opportunity_before()
                         || style.overflow_wrap == OverflowWrap::Anywhere)
                 {
-                    self.min_width = self
-                        .min_width
-                        .max(self.running_min_width - self.running_hanging_whitespace);
-                    self.running_min_width = 0.0;
+                    self.soft_break();
                 }
                 // `Whitespace::Newline` are forced breaks. Note newlines have no advance.
                 if whitespace == Whitespace::Newline {
                     // Newlines hang, so whitespace before them keeps hanging.
-                    self.min_width = self
-                        .min_width
-                        .max(self.running_min_width - self.running_hanging_whitespace);
-                    if !self.hangs_conditionally {
-                        self.running_max_width -= self.running_hanging_whitespace;
-                    }
-                    self.max_width = self.max_width.max(self.running_max_width);
-                    self.running_min_width = 0.0;
-                    self.running_max_width = 0.0;
-                    self.running_hanging_whitespace = 0.0;
+                    self.hard_break();
                     skip_atom = true;
                     continue;
                 }
@@ -530,18 +538,18 @@ impl ContentWidthsMeasurer {
 
     fn measure_inline_box(&mut self, inline_box: &InlineBox) {
         if inline_box.kind == InlineBoxKind::InFlow {
-            self.running_max_width += inline_box.width;
-            if self.text_wrap_mode == TextWrapMode::Wrap {
-                self.min_width = self
-                    .min_width
-                    .max(self.running_min_width - self.running_hanging_whitespace);
-                self.min_width = self.min_width.max(inline_box.width);
-                self.running_min_width = 0.0;
-            } else {
-                self.running_min_width += inline_box.width;
+            // Inline boxes have soft wrap opportunities on both sides.
+            let wraps = self.text_wrap_mode == TextWrapMode::Wrap;
+            if wraps {
+                self.soft_break();
             }
             // Inline boxes don't hang.
             self.running_hanging_whitespace = 0.0;
+            self.running_min_width += inline_box.width;
+            self.running_max_width += inline_box.width;
+            if wraps {
+                self.soft_break();
+            }
         }
     }
 }
