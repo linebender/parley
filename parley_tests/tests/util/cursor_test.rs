@@ -342,7 +342,6 @@ impl CursorTest {
     ///
     /// Uses the same format as assertion failures.
     #[track_caller]
-    #[allow(clippy::print_stderr, reason = "the logging here is intentional")]
     pub(crate) fn print_cursor(&self, cursor: Cursor) {
         eprintln!(
             concat!(
@@ -361,7 +360,6 @@ impl CursorTest {
     ///
     /// Uses the same visual format as assertion failures.
     #[track_caller]
-    #[allow(clippy::print_stderr, reason = "the logging here is intentional")]
     #[allow(dead_code, reason = "this will be used for the editor tests later")]
     pub(crate) fn render_cursor(&self, cursor: Cursor) {
         let background_color = Color::from_rgba8(255, 255, 255, 255);
