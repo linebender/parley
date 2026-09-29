@@ -87,11 +87,9 @@ struct LineState {
 
 impl LineState {
     /// Reset the per-line running state in preparation for building a new line.
-    ///
-    /// The line starts out containing the root span box (the "strut", CSS 2 §10.8).
-    fn reset(&mut self, strut: Option<&StyleMetrics>, contributed: &mut Vec<u16>) {
+    fn reset(&mut self) {
         self.x = 0.0;
-        self.box_metrics.reset(strut, contributed);
+        self.box_metrics.reset();
         self.num_word_separators = 0;
     }
 }
@@ -224,8 +222,8 @@ impl Default for LineBoxMetrics {
 }
 
 impl LineBoxMetrics {
-    /// Reset to an empty line whose root aligned subtree contains only `strut`, if any.
-    fn reset(&mut self, strut: Option<&StyleMetrics>, contributed: &mut Vec<u16>) {
+    /// Reset to an empty line.
+    fn reset(&mut self) {
         let Self {
             subtrees,
             line_relative_top_height,
@@ -235,21 +233,10 @@ impl LineBoxMetrics {
         } = Self::default();
         self.subtrees.clear();
         self.subtrees.extend(subtrees);
-        contributed.clear();
         self.line_relative_top_height = line_relative_top_height;
         self.line_relative_bottom_height = line_relative_bottom_height;
         self.has_content = has_content;
         self.last_text = last_text;
-        if let Some(strut) = strut {
-            self.add_strut(strut, contributed);
-        }
-    }
-
-    fn add_strut(&mut self, strut: &StyleMetrics, contributed: &mut Vec<u16>) {
-        let root = &mut self.subtrees[0];
-        root.line_box.add(0., strut.over, strut.under);
-        root.content_box.add(0., strut.ascent, strut.descent);
-        contributed.push(0);
     }
 
     /// The extents of the root aligned subtree.
@@ -644,12 +631,6 @@ impl BreakerState {
         self.contributed.truncate(prev_state.contributed_len);
     }
 
-    /// Reset the per-line running state in preparation for building a new line.
-    fn reset_line(&mut self, strut: Option<&StyleMetrics>) {
-        self.line.reset(strut, &mut self.contributed);
-        self.update_max_height_exceeded();
-    }
-
     #[inline(always)]
     fn update_max_height_exceeded(&mut self) {
         self.line.max_height_exceeded = self.line_max_height != f32::MAX
@@ -731,15 +712,30 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         lines.lines.clear();
         lines.line_items.clear();
         lines.aligned_subtree_offsets.clear();
-        let mut state = BreakerState::default();
-        state.reset_line(layout.data.style_metrics.first());
-        Self {
+        let mut this = Self {
             layout,
             lines,
-            state,
+            state: BreakerState::default(),
             prev_state: None,
             done: false,
-        }
+        };
+        this.reset_line();
+        this
+    }
+
+    /// Reset the per-line running state in preparation for building a new line.
+    ///
+    /// The line starts out containing the root span box (the "strut", CSS 2 §10.8).
+    fn reset_line(&mut self) {
+        let state = &mut self.state;
+        state.line.reset();
+        state.contributed.clear();
+        state.line.box_metrics.add_style(
+            0,
+            &self.layout.data.style_metrics,
+            &mut state.contributed,
+        );
+        state.update_max_height_exceeded();
     }
 
     /// Add the layout's inline box `index` to the current line. Out-of-flow boxes contribute
@@ -801,8 +797,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // it must run before we reset the per-line running state. It may grow the line (e.g. the
         // trailing line after a final newline), so use the returned height.
         let line_height = self.finish_line(self.lines.lines.len() - 1, line_height, invisible);
-        self.state
-            .reset_line(self.layout.data.style_metrics.first());
+        self.reset_line();
 
         self.state.line_y += line_height as f64;
 
