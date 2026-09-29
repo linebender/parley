@@ -630,7 +630,7 @@ pub(crate) fn analyze_text(
     // a `break_spaces` range.
     let mut prev_is_break_space = false;
     let mut break_spaces_iter = options.break_spaces.iter().peekable();
-    let mut anywhere_iter = options
+    let mut break_anywhere_iter = options
         .line_break
         .iter()
         .filter(|(_, config)| config.line_break == LineBreak::Anywhere)
@@ -711,13 +711,13 @@ pub(crate) fn analyze_text(
             .is_some_and(|range| range.contains(&byte_pos))
             && matches!(ch, ' ' | '\t' | '\u{3000}');
 
-        while anywhere_iter
+        while break_anywhere_iter
             .peek()
             .is_some_and(|range| range.end <= byte_pos)
         {
-            _ = anywhere_iter.next();
+            _ = break_anywhere_iter.next();
         }
-        let is_anywhere = anywhere_iter
+        let is_break_anywhere = break_anywhere_iter
             .peek()
             .is_some_and(|range| range.contains(&byte_pos));
 
@@ -729,7 +729,7 @@ pub(crate) fn analyze_text(
         let is_soft_wrap_opportunity = if is_mandatory_linebreak || prev_is_mandatory_linebreak {
             false
         } else {
-            let mut opportunity = if is_anywhere {
+            let mut opportunity = if is_break_anywhere {
                 // `line-break: anywhere`: an opportunity around every grapheme.
                 prev_char.is_some() && is_grapheme_start
             } else {
