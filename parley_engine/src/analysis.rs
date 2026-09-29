@@ -624,11 +624,13 @@ pub(crate) fn analyze_text(
     let mut lb_iter = line_boundary_positions.iter().peekable();
     let mut prev_char = None;
     let mut prev_prev_char = None;
+    // Whether the preceding character is a mandatory break.
+    let mut prev_is_mandatory_linebreak = false;
     // Whether the preceding character is a break-space, i.e. a space, tab or ideographic space in
     // a `break_spaces` range.
     let mut prev_is_break_space = false;
     let mut break_spaces_iter = options.break_spaces.iter().peekable();
-    let mut anywhere_iter = options
+    let mut break_anywhere_iter = options
         .line_break
         .iter()
         .filter(|(_, config)| config.line_break == LineBreak::Anywhere)
@@ -686,16 +688,14 @@ pub(crate) fn analyze_text(
             is_word = true;
         }
 
-        let mut is_line = false;
-        if let Some(&l) = lb_iter.peek()
+        let is_icu_line = if let Some(&l) = lb_iter.peek()
             && *l == byte_pos
         {
-            // A soft break opportunity is never valid directly before a mandatory break
-            // character (UAX #14 LB6), but ICU4X's line segmenter emits one at the end of a
-            // complex-script (Thai, Khmer, Lao, ...) run regardless of what follows it.
-            is_line = !properties.is_mandatory_linebreak();
             _ = lb_iter.next();
-        }
+            true
+        } else {
+            false
+        };
 
         // CSS Text 4 § 4.3.1 `break-spaces`: a soft wrap opportunity exists after each preserved
         // space or tab (but never directly before a mandatory break, UAX #14 LB6).
@@ -705,102 +705,108 @@ pub(crate) fn analyze_text(
         {
             _ = break_spaces_iter.next();
         }
-        let is_break_space = break_spaces_iter
+        let after_break_space = prev_is_break_space;
+        prev_is_break_space = break_spaces_iter
             .peek()
             .is_some_and(|range| range.contains(&byte_pos))
             && matches!(ch, ' ' | '\t' | '\u{3000}');
-        if prev_is_break_space && !properties.is_mandatory_linebreak() {
-            is_line = true;
-        }
-        prev_is_break_space = is_break_space;
 
-        while anywhere_iter
+        while break_anywhere_iter
             .peek()
             .is_some_and(|range| range.end <= byte_pos)
         {
-            _ = anywhere_iter.next();
+            _ = break_anywhere_iter.next();
         }
-        if anywhere_iter
+        let is_break_anywhere = break_anywhere_iter
             .peek()
-            .is_some_and(|range| range.contains(&byte_pos))
-        {
-            // `line-break: anywhere`: an opportunity around every grapheme.
-            is_line =
-                prev_char.is_some() && is_grapheme_start && !properties.is_mandatory_linebreak();
-        }
+            .is_some_and(|range| range.contains(&byte_pos));
 
-        // This leaves word boundaries intact. Consumers can only impact line boundaries.
-        if let (Some(prev), Some(lb_override)) = (prev_char, options.line_break_override) {
-            let forced = lb_override(LineBreakContext {
-                before_before: prev_prev_char,
-                before: prev,
-                after: ch,
-            });
-            if let Some(forced) = forced {
-                is_line = forced;
+        let is_mandatory_linebreak = properties.is_mandatory_linebreak();
+
+        // We never have a soft wrap opportunity before a mandatory break (following UAX #14 LB6),
+        // and we never have one right after a mandatory break: the mandatory break is handled
+        // separately.
+        let is_soft_wrap_opportunity = if is_mandatory_linebreak || prev_is_mandatory_linebreak {
+            false
+        } else {
+            let mut opportunity = if is_break_anywhere {
+                // `line-break: anywhere`: an opportunity around every grapheme.
+                prev_char.is_some() && is_grapheme_start
+            } else {
+                is_icu_line || after_break_space
+            };
+            // Consumers can override soft wrap opportunities, except around a mandatory
+            // break.
+            if let (Some(prev), Some(lb_override)) = (prev_char, options.line_break_override) {
+                let forced = lb_override(LineBreakContext {
+                    before_before: prev_prev_char,
+                    before: prev,
+                    after: ch,
+                });
+                if let Some(forced) = forced {
+                    opportunity = forced;
+                }
             }
-        }
+            opportunity
+        };
+
         prev_prev_char = prev_char;
         prev_char = Some(ch);
+        prev_is_mandatory_linebreak = is_mandatory_linebreak;
 
-        (is_line, is_word, is_grapheme_start, ch, properties)
+        (
+            is_soft_wrap_opportunity,
+            is_word,
+            is_grapheme_start,
+            ch,
+            properties,
+        )
     });
 
     let mut needs_bidi_resolution = false;
 
     analysis.info.reserve(text.len());
-    boundary_iter
-        // Note the line segmenter reports a break position after a forced break (like '\n'). We
-        // don't consider that to be a soft wrap opportunity, so we ignore it if the preceding
-        // character was a forced break (i.e., if `after_mandatory_linebreak` is `true`).
-        .fold(
-            false,
-            |after_mandatory_linebreak, (is_line, is_word, is_grapheme_start, ch, properties)| {
-                let script = properties.script();
-                let grapheme_cluster_break = properties.grapheme_cluster_break();
-                let bidi_class = properties.bidi_class();
-                let general_category = properties.general_category();
-                let is_emoji_or_pictograph = properties.is_emoji_or_pictograph();
-                let is_variation_selector = properties.is_variation_selector();
-                let is_region_indicator = properties.is_region_indicator();
-                let is_mandatory_linebreak = properties.is_mandatory_linebreak();
-                let is_soft_wrap_opportunity = is_line && !after_mandatory_linebreak;
+    for (is_soft_wrap_opportunity, is_word, is_grapheme_start, ch, properties) in boundary_iter {
+        let script = properties.script();
+        let grapheme_cluster_break = properties.grapheme_cluster_break();
+        let bidi_class = properties.bidi_class();
+        let general_category = properties.general_category();
+        let is_emoji_or_pictograph = properties.is_emoji_or_pictograph();
+        let is_variation_selector = properties.is_variation_selector();
+        let is_region_indicator = properties.is_region_indicator();
 
-                let force_normalize = {
-                    // "Extend" break chars should be normalized first, with two exceptions
-                    if matches!(grapheme_cluster_break, GraphemeClusterBreak::Extend) &&
+        let force_normalize = {
+            // "Extend" break chars should be normalized first, with two exceptions
+            if matches!(grapheme_cluster_break, GraphemeClusterBreak::Extend) &&
                     ch as u32 != 0x200C && // Is not a Zero Width Non-Joiner &&
                     !is_variation_selector
-                    {
-                        true
-                    } else {
-                        // All spacing mark break chars should be normalized first.
-                        matches!(grapheme_cluster_break, GraphemeClusterBreak::SpacingMark)
-                    }
-                };
+            {
+                true
+            } else {
+                // All spacing mark break chars should be normalized first.
+                matches!(grapheme_cluster_break, GraphemeClusterBreak::SpacingMark)
+            }
+        };
 
-                needs_bidi_resolution |= bidi::needs_bidi_resolution(bidi_class);
+        needs_bidi_resolution |= bidi::needs_bidi_resolution(bidi_class);
 
-                analysis.info.push(CharInfo::new(
-                    script,
-                    is_variation_selector,
-                    is_region_indicator,
-                    general_category == GeneralCategory::Control,
-                    is_emoji_or_pictograph,
-                    contributes_to_shaping(general_category, script),
-                    force_normalize,
-                    is_grapheme_start,
-                    is_word,
-                    is_soft_wrap_opportunity,
-                    properties.is_emoji(),
-                    properties.is_emoji_presentation(),
-                    properties.is_emoji_modifier(),
-                    properties.is_emoji_modifier_base(),
-                ));
-
-                is_mandatory_linebreak
-            },
-        );
+        analysis.info.push(CharInfo::new(
+            script,
+            is_variation_selector,
+            is_region_indicator,
+            general_category == GeneralCategory::Control,
+            is_emoji_or_pictograph,
+            contributes_to_shaping(general_category, script),
+            force_normalize,
+            is_grapheme_start,
+            is_word,
+            is_soft_wrap_opportunity,
+            properties.is_emoji(),
+            properties.is_emoji_presentation(),
+            properties.is_emoji_modifier(),
+            properties.is_emoji_modifier_base(),
+        ));
+    }
 
     if needs_bidi_resolution || options.base_direction == BaseDirection::Rtl {
         analyzer.bidi.resolve(
