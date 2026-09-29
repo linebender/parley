@@ -686,8 +686,9 @@ pub(crate) fn analyze_text(
         // We never have a soft wrap opportunity before a mandatory break (following UAX #14 LB6),
         // and we never have one right after a mandatory break: the mandatory break is handled
         // separately.
-        let is_soft_wrap_opportunity = !(is_mandatory_linebreak || prev_is_mandatory_linebreak)
-            && {
+        let is_soft_wrap_opportunity = if is_mandatory_linebreak || prev_is_mandatory_linebreak {
+            false
+        }else {
                 let mut opportunity = is_icu_line || after_break_space;
                 // Consumers can override soft wrap opportunities, except around a mandatory
                 // break.
