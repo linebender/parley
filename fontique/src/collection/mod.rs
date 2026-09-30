@@ -710,11 +710,9 @@ impl CommonData {
                 kind: SourceKind::Path(Arc::from(scanned_font.path.unwrap())),
             };
 
-            // `scan_paths` already yields one fully parsed font per callback (a
-            // single face, or each face of a collection in turn), so register it
-            // directly. The previous code re-scanned the whole file here, which
-            // re-added every font in it on each callback and so duplicated faces
-            // (and multiplied them further for collection files).
+            // `scan_paths` invokes this callback once per face (each face of a
+            // collection is reported separately), so register exactly this font.
+            // Re-scanning the file here would register duplicate faces.
             families.clear();
             self.register_scanned_font(
                 scanned_font,
