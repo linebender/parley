@@ -335,10 +335,11 @@ struct ContentWidthsMeasurer {
     running_min_width: f32,
     running_max_width: f32,
 
-    /// Whether the current running_min_width and running_max_width lines have content.
+    /// Whether the current `running_min_width` and `running_max_width` lines have content.
     ///
-    /// The text-indent is added to running_min_width/running_max_width eagerly when a line starts.
-    /// We track "emptiness" so so that an empty line doesn't contribute its indent to  min_width / max_width
+    /// The text-indent is added to `running_min_width`/`running_max_width` eagerly when a line
+    /// starts. We track "emptiness" so that an empty line doesn't contribute its indent to
+    /// `min_width`/`max_width`.
     min_width_line_has_content: bool,
     max_width_line_has_content: bool,
 
