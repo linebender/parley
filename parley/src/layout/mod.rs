@@ -132,7 +132,7 @@ impl IndentOptions {
     /// The indent of a line: `is_scope_line` is the first line or, with `each-line`, a line
     /// following a forced break. With `hanging`, the non-scope lines are indented instead.
     #[inline(always)]
-    pub(crate) fn line_indent(&self, amount: f32, is_scope_line: bool) -> f32 {
+    pub(crate) fn line_indent(self, amount: f32, is_scope_line: bool) -> f32 {
         if is_scope_line ^ self.hanging {
             amount
         } else {
@@ -142,20 +142,20 @@ impl IndentOptions {
 
     /// The indent of the first line of the [`Layout`].
     #[inline(always)]
-    pub(crate) fn indent_for_first_line(&self, amount: f32) -> f32 {
+    pub(crate) fn indent_for_first_line(self, amount: f32) -> f32 {
         self.line_indent(amount, true)
     }
 
     /// The indent of a line following a hard wrap.
     /// With `each-line`, it's indented like the first line.
     #[inline(always)]
-    pub(crate) fn indent_following_hard_break(&self, amount: f32) -> f32 {
+    pub(crate) fn indent_following_hard_break(self, amount: f32) -> f32 {
         self.line_indent(amount, self.each_line)
     }
 
     /// The indent of a continuation line after a soft wrap.
     #[inline(always)]
-    pub(crate) fn indent_following_soft_break(&self, amount: f32) -> f32 {
+    pub(crate) fn indent_following_soft_break(self, amount: f32) -> f32 {
         self.line_indent(amount, false)
     }
 }
