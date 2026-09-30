@@ -121,4 +121,23 @@ impl IndentOptions {
             0.0
         }
     }
+
+    /// The indent of the first line of the [`Layout`].
+    #[inline(always)]
+    pub(crate) fn first_line(&self, amount: f32) -> f32 {
+        self.line_indent(amount, true)
+    }
+
+    /// The indent of a line following a hard wrap.
+    /// With `each-line`, it's indented like the first line.
+    #[inline(always)]
+    pub(crate) fn following_hard_break(&self, amount: f32) -> f32 {
+        self.line_indent(amount, self.each_line)
+    }
+
+    /// The indent of a continuation line after a soft wrap.
+    #[inline(always)]
+    pub(crate) fn following_soft_break(&self, amount: f32) -> f32 {
+        self.line_indent(amount, false)
+    }
 }
