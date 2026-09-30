@@ -434,18 +434,16 @@ struct ContentWidthsMeasurer {
 
     text_wrap_mode: TextWrapMode,
 
-    /// Loop-invariant indents, precomputed so the hot break helpers don't re-read the options.
-    /// The indent of a continuation line after a soft wrap.
+    /// Indents for lines following a soft/hard wrap.
+    /// Precomputed so the hot break helpers don't re-read the options.
     soft_indent: f32,
-    /// The indent of a line following a hard wrap. With `each-line`, it's indented like the first
-    /// line.
     hard_indent: f32,
 }
 
 impl ContentWidthsMeasurer {
     #[inline(always)]
     fn new(indent_amount: f32, indent_options: IndentOptions) -> Self {
-        let first_line_indent = indent_options.first_line(indent_amount);
+        let first_line_indent = indent_options.indent_for_first_line(indent_amount);
         Self {
             min_width: 0.,
             max_width: 0.,
@@ -454,8 +452,8 @@ impl ContentWidthsMeasurer {
             running_hanging_whitespace: 0.,
             hangs_conditionally: false,
             text_wrap_mode: TextWrapMode::Wrap,
-            soft_indent: indent_options.following_soft_break(indent_amount),
-            hard_indent: indent_options.following_hard_break(indent_amount),
+            soft_indent: indent_options.indent_following_soft_break(indent_amount),
+            hard_indent: indent_options.indent_following_hard_break(indent_amount),
             min_width_line_has_content: false,
             max_width_line_has_content: false,
         }
