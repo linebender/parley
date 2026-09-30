@@ -363,7 +363,10 @@ struct ContentWidthsMeasurer {
 struct IndentState {
     amount: f32,
     options: IndentOptions,
-    /// Whether the current line is the first line or, with `each-line`, follows a forced break.
+
+    /// Whether the current line matches one of the following:
+    ///   - Is it the very first line of the Layout
+    ///   - It immediately follows a hard break (and `each-line` is set in the [`IndentOptions`])
     is_scope_line: bool,
 }
 
@@ -377,15 +380,16 @@ impl IndentState {
         }
     }
 
-    /// The indent of the current line, mirroring the line breaker's `resolve_indent`.
+    /// The indent of a line following a hard wrap.
+    /// Uses `is_scope_line` to account for the each-line option.
     #[inline(always)]
-    fn line_indent(&self) -> f32 {
+    fn following_hard_break(&self) -> f32 {
         self.indent(self.is_scope_line)
     }
 
     /// The indent of a continuation line after a soft wrap.
     #[inline(always)]
-    fn continuation_indent(&self) -> f32 {
+    fn following_soft_break(&self) -> f32 {
         self.indent(false)
     }
 
@@ -408,7 +412,7 @@ impl IndentState {
 impl ContentWidthsMeasurer {
     #[inline(always)]
     fn new(indent: IndentState) -> Self {
-        let line_indent = indent.line_indent();
+        let line_indent = indent.following_hard_break();
         Self {
             min_width: 0.,
             max_width: 0.,
@@ -435,7 +439,7 @@ impl ContentWidthsMeasurer {
         self.min_width = self
             .min_width
             .max(self.running_min_width - self.running_hanging_whitespace);
-        self.running_min_width = self.indent.continuation_indent();
+        self.running_min_width = self.indent.following_soft_break();
     }
 
     /// Ends the current line at a forced break or the end of the layout.
@@ -456,7 +460,7 @@ impl ContentWidthsMeasurer {
         self.min_width_line_has_content = false;
         self.max_width_line_has_content = false;
         self.indent.start_line();
-        let indent = self.indent.line_indent();
+        let indent = self.indent.following_hard_break();
         self.running_min_width = indent;
         self.running_max_width = indent;
     }
