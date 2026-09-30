@@ -445,7 +445,7 @@ struct ContentWidthsMeasurer {
 impl ContentWidthsMeasurer {
     #[inline(always)]
     fn new(indent_amount: f32, indent_options: IndentOptions) -> Self {
-        let first_line_indent = indent_options.line_indent(indent_amount, true);
+        let first_line_indent = indent_options.first_line(indent_amount);
         Self {
             min_width: 0.,
             max_width: 0.,
@@ -454,8 +454,8 @@ impl ContentWidthsMeasurer {
             running_hanging_whitespace: 0.,
             hangs_conditionally: false,
             text_wrap_mode: TextWrapMode::Wrap,
-            soft_indent: indent_options.line_indent(indent_amount, false),
-            hard_indent: indent_options.line_indent(indent_amount, indent_options.each_line),
+            soft_indent: indent_options.following_soft_break(indent_amount),
+            hard_indent: indent_options.following_hard_break(indent_amount),
             min_width_line_has_content: false,
             max_width_line_has_content: false,
         }
