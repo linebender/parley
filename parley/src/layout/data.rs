@@ -422,6 +422,10 @@ struct ContentWidthsMeasurer {
     min_width_line_has_content: bool,
     max_width_line_has_content: bool,
 
+    /// Loop-invariant indents, precomputed so the hot break helpers don't re-read `indent`.
+    soft_indent: f32,
+    hard_indent: f32,
+
     /// The running advance of whitespace that would hang if a line ended here. Can exceed
     /// `running_min_width` when the hanging whitespace started before the last break
     /// opportunity, in which case the line consists entirely of hanging whitespace.
@@ -491,6 +495,8 @@ impl ContentWidthsMeasurer {
             running_hanging_whitespace: 0.,
             hangs_conditionally: false,
             text_wrap_mode: TextWrapMode::Wrap,
+            soft_indent: indent.following_soft_break(),
+            hard_indent: indent.following_hard_break(),
             indent,
             min_width_line_has_content: false,
             max_width_line_has_content: false,
@@ -509,7 +515,7 @@ impl ContentWidthsMeasurer {
         self.min_width = self
             .min_width
             .max(self.running_min_width - self.running_hanging_whitespace);
-        self.running_min_width = self.indent.following_soft_break();
+        self.running_min_width = self.soft_indent;
     }
 
     /// Ends the current line at a forced break or the end of the layout.
@@ -529,9 +535,8 @@ impl ContentWidthsMeasurer {
         self.running_hanging_whitespace = 0.0;
         self.min_width_line_has_content = false;
         self.max_width_line_has_content = false;
-        let indent = self.indent.following_hard_break();
-        self.running_min_width = indent;
-        self.running_max_width = indent;
+        self.running_min_width = self.hard_indent;
+        self.running_max_width = self.hard_indent;
     }
 
     #[inline(always)]
