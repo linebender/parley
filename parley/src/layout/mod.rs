@@ -127,3 +127,16 @@ pub struct SpanMetrics {
     /// Typographic x-height of the span's first available font.
     pub x_height: f32,
 }
+
+impl IndentOptions {
+    /// The indent of a line: `is_scope_line` is the first line or, with `each-line`, a line
+    /// following a forced break. With `hanging`, the non-scope lines are indented instead.
+    #[inline(always)]
+    pub(crate) fn line_indent(&self, amount: f32, is_scope_line: bool) -> f32 {
+        if is_scope_line ^ self.hanging {
+            amount
+        } else {
+            0.0
+        }
+    }
+}

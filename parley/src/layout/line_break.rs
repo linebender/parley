@@ -1469,14 +1469,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             } else {
                 self.lines.lines.is_empty()
             };
-            is_scope_line ^ self.layout.data.indent_options.hanging
+            is_scope_line
         };
 
-        if should_indent {
-            self.layout.data.indent_amount
-        } else {
-            0.0
-        }
+        self.layout
+            .data
+            .indent_options
+            .line_indent(self.layout.data.indent_amount, should_indent)
     }
 
     fn finish_line(&mut self, line_idx: usize, line_height: f32, invisible: bool) -> f32 {

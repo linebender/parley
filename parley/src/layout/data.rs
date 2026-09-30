@@ -403,8 +403,7 @@ impl<B: Brush> LayoutData<B> {
     /// - min-content width: any conditionally-hanging suffix hangs in full, so all hanging
     ///   whitespace hangs in full.
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
-        ContentWidthsMeasurer::new(IndentState::new(self.indent_amount, self.indent_options))
-            .measure(self)
+        ContentWidthsMeasurer::new(self.indent_amount, self.indent_options).measure(self)
     }
 }
 
@@ -422,10 +421,6 @@ struct ContentWidthsMeasurer {
     min_width_line_has_content: bool,
     max_width_line_has_content: bool,
 
-    /// Loop-invariant indents, precomputed so the hot break helpers don't re-read `indent`.
-    soft_indent: f32,
-    hard_indent: f32,
-
     /// The running advance of whitespace that would hang if a line ended here. Can exceed
     /// `running_min_width` when the hanging whitespace started before the last break
     /// opportunity, in which case the line consists entirely of hanging whitespace.
@@ -439,65 +434,28 @@ struct ContentWidthsMeasurer {
 
     text_wrap_mode: TextWrapMode,
 
-    indent: IndentState,
-}
-
-/// The text-indent state of a [`ContentWidthsMeasurer`].
-struct IndentState {
-    amount: f32,
-    options: IndentOptions,
-}
-
-impl IndentState {
-    #[inline(always)]
-    fn new(amount: f32, options: IndentOptions) -> Self {
-        Self { amount, options }
-    }
-
-    /// The indent of the first line of the [`Layout`].
-    #[inline(always)]
-    fn for_first_line(&self) -> f32 {
-        self.indent(true)
-    }
-
-    /// The indent of a line following a hard wrap.
-    /// With `each-line`, it's indented like the first line.
-    #[inline(always)]
-    fn following_hard_break(&self) -> f32 {
-        self.indent(self.options.each_line)
-    }
-
+    /// Loop-invariant indents, precomputed so the hot break helpers don't re-read the options.
     /// The indent of a continuation line after a soft wrap.
-    #[inline(always)]
-    fn following_soft_break(&self) -> f32 {
-        self.indent(false)
-    }
-
-    #[inline(always)]
-    fn indent(&self, is_scope_line: bool) -> f32 {
-        if is_scope_line ^ self.options.hanging {
-            self.amount
-        } else {
-            0.0
-        }
-    }
+    soft_indent: f32,
+    /// The indent of a line following a hard wrap. With `each-line`, it's indented like the first
+    /// line.
+    hard_indent: f32,
 }
 
 impl ContentWidthsMeasurer {
     #[inline(always)]
-    fn new(indent: IndentState) -> Self {
-        let line_indent = indent.for_first_line();
+    fn new(indent_amount: f32, indent_options: IndentOptions) -> Self {
+        let first_line_indent = indent_options.line_indent(indent_amount, true);
         Self {
             min_width: 0.,
             max_width: 0.,
-            running_min_width: line_indent,
-            running_max_width: line_indent,
+            running_min_width: first_line_indent,
+            running_max_width: first_line_indent,
             running_hanging_whitespace: 0.,
             hangs_conditionally: false,
             text_wrap_mode: TextWrapMode::Wrap,
-            soft_indent: indent.following_soft_break(),
-            hard_indent: indent.following_hard_break(),
-            indent,
+            soft_indent: indent_options.line_indent(indent_amount, false),
+            hard_indent: indent_options.line_indent(indent_amount, indent_options.each_line),
             min_width_line_has_content: false,
             max_width_line_has_content: false,
         }
