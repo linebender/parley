@@ -363,28 +363,25 @@ struct ContentWidthsMeasurer {
 struct IndentState {
     amount: f32,
     options: IndentOptions,
-
-    /// Whether the current line matches one of the following:
-    ///   - Is it the very first line of the Layout
-    ///   - It immediately follows a hard break (and `each-line` is set in the [`IndentOptions`])
-    is_scope_line: bool,
 }
 
 impl IndentState {
     #[inline(always)]
     fn new(amount: f32, options: IndentOptions) -> Self {
-        Self {
-            amount,
-            options,
-            is_scope_line: true,
-        }
+        Self { amount, options }
+    }
+
+    /// The indent of the first line of the [`Layout`].
+    #[inline(always)]
+    fn for_first_line(&self) -> f32 {
+        self.indent(true)
     }
 
     /// The indent of a line following a hard wrap.
-    /// Uses `is_scope_line` to account for the each-line option.
+    /// With `each-line`, it's indented like the first line.
     #[inline(always)]
     fn following_hard_break(&self) -> f32 {
-        self.indent(self.is_scope_line)
+        self.indent(self.options.each_line)
     }
 
     /// The indent of a continuation line after a soft wrap.
@@ -401,18 +398,12 @@ impl IndentState {
             0.0
         }
     }
-
-    /// Starts a new, empty line after a forced break.
-    #[inline(always)]
-    fn start_line(&mut self) {
-        self.is_scope_line = self.options.each_line;
-    }
 }
 
 impl ContentWidthsMeasurer {
     #[inline(always)]
     fn new(indent: IndentState) -> Self {
-        let line_indent = indent.following_hard_break();
+        let line_indent = indent.for_first_line();
         Self {
             min_width: 0.,
             max_width: 0.,
@@ -459,7 +450,6 @@ impl ContentWidthsMeasurer {
         self.running_hanging_whitespace = 0.0;
         self.min_width_line_has_content = false;
         self.max_width_line_has_content = false;
-        self.indent.start_line();
         let indent = self.indent.following_hard_break();
         self.running_min_width = indent;
         self.running_max_width = indent;
