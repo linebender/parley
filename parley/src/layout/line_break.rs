@@ -240,7 +240,7 @@ impl SubtreeHistory {
         self.entries.iter().rev().find(|s| s.root == root).copied()
     }
 
-    /// The current extents of every subtree with content on the line.
+    /// The current extents of every subtree with content on the line, in no particular order.
     fn current(&self) -> SmallVec<[SubtreeExtents; 4]> {
         let mut current = SmallVec::<[SubtreeExtents; 4]>::new();
         for entry in self.entries.iter().rev() {
@@ -248,7 +248,6 @@ impl SubtreeHistory {
                 current.push(*entry);
             }
         }
-        current.reverse();
         current
     }
 
