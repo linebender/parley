@@ -794,6 +794,38 @@ fn base_level_alignment_rtl() {
 }
 
 #[test]
+/// The last line of the layout and lines ending in an explicit line break use the last line
+/// alignment, all other lines use the main alignment.
+fn last_line_alignment() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    let ltr = "Lorem ipsum dolor sit amet,\nconsectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.";
+    let rtl = "عند برمجة أجهزة الكمبيوتر، قد تجد نفسك فجأة\nفي مواقف غريبة، مثل الكتابة بلغة لا تتحدثها فعليًا.";
+
+    for (text, text_name) in [(ltr, "ltr"), (rtl, "rtl")] {
+        for (alignment, last_line_alignment, test_case_name) in [
+            (Alignment::Justify, Alignment::End, "justify_end"),
+            (Alignment::Justify, Alignment::Center, "justify_center"),
+            (Alignment::Justify, Alignment::Justify, "justify_justify"),
+            (Alignment::Center, Alignment::Start, "center_start"),
+        ] {
+            let builder = env.ranged_builder(text);
+            let mut layout = builder.build(text);
+            layout.break_all_lines(Some(150.0));
+            layout.align(
+                alignment,
+                AlignmentOptions {
+                    last_line_alignment: Some(last_line_alignment),
+                    ..AlignmentOptions::default()
+                },
+            );
+            env.with_name(&format!("{text_name}_{test_case_name}"))
+                .check_layout_snapshot(&layout);
+        }
+    }
+}
+
+#[test]
 /// On overflow without alignment-on-overflow, RTL-text should be start-aligned (i.e., aligned to
 /// the right edge, overflowing on the left).
 fn overflow_alignment_rtl() {
@@ -1101,6 +1133,7 @@ fn realign_all() {
             None,
             AlignmentOptions {
                 align_when_overflowing: true,
+                ..AlignmentOptions::default()
             },
             "none",
             "awo_true",
@@ -1109,6 +1142,7 @@ fn realign_all() {
             None,
             AlignmentOptions {
                 align_when_overflowing: false,
+                ..AlignmentOptions::default()
             },
             "none",
             "awo_false",
