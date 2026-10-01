@@ -39,6 +39,11 @@ pub(crate) struct RunData {
     /// If the metrics change within the run, this is `None`. The run's boxes should then be
     /// resolved per style.
     pub(crate) run_box: Option<BoxMetrics>,
+    /// Whether this run has atoms with styles changing mid-atom.
+    ///
+    /// This can happen when ligatures span across styles, or (awkwardly) if a style changes within
+    /// a grapheme.
+    pub(crate) has_mixed_style_atoms: bool,
 }
 
 /// The metrics of a run's box. This differs from the style-derived box by taking into account any
@@ -300,6 +305,7 @@ impl<B: Brush> LayoutData<B> {
     /// Processes a shaped run into [`RunData`] and a [`LayoutItem`].
     ///
     /// `char_styles` are the style indices of the text's characters.
+    #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub(crate) fn process_shaped_run(
         &mut self,
         shaped_run_idx: usize,
@@ -343,6 +349,19 @@ impl<B: Brush> LayoutData<B> {
             }
         };
 
+        // An atom has mixed styles iff a style changes at one of its characters other than its
+        // first.
+        let has_mixed_style_atoms = {
+            let chars = shaped_run.range.char_range.clone();
+            let slice = self.shaped_text.run_slice(shaped_run_idx as u32);
+            (chars.start + 1..chars.end).any(|char_idx| {
+                char_styles[char_idx - 1] != char_styles[char_idx]
+                    && slice
+                        .atom_at_char(char_idx as u32)
+                        .is_some_and(|atom| atom.char_range().start != char_idx as u32)
+            })
+        };
+
         let font = &self.shaped_text.fonts()[shaped_run.font_index];
         let run = RunData {
             font_attrs: fontique::Attributes {
@@ -354,6 +373,7 @@ impl<B: Brush> LayoutData<B> {
             line_height,
             spacing,
             run_box,
+            has_mixed_style_atoms,
         };
 
         self.runs.push(run);
