@@ -322,8 +322,9 @@ impl LineBoxMetrics {
     ) {
         self.has_content = true;
         // Consecutive atoms almost always come from the same run and style, whose boxes are then
-        // already on the line.
-        if self.last_text == (item_idx, style_index) {
+        // already on the line, so we can exit early. In case the run has atoms with mixed styles,
+        // new boxes may still be added.
+        if self.last_text == (item_idx, style_index) && !data.runs[run_idx].has_mixed_style_atoms {
             return;
         }
         self.add_text_boxes(
@@ -358,8 +359,6 @@ impl LineBoxMetrics {
             for character in characters.iter().skip(1) {
                 self.add_style(character.style_index, &data.style_metrics, contributed);
             }
-            // Take this path for the run's next atom too, which could also have mixed styles.
-            self.last_text = (usize::MAX, 0);
         }
         let style = usize::from(style_index);
         let shaped_run = &data.shaped_text.runs()[run_idx];
