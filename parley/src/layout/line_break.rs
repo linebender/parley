@@ -419,7 +419,7 @@ impl LineBoxMetrics {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct PrevBoundaryState {
     item_idx: usize,
     run_idx: usize,
@@ -929,14 +929,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
     /// Computes the next line in the paragraph. Returns the advance and size
     /// (width and height for horizontal layouts) of the line.
-    #[inline(always)]
     pub fn break_next(&mut self) -> Option<YieldData> {
-        self.break_next_line_or_box()
-    }
-
-    /// Computes the next line in the paragraph. Returns the advance and size
-    /// (width and height for horizontal layouts) of the line.
-    fn break_next_line_or_box(&mut self) -> Option<YieldData> {
         assert!(
             self.state.layout_max_advance == f32::INFINITY
                 || self.state.line_max_advance - self.state.layout_max_advance < 1.0
@@ -1389,10 +1382,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     }
 
     fn finish_line(&mut self, line_idx: usize, line_height: f32, invisible: bool) -> f32 {
-        let prev_line_metrics = match line_idx {
-            0 => None,
-            idx => Some(self.lines.lines[idx - 1].metrics),
-        };
         let line = &mut self.lines.lines[line_idx];
 
         // Reset metrics for line
@@ -1407,7 +1396,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // Whether metrics should be quantized to pixel boundaries
         let quantize = self.layout.data.quantize;
 
-        if line.item_range.is_empty() && prev_line_metrics.is_some() {
+        if line.item_range.is_empty() && line_idx > 0 {
             // If we have no items on this line, it must be the last (empty)
             // line in a layout following a newline. Commit an empty run so
             // that consumers, such as accessibility integrations, have
@@ -1554,7 +1543,7 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
         let mut layout_width = 0_f32;
         let mut layout_full_width = 0_f32;
         let mut height = 0_f64; // f32 causes test failures due to accumulated error
-        for line in &mut self.lines.lines {
+        for line in &self.lines.lines {
             let indent_extra = line.indent.max(0.0);
             let line_max = line.metrics.inline_min_coord + line.metrics.advance + indent_extra;
             layout_full_width = layout_full_width.max(line_max);
@@ -1598,7 +1587,7 @@ fn commit_line<B: Brush>(
     max_advance: f32,
     break_reason: BreakReason,
     line_indent: f32,
-) -> bool {
+) {
     let shaped_text = &layout.data.shaped_text;
     let shaped_clusters = shaped_text.shaped_clusters();
 
@@ -1607,7 +1596,6 @@ fn commit_line<B: Brush>(
     state.items.end = state.items.end.min(layout.data.items.len());
 
     let start_item_idx = lines.line_items.len();
-    // let start_run_idx = lines.line_items.last().map(|item| item.index).unwrap_or(0);
 
     let items_to_commit = &layout.data.items[state.items.clone()];
 
@@ -1761,8 +1749,6 @@ fn commit_line<B: Brush>(
         // the first item of line N+1 to be the item AFTER the last item in line N.
         LayoutItemKind::InlineBox => state.items.end,
     };
-
-    true
 }
 
 /// Returns the advance of the whitespace hanging past the end of the line made up of `line_items`,
@@ -1925,14 +1911,7 @@ fn reorder_line_items(runs: &mut [LineItemData]) {
                     end += 1;
                 }
 
-                let mut j = i;
-                let mut k = end - 1;
-                while j < k {
-                    runs.swap(j, k);
-                    j += 1;
-                    k -= 1;
-                }
-
+                runs[i..end].reverse();
                 i = end;
             }
             i += 1;
