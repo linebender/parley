@@ -10,11 +10,9 @@ use alloc::vec::Vec;
 use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
-use crate::layout::data::AlignedSubtreeOffset;
+use crate::layout::data::{AlignedSubtreeOffset, run_box_metrics};
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
-use crate::layout::style_metrics::{
-    BoxMetrics, InlineBoxPlacement, StyleMetrics, inline_box_placement,
-};
+use crate::layout::style_metrics::{InlineBoxPlacement, StyleMetrics, inline_box_placement};
 use crate::layout::whitespace::atom_hanging_advance;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
@@ -22,7 +20,7 @@ use crate::layout::{
 };
 use crate::style::Brush;
 use crate::{
-    BaselineShift, InlineBox, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode, VerticalAlign,
+    BaselineShift, InlineBox, InlineBoxKind, OverflowWrap, TextWrapMode, VerticalAlign,
     WhiteSpaceCollapse,
 };
 
@@ -301,20 +299,23 @@ impl LineBoxMetrics {
         }
     }
 
-    /// Add the glyphs of a text atom of `style_index` in layout item `item_idx`, a run whose own
-    /// box is `run_box` (see [`run_box_metrics`]).
+    /// Add the glyphs of a text atom of `style_index` in layout item `item_idx` and text run
+    /// `run_idx`.
     ///
     /// This adds the style's span box together with its ancestors. When the style's line height
     /// is [`LineHeight::MetricsRelative`] (which corresponds to CSS `line-height: normal`), it also
     /// adds the run's box, which matters when the run was shaped with a fallback font whose metrics
-    /// differ from the style's first available font, the font the span box is built from.
+    /// differ from the style's first available font, the font the span box is built from. See
+    /// [`run_box_metrics`].
+    ///
+    /// [`LineHeight::MetricsRelative`]: crate::LineHeight::MetricsRelative
     #[inline]
-    fn add_text(
+    fn add_text<B: Brush>(
         &mut self,
         item_idx: usize,
+        run_idx: usize,
         style_index: u16,
-        style_metrics: &[StyleMetrics],
-        run_box: Option<&BoxMetrics>,
+        data: &LayoutData<B>,
         contributed: &mut Vec<u16>,
     ) {
         self.has_content = true;
@@ -323,15 +324,36 @@ impl LineBoxMetrics {
         if self.last_text == (item_idx, style_index) {
             return;
         }
+        self.add_text_boxes(item_idx, run_idx, style_index, data, contributed);
+    }
+
+    /// The part of [`Self::add_text`] for atoms whose boxes may not be on the line yet.
+    ///
+    /// Note we mark this `inline(never)`, to keep the common case fast.
+    #[inline(never)]
+    fn add_text_boxes<B: Brush>(
+        &mut self,
+        item_idx: usize,
+        run_idx: usize,
+        style_index: u16,
+        data: &LayoutData<B>,
+        contributed: &mut Vec<u16>,
+    ) {
         self.last_text = (item_idx, style_index);
         if contributed.last() != Some(&style_index) {
-            self.add_style(style_index, style_metrics, contributed);
+            self.add_style(style_index, &data.style_metrics, contributed);
         }
-        let Some(run_box) = run_box else {
+        let style = usize::from(style_index);
+        let shaped_run = &data.shaped_text.runs()[run_idx];
+        let Some(run_box) = data.runs[run_idx]
+            .run_box
+            .or_else(|| run_box_metrics(&data.styles[style], shaped_run, data.quantize))
+        else {
             return;
         };
-        let (baseline_offset, aligned_subtree) = style_metrics
-            .get(usize::from(style_index))
+        let (baseline_offset, aligned_subtree) = data
+            .style_metrics
+            .get(style)
             .map_or((0., 0), |m| (m.baseline_offset, m.aligned_subtree));
         let subtree = self.subtree_mut(aligned_subtree);
         subtree
@@ -527,18 +549,17 @@ impl Default for BreakerState {
 impl BreakerState {
     /// Add the atom currently being evaluated to the current line.
     ///
-    /// `run_box` is the box of the atom's run (see [`run_box_metrics`]). `style_index` is the
-    /// atom's style, whose span box (and those of its ancestors) is added to the line too.
-    /// `is_word_separator` is `true` iff the atom is a [word separator](`is_word_separator`), i.e.,
-    /// a justification opportunity.
+    /// The box of the atom's run (see [`LineBoxMetrics::add_text`]) is added to the line box.
+    /// `style_index` is the atom's style, whose span box (and those of its ancestors) is added to
+    /// the line too. `is_word_separator` is `true` iff the atom is a
+    /// [word separator](`is_word_separator`), i.e., a justification opportunity.
     #[inline]
-    fn append_atom_to_line(
+    fn append_atom_to_line<B: Brush>(
         &mut self,
         atom: &Atom<'_>,
         next_x: f32,
         style_index: u16,
-        style_metrics: &[StyleMetrics],
-        run_box: Option<&BoxMetrics>,
+        data: &LayoutData<B>,
         is_word_separator: bool,
     ) {
         self.line.items.end = self.item_idx + 1;
@@ -548,9 +569,9 @@ impl BreakerState {
         self.line.num_word_separators += u32::from(is_word_separator);
         self.line.box_metrics.add_text(
             self.item_idx,
+            self.run_idx,
             style_index,
-            style_metrics,
-            run_box,
+            data,
             &mut self.contributed,
         );
         self.update_max_height_exceeded();
@@ -988,8 +1009,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let run_idx = item.index;
                     let run = Run::new(self.layout, 0, 0, run_idx, None);
                     let slice = run.full_slice();
-                    let run_box = run_box_metrics(&self.layout.data, run_idx);
-                    let run_box = run_box.as_ref();
 
                     // Additional spacing to apply between atoms.
                     let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
@@ -1024,8 +1043,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 &atom,
                                 self.state.line.x,
                                 style_index,
-                                &self.layout.data.style_metrics,
-                                run_box,
+                                &self.layout.data,
                                 is_separator,
                             );
 
@@ -1069,8 +1087,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 &atom,
                                 next_x,
                                 style_index,
-                                &self.layout.data.style_metrics,
-                                run_box,
+                                &self.layout.data,
                                 is_separator,
                             );
                         }
@@ -1098,8 +1115,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     &atom,
                                     next_x,
                                     style_index,
-                                    &self.layout.data.style_metrics,
-                                    run_box,
+                                    &self.layout.data,
                                     is_separator,
                                 );
                             }
@@ -1143,8 +1159,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     &atom,
                                     next_x,
                                     style_index,
-                                    &self.layout.data.style_metrics,
-                                    run_box,
+                                    &self.layout.data,
                                     is_separator,
                                 );
                             }
@@ -1234,8 +1249,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let slice = run.full_slice();
                     let spacing = run.line_spacing();
                     let cluster_end = shaped_run.shaped_clusters_range.end;
-                    let run_box = run_box_metrics(&self.layout.data, run_idx);
-                    let run_box = run_box.as_ref();
 
                     for atom in slice.atoms_from(self.state.cluster_idx) {
                         // Check if we should break before this atom
@@ -1261,8 +1274,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             &atom,
                             next_x,
                             first_character.style_index,
-                            &self.layout.data.style_metrics,
-                            run_box,
+                            &self.layout.data,
                             is_separator,
                         );
                         char_count += atom.char_range().len() as u32;
@@ -1397,12 +1409,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 let style_index = self.layout.data.shaped_text.shaped_clusters()
                     [cluster as usize - 1]
                     .style_index;
-                let run_box = run_box_metrics(&self.layout.data, index);
                 self.state.line.box_metrics.add_text(
                     index,
+                    index,
                     style_index,
-                    &self.layout.data.style_metrics,
-                    run_box.as_ref(),
+                    &self.layout.data,
                     &mut self.state.contributed,
                 );
                 line.metrics.line_height = self.state.line.box_metrics.line_height();
@@ -1858,30 +1869,6 @@ fn hanging_whitespace<B: Brush>(
         justification_end_cluster,
         hanging_opportunities,
     )
-}
-
-/// The post-shaping metrics of a run, if needed for line box resolution. This differs from the
-/// style derived box by taking into account any fallback fonts (rather than just using the first
-/// available font).
-///
-/// Per [CSS Inline 3 § 4.1], glyphs from fonts other than the first available font only
-/// contribute to the line when the `line-height` is `normal` ([`LineHeight::MetricsRelative`]);
-/// otherwise the style's span box alone sizes the line and this returns `None`.
-///
-/// [CSS Inline 3 § 4.1]: https://drafts.csswg.org/css-inline-3/#inline-height
-#[inline]
-fn run_box_metrics<B: Brush>(data: &LayoutData<B>, run_idx: usize) -> Option<BoxMetrics> {
-    let shaped_run = &data.shaped_text.runs()[run_idx];
-    let style_index =
-        data.shaped_text.characters()[shaped_run.characters_range.start as usize].style_index;
-    match data.styles[usize::from(style_index)].line_height {
-        LineHeight::MetricsRelative(_) => Some(BoxMetrics::from_font(
-            &shaped_run.font_metrics,
-            data.runs[run_idx].line_height,
-            data.quantize,
-        )),
-        LineHeight::FontSizeRelative(_) | LineHeight::Absolute(_) => None,
-    }
 }
 
 /// Reorder items within line according to the bidi levels of the items

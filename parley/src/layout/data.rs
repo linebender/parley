@@ -3,18 +3,20 @@
 
 use crate::inline_box::{InlineBox, LayoutInlineBox};
 use crate::layout::spacing::{Justification, Spacing};
-use crate::layout::style_metrics::StyleMetrics;
+use crate::layout::style_metrics::{BoxMetrics, StyleMetrics};
 use crate::layout::whitespace::whitespace_hangs;
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
-use crate::{IndentOptions, InlineBoxKind, OverflowWrap, TextWrapMode, WhiteSpaceCollapse};
+use crate::{
+    IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode, WhiteSpaceCollapse,
+};
 use core::ops::Range;
 
 use alloc::vec::Vec;
 use parlance::BidiLevel;
 use parley_engine::shape::Whitespace;
-use parley_engine::{ShapedSlice, ShapedText};
+use parley_engine::{ShapedRun, ShapedSlice, ShapedText};
 
 /// `HarfRust`-based run data
 #[derive(Clone, Debug, PartialEq)]
@@ -32,6 +34,35 @@ pub(crate) struct RunData {
     ///
     /// [css-spacing-cursive]: https://www.w3.org/TR/css-text-4/#cursive-tracking
     pub(crate) spacing: Spacing,
+    /// The box metrics this run adds to the line box, if this run has uniform box metrics.
+    ///
+    /// If the metrics change within the run, this is `None`. The run's boxes should then be
+    /// resolved per style.
+    pub(crate) run_box: Option<BoxMetrics>,
+}
+
+/// The metrics of a run's box. This differs from the style-derived box by taking into account any
+/// fallback fonts (rather than just using the first available font).
+///
+/// Per [CSS Inline 3 § 4.1], glyphs from fonts other than the first available font only
+/// contribute to the line when the `line-height` is `normal` ([`LineHeight::MetricsRelative`]);
+/// otherwise the style's span box alone sizes the line and this returns `None`.
+///
+/// [CSS Inline 3 § 4.1]: https://drafts.csswg.org/css-inline-3/#inline-height
+#[inline]
+pub(crate) fn run_box_metrics<B: Brush>(
+    style: &Style<B>,
+    shaped_run: &ShapedRun,
+    quantize: bool,
+) -> Option<BoxMetrics> {
+    match style.line_height {
+        LineHeight::MetricsRelative(_) => {
+            let (size, metrics) = (shaped_run.font_size, &shaped_run.font_metrics);
+            let line_height = style.line_height.resolve(size, metrics, quantize);
+            Some(BoxMetrics::from_font(metrics, line_height, quantize))
+        }
+        LineHeight::FontSizeRelative(_) | LineHeight::Absolute(_) => None,
+    }
 }
 
 #[derive(Copy, Clone, Default, PartialEq, Debug)]
@@ -266,11 +297,15 @@ impl<B: Brush> LayoutData<B> {
             bidi_level,
         });
     }
+    /// Processes a shaped run into [`RunData`] and a [`LayoutItem`].
+    ///
+    /// `char_styles` are the style indices of the text's characters.
     pub(crate) fn process_shaped_run(
         &mut self,
         shaped_run_idx: usize,
         run_style: &ResolvedStyle<B>,
         spacing: Spacing,
+        char_styles: &[u16],
     ) {
         let shaped_run = &self.shaped_text.runs()[shaped_run_idx];
         debug_assert!(
@@ -286,6 +321,28 @@ impl<B: Brush> LayoutData<B> {
             self.quantize,
         );
 
+        // The run's box metrics, if it's uniform across all the styles within the run. A run's box
+        // can change mid-run if the line height changes.
+        let run_box = {
+            let chars = shaped_run.range.char_range.clone();
+            let first_style = char_styles[chars.start];
+            let line_height = self.styles[usize::from(first_style)].line_height;
+
+            let uniform_line_height = char_styles[chars].iter().all(|&s| {
+                s == first_style || self.styles[usize::from(s)].line_height == line_height
+            });
+
+            if uniform_line_height {
+                run_box_metrics(
+                    &self.styles[usize::from(first_style)],
+                    shaped_run,
+                    self.quantize,
+                )
+            } else {
+                None
+            }
+        };
+
         let font = &self.shaped_text.fonts()[shaped_run.font_index];
         let run = RunData {
             font_attrs: fontique::Attributes {
@@ -296,6 +353,7 @@ impl<B: Brush> LayoutData<B> {
             synthesis: font.synthesis,
             line_height,
             spacing,
+            run_box,
         };
 
         self.runs.push(run);

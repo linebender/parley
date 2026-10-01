@@ -229,6 +229,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
             // they're non-zero).
             run_style,
             Spacing::new(run_style.word_spacing, run_style.letter_spacing),
+            char_style_indices,
         );
     }
 
