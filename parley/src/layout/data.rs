@@ -328,19 +328,19 @@ impl<B: Brush> LayoutData<B> {
             let first_style = char_styles[chars.start];
             let line_height = self.styles[usize::from(first_style)].line_height;
 
-            char_styles[chars]
-                .iter()
-                .all(|&s| {
-                    s == first_style || self.styles[usize::from(s)].line_height == line_height
-                })
-                .then(|| {
-                    run_box_metrics(
-                        &self.styles[usize::from(first_style)],
-                        shaped_run,
-                        self.quantize,
-                    )
-                })
-                .flatten()
+            let uniform_line_height = char_styles[chars].iter().all(|&s| {
+                s == first_style || self.styles[usize::from(s)].line_height == line_height
+            });
+
+            if uniform_line_height {
+                run_box_metrics(
+                    &self.styles[usize::from(first_style)],
+                    shaped_run,
+                    self.quantize,
+                )
+            } else {
+                None
+            }
         };
 
         let font = &self.shaped_text.fonts()[shaped_run.font_index];
