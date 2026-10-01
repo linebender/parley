@@ -185,7 +185,7 @@ impl Shared {
             HashEntry::Vacant(vacant) => {
                 if let Some(blob) = load_blob(path) {
                     vacant.insert(Entry::Loaded(EntryData {
-                        font_data: blob.clone().downgrade(),
+                        font_data: blob.downgrade(),
                         serial: 0,
                     }));
                     Some(blob)

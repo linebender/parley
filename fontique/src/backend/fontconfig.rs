@@ -828,7 +828,7 @@ impl SystemFonts {
             return None;
         }
 
-        Some(FamilyInfo::new(name.clone(), font_infos))
+        Some(FamilyInfo::new(name, font_infos))
     }
 }
 
