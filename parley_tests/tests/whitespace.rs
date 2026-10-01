@@ -96,6 +96,77 @@ fn hanging_across_collapse_mode_boundary() {
 }
 
 #[test]
+fn collapsible_hanging_advance() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Collapsible whitespace at the end of a line is reported separately from the other whitespace
+    // hanging there: preserved whitespace and the ideographic space (which never collapses) hang
+    // too, but aren't collapsible. Only the collapsible whitespace directly at the line's end
+    // counts, though a forced break may follow it.
+    let word = advance(&mut env, "X");
+    let space = advance(&mut env, " ");
+    let ideographic_space = advance(&mut env, "\u{3000}");
+    for (text, default, collapse_range, hanging, collapsible) in [
+        ("X X", WhiteSpaceCollapse::Collapse, None, space, space),
+        (
+            "X\u{3000} X",
+            WhiteSpaceCollapse::Collapse,
+            None,
+            ideographic_space + space,
+            space,
+        ),
+        (
+            "X \u{3000}X",
+            WhiteSpaceCollapse::Collapse,
+            None,
+            space + ideographic_space,
+            0.,
+        ),
+        ("X  X", WhiteSpaceCollapse::Preserve, None, 2. * space, 0.),
+        (
+            "X  X",
+            WhiteSpaceCollapse::Preserve,
+            Some(2..3),
+            2. * space,
+            space,
+        ),
+        (
+            "X  X",
+            WhiteSpaceCollapse::Preserve,
+            Some(1..2),
+            2. * space,
+            0.,
+        ),
+        (
+            "X\u{3000} \nX",
+            WhiteSpaceCollapse::Preserve,
+            Some(4..5),
+            ideographic_space + space,
+            space,
+        ),
+    ] {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::WhiteSpaceCollapse(default));
+        if let Some(range) = collapse_range.clone() {
+            builder.push(
+                StyleProperty::WhiteSpaceCollapse(WhiteSpaceCollapse::Collapse),
+                range,
+            );
+        }
+        let mut layout: Layout<ColorBrush> = builder.build(text);
+        layout.break_all_lines(Some(word + 0.5));
+        assert_eq!(layout.len(), 2, "{text:?} {collapse_range:?}");
+        let metrics = *layout.get(0).unwrap().metrics();
+        nearly_eq(metrics.hanging_advance, hanging);
+        nearly_eq(metrics.collapsible_hanging_advance, collapsible);
+        // The last line has no trailing whitespace.
+        let metrics = *layout.get(1).unwrap().metrics();
+        nearly_eq(metrics.hanging_advance, 0.);
+        nearly_eq(metrics.collapsible_hanging_advance, 0.);
+    }
+}
+
+#[test]
 fn overflowing_whitespace_hangs_without_adding_a_break_opportunity() {
     let mut env = TestEnv::new(test_name!(), None);
 
