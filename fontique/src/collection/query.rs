@@ -331,7 +331,7 @@ fn load_font<'a>(
                 font_info.synthesis(attributes.width, attributes.style, attributes.weight);
             *status = Entry::Ok(QueryFont {
                 family: (family.id(), family_index),
-                blob: blob,
+                blob,
                 index: blob_index,
                 synthesis,
                 charmap_index: font_info.charmap_index(),
