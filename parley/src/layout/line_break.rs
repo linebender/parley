@@ -355,9 +355,11 @@ impl LineBoxMetrics {
             self.add_style(style_index, &data.style_metrics, contributed);
         }
         if data.runs[run_idx].has_mixed_style_atoms {
-            // Add the spans of all the atom's characters.
+            // Add the spans of all the atom's other styles.
             for character in characters.iter().skip(1) {
-                self.add_style(character.style_index, &data.style_metrics, contributed);
+                if character.style_index != style_index {
+                    self.add_style(character.style_index, &data.style_metrics, contributed);
+                }
             }
         }
         let style = usize::from(style_index);
