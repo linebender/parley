@@ -29,6 +29,7 @@ use crate::{
 use core::ops::Range;
 use parley_engine::Atom;
 use parley_engine::shape::{Character, Whitespace};
+use smallvec::SmallVec;
 
 #[derive(Default)]
 struct LineLayout {
@@ -240,16 +241,15 @@ impl SubtreeHistory {
     }
 
     /// The current extents of every subtree with content on the line.
-    fn iter(&self) -> impl Iterator<Item = SubtreeExtents> {
-        let is_current = |(i, s): &(usize, &SubtreeExtents)| {
-            let newer = &self.entries[i + 1..];
-            newer.iter().all(|n| n.root != s.root)
-        };
-        self.entries
-            .iter()
-            .enumerate()
-            .filter(is_current)
-            .map(|(_, s)| *s)
+    fn current(&self) -> SmallVec<[SubtreeExtents; 4]> {
+        let mut current = SmallVec::<[SubtreeExtents; 4]>::new();
+        for entry in self.entries.iter().rev() {
+            if current.iter().rev().all(|s| s.root != entry.root) {
+                current.push(*entry);
+            }
+        }
+        current.reverse();
+        current
     }
 
     /// Grow the subtree rooted at `root` to include a box whose baseline is `baseline_offset`
@@ -1537,9 +1537,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             )
         };
 
+        let subtrees = self.state.subtrees.current();
         let mut top_height = box_metrics.line_relative_top_height;
         let mut bottom_height = box_metrics.line_relative_bottom_height;
-        for subtree in self.state.subtrees.iter() {
+        for subtree in &subtrees {
             let height = subtree.line_box.height();
             match self.layout.data.styles[usize::from(subtree.root)]
                 .vertical_align
@@ -1560,7 +1561,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         let offsets = &mut self.lines.aligned_subtree_offsets;
         line.aligned_subtree_offsets.start = offsets.len() as u32;
-        for subtree in self.state.subtrees.iter() {
+        for subtree in &subtrees {
             let extents = subtree.line_box.or_zero();
             let offset = match self.layout.data.styles[usize::from(subtree.root)]
                 .vertical_align
@@ -2033,7 +2034,7 @@ mod tests {
             add_box(&mut state, -4.);
             assert_eq!(state.line.box_metrics.line_height(), 16.);
             assert_eq!(subtree_height(&state), 16.);
-            assert_eq!(state.subtrees.iter().count(), 1);
+            assert_eq!(state.subtrees.current().len(), 1);
 
             let boundary = if emergency {
                 state.emergency_boundary.take().unwrap()
@@ -2044,7 +2045,7 @@ mod tests {
             let expected = if emergency { 12. } else { 8. };
             assert_eq!(state.line.box_metrics.line_height(), expected);
             assert_eq!(subtree_height(&state), expected);
-            assert_eq!(state.subtrees.iter().count(), 1);
+            assert_eq!(state.subtrees.current().len(), 1);
         }
     }
 }
