@@ -67,7 +67,6 @@ fn one_metrics_entry_per_style() {
 fn line_height_is_distributed_as_half_leading() {
     let layout = build();
     let root = metrics(&layout)[0];
-    assert_eq!(root.line_height, 30.);
     assert!((root.over + root.under - 30.).abs() < 1e-4);
     assert!(root.over > root.ascent && root.under > root.descent);
     // Roboto at 20px.
@@ -82,7 +81,7 @@ fn ancestors_without_text_have_metrics() {
     let layout = build();
     // Span A has no direct text but still has a style entry with its own 40px metrics.
     let a = metrics(&layout)[1];
-    assert_eq!(a.line_height, 50.);
+    assert!((a.over + a.under - 50.).abs() < 1e-4);
     assert!(a.ascent > 30.);
     assert_eq!(a.baseline_offset, 0.);
     assert_eq!(a.aligned_subtree, 0);
@@ -289,7 +288,6 @@ fn quantized_metrics_are_whole_pixels() {
     assert_eq!(root.ascent.fract(), 0.);
     assert_eq!(root.descent.fract(), 0.);
     assert_eq!(root.over.fract(), 0.);
-    assert_eq!(root.line_height.fract(), 0.);
     assert_eq!(root.under.fract(), 0.);
 }
 
