@@ -13,7 +13,7 @@ use smallvec::SmallVec;
 
 use super::layout::Layout;
 use super::resolve::{ResolveContext, ResolvedStyle};
-use super::style::{Brush, FontFeature, FontVariation};
+use super::style::{Brush, FontFeature};
 use crate::inline_box::LayoutInlineBox;
 use crate::util::{nearly_eq, nearly_zero};
 use crate::{FontContext, FontData, Spacing};
@@ -264,8 +264,6 @@ struct FontSelector<'a, 'b, B: Brush> {
     styles: &'a [ResolvedStyle<B>],
     style_index: u16,
     attrs: fontique::Attributes,
-    variations: &'a [FontVariation],
-    features: &'a [FontFeature],
 
     /// Whether [`Self::query`] yields any font, cached.
     query_yields_font: Option<bool>,
@@ -296,8 +294,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             styles,
             style_index: 0,
             attrs,
-            variations: &[],
-            features: &[],
             query_yields_font: None,
             last_resort_font: LastResortFont::Unresolved,
 
@@ -357,8 +353,6 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
                 self.attrs = attrs;
                 self.query_yields_font = None;
             }
-            self.variations = self.rcx.variations(style.font_variations).unwrap_or(&[]);
-            self.features = self.rcx.features(style.font_features).unwrap_or(&[]);
         }
 
         // Fall back to the last-resort font if the query doesn't yield a font (with a charmap) at
