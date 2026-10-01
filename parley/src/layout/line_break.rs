@@ -1363,22 +1363,17 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
     #[inline]
     fn resolve_indent(&self) -> f32 {
-        let should_indent = {
-            let is_scope_line = if self.layout.data.indent_options.each_line {
-                self.lines.lines.is_empty()
-                    || self.lines.lines.last().map(|l| l.break_reason)
-                        == Some(BreakReason::Explicit)
-            } else {
-                self.lines.lines.is_empty()
-            };
-            is_scope_line ^ self.layout.data.indent_options.hanging
+        let should_indent = if self.layout.data.indent_options.each_line {
+            self.lines.lines.is_empty()
+                || self.lines.lines.last().map(|l| l.break_reason) == Some(BreakReason::Explicit)
+        } else {
+            self.lines.lines.is_empty()
         };
 
-        if should_indent {
-            self.layout.data.indent_amount
-        } else {
-            0.0
-        }
+        self.layout
+            .data
+            .indent_options
+            .line_indent(self.layout.data.indent_amount, should_indent)
     }
 
     fn finish_line(&mut self, line_idx: usize, line_height: f32, invisible: bool) -> f32 {
