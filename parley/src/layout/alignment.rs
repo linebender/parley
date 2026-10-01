@@ -103,10 +103,14 @@ pub(crate) fn align<B: Brush>(
         }
 
         let is_last_line = matches!(line.break_reason, BreakReason::None | BreakReason::Explicit);
-        let line_alignment = match (is_last_line, options.last_line_alignment) {
-            (true, Some(last_line_alignment)) => last_line_alignment,
-            (true, None) if alignment == Alignment::Justify => Alignment::Start,
-            _ => alignment,
+        let line_alignment = if !is_last_line {
+            alignment
+        } else if let Some(last_line_alignment) = options.last_line_alignment {
+            last_line_alignment
+        } else if alignment == Alignment::Justify {
+            Alignment::Start
+        } else {
+            alignment
         };
 
         match (line_alignment, is_rtl) {
