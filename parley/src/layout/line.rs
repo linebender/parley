@@ -180,6 +180,15 @@ pub struct LineMetrics {
     // into two fields.
     pub hanging_advance: f32,
 
+    /// The portion of [`Self::hanging_advance`] that is collapsible white space at the end of the
+    /// line.
+    ///
+    /// Under CSS Text 4 § 4.3.2 collapsible white space at the end of a line is removed, whereas
+    /// other hanging white space (preserved white space, or spaces that never collapse like the
+    /// ideographic space) remains part of the line's content. Parley hangs both, and reports the
+    /// former here so that, e.g., backgrounds and decorations can be drawn without it.
+    pub collapsible_hanging_advance: f32,
+
     /// The minimum inline-axis coordinate of the line.
     ///
     /// For horizontal text, this would be the left of the line.
