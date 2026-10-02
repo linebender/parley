@@ -90,17 +90,17 @@ impl<'a, B: Brush> Line<'a, B> {
             BaselineShift::Top => self.data.metrics.block_min_coord,
             BaselineShift::Bottom => self.data.metrics.block_max_coord - inline_box.height,
             _ => {
-                let aligned_subtree = self
+                let aligned_subtree_root = self
                     .layout
                     .data
                     .style_metrics
                     .get(usize::from(layout_box.parent_style_index))
-                    .map_or(0, |m| m.aligned_subtree);
+                    .map_or(0, |m| m.aligned_subtree_root);
                 let ascent = inline_box.baseline.unwrap_or(inline_box.height);
                 self.data.metrics.baseline
                     - self.data.aligned_subtree_offset(
                         &self.layout.data.aligned_subtree_offsets,
-                        aligned_subtree,
+                        aligned_subtree_root,
                     )
                     - layout_box.baseline_offset
                     - ascent

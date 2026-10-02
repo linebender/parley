@@ -317,19 +317,19 @@ impl LineBoxMetrics {
     }
 
     /// Add a box whose baseline is `baseline_offset` above the baseline of the aligned subtree
-    /// rooted at `aligned_subtree`.
+    /// rooted at `aligned_subtree_root`.
     #[inline]
     fn add_box(
         &mut self,
-        aligned_subtree: u16,
+        aligned_subtree_root: u16,
         baseline_offset: f32,
         metrics: BoxMetrics,
         subtrees: &mut SubtreeHistory,
     ) {
-        if aligned_subtree == 0 {
+        if aligned_subtree_root == 0 {
             self.root.add(baseline_offset, metrics);
         } else {
-            let subtree = subtrees.grow(aligned_subtree, baseline_offset, metrics);
+            let subtree = subtrees.grow(aligned_subtree_root, baseline_offset, metrics);
             self.non_root_height = self.non_root_height.max(subtree.line_box.height());
         }
     }
@@ -367,7 +367,7 @@ impl LineBoxMetrics {
                 under: metrics.under,
             };
             self.add_box(
-                metrics.aligned_subtree,
+                metrics.aligned_subtree_root,
                 metrics.baseline_offset,
                 span_box,
                 subtrees,
@@ -458,18 +458,19 @@ impl LineBoxMetrics {
         else {
             return;
         };
-        let (baseline_offset, aligned_subtree) = data
+        let (baseline_offset, aligned_subtree_root) = data
             .style_metrics
             .get(style)
-            .map_or((0., 0), |m| (m.baseline_offset, m.aligned_subtree));
-        self.add_box(aligned_subtree, baseline_offset, run_box, subtrees);
+            .map_or((0., 0), |m| (m.baseline_offset, m.aligned_subtree_root));
+        self.add_box(aligned_subtree_root, baseline_offset, run_box, subtrees);
     }
 
     /// Add an inline box extending `ascent` above and `descent` below a baseline that is
-    /// `baseline_offset` above the baseline of the `aligned_subtree` root.
+    /// `baseline_offset` above the baseline of the aligned subtree rooted at
+    /// `aligned_subtree_root`.
     fn add_inline_box(
         &mut self,
-        aligned_subtree: u16,
+        aligned_subtree_root: u16,
         baseline_offset: f32,
         ascent: f32,
         descent: f32,
@@ -488,7 +489,7 @@ impl LineBoxMetrics {
             over: ascent,
             under: descent,
         };
-        self.add_box(aligned_subtree, baseline_offset, inline_box, subtrees);
+        self.add_box(aligned_subtree_root, baseline_offset, inline_box, subtrees);
     }
 
     /// Add an inline box with `vertical-align: top | bottom`, which only constrains the line
@@ -726,7 +727,7 @@ impl BreakerState {
             );
         } else {
             self.line.box_metrics.add_inline_box(
-                placement.aligned_subtree,
+                placement.aligned_subtree_root,
                 placement.baseline_offset,
                 placement.ascent,
                 placement.descent,

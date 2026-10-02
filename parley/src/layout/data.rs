@@ -143,7 +143,7 @@ impl LineData {
         metrics: &StyleMetrics,
     ) -> f32 {
         self.metrics.baseline
-            - self.aligned_subtree_offset(offsets, metrics.aligned_subtree)
+            - self.aligned_subtree_offset(offsets, metrics.aligned_subtree_root)
             - metrics.baseline_offset
     }
 

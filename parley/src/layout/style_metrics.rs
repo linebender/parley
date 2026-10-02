@@ -26,8 +26,8 @@
 //! with `vertical-align: top | bottom`. They don't overlap, and each box on a line belongs to
 //! exactly one of them: the one rooted at its nearest ancestor (or self) with
 //! `vertical-align: top | bottom`, or the root aligned subtree if there is none (see
-//! [`StyleMetrics::aligned_subtree`]). Where the rest of this crate says just "aligned subtree",
-//! it means an independent one. For example, with these spans:
+//! [`StyleMetrics::aligned_subtree_root`]). Where the rest of this crate says just "aligned
+//! subtree", it means an independent one. For example, with these spans:
 //!
 //! ```text
 //! root
@@ -78,7 +78,7 @@ pub(crate) struct StyleMetrics {
     /// Offset of this box's baseline above the baseline of the root of the
     /// [independent aligned subtree] it belongs to.
     ///
-    /// [independent aligned subtree]: Self::aligned_subtree
+    /// [independent aligned subtree]: Self::aligned_subtree_root
     pub(crate) baseline_offset: f32,
     /// [`Self::baseline_offset`] before quantization. Children accumulate their shifts from this
     /// so that rounding never compounds along the ancestor chain.
@@ -88,7 +88,7 @@ pub(crate) struct StyleMetrics {
     /// if there is none.
     ///
     /// [independent aligned subtree]: self#aligned-subtrees
-    pub(crate) aligned_subtree: u16,
+    pub(crate) aligned_subtree_root: u16,
     /// Style index of the parent span; always less than the span's own index, except for the
     /// root (index `0`), whose parent is `0`.
     pub(crate) parent: u16,
@@ -135,7 +135,7 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
             metrics.parent = 0;
             metrics.baseline_offset = 0.;
             metrics.exact_baseline_offset = 0.;
-            metrics.aligned_subtree = 0;
+            metrics.aligned_subtree_root = 0;
         } else {
             let parent_index = usize::from(style.parent);
             debug_assert!(
@@ -154,7 +154,7 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
             if align.is_line_relative() {
                 metrics.baseline_offset = 0.;
                 metrics.exact_baseline_offset = 0.;
-                metrics.aligned_subtree = index as u16;
+                metrics.aligned_subtree_root = index as u16;
             } else {
                 let shift = shift_from_parent(align, metrics.over, metrics.under, parent);
                 metrics.exact_baseline_offset = parent.exact_baseline_offset + shift;
@@ -165,7 +165,7 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
                 } else {
                     metrics.exact_baseline_offset
                 };
-                metrics.aligned_subtree = parent.aligned_subtree;
+                metrics.aligned_subtree_root = parent.aligned_subtree_root;
             }
         }
 
@@ -262,7 +262,7 @@ impl StyleMetrics {
             under: box_metrics.under,
             baseline_offset: 0.,
             exact_baseline_offset: 0.,
-            aligned_subtree: 0,
+            aligned_subtree_root: 0,
             parent: 0,
             font_size: 0.,
         }
@@ -299,8 +299,8 @@ pub(crate) fn shift_from_parent(
 /// subtree it belongs to.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct InlineBoxPlacement {
-    /// Style index of the aligned subtree root (see [`StyleMetrics::aligned_subtree`]).
-    pub(crate) aligned_subtree: u16,
+    /// Style index of the aligned subtree root (see [`StyleMetrics::aligned_subtree_root`]).
+    pub(crate) aligned_subtree_root: u16,
     /// Offset of the box's baseline above the subtree root's baseline.
     pub(crate) baseline_offset: f32,
     /// Height of the box above its baseline.
@@ -331,7 +331,7 @@ pub(crate) fn inline_box_placement(
     let shift = shift_from_parent(inline_box.vertical_align, ascent, descent, &parent);
     let baseline_offset = parent.exact_baseline_offset + shift;
     InlineBoxPlacement {
-        aligned_subtree: parent.aligned_subtree,
+        aligned_subtree_root: parent.aligned_subtree_root,
         baseline_offset: if quantize {
             baseline_offset.round()
         } else {
