@@ -117,6 +117,8 @@ pub struct IndentOptions {
 ///
 /// This is currently only available for the root span,
 /// as [`Layout::root_span_metrics`](crate::Layout::root_span_metrics).
+#[derive(Copy, Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct SpanMetrics {
     /// Typographic ascent of the span's first available font.
     pub ascent: f32,
