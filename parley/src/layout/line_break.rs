@@ -233,8 +233,8 @@ impl SubtreeExtents {
 #[derive(Clone, Default)]
 struct SubtreeHistory {
     entries: Vec<SubtreeExtents>,
-    /// The first `frozen` entries may be needed by a save, so are never modified.
-    frozen: usize,
+    /// The entries before this index are frozen: a save may need them, so they are never modified.
+    frozen_up_to: usize,
 }
 
 impl SubtreeHistory {
@@ -258,7 +258,7 @@ impl SubtreeHistory {
         new.add(baseline_offset, metrics);
         if old != Some(new) {
             match index {
-                Some(i) if i >= self.frozen => self.entries[i] = new,
+                Some(i) if i >= self.frozen_up_to => self.entries[i] = new,
                 _ => self.entries.push(new),
             }
         }
@@ -268,20 +268,20 @@ impl SubtreeHistory {
     /// Save the current extents of every subtree, returning the length of the history to pass
     /// to [`Self::restore`].
     fn save(&mut self) -> usize {
-        self.frozen = self.entries.len();
-        self.frozen
+        self.frozen_up_to = self.entries.len();
+        self.frozen_up_to
     }
 
     /// Restore the extents of every subtree to what they were at the save that returned `len`.
     /// Earlier saves can still be restored afterwards; later ones can't.
     fn restore(&mut self, len: usize) {
         self.entries.truncate(len);
-        self.frozen = len;
+        self.frozen_up_to = len;
     }
 
     fn clear(&mut self) {
         self.entries.clear();
-        self.frozen = 0;
+        self.frozen_up_to = 0;
     }
 }
 
