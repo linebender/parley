@@ -265,17 +265,18 @@ impl SubtreeHistory {
         new
     }
 
-    /// Save the current extents of every subtree, returning a token for [`Self::restore`].
+    /// Save the current extents of every subtree, returning the length of the history to pass
+    /// to [`Self::restore`].
     fn save(&mut self) -> usize {
         self.frozen = self.entries.len();
         self.frozen
     }
 
-    /// Restore the extents of every subtree to what they were at `save`. Earlier saves can
-    /// still be restored afterwards; later ones can't.
-    fn restore(&mut self, save: usize) {
-        self.entries.truncate(save);
-        self.frozen = save;
+    /// Restore the extents of every subtree to what they were at the save that returned `len`.
+    /// Earlier saves can still be restored afterwards; later ones can't.
+    fn restore(&mut self, len: usize) {
+        self.entries.truncate(len);
+        self.frozen = len;
     }
 
     fn clear(&mut self) {
@@ -502,8 +503,8 @@ struct PrevBoundaryState {
     state: LineState,
     /// Length of [`BreakerState::contributed`] at this opportunity.
     contributed_len: usize,
-    /// [Save](SubtreeHistory::save) of [`BreakerState::subtrees`] at this opportunity.
-    subtrees_save: usize,
+    /// Length of [`BreakerState::subtrees`] at this opportunity, as [saved](SubtreeHistory::save).
+    subtrees_len: usize,
 }
 
 /// Reason that the line breaker has yielded control flow
@@ -733,7 +734,7 @@ impl BreakerState {
             cluster_idx: self.cluster_idx,
             state: self.line.clone(),
             contributed_len: self.contributed.len(),
-            subtrees_save: self.subtrees.save(),
+            subtrees_len: self.subtrees.save(),
         });
     }
 
@@ -746,7 +747,7 @@ impl BreakerState {
             cluster_idx: self.cluster_idx,
             state: self.line.clone(),
             contributed_len: self.contributed.len(),
-            subtrees_save: self.subtrees.save(),
+            subtrees_len: self.subtrees.save(),
         });
     }
 
@@ -757,7 +758,7 @@ impl BreakerState {
         self.cluster_idx = prev_state.cluster_idx;
         self.line = prev_state.state;
         self.contributed.truncate(prev_state.contributed_len);
-        self.subtrees.restore(prev_state.subtrees_save);
+        self.subtrees.restore(prev_state.subtrees_len);
     }
 
     #[inline(always)]
