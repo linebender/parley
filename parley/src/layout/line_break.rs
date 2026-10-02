@@ -221,25 +221,23 @@ impl SubtreeExtents {
 /// box with `vertical-align: top | bottom`. Empty for lines without such content.
 ///
 /// Reverting to a saved line-breaking opportunity has to restore these extents to what they were
-/// at that opportunity. So that saving an opportunity doesn't have to copy them, this is an
-/// append-only history: growing a subtree pushes its new extents instead of overwriting the old
-/// ones. Hence:
+/// at that opportunity. So that saving an opportunity doesn't have to copy them, this is a
+/// history: [saving](Self::save) freezes the entries pushed so far, and growing a subtree whose
+/// entry is frozen pushes its new extents instead of overwriting the old ones. Hence:
 ///
 /// - the current extents of a subtree are the *last* entry with its root, and
-/// - truncating to an earlier [length](Self::len) restores the extents as of that time.
+/// - [restoring](Self::restore) a save drops every entry pushed since, leaving the frozen
+///   entries as they were at that save.
 ///
 /// [aligned subtrees]: crate::layout::style_metrics#aligned-subtrees
 #[derive(Clone, Default)]
 struct SubtreeHistory {
     entries: Vec<SubtreeExtents>,
+    /// The first `frozen` entries may be needed by a save, so are never modified.
+    frozen: usize,
 }
 
 impl SubtreeHistory {
-    /// The current extents of the subtree rooted at `root`, if it has content on the line.
-    fn get(&self, root: u16) -> Option<SubtreeExtents> {
-        self.entries.iter().rev().find(|s| s.root == root).copied()
-    }
-
     /// The current extents of every subtree with content on the line, in no particular order.
     fn current(&self) -> SmallVec<[SubtreeExtents; 4]> {
         let mut current = SmallVec::<[SubtreeExtents; 4]>::new();
@@ -254,25 +252,35 @@ impl SubtreeHistory {
     /// Grow the subtree rooted at `root` to include a box whose baseline is `baseline_offset`
     /// above the subtree's baseline. Returns the subtree's new extents.
     fn grow(&mut self, root: u16, baseline_offset: f32, metrics: BoxMetrics) -> SubtreeExtents {
-        let old = self.get(root);
+        let index = self.entries.iter().rposition(|s| s.root == root);
+        let old = index.map(|i| self.entries[i]);
         let mut new = old.unwrap_or(SubtreeExtents::new(root));
         new.add(baseline_offset, metrics);
         if old != Some(new) {
-            self.entries.push(new);
+            match index {
+                Some(i) if i >= self.frozen => self.entries[i] = new,
+                _ => self.entries.push(new),
+            }
         }
         new
     }
 
-    fn len(&self) -> usize {
-        self.entries.len()
+    /// Save the current extents of every subtree, returning a token for [`Self::restore`].
+    fn save(&mut self) -> usize {
+        self.frozen = self.entries.len();
+        self.frozen
     }
 
-    fn truncate(&mut self, len: usize) {
-        self.entries.truncate(len);
+    /// Restore the extents of every subtree to what they were at `save`. Earlier saves can
+    /// still be restored afterwards; later ones can't.
+    fn restore(&mut self, save: usize) {
+        self.entries.truncate(save);
+        self.frozen = save;
     }
 
     fn clear(&mut self) {
         self.entries.clear();
+        self.frozen = 0;
     }
 }
 
@@ -494,8 +502,8 @@ struct PrevBoundaryState {
     state: LineState,
     /// Length of [`BreakerState::contributed`] at this opportunity.
     contributed_len: usize,
-    /// Length of [`BreakerState::subtrees`] at this opportunity.
-    subtrees_len: usize,
+    /// [Save](SubtreeHistory::save) of [`BreakerState::subtrees`] at this opportunity.
+    subtrees_save: usize,
 }
 
 /// Reason that the line breaker has yielded control flow
@@ -725,7 +733,7 @@ impl BreakerState {
             cluster_idx: self.cluster_idx,
             state: self.line.clone(),
             contributed_len: self.contributed.len(),
-            subtrees_len: self.subtrees.len(),
+            subtrees_save: self.subtrees.save(),
         });
     }
 
@@ -738,7 +746,7 @@ impl BreakerState {
             cluster_idx: self.cluster_idx,
             state: self.line.clone(),
             contributed_len: self.contributed.len(),
-            subtrees_len: self.subtrees.len(),
+            subtrees_save: self.subtrees.save(),
         });
     }
 
@@ -749,7 +757,7 @@ impl BreakerState {
         self.cluster_idx = prev_state.cluster_idx;
         self.line = prev_state.state;
         self.contributed.truncate(prev_state.contributed_len);
-        self.subtrees.truncate(prev_state.subtrees_len);
+        self.subtrees.restore(prev_state.subtrees_save);
     }
 
     #[inline(always)]
@@ -2024,9 +2032,10 @@ mod tests {
                     .add_box(1, baseline_offset, metrics, &mut state.subtrees);
             };
             let subtree_height =
-                |state: &BreakerState| state.subtrees.get(1).unwrap().line_box.height();
+                |state: &BreakerState| state.subtrees.current()[0].line_box.height();
 
             add_box(&mut state, 0.);
+            add_box(&mut state, 1.);
             state.mark_line_break_opportunity();
             add_box(&mut state, 4.);
             state.mark_emergency_break_opportunity();
@@ -2041,7 +2050,7 @@ mod tests {
                 state.prev_boundary.take().unwrap()
             };
             state.reset_to(boundary);
-            let expected = if emergency { 12. } else { 8. };
+            let expected = if emergency { 12. } else { 9. };
             assert_eq!(state.line.box_metrics.line_height(), expected);
             assert_eq!(subtree_height(&state), expected);
             assert_eq!(state.subtrees.current().len(), 1);
