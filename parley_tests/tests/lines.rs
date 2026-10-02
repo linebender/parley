@@ -743,6 +743,33 @@ fn line_height_change_inside_ligature() {
     assert_eq!(lines.next().unwrap().metrics().line_height, large);
 }
 
+/// A ligature whose first character has the same style as the preceding atom of the same run must
+/// still contribute the line heights of its other characters.
+#[test]
+fn line_height_change_inside_ligature_after_same_style_atom() {
+    let text = "ffi affi";
+    let small = 20.0;
+    let large = 40.0;
+
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(LineHeight::Absolute(small));
+    // The "ffi" ligature of the second word gets the bigger line height from its middle "f". The
+    // ligature's first "f" has the same style as the preceding "a".
+    builder.push(LineHeight::Absolute(large), 6..7);
+    let mut layout: Layout<ColorBrush> = builder.build(text);
+
+    // Narrow enough for one word per line.
+    layout.break_all_lines(Some(1.0));
+    let line_heights: Vec<f32> = layout.lines().map(|l| l.metrics().line_height).collect();
+    assert_eq!(line_heights, [small, large]);
+
+    // Unwrapped, the ligature is preceded by several atoms of the same run and style.
+    layout.break_all_lines(None);
+    assert_eq!(layout.len(), 1);
+    assert_eq!(layout.lines().next().unwrap().metrics().line_height, large);
+}
+
 /// Metrics contributed by content that is moved to the next line when a word does not fit must
 /// not leak into the line it was reverted from.
 #[test]
