@@ -53,8 +53,6 @@ pub(crate) struct StyleMetrics {
     pub(crate) over: f32,
     /// Distance from the baseline to the bottom of the line-height expanded span box.
     pub(crate) under: f32,
-    /// Resolved `line-height` (`over + under`).
-    pub(crate) line_height: f32,
     /// Offset of this box's baseline above the baseline of its [aligned subtree's] root.
     ///
     /// [aligned subtree's]: Self::aligned_subtree
@@ -238,7 +236,6 @@ impl StyleMetrics {
             x_height: if quantize { x_height.round() } else { x_height },
             over: box_metrics.over,
             under: box_metrics.under,
-            line_height,
             baseline_offset: 0.,
             exact_baseline_offset: 0.,
             aligned_subtree: 0,
