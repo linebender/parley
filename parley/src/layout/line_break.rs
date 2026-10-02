@@ -102,19 +102,21 @@ impl LineState {
 /// Following CSS 2.2 § 10.8 (line height calculations in "Visual formatting model details"), line
 /// boxes are sized to fit the line's inline content. Span boxes and inline boxes with a
 /// parent-relative `vertical-align` are first aligned to each other relative to the baseline of
-/// their parent span; each chain of such boxes forms an [aligned subtree], rooted at the root span
-/// box or at a box with `vertical-align: top | bottom`. Each subtree's extents are tracked
-/// relative to its own baseline: the root subtree's in [`Self::root`], the others' in
-/// [`SubtreeHistory`]. The subtrees are only positioned against each other once the line is
+/// their parent span; the boxes aligned to each other in this way form an
+/// [independent aligned subtree], rooted at the root span box or at a box with
+/// `vertical-align: top | bottom`. Each subtree's extents are tracked relative to its own
+/// baseline: the root aligned subtree's in [`Self::root`], those rooted at a `top`/`bottom` span
+/// in [`SubtreeHistory`]. The subtrees are only positioned against each other once the line is
 /// complete (see `BreakLines::finish_line`).
 /// See <https://www.w3.org/TR/CSS22/visudet.html#line-height>.
 ///
-/// [aligned subtree]: crate::layout::style_metrics#aligned-subtrees
+/// [independent aligned subtree]: crate::layout::style_metrics#aligned-subtrees
 #[derive(Clone, Copy, Debug)]
 struct LineBoxMetrics {
     /// Extents of the root aligned subtree.
     root: SubtreeExtents,
-    /// Height of the tallest non-root aligned subtree (see [`SubtreeHistory`]).
+    /// Height of the tallest aligned subtree rooted at a `top`/`bottom` span (see
+    /// [`SubtreeHistory`]).
     non_root_height: f32,
     /// Height of the tallest `vertical-align: top` inline box, which is positioned against the
     /// line box rather than a baseline.
@@ -128,7 +130,10 @@ struct LineBoxMetrics {
     last_text: (usize, u16),
 }
 
-/// Extents of one aligned subtree on the current line, measured from the subtree's own baseline.
+/// Extents of one [independent aligned subtree] on the current line, measured from the subtree's
+/// own baseline.
+///
+/// [independent aligned subtree]: crate::layout::style_metrics#aligned-subtrees
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct SubtreeExtents {
     /// Style index of the subtree root: `0` for the root span box, otherwise a style with
@@ -620,8 +625,8 @@ pub struct BreakerState {
     /// [`LineBoxMetrics::add_style`]). Lives here rather than in [`LineState`] so that saving a
     /// line-breaking opportunity only records its length; reverting truncates it back.
     contributed: Vec<u16>,
-    /// Extents of the non-root aligned subtrees on the current line. Like [`Self::contributed`],
-    /// saving a line-breaking opportunity only records its length.
+    /// Extents of the aligned subtrees rooted at `top`/`bottom` spans on the current line. Like
+    /// [`Self::contributed`], saving a line-breaking opportunity only records its length.
     subtrees: SubtreeHistory,
 
     // Saved breaker states for reverting to a previously encountered line-breaking opportunity
@@ -1536,11 +1541,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
         }
 
-        // Position the aligned subtrees against each other (CSS 2.2 §10.8.1).
+        // Position the independent aligned subtrees against each other (CSS 2.2 §10.8.1).
         //
-        // The root subtree determines the line's baseline. `top`/`bottom` aligned subtrees sit
-        // flush with the line box's top/bottom edge. If taller than the root subtree then top-aligned
-        // subtrees grow the line box downwards and bottom-aligned subtrees grow it upwards.
+        // The root aligned subtree determines the line's baseline. Those rooted at a `top`/`bottom`
+        // span sit flush with the line box's top/bottom edge. If taller than the root aligned
+        // subtree then top-aligned subtrees grow the line box downwards and bottom-aligned subtrees
+        // grow it upwards.
         let box_metrics = &self.state.line.box_metrics;
         let (mut line_box_extents, mut content_box_extents) = if invisible {
             (Extents::default().or_zero(), Extents::default().or_zero())

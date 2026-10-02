@@ -33,10 +33,10 @@ pub(crate) struct LayoutInlineBox {
     /// Style index of the span containing the box, against which the box's `vertical_align`
     /// is resolved. The box itself has no style of its own.
     pub(crate) parent_style_index: u16,
-    /// Offset of the box's baseline above the baseline of its aligned subtree (that of the
-    /// parent style), resolved when the box is placed on a line (box sizes may change between
-    /// building and line breaking). Unused for out-of-flow and `vertical-align: top | bottom`
-    /// boxes.
+    /// Offset of the box's baseline above the baseline of the independent aligned subtree it
+    /// belongs to (that of the parent style), resolved when the box is placed on a line (box
+    /// sizes may change between building and line breaking). Unused for out-of-flow and
+    /// `vertical-align: top | bottom` boxes.
     pub(crate) baseline_offset: f32,
 }
 

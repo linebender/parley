@@ -98,7 +98,7 @@ fn super_shifts_relative_to_parent() {
 }
 
 #[test]
-fn top_starts_an_aligned_subtree() {
+fn top_starts_an_independent_aligned_subtree() {
     let layout = build();
     let c = metrics(&layout)[3];
     let d = metrics(&layout)[4];

@@ -75,9 +75,10 @@ pub(crate) struct StyleMetrics {
     pub(crate) over: f32,
     /// Distance from the baseline to the bottom of the line-height expanded span box.
     pub(crate) under: f32,
-    /// Offset of this box's baseline above the baseline of its [aligned subtree's] root.
+    /// Offset of this box's baseline above the baseline of the root of the
+    /// [independent aligned subtree] it belongs to.
     ///
-    /// [aligned subtree's]: Self::aligned_subtree
+    /// [independent aligned subtree]: Self::aligned_subtree
     pub(crate) baseline_offset: f32,
     /// [`Self::baseline_offset`] before quantization. Children accumulate their shifts from this
     /// so that rounding never compounds along the ancestor chain.
@@ -294,7 +295,8 @@ pub(crate) fn shift_from_parent(
     alignment + shift
 }
 
-/// Where an in-flow [`InlineBox`] sits relative to the baseline of its aligned subtree.
+/// Where an in-flow [`InlineBox`] sits relative to the baseline of the independent aligned
+/// subtree it belongs to.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct InlineBoxPlacement {
     /// Style index of the aligned subtree root (see [`StyleMetrics::aligned_subtree`]).
@@ -311,8 +313,9 @@ pub(crate) struct InlineBoxPlacement {
 /// containing it (`parent_style`).
 ///
 /// A box without an explicit baseline sits on the baseline, i.e. it is all ascent. For
-/// `vertical-align: top | bottom` the returned offset is relative to the parent's subtree, but
-/// such boxes are positioned against the line box instead (see [`crate::Line::inline_box_top`]).
+/// `vertical-align: top | bottom` the returned offset is relative to the subtree the parent
+/// belongs to, but such boxes are positioned against the line box instead (see
+/// [`crate::Line::inline_box_top`]).
 pub(crate) fn inline_box_placement(
     inline_box: &InlineBox,
     parent_style: u16,

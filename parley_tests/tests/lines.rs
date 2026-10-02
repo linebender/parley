@@ -765,7 +765,7 @@ fn lines_revert_restores_line_height() {
 }
 
 /// Like [`lines_revert_restores_line_height`], but the reverted content is in a
-/// `vertical-align: top` span, i.e. in a non-root aligned subtree.
+/// `vertical-align: top` span, i.e. not in the root aligned subtree.
 #[test]
 fn lines_revert_restores_aligned_subtree_line_height() {
     let mut env = TestEnv::new(test_name!(), None);
@@ -806,7 +806,8 @@ fn lines_aligned_subtrees_grow_across_breaks() {
             .enumerate()
         {
             let size = 12.0 + 4.0 * ((i + j) % 4) as f32;
-            // `vertical-align` is inherited, so reset it to keep the word in the outer subtree.
+            // `vertical-align` is inherited, so reset it to keep the word in the subtree of the
+            // enclosing `top`/`bottom` span.
             builder.push_style_modification_span(&[
                 StyleProperty::FontSize(size),
                 StyleProperty::VerticalAlign(VerticalAlign::BASELINE),
