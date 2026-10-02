@@ -13,15 +13,37 @@
 //!
 //! # Aligned subtrees
 //!
-//! CSS Inline Layout 3 §4.2.3 defines the *aligned subtree* of a span box as that box together
-//! with every descendant span box (or [`InlineBox`]) whose `vertical-align` is parent-relative
-//! (`baseline`, `sub`, `super`, `text-top`, `text-bottom`, `middle`, or a
-//! `<length>`/`<percentage>`), i.e. everything that is aligned relative to its parent's baseline
-//! rather than to the line box. Boxes with `vertical-align: top | bottom` are aligned to the line
-//! box instead, so each of them roots a new aligned subtree. Within a subtree all baselines are
-//! fixed relative to each other, so its extents can be accumulated relative to the root's baseline
-//! while the line is being built; the subtrees are only positioned against each other, and the
-//! line box sized, once the line is complete.
+//! CSS Inline Layout 3 §4.2.3 defines the *aligned subtree* of a span box recursively: it is that
+//! box together with the aligned subtrees of each child span box (or [`InlineBox`]) whose
+//! `vertical-align` is parent-relative (`baseline`, `sub`, `super`, `text-top`, `text-bottom`,
+//! `middle`, or a `<length>`/`<percentage>`). Children with `vertical-align: top | bottom` are
+//! aligned to the line box instead, so they and their descendants are left out.
+//!
+//! By that definition every span box has an aligned subtree, most of them nested inside their
+//! parent's. The ones that matter for layout are those that are not part of a larger one, which
+//! Parley calls *independent aligned subtrees* (our term; the specifications don't name them).
+//! Their roots are the root span box, whose subtree is the *root aligned subtree*, and every box
+//! with `vertical-align: top | bottom`. They don't overlap, and each box on a line belongs to
+//! exactly one of them: the one rooted at its nearest ancestor (or self) with
+//! `vertical-align: top | bottom`, or the root aligned subtree if there is none (see
+//! [`StyleMetrics::aligned_subtree`]). Where the rest of this crate says just "aligned subtree",
+//! it means an independent one. For example, with these spans:
+//!
+//! ```text
+//! root
+//! ├─ a (super)
+//! │  └─ b (baseline)
+//! └─ c (top)
+//!    └─ d (sub)
+//! ```
+//!
+//! the CSS definition gives five aligned subtrees (`{root, a, b}`, `{a, b}`, `{b}`, `{c, d}` and
+//! `{d}`), of which two are independent: `{root, a, b}` (the root aligned subtree) and `{c, d}`.
+//!
+//! Within an independent aligned subtree all baselines are fixed relative to each other, so its
+//! extents can be accumulated relative to the root's baseline while the line is being built; the
+//! independent aligned subtrees are only positioned against each other, and the line box sized,
+//! once the line is complete.
 //! See <https://drafts.csswg.org/css-inline-3/#aligned-subtree> and CSS 2 §10.8
 //! <https://www.w3.org/TR/CSS22/visudet.html#line-height>.
 
@@ -60,10 +82,11 @@ pub(crate) struct StyleMetrics {
     /// [`Self::baseline_offset`] before quantization. Children accumulate their shifts from this
     /// so that rounding never compounds along the ancestor chain.
     pub(crate) exact_baseline_offset: f32,
-    /// Style index of the root of the [aligned subtree] this box belongs to: `0` for the root
-    /// span box, or the nearest ancestor (or self) with `vertical-align: top | bottom`.
+    /// Style index of the root of the [independent aligned subtree] this box belongs to: the
+    /// nearest ancestor (or self) with `vertical-align: top | bottom`, or `0` (the root span box)
+    /// if there is none.
     ///
-    /// [aligned subtree]: self#aligned-subtrees
+    /// [independent aligned subtree]: self#aligned-subtrees
     pub(crate) aligned_subtree: u16,
     /// Style index of the parent span; always less than the span's own index, except for the
     /// root (index `0`), whose parent is `0`.

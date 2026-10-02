@@ -217,8 +217,14 @@ impl SubtreeExtents {
     }
 }
 
-/// The extents of the non-root [aligned subtrees] on the current line, i.e. those rooted at a
-/// box with `vertical-align: top | bottom`. Empty for lines without such content.
+/// The extents of the [independent aligned subtree] rooted at each span with
+/// `vertical-align: top | bottom` that has content on the current line. Spans with any other
+/// `vertical-align` never get extents of their own, as their boxes are part of the independent
+/// aligned subtree they are nested in. Empty for lines without `top`/`bottom` spans.
+///
+/// The extents of the root aligned subtree are in [`LineBoxMetrics::root`] instead. An
+/// [`InlineBox`] with `vertical-align: top | bottom` has no descendants, so [`LineBoxMetrics`]
+/// only keeps its height.
 ///
 /// Reverting to a saved line-breaking opportunity has to restore these extents to what they were
 /// at that opportunity. So that saving an opportunity doesn't have to copy them, this is a
@@ -229,7 +235,7 @@ impl SubtreeExtents {
 /// - [restoring](Self::restore) a save drops every entry pushed since, leaving the frozen
 ///   entries as they were at that save.
 ///
-/// [aligned subtrees]: crate::layout::style_metrics#aligned-subtrees
+/// [independent aligned subtree]: crate::layout::style_metrics#aligned-subtrees
 #[derive(Clone, Default)]
 struct SubtreeHistory {
     entries: Vec<SubtreeExtents>,
