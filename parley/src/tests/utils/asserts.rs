@@ -14,15 +14,15 @@ fn canonicalize_layout_data<B: Brush>(layout_data: &LayoutData<B>) -> LayoutData
     let mut remap = Vec::with_capacity(normalized.styles.len());
 
     // The style tree (`parent`) and everything derived from it (the parent-relative
-    // `baseline_offset` and `aligned_subtree` of the style metrics) is intentionally not part of
-    // the comparison: the tree builder records span nesting that the flat builders cannot
-    // express, so only the visual style properties are compared.
+    // `baseline_offset` and `aligned_subtree_root` of the style metrics) is intentionally not
+    // part of the comparison: the tree builder records span nesting that the flat builders
+    // cannot express, so only the visual style properties are compared.
     for (style, metrics) in normalized.styles.iter().zip(&normalized.style_metrics) {
         let mut style = style.clone();
         style.parent = 0;
         let mut metrics = *metrics;
         metrics.baseline_offset = 0.;
-        metrics.aligned_subtree = 0;
+        metrics.aligned_subtree_root = 0;
         metrics.parent = 0;
         if let Some(index) = canonical_styles
             .iter()

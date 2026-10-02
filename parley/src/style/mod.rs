@@ -128,9 +128,10 @@ pub enum AlignmentBaseline {
 /// A shift applied to a span (or [`InlineBox`]) after [`AlignmentBaseline`] alignment. Mirrors
 /// the CSS `baseline-shift` property.
 ///
-/// [`Top`](Self::Top) and [`Bottom`](Self::Bottom) are *line-relative*: the box and its
-/// descendants form an aligned subtree that is placed against the line box, and the
-/// [`AlignmentBaseline`] is ignored. All other values are relative to the parent span.
+/// [`Top`](Self::Top) and [`Bottom`](Self::Bottom) are *line-relative*: the box, together with
+/// the descendants that are aligned relative to it, is placed against the line box instead of
+/// its parent span, and the [`AlignmentBaseline`] is ignored. All other values are relative to
+/// the parent span.
 ///
 /// [`InlineBox`]: crate::InlineBox
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -196,7 +197,8 @@ impl VerticalAlign {
         Self::new(AlignmentBaseline::Baseline, BaselineShift::Length(length))
     }
 
-    /// Whether this value forms a line-relative aligned subtree (`top` or `bottom`).
+    /// Whether this value is line-relative (`top` or `bottom`), i.e. aligns the box to the line
+    /// box rather than to its parent span.
     pub fn is_line_relative(self) -> bool {
         matches!(self.shift, BaselineShift::Top | BaselineShift::Bottom)
     }

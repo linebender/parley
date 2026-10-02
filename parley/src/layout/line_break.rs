@@ -12,7 +12,9 @@ use parlance::BidiLevel;
 
 use crate::layout::data::{AlignedSubtreeOffset, run_box_metrics};
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
-use crate::layout::style_metrics::{InlineBoxPlacement, StyleMetrics, inline_box_placement};
+use crate::layout::style_metrics::{
+    BoxMetrics, InlineBoxPlacement, StyleMetrics, inline_box_placement,
+};
 use crate::layout::whitespace::atom_hanging_advance;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
@@ -100,18 +102,22 @@ impl LineState {
 /// Following CSS 2.2 § 10.8 (line height calculations in "Visual formatting model details"), line
 /// boxes are sized to fit the line's inline content. Span boxes and inline boxes with a
 /// parent-relative `vertical-align` are first aligned to each other relative to the baseline of
-/// their parent span; each chain of such boxes forms an [aligned subtree], rooted at the root span
-/// box or at a box with `vertical-align: top | bottom`. Each subtree's extents are tracked
-/// relative to its own baseline in [`Self::subtrees`]; the subtrees are only positioned against
-/// each other once the line is complete (see `BreakLines::finish_line`).
+/// their parent span; the boxes aligned to each other in this way form an
+/// [independent aligned subtree], rooted at the root span box or at a box with
+/// `vertical-align: top | bottom`. Each subtree's extents are tracked relative to its own
+/// baseline: the root aligned subtree's in [`Self::root`], those rooted at a `top`/`bottom` span
+/// in [`SubtreeHistory`]. The subtrees are only positioned against each other once the line is
+/// complete (see `BreakLines::finish_line`).
 /// See <https://www.w3.org/TR/CSS22/visudet.html#line-height>.
 ///
-/// [aligned subtree]: crate::layout::style_metrics#aligned-subtrees
-#[derive(Clone, Debug)]
+/// [independent aligned subtree]: crate::layout::style_metrics#aligned-subtrees
+#[derive(Clone, Copy, Debug)]
 struct LineBoxMetrics {
-    /// Extents of each aligned subtree with content on this line. The first entry is always the
-    /// root subtree (root style index `0`).
-    subtrees: SmallVec<[SubtreeExtents; 2]>,
+    /// Extents of the root aligned subtree.
+    root: SubtreeExtents,
+    /// Height of the tallest aligned subtree rooted at a `top`/`bottom` span (see
+    /// [`SubtreeHistory`]).
+    non_root_height: f32,
     /// Height of the tallest `vertical-align: top` inline box, which is positioned against the
     /// line box rather than a baseline.
     line_relative_top_height: f32,
@@ -124,8 +130,11 @@ struct LineBoxMetrics {
     last_text: (usize, u16),
 }
 
-/// Extents of one aligned subtree on the current line, measured from the subtree's own baseline.
-#[derive(Clone, Copy, Debug)]
+/// Extents of one [independent aligned subtree] on the current line, measured from the subtree's
+/// own baseline.
+///
+/// [independent aligned subtree]: crate::layout::style_metrics#aligned-subtrees
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct SubtreeExtents {
     /// Style index of the subtree root: `0` for the root span box, otherwise a style with
     /// `vertical-align: top | bottom`.
@@ -145,7 +154,7 @@ struct SubtreeExtents {
     content_box: Extents,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct Extents {
     /// The space over the baseline.
     over: f32,
@@ -202,15 +211,92 @@ impl SubtreeExtents {
             content_box: Extents::default(),
         }
     }
+
+    /// Grow to include a box whose baseline is `baseline_offset` above the subtree's baseline.
+    #[inline(always)]
+    fn add(&mut self, baseline_offset: f32, metrics: BoxMetrics) {
+        self.line_box
+            .add(baseline_offset, metrics.over, metrics.under);
+        self.content_box
+            .add(baseline_offset, metrics.ascent, metrics.descent);
+    }
+}
+
+/// The extents of every [independent aligned subtree] on the current line other than the root
+/// one (which is in [`LineBoxMetrics::root`]), i.e. those rooted at a span with
+/// `vertical-align: top | bottom`. Empty for lines without such spans.
+///
+/// Reverting to a saved line-breaking opportunity has to restore these extents to what they were
+/// at that opportunity. So that saving an opportunity doesn't have to copy them, this is a
+/// history: [saving](Self::save) freezes the entries pushed so far, and growing a subtree whose
+/// entry is frozen pushes its new extents instead of overwriting the old ones. Hence:
+///
+/// - the current extents of a subtree are the *last* entry with its root, and
+/// - [restoring](Self::restore) a save drops every entry pushed since, leaving the frozen
+///   entries as they were at that save.
+///
+/// [independent aligned subtree]: crate::layout::style_metrics#aligned-subtrees
+#[derive(Clone, Default)]
+struct SubtreeHistory {
+    entries: Vec<SubtreeExtents>,
+    /// The first `frozen_count` entries may be needed by a save, so are never modified.
+    frozen_count: usize,
+}
+
+impl SubtreeHistory {
+    /// The current extents of every subtree with content on the line, in no particular order.
+    fn current(&self) -> SmallVec<[SubtreeExtents; 4]> {
+        let mut current = SmallVec::<[SubtreeExtents; 4]>::new();
+        for entry in self.entries.iter().rev() {
+            if current.iter().rev().all(|s| s.root != entry.root) {
+                current.push(*entry);
+            }
+        }
+        current
+    }
+
+    /// Grow the subtree rooted at `root` to include a box whose baseline is `baseline_offset`
+    /// above the subtree's baseline. Returns the subtree's new extents.
+    fn grow(&mut self, root: u16, baseline_offset: f32, metrics: BoxMetrics) -> SubtreeExtents {
+        let index = self.entries.iter().rposition(|s| s.root == root);
+        let old = index.map(|i| self.entries[i]);
+        let mut new = old.unwrap_or(SubtreeExtents::new(root));
+        new.add(baseline_offset, metrics);
+        if old != Some(new) {
+            match index {
+                Some(i) if i >= self.frozen_count => self.entries[i] = new,
+                _ => self.entries.push(new),
+            }
+        }
+        new
+    }
+
+    /// Save the current extents of every subtree, returning the length of the history to pass
+    /// to [`Self::restore`].
+    fn save(&mut self) -> usize {
+        self.frozen_count = self.entries.len();
+        self.frozen_count
+    }
+
+    /// Restore the extents of every subtree to what they were at the save that returned `len`.
+    /// Earlier saves can still be restored afterwards; later ones can't.
+    fn restore(&mut self, len: usize) {
+        self.entries.truncate(len);
+        self.frozen_count = len;
+    }
+
+    fn clear(&mut self) {
+        self.entries.clear();
+        self.frozen_count = 0;
+    }
 }
 
 impl Default for LineBoxMetrics {
     /// An empty line containing only the root aligned subtree, without a strut.
     fn default() -> Self {
-        let mut subtrees = SmallVec::new();
-        subtrees.push(SubtreeExtents::new(0));
         Self {
-            subtrees,
+            root: SubtreeExtents::new(0),
+            non_root_height: 0.,
             line_relative_top_height: 0.,
             line_relative_bottom_height: 0.,
             has_content: false,
@@ -222,51 +308,34 @@ impl Default for LineBoxMetrics {
 impl LineBoxMetrics {
     /// Reset to an empty line.
     fn reset(&mut self) {
-        let Self {
-            subtrees,
-            line_relative_top_height,
-            line_relative_bottom_height,
-            has_content,
-            last_text,
-        } = Self::default();
-        self.subtrees.clear();
-        self.subtrees.extend(subtrees);
-        self.line_relative_top_height = line_relative_top_height;
-        self.line_relative_bottom_height = line_relative_bottom_height;
-        self.has_content = has_content;
-        self.last_text = last_text;
+        *self = Self::default();
     }
 
-    /// The extents of the root aligned subtree.
-    fn root(&self) -> &SubtreeExtents {
-        &self.subtrees[0]
-    }
-
+    /// Add a box whose baseline is `baseline_offset` above the baseline of the aligned subtree
+    /// rooted at `aligned_subtree_root`.
     #[inline]
-    fn subtree_mut(&mut self, root: u16) -> &mut SubtreeExtents {
-        if root == 0 {
-            return &mut self.subtrees[0];
+    fn add_box(
+        &mut self,
+        aligned_subtree_root: u16,
+        baseline_offset: f32,
+        metrics: BoxMetrics,
+        subtrees: &mut SubtreeHistory,
+    ) {
+        if aligned_subtree_root == 0 {
+            self.root.add(baseline_offset, metrics);
+        } else {
+            let subtree = subtrees.grow(aligned_subtree_root, baseline_offset, metrics);
+            self.non_root_height = self.non_root_height.max(subtree.line_box.height());
         }
-        let index = match self.subtrees.iter().position(|s| s.root == root) {
-            Some(index) => index,
-            None => {
-                self.subtrees.push(SubtreeExtents::new(root));
-                self.subtrees.len() - 1
-            }
-        };
-        &mut self.subtrees[index]
     }
 
     /// The line height seen so far.
     #[inline]
     fn line_height(&self) -> f32 {
-        let mut height = self.root().line_box.height();
-        if self.subtrees.len() > 1 {
-            for subtree in &self.subtrees[1..] {
-                height = height.max(subtree.line_box.height());
-            }
-        }
-        height
+        self.root
+            .line_box
+            .height()
+            .max(self.non_root_height)
             .max(self.line_relative_top_height)
             .max(self.line_relative_bottom_height)
     }
@@ -278,6 +347,7 @@ impl LineBoxMetrics {
         style_index: u16,
         style_metrics: &[StyleMetrics],
         contributed: &mut Vec<u16>,
+        subtrees: &mut SubtreeHistory,
     ) {
         let mut index = style_index;
         while !contributed.contains(&index) {
@@ -285,13 +355,18 @@ impl LineBoxMetrics {
             let Some(metrics) = style_metrics.get(usize::from(index)) else {
                 return;
             };
-            let subtree = self.subtree_mut(metrics.aligned_subtree);
-            subtree
-                .line_box
-                .add(metrics.baseline_offset, metrics.over, metrics.under);
-            subtree
-                .content_box
-                .add(metrics.baseline_offset, metrics.ascent, metrics.descent);
+            let span_box = BoxMetrics {
+                ascent: metrics.ascent,
+                descent: metrics.descent,
+                over: metrics.over,
+                under: metrics.under,
+            };
+            self.add_box(
+                metrics.aligned_subtree_root,
+                metrics.baseline_offset,
+                span_box,
+                subtrees,
+            );
             if index == 0 {
                 return;
             }
@@ -319,6 +394,7 @@ impl LineBoxMetrics {
         characters: &[Character],
         data: &LayoutData<B>,
         contributed: &mut Vec<u16>,
+        subtrees: &mut SubtreeHistory,
     ) {
         self.has_content = true;
         // Consecutive atoms almost always come from the same run and style, whose boxes are then
@@ -334,6 +410,7 @@ impl LineBoxMetrics {
             characters,
             data,
             contributed,
+            subtrees,
         );
     }
 
@@ -349,16 +426,22 @@ impl LineBoxMetrics {
         characters: &[Character],
         data: &LayoutData<B>,
         contributed: &mut Vec<u16>,
+        subtrees: &mut SubtreeHistory,
     ) {
         self.last_text = (item_idx, style_index);
         if contributed.last() != Some(&style_index) {
-            self.add_style(style_index, &data.style_metrics, contributed);
+            self.add_style(style_index, &data.style_metrics, contributed, subtrees);
         }
         if data.runs[run_idx].has_mixed_style_atoms {
             // Add the spans of all the atom's other styles.
             for character in characters.iter().skip(1) {
                 if character.style_index != style_index {
-                    self.add_style(character.style_index, &data.style_metrics, contributed);
+                    self.add_style(
+                        character.style_index,
+                        &data.style_metrics,
+                        contributed,
+                        subtrees,
+                    );
                 }
             }
         }
@@ -370,27 +453,23 @@ impl LineBoxMetrics {
         else {
             return;
         };
-        let (baseline_offset, aligned_subtree) = data
+        let (baseline_offset, aligned_subtree_root) = data
             .style_metrics
             .get(style)
-            .map_or((0., 0), |m| (m.baseline_offset, m.aligned_subtree));
-        let subtree = self.subtree_mut(aligned_subtree);
-        subtree
-            .line_box
-            .add(baseline_offset, run_box.over, run_box.under);
-        subtree
-            .content_box
-            .add(baseline_offset, run_box.ascent, run_box.descent);
+            .map_or((0., 0), |m| (m.baseline_offset, m.aligned_subtree_root));
+        self.add_box(aligned_subtree_root, baseline_offset, run_box, subtrees);
     }
 
     /// Add an inline box extending `ascent` above and `descent` below a baseline that is
-    /// `baseline_offset` above the baseline of the `aligned_subtree` root.
+    /// `baseline_offset` above the baseline of the aligned subtree rooted at
+    /// `aligned_subtree_root`.
     fn add_inline_box(
         &mut self,
-        aligned_subtree: u16,
+        aligned_subtree_root: u16,
         baseline_offset: f32,
         ascent: f32,
         descent: f32,
+        subtrees: &mut SubtreeHistory,
     ) {
         // Inline box extents are exact box sizes supplied by the caller, not font metrics;
         // rounding them would change the space the box reserves relative to its height.
@@ -399,9 +478,13 @@ impl LineBoxMetrics {
         if (ascent != 0. || descent != 0.) && ascent.is_finite() && descent.is_finite() {
             self.has_content = true;
         }
-        let subtree = self.subtree_mut(aligned_subtree);
-        subtree.line_box.add(baseline_offset, ascent, descent);
-        subtree.content_box.add(baseline_offset, ascent, descent);
+        let inline_box = BoxMetrics {
+            ascent,
+            descent,
+            over: ascent,
+            under: descent,
+        };
+        self.add_box(aligned_subtree_root, baseline_offset, inline_box, subtrees);
     }
 
     /// Add an inline box with `vertical-align: top | bottom`, which only constrains the line
@@ -427,6 +510,8 @@ struct PrevBoundaryState {
     state: LineState,
     /// Length of [`BreakerState::contributed`] at this opportunity.
     contributed_len: usize,
+    /// Length of [`BreakerState::subtrees`] at this opportunity, as [saved](SubtreeHistory::save).
+    subtrees_len: usize,
 }
 
 /// Reason that the line breaker has yielded control flow
@@ -536,6 +621,9 @@ pub struct BreakerState {
     /// [`LineBoxMetrics::add_style`]). Lives here rather than in [`LineState`] so that saving a
     /// line-breaking opportunity only records its length; reverting truncates it back.
     contributed: Vec<u16>,
+    /// Extents of the aligned subtrees rooted at `top`/`bottom` spans on the current line. Like
+    /// [`Self::contributed`], saving a line-breaking opportunity only records its length.
+    subtrees: SubtreeHistory,
 
     // Saved breaker states for reverting to a previously encountered line-breaking opportunity
     /// Saved breaker state for the last non-emergency line-breaking opportunity
@@ -559,6 +647,7 @@ impl Default for BreakerState {
             line_max_height: f32::MAX,
             line: LineState::default(),
             contributed: Vec::new(),
+            subtrees: SubtreeHistory::default(),
             prev_boundary: None,
             emergency_boundary: None,
         }
@@ -593,6 +682,7 @@ impl BreakerState {
             atom.characters(),
             data,
             &mut self.contributed,
+            &mut self.subtrees,
         );
         self.update_max_height_exceeded();
     }
@@ -606,7 +696,9 @@ impl BreakerState {
         self.item_idx += 1;
         self.line.items.end += 1;
         self.line.x = next_x;
-        self.line.box_metrics.add_inline_box(0, 0., ascent, descent);
+        self.line
+            .box_metrics
+            .add_inline_box(0, 0., ascent, descent, &mut self.subtrees);
         self.update_max_height_exceeded();
     }
 
@@ -630,10 +722,11 @@ impl BreakerState {
             );
         } else {
             self.line.box_metrics.add_inline_box(
-                placement.aligned_subtree,
+                placement.aligned_subtree_root,
                 placement.baseline_offset,
                 placement.ascent,
                 placement.descent,
+                &mut self.subtrees,
             );
         }
         self.update_max_height_exceeded();
@@ -648,6 +741,7 @@ impl BreakerState {
             cluster_idx: self.cluster_idx,
             state: self.line.clone(),
             contributed_len: self.contributed.len(),
+            subtrees_len: self.subtrees.save(),
         });
     }
 
@@ -660,6 +754,7 @@ impl BreakerState {
             cluster_idx: self.cluster_idx,
             state: self.line.clone(),
             contributed_len: self.contributed.len(),
+            subtrees_len: self.subtrees.save(),
         });
     }
 
@@ -670,6 +765,7 @@ impl BreakerState {
         self.cluster_idx = prev_state.cluster_idx;
         self.line = prev_state.state;
         self.contributed.truncate(prev_state.contributed_len);
+        self.subtrees.restore(prev_state.subtrees_len);
     }
 
     #[inline(always)]
@@ -771,10 +867,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         let state = &mut self.state;
         state.line.reset();
         state.contributed.clear();
+        state.subtrees.clear();
         state.line.box_metrics.add_style(
             0,
             &self.layout.data.style_metrics,
             &mut state.contributed,
+            &mut state.subtrees,
         );
         state.update_max_height_exceeded();
     }
@@ -1425,6 +1523,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     &[],
                     &self.layout.data,
                     &mut self.state.contributed,
+                    &mut self.state.subtrees,
                 );
                 line.metrics.line_height = self.state.line.box_metrics.line_height();
                 self.lines.line_items.push(LineItemData {
@@ -1438,24 +1537,26 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
         }
 
-        // Position the aligned subtrees against each other (CSS 2.2 §10.8.1).
+        // Position the independent aligned subtrees against each other (CSS 2.2 §10.8.1).
         //
-        // The root subtree determines the line's baseline. `top`/`bottom` aligned subtrees sit
-        // flush with the line box's top/bottom edge. If taller than the root subtree then top-aligned
-        // subtrees grow the line box downwards and bottom-aligned subtrees grow it upwards.
+        // The root aligned subtree determines the line's baseline. Those rooted at a `top`/`bottom`
+        // span sit flush with the line box's top/bottom edge. If taller than the root aligned
+        // subtree then top-aligned subtrees grow the line box downwards and bottom-aligned subtrees
+        // grow it upwards.
         let box_metrics = &self.state.line.box_metrics;
         let (mut line_box_extents, mut content_box_extents) = if invisible {
             (Extents::default().or_zero(), Extents::default().or_zero())
         } else {
             (
-                box_metrics.root().line_box.or_zero(),
-                box_metrics.root().content_box.or_zero(),
+                box_metrics.root.line_box.or_zero(),
+                box_metrics.root.content_box.or_zero(),
             )
         };
 
+        let subtrees = self.state.subtrees.current();
         let mut top_height = box_metrics.line_relative_top_height;
         let mut bottom_height = box_metrics.line_relative_bottom_height;
-        for subtree in &box_metrics.subtrees[1..] {
+        for subtree in &subtrees {
             let height = subtree.line_box.height();
             match self.layout.data.styles[usize::from(subtree.root)]
                 .vertical_align
@@ -1476,7 +1577,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         let offsets = &mut self.lines.aligned_subtree_offsets;
         line.aligned_subtree_offsets.start = offsets.len() as u32;
-        for subtree in &box_metrics.subtrees[1..] {
+        for subtree in &subtrees {
             let extents = subtree.line_box.or_zero();
             let offset = match self.layout.data.styles[usize::from(subtree.root)]
                 .vertical_align
@@ -1915,6 +2016,53 @@ fn reorder_line_items(runs: &mut [LineItemData]) {
                 i = end;
             }
             i += 1;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BoxMetrics, BreakerState};
+
+    #[test]
+    fn subtree_extents_restored_at_break_opportunities() {
+        let metrics = BoxMetrics {
+            ascent: 6.,
+            descent: 2.,
+            over: 6.,
+            under: 2.,
+        };
+        for emergency in [false, true] {
+            let mut state = BreakerState::default();
+            let add_box = |state: &mut BreakerState, baseline_offset| {
+                state
+                    .line
+                    .box_metrics
+                    .add_box(1, baseline_offset, metrics, &mut state.subtrees);
+            };
+            let subtree_height =
+                |state: &BreakerState| state.subtrees.current()[0].line_box.height();
+
+            add_box(&mut state, 0.);
+            add_box(&mut state, 1.);
+            state.mark_line_break_opportunity();
+            add_box(&mut state, 4.);
+            state.mark_emergency_break_opportunity();
+            add_box(&mut state, -4.);
+            assert_eq!(state.line.box_metrics.line_height(), 16.);
+            assert_eq!(subtree_height(&state), 16.);
+            assert_eq!(state.subtrees.current().len(), 1);
+
+            let boundary = if emergency {
+                state.emergency_boundary.take().unwrap()
+            } else {
+                state.prev_boundary.take().unwrap()
+            };
+            state.reset_to(boundary);
+            let expected = if emergency { 12. } else { 9. };
+            assert_eq!(state.line.box_metrics.line_height(), expected);
+            assert_eq!(subtree_height(&state), expected);
+            assert_eq!(state.subtrees.current().len(), 1);
         }
     }
 }

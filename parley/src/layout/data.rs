@@ -98,15 +98,16 @@ pub(crate) struct LineData {
     pub(crate) indent: f32,
     /// This line's entries in [`LayoutData::aligned_subtree_offsets`].
     ///
-    /// Empty for lines with only baseline-relative content because the top-level aligned
-    /// subtree for each line trivially has an offset of 0
+    /// Empty for lines with only baseline-relative content because the root aligned subtree
+    /// for each line trivially has an offset of 0
     pub(crate) aligned_subtree_offsets: Range<u32>,
 }
 
-/// Position of an [aligned subtree] (rooted at a `vertical-align: top | bottom` style) on a line.
-/// Computed for each non-top-level aligned subtree on the line in `BreakLines::finish_line`.
+/// Position of an [independent aligned subtree] rooted at a span with
+/// `vertical-align: top | bottom` on a line. Computed for each such subtree on the line in
+/// `BreakLines::finish_line`.
 ///
-/// [aligned subtree]: crate::layout::style_metrics#aligned-subtrees
+/// [independent aligned subtree]: crate::layout::style_metrics#aligned-subtrees
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AlignedSubtreeOffset {
     /// Style index of the subtree root (a span with `vertical-align: top | bottom`)
@@ -142,7 +143,7 @@ impl LineData {
         metrics: &StyleMetrics,
     ) -> f32 {
         self.metrics.baseline
-            - self.aligned_subtree_offset(offsets, metrics.aligned_subtree)
+            - self.aligned_subtree_offset(offsets, metrics.aligned_subtree_root)
             - metrics.baseline_offset
     }
 
@@ -221,7 +222,7 @@ pub(crate) struct LayoutData<B: Brush> {
     /// Items within each line
     pub(crate) line_items: Vec<LineItemData>,
     /// Position of each aligned subtree rooted at a `vertical-align: top | bottom` style on each line.
-    /// The top-level aligned subtree of each line doesn't have an entry as its offset is trivially zero.
+    /// The root aligned subtree of each line doesn't have an entry as its offset is trivially zero.
     ///
     /// Each line owns a contiguous slice ([`LineData::aligned_subtree_offsets`]).
     pub(crate) aligned_subtree_offsets: Vec<AlignedSubtreeOffset>,

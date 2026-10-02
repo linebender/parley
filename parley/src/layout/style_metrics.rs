@@ -13,15 +13,37 @@
 //!
 //! # Aligned subtrees
 //!
-//! CSS Inline Layout 3 §4.2.3 defines the *aligned subtree* of a span box as that box together
-//! with every descendant span box (or [`InlineBox`]) whose `vertical-align` is parent-relative
-//! (`baseline`, `sub`, `super`, `text-top`, `text-bottom`, `middle`, or a
-//! `<length>`/`<percentage>`), i.e. everything that is aligned relative to its parent's baseline
-//! rather than to the line box. Boxes with `vertical-align: top | bottom` are aligned to the line
-//! box instead, so each of them roots a new aligned subtree. Within a subtree all baselines are
-//! fixed relative to each other, so its extents can be accumulated relative to the root's baseline
-//! while the line is being built; the subtrees are only positioned against each other, and the
-//! line box sized, once the line is complete.
+//! CSS Inline Layout 3 §4.2.3 defines the *aligned subtree* of a span box recursively: it is that
+//! box together with the aligned subtrees of each child span box (or [`InlineBox`]) whose
+//! `vertical-align` is parent-relative (`baseline`, `sub`, `super`, `text-top`, `text-bottom`,
+//! `middle`, or a `<length>`/`<percentage>`). Children with `vertical-align: top | bottom` are
+//! aligned to the line box instead, so they and their descendants are left out.
+//!
+//! By that definition every span box has an aligned subtree, most of them nested inside their
+//! parent's. The ones that matter for layout are those that are not part of a larger one, which
+//! Parley calls *independent aligned subtrees* (our term; the specifications don't name them).
+//! Their roots are the root span box, whose subtree is the *root aligned subtree*, and every box
+//! with `vertical-align: top | bottom`. They don't overlap, and each box on a line belongs to
+//! exactly one of them: the one rooted at its nearest ancestor (or self) with
+//! `vertical-align: top | bottom`, or the root aligned subtree if there is none (see
+//! [`StyleMetrics::aligned_subtree_root`]). Where the rest of this crate says just "aligned
+//! subtree", it means an independent one. For example, with these spans:
+//!
+//! ```text
+//! root
+//! ├─ a (super)
+//! │  └─ b (baseline)
+//! └─ c (top)
+//!    └─ d (sub)
+//! ```
+//!
+//! the CSS definition gives five aligned subtrees (`{root, a, b}`, `{a, b}`, `{b}`, `{c, d}` and
+//! `{d}`), of which two are independent: `{root, a, b}` (the root aligned subtree) and `{c, d}`.
+//!
+//! Within an independent aligned subtree all baselines are fixed relative to each other, so its
+//! extents can be accumulated relative to the root's baseline while the line is being built; the
+//! independent aligned subtrees are only positioned against each other, and the line box sized,
+//! once the line is complete.
 //! See <https://drafts.csswg.org/css-inline-3/#aligned-subtree> and CSS 2 §10.8
 //! <https://www.w3.org/TR/CSS22/visudet.html#line-height>.
 
@@ -53,18 +75,20 @@ pub(crate) struct StyleMetrics {
     pub(crate) over: f32,
     /// Distance from the baseline to the bottom of the line-height expanded span box.
     pub(crate) under: f32,
-    /// Offset of this box's baseline above the baseline of its [aligned subtree's] root.
+    /// Offset of this box's baseline above the baseline of the root of the
+    /// [independent aligned subtree] it belongs to.
     ///
-    /// [aligned subtree's]: Self::aligned_subtree
+    /// [independent aligned subtree]: Self::aligned_subtree_root
     pub(crate) baseline_offset: f32,
     /// [`Self::baseline_offset`] before quantization. Children accumulate their shifts from this
     /// so that rounding never compounds along the ancestor chain.
     pub(crate) exact_baseline_offset: f32,
-    /// Style index of the root of the [aligned subtree] this box belongs to: `0` for the root
-    /// span box, or the nearest ancestor (or self) with `vertical-align: top | bottom`.
+    /// Style index of the root of the [independent aligned subtree] this box belongs to: the
+    /// nearest ancestor (or self) with `vertical-align: top | bottom`, or `0` (the root span box)
+    /// if there is none.
     ///
-    /// [aligned subtree]: self#aligned-subtrees
-    pub(crate) aligned_subtree: u16,
+    /// [independent aligned subtree]: self#aligned-subtrees
+    pub(crate) aligned_subtree_root: u16,
     /// Style index of the parent span; always less than the span's own index, except for the
     /// root (index `0`), whose parent is `0`.
     pub(crate) parent: u16,
@@ -111,7 +135,7 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
             metrics.parent = 0;
             metrics.baseline_offset = 0.;
             metrics.exact_baseline_offset = 0.;
-            metrics.aligned_subtree = 0;
+            metrics.aligned_subtree_root = 0;
         } else {
             let parent_index = usize::from(style.parent);
             debug_assert!(
@@ -130,7 +154,7 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
             if align.is_line_relative() {
                 metrics.baseline_offset = 0.;
                 metrics.exact_baseline_offset = 0.;
-                metrics.aligned_subtree = index as u16;
+                metrics.aligned_subtree_root = index as u16;
             } else {
                 let shift = shift_from_parent(align, metrics.over, metrics.under, parent);
                 metrics.exact_baseline_offset = parent.exact_baseline_offset + shift;
@@ -141,7 +165,7 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
                 } else {
                     metrics.exact_baseline_offset
                 };
-                metrics.aligned_subtree = parent.aligned_subtree;
+                metrics.aligned_subtree_root = parent.aligned_subtree_root;
             }
         }
 
@@ -238,7 +262,7 @@ impl StyleMetrics {
             under: box_metrics.under,
             baseline_offset: 0.,
             exact_baseline_offset: 0.,
-            aligned_subtree: 0,
+            aligned_subtree_root: 0,
             parent: 0,
             font_size: 0.,
         }
@@ -271,11 +295,12 @@ pub(crate) fn shift_from_parent(
     alignment + shift
 }
 
-/// Where an in-flow [`InlineBox`] sits relative to the baseline of its aligned subtree.
+/// Where an in-flow [`InlineBox`] sits relative to the baseline of the independent aligned
+/// subtree it belongs to.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct InlineBoxPlacement {
-    /// Style index of the aligned subtree root (see [`StyleMetrics::aligned_subtree`]).
-    pub(crate) aligned_subtree: u16,
+    /// Style index of the aligned subtree root (see [`StyleMetrics::aligned_subtree_root`]).
+    pub(crate) aligned_subtree_root: u16,
     /// Offset of the box's baseline above the subtree root's baseline.
     pub(crate) baseline_offset: f32,
     /// Height of the box above its baseline.
@@ -288,8 +313,9 @@ pub(crate) struct InlineBoxPlacement {
 /// containing it (`parent_style`).
 ///
 /// A box without an explicit baseline sits on the baseline, i.e. it is all ascent. For
-/// `vertical-align: top | bottom` the returned offset is relative to the parent's subtree, but
-/// such boxes are positioned against the line box instead (see [`crate::Line::inline_box_top`]).
+/// `vertical-align: top | bottom` the returned offset is relative to the subtree the parent
+/// belongs to, but such boxes are positioned against the line box instead (see
+/// [`crate::Line::inline_box_top`]).
 pub(crate) fn inline_box_placement(
     inline_box: &InlineBox,
     parent_style: u16,
@@ -305,7 +331,7 @@ pub(crate) fn inline_box_placement(
     let shift = shift_from_parent(inline_box.vertical_align, ascent, descent, &parent);
     let baseline_offset = parent.exact_baseline_offset + shift;
     InlineBoxPlacement {
-        aligned_subtree: parent.aligned_subtree,
+        aligned_subtree_root: parent.aligned_subtree_root,
         baseline_offset: if quantize {
             baseline_offset.round()
         } else {

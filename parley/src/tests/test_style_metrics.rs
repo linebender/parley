@@ -73,7 +73,7 @@ fn line_height_is_distributed_as_half_leading() {
     assert!(root.ascent > 15. && root.ascent < 20.);
     assert!(root.x_height > 9. && root.x_height < 12.);
     assert_eq!(root.baseline_offset, 0.);
-    assert_eq!(root.aligned_subtree, 0);
+    assert_eq!(root.aligned_subtree_root, 0);
 }
 
 #[test]
@@ -84,7 +84,7 @@ fn ancestors_without_text_have_metrics() {
     assert!((a.over + a.under - 50.).abs() < 1e-4);
     assert!(a.ascent > 30.);
     assert_eq!(a.baseline_offset, 0.);
-    assert_eq!(a.aligned_subtree, 0);
+    assert_eq!(a.aligned_subtree_root, 0);
 }
 
 #[test]
@@ -94,19 +94,19 @@ fn super_shifts_relative_to_parent() {
     assert_eq!(layout.data.styles[2].parent, 1);
     // WebKit/Blink constant: a third of the *parent's* font size (40px).
     assert!((b.baseline_offset - 40. / 3.).abs() < 1e-4);
-    assert_eq!(b.aligned_subtree, 0);
+    assert_eq!(b.aligned_subtree_root, 0);
 }
 
 #[test]
-fn top_starts_an_aligned_subtree() {
+fn top_starts_an_independent_aligned_subtree() {
     let layout = build();
     let c = metrics(&layout)[3];
     let d = metrics(&layout)[4];
     assert_eq!(c.baseline_offset, 0.);
-    assert_eq!(c.aligned_subtree, 3);
+    assert_eq!(c.aligned_subtree_root, 3);
     // Children of a `top` box are relative to it, not to the root.
     assert_eq!(d.baseline_offset, 3.);
-    assert_eq!(d.aligned_subtree, 3);
+    assert_eq!(d.aligned_subtree_root, 3);
 }
 
 #[test]
