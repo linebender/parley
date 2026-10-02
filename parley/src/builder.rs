@@ -266,16 +266,28 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
         self.lcx.tree_style_builder.push_text(text);
     }
 
-    pub fn push_inline_box(&mut self, mut inline_box: InlineBox) {
-        self.lcx.tree_style_builder.commit_uncommitted_text();
+    /// Returns the text pushed so far, after white space processing.
+    ///
+    /// This excludes any trailing collapsible whitespace, since whether that is kept (as a single
+    /// space) depends on the content that follows it. See [`Self::has_pending_whitespace`].
+    pub fn text(&self) -> &str {
+        self.lcx.tree_style_builder.text()
+    }
 
+    /// Returns whether [`Self::text`] is followed by collapsible whitespace, which will become a
+    /// single space if more content follows, or be removed otherwise.
+    pub fn has_pending_whitespace(&self) -> bool {
+        self.lcx.tree_style_builder.has_pending_whitespace()
+    }
+
+    pub fn push_inline_box(&mut self, mut inline_box: InlineBox) {
         if inline_box.kind == InlineBoxKind::InFlow {
             self.lcx.tree_style_builder.flush_pending_whitespace();
             self.lcx.tree_style_builder.set_last_item_is_inline_box();
         }
 
         // TODO: arrange type better here to factor out the index
-        inline_box.index = self.lcx.tree_style_builder.committed_text_len();
+        inline_box.index = self.lcx.tree_style_builder.text().len();
         let parent_style_index = self.lcx.tree_style_builder.resolve_current_style_id();
         self.lcx.inline_boxes.push(LayoutInlineBox {
             inline_box,

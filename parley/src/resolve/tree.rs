@@ -40,7 +40,6 @@ pub(crate) struct TreeStyleBuilder<B: Brush> {
     style_table: Vec<ResolvedStyle<B>>,
     style_runs: Vec<StyleRun>,
     text: String,
-    uncommitted_text: String,
     current_span: usize,
     /// The span that a not-yet-committed collapsible whitespace sequence belongs to.
     ///
@@ -60,7 +59,6 @@ impl<B: Brush> Default for TreeStyleBuilder<B> {
             style_table: Vec::new(),
             style_runs: Vec::new(),
             text: String::new(),
-            uncommitted_text: String::new(),
             current_span: usize::MAX,
             pending_whitespace: None,
             last_item_is_inline_box: false,
@@ -82,7 +80,6 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.style_table.clear();
         self.style_runs.clear();
         self.text.clear();
-        self.uncommitted_text.clear();
         self.pending_whitespace = None;
         self.last_item_is_inline_box = false;
 
@@ -106,28 +103,27 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.last_item_is_inline_box = true;
     }
 
-    /// Applies white space processing to the buffered text and commits the result, leaving any
-    /// trailing collapsible whitespace pending.
-    pub(crate) fn commit_uncommitted_text(&mut self) {
-        let uncommitted_text = core::mem::take(&mut self.uncommitted_text);
-        if uncommitted_text.is_empty() {
+    /// Applies white space processing to `text` in the current span and commits the result, leaving
+    /// any trailing collapsible whitespace pending.
+    pub(crate) fn push_text(&mut self, text: &str) {
+        if text.is_empty() {
             return;
         }
 
         let span = self.current_span;
         match self.tree[span].style.white_space_collapse {
             WhiteSpaceCollapse::Preserve | WhiteSpaceCollapse::BreakSpaces => {
-                if uncommitted_text.starts_with(is_segment_break) {
+                if text.starts_with(is_segment_break) {
                     // Pending whitespace is always from a `WhiteSpaceCollapse::Collapse` or
                     // `WhiteSpaceCollapse::PreserveBreaks` span, and following CSS Text 4 § 4.3.1 Rule 1
                     // must be removed if it immediately precedes a preserved segment break.
                     self.pending_whitespace = None;
                 }
                 self.flush_pending_whitespace();
-                self.commit_text(span, &uncommitted_text);
+                self.commit_text(span, text);
             }
             mode @ (WhiteSpaceCollapse::Collapse | WhiteSpaceCollapse::PreserveBreaks) => {
-                let mut rest = uncommitted_text.as_str();
+                let mut rest = text;
                 while !rest.is_empty() {
                     let whitespace_len =
                         rest.find(|c| !mode.is_collapsible(c)).unwrap_or(rest.len());
@@ -259,15 +255,18 @@ impl<B: Brush> TreeStyleBuilder<B> {
         style_id
     }
 
-    /// The length in bytes of the text committed so far, excluding buffered text.
-    pub(crate) fn committed_text_len(&self) -> usize {
-        self.text.len()
+    /// The white space processed text so far.
+    pub(crate) fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Whether the text so far is followed by pending collapsible whitespace.
+    pub(crate) fn has_pending_whitespace(&self) -> bool {
+        self.pending_whitespace.is_some()
     }
 
     /// Begins a child span with the given style, which subsequent text is attributed to.
     pub(crate) fn push_style_span(&mut self, style: ResolvedStyle<B>) {
-        self.commit_uncommitted_text();
-
         self.tree.push(StyleTreeNode {
             parent: Some(self.current_span),
             style,
@@ -291,16 +290,9 @@ impl<B: Brush> TreeStyleBuilder<B> {
 
     /// Ends the current span, returning to its parent.
     pub(crate) fn pop_style_span(&mut self) {
-        self.commit_uncommitted_text();
-
         self.current_span = self.tree[self.current_span]
             .parent
             .expect("Popped root style");
-    }
-
-    /// Buffers text in the current span, to be white space processed when it is committed.
-    pub(crate) fn push_text(&mut self, text: &str) {
-        self.uncommitted_text.push_str(text);
     }
 
     /// Computes style table + style runs and returns the final text buffer.
@@ -312,8 +304,6 @@ impl<B: Brush> TreeStyleBuilder<B> {
         while self.tree[self.current_span].parent.is_some() {
             self.pop_style_span();
         }
-
-        self.commit_uncommitted_text();
 
         style_table.clear();
         style_runs.clear();
@@ -609,5 +599,65 @@ mod tests {
         assert_eq!(style_runs[2].style_index, 2);
         assert_eq!(style_runs[3].style_index, 1);
         assert_eq!(style_runs[4].style_index, 0);
+    }
+
+    #[test]
+    fn splitting_text_does_not_affect_white_space_processing() {
+        for mode in [
+            WhiteSpaceCollapse::Collapse,
+            WhiteSpaceCollapse::PreserveBreaks,
+            WhiteSpaceCollapse::Preserve,
+            WhiteSpaceCollapse::BreakSpaces,
+        ] {
+            let style = ResolvedStyle {
+                white_space_collapse: mode,
+                ..ResolvedStyle::default()
+            };
+            for input in [" a \t b\n  c ", " \ta \t\r \t\n \tb \t", "a \u{2028} \tb"] {
+                let mut builder = TreeStyleBuilder::<u32>::default();
+                builder.begin(style.clone());
+                builder.push_text(input);
+                let mut expected_runs = Vec::new();
+                let expected = builder.finish(&mut Vec::new(), &mut expected_runs);
+
+                for split in (0..=input.len()).filter(|&i| input.is_char_boundary(i)) {
+                    let mut builder = TreeStyleBuilder::<u32>::default();
+                    builder.begin(style.clone());
+                    builder.push_text(&input[..split]);
+                    assert!(expected.starts_with(builder.text()));
+                    builder.push_text(&input[split..]);
+                    let mut runs = Vec::new();
+                    let text = builder.finish(&mut Vec::new(), &mut runs);
+                    assert_eq!(text, expected, "{mode:?} {input:?} split at {split}");
+                    assert_eq!(
+                        runs.iter().map(|r| r.range.clone()).collect::<Vec<_>>(),
+                        expected_runs
+                            .iter()
+                            .map(|r| r.range.clone())
+                            .collect::<Vec<_>>(),
+                        "{mode:?} {input:?} split at {split}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn reports_pending_whitespace() {
+        let mut builder = TreeStyleBuilder::<u32>::default();
+        builder.begin(ResolvedStyle {
+            white_space_collapse: WhiteSpaceCollapse::Collapse,
+            ..ResolvedStyle::default()
+        });
+        assert_eq!(builder.text(), "");
+        assert!(!builder.has_pending_whitespace());
+        builder.push_text("  a  ");
+        assert_eq!(builder.text(), "a");
+        assert!(builder.has_pending_whitespace());
+        builder.push_style_modification_span([ResolvedProperty::FontSize(20.)].into_iter());
+        builder.push_text(" b");
+        assert_eq!(builder.text(), "a b");
+        assert!(!builder.has_pending_whitespace());
+        builder.pop_style_span();
     }
 }
