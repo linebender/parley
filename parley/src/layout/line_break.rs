@@ -222,14 +222,9 @@ impl SubtreeExtents {
     }
 }
 
-/// The extents of the [independent aligned subtree] rooted at each span with
-/// `vertical-align: top | bottom` that has content on the current line. Spans with any other
-/// `vertical-align` never get extents of their own, as their boxes are part of the independent
-/// aligned subtree they are nested in. Empty for lines without `top`/`bottom` spans.
-///
-/// The extents of the root aligned subtree are in [`LineBoxMetrics::root`] instead. An
-/// [`InlineBox`] with `vertical-align: top | bottom` has no descendants, so [`LineBoxMetrics`]
-/// only keeps its height.
+/// The extents of every [independent aligned subtree] on the current line other than the root
+/// one (which is in [`LineBoxMetrics::root`]), i.e. those rooted at a span with
+/// `vertical-align: top | bottom`. Empty for lines without such spans.
 ///
 /// Reverting to a saved line-breaking opportunity has to restore these extents to what they were
 /// at that opportunity. So that saving an opportunity doesn't have to copy them, this is a
