@@ -133,14 +133,6 @@ impl Shaper {
     /// Each segment is then broken into runs of maximal sequences of character clusters for which
     /// `select_font` returns the same font.
     ///
-    /// `produce_safe_to_concat_flags` determines whether
-    /// [`ShapedCluster::is_safe_to_concat_before`](`crate::shape::ShapedCluster::is_safe_to_concat_bef`
-    /// flags are produced.
-    ///
-    /// If this is `false`, all
-    /// [`ShapedCluster::is_safe_to_concat_before`](`crate::shape::ShapedCluster::is_safe_to_concat_bef`
-    /// or flags will be `false`.
-    ///
     /// If `produce_safe_to_concat_flags` is `true`, shaping records which shaped clusters are [safe
     /// to concatenate before](super::ShapedCluster::is_safe_to_concat_before), and
     /// [`ShapedText::has_safe_to_concat_flags`] will be `true`. These flags can be used to perform
