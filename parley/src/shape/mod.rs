@@ -187,6 +187,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         char_style_indices,
         items,
         font_selector,
+        false,
         &mut layout.data.shaped_text,
     );
 

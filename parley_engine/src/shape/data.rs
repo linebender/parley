@@ -45,12 +45,13 @@ impl ShapedClusterFlags {
     const GLYPH_LEN_MASK: u16 = 0x00FF;
     const INLINE_GLYPH: u16 = 1 << 8;
     const GRAPHEME_START: u16 = 1 << 9;
-    const SAFE_TO_BREAK_BEFORE: u16 = 1 << 10;
     /// Whether a soft wrap opportunity exists before the cluster's first character.
-    const SOFT_WRAP_BEFORE: u16 = 1 << 11;
+    const SOFT_WRAP_BEFORE: u16 = 1 << 10;
     /// [`Whitespace`] class of the cluster's first character (3 bits).
-    const WHITESPACE_SHIFT: u16 = 12;
+    const WHITESPACE_SHIFT: u16 = 11;
     const WHITESPACE_MASK: u16 = 0b111 << Self::WHITESPACE_SHIFT;
+    const SAFE_TO_BREAK_BEFORE: u16 = 1 << 14;
+    const SAFE_TO_CONCAT_BEFORE: u16 = 1 << 15;
 
     #[inline(always)]
     pub(crate) const fn new(glyph_len: u8) -> Self {
@@ -73,6 +74,13 @@ impl ShapedClusterFlags {
     pub(crate) const fn with_safe_to_break_before(mut self, set: bool) -> Self {
         self.0 =
             self.0 & !Self::SAFE_TO_BREAK_BEFORE | if set { Self::SAFE_TO_BREAK_BEFORE } else { 0 };
+        self
+    }
+
+    #[inline(always)]
+    pub(crate) const fn with_safe_to_concat_before(mut self, set: bool) -> Self {
+        self.0 = self.0 & !Self::SAFE_TO_CONCAT_BEFORE
+            | if set { Self::SAFE_TO_CONCAT_BEFORE } else { 0 };
         self
     }
 
@@ -129,6 +137,11 @@ impl ShapedClusterFlags {
     #[inline(always)]
     const fn is_safe_to_break_before(self) -> bool {
         self.0 & Self::SAFE_TO_BREAK_BEFORE != 0
+    }
+
+    #[inline(always)]
+    const fn is_safe_to_concat_before(self) -> bool {
+        self.0 & Self::SAFE_TO_CONCAT_BEFORE != 0
     }
 }
 
@@ -207,13 +220,32 @@ impl ShapedCluster {
         self.flags.is_grapheme_start()
     }
 
-    /// Whether breaking logically before this shaped cluster requires reshaping.
+    /// Whether the text can be broken logically before this shaped cluster without reshaping.
     ///
-    /// Note that if this shaped cluster does not start a grapheme (see
-    /// [`Self::is_grapheme_start`]), you have to reshape regardless of this value.
+    /// If so, reshaping the text on either side of the break, would result in the same glyphs and
+    /// advances. For example, if a font kerns the glyphs of "To", the "o" is not safe to break
+    /// before. Breaking inside a shaped cluster (such as between the letters of an "ffi" ligature)
+    /// always requires shaping.
     #[inline(always)]
     pub fn is_safe_to_break_before(self) -> bool {
         self.flags.is_safe_to_break_before()
+    }
+
+    /// Whether shaping did not look across this shaped cluster's logical start.
+    ///
+    /// For example, if a font kerns "T" with some letters but not "e", the "e" in "Te" is safe to
+    /// break before, but not to concatenate before: say "To" would get kerning applied,
+    /// concatenating the "T" with "o" instead would miss that kern.
+    ///
+    /// If concatenating is safe for this cluster, [`Self::is_safe_to_break_before`] will also be
+    /// true.
+    ///
+    /// If the text was shaped without these flags (see
+    /// [`ShapedText::has_safe_to_concat_flags`](crate::ShapedText::has_safe_to_concat_flags)), this
+    /// is always `false`.
+    #[inline(always)]
+    pub fn is_safe_to_concat_before(self) -> bool {
+        self.flags.is_safe_to_concat_before()
     }
 
     /// Whether a soft wrap opportunity exists before this cluster's first character.
