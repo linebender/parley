@@ -5,7 +5,8 @@ use fontique::{
     Attributes, CharmapIndex, Collection, FamilyId, FontStyle, Query, QueryFamily, SourceCache,
 };
 use hashbrown::HashMap;
-use parley_engine::{FontInstance, FontMetrics};
+use parley_engine::shape::{CharCluster, Coverage};
+use parley_engine::{AnalysisDataSources, FontInstance, FontMetrics};
 use smallvec::SmallVec;
 
 use crate::FontData;
@@ -114,6 +115,16 @@ impl FontCache {
         query.set_families(families.iter().copied().map(QueryFamily::Id));
         query.set_attributes(attributes);
         let found = query.first_available_font().map(|font| FirstAvailableFont {
+            ascii_coverage: {
+                let mut coverage = [false; 128];
+                if let Some(charmap) = font.charmap_index.charmap(font.blob.as_ref()) {
+                    for (ch, covered) in coverage.iter_mut().enumerate() {
+                        // Any non-zero value indicates the existence of a glyph.
+                        *covered = charmap.map(ch as u32).is_some_and(|g| g != 0);
+                    }
+                }
+                coverage
+            },
             font: FontInstance {
                 font: FontData {
                     data: font.blob,
@@ -157,6 +168,34 @@ impl FontCache {
 pub(crate) struct FirstAvailableFont {
     pub(crate) font: FontInstance,
     pub(crate) charmap_index: CharmapIndex,
+    /// Whether the font has a glyph for each ASCII character.
+    ///
+    /// Text is overwhelmingly ASCII, and this answers the coverage question for those
+    /// characters without parsing the font's character map or searching it per character.
+    ascii_coverage: [bool; 128],
+}
+
+impl FirstAvailableFont {
+    /// The coverage of `cluster` in this font.
+    pub(crate) fn coverage(
+        &self,
+        cluster: &mut CharCluster,
+        data_sources: &AnalysisDataSources,
+    ) -> Coverage {
+        // The charmap is only built if the cluster contains a non-ASCII character.
+        let charmap = core::cell::OnceCell::new();
+        cluster.calculate_coverage(
+            |ch| match self.ascii_coverage.get(ch as usize) {
+                Some(covered) => *covered,
+                None => charmap
+                    .get_or_init(|| self.charmap_index.charmap(self.font.font.data.as_ref()))
+                    .as_ref()
+                    // Any non-zero value indicates the existence of a glyph.
+                    .is_some_and(|charmap| charmap.map(ch).is_some_and(|g| g != 0)),
+            },
+            data_sources,
+        )
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]

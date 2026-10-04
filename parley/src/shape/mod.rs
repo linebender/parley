@@ -432,13 +432,8 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
         let mut use_first_available = false;
 
         let faf = self.first_available_font.as_ref();
-        if let Some(faf) = faf
-            && let Some(charmap) = faf.charmap_index.charmap(faf.font.font.data.as_ref())
-        {
-            let coverage = cluster.calculate_coverage(
-                |ch| charmap.map(ch).map(|g| g != 0).unwrap_or_default(),
-                self.analysis_data_sources,
-            );
+        if let Some(faf) = faf {
+            let coverage = faf.coverage(cluster, self.analysis_data_sources);
             if coverage.is_complete() {
                 return Some(faf.font.as_ref());
             }
