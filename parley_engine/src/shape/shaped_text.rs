@@ -531,7 +531,9 @@ fn process_shaped_clusters<'a>(
         inline_glyph: None,
         advance: 0.,
         safe_to_break_before: true,
-        safe_to_concat_before: true,
+        // Note that a run without glyphs is not safe to concat: e.g., concatenating something else
+        // to the run before could cause that run to shape differently.
+        safe_to_concat_before: false,
     };
 
     for (glyph_info, glyph_pos) in glyph_infos.zip(glyph_positions) {
