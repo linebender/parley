@@ -305,12 +305,11 @@ fn shape_segment(
             cache::ShapePlanKey::new(
                 font.font.data.id(),
                 font.font.index,
-                &font.synthesis,
                 direction,
                 hb_script,
                 language.clone(),
                 &scx.features,
-                Some(options.variations),
+                instance.coords(),
             ),
             || {
                 harfrust::ShapePlan::new(
