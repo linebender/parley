@@ -403,6 +403,7 @@ impl ShapedText {
         self.characters[characters_start].grapheme_start = true;
 
         let glyphs_start = self.glyphs.len();
+        let characters_range = characters_start..self.characters.len();
         if segment.bidi_level.is_ltr() {
             process_shaped_clusters(
                 &mut self.shaped_clusters,
@@ -411,7 +412,7 @@ impl ShapedText {
                 glyph_infos.iter(),
                 glyph_positions.iter(),
                 &self.characters,
-                characters_start,
+                characters_range,
                 self.has_safe_to_concat_flags,
             );
         } else {
@@ -422,7 +423,7 @@ impl ShapedText {
                 glyph_infos.iter().rev(),
                 glyph_positions.iter().rev(),
                 &self.characters,
-                characters_start,
+                characters_range,
                 self.has_safe_to_concat_flags,
             );
             // Reverse each cluster's glyphs, such that they are in paint order.
@@ -509,9 +510,10 @@ pub struct ShapedRun {
 /// * `glyph_infos` - `HarfRust` glyph information in logical order (i.e., reversed for RTL runs).
 /// * `glyph_positions` - `HarfRust` glyph positioning data in logical order (i.e., reversed for RTL
 ///   runs).
-/// * `characters` must contain the shaped characters whose clusters we're now processing, starting at
-///   index `characters_start`.
-/// * `characters_start` - See `characters`.
+/// * `characters` - The characters that the shaped clusters' character ranges index into.
+/// * `characters_range` - The range of `characters` that was shaped. A glyph's `HarfRust` cluster
+///   value is the offset of its cluster's first character from the start of this range. The last
+///   cluster extends to the end of this range.
 /// * `produce_safe_to_concat_flags` - Whether `HarfRust` was asked to produce the unsafe-to-concat
 ///   glyph flags.
 fn process_shaped_clusters<'a>(
@@ -521,7 +523,7 @@ fn process_shaped_clusters<'a>(
     glyph_infos: impl Iterator<Item = &'a harfrust::GlyphInfo>,
     glyph_positions: impl Iterator<Item = &'a harfrust::GlyphPosition>,
     characters: &[Character],
-    characters_start: usize,
+    characters_range: Range<usize>,
     produce_safe_to_concat_flags: bool,
 ) {
     struct Cluster {
@@ -586,7 +588,7 @@ fn process_shaped_clusters<'a>(
 
     let mut cluster = Cluster {
         id: 0,
-        characters_start,
+        characters_start: characters_range.start,
         glyphs_start: glyphs.len(),
         glyphs: 0,
         inline_glyph: None,
@@ -599,7 +601,7 @@ fn process_shaped_clusters<'a>(
 
     for (glyph_info, glyph_pos) in glyph_infos.zip(glyph_positions) {
         if glyph_info.cluster != cluster.id {
-            let char_end = characters_start + glyph_info.cluster as usize;
+            let char_end = characters_range.start + glyph_info.cluster as usize;
             flush(&mut cluster, char_end, characters, shaped_clusters);
 
             cluster = Cluster {
@@ -643,7 +645,7 @@ fn process_shaped_clusters<'a>(
     }
 
     // Flush the final cluster.
-    flush(&mut cluster, characters.len(), characters, shaped_clusters);
+    flush(&mut cluster, characters_range.end, characters, shaped_clusters);
 }
 
 #[cfg(test)]
