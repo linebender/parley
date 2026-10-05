@@ -92,31 +92,30 @@ impl FontMetrics {
                         .map(|v| (skrifa::Tag::new(&v.tag.to_bytes()), v.value)),
                 ),
         );
-        Some(Self::from_skrifa_metrics(&skrifa::metrics::Metrics::new(
-            &font_ref,
-            skrifa::prelude::Size::new(font_size),
-            &location,
-        )))
+        Some(Self::from_skrifa_metrics(
+            &skrifa::metrics::Metrics::new(
+                &font_ref,
+                skrifa::prelude::Size::new(font_size),
+                &location,
+            ),
+            font_size,
+        ))
     }
 
-    fn from_skrifa_metrics(metrics: &skrifa::metrics::Metrics) -> Self {
-        let units_per_em = metrics.units_per_em as f32;
+    fn from_skrifa_metrics(metrics: &skrifa::metrics::Metrics, font_size: f32) -> Self {
+        // Default values from HarfBuzz: https://github.com/harfbuzz/harfbuzz/blob/12ee77ee00514c442bcd28f9aa9d56b708c37382/src/hb-ot-metrics.cc#L355-L372
+        let fallback_decoration_size = font_size / 18.0;
 
-        // TODO: The following seems to be in the wrong scale, as its staying in design units rather
-        // than scaled to the font size like the other fields for `FontMetrics`.
         let (underline_offset, underline_size) = if let Some(underline) = metrics.underline {
             (underline.offset, underline.thickness)
         } else {
-            // Default values from Harfbuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334
-            let default = units_per_em / 18.0;
-            (default, default)
+            (-fallback_decoration_size, fallback_decoration_size)
         };
         let (strikethrough_offset, strikethrough_size) = if let Some(strikeout) = metrics.strikeout
         {
             (strikeout.offset, strikeout.thickness)
         } else {
-            // Default values from HarfBuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334-L347
-            (metrics.ascent / 2.0, units_per_em / 18.0)
+            (metrics.ascent / 2.0, fallback_decoration_size)
         };
 
         Self {
@@ -314,7 +313,7 @@ impl ShapedText {
             )
         };
         let units_per_em = metrics.units_per_em as f32;
-        let font_metrics = FontMetrics::from_skrifa_metrics(&metrics);
+        let font_metrics = FontMetrics::from_skrifa_metrics(&metrics, options.font_size);
 
         // `HarfRust` returns glyphs in visual order, so we need to process them as such while
         // maintaining logical ordering of clusters.
