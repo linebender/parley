@@ -165,7 +165,7 @@ impl Shaper {
     }
 
     /// Shape a character range of one run with edits.
-    pub fn reshape(
+    pub(crate) fn reshape(
         &mut self,
         text: &str,
         shaped: &ShapedText,
@@ -201,6 +201,27 @@ pub struct Edit<'a> {
 }
 
 impl<'a> Edit<'a> {
+    /// Replace the `replaced_chars` source characters at the line's edge by `inserted`.
+    ///
+    /// For an edit at the line's logical start, the replaced characters are the line's first
+    /// characters. For an edit at a line's logical end, these are the line's last characters.
+    /// `replace_chars` may be zero, in which case `inserted` is only inserted. With an empty
+    /// `inserted`, the characters are only dropped.
+    ///
+    /// # Examples
+    ///
+    /// - "skiën" broken after "ski" ends the first line with `Edit::new(0, "-")`, and starts the
+    ///   second line with `Edit::new(1, "e")`.
+    /// - "bussjåfør" broken after "buss" ends the first line with `Edit::new(0, "-")`, and starts
+    ///   the second line with `Edit::new(0, "s")`.
+    #[inline(always)]
+    pub const fn new(replaced_chars: u32, inserted: &'a str) -> Self {
+        Self {
+            replaced_chars,
+            inserted,
+        }
+    }
+
     #[inline(always)]
     pub fn replaced_chars(self) -> u32 {
         self.replaced_chars
