@@ -544,8 +544,11 @@ pub enum YieldData {
 pub struct LineBreakData {
     /// The reason for the line break (see [`BreakReason`] for details)
     pub reason: BreakReason,
-    /// The computed advance (width) of the line
+    /// The computed advance (width) of the line, including trailing whitespace
     pub advance: f32,
+    /// The portion of [`Self::advance`] that is trailing whitespace hanging past the line's
+    /// end edge (see [`LineMetrics::hanging_advance`](crate::layout::LineMetrics::hanging_advance))
+    pub hanging_advance: f32,
     /// The computed height of the line
     pub line_height: f32,
     /// The position of the top of the line
@@ -951,6 +954,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         LineBreakData {
             reason,
             advance: line.metrics.advance,
+            hanging_advance: line.metrics.hanging_advance,
             line_height: line.size(),
             line_y_start,
             line_y_end: self.state.line_y,
