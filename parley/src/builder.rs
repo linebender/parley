@@ -266,16 +266,20 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
         self.lcx.tree_style_builder.push_text(text);
     }
 
-    /// Returns the text pushed so far, after white space processing.
+    /// Returns the pushed text so far, after whitespace processing, but excluding any trailing
+    /// collapsible whitespace.
     ///
-    /// This excludes any trailing collapsible whitespace, since whether that is kept (as a single
-    /// space) depends on the content that follows it. See [`Self::has_pending_whitespace`].
+    /// This is a prefix of the text that [`Self::build`] will return. Whether that trailing
+    /// collapsible whitespace ends up being kept (as a single space) depends on where it is and on
+    /// what follows it. See [`Self::has_pending_whitespace`].
     pub fn text(&self) -> &str {
         self.lcx.tree_style_builder.text()
     }
 
-    /// Returns whether [`Self::text`] is followed by collapsible whitespace, which will become a
-    /// single space if more content follows, or be removed otherwise.
+/// Returns whether [`Self::text`] is followed by collapsible whitespace.
+///
+/// That white space is not yet part of [`Self::text`]: depending on where it is and what
+/// follows, it is either removed or kept as a single space.
     pub fn has_pending_whitespace(&self) -> bool {
         self.lcx.tree_style_builder.has_pending_whitespace()
     }
