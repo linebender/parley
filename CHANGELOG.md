@@ -16,6 +16,44 @@ Every change to this file must be written by a human.
 
 This release has an [MSRV] of 1.88.
 
+### Highlights
+
+#### `parley_engine`
+
+This release introduces `parley_engine`, a lower-level crate for building your own text layout.
+`parley` itself is now built on top of it.
+This new crate performs paragraph-level analysis of text, resolving details like line break opportunities, grapheme boundaries, bidirectional text embedding levels, and emoji presentation, and shapes the text with caller-provided font selection.
+Layout decisions like where to break lines and how to align or stack lines are left to the caller.
+Work is underway to support reshaping of lines, e.g., when a break falls within a ligature or word in a cursive script.
+
+#### Whitespace handling and spacing
+
+Parley now implements whitespace hanging rules following [CSS Text 4][css-text-4], and `parley::TreeBuilder` collapses whitespace according to CSS's `white-space-collapse` property.
+
+[css-text-4]: https://www.w3.org/TR/css-text-4/
+
+#### Line boxes and vertical alignment
+
+Lines in a layout are now sized more closely to [the CSS line box model][css-line-box].
+Inline boxes and spans of text can be vertically aligned following the keywords and lengths of [CSS 2.2's `vertical-align`][css-2-vertical-align].
+The layout now correctly deals with line heights changing part-way through words.
+
+[css-line-box]: https://www.w3.org/TR/CSS22/visuren.html#line-box
+[css-2-vertical-align]: https://www.w3.org/TR/CSS22/visudet.html#propdef-vertical-align
+
+#### Grapheme clusters
+
+`parley::layout::Cluster` now spans whole [extended grapheme clusters][unicode-extended-grapheme-cluster], instead of single characters.
+Carets and selections no longer land inside graphemes (such as between a letter and its combining accent); within ligatures, carets land at approximate grapheme boundaries.
+
+[unicode-extended-grapheme-cluster]: https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries
+
+#### Performance
+
+Over the past few releases, building a `parley::Layout` got slower.
+In this release, building a layout has roughly 35% more throughput than in v0.11, with timings comparable to v0.6.
+Glyph iteration has roughly 3x the throughput.
+
 ### Added
 
 #### Parlance
