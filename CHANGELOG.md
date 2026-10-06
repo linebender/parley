@@ -47,30 +47,6 @@ This release has an [MSRV] of 1.88.
 - `Layout::root_span_metrics`, to help with placing directly drawn bullet points. ([#867][] by [@DJMcNab][])
 - TO EDIT: Implement `baseline` field on inline boxes ([#639][] by [@nicoburns][])
 - TO EDIT: Expose `BaseDirection` through paragraph analysis ([#708][] by [@waywardmonkeys][])
-- TO EDIT: Add documentation for running WPT tests against Parley via Blitz ([#751][] by [@nicoburns][])
-
-#### Parley Engine
-
-- TO EDIT: Move bidi algorithm into `parley_core` ([#647][] by [@tomcur][])
-- TO EDIT: Move line break opportunity overrides into `parley_core` ([#648][] by [@tomcur][])
-- TO EDIT: Migrate analysis from `parley` to `parley_core` ([#649][] by [@tomcur][])
-- TO EDIT: Add `parley_core` itemizer, refactor `parley` to use it ([#670][] by [@tomcur][])
-- TO EDIT: Implement shaping in `parley_core` ([#675][] by [@tomcur][])
-- TO EDIT: Move `CharCluster` mutation into a single module and improve docs ([#685][] by [@tomcur][])
-- TO EDIT: Fix docs about emoji variation selector ignoring ([#686][] by [@tomcur][])
-- TO EDIT: Drop unread `CharCluster::form` field ([#687][] by [@tomcur][])
-- TO EDIT: Drop unread `Char::glyph_id` mapping from character clusters, improve docs ([#688][] by [@tomcur][])
-- TO EDIT: Correctly handle "doesn't compose" in `CharCluster` ([#690][] by [@tomcur][])
-- TO EDIT: Implement `parley_core::ShapedText` ([#679][] by [@tomcur][])
-- TO EDIT: Pre-allocate some `ShapedText` storage ([#702][] by [@tomcur][])
-- TO EDIT: Lookup + Store Grapheme Boundaries during Text Analysis ([#700][] by [@taj-p][])
-- TO EDIT: Rename `parley_core` to `parley_engine` ([#705][] by [@tomcur][])
-- TO EDIT: Derive `ShapedRun::advance` from clusters ([#706][] by [@waywardmonkeys][])
-- TO EDIT: Let `CharCluster`'s coverage check return `Coverage`s users can compare ([#691][] by [@tomcur][])
-- TO EDIT: `parley_engine`: Abort shaping if no font is available, attempt a last resort scan in `parley` ([#722][] by [@tomcur][])
-- TO EDIT: `parley_engine`: Move glyph iteration to `ShapedSlice` ([#733][] by [@tomcur][])
-- TO EDIT: `parley_engine`: Always shape full text, ensuring `ShapedText` covers the full text ([#727][] by [@tomcur][])
-- TO EDIT: Move `char_style_indices` out of the per-item `ShapeOptions` ([#741][] by [@tomcur][])
 
 ### Changed
 
@@ -98,22 +74,8 @@ This release has an [MSRV] of 1.88.
 - Breaking change: `Run::{logical_to_visual, visual_to_logical}` were removed. Use `Run::visual_clusters` or `Cluster::{next, previous}_visual` instead. ([#810][] by [@tomcur][])
 - Following CSS Text 4 § 4.3.2, whitespace with `WhiteSpaceCollapse::Preserve` now hangs only if it's not on the last line, and is not followed by a newline. ([#790][] by [@tomcur][])
 - TO EDIT: Rename `parley::layout::Cluster::first_style` => `style`, improve docstring ([#660][] by [@tomcur][])
-- TO EDIT: Update to the Rust 2024 edition ([#666][] by [@DJMcNab][])
-- TO EDIT: Update PackTab to 1.9.0 ([#674][] by [@taj-p][])
-- TO EDIT: Remove glifo from `vello_cpu_render` example ([#668][] by [@nicoburns][])
-- TO EDIT: Consolidate line height calculations ([#696][] by [@tomcur][])
-- TO EDIT: ci: Update to stable Rust 1.97.1, typos 1.48.0 ([#699][] by [@tomcur][])
-- TO EDIT: Test reusing a `parley::Layout` ([#701][] by [@tomcur][])
-- TO EDIT: Clean up duplicated asserts ([#709][] by [@tomcur][])
-- TO EDIT: Port `vello_editor` example to `vello_cpu` + rename to just `editor` ([#669][] by [@nicoburns][])
 - TO EDIT: Upgrade to read-fonts 0.41, skrifa 0.44, harfrust 0.12 ([#719][] by [@nicoburns][])
-- TO EDIT: Fix `clippy::chunks_exact_to_as_chunks` lint ([#726][] by [@tomcur][])
-- TO EDIT: Simplify whitespace collapsing code somewhat ([#735][] by [@tomcur][])
-- TO EDIT: Optimize `calculate_content_widths` ([#822][] by [@nicoburns][])
-
-#### Parlance
-
-- TO EDIT: Only lowercase once in `GenericFamily::parse` ([#658][] by [@nicoburns][])
+- TO EDIT: `parley_engine`: Abort shaping if no font is available, attempt a last resort scan in `parley` ([#722][] by [@tomcur][])
 
 #### Fontique
 
@@ -125,12 +87,6 @@ This release has an [MSRV] of 1.88.
 #### Parlance
 
 - TO EDIT: Deprecate `parlance::Script::from_str_unchecked` ([#677][] by [@DJMcNab][])
-
-### Removed
-
-#### Parley
-
-- TO EDIT: Remove Parley's drawing benchmarks and Hybrid example ([#665][] by [@DJMcNab][])
 
 ### Fixed
 
@@ -162,7 +118,6 @@ This release has an [MSRV] of 1.88.
 - In case a font does not carry decoration metrics like underline size, the fallbacks now scale with the font size instead of staying in font units, and the fallback underline is now placed below the baseline instead of above. ([#878][] by [@tomcur][])
 - TO EDIT: Fix handling of line break overrides before newlines ([#676][] by [@DJMcNab][])
 - TO EDIT: Treat CRLF as a single hard line break ([#667][] by [@mvanhorn][])
-- TO EDIT: Ignore empty word break ranges, clarify ranges must fall on character boundaries ([#720][] by [@tomcur][])
 - TO EDIT: Consistently pass through the root style for empty text ([#721][] by [@tomcur][])
 - TO EDIT: Preserve non-breaking spaces when collapsing whitespace ([#734][] by [@subotac][])
 - TO EDIT: Fix infinite loop in `break_remaining` with `CustomOutOfFlow` inline boxes ([#753][] by [@nicoburns][])
@@ -855,67 +810,34 @@ This release has an [MSRV][] of 1.70.
 [#639]: https://github.com/linebender/parley/pull/639
 [#640]: https://github.com/linebender/parley/pull/640
 [#643]: https://github.com/linebender/parley/pull/643
-[#647]: https://github.com/linebender/parley/pull/647
-[#648]: https://github.com/linebender/parley/pull/648
-[#649]: https://github.com/linebender/parley/pull/649
 [#650]: https://github.com/linebender/parley/pull/650
 [#654]: https://github.com/linebender/parley/pull/654
-[#658]: https://github.com/linebender/parley/pull/658
 [#660]: https://github.com/linebender/parley/pull/660
 [#661]: https://github.com/linebender/parley/pull/661
 [#663]: https://github.com/linebender/parley/pull/663
-[#665]: https://github.com/linebender/parley/pull/665
-[#666]: https://github.com/linebender/parley/pull/666
 [#667]: https://github.com/linebender/parley/pull/667
-[#668]: https://github.com/linebender/parley/pull/668
-[#669]: https://github.com/linebender/parley/pull/669
-[#670]: https://github.com/linebender/parley/pull/670
 [#671]: https://github.com/linebender/parley/pull/671
-[#674]: https://github.com/linebender/parley/pull/674
-[#675]: https://github.com/linebender/parley/pull/675
 [#676]: https://github.com/linebender/parley/pull/676
 [#677]: https://github.com/linebender/parley/pull/677
-[#679]: https://github.com/linebender/parley/pull/679
-[#685]: https://github.com/linebender/parley/pull/685
-[#686]: https://github.com/linebender/parley/pull/686
-[#687]: https://github.com/linebender/parley/pull/687
-[#688]: https://github.com/linebender/parley/pull/688
-[#690]: https://github.com/linebender/parley/pull/690
-[#691]: https://github.com/linebender/parley/pull/691
-[#696]: https://github.com/linebender/parley/pull/696
 [#697]: https://github.com/linebender/parley/pull/697
-[#699]: https://github.com/linebender/parley/pull/699
-[#700]: https://github.com/linebender/parley/pull/700
-[#701]: https://github.com/linebender/parley/pull/701
-[#702]: https://github.com/linebender/parley/pull/702
-[#705]: https://github.com/linebender/parley/pull/705
-[#706]: https://github.com/linebender/parley/pull/706
 [#708]: https://github.com/linebender/parley/pull/708
-[#709]: https://github.com/linebender/parley/pull/709
 [#710]: https://github.com/linebender/parley/pull/710
 [#715]: https://github.com/linebender/parley/pull/715
 [#716]: https://github.com/linebender/parley/pull/716
 [#717]: https://github.com/linebender/parley/pull/717
 [#719]: https://github.com/linebender/parley/pull/719
-[#720]: https://github.com/linebender/parley/pull/720
 [#721]: https://github.com/linebender/parley/pull/721
 [#722]: https://github.com/linebender/parley/pull/722
 [#723]: https://github.com/linebender/parley/pull/723
 [#724]: https://github.com/linebender/parley/pull/724
 [#725]: https://github.com/linebender/parley/pull/725
-[#726]: https://github.com/linebender/parley/pull/726
-[#727]: https://github.com/linebender/parley/pull/727
 [#728]: https://github.com/linebender/parley/pull/728
 [#731]: https://github.com/linebender/parley/pull/731
-[#733]: https://github.com/linebender/parley/pull/733
 [#734]: https://github.com/linebender/parley/pull/734
-[#735]: https://github.com/linebender/parley/pull/735
 [#738]: https://github.com/linebender/parley/pull/738
 [#740]: https://github.com/linebender/parley/pull/740
-[#741]: https://github.com/linebender/parley/pull/741
 [#743]: https://github.com/linebender/parley/pull/743
 [#746]: https://github.com/linebender/parley/pull/746
-[#751]: https://github.com/linebender/parley/pull/751
 [#753]: https://github.com/linebender/parley/pull/753
 [#754]: https://github.com/linebender/parley/pull/754
 [#756]: https://github.com/linebender/parley/pull/756
@@ -938,7 +860,6 @@ This release has an [MSRV][] of 1.70.
 [#814]: https://github.com/linebender/parley/pull/814
 [#815]: https://github.com/linebender/parley/pull/815
 [#819]: https://github.com/linebender/parley/pull/819
-[#822]: https://github.com/linebender/parley/pull/822
 [#829]: https://github.com/linebender/parley/pull/829
 [#833]: https://github.com/linebender/parley/pull/833
 [#834]: https://github.com/linebender/parley/pull/834
