@@ -852,7 +852,7 @@ mod tests {
 
     fn font_instance_with_weight(font_data: &'static [u8], weight: f32) -> FontInstance {
         FontInstance {
-            synthesis: Synthesis::try_new(&[(WGHT, weight)], false, 0).unwrap(),
+            synthesis: Synthesis::default().with_weight(weight),
             ..font_instance(font_data)
         }
     }
@@ -923,7 +923,7 @@ mod tests {
         let faux = shape_with_font_selector(
             text,
             SingleFont(FontInstance {
-                synthesis: Synthesis::try_new(&[], true, 14).unwrap(),
+                synthesis: Synthesis::default().with_embolden(true).with_skew(14),
                 ..font_instance(ROBOTO)
             }),
         );
