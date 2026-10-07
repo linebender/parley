@@ -64,8 +64,11 @@ Carets and selections no longer land inside graphemes (such as between a letter 
   `ClusterPath::new` and the `Style::locale` field are now public as well.
   Together these make it possible to build an accessibility integration outside of Parley.
 - `Layout::root_span_metrics`, to help with placing directly drawn bullet points. ([#867][] by [@DJMcNab][])
+- `LineMetrics::content_block_{min, max}_coord`, which are the typographic content bounds of a line independent of line height. ([#697][] by [@tomcur][])
+- `Cluster::{style, style_index}` and `GlyphRun::{style, style_index}`. ([#661][] by [@tomcur][])
 - The base direction of paragraphs can now be set using `{RangedBuilder, StyleRunBuilder, TreeBuilder, PlainEditor}::set_base_direction`. ([#708][] by [@waywardmonkeys][], [#858][] by [@nicoburns][])
 - `Layout::clear` to clear the contents of a layout. This can be used to clean up font resources. ([#804][] by [@taj-p][])
+- `Cluster` and `Run` are now `Copy` and `Clone` for any brush. ([#715][] by [@tomcur][])
 
 #### Parley Engine
 
