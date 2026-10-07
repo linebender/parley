@@ -556,8 +556,8 @@ fn process_shaped_clusters<'a>(
 mod tests {
     use alloc::{sync::Arc, vec, vec::Vec};
 
-    use fontique::Synthesis;
     use linebender_resource_handle::{Blob, FontData};
+    use parlance::{FontVariation, Synthesis, Tag};
 
     use crate::{
         Analysis, AnalysisOptions, Analyzer, FontInstance, FontInstanceRef, FontSelector,
@@ -566,10 +566,12 @@ mod tests {
         shape::CharCluster,
     };
 
-    use super::ShapedText;
+    use super::{FontMetrics, ShapedText};
 
     const ROBOTO: &[u8] =
         include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
+    const ROBOTO_FLEX: &[u8] =
+        include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/RobotoFlex-VariableFont.ttf");
     const NOTO_KUFI_ARABIC: &[u8] =
         include_bytes!("../../../parley_dev/assets/fonts/noto_fonts/NotoKufiArabic-Regular.otf");
     const NOTO_COLOR_EMOJI: &[u8] = include_bytes!(
@@ -639,6 +641,14 @@ mod tests {
     }
 
     fn shape_with_font_selector(text: &str, select_font: impl FontSelector) -> ShapedText {
+        shape_with_variations(text, select_font, &[])
+    }
+
+    fn shape_with_variations(
+        text: &str,
+        select_font: impl FontSelector,
+        variations: &[FontVariation],
+    ) -> ShapedText {
         let analysis = analyze(text);
         let mut shaper = Shaper::default();
         let mut shaped = ShapedText::new();
@@ -650,7 +660,7 @@ mod tests {
                 font_size: 32.0,
                 language: None,
                 features: &[],
-                variations: &[],
+                variations,
             },
         }];
         shaper.shape_text(
@@ -836,5 +846,116 @@ mod tests {
 
         // But note that, had we had three regional indicator symbols, like `[R0 R1 R2]` itemized as
         // `[R0] [R1 R2]`, the last pair should form a single grapheme. We don't do that currently.
+    }
+
+    const WGHT: Tag = Tag::new(b"wght");
+
+    fn font_instance_with_weight(font_data: &'static [u8], weight: f32) -> FontInstance {
+        FontInstance {
+            synthesis: Synthesis::try_new(&[(WGHT, weight)], false, 0).unwrap(),
+            ..font_instance(font_data)
+        }
+    }
+
+    fn explicit_weight(weight: f32) -> [FontVariation; 1] {
+        [FontVariation {
+            tag: WGHT,
+            value: weight,
+        }]
+    }
+
+    fn run_advances(shaped: &ShapedText) -> Vec<f32> {
+        shaped.runs().iter().map(|run| run.advance).collect()
+    }
+
+    /// The variation settings of a font instance's synthesis are applied when shaping.
+    #[test]
+    fn synthesis_variations_are_applied() {
+        let text = "Hello";
+        let default = shape_with_font(text, ROBOTO_FLEX);
+        let bold = shape_with_font_selector(
+            text,
+            SingleFont(font_instance_with_weight(ROBOTO_FLEX, 900.)),
+        );
+        assert_eq!(default.runs().len(), 1);
+        assert_ne!(
+            run_advances(&default),
+            run_advances(&bold),
+            "synthesizing a heavier weight should change the run advance"
+        );
+
+        // Synthesizing a variation is equivalent to explicitly requesting it.
+        let explicit_bold = shape_with_variations(
+            text,
+            SingleFont(font_instance(ROBOTO_FLEX)),
+            &explicit_weight(900.),
+        );
+        assert_eq!(run_advances(&bold), run_advances(&explicit_bold));
+    }
+
+    /// Explicit variations are applied after synthesized variations, and so override them.
+    #[test]
+    fn explicit_variations_override_synthesis() {
+        let text = "Hello";
+        let explicit_thin = shape_with_variations(
+            text,
+            SingleFont(font_instance(ROBOTO_FLEX)),
+            &explicit_weight(100.),
+        );
+        let overridden = shape_with_variations(
+            text,
+            SingleFont(font_instance_with_weight(ROBOTO_FLEX, 900.)),
+            &explicit_weight(100.),
+        );
+        let bold = shape_with_font_selector(
+            text,
+            SingleFont(font_instance_with_weight(ROBOTO_FLEX, 900.)),
+        );
+        assert_eq!(run_advances(&overridden), run_advances(&explicit_thin));
+        assert_ne!(run_advances(&overridden), run_advances(&bold));
+    }
+
+    /// Faux bold and skew are not applied by shaping.
+    #[test]
+    fn faux_synthesis_does_not_affect_shaping() {
+        let text = "Hello";
+        let default = shape_with_font(text, ROBOTO);
+        let faux = shape_with_font_selector(
+            text,
+            SingleFont(FontInstance {
+                synthesis: Synthesis::try_new(&[], true, 14).unwrap(),
+                ..font_instance(ROBOTO)
+            }),
+        );
+        assert_eq!(run_advances(&default), run_advances(&faux));
+        assert!(faux.fonts()[0].synthesis.embolden());
+        assert_eq!(faux.fonts()[0].synthesis.skew(), Some(14.));
+    }
+
+    /// Font metrics are computed at the location given by the synthesized variations, with
+    /// explicit variations overriding them.
+    #[test]
+    fn metrics_use_synthesis_and_explicit_variations() {
+        let font_size = 32.;
+        let default = font_instance(ROBOTO_FLEX);
+        let bold = font_instance_with_weight(ROBOTO_FLEX, 900.);
+
+        let default_metrics = FontMetrics::from_font_instance(&default, font_size, &[]).unwrap();
+        let bold_metrics = FontMetrics::from_font_instance(&bold, font_size, &[]).unwrap();
+        assert_ne!(
+            default_metrics, bold_metrics,
+            "synthesizing a heavier weight should change the font metrics"
+        );
+
+        let explicit_bold_metrics =
+            FontMetrics::from_font_instance(&default, font_size, &explicit_weight(900.)).unwrap();
+        assert_eq!(bold_metrics, explicit_bold_metrics);
+
+        let explicit_thin_metrics =
+            FontMetrics::from_font_instance(&default, font_size, &explicit_weight(100.)).unwrap();
+        let overridden_metrics =
+            FontMetrics::from_font_instance(&bold, font_size, &explicit_weight(100.)).unwrap();
+        assert_eq!(overridden_metrics, explicit_thin_metrics);
+        assert_ne!(overridden_metrics, bold_metrics);
     }
 }

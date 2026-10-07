@@ -858,8 +858,8 @@ impl Grapheme {
 mod tests {
     use alloc::{sync::Arc, vec};
 
-    use fontique::Synthesis;
     use linebender_resource_handle::{Blob, FontData};
+    use parlance::Synthesis;
 
     use crate::{
         Analysis, AnalysisOptions, Analyzer, FontInstance, FontInstanceRef, FontSelector,

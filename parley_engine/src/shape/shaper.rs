@@ -42,9 +42,9 @@ pub struct FontInstance {
     /// The font.
     pub font: FontData,
     /// Font synthesis suggestions.
-    // TODO: Synthesis carries more than we need, and ties us to `fontique`. We can likely change
-    // this to opaque user data.
-    pub synthesis: fontique::Synthesis,
+    // TODO: Synthesis carries more than we need: shaping only uses its variation settings. We can
+    // likely change this to opaque user data.
+    pub synthesis: parlance::Synthesis,
 }
 
 impl FontInstance {
@@ -67,7 +67,7 @@ pub struct FontInstanceRef<'a> {
     /// Index of the font in a collection, or 0 for a single font.
     pub index: u32,
     /// Font synthesis suggestions.
-    pub synthesis: &'a fontique::Synthesis,
+    pub synthesis: &'a parlance::Synthesis,
 }
 
 impl From<FontInstanceRef<'_>> for FontInstance {
@@ -431,7 +431,7 @@ fn shape_segment(
 
 #[inline]
 fn variations_iter<'a>(
-    synthesis: &'a fontique::Synthesis,
+    synthesis: &'a parlance::Synthesis,
     item: &'a [FontVariation],
 ) -> impl Iterator<Item = harfrust::Variation> + 'a {
     synthesis
@@ -447,7 +447,7 @@ fn variations_iter<'a>(
         }))
 }
 
-pub(crate) fn script_to_harfrust(script: fontique::Script) -> harfrust::Script {
+pub(crate) fn script_to_harfrust(script: parlance::Script) -> harfrust::Script {
     harfrust::Script::from_iso15924_tag(harfrust::Tag::new(&script.to_bytes()))
         .unwrap_or(harfrust::script::UNKNOWN)
 }
