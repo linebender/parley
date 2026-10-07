@@ -80,24 +80,17 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 
 #### Parley
 
-- Breaking change: the `accesskit` feature, and the AccessKit integration it enabled, were removed. ([#716][] by [@DataTriny][])
-  The integration now lives in the `vello_editor` example, where it is easier to evolve and can be copied and adapted by consumers.
-  This removed `LayoutAccessibility`, `PlainEditor::try_accessibility`, `PlainEditorDriver::accessibility`, `PlainEditorDriver::select_from_accesskit`, `Cursor::from_access_position`, `Cursor::to_access_position`, `Selection::from_access_selection`, and `Selection::to_access_selection`.
 - Breaking change: `Cluster` now spans a full grapheme cluster instead of a single character. ([#715][] by [@tomcur][])  
   Shaped clusters that cross grapheme boundaries are represented using the existing `Cluster::is_ligature_start` and `Cluster::is_ligature_continuation`; note these methods previously encoded graphemes as well.
   Shaped clusters' advances are split evenly over the grapheme clusters they overlap.
   `Run::cluster_range` now returns grapheme cluster indices relative to the run's shaped run.
-- Breaking change: `ClusterPath::logical_index` was removed. You can resolve the path to a `Cluster` using `ClusterPath::cluster`. `ClusterPath` still provides the line and run indices, but should otherwise be treated as an opaque handle. ([#810][] by [@tomcur][])
 - Breaking change: lines with mixed inline content, like different fonts or sizes, or inline boxes, are now sized more closely to the CSS line-box model. ([#697][] by [@tomcur][])  
   The `LineMetrics::{ascent,descent,leading}` fields were removed, and `LineMetrics::block_{min,max}_coord` now describe the block-axis layout bounds of each line box.
   Glyphs may overflow these layout bounds, especially when a small line height is used.
   `LineMetrics::content_block_{min,max}_coord` provide the typographic content bounds, covering typographic ascent and descent as well as inline boxes, ignoring the specified line height.
   Note glyphs overflow these content bounds as well, for example when many combining marks are stacked.
   The union of the line-box and content bounds is close to the old `LineMetrics::block_{min,max}_coord` fields.
-- Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. ([#661][] by [@tomcur][])
 - Breaking change: `layout::Cluster::first_style` was renamed to `layout::Cluster::style`. ([#660][] by [@tomcur][])
-- Breaking change: `layout::Run::metrics()` was removed, use `layout::Run::font_metrics()` instead. ([#679][] by [@tomcur][])
-- Breaking change: `layout::Run::{logical_to_visual, visual_to_logical}` were removed. Use `layout::Run::visual_clusters` or `layout::Cluster::{next, previous}_visual` instead. ([#810][] by [@tomcur][])
 - Breaking change: `WhiteSpaceCollapse` is now a style rather than a special method on the `TreeBuilder` ([#814][] by [@nicoburns][])
 - Breaking change: `LineMetrics::trailing_whitespace` was renamed to `LineMetrics::hanging_advance`. Following CSS Text 4 § 4.3.2, non-breaking spaces no longer hang past line ends. ([#762][] by [@tomcur][])
 - Ideographic spaces can now hang past line ends. ([#784][] by [@tomcur][])
@@ -119,6 +112,18 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 
 - `parlance::Script::from_str_unchecked` has been deprecated. ([#677][] by [@DJMcNab][])  
   Use `parlance::Script::from_bytes` instead.
+
+### Removed
+
+#### Parley
+
+- Breaking change: the `accesskit` feature, and the AccessKit integration it enabled, were removed. ([#716][] by [@DataTriny][])
+  The integration now lives in the `vello_editor` example, where it is easier to evolve and can be copied and adapted by consumers.
+  This removed `LayoutAccessibility`, `PlainEditor::try_accessibility`, `PlainEditorDriver::accessibility`, `PlainEditorDriver::select_from_accesskit`, `Cursor::from_access_position`, `Cursor::to_access_position`, `Selection::from_access_selection`, and `Selection::to_access_selection`.
+- Breaking change: `ClusterPath::logical_index` was removed. You can resolve the path to a `Cluster` using `ClusterPath::cluster`. `ClusterPath` still provides the line and run indices, but should otherwise be treated as an opaque handle. ([#810][] by [@tomcur][])
+- Breaking change: `layout::Run::{logical_to_visual, visual_to_logical}` were removed. Use `layout::Run::visual_clusters` or `layout::Cluster::{next, previous}_visual` instead. ([#810][] by [@tomcur][])
+- Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. ([#661][] by [@tomcur][])
+- Breaking change: `layout::Run::metrics()` was removed, use `layout::Run::font_metrics()` instead. ([#679][] by [@tomcur][])
 
 ### Fixed
 
