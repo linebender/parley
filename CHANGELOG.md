@@ -178,7 +178,7 @@ This release has an [MSRV] of 1.88.
 
 #### Parley
 
-- Upgrade to `read-fonts` 0.41, `skrifa` 0.44, `harfrust` 0.12 (by [@nicoburns][])
+- Upgrade to `read-fonts` 0.41, `skrifa` 0.44, `harfrust` 0.12 ([#719][] by [@nicoburns][])
 
 ## [0.11.0] - 2026-06-24
 
@@ -920,7 +920,8 @@ This release has an [MSRV][] of 1.70.
 [#872]: https://github.com/linebender/parley/pull/872
 [#878]: https://github.com/linebender/parley/pull/878
 
-[Unreleased]: https://github.com/linebender/parley/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/linebender/parley/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.1
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/linebender/parley/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/linebender/parley/compare/v0.8.0...v0.9.0
