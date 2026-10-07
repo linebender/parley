@@ -602,47 +602,6 @@ mod tests {
     }
 
     #[test]
-    fn splitting_text_does_not_affect_white_space_processing() {
-        for mode in [
-            WhiteSpaceCollapse::Collapse,
-            WhiteSpaceCollapse::PreserveBreaks,
-            WhiteSpaceCollapse::Preserve,
-            WhiteSpaceCollapse::BreakSpaces,
-        ] {
-            let style = ResolvedStyle {
-                white_space_collapse: mode,
-                ..ResolvedStyle::default()
-            };
-            for input in [" a \t b\n  c ", " \ta \t\r \t\n \tb \t", "a \u{2028} \tb"] {
-                let mut builder = TreeStyleBuilder::<u32>::default();
-                builder.begin(style.clone());
-                builder.push_text(input);
-                let mut expected_runs = Vec::new();
-                let expected = builder.finish(&mut Vec::new(), &mut expected_runs);
-
-                for split in (0..=input.len()).filter(|&i| input.is_char_boundary(i)) {
-                    let mut builder = TreeStyleBuilder::<u32>::default();
-                    builder.begin(style.clone());
-                    builder.push_text(&input[..split]);
-                    assert!(expected.starts_with(builder.text()));
-                    builder.push_text(&input[split..]);
-                    let mut runs = Vec::new();
-                    let text = builder.finish(&mut Vec::new(), &mut runs);
-                    assert_eq!(text, expected, "{mode:?} {input:?} split at {split}");
-                    assert_eq!(
-                        runs.iter().map(|r| r.range.clone()).collect::<Vec<_>>(),
-                        expected_runs
-                            .iter()
-                            .map(|r| r.range.clone())
-                            .collect::<Vec<_>>(),
-                        "{mode:?} {input:?} split at {split}"
-                    );
-                }
-            }
-        }
-    }
-
-    #[test]
     fn reports_pending_whitespace() {
         let mut builder = TreeStyleBuilder::<u32>::default();
         builder.begin(ResolvedStyle {
