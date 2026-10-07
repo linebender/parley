@@ -48,12 +48,6 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 
 [unicode-extended-grapheme-cluster]: https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries
 
-#### Performance
-
-Over the past few releases, building a `parley::Layout` got slower.
-In this release, building a layout has roughly 35% more throughput than in v0.11, with timings comparable to v0.6.
-Glyph iteration has roughly 3x the throughput.
-
 ### Added
 
 #### Parley
