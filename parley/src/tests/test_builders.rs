@@ -236,6 +236,8 @@ fn create_root_style() -> TextStyle<'static, 'static, ColorBrush> {
         overflow_wrap: OverflowWrap::Anywhere,
         text_wrap_mode: TextWrapMode::Wrap,
         white_space_collapse: WhiteSpaceCollapse::PreserveBreaks,
+        // Only affects the `TreeBuilder`, which collapses white space.
+        collapsed_space: crate::CollapsedSpace::Space,
     }
 }
 
