@@ -8,8 +8,7 @@ use crate::CharmapIndex;
 use super::source::{SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
 use crate::{FontStyle, FontWeight, FontWidth};
-use core::fmt;
-use parlance::Tag as SynthesisTag;
+use parlance::{Synthesis, Tag as SynthesisTag};
 use read_fonts::{FontRef, TableProvider as _, types::Tag};
 use smallvec::SmallVec;
 
@@ -338,103 +337,6 @@ pub struct AxisInfo {
     pub max: f32,
     /// The default value of the axis.
     pub default: f32,
-}
-
-/// Suggestions for synthesizing a set of font attributes for a given
-/// font.
-///
-/// Instances of this can be obtained from [`FontInfo::synthesis`]
-/// as well as [`QueryFont::synthesis`].
-///
-/// [`QueryFont::synthesis`]: crate::QueryFont::synthesis
-#[derive(Copy, Clone, PartialEq)]
-pub struct Synthesis {
-    vars: [(SynthesisTag, f32); 3],
-    len: u8,
-    embolden: bool,
-    skew: i8,
-}
-
-impl Default for Synthesis {
-    fn default() -> Self {
-        Self {
-            vars: [(SynthesisTag::from_bytes([0; 4]), 0.0); 3],
-            len: 0,
-            embolden: false,
-            skew: 0,
-        }
-    }
-}
-
-impl Synthesis {
-    /// The maximum number of variation settings a `Synthesis` can hold.
-    const MAX_VARIATIONS: usize = 3;
-
-    /// Creates synthesis suggestions from their parts.
-    ///
-    /// - `variations` are the variation settings that should be applied to the font. At most
-    ///   three are supported; this is enough for one setting each for width, weight and style.
-    /// - `embolden` is whether a faux bold should be applied.
-    /// - `skew_degrees` is the skew angle in degrees for a faux italic/oblique, with `0` meaning
-    ///   no skew.
-    ///
-    /// Returns `None` if there are more than three `variations`.
-    pub fn try_new(
-        variations: &[(SynthesisTag, f32)],
-        embolden: bool,
-        skew_degrees: i8,
-    ) -> Option<Self> {
-        if variations.len() > Self::MAX_VARIATIONS {
-            return None;
-        }
-        let mut synthesis = Self {
-            len: variations.len() as u8,
-            embolden,
-            skew: skew_degrees,
-            ..Self::default()
-        };
-        synthesis.vars[..variations.len()].copy_from_slice(variations);
-        Some(synthesis)
-    }
-
-    /// Returns `true` if any synthesis suggestions are available.
-    pub fn any(&self) -> bool {
-        self.len != 0 || self.embolden || self.skew != 0
-    }
-
-    /// Returns the variation settings that should be applied to match the
-    /// requested attributes.
-    ///
-    /// When using `parley`, these can be used to create `FontVariation`
-    /// settings.
-    pub fn variation_settings(&self) -> &[(SynthesisTag, f32)] {
-        &self.vars[..self.len as usize]
-    }
-
-    /// Returns `true` if the scaler should apply a faux bold.
-    pub fn embolden(&self) -> bool {
-        self.embolden
-    }
-
-    /// Returns a skew angle for faux italic/oblique, if requested.
-    pub fn skew(&self) -> Option<f32> {
-        if self.skew != 0 {
-            Some(self.skew as f32)
-        } else {
-            None
-        }
-    }
-}
-
-#[allow(clippy::missing_fields_in_debug)]
-impl fmt::Debug for Synthesis {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Synthesis")
-            .field("vars", &self.variation_settings())
-            .field("embolden", &self.embolden)
-            .field("skew", &self.skew)
-            .finish()
-    }
 }
 
 fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
