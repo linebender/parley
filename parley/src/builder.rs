@@ -276,10 +276,10 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
         self.lcx.tree_style_builder.text()
     }
 
-/// Returns whether [`Self::text`] is followed by collapsible whitespace.
-///
-/// That white space is not yet part of [`Self::text`]: depending on where it is and what
-/// follows, it is either removed or kept as a single space.
+    /// Returns whether [`Self::text`] is followed by collapsible whitespace.
+    ///
+    /// That white space is not yet part of [`Self::text`]: depending on where it is and what
+    /// follows, it is either removed or kept as a single space.
     pub fn has_pending_whitespace(&self) -> bool {
         self.lcx.tree_style_builder.has_pending_whitespace()
     }
