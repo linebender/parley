@@ -133,7 +133,6 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - Letter and word spacing is now applied once per grapheme. Previously, spacing was mistakenly counted for each character in the grapheme. ([#738][] by [@tomcur][])
 - `Layout::width` no longer under-reports widths when there are explicit newlines present and the style has non-zero letter spacing. Previously, an explicit newline would erroneously subtract the configured letter spacing from its line. ([#738][] by [@tomcur][])
 - Honours script and region sub tags for correct shaping of, for example, zh-Hans and zh-Hant. ([#756][] by [@DJMcNab][])
-- Line boxes with negative half-leading (line-height smaller than ascent + descent) are no longer floored at the content height; out-of-flow inline boxes no longer floor a line's extents at zero. ([#743][] by [@nicoburns][])
 - All line height changes within a run now contribute to the line box. ([#864][] by [@tomcur][])
 - Fix `calculate_content_widths` when an inline boxes immediately follows a hard/explicit newline. They were previously incorrectly counted as being before the newline. ([#746][] by [@nicoburns][], [#772][] by [@tomcur][])
 - In `calculate_content_widths`, the `max_content` width is now floored by `min_content` width. ([#834][] by [@nicoburns][])  
@@ -872,7 +871,6 @@ This release has an [MSRV][] of 1.70.
 [#734]: https://github.com/linebender/parley/pull/734
 [#738]: https://github.com/linebender/parley/pull/738
 [#740]: https://github.com/linebender/parley/pull/740
-[#743]: https://github.com/linebender/parley/pull/743
 [#746]: https://github.com/linebender/parley/pull/746
 [#753]: https://github.com/linebender/parley/pull/753
 [#754]: https://github.com/linebender/parley/pull/754
