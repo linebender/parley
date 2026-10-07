@@ -139,9 +139,9 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - Trailing white space consisting of separate runs (e.g., due to font size changes), now hangs past line ends. ([#762][] by [@tomcur][])
 - Collapsible white space is now collapsed across style span and inline box boundaries instead of being trimmed at each span boundary, and is removed around hard line breaks. ([#786][] by [@nicoburns][])
 - Mandatory line breaks (\n, \r\n, U+2028, U+2029) directly following Thai, Khmer or Lao text are no longer dropped. ([#781][] by [@nicoburns][])
-- Text that shapes into zero glyphs is no longer silently dropped. ([#815][] by [@tomcur][])  
-  This fixes some esoteric interactions, such as the string `\r\u{00AD}\n` losing the mandatory newline if the `\u{00AD}` soft-hyphen was shaped with a font missing a space glyph. ([#805][] by [@tomcur][])
-- When using the `TreeBuilder`, out-of-flow boxes are now correctly positioned within the text.
+- Text that shapes into zero glyphs is no longer silently dropped. ([#805][] by [@tomcur][])  
+  This fixes some esoteric interactions, such as the string `\r\u{00AD}\n` losing the mandatory newline if the `\u{00AD}` soft-hyphen was shaped with a font missing a space glyph.
+- When using the `TreeBuilder`, out-of-flow boxes are now correctly positioned within the text. ([#815][] by [@tomcur][])
 - Parley's detection of Emoji is now more robust. ([#811][] by [@DJMcNab][])
 - Fixed CJK and Korean word boundary navigation in `Cluster::is_word_boundary()`, properly distinguishing UAX #29 word boundaries from UAX #14 line break opportunities. ([#819][] by [@GoCoder7][], [#829][] by [@tomcur][])  
   Word boundaries of complex scripts, in the absence of dictionary data, now follow Unicode rules.
