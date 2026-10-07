@@ -467,8 +467,10 @@ mod tests {
 
         let synthesis = font.synthesis(font.width(), font.style(), FontWeight::NORMAL);
         assert_eq!(
-            synthesis.variation_settings(),
-            &[(parlance::Tag::new(b"wght"), FontWeight::NORMAL.value())]
+            synthesis
+                .variation_settings()
+                .collect::<alloc::vec::Vec<_>>(),
+            [(parlance::Tag::new(b"wght"), FontWeight::NORMAL.value())]
         );
         assert!(!synthesis.embolden());
 
@@ -493,6 +495,6 @@ mod tests {
             FontWeight::new(font.weight().value() + 201.0),
         );
         assert!(synthesis.embolden());
-        assert!(synthesis.variation_settings().is_empty());
+        assert!(synthesis.variation_settings().next().is_none());
     }
 }

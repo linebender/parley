@@ -19,47 +19,53 @@ use crate::Tag;
 /// use parlance::{Synthesis, Tag};
 ///
 /// let synthesis = Synthesis::default().with_weight(700.0).with_skew(14);
-/// assert_eq!(synthesis.variation_settings(), &[(Tag::new(b"wght"), 700.0)]);
+/// assert!(
+///     synthesis
+///         .variation_settings()
+///         .eq([(Tag::new(b"wght"), 700.0)])
+/// );
 /// assert_eq!(synthesis.skew(), Some(14.0));
 /// assert!(!synthesis.embolden());
 /// ```
-#[derive(Copy, Clone, PartialEq)]
+//
+// The values of variation settings that are not set are kept at zero, so that equality can be
+// derived.
+#[derive(Copy, Clone, Default, PartialEq)]
 pub struct Synthesis {
-    vars: [(Tag, f32); 3],
-    len: u8,
-    embolden: bool,
+    /// The value for the `wdth` axis, if `HAS_WIDTH` is set.
+    width: f32,
+    /// The value for the `wght` axis, if `HAS_WEIGHT` is set.
+    weight: f32,
+    /// The value for the `slnt` axis, if `HAS_SLANT` is set.
+    slant: f32,
+    flags: u8,
     skew: i8,
 }
 
-impl Default for Synthesis {
-    fn default() -> Self {
-        Self {
-            vars: [(Tag::from_bytes([0; 4]), 0.0); 3],
-            len: 0,
-            embolden: false,
-            skew: 0,
-        }
-    }
-}
-
 impl Synthesis {
-    const WDTH: Tag = Tag::new(b"wdth");
-    const WGHT: Tag = Tag::new(b"wght");
-    const ITAL: Tag = Tag::new(b"ital");
-    const SLNT: Tag = Tag::new(b"slnt");
+    const HAS_WIDTH: u8 = 1 << 0;
+    const HAS_WEIGHT: u8 = 1 << 1;
+    /// The `ital` axis is set to `1`. Mutually exclusive with `HAS_SLANT`.
+    const HAS_ITALIC: u8 = 1 << 2;
+    const HAS_SLANT: u8 = 1 << 3;
+    const EMBOLDEN: u8 = 1 << 4;
 
     /// Sets the value to apply to the font's width (`wdth`) variation axis.
     #[inline]
     #[must_use]
-    pub const fn with_width(self, width: f32) -> Self {
-        self.with_variation(Self::WDTH, width)
+    pub const fn with_width(mut self, width: f32) -> Self {
+        self.width = width;
+        self.flags |= Self::HAS_WIDTH;
+        self
     }
 
     /// Sets the value to apply to the font's weight (`wght`) variation axis.
     #[inline]
     #[must_use]
-    pub const fn with_weight(self, weight: f32) -> Self {
-        self.with_variation(Self::WGHT, weight)
+    pub const fn with_weight(mut self, weight: f32) -> Self {
+        self.weight = weight;
+        self.flags |= Self::HAS_WEIGHT;
+        self
     }
 
     /// Sets the font's italic (`ital`) variation axis to `1`.
@@ -68,8 +74,10 @@ impl Synthesis {
     /// made by [`with_slant`](Self::with_slant).
     #[inline]
     #[must_use]
-    pub const fn with_italic(self) -> Self {
-        self.with_variation(Self::ITAL, 1.0)
+    pub const fn with_italic(mut self) -> Self {
+        self.slant = 0.0;
+        self.flags = (self.flags & !Self::HAS_SLANT) | Self::HAS_ITALIC;
+        self
     }
 
     /// Sets the value to apply to the font's slant (`slnt`) variation axis.
@@ -78,15 +86,21 @@ impl Synthesis {
     /// made by [`with_italic`](Self::with_italic).
     #[inline]
     #[must_use]
-    pub const fn with_slant(self, slant: f32) -> Self {
-        self.with_variation(Self::SLNT, slant)
+    pub const fn with_slant(mut self, slant: f32) -> Self {
+        self.slant = slant;
+        self.flags = (self.flags & !Self::HAS_ITALIC) | Self::HAS_SLANT;
+        self
     }
 
     /// Sets whether the scaler should apply a faux bold.
     #[inline]
     #[must_use]
     pub const fn with_embolden(mut self, embolden: bool) -> Self {
-        self.embolden = embolden;
+        if embolden {
+            self.flags |= Self::EMBOLDEN;
+        } else {
+            self.flags &= !Self::EMBOLDEN;
+        }
         self
     }
 
@@ -100,54 +114,37 @@ impl Synthesis {
         self
     }
 
-    /// The position of a variation setting within `vars`. Width, weight and style each have one
-    /// slot, kept in that order.
-    const fn slot(tag: Tag) -> u8 {
-        match tag.to_bytes() {
-            [b'w', b'd', b't', b'h'] => 0,
-            [b'w', b'g', b'h', b't'] => 1,
-            _ => 2,
-        }
-    }
-
-    /// Sets the variation setting of `tag`'s slot, replacing a previous setting of that slot.
-    const fn with_variation(mut self, tag: Tag, value: f32) -> Self {
-        let slot = Self::slot(tag);
-        let len = self.len as usize;
-        let mut index = 0;
-        while index < len && Self::slot(self.vars[index].0) < slot {
-            index += 1;
-        }
-        if index == len || Self::slot(self.vars[index].0) != slot {
-            // The slot is not in use yet, so there is room for it. Make space at its position.
-            let mut end = len;
-            while end > index {
-                self.vars[end] = self.vars[end - 1];
-                end -= 1;
-            }
-            self.len += 1;
-        }
-        self.vars[index] = (tag, value);
-        self
-    }
-
     /// Returns `true` if any synthesis suggestions are available.
     #[inline]
     pub fn any(&self) -> bool {
-        self.len != 0 || self.embolden || self.skew != 0
+        self.flags != 0 || self.skew != 0
     }
 
     /// Returns the variation settings that should be applied to match the
     /// requested attributes.
+    ///
+    /// These are yielded in the order width (`wdth`), weight (`wght`), style (`ital` or `slnt`).
     #[inline]
-    pub fn variation_settings(&self) -> &[(Tag, f32)] {
-        &self.vars[..self.len as usize]
+    pub fn variation_settings(&self) -> impl Iterator<Item = (Tag, f32)> + Clone + use<> {
+        let has = |flag: u8| self.flags & flag != 0;
+        let style = if has(Self::HAS_ITALIC) {
+            Some((Tag::new(b"ital"), 1.0))
+        } else {
+            has(Self::HAS_SLANT).then_some((Tag::new(b"slnt"), self.slant))
+        };
+        [
+            has(Self::HAS_WIDTH).then_some((Tag::new(b"wdth"), self.width)),
+            has(Self::HAS_WEIGHT).then_some((Tag::new(b"wght"), self.weight)),
+            style,
+        ]
+        .into_iter()
+        .flatten()
     }
 
     /// Returns `true` if the scaler should apply a faux bold.
     #[inline]
     pub fn embolden(&self) -> bool {
-        self.embolden
+        self.flags & Self::EMBOLDEN != 0
     }
 
     /// Returns a skew angle for faux italic/oblique, if requested.
@@ -163,13 +160,20 @@ impl Synthesis {
 
 #[expect(
     clippy::missing_fields_in_debug,
-    reason = "only the variation settings in use are shown"
+    reason = "the fields are shown as the settings they represent"
 )]
 impl fmt::Debug for Synthesis {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        struct Vars(Synthesis);
+        impl fmt::Debug for Vars {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_list().entries(self.0.variation_settings()).finish()
+            }
+        }
+
         f.debug_struct("Synthesis")
-            .field("vars", &self.variation_settings())
-            .field("embolden", &self.embolden)
+            .field("vars", &Vars(*self))
+            .field("embolden", &self.embolden())
             .field("skew", &self.skew)
             .finish()
     }
@@ -184,24 +188,33 @@ mod tests {
     const SLNT: Tag = Tag::new(b"slnt");
     const ITAL: Tag = Tag::new(b"ital");
 
+    #[track_caller]
+    fn assert_variation_settings(synthesis: Synthesis, expected: &[(Tag, f32)]) {
+        let mut settings = synthesis.variation_settings();
+        for setting in expected {
+            assert_eq!(settings.next(), Some(*setting));
+        }
+        assert_eq!(settings.next(), None);
+    }
+
     #[test]
     fn default_has_no_suggestions() {
         let synthesis = Synthesis::default();
         assert!(!synthesis.any());
-        assert!(synthesis.variation_settings().is_empty());
+        assert_variation_settings(synthesis, &[]);
         assert!(!synthesis.embolden());
         assert_eq!(synthesis.skew(), None);
     }
 
     #[test]
-    fn variations_are_kept_in_slot_order() {
+    fn variations_are_yielded_in_slot_order() {
         let expected = [(WDTH, 75.0), (WGHT, 700.0), (SLNT, -14.0)];
         let synthesis = Synthesis::default()
             .with_width(75.0)
             .with_weight(700.0)
             .with_slant(-14.0);
         assert!(synthesis.any());
-        assert_eq!(synthesis.variation_settings(), &expected);
+        assert_variation_settings(synthesis, &expected);
         assert!(!synthesis.embolden());
         assert_eq!(synthesis.skew(), None);
 
@@ -210,14 +223,26 @@ mod tests {
             .with_slant(-14.0)
             .with_weight(700.0)
             .with_width(75.0);
-        assert_eq!(reordered.variation_settings(), &expected);
+        assert_variation_settings(reordered, &expected);
         assert_eq!(reordered, synthesis);
 
         let weight_and_style = Synthesis::default().with_italic().with_weight(700.0);
-        assert_eq!(
-            weight_and_style.variation_settings(),
-            &[(WGHT, 700.0), (ITAL, 1.0)]
-        );
+        assert_variation_settings(weight_and_style, &[(WGHT, 700.0), (ITAL, 1.0)]);
+    }
+
+    #[test]
+    fn single_variations() {
+        let width = Synthesis::default().with_width(75.0);
+        assert!(width.any());
+        assert_variation_settings(width, &[(WDTH, 75.0)]);
+
+        let slant = Synthesis::default().with_slant(-14.0);
+        assert!(slant.any());
+        assert_variation_settings(slant, &[(SLNT, -14.0)]);
+
+        let italic = Synthesis::default().with_italic();
+        assert!(italic.any());
+        assert_variation_settings(italic, &[(ITAL, 1.0)]);
     }
 
     #[test]
@@ -227,10 +252,7 @@ mod tests {
             .with_weight(400.0)
             .with_weight(700.0)
             .with_width(125.0);
-        assert_eq!(
-            synthesis.variation_settings(),
-            &[(WDTH, 125.0), (WGHT, 700.0)]
-        );
+        assert_variation_settings(synthesis, &[(WDTH, 125.0), (WGHT, 700.0)]);
         assert_eq!(
             synthesis,
             Synthesis::default().with_width(125.0).with_weight(700.0)
@@ -242,17 +264,11 @@ mod tests {
         let all = Synthesis::default().with_width(75.0).with_weight(700.0);
 
         let slant = all.with_italic().with_slant(-14.0);
-        assert_eq!(
-            slant.variation_settings(),
-            &[(WDTH, 75.0), (WGHT, 700.0), (SLNT, -14.0)]
-        );
+        assert_variation_settings(slant, &[(WDTH, 75.0), (WGHT, 700.0), (SLNT, -14.0)]);
         assert_eq!(slant, all.with_slant(-14.0));
 
         let italic = all.with_slant(-14.0).with_italic();
-        assert_eq!(
-            italic.variation_settings(),
-            &[(WDTH, 75.0), (WGHT, 700.0), (ITAL, 1.0)]
-        );
+        assert_variation_settings(italic, &[(WDTH, 75.0), (WGHT, 700.0), (ITAL, 1.0)]);
         assert_eq!(italic, all.with_italic());
     }
 
@@ -261,7 +277,7 @@ mod tests {
         let synthesis = Synthesis::default().with_embolden(true);
         assert!(synthesis.any());
         assert!(synthesis.embolden());
-        assert!(synthesis.variation_settings().is_empty());
+        assert_variation_settings(synthesis, &[]);
         assert_eq!(synthesis.skew(), None);
 
         assert_eq!(synthesis.with_embolden(false), Synthesis::default());
@@ -287,6 +303,11 @@ mod tests {
         assert_eq!(one, Synthesis::default().with_weight(700.0));
         assert_ne!(one, Synthesis::default().with_weight(400.0));
         assert_ne!(one, Synthesis::default().with_width(700.0));
+        assert_ne!(one, Synthesis::default().with_slant(700.0));
         assert_ne!(one, Synthesis::default());
+        assert_ne!(
+            Synthesis::default().with_italic(),
+            Synthesis::default().with_slant(0.0)
+        );
     }
 }

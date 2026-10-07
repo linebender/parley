@@ -84,8 +84,7 @@ impl FontMetrics {
         let location = font_ref.axes().location(
             font.synthesis
                 .variation_settings()
-                .iter()
-                .map(|(tag, value)| (skrifa::Tag::new(&tag.to_bytes()), *value))
+                .map(|(tag, value)| (skrifa::Tag::new(&tag.to_bytes()), value))
                 .chain(
                     variations
                         .iter()

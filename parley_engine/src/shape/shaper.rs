@@ -436,10 +436,9 @@ fn variations_iter<'a>(
 ) -> impl Iterator<Item = harfrust::Variation> + 'a {
     synthesis
         .variation_settings()
-        .iter()
         .map(|(tag, value)| harfrust::Variation {
             tag: harfrust::Tag::new(&tag.to_bytes()),
-            value: *value,
+            value,
         })
         .chain(item.iter().map(|variation| harfrust::Variation {
             tag: harfrust::Tag::new(&variation.tag.to_bytes()),
