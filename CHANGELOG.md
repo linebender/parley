@@ -105,7 +105,6 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - `parley::editing::Cursor::{previous,next}_logical_word` now land at the previous/next logical start of a word and skip over whitespace. ([#215][] by [@tomcur][])
 - OutOfFlow inline boxes no longer produce line-break opportunities ([#797][] by [@nicoburns][])
 - When no fonts are returned by the font query, Parley now falls back to selecting any font from the collection. ([#722][] by [@tomcur][])
-- Upgrade to read-fonts 0.41, skrifa 0.44, harfrust 0.12 ([#719][] by [@nicoburns][])
 
 #### Fontique
 
