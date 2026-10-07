@@ -473,7 +473,7 @@ fn glyph_run_builder<'a>(
 ) -> GlyphRunBuilder<'a> {
     let run = glyph_run.run();
     let mut builder = renderer
-        .glyph_run(resources, &run.font().font)
+        .glyph_run(resources, run.font())
         .font_size(run.font_size())
         .hint(config.hint)
         .normalized_coords(normalized_coords);

@@ -1,6 +1,7 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::FontData;
 use crate::layout::cluster::Cluster;
 use crate::layout::data::{LineItemData, RunData};
 use crate::layout::layout::Layout;
@@ -10,8 +11,8 @@ use crate::style::Brush;
 use core::ops::Range;
 use fontique::Synthesis;
 use parley_engine::{
-    Atom, Atoms, FontInstance, FontMetrics, Glyph, Graphemes, NormalizedCoord, ShapedClusterGlyphs,
-    ShapedRun, ShapedSlice,
+    Atom, Atoms, FontMetrics, Glyph, Graphemes, NormalizedCoord, ShapedClusterGlyphs, ShapedRun,
+    ShapedSlice,
 };
 
 /// Sequence of clusters with a single font and style.
@@ -82,13 +83,15 @@ impl<'a, B: Brush> Run<'a, B> {
     }
 
     /// Returns the font for the run.
-    pub fn font(&self) -> &FontInstance {
-        self.layout
+    pub fn font(&self) -> &FontData {
+        &self
+            .layout
             .data
             .shaped_text
             .fonts()
             .get(self.shaped.font_index)
             .unwrap()
+            .font
     }
 
     /// Returns the font size for the run.
