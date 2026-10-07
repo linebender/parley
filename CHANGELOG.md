@@ -51,15 +51,15 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 
 #### Parley
 
-- The baselines of inline boxes can now be specified. ([#639][] by [@nicoburns][])
-- The `VerticalAlign` style, allowing vertical alignment of inline spans to be specified. ([#766][] by [@nicoburns][])
+- Breaking change: The baselines of inline boxes can now be specified. ([#639][] by [@nicoburns][])
+- Breaking change: The `VerticalAlign` style, allowing vertical alignment of inline spans to be specified. ([#766][] by [@nicoburns][])
+- Breaking change: `AlignOption::last_line_alignment`, which allows the alignment of the last line to be configured. ([#872][] by [@nicoburns][])
+- Breaking change: Support for `WhiteSpaceCollapse::{PreserveBreaks, BreakSpace}`. ([#812][], [#833][] by [@nicoburns][])
+- Breaking change: Support for the CSS `line-break` style. This controls line-breaking behaviour of CJK text. ([#843][] by [@nicoburns][])
 - `Layout::text_len` and `Layout::alignment`, `Cursor::upstream_cluster` and `Cursor::downstream_cluster`, `PlainEditor::is_cursor_visible`, and `PlainEditorDriver::set_selection`. ([#716][] by [@DataTriny][])
   `ClusterPath::new` and the `Style::locale` field are now public as well.
   Together these make it possible to build an accessibility integration outside of Parley.
 - Shaping across style boundaries now uses the surrounding context to select the correct glyphs. ([#740][] by [@tomcur][])
-- Support for `WhiteSpaceCollapse::{PreserveBreaks, BreakSpace}`. ([#812][], [#833][] by [@nicoburns][])
-- Support for the CSS `line-break` style. This controls line-breaking behaviour of CJK text. ([#843][] by [@nicoburns][])
-- `AlignOption::last_line_alignment`, which allows the alignment of the last line to be configured. ([#872][] by [@nicoburns][])
 - `Layout::root_span_metrics`, to help with placing directly drawn bullet points. ([#867][] by [@DJMcNab][])
 - The base direction of paragraphs can now be set using `Layout::set_base_direction` and `PlainEditor::set_base_direction`. ([#708][] by [@waywardmonkeys][], [#858][] by [@nicoburns][])
 - `Layout::clear` to clear the contents of a layout. This can be used to clean up font resources. ([#804][] by [@taj-p][])
@@ -116,7 +116,7 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 
 #### Parlance
 
-- Breaking change: `parlance::Script::from_str_unchecked` has been deprecated. ([#677][] by [@DJMcNab][])  
+- `parlance::Script::from_str_unchecked` has been deprecated. ([#677][] by [@DJMcNab][])  
   Use `parlance::Script::from_bytes` instead.
 
 ### Fixed
