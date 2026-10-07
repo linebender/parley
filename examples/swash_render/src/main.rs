@@ -250,7 +250,7 @@ fn render_glyph_run(
     let normalized_coords = run.normalized_coords();
 
     // Convert from parley::Font to swash::FontRef
-    let font_ref = FontRef::from_index(font.font.data.as_ref(), font.font.index as usize).unwrap();
+    let font_ref = FontRef::from_index(font.data.as_ref(), font.index as usize).unwrap();
 
     // Build a scaler. As the font properties are constant across an entire run of glyphs
     // we can build one scaler for the run and reuse it for each glyph.

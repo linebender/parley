@@ -443,7 +443,7 @@ impl Editor {
                 set_brush(renderer, &style.brush);
                 let normalized_coords = bytemuck::cast_slice::<_, i16>(run.normalized_coords());
                 let mut builder = renderer
-                    .glyph_run(resources, &font.font)
+                    .glyph_run(resources, font)
                     .font_size(font_size)
                     .hint(true)
                     .normalized_coords(normalized_coords);
