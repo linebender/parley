@@ -1690,7 +1690,7 @@ fn commit_line<B: Brush>(
     };
     let HangingWhitespace {
         advance: hanging_advance,
-        collapsible_advance: collapsible_hanging_advance,
+        removed_advance,
         justification_end_cluster,
         opportunities: hanging_opportunities,
     } = hanging_whitespace(
@@ -1723,7 +1723,7 @@ fn commit_line<B: Brush>(
             indent: line_indent,
             advance: state.x,
             hanging_advance,
-            collapsible_hanging_advance,
+            removed_advance,
             ..Default::default()
         },
         aligned_subtree_offsets: Range::default(),
@@ -1745,9 +1745,9 @@ fn commit_line<B: Brush>(
 struct HangingWhitespace {
     /// The advance of the hanging whitespace.
     advance: f32,
-    /// The portion of `advance` that is the line's trailing collapsible whitespace (see
-    /// [`LineMetrics::collapsible_hanging_advance`]).
-    collapsible_advance: f32,
+    /// The portion of `advance` that is the line's trailing collapsible whitespace, which CSS
+    /// removes rather than hangs (see [`LineMetrics::removed_advance`]).
+    removed_advance: f32,
     /// The index one past the line's logically last shaped cluster that's eligible for
     /// justification (see [`Justification::justification_end_cluster`]).
     justification_end_cluster: u32,
@@ -1781,8 +1781,8 @@ fn hanging_whitespace<B: Brush>(
 ) -> HangingWhitespace {
     let mut hanging_whitespace_advance = 0.;
     // Collapsible whitespace can't be conditionally hanging, so this is unaffected by `overflow`.
-    let mut collapsible_advance = 0.;
-    let mut in_collapsible_suffix = true;
+    let mut removed_advance = 0.;
+    let mut in_removed_suffix = true;
     // Atoms with shaped clusters before this index may be stretched by justification.
     let mut justification_end_cluster = u32::MAX;
     let mut hanging_opportunities = 0;
@@ -1848,7 +1848,7 @@ fn hanging_whitespace<B: Brush>(
             }
             hanging_whitespace_advance += hanging;
             // A forced break doesn't separate collapsible whitespace from the line's end.
-            if in_collapsible_suffix && whitespace != Whitespace::Newline {
+            if in_removed_suffix && whitespace != Whitespace::Newline {
                 if all_hang
                     && atom.characters().iter().all(|character| {
                         layout.data.styles[character.style_index as usize]
@@ -1856,9 +1856,9 @@ fn hanging_whitespace<B: Brush>(
                             .collapses(character.whitespace)
                     })
                 {
-                    collapsible_advance += hanging;
+                    removed_advance += hanging;
                 } else {
-                    in_collapsible_suffix = false;
+                    in_removed_suffix = false;
                 }
             }
             // Justification can't stretch within an atom, so it stops at the start of the
@@ -1879,7 +1879,7 @@ fn hanging_whitespace<B: Brush>(
 
     HangingWhitespace {
         advance: hanging_whitespace_advance,
-        collapsible_advance,
+        removed_advance,
         justification_end_cluster,
         opportunities: hanging_opportunities,
     }
