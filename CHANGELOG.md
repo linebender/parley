@@ -18,10 +18,10 @@ This release has an [MSRV] of 1.88.
 
 ### Highlights
 
-#### `parley_engine`
+#### Parley Engine
 
-This release introduces `parley_engine`, a lower-level crate for building your own text layout.
-`parley` itself is now built on top of it.
+This release introduces `parley_engine`, a lower-level crate intended for those building document-style and/or higher-fidelity text layout, where Parley makes trade-offs suitable for web layout.
+Parley itself is now built on top of it.
 This new crate performs paragraph-level analysis of text, resolving details like line break opportunities, grapheme boundaries, bidirectional text embedding levels, and emoji presentation, and shapes the text with caller-provided font selection.
 Layout decisions like where to break lines and how to align or stack lines are left to the caller.
 Work is underway to support reshaping of lines, e.g., when a break falls within a ligature or word in a cursive script.
