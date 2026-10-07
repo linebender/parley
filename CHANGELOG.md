@@ -94,15 +94,16 @@ Carets and selections no longer land inside graphemes (such as between a letter 
   Note glyphs overflow these content bounds as well, for example when many combining marks are stacked.
   The union of the line-box and content bounds is close to the old `LineMetrics::block_{min,max}_coord` fields.
 - Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. ([#661][] by [@tomcur][])
-- Breaking change: `parley::layout::Cluster::first_style` was renamed to `parley::layout::Cluster::style`. ([#660][] by [@tomcur][])
-- Breaking change: `Run::{logical_to_visual, visual_to_logical}` were removed. Use `Run::visual_clusters` or `Cluster::{next, previous}_visual` instead. ([#810][] by [@tomcur][])
+- Breaking change: `layout::Cluster::first_style` was renamed to `layout::Cluster::style`. ([#660][] by [@tomcur][])
+- Breaking change: `layout::Run::metrics()` was removed, use `layout::Run::font_metrics()` instead. ([#679][] by [@tomcur][])
+- Breaking change: `layout::Run::{logical_to_visual, visual_to_logical}` were removed. Use `layout::Run::visual_clusters` or `layout::Cluster::{next, previous}_visual` instead. ([#810][] by [@tomcur][])
 - Breaking change: `WhiteSpaceCollapse` is now a style rather than a special method on the `TreeBuilder` ([#814][] by [@nicoburns][])
 - Breaking change: `LineMetrics::trailing_whitespace` was renamed to `LineMetrics::hanging_advance`. Following CSS Text 4 § 4.3.2, non-breaking spaces no longer hang past line ends. ([#762][] by [@tomcur][])
 - Ideographic spaces can now hang past line ends. ([#784][] by [@tomcur][])
 - Following CSS Text 4 § 4.3.2, whitespace with `WhiteSpaceCollapse::Preserve` now hangs only if it's not on the last line, and is not followed by a newline. ([#790][] by [@tomcur][])
 - Non-breaking spaces are now conserved when collapsing whitespace. ([#734][] by [@subotac][])
 - Applying letter spacing now stops optional ligatures from forming. ([#731][] by [@tomcur][])
-- `parley::editing::Cursor::{previous,next}_logical_word` now land at the previous/next logical start of a word and skip over whitespace. ([#215][] by [@tomcur][])
+- `editing::Cursor::{previous,next}_logical_word` now land at the previous/next logical start of a word and skip over whitespace. ([#215][] by [@tomcur][])
 - OutOfFlow inline boxes no longer produce line-break opportunities ([#797][] by [@nicoburns][])
 - When no fonts are returned by the font query, Parley now falls back to selecting any font from the collection. ([#722][] by [@tomcur][])
 
@@ -847,6 +848,7 @@ This release has an [MSRV][] of 1.70.
 [#671]: https://github.com/linebender/parley/pull/671
 [#676]: https://github.com/linebender/parley/pull/676
 [#677]: https://github.com/linebender/parley/pull/677
+[#679]: https://github.com/linebender/parley/pull/679
 [#697]: https://github.com/linebender/parley/pull/697
 [#708]: https://github.com/linebender/parley/pull/708
 [#710]: https://github.com/linebender/parley/pull/710
