@@ -85,7 +85,7 @@ impl FontMetrics {
             font.synthesis
                 .variation_settings()
                 .iter()
-                .map(|(tag, value)| (skrifa::Tag::new(&tag.to_be_bytes()), *value))
+                .map(|(tag, value)| (skrifa::Tag::new(&tag.to_bytes()), *value))
                 .chain(
                     variations
                         .iter()

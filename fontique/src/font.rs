@@ -9,6 +9,7 @@ use super::source::{SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
 use crate::{FontStyle, FontWeight, FontWidth};
 use core::fmt;
+use parlance::Tag as SynthesisTag;
 use read_fonts::{FontRef, TableProvider as _, types::Tag};
 use smallvec::SmallVec;
 
@@ -88,10 +89,14 @@ impl FontInfo {
 
     /// Returns synthesis suggestions for this font with the given attributes.
     pub fn synthesis(&self, width: FontWidth, style: FontStyle, weight: FontWeight) -> Synthesis {
-        let mut synth = Synthesis::default();
+        // At most three variations are synthesized: one each for width and weight, and one for
+        // style (`ital` and `slnt` are mutually exclusive).
+        let mut vars = [(SynthesisTag::new(b"wdth"), 0.0); 3];
         let mut len = 0_usize;
+        let mut embolden = false;
+        let mut skew = 0_i8;
         if self.has_width_axis() && self.width != width {
-            synth.vars[len] = (Tag::new(b"wdth"), width.percentage());
+            vars[len] = (SynthesisTag::new(b"wdth"), width.percentage());
             len += 1;
         }
         // Imagine a caller requests weight 400, but the `wght` axis defaults to
@@ -105,11 +110,11 @@ impl FontInfo {
         //      - See: <https://learn.microsoft.com/en-us/typography/opentype/spec/dvaraxistag_wght#additional-information>
         if let Some(weight_axis) = self.axes.iter().find(|axis| axis.tag == Tag::new(b"wght")) {
             if weight_axis.default != weight.value() {
-                synth.vars[len] = (Tag::new(b"wght"), weight.value());
+                vars[len] = (SynthesisTag::new(b"wght"), weight.value());
                 len += 1;
             }
         } else if weight.value() > self.weight.value() + 200.0 {
-            synth.embolden = true;
+            embolden = true;
         }
         if self.style != style {
             match style {
@@ -117,13 +122,13 @@ impl FontInfo {
                 FontStyle::Italic => {
                     if self.style == FontStyle::Normal {
                         if self.has_italic_axis() {
-                            synth.vars[len] = (Tag::new(b"ital"), 1.0);
+                            vars[len] = (SynthesisTag::new(b"ital"), 1.0);
                             len += 1;
                         } else if self.has_slant_axis() {
-                            synth.vars[len] = (Tag::new(b"slnt"), 14.0);
+                            vars[len] = (SynthesisTag::new(b"slnt"), 14.0);
                             len += 1;
                         } else {
-                            synth.skew = 14;
+                            skew = 14;
                         }
                     }
                 }
@@ -131,20 +136,20 @@ impl FontInfo {
                     if self.style == FontStyle::Normal {
                         let degrees = angle.unwrap_or(14.0);
                         if self.has_slant_axis() {
-                            synth.vars[len] = (Tag::new(b"slnt"), degrees);
+                            vars[len] = (SynthesisTag::new(b"slnt"), degrees);
                             len += 1;
                         } else if self.has_italic_axis() && degrees > 0. {
-                            synth.vars[len] = (Tag::new(b"ital"), 1.0);
+                            vars[len] = (SynthesisTag::new(b"ital"), 1.0);
                             len += 1;
                         } else {
-                            synth.skew = degrees as i8;
+                            skew = degrees as i8;
                         }
                     }
                 }
             }
         }
-        synth.len = len as u8;
-        synth
+        Synthesis::try_new(&vars[..len], embolden, skew)
+            .expect("at most three variations are synthesized")
     }
 
     /// Returns the variation [axes] for the font.
@@ -342,15 +347,56 @@ pub struct AxisInfo {
 /// as well as [`QueryFont::synthesis`].
 ///
 /// [`QueryFont::synthesis`]: crate::QueryFont::synthesis
-#[derive(Copy, Clone, Default, PartialEq)]
+#[derive(Copy, Clone, PartialEq)]
 pub struct Synthesis {
-    vars: [(Tag, f32); 3],
+    vars: [(SynthesisTag, f32); 3],
     len: u8,
     embolden: bool,
     skew: i8,
 }
 
+impl Default for Synthesis {
+    fn default() -> Self {
+        Self {
+            vars: [(SynthesisTag::from_bytes([0; 4]), 0.0); 3],
+            len: 0,
+            embolden: false,
+            skew: 0,
+        }
+    }
+}
+
 impl Synthesis {
+    /// The maximum number of variation settings a `Synthesis` can hold.
+    const MAX_VARIATIONS: usize = 3;
+
+    /// Creates synthesis suggestions from their parts.
+    ///
+    /// - `variations` are the variation settings that should be applied to the font. At most
+    ///   three are supported; this is enough for one setting each for width, weight and style.
+    /// - `embolden` is whether a faux bold should be applied.
+    /// - `skew_degrees` is the skew angle in degrees for a faux italic/oblique, with `0` meaning
+    ///   no skew.
+    ///
+    /// Returns `None` if there are more than three `variations`.
+    pub fn try_new(
+        variations: &[(SynthesisTag, f32)],
+        embolden: bool,
+        skew_degrees: i8,
+    ) -> Option<Self> {
+        if variations.len() > Self::MAX_VARIATIONS {
+            return None;
+        }
+        let mut synthesis = Self {
+            len: variations.len() as u8,
+            embolden,
+            skew: skew_degrees,
+            ..Self::default()
+        };
+        synthesis.vars[..variations.len()].copy_from_slice(variations);
+        Some(synthesis)
+    }
+
     /// Returns `true` if any synthesis suggestions are available.
     pub fn any(&self) -> bool {
         self.len != 0 || self.embolden || self.skew != 0
@@ -361,7 +407,7 @@ impl Synthesis {
     ///
     /// When using `parley`, these can be used to create `FontVariation`
     /// settings.
-    pub fn variation_settings(&self) -> &[(Tag, f32)] {
+    pub fn variation_settings(&self) -> &[(SynthesisTag, f32)] {
         &self.vars[..self.len as usize]
     }
 
@@ -532,7 +578,7 @@ mod tests {
         let synthesis = font.synthesis(font.width(), font.style(), FontWeight::NORMAL);
         assert_eq!(
             synthesis.variation_settings(),
-            &[(Tag::new(b"wght"), FontWeight::NORMAL.value())]
+            &[(SynthesisTag::new(b"wght"), FontWeight::NORMAL.value())]
         );
         assert!(!synthesis.embolden());
 

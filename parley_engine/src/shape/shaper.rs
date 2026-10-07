@@ -438,7 +438,7 @@ fn variations_iter<'a>(
         .variation_settings()
         .iter()
         .map(|(tag, value)| harfrust::Variation {
-            tag: *tag,
+            tag: harfrust::Tag::new(&tag.to_bytes()),
             value: *value,
         })
         .chain(item.iter().map(|variation| harfrust::Variation {
