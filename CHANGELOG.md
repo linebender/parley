@@ -170,6 +170,16 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 
 - `GenericFamily::parse` is now case-insensitive. ([#654][] by [@mvanhorn][])
 
+## [0.11.1] - 2026-08-16
+
+This release has an [MSRV] of 1.88.
+
+### Changed
+
+#### Parley
+
+- Upgrade to `read-fonts` 0.41, `skrifa` 0.44, `harfrust` 0.12 (by [@nicoburns][])
+
 ## [0.11.0] - 2026-06-24
 
 This release has an [MSRV] of 1.88.
