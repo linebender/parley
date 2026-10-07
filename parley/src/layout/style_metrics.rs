@@ -182,7 +182,7 @@ fn shaped_run_metrics(
     font_size: f32,
     variations: &[crate::FontVariation],
 ) -> Option<FontMetrics> {
-    if !variations.is_empty() || font.synthesis.variation_settings().next().is_some() {
+    if !variations.is_empty() || font.synthesis.has_variations() {
         return None;
     }
     let font_index = shaped_text.fonts().iter().position(|f| f == font)?;

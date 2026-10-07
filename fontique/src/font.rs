@@ -495,6 +495,6 @@ mod tests {
             FontWeight::new(font.weight().value() + 201.0),
         );
         assert!(synthesis.embolden());
-        assert!(synthesis.variation_settings().next().is_none());
+        assert!(!synthesis.has_variations());
     }
 }

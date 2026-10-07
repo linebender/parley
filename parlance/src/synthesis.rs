@@ -49,6 +49,8 @@ impl Synthesis {
     const HAS_ITALIC: u8 = 1 << 2;
     const HAS_SLANT: u8 = 1 << 3;
     const EMBOLDEN: u8 = 1 << 4;
+    /// The flags of all variation settings.
+    const VARIATIONS: u8 = Self::HAS_WIDTH | Self::HAS_WEIGHT | Self::HAS_ITALIC | Self::HAS_SLANT;
 
     /// Sets the value to apply to the font's width (`wdth`) variation axis.
     #[inline]
@@ -118,6 +120,12 @@ impl Synthesis {
     #[inline]
     pub fn any(&self) -> bool {
         self.flags != 0 || self.skew != 0
+    }
+
+    /// Returns `true` if there are any [variation settings](Self::variation_settings) to apply.
+    #[inline]
+    pub const fn has_variations(&self) -> bool {
+        self.flags & Self::VARIATIONS != 0
     }
 
     /// Returns the variation settings that should be applied to match the
