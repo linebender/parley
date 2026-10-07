@@ -60,7 +60,6 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - `Layout::text_len` and `Layout::alignment`, `Cursor::upstream_cluster` and `Cursor::downstream_cluster`, `PlainEditor::is_cursor_visible`, and `PlainEditorDriver::set_selection`. ([#716][] by [@DataTriny][])
   `ClusterPath::new` and the `Style::locale` field are now public as well.
   Together these make it possible to build an accessibility integration outside of Parley.
-- Shaping across style boundaries now uses the surrounding context to select the correct glyphs. ([#740][] by [@tomcur][])
 - `Layout::root_span_metrics`, to help with placing directly drawn bullet points. ([#867][] by [@DJMcNab][])
 - The base direction of paragraphs can now be set using `{RangedBuilder, StyleRunBuilder, TreeBuilder, PlainEditor}::set_base_direction`. ([#708][] by [@waywardmonkeys][], [#858][] by [@nicoburns][])
 - `Layout::clear` to clear the contents of a layout. This can be used to clean up font resources. ([#804][] by [@taj-p][])
@@ -97,7 +96,6 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - Following CSS Text 4 § 4.3.2, whitespace with `WhiteSpaceCollapse::Preserve` now hangs only if it's not on the last line, and is not followed by a newline. ([#790][] by [@tomcur][])
 - Non-breaking spaces are now conserved when collapsing whitespace. ([#734][] by [@subotac][])
 - Applying letter spacing now stops optional ligatures from forming. ([#731][] by [@tomcur][])
-- `editing::Cursor::{previous,next}_logical_word` now land at the previous/next logical start of a word and skip over whitespace. ([#215][] by [@tomcur][])
 - OutOfFlow inline boxes no longer produce line-break opportunities ([#797][] by [@nicoburns][])
 - When no fonts are returned by the font query, Parley now falls back to selecting any font from the collection. ([#722][] by [@tomcur][])
 
@@ -129,7 +127,9 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 
 #### Parley
 
+- Shaping across style boundaries now uses the surrounding context to select the correct glyphs. ([#740][] by [@tomcur][])
 - Cursor movement and hit-testing no longer place the caret inside grapheme clusters. ([#715][] by [@tomcur][])
+- `editing::Cursor::{previous,next}_logical_word` now land at the previous/next logical start of a word and skip over whitespace. ([#215][] by [@tomcur][])
 - Letter and word spacing is now applied once per grapheme. Previously, spacing was mistakenly counted for each character in the grapheme. ([#738][] by [@tomcur][])
 - `Layout::width` no longer under-reports widths when there are explicit newlines present and the style has non-zero letter spacing. Previously, an explicit newline would erroneously subtract the configured letter spacing from its line. ([#738][] by [@tomcur][])
 - Honours script and region sub tags for correct shaping of, for example, zh-Hans and zh-Hant. ([#756][] by [@DJMcNab][])
