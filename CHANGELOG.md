@@ -55,7 +55,7 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - Breaking change: The `VerticalAlign` style, allowing vertical alignment of inline spans to be specified. ([#766][] by [@nicoburns][])  
   `Layout::{inline_boxes, inline_boxes_mut}` now return `impl ExactSizeIterator` instead of slices.
 - Breaking change: `AlignmentOptions::last_line_alignment`, which allows the alignment of the last line to be configured. ([#872][] by [@nicoburns][])  
-  This is useful especially in combination with justification.
+  This is especially useful in combination with justification.
 - Breaking change: Support for `WhiteSpaceCollapse::{PreserveBreaks, BreakSpaces}`. ([#812][], [#833][] by [@nicoburns][])
 - Breaking change: Support for the CSS `line-break` style. This controls line-breaking behaviour of CJK text. ([#843][] by [@nicoburns][])
 - `Layout::text_len` and `Layout::alignment`, `Cursor::upstream_cluster` and `Cursor::downstream_cluster`, `PlainEditor::is_cursor_visible`, and `PlainEditorDriver::set_selection`. ([#716][] by [@DataTriny][])
