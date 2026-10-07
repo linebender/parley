@@ -61,7 +61,7 @@ Carets and selections no longer land inside graphemes (such as between a letter 
   Together these make it possible to build an accessibility integration outside of Parley.
 - Shaping across style boundaries now uses the surrounding context to select the correct glyphs. ([#740][] by [@tomcur][])
 - `Layout::root_span_metrics`, to help with placing directly drawn bullet points. ([#867][] by [@DJMcNab][])
-- The base direction of paragraphs can now be set using `Layout::set_base_direction` and `PlainEditor::set_base_direction`. ([#708][] by [@waywardmonkeys][], [#858][] by [@nicoburns][])
+- The base direction of paragraphs can now be set using `{RangedBuilder, StyleRunBuilder, TreeBuilder, PlainEditor}::set_base_direction`. ([#708][] by [@waywardmonkeys][], [#858][] by [@nicoburns][])
 - `Layout::clear` to clear the contents of a layout. This can be used to clean up font resources. ([#804][] by [@taj-p][])
 
 #### Parlance
