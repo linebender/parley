@@ -32,7 +32,7 @@ Parley now implements whitespace hanging rules following [CSS Text 4][css-text-4
 
 [css-text-4]: https://www.w3.org/TR/css-text-4/
 
-#### Line boxes and vertical alignment
+#### Vertical alignment
 
 Lines in a layout are now sized more closely to [the CSS line box model][css-line-box].
 Inline boxes and spans of text can be vertically aligned following the keywords and lengths of [CSS 2.2's `vertical-align`][css-2-vertical-align].
