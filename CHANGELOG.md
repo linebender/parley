@@ -28,17 +28,19 @@ Work is underway to support reshaping of lines, e.g., when a break falls within 
 
 #### Whitespace handling and spacing
 
-Parley now implements whitespace hanging rules following [CSS Text 4][css-text-4], and `parley::TreeBuilder` collapses whitespace according to CSS's `white-space-collapse` property.
+Parley now implements whitespace hanging rules following [CSS Text 4][css-text-4], and `parley::TreeBuilder` can now collapse whitespace according to CSS's `white-space-collapse` property; see [`style::WhiteSpaceCollapse`][style-white-space-collapse-012].
 
 [css-text-4]: https://www.w3.org/TR/css-text-4/
+[style-white-space-collapse-012]: https://docs.rs/parley/0.12.0/parley/style/enum.WhiteSpaceCollapse.html
 
 #### Vertical alignment
 
 Lines in a layout are now sized more closely to [the CSS line box model][css-line-box].
-Inline boxes and spans of text can be vertically aligned following the keywords and lengths of [CSS 2.2's `vertical-align`][css-2-vertical-align].
+Inline boxes and spans of text can be vertically aligned following the keywords and lengths of [CSS 2.2's `vertical-align`][css-2-vertical-align]; see [`style::VerticalAlign`][style-vertical-align-012]
 
 [css-line-box]: https://www.w3.org/TR/CSS22/visuren.html#line-box
 [css-2-vertical-align]: https://www.w3.org/TR/CSS22/visudet.html#propdef-vertical-align
+[style-vertical-align-012]: https://docs.rs/parley/0.12.0/parley/style/enum.VerticalAlign.html
 
 #### Grapheme clusters
 
@@ -56,7 +58,7 @@ Carets and selections no longer land inside graphemes (such as between a letter 
   `Layout::{inline_boxes, inline_boxes_mut}` now return `impl ExactSizeIterator` instead of slices.
 - Breaking change: `AlignmentOptions::last_line_alignment`, which allows the alignment of the last line to be configured. ([#872][] by [@nicoburns][])  
   This is especially useful in combination with justification.
-- Breaking change: Support for `WhiteSpaceCollapse::{PreserveBreaks, BreakSpaces}`. ([#812][], [#833][] by [@nicoburns][])
+- Breaking change: Added the `WhiteSpaceCollapse::{PreserveBreaks, BreakSpaces}` variants. ([#812][], [#833][] by [@nicoburns][])
 - Breaking change: Support for the CSS `line-break` style. This controls line-breaking behaviour of CJK text. ([#843][] by [@nicoburns][])
 - `Layout::text_len` and `Layout::alignment`, `Cursor::upstream_cluster` and `Cursor::downstream_cluster`, `PlainEditor::is_cursor_visible`, and `PlainEditorDriver::set_selection`. ([#716][] by [@DataTriny][])
   `ClusterPath::new` and the `Style::locale` field are now public as well.
