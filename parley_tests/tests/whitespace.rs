@@ -96,17 +96,17 @@ fn hanging_across_collapse_mode_boundary() {
 }
 
 #[test]
-fn collapsible_hanging_advance() {
+fn removed_advance() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    // Collapsible whitespace at the end of a line is reported separately from the other whitespace
-    // hanging there: preserved whitespace and the ideographic space (which never collapses) hang
-    // too, but aren't collapsible. Only the collapsible whitespace directly at the line's end
-    // counts, though a forced break may follow it.
+    // Collapsible whitespace at the end of a line is reported as removed, separately from the other
+    // whitespace hanging there: preserved whitespace and the ideographic space (which never
+    // collapses) hang too, but aren't removed. Only the collapsible whitespace directly at the
+    // line's end counts, though a forced break may follow it.
     let word = advance(&mut env, "X");
     let space = advance(&mut env, " ");
     let ideographic_space = advance(&mut env, "\u{3000}");
-    for (text, default, collapse_range, hanging, collapsible) in [
+    for (text, default, collapse_range, hanging, removed) in [
         ("X X", WhiteSpaceCollapse::Collapse, None, space, space),
         (
             "X\u{3000} X",
@@ -158,11 +158,11 @@ fn collapsible_hanging_advance() {
         assert_eq!(layout.len(), 2, "{text:?} {collapse_range:?}");
         let metrics = *layout.get(0).unwrap().metrics();
         nearly_eq(metrics.hanging_advance, hanging);
-        nearly_eq(metrics.collapsible_hanging_advance, collapsible);
+        nearly_eq(metrics.removed_advance, removed);
         // The last line has no trailing whitespace.
         let metrics = *layout.get(1).unwrap().metrics();
         nearly_eq(metrics.hanging_advance, 0.);
-        nearly_eq(metrics.collapsible_hanging_advance, 0.);
+        nearly_eq(metrics.removed_advance, 0.);
     }
 }
 
