@@ -20,7 +20,7 @@ This release has an [MSRV] of 1.88.
 
 #### Parley Engine
 
-This release introduces `parley_engine`, a lower-level crate for applications that need full control over text layout, such as document editors for which Parley's more opnionated web-style layout is unsuitable.
+This release introduces `parley_engine`, a lower-level crate for applications that need more control over text layout than Parley's web-style model allows, such as typesetters implementing their own line-breaking algorithms.
 Parley itself is now built on top of it.
 Parley Engine analyzes paragraphs of text, resolving details like line break opportunities, grapheme boundaries, bidirectional text embedding levels, and emoji presentation, and shapes them with caller-provided font selection.
 Layout decisions, such as where to break lines and how to align or stack them, are left to the caller.
