@@ -24,7 +24,7 @@ members = [
 
 [workspace.package]
 edition = "2024"
-version = "0.11.0"
+version = "0.12.0"
 # Keep in sync with RUST_MIN_VER in .github/workflows/ci.yml, with the relevant README.md files
 # and with the MSRV in the `Unreleased` section of CHANGELOG.md.
 # Until MSRV is bumped to 1.96+, use `core::ops::Range*` rather than `core::range::Range*`.
@@ -35,13 +35,13 @@ repository = "https://github.com/linebender/parley"
 [workspace.dependencies]
 # Local crates
 parlance = { version = "0.1.0", default-features = false, path = "parlance" }
-fontique = { version = "0.11.0", default-features = false, path = "fontique" }
-parley = { version = "0.11.0", default-features = false, path = "parley" }
-parley_data = { version = "0.11.0", path = "parley_data", default-features = false }
+fontique = { version = "0.12.0", default-features = false, path = "fontique" }
+parley = { version = "0.12.0", default-features = false, path = "parley" }
+parley_data = { version = "0.12.0", path = "parley_data", default-features = false }
 parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
-parley_engine = { version = "0.11.0", default-features = false, path = "parley_engine" }
-parley_emoji = { version = "0.11.0", default-features = false, path = "parley_emoji" }
+parley_engine = { version = "0.12.0", default-features = false, path = "parley_engine" }
+parley_emoji = { version = "0.12.0", default-features = false, path = "parley_emoji" }
 parley_linebreaking_cases = { path = "parley_tests/linebreaking_cases" }
 
 # External dependencies

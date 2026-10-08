@@ -16,6 +16,10 @@ Every change to this file must be written by a human.
 
 This release has an [MSRV] of 1.88.
 
+## [0.12.0] - 2026-10-09
+
+This release has an [MSRV] of 1.88.
+
 ### Highlights
 
 #### Parley Engine
@@ -938,7 +942,8 @@ This release has an [MSRV][] of 1.70.
 [#872]: https://github.com/linebender/parley/pull/872
 [#878]: https://github.com/linebender/parley/pull/878
 
-[Unreleased]: https://github.com/linebender/parley/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/linebender/parley/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/linebender/parley/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.1
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/linebender/parley/compare/v0.9.0...v0.10.0
