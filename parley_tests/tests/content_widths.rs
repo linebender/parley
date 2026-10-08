@@ -394,11 +394,21 @@ fn content_widths_text_indent() {
         full.max(hanging_min),
     );
 
-    // A negative indent reduces the first line's contribution.
+    // A negative indent reduces the first line's contribution. While the line's running width is
+    // still negative, soft wrap opportunities are not taken: here the whole text stays on the first
+    // line.
+    let partial = short + 10.0;
+    assert_widths(
+        measure("AA BBBB", -partial, IndentOptions::default(), false),
+        full - partial,
+        full - partial,
+    );
+
+    // A negative indent wider than the text leaves no measurable width at all.
     assert_widths(
         measure("AA BBBB", -indent, IndentOptions::default(), false),
-        long,
-        (full - indent).max(long),
+        0.0,
+        0.0,
     );
 
     // Without `each-line`, lines after a forced break aren't indented.

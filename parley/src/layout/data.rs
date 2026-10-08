@@ -462,11 +462,12 @@ impl ContentWidthsMeasurer {
     /// Ends the current min-content fragment at a soft wrap opportunity.
     ///
     /// Under a min-content constraint, every soft wrap opportunity is taken, unless the line has no
-    /// content yet. The next fragment then starts a line after a soft wrap break, which will be
-    /// indented iff the indent is "hanging" (see [`IndentOptions::hanging`]).
+    /// content yet or its running width is still negative (due to a negative indent or inline box).
+    /// The next fragment then starts a line after a soft wrap break, which will be indented iff the
+    /// indent is "hanging" (see [`IndentOptions::hanging`]).
     #[inline(always)]
     fn soft_break(&mut self, min_width_line_has_content: bool) {
-        if !min_width_line_has_content {
+        if !min_width_line_has_content || self.running_min_width < 0.0 {
             return;
         }
         self.min_width = self
