@@ -16,32 +16,80 @@ Every change to this file must be written by a human.
 
 This release has an [MSRV] of 1.88.
 
+### Highlights
+
+#### Parley Engine
+
+This release introduces `parley_engine`, a lower-level crate for applications that need more control over text layout than Parley's web-style model allows, such as typesetters implementing their own line-breaking algorithms.
+Parley itself is now built on top of it.
+Parley Engine analyzes paragraphs of text, resolving details like line break opportunities, grapheme boundaries, bidirectional text embedding levels, and emoji presentation, and shapes them with caller-provided font selection.
+Layout decisions, such as where to break lines and how to align or stack them, are left to the caller.
+Work is underway to support reshaping of lines, e.g., when a break falls within a ligature or splits a word in a cursive script.
+
+#### Whitespace handling
+
+Parley now implements whitespace hanging rules following [CSS Text 4][css-text-4], and `parley::TreeBuilder` can now collapse whitespace according to CSS's `white-space-collapse` property; see [`style::WhiteSpaceCollapse`][style-white-space-collapse-012].
+
+[css-text-4]: https://www.w3.org/TR/css-text-4/
+[style-white-space-collapse-012]: https://docs.rs/parley/0.12.0/parley/style/enum.WhiteSpaceCollapse.html
+
+#### Vertical alignment
+
+Lines in a layout are now sized more closely to [the CSS line box model][css-line-box].
+Inline boxes and spans of text can be vertically aligned following the keywords and lengths of [CSS 2.2's `vertical-align`][css-2-vertical-align]; see [`style::VerticalAlign`][style-vertical-align-012].
+
+[css-line-box]: https://www.w3.org/TR/CSS22/visuren.html#line-box
+[css-2-vertical-align]: https://www.w3.org/TR/CSS22/visudet.html#propdef-vertical-align
+[style-vertical-align-012]: https://docs.rs/parley/0.12.0/parley/style/struct.VerticalAlign.html
+
+#### Grapheme clusters
+
+`parley::layout::Cluster` now spans whole [extended grapheme clusters][unicode-extended-grapheme-cluster], instead of single characters.
+Carets and selections no longer land inside graphemes (such as between a letter and its combining accent); within a ligature, carets land between its graphemes at evenly spaced positions.
+
+[unicode-extended-grapheme-cluster]: https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries
+
 ### Added
+
+#### Parley
+
+- Breaking change: The baselines of inline boxes can now be specified. ([#639][] by [@nicoburns][])
+- Breaking change: The `VerticalAlign` style, allowing vertical alignment of inline spans to be specified. ([#766][] by [@nicoburns][])  
+  `Layout::{inline_boxes, inline_boxes_mut}` now return `impl ExactSizeIterator` instead of slices.
+- Breaking change: `AlignmentOptions::last_line_alignment`, which allows the alignment of the last line to be configured. ([#872][] by [@nicoburns][])  
+  This is especially useful in combination with justification.
+- Breaking change: Added the `WhiteSpaceCollapse::{PreserveBreaks, BreakSpaces}` variants. ([#812][], [#833][] by [@nicoburns][])
+- Breaking change: Support for the CSS `line-break` style. This controls line-breaking behaviour of CJK text. ([#843][] by [@nicoburns][])
+- `Layout::text_len` and `Layout::alignment`, `Cursor::upstream_cluster` and `Cursor::downstream_cluster`, `PlainEditor::is_cursor_visible`, and `PlainEditorDriver::set_selection`. ([#716][] by [@DataTriny][])  
+  `ClusterPath::new` and the `Style::locale` field are now public as well.
+  Together these make it possible to build an accessibility integration outside of Parley.
+- `Layout::root_span_metrics`, to help with placing directly drawn bullet points. ([#867][] by [@DJMcNab][])
+- `LineMetrics::content_block_{min, max}_coord`, which are the typographic content bounds of a line independent of line height. ([#697][] by [@tomcur][])
+- `Cluster::style_index` and `GlyphRun::style_index`. ([#661][] by [@tomcur][])
+- The base direction of paragraphs can now be set using `{RangedBuilder, StyleRunBuilder, TreeBuilder, PlainEditor}::set_base_direction`. ([#708][] by [@waywardmonkeys][], [#858][] by [@nicoburns][])
+- `Layout::clear` to clear the contents of a layout. This can be used to clean up font resources. ([#804][] by [@taj-p][])
+- `Cluster` and `Run` are now `Copy` and `Clone` for any brush. ([#715][] by [@tomcur][])
+- `TreeBuilder::text()` and `TreeBuilder::has_pending_whitespace()`, which allow the current state of the `TreeBuilder`'s processed text to be inspected. ([#856][] by [@nicoburns][])
+
+#### Parley Engine
+
+- Initial release. See the highlights above. ([@tomcur][], with contributions from [@DJMcNab][], [@fundon][], [@GoCoder7][], [@nicoburns][], [@Soundcreates][], [@taj-p][] and [@waywardmonkeys][])
 
 #### Parlance
 
 - `BidiLevel` to encode bidirectional text embedding levels. ([#710][] by [@tomcur][])
 - `Script::is_cursive` returning whether a script is cursive. ([#728][] by [@tomcur][])  
   This can be used to decide, for example, whether to apply letter spacing.
+- `NormalizedCoord` to encode normalized font coordinates. ([#813][] by [@nicoburns][])
 
 #### Fontique
 
 - `Collection::family_ids` to iterate over unique font family identifiers. ([#725][] by [@tomcur][])
 
-#### Parley
-
-- `Layout::text_len` and `Layout::alignment`, `Cursor::upstream_cluster` and `Cursor::downstream_cluster`, `PlainEditor::is_cursor_visible`, and `PlainEditorDriver::set_selection`. ([#716][] by [@DataTriny][])
-  `ClusterPath::new` and the `Style::locale` field are now public as well.
-  Together these make it possible to build an accessibility integration outside of Parley.
-
 ### Changed
 
 #### Parley
 
-- Breaking change: the `accesskit` feature, and the AccessKit integration it enabled, were removed. ([#716][] by [@DataTriny][])
-  The integration now lives in the `vello_editor` example, where it is easier to evolve and can be copied and adapted by consumers.
-  This removed `LayoutAccessibility`, `PlainEditor::try_accessibility`, `PlainEditorDriver::accessibility`, `PlainEditorDriver::select_from_accesskit`, `Cursor::from_access_position`, `Cursor::to_access_position`, `Selection::from_access_selection`, and `Selection::to_access_selection`.
-- Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. ([#661][] by [@tomcur][])
 - Breaking change: `Cluster` now spans a full grapheme cluster instead of a single character. ([#715][] by [@tomcur][])  
   Shaped clusters that cross grapheme boundaries are represented using the existing `Cluster::is_ligature_start` and `Cluster::is_ligature_continuation`; note these methods previously encoded graphemes as well.
   Shaped clusters' advances are split evenly over the grapheme clusters they overlap.
@@ -52,19 +100,98 @@ This release has an [MSRV] of 1.88.
   `LineMetrics::content_block_{min,max}_coord` provide the typographic content bounds, covering typographic ascent and descent as well as inline boxes, ignoring the specified line height.
   Note glyphs overflow these content bounds as well, for example when many combining marks are stacked.
   The union of the line-box and content bounds is close to the old `LineMetrics::block_{min,max}_coord` fields.
-- `parley::editing::Cursor::{previous,next}_logical_word` now land at the previous/next logical start of a word and skip over whitespace. ([#215][] by [@tomcur][])
+- Breaking change: `layout::Cluster::first_style` was renamed to `layout::Cluster::style`. ([#660][] by [@tomcur][])
+- Breaking change: `WhiteSpaceCollapse` is now a style, and `TreeBuilder::set_white_space_mode` was removed. ([#814][] by [@nicoburns][])
+- Breaking change: `LineMetrics::trailing_whitespace` was renamed to `LineMetrics::hanging_advance`. Following CSS Text 4 § 4.3.2, non-breaking spaces no longer hang past line ends. ([#762][] by [@tomcur][])
+- Breaking change: `Run::normalized_coords` now returns `&[NormalizedCoord]` instead of `&[i16]`. ([#679][] by [@tomcur][])  
+  Use `NormalizedCoord::to_bits`, or cast the slice using the new `bytemuck` feature.
+- Ideographic spaces can now hang past line ends. ([#784][] by [@tomcur][])
+- Following CSS Text 4 § 4.3.2, trailing `WhiteSpaceCollapse::Preserve` whitespace before a forced line break or at the end of the text now hangs only as far as it overflows the line. ([#790][] by [@tomcur][])
+- Applying letter spacing now stops optional ligatures from forming. ([#731][] by [@tomcur][])
+- OutOfFlow inline boxes no longer produce line-break opportunities ([#797][] by [@nicoburns][])
+- When no fonts are returned by the font query, Parley now falls back to selecting any font from the collection. ([#722][] by [@tomcur][])
+
+#### Fontique
+
+- Synthetic font emboldening is now only requested if the weight difference is greater than 200. ([#724][] by [@taj-p][])
+- The `&QueryFont` passed by `Query::matches_with` now lives as long as the query borrow itself. ([#841][] by [@tomcur][])
+
+### Deprecated
+
+#### Parlance
+
+- `parlance::Script::from_str_unchecked` has been deprecated. ([#677][] by [@DJMcNab][])  
+  Use `parlance::Script::from_bytes` instead.
+
+### Removed
+
+#### Parley
+
+- Breaking change: the `accesskit` feature, and the AccessKit integration it enabled, were removed. ([#716][] by [@DataTriny][])  
+  The integration now lives in the `editor` example, where it is easier to evolve and can be copied and adapted by consumers.
+  This removed `LayoutAccessibility`, `PlainEditor::try_accessibility`, `PlainEditorDriver::accessibility`, `PlainEditorDriver::select_from_accesskit`, `Cursor::from_access_position`, `Cursor::to_access_position`, `Selection::from_access_selection`, and `Selection::to_access_selection`.
+- Breaking change: `ClusterPath::logical_index` was removed. You can resolve the path to a `Cluster` using `ClusterPath::cluster`. `ClusterPath` still provides the line and run indices, but should otherwise be treated as an opaque handle. ([#810][] by [@tomcur][])
+- Breaking change: `layout::Run::{logical_to_visual, visual_to_logical}` were removed. Use `layout::Run::visual_clusters` or `layout::Cluster::{next, previous}_visual` instead. ([#810][] by [@tomcur][])
+- Breaking change: the `Glyph::style_index` field was removed. Use `Cluster::{style, style_index}` or `GlyphRun::{style, style_index}` instead. ([#661][] by [@tomcur][])
+- Breaking change: `layout::Run::metrics()` was removed, use `layout::Run::font_metrics()` instead. ([#679][] by [@tomcur][])
 
 ### Fixed
 
 #### Parley
 
-- Applying letter spacing now stops optional ligatures from forming. ([#731][] by [@tomcur][])
+- Shaping across style boundaries now uses the surrounding context to select the correct glyphs. ([#740][] by [@tomcur][])
+- Cursor movement and hit-testing no longer place the caret inside grapheme clusters. ([#715][] by [@tomcur][])
+- `editing::Cursor::{previous,next}_logical_word` now land at the previous/next logical start of a word and skip over whitespace. ([#215][] by [@tomcur][])
+- Letter and word spacing is now applied once per grapheme. Previously, spacing was mistakenly counted for each character in the grapheme. ([#738][] by [@tomcur][])
+- `Layout::width` no longer under-reports widths when there are explicit newlines present and the style has non-zero letter spacing. Previously, an explicit newline would erroneously subtract the configured letter spacing from its line. ([#738][] by [@tomcur][])
+- Shaping now honours script and region subtags for correct handling of, for example, zh-Hans and zh-Hant. ([#756][] by [@DJMcNab][])
+- All line height changes within a run now contribute to the line box. ([#863][], [#864][] by [@tomcur][])
+- Fix `calculate_content_widths` when an inline box immediately follows a hard/explicit newline. It was previously incorrectly counted as being before the newline. ([#746][] by [@nicoburns][], [#772][] by [@tomcur][])
+- In `calculate_content_widths`, the max-content width is now floored by the min-content width. ([#834][] by [@nicoburns][])  
+  This follows CSS in guarding against cases where the max-content width could be smaller than the min-content width, e.g., in the presence of inline boxes with negative margins.
+- `Layout::calculate_content_widths` now correctly handles hanging of consecutive trailing white space and trailing white space consisting of separate runs (e.g., due to font size changes). ([#785][] by [@tomcur][])
+- Justification of lines with overflowing trailing spaces now correctly distributes free space over all interior spaces. ([#738][] by [@tomcur][])
+- Lines aligned with justification now correctly handle runs of consecutive trailing spaces. ([#760][] by [@tomcur][])
+- Trailing white space consisting of separate runs (e.g., due to font size changes) now hangs past line ends. ([#762][] by [@tomcur][])
+- Collapsible white space is now collapsed across style span and inline box boundaries instead of being trimmed at each span boundary, and is removed around hard line breaks. ([#786][] by [@nicoburns][])
+- Non-breaking spaces are now preserved when collapsing whitespace. ([#734][] by [@subotac][])
+- Mandatory line breaks (`\n`, `\r\n`, U+2028, U+2029) directly following Thai, Khmer or Lao text are no longer dropped. ([#781][] by [@nicoburns][])
+- Text that shapes into zero glyphs is no longer silently dropped. ([#805][] by [@tomcur][])  
+  This fixes some esoteric interactions, such as the string `\r\u{00AD}\n` losing the mandatory newline if the `\u{00AD}` soft-hyphen was shaped with a font missing a space glyph.
+- When using the `TreeBuilder`, out-of-flow boxes are now correctly positioned within the text. ([#815][] by [@tomcur][])
+- Parley's detection of Emoji is now more robust. ([#811][] by [@DJMcNab][])
+- Fixed CJK and Korean word boundary navigation in `Cluster::is_word_boundary()`, properly distinguishing UAX #29 word boundaries from UAX #14 line break opportunities. ([#819][] by [@GoCoder7][], [#829][] by [@tomcur][])  
+  Word boundaries of complex scripts, in the absence of dictionary data, now follow Unicode rules.
+- Apply `TextWrapMode::NoWrap` to line-breaking opportunities following inline boxes ([#844][] by [@nicoburns][])
+- `PlainEditor::set_text` no longer crashes on the next edit when the old cursor is outside the new text; the cursor is clamped to the new text. ([#850][] by [@teolines][])
+- In case a font does not carry decoration metrics like underline size, the fallbacks now scale with the font size instead of staying in font units, and the fallback underline is now placed below the baseline instead of above. ([#878][] by [@tomcur][])
+- Fix reporting of soft wrap opportunities around forced breaks. ([#676][] by [@DJMcNab][], [#838][] by [@tomcur][])
+- `\r\n` now gives a single forced break instead of two. ([#667][] by [@mvanhorn][], [#824][] by [@tomcur][])
+- The root style is now consistently passed through when the text is empty. ([#721][] by [@tomcur][])
+- State tracking of `YieldData::MaxHeightExceeded` has been corrected. ([#853][] by [@nicoburns][])
+- Fix infinite loop in `break_remaining` with `CustomOutOfFlow` inline boxes. ([#753][] by [@nicoburns][])
 
 #### Fontique
 
-- Fix compilation on 32-bit platforms without 64-bit atomics (e.g. `mipsel-unknown-linux-gnu`). ([#671][] by [@nicoburns][])
+- Fix compilation on 32-bit platforms without 64-bit atomics (e.g. `mipsel-unknown-linux-gnu`). ([#672][] by [@nicoburns][])
 - Don't panic when fontconfig exposes no fonts. ([#717][] by [@ogoffart][])
 - `Collection::load_fonts_from_paths` no longer registers duplicate faces. ([#754][] by [@ChrisJr404][])
+- All coverage variants for a family are now included in the query. ([#663][] by [@kane50613][])
+- Select the correct variable font weight in synthesis when the default and declared weights conflict. ([#723][] by [@taj-p][])
+
+#### Parlance
+
+- `GenericFamily::parse` is now case-insensitive. ([#654][] by [@mvanhorn][])
+
+## [0.11.1] - 2026-08-16
+
+This release has an [MSRV] of 1.88.
+
+### Changed
+
+#### Parley
+
+- Upgrade to `read-fonts` 0.41, `skrifa` 0.44, `harfrust` 0.12 ([#719][] by [@nicoburns][])
 
 ## [0.11.0] - 2026-06-24
 
@@ -571,6 +698,7 @@ This release has an [MSRV][] of 1.70.
 [@dqii]: https://github.com/dqii
 [@elbaro]: https://github.com/elbaro
 [@fundon]: https://github.com/fundon
+[@GoCoder7]: https://github.com/GoCoder7
 [@guiguiprim]: https://github.com/guiguiprim
 [@grebmeg]: https://github.com/grebmeg
 [@jordanhalase]: https://github.com/jordanhalase
@@ -578,6 +706,7 @@ This release has an [MSRV][] of 1.70.
 [@kekelp]: https://github.com/kekelp
 [@lainon1]: https://github.com/lainon1
 [@Linktime]: https://github.com/Linktime
+[@mvanhorn]: https://github.com/mvanhorn
 [@mwcampbell]: https://github.com/mwcampbell
 [@NandishwarSingh]: https://github.com/NandishwarSingh
 [@nicoburns]: https://github.com/nicoburns
@@ -586,8 +715,11 @@ This release has an [MSRV][] of 1.70.
 [@PoignardAzur]: https://github.com/@PoignardAzur
 [@raiscui]: https://github.com/raiscui
 [@richardhozak]: https://github.com/richardhozak
+[@Soundcreates]: https://github.com/Soundcreates
 [@spirali]: https://github.com/spirali
+[@subotac]: https://github.com/subotac
 [@taj-p]: https://github.com/taj-p
+[@teolines]: https://github.com/teolines
 [@tomcur]: https://github.com/tomcur
 [@valadaptive]: https://github.com/valadaptive
 [@waywardmonkeys]: https://github.com/waywardmonkeys
@@ -735,22 +867,79 @@ This release has an [MSRV][] of 1.70.
 [#626]: https://github.com/linebender/parley/pull/626
 [#632]: https://github.com/linebender/parley/pull/632
 [#637]: https://github.com/linebender/parley/pull/637
+[#639]: https://github.com/linebender/parley/pull/639
 [#640]: https://github.com/linebender/parley/pull/640
 [#643]: https://github.com/linebender/parley/pull/643
 [#650]: https://github.com/linebender/parley/pull/650
+[#654]: https://github.com/linebender/parley/pull/654
+[#660]: https://github.com/linebender/parley/pull/660
 [#661]: https://github.com/linebender/parley/pull/661
-[#671]: https://github.com/linebender/parley/pull/671
+[#663]: https://github.com/linebender/parley/pull/663
+[#667]: https://github.com/linebender/parley/pull/667
+[#672]: https://github.com/linebender/parley/pull/672
+[#676]: https://github.com/linebender/parley/pull/676
+[#677]: https://github.com/linebender/parley/pull/677
+[#679]: https://github.com/linebender/parley/pull/679
 [#697]: https://github.com/linebender/parley/pull/697
+[#708]: https://github.com/linebender/parley/pull/708
 [#710]: https://github.com/linebender/parley/pull/710
 [#715]: https://github.com/linebender/parley/pull/715
 [#716]: https://github.com/linebender/parley/pull/716
 [#717]: https://github.com/linebender/parley/pull/717
+[#719]: https://github.com/linebender/parley/pull/719
+[#721]: https://github.com/linebender/parley/pull/721
+[#722]: https://github.com/linebender/parley/pull/722
+[#723]: https://github.com/linebender/parley/pull/723
+[#724]: https://github.com/linebender/parley/pull/724
 [#725]: https://github.com/linebender/parley/pull/725
 [#728]: https://github.com/linebender/parley/pull/728
 [#731]: https://github.com/linebender/parley/pull/731
+[#734]: https://github.com/linebender/parley/pull/734
+[#738]: https://github.com/linebender/parley/pull/738
+[#740]: https://github.com/linebender/parley/pull/740
+[#746]: https://github.com/linebender/parley/pull/746
+[#753]: https://github.com/linebender/parley/pull/753
 [#754]: https://github.com/linebender/parley/pull/754
+[#756]: https://github.com/linebender/parley/pull/756
+[#760]: https://github.com/linebender/parley/pull/760
+[#762]: https://github.com/linebender/parley/pull/762
+[#766]: https://github.com/linebender/parley/pull/766
+[#772]: https://github.com/linebender/parley/pull/772
+[#781]: https://github.com/linebender/parley/pull/781
+[#784]: https://github.com/linebender/parley/pull/784
+[#785]: https://github.com/linebender/parley/pull/785
+[#786]: https://github.com/linebender/parley/pull/786
+[#790]: https://github.com/linebender/parley/pull/790
+[#797]: https://github.com/linebender/parley/pull/797
+[#804]: https://github.com/linebender/parley/pull/804
+[#805]: https://github.com/linebender/parley/pull/805
+[#810]: https://github.com/linebender/parley/pull/810
+[#811]: https://github.com/linebender/parley/pull/811
+[#812]: https://github.com/linebender/parley/pull/812
+[#813]: https://github.com/linebender/parley/pull/813
+[#814]: https://github.com/linebender/parley/pull/814
+[#815]: https://github.com/linebender/parley/pull/815
+[#819]: https://github.com/linebender/parley/pull/819
+[#824]: https://github.com/linebender/parley/pull/824
+[#829]: https://github.com/linebender/parley/pull/829
+[#833]: https://github.com/linebender/parley/pull/833
+[#834]: https://github.com/linebender/parley/pull/834
+[#838]: https://github.com/linebender/parley/pull/838
+[#841]: https://github.com/linebender/parley/pull/841
+[#843]: https://github.com/linebender/parley/pull/843
+[#844]: https://github.com/linebender/parley/pull/844
+[#850]: https://github.com/linebender/parley/pull/850
+[#853]: https://github.com/linebender/parley/pull/853
+[#856]: https://github.com/linebender/parley/pull/856
+[#858]: https://github.com/linebender/parley/pull/858
+[#863]: https://github.com/linebender/parley/pull/863
+[#864]: https://github.com/linebender/parley/pull/864
+[#867]: https://github.com/linebender/parley/pull/867
+[#872]: https://github.com/linebender/parley/pull/872
+[#878]: https://github.com/linebender/parley/pull/878
 
-[Unreleased]: https://github.com/linebender/parley/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/linebender/parley/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.1
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/linebender/parley/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/linebender/parley/compare/v0.8.0...v0.9.0
