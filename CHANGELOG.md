@@ -69,7 +69,7 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - The base direction of paragraphs can now be set using `{RangedBuilder, StyleRunBuilder, TreeBuilder, PlainEditor}::set_base_direction`. ([#708][] by [@waywardmonkeys][], [#858][] by [@nicoburns][])
 - `Layout::clear` to clear the contents of a layout. This can be used to clean up font resources. ([#804][] by [@taj-p][])
 - `Cluster` and `Run` are now `Copy` and `Clone` for any brush. ([#715][] by [@tomcur][])
-- `TreeBuilder::text()` and `TreeBuilder::has_pending_whitespace()`, which allow the current state of the `TreeBuilder`'s processed text to be inspected.
+- `TreeBuilder::text()` and `TreeBuilder::has_pending_whitespace()`, which allow the current state of the `TreeBuilder`'s processed text to be inspected. ([#856][] by [@nicoburns][])
 
 #### Parley Engine
 
@@ -925,6 +925,7 @@ This release has an [MSRV][] of 1.70.
 [#844]: https://github.com/linebender/parley/pull/844
 [#850]: https://github.com/linebender/parley/pull/850
 [#853]: https://github.com/linebender/parley/pull/853
+[#856]: https://github.com/linebender/parley/pull/856
 [#858]: https://github.com/linebender/parley/pull/858
 [#864]: https://github.com/linebender/parley/pull/864
 [#867]: https://github.com/linebender/parley/pull/867
