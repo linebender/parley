@@ -413,6 +413,18 @@ fn content_widths_text_indent() {
             },
             compare_with_layout: true,
         },
+        // A line holding only a forced break is still indented.
+        IndentCase {
+            name: "empty first line",
+            text: "\nAA",
+            indent_amount: indent,
+            indent_options: normal,
+            expected: ContentWidths {
+                min: indent,
+                max: indent,
+            },
+            compare_with_layout: true,
+        },
         // These cases differ from Layout::width(), so they are checked only by value.
         // Hanging continuation indents floor max-content at min-content above the unwrapped width.
         IndentCase {

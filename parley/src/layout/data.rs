@@ -499,7 +499,8 @@ impl ContentWidthsMeasurer {
 
     #[inline(always)]
     fn measure<B: Brush>(mut self, layout_data: &LayoutData<B>) -> ContentWidths {
-        for item in &layout_data.items {
+        let mut items = layout_data.items.iter();
+        while let Some(item) = items.next() {
             match item.kind {
                 LayoutItemKind::TextRun => {
                     let slice = layout_data.shaped_text.run_slice(item.index as u32);
@@ -530,7 +531,16 @@ impl ContentWidthsMeasurer {
                     }
                 }
                 LayoutItemKind::InlineBox => {
-                    self.measure_inline_box(&layout_data.inline_boxes[item.index].inline_box);
+                    // A forced break right after a box suppresses the box's soft wrap opportunity.
+                    let followed_by_forced_break = match items.as_slice().first() {
+                        Some(next) if next.kind == LayoutItemKind::TextRun => {
+                            let slice = layout_data.shaped_text.run_slice(next.index as u32);
+                            slice.shaped_clusters()[0].whitespace() == Whitespace::Newline
+                        }
+                        _ => false,
+                    };
+                    let inline_box = &layout_data.inline_boxes[item.index].inline_box;
+                    self.measure_inline_box(inline_box, followed_by_forced_break);
                 }
             }
         }
@@ -607,7 +617,7 @@ impl ContentWidthsMeasurer {
                 // `Whitespace::Newline` are forced breaks. Note newlines have no advance.
                 if whitespace == Whitespace::Newline {
                     // Newlines hang, so whitespace before them keeps hanging.
-                    self.hard_break(i != min_width_empty_at, i != max_width_empty_at);
+                    self.hard_break(true, true);
                     min_width_empty_at = i + 1;
                     max_width_empty_at = i + 1;
                     skip_atom = true;
@@ -665,7 +675,7 @@ impl ContentWidthsMeasurer {
         self.max_width_line_has_content = max_width_empty_at != clusters.len();
     }
 
-    fn measure_inline_box(&mut self, inline_box: &InlineBox) {
+    fn measure_inline_box(&mut self, inline_box: &InlineBox, followed_by_forced_break: bool) {
         if inline_box.kind == InlineBoxKind::InFlow {
             // Inline boxes have soft wrap opportunities on both sides.
             let wraps = self.text_wrap_mode == TextWrapMode::Wrap;
@@ -678,7 +688,7 @@ impl ContentWidthsMeasurer {
             self.running_max_width += inline_box.width;
             self.max_width_line_has_content = true;
             self.min_width_line_has_content = true;
-            if wraps {
+            if wraps && !followed_by_forced_break {
                 self.soft_break(true);
                 self.min_width_line_has_content = false;
             }
