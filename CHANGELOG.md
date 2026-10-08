@@ -67,6 +67,10 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - The base direction of paragraphs can now be set using `{RangedBuilder, StyleRunBuilder, TreeBuilder, PlainEditor}::set_base_direction`. ([#708][] by [@waywardmonkeys][], [#858][] by [@nicoburns][])
 - `Layout::clear` to clear the contents of a layout. This can be used to clean up font resources. ([#804][] by [@taj-p][])
 
+#### Parley Engine
+
+- Initial release. See the highlights above. ([@tomcur][], with contributions from [@DJMcNab][], [@fundon][], [@GoCoder7][], [@nicoburns][], [@Soundcreates][], [@taj-p][] and [@waywardmonkeys][])
+
 #### Parlance
 
 - `BidiLevel` to encode bidirectional text embedding levels. ([#710][] by [@tomcur][])
@@ -704,6 +708,7 @@ This release has an [MSRV][] of 1.70.
 [@PoignardAzur]: https://github.com/@PoignardAzur
 [@raiscui]: https://github.com/raiscui
 [@richardhozak]: https://github.com/richardhozak
+[@Soundcreates]: https://github.com/Soundcreates
 [@spirali]: https://github.com/spirali
 [@subotac]: https://github.com/subotac
 [@taj-p]: https://github.com/taj-p
