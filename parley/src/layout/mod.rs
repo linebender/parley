@@ -146,16 +146,16 @@ impl IndentOptions {
         self.line_indent(amount, true)
     }
 
-    /// The indent of a line following a hard wrap.
+    /// The indent of a line following a forced line break.
     /// With `each-line`, it's indented like the first line.
     #[inline(always)]
-    pub(crate) fn indent_following_hard_break(self, amount: f32) -> f32 {
+    pub(crate) fn indent_following_forced_line_break(self, amount: f32) -> f32 {
         self.line_indent(amount, self.each_line)
     }
 
-    /// The indent of a continuation line after a soft wrap.
+    /// The indent of a continuation line after a soft wrap break.
     #[inline(always)]
-    pub(crate) fn indent_following_soft_break(self, amount: f32) -> f32 {
+    pub(crate) fn indent_following_soft_wrap_break(self, amount: f32) -> f32 {
         self.line_indent(amount, false)
     }
 }

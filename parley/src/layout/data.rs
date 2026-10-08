@@ -436,7 +436,6 @@ struct ContentWidthsMeasurer {
     text_wrap_mode: TextWrapMode,
 
     /// Indents for lines following a soft/hard wrap.
-    /// Precomputed so the hot break helpers don't re-read the options.
     soft_indent: f32,
     hard_indent: f32,
 }
@@ -453,8 +452,8 @@ impl ContentWidthsMeasurer {
             running_hanging_whitespace: 0.,
             hangs_conditionally: false,
             text_wrap_mode: TextWrapMode::Wrap,
-            soft_indent: indent_options.indent_following_soft_break(indent_amount),
-            hard_indent: indent_options.indent_following_hard_break(indent_amount),
+            soft_indent: indent_options.indent_following_soft_wrap_break(indent_amount),
+            hard_indent: indent_options.indent_following_forced_line_break(indent_amount),
             min_width_line_has_content: false,
             max_width_line_has_content: false,
         }
@@ -462,8 +461,9 @@ impl ContentWidthsMeasurer {
 
     /// Ends the current min-content fragment at a soft wrap opportunity.
     ///
-    /// Under a min-content constraint, every soft wrap opportunity is taken, so the fragment after
-    /// it is a continuation line.
+    /// Under a min-content constraint, every soft wrap opportunity is taken, unless the line has no
+    /// content yet. The next fragment then starts a line after a soft wrap break, which will be
+    /// indented iff the indent is "hanging" (see [`IndentOptions::hanging`]).
     #[inline(always)]
     fn soft_break(&mut self, min_width_line_has_content: bool) {
         if !min_width_line_has_content {
