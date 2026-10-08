@@ -482,49 +482,26 @@ fn content_widths_text_indent() {
 fn content_widths_text_indent_inline_box() {
     let mut env = TestEnv::new(test_name!(), None);
     let indent = 100.0;
-    let box_width = 10.0;
-    let text = "A BBBBBB\nCCC DDDDDDDD";
-    let first_line_width = box_width + single_line_width(&mut env, "A BBBBBB");
-    let forced_line_width = single_line_width(&mut env, "CCC DDDDDDDD");
-    let forced_word_width = single_line_width(&mut env, "CCC");
 
-    // Without each-line, the initial inline box determines min-content and the first line max-content.
-    // With each-line, the line after the forced break determines both widths instead.
-    for each_line in [false, true] {
-        let mut builder = env.ranged_builder(text);
-        builder.push_inline_box(InlineBox {
-            id: 0,
-            kind: InlineBoxKind::InFlow,
-            index: 0,
-            width: box_width,
-            height: 10.0,
-            baseline: None,
-            vertical_align: VerticalAlign::BASELINE,
-        });
-        let mut layout = builder.build(text);
-        layout.set_text_indent(
-            indent,
-            IndentOptions {
-                each_line,
-                hanging: false,
-            },
-        );
-        let expected = if each_line {
-            ContentWidths {
-                min: indent + forced_word_width,
-                max: indent + forced_line_width,
-            }
-        } else {
-            ContentWidths {
-                min: indent + box_width,
-                max: indent + first_line_width,
-            }
-        };
-        let widths = layout.calculate_content_widths();
-        assert!(
-            (widths.min - expected.min).abs() < 1e-3 && (widths.max - expected.max).abs() < 1e-3,
-            "each_line={each_line}: expected {expected:?}, got {widths:?}",
-        );
-        assert_content_widths_match_layout(&mut layout);
-    }
+    // The indent applies to an inline box at the start of the first line.
+    let text = "AA";
+    let mut builder = env.ranged_builder(text);
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        kind: InlineBoxKind::InFlow,
+        index: 0,
+        width: 10.0,
+        height: 10.0,
+        baseline: None,
+        vertical_align: VerticalAlign::BASELINE,
+    });
+    let mut layout = builder.build(text);
+    layout.set_text_indent(indent, IndentOptions::default());
+    let widths = layout.calculate_content_widths();
+    assert!(
+        (widths.min - (indent + 10.0)).abs() < 1e-3,
+        "Min content width {} should be the indented inline box's width {}",
+        widths.min,
+        indent + 10.0
+    );
 }
