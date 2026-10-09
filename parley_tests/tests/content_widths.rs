@@ -413,6 +413,18 @@ fn content_widths_text_indent() {
             },
             compare_with_layout: true,
         },
+        // A line holding only a forced break is still indented.
+        IndentCase {
+            name: "empty first line",
+            text: "\nAA",
+            indent_amount: indent,
+            indent_options: normal,
+            expected: ContentWidths {
+                min: indent,
+                max: indent,
+            },
+            compare_with_layout: true,
+        },
         // These cases differ from Layout::width(), so they are checked only by value.
         // Hanging continuation indents floor max-content at min-content above the unwrapped width.
         IndentCase {
@@ -484,17 +496,19 @@ fn content_widths_text_indent_inline_box() {
     let indent = 100.0;
 
     // The indent applies to an inline box at the start of the first line.
-    let text = "AA";
+    let text = "\nAA";
     let mut builder = env.ranged_builder(text);
-    builder.push_inline_box(InlineBox {
-        id: 0,
-        kind: InlineBoxKind::InFlow,
-        index: 0,
-        width: 10.0,
-        height: 10.0,
-        baseline: None,
-        vertical_align: VerticalAlign::BASELINE,
-    });
+    for (id, kind) in [(0, InlineBoxKind::InFlow), (1, InlineBoxKind::OutOfFlow)] {
+        builder.push_inline_box(InlineBox {
+            id,
+            kind,
+            index: 0,
+            width: 10.0,
+            height: 10.0,
+            baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
+        });
+    }
     let mut layout = builder.build(text);
     layout.set_text_indent(indent, IndentOptions::default());
     let widths = layout.calculate_content_widths();
@@ -503,5 +517,21 @@ fn content_widths_text_indent_inline_box() {
         "Min content width {} should be the indented inline box's width {}",
         widths.min,
         indent + 10.0
+    );
+
+    // With `each-line hanging`, only lines after the first soft wrap are indented. Here, the forced
+    // break suppresses the in-flow inline box's soft wrap opportunity (ignoring the out-of-flow
+    // box), and so no line should be indented.
+    layout.set_text_indent(
+        indent,
+        IndentOptions {
+            each_line: true,
+            hanging: true,
+        },
+    );
+    let widths = assert_content_widths_match_layout(&mut layout);
+    assert!(
+        widths.max < indent,
+        "no line should be indented: {widths:?}"
     );
 }
