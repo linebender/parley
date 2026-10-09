@@ -265,7 +265,12 @@ mod tests {
         let mut analyzer = Analyzer::new();
         let mut analysis = Analysis::new();
         let options = AnalysisOptions::default();
-        analyzer.analyze(text, &options, &mut analysis);
+        analyzer.analyze(
+            text,
+            &options,
+            &mut analysis,
+            &crate::AnalysisDataSources::default(),
+        );
         analysis
     }
 

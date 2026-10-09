@@ -7,7 +7,7 @@ use core::ops::Range;
 
 use alloc::{vec, vec::Vec};
 
-use parley_engine::{Analysis, AnalysisDataSources, Analyzer, LineBreakConfig, Shaper};
+use parley_engine::{Analysis, Analyzer, LineBreakConfig, Shaper};
 
 use super::FontContext;
 use super::builder::{BuilderOptions, RangedBuilder, StyleRunBuilder};
@@ -40,9 +40,6 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     /// Style index for each character, parallel to [`Analysis::char_info`].
     pub(crate) char_style_indices: Vec<u16>,
     pub(crate) scx: Shaper,
-
-    // Unicode analysis data sources (provided by icu)
-    pub(crate) analysis_data_sources: AnalysisDataSources,
 }
 
 impl<B: Brush> LayoutContext<B> {
@@ -59,7 +56,6 @@ impl<B: Brush> LayoutContext<B> {
             ranged_style_builder: RangedStyleBuilder::default(),
             tree_style_builder: TreeStyleBuilder::default(),
             char_style_indices: vec![],
-            analysis_data_sources: AnalysisDataSources::new(),
             scx: Shaper::default(),
         }
     }

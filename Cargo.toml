@@ -19,6 +19,7 @@ members = [
     "examples/tiny_skia_render",
     "examples/vello_cpu_render",
     "examples/editor",
+    "examples/external_dictionaries",
     "xtask",
 ]
 
@@ -55,6 +56,9 @@ icu_collections = { version = "2.3.0", default-features = false }
 icu_locale_core = { version = "2.3.0", default-features = false }
 icu_normalizer = { version = "2.3.0", default-features = false }
 icu_properties = { version = "2.3.0", default-features = false }
+icu_provider = { version = "2.3.0", default-features = false }
+icu_provider_blob = { version = "2.3.0", default-features = false }
+# Check CachingDictionary when upgrading.
 icu_segmenter = { version = "2.3.0", default-features = false }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
 packtab = { version = "1.9.0" }
