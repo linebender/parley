@@ -3,6 +3,7 @@
 
 //! The analyzer API.
 
+use alloc::vec::Vec;
 use core::ops::Range;
 
 use parlance::{BaseDirection, Language, LineBreak, WordBreak};
@@ -15,6 +16,8 @@ use crate::analysis::{Analysis, analyze_text};
 #[derive(Default)]
 pub struct Analyzer {
     pub(crate) bidi: BidiResolver,
+    /// Byte offsets of the line boundaries of the text being analyzed.
+    pub(crate) line_boundary_positions: Vec<usize>,
 }
 
 impl core::fmt::Debug for Analyzer {
