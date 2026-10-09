@@ -101,7 +101,7 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - Breaking change: `layout::Cluster::first_style` was renamed to `layout::Cluster::style`. ([#660][] by [@tomcur][])
 - Breaking change: `WhiteSpaceCollapse` is now a style, and `TreeBuilder::set_white_space_mode` was removed. ([#814][] by [@nicoburns][])
 - Breaking change: `LineMetrics::trailing_whitespace` was renamed to `LineMetrics::hanging_advance`. Following CSS Text 4 § 4.3.2, non-breaking spaces no longer hang past line ends. ([#762][] by [@tomcur][])
-- Breaking change: `LineBreakData::{advance, line_height}` were replaced by `LineBreakData::metrics`, which holds the line's full `LineMetrics`.  ([#892][] by [@nicoburns][], [#893][] by [@tomcur][])
+- Breaking change: `LineBreakData::{advance, line_height}` were replaced by `LineBreakData::metrics`, which holds the line's full `LineMetrics`. ([#892][] by [@nicoburns][], [#893][] by [@tomcur][])
 - Breaking change: `Run::normalized_coords` now returns `&[NormalizedCoord]` instead of `&[i16]`. ([#679][] by [@tomcur][])  
   Use `NormalizedCoord::to_bits`, or cast the slice using the new `bytemuck` feature.
 - Ideographic spaces can now hang past line ends. ([#784][] by [@tomcur][])
