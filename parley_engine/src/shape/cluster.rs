@@ -114,8 +114,8 @@ pub enum Whitespace {
     /// There are also `Cc` characters that aren't `White_Space` (those would be
     /// [`Whitespace::None`]).
     ControlWhitespace = 7,
-    // NOTE: if you grow these variants more than eight, ensure you also update the encoding in
-    // `GraphemeFlags`.
+    // NOTE: `GraphemeFlags` and `ShapedClusterFlags` store this in three bits. If you grow these
+    // variants beyond eight, widen those fields.
 }
 
 impl Whitespace {
@@ -138,6 +138,22 @@ impl Whitespace {
             // as control characters.
             '\u{000b}' | '\u{000c}' | '\u{0085}' => Self::ControlWhitespace,
             _ => Self::None,
+        }
+    }
+
+    /// The inverse of `whitespace as u8`. Panics on any other value.
+    #[inline(always)]
+    pub(crate) const fn from_u8(value: u8) -> Self {
+        match value {
+            0 => Self::None,
+            1 => Self::Space,
+            2 => Self::NoBreakSpace,
+            3 => Self::IdeographicSpace,
+            4 => Self::OtherSpaceSeparator,
+            5 => Self::Tab,
+            6 => Self::Newline,
+            7 => Self::ControlWhitespace,
+            _ => unreachable!(),
         }
     }
 

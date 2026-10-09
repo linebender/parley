@@ -107,16 +107,7 @@ impl ShapedClusterFlags {
 
     #[inline(always)]
     const fn whitespace(self) -> Whitespace {
-        match (self.0 & Self::WHITESPACE_MASK) >> Self::WHITESPACE_SHIFT {
-            1 => Whitespace::Space,
-            2 => Whitespace::NoBreakSpace,
-            3 => Whitespace::IdeographicSpace,
-            4 => Whitespace::OtherSpaceSeparator,
-            5 => Whitespace::Tab,
-            6 => Whitespace::Newline,
-            7 => Whitespace::ControlWhitespace,
-            _ => Whitespace::None,
-        }
+        Whitespace::from_u8(((self.0 & Self::WHITESPACE_MASK) >> Self::WHITESPACE_SHIFT) as u8)
     }
 
     #[inline(always)]
