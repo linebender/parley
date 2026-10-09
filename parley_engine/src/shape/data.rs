@@ -240,9 +240,9 @@ impl ShapedCluster {
     /// If concatenating is safe for this cluster, [`Self::is_safe_to_break_before`] will also be
     /// true.
     ///
-    /// If the text was shaped without these flags (see
-    /// [`ShapedText::has_safe_to_concat_flags`](crate::ShapedText::has_safe_to_concat_flags)), this
-    /// is always `false`.
+    /// If the text was shaped without these flags, this is always `false`. See the
+    /// `produce_safe_to_concat_flags` argument of
+    /// [`Shaper::shape_text`](crate::Shaper::shape_text).
     #[inline(always)]
     pub fn is_safe_to_concat_before(self) -> bool {
         self.flags.is_safe_to_concat_before()
