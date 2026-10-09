@@ -360,7 +360,7 @@ impl LineBoxMetrics {
         &mut self,
         style_index: u16,
         style_metrics: &[StyleMetrics],
-        contributed: &mut SmallVec<[u16; 8]>,
+        contributed: &mut Vec<u16>,
         subtrees: &mut SubtreeHistory,
     ) {
         let mut index = style_index;
@@ -407,7 +407,7 @@ impl LineBoxMetrics {
         style_index: u16,
         characters: &[Character],
         data: &LayoutData<B>,
-        contributed: &mut SmallVec<[u16; 8]>,
+        contributed: &mut Vec<u16>,
         subtrees: &mut SubtreeHistory,
     ) {
         self.has_content = true;
@@ -439,7 +439,7 @@ impl LineBoxMetrics {
         style_index: u16,
         characters: &[Character],
         data: &LayoutData<B>,
-        contributed: &mut SmallVec<[u16; 8]>,
+        contributed: &mut Vec<u16>,
         subtrees: &mut SubtreeHistory,
     ) {
         self.last_text = (item_idx, style_index);
@@ -633,7 +633,7 @@ pub struct BreakerState {
     /// Style indices whose span box has already been added to the current line (see
     /// [`LineBoxMetrics::add_style`]). Lives here rather than in [`LineState`] so that saving a
     /// line-breaking opportunity only records its length; reverting truncates it back.
-    contributed: SmallVec<[u16; 8]>,
+    contributed: Vec<u16>,
     /// Extents of the aligned subtrees rooted at `top`/`bottom` spans on the current line. Like
     /// [`Self::contributed`], saving a line-breaking opportunity only records its length.
     subtrees: SubtreeHistory,
@@ -717,7 +717,7 @@ impl Default for BreakerState {
             line_max_advance: 0.0,
             line_max_height: f32::MAX,
             line: LineState::default(),
-            contributed: SmallVec::new(),
+            contributed: Vec::new(),
             subtrees: SubtreeHistory::default(),
             prev_boundary: None,
             emergency_boundary: None,
