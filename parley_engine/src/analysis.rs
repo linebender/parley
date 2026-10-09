@@ -84,6 +84,48 @@ impl Analysis {
     }
 }
 
+// TODO: Properly document this crate's features, and point to this doc in the doc of [`complex-scripts`].
+// See https://github.com/linebender/parley/issues/773
+/// An external source of complex script dictionaries for line and word breaking in Parley.
+///
+/// Some scripts require complex context dependent analysis to find word and line breaks, as their writing
+/// doesn't have inherent word breaks (compare with English, which uses spaces as word break and
+/// soft wrap opportunities).
+/// The scripts we support this analysis for are currently Chinese, Japanese, Khmer, Lao, Myanmar, and Thai.
+/// We use `icu_segmenter` to determine those boundaries in these scripts; its analysis requires access to
+/// somewhat large dictionaries for each supported language.
+///
+/// Parley supports providing these dictionaries in two ways:
+/// - Through this trait (see [using the trait](#using-the-trait)).
+/// - By enabling the `complex-scripts` cargo feature, which will compile these dictionaries into the binary instead.
+///   Most users should prefer enabling that feature, as it will be more stable across Parley releases.
+///
+/// # Using the trait
+///
+/// This trait allows providing these dictionaries externally (i.e. not in the binary).
+/// One such use case is where your application binary will be downloaded many times by each
+/// user (perhaps due to updates), but the dictionaries can be cached.
+/// You may also wish to avoid downloading any dictionaries your user's text does not use.
+///
+/// If you're using Parley, this can be used through layout builder's `set_dictionary_provider` method.
+///
+/// This trait is implemented for each type which has the `icu_provider` [`DataProvider`] implementations
+/// needed for word and line segmentation.
+/// Unfortunately, this is a somewhat leaky abstraction, as `icu_segmenter` does not guarantee which dictionary
+/// names are used. As such, if using this API, we recommend pinning a specific version of `icu_segmenter`.
+/// Additionally, you should avoid the use of [`DeserializingBufferProvider`](icu_provider::buf::DeserializingBufferProvider),
+/// as this would deserialise the dictionaries at the time of each layout. Our `external_dictionaries` example shows how
+/// to create a caching typed provider instead.
+///
+/// If your underlying [`DataProvider`] implementations return an error except `IdentifierNotFound`, Parley Engine
+/// will currently panic during text analysis.
+///
+/// # Note on LSTMs
+///
+/// `icu_segmenter` also supports using [LSTM models](https://docs.rs/icu_segmenter/2.3.0/icu_segmenter/struct.LineSegmenter.html#method.new_lstm)
+/// for determining these boundaries. Parley doesn't currently support using these, but might in a future release.
+/// If we do, your use of this trait may need to change; this would be in a breaking release of Parley. This is another
+/// reason we recommend using `complex-scripts` instead, if your use case allows it.
 pub trait DictionaryProvider:
     DataProvider<SegmenterDictionaryAutoV1> + DataProvider<SegmenterDictionaryExtendedV1>
 {
@@ -94,6 +136,9 @@ impl<P: ?Sized> DictionaryProvider for P where
 {
 }
 
+/// Provides runtime data needed for text analysis.
+///
+/// Currently, this only includes an optional [`DictionaryProvider`]
 #[derive(Default)]
 pub struct AnalysisDataSources<'a> {
     provider: Option<&'a dyn DictionaryProvider>,
@@ -108,6 +153,10 @@ impl core::fmt::Debug for AnalysisDataSources<'_> {
 }
 
 impl<'a> AnalysisDataSources<'a> {
+    /// Create a new `AnalysisDataSources` which will use `provider` for line and word segmentation,
+    /// falling back to data compiled into the binary (if present).
+    ///
+    /// See [`DictionaryProvider`] for more details.
     pub const fn new(provider: Option<&'a dyn DictionaryProvider>) -> Self {
         Self { provider }
     }
