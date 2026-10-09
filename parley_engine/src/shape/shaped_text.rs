@@ -435,6 +435,7 @@ impl ShapedText {
 
 /// One shaped run, belonging to a [`ShapedText`].
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct ShapedRun {
     /// The range of text this run corresponds to.
     pub range: TextRange,
