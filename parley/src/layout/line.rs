@@ -168,7 +168,15 @@ pub struct LineMetrics {
     /// Offset for alignment.
     pub offset: f32,
 
-    /// Full inline advance of the line, including trailing whitespace.
+    /// The text indent appleid to this line (see [`Layout::set_text_indent`]).
+    ///
+    /// This isn't part of [`Self::advance`]. After alignment, [`Self::offset`] accounts for it.
+    pub indent: f32,
+
+    /// The inline advance of the line's content.
+    ///
+    /// This includes [`Self::hanging_advance`], but not [`Self::indent`]. This also doesn't include
+    /// additional spacing from [justified alignment](crate::Alignment::Justify).
     pub advance: f32,
 
     /// The portion of [`Self::advance`] that hangs past the line's end edge.

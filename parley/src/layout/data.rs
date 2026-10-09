@@ -94,8 +94,6 @@ pub(crate) struct LineData {
     /// The number of justification opportunities on the line.
     pub(crate) num_justification_opportunities: u32,
     pub(crate) justification: Justification,
-    /// Text indent applied to this line.
-    pub(crate) indent: f32,
     /// This line's entries in [`LayoutData::aligned_subtree_offsets`].
     ///
     /// Empty for lines with only baseline-relative content because the root aligned subtree
@@ -145,10 +143,6 @@ impl LineData {
         self.metrics.baseline
             - self.aligned_subtree_offset(offsets, metrics.aligned_subtree_root)
             - metrics.baseline_offset
-    }
-
-    pub(crate) fn size(&self) -> f32 {
-        self.metrics.line_height
     }
 }
 

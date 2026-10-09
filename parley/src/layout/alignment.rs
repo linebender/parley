@@ -79,7 +79,7 @@ pub(crate) fn align<B: Brush>(
     for line in &mut layout.lines {
         line.justification.amount_per_opportunity = 0.;
 
-        let indent = line.indent;
+        let indent = line.metrics.indent;
 
         if is_rtl {
             // In RTL text, trailing whitespace is on the left. As we hang that whitespace, offset
