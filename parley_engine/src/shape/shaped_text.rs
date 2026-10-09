@@ -6,7 +6,7 @@
 use core::ops::Range;
 
 use alloc::vec::Vec;
-use parlance::{BidiLevel, NormalizedCoord};
+use parlance::{BidiLevel, FontFeature, Language, NormalizedCoord, Script};
 use skrifa::MetadataProvider;
 
 use crate::{
@@ -152,6 +152,7 @@ pub struct ShapedText {
     glyphs: Vec<Glyph>,
     fonts: Vec<FontInstance>,
     normalized_coords: Vec<NormalizedCoord>,
+    features: Vec<FontFeature>,
     /// See [`Self::has_safe_to_concat_flags`].
     pub(crate) has_safe_to_concat_flags: bool,
 }
@@ -181,6 +182,7 @@ impl ShapedText {
         self.glyphs.clear();
         self.fonts.clear();
         self.normalized_coords.clear();
+        self.features.clear();
         self.has_safe_to_concat_flags = false;
     }
 
@@ -274,6 +276,14 @@ impl ShapedText {
         &self.normalized_coords
     }
 
+    /// The font features used by runs in this shaped text.
+    ///
+    /// [`ShapedRun::features_range`] splits this into per-run slices.
+    #[inline(always)]
+    pub fn features(&self) -> &[FontFeature] {
+        &self.features
+    }
+
     #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     pub(crate) fn push_run(
         &mut self,
@@ -303,6 +313,12 @@ impl ShapedText {
                     .map(|c| NormalizedCoord::from_bits(c.to_bits())),
             );
             start..self.normalized_coords.len()
+        };
+
+        let features_range = {
+            let start = self.features.len();
+            self.features.extend_from_slice(options.features);
+            start..self.features.len()
         };
 
         let font_index = self
@@ -407,7 +423,10 @@ impl ShapedText {
             shaped_clusters_range,
             glyphs_range: glyphs_start..self.glyphs.len(),
             normalized_coords_range,
+            features_range,
             bidi_level: segment.bidi_level,
+            script: segment.script,
+            language: options.language,
             advance: run_advance,
             font_metrics,
         });
@@ -416,6 +435,7 @@ impl ShapedText {
 
 /// One shaped run, belonging to a [`ShapedText`].
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct ShapedRun {
     /// The range of text this run corresponds to.
     pub range: TextRange,
@@ -434,8 +454,14 @@ pub struct ShapedRun {
     pub glyphs_range: Range<usize>,
     /// The normalized variation coords of this run, as a range into [`ShapedText::normalized_coords`].
     pub normalized_coords_range: Range<usize>,
+    /// The font features this run was shaped with, as a range into [`ShapedText::features`].
+    pub features_range: Range<usize>,
     /// The bidi level of the run.
     pub bidi_level: BidiLevel,
+    /// The script this run was shaped with.
+    pub script: Script,
+    /// The language this run was shaped with.
+    pub language: Option<Language>,
     /// Total advance of the run.
     pub advance: f32,
     /// The font metrics of this run.
