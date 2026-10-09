@@ -133,6 +133,16 @@ impl Shaper {
     /// Each segment is then broken into runs of maximal sequences of character clusters for which
     /// `select_font` returns the same font.
     ///
+    /// If `produce_safe_to_concat_flags` is `true`, shaping records which shaped clusters are [safe
+    /// to concatenate before](super::ShapedCluster::is_safe_to_concat_before), and
+    /// [`ShapedText::has_safe_to_concat_flags`] will be `true`. These flags can be used to perform
+    /// bounded reshapes with the result remaining fully correct, but producing them increases
+    /// shaping time under some fonts. Note that a font examining a neighboring character clears the
+    /// flag, even if the resulting glyph or kerning was unaffected. For fonts like Roboto, that can
+    /// result in entire lines needing reshaping. Reshaping from the nearest
+    /// [`ShapedCluster::is_safe_to_break_before`](super::ShapedCluster::is_safe_to_break_before)
+    /// cluster can be much cheaper, and almost always gives the same result.
+    ///
     /// # Panics
     ///
     /// Panics if `items` does not cover the entire source text, or the font returned by
@@ -145,9 +155,11 @@ impl Shaper {
         char_style_indices: &[u16],
         items: impl IntoIterator<Item = Item<'options>>,
         mut select_font: impl FontSelector,
+        produce_safe_to_concat_flags: bool,
         shaped_text: &mut ShapedText,
     ) {
         shaped_text.clear();
+        shaped_text.has_safe_to_concat_flags = produce_safe_to_concat_flags;
         shaped_text.reserve(text.len());
 
         let char_count = analysis.char_info().len();
@@ -327,6 +339,11 @@ fn shape_segment(
         let mut buffer = mem::take(&mut scx.unicode_buffer).unwrap();
         buffer.clear();
         buffer.set_cluster_level(harfrust::BufferClusterLevel::MonotoneCharacters);
+        buffer.set_flags(if shaped_text.has_safe_to_concat_flags {
+            harfrust::BufferFlags::PRODUCE_UNSAFE_TO_CONCAT
+        } else {
+            harfrust::BufferFlags::empty()
+        });
 
         // Use the entire run text including newlines.
         let run_text = &text[range.byte_range.clone()];

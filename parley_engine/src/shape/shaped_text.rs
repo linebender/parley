@@ -152,6 +152,8 @@ pub struct ShapedText {
     glyphs: Vec<Glyph>,
     fonts: Vec<FontInstance>,
     normalized_coords: Vec<NormalizedCoord>,
+    /// See [`Self::has_safe_to_concat_flags`].
+    pub(crate) has_safe_to_concat_flags: bool,
 }
 
 impl ShapedText {
@@ -179,6 +181,17 @@ impl ShapedText {
         self.glyphs.clear();
         self.fonts.clear();
         self.normalized_coords.clear();
+        self.has_safe_to_concat_flags = false;
+    }
+
+    /// Whether this text was shaped with production of [`ShapedCluster::is_safe_to_concat_before`]
+    /// flags.
+    ///
+    /// See the `produce_safe_to_concat_flags` argument of
+    /// [`Shaper::shape_text`](crate::Shaper::shape_text).
+    #[inline]
+    pub fn has_safe_to_concat_flags(&self) -> bool {
+        self.has_safe_to_concat_flags
     }
 
     /// Get a [`ShapedSlice`] of the run at `run_index`.
@@ -356,6 +369,7 @@ impl ShapedText {
                 glyph_positions.iter(),
                 &self.characters,
                 characters_start,
+                self.has_safe_to_concat_flags,
             );
         } else {
             process_shaped_clusters(
@@ -366,6 +380,7 @@ impl ShapedText {
                 glyph_positions.iter().rev(),
                 &self.characters,
                 characters_start,
+                self.has_safe_to_concat_flags,
             );
             // Reverse each cluster's glyphs, such that they are in paint order.
             //
@@ -444,6 +459,8 @@ pub struct ShapedRun {
 /// * `characters` must contain the shaped characters whose clusters we're now processing, starting at
 ///   index `characters_start`.
 /// * `characters_start` - See `characters`.
+/// * `produce_safe_to_concat_flags` - Whether `HarfRust` was asked to produce the unsafe-to-concat
+///   glyph flags.
 fn process_shaped_clusters<'a>(
     shaped_clusters: &mut Vec<ShapedCluster>,
     glyphs: &mut Vec<Glyph>,
@@ -452,6 +469,7 @@ fn process_shaped_clusters<'a>(
     glyph_positions: impl Iterator<Item = &'a harfrust::GlyphPosition>,
     characters: &[Character],
     characters_start: usize,
+    produce_safe_to_concat_flags: bool,
 ) {
     struct Cluster {
         id: u32,
@@ -460,6 +478,8 @@ fn process_shaped_clusters<'a>(
         glyphs: u32,
         inline_glyph: Option<Glyph>,
         advance: f32,
+        safe_to_break_before: bool,
+        safe_to_concat_before: bool,
     }
 
     /// Flush `cluster`, whose characters end at `char_end`, onto `shaped_clusters`.
@@ -491,8 +511,8 @@ fn process_shaped_clusters<'a>(
             style_index: first_character.style_index,
             flags: ShapedClusterFlags::new(glyph_len)
                 .with_grapheme_start(first_character.grapheme_start)
-                // TODO: fill with actual shaping data (`parley` currently just ignores this)
-                .with_safe_to_break_before(false)
+                .with_safe_to_break_before(cluster.safe_to_break_before)
+                .with_safe_to_concat_before(cluster.safe_to_concat_before)
                 .with_inline_glyph(inline_glyph)
                 .with_first_char(
                     first_character.flags.is_soft_wrap_opportunity(),
@@ -510,6 +530,10 @@ fn process_shaped_clusters<'a>(
         glyphs: 0,
         inline_glyph: None,
         advance: 0.,
+        safe_to_break_before: true,
+        // A run without glyphs is not necessarily safe to concat: `HarfRust` only produces flags on
+        // glyphs, and a run can be glyphless conditional on the text before it.
+        safe_to_concat_before: false,
     };
 
     for (glyph_info, glyph_pos) in glyph_infos.zip(glyph_positions) {
@@ -524,7 +548,17 @@ fn process_shaped_clusters<'a>(
                 glyphs: 0,
                 inline_glyph: None,
                 advance: 0.,
+                safe_to_break_before: true,
+                safe_to_concat_before: false,
             };
+        }
+
+        if cluster.glyphs == 0 {
+            cluster.safe_to_break_before = !glyph_info.unsafe_to_break();
+
+            // Without the flag being produced, we can't know whether it's safe to concat.
+            cluster.safe_to_concat_before =
+                produce_safe_to_concat_flags && !glyph_info.unsafe_to_concat();
         }
 
         let glyph = Glyph {
@@ -634,10 +668,14 @@ mod tests {
     }
 
     fn shape_with_font(text: &str, font_data: &'static [u8]) -> ShapedText {
-        shape_with_font_selector(text, SingleFont(font_instance(font_data)))
+        shape_with_font_selector(text, SingleFont(font_instance(font_data)), false)
     }
 
-    fn shape_with_font_selector(text: &str, select_font: impl FontSelector) -> ShapedText {
+    fn shape_with_font_selector(
+        text: &str,
+        select_font: impl FontSelector,
+        produce_safe_to_concat_flags: bool,
+    ) -> ShapedText {
         let analysis = analyze(text);
         let mut shaper = Shaper::default();
         let mut shaped = ShapedText::new();
@@ -658,6 +696,7 @@ mod tests {
             &char_style_indices,
             items,
             select_font,
+            produce_safe_to_concat_flags,
             &mut shaped,
         );
         shaped
@@ -680,6 +719,7 @@ mod tests {
                 font: font_instance(NOTO_COLOR_EMOJI),
                 other_font: font_instance(ROBOTO),
             },
+            false,
         );
 
         assert_eq!(
@@ -826,6 +866,7 @@ mod tests {
             &char_style_indices,
             items,
             SingleFont(font),
+            false,
             &mut shaped,
         );
 

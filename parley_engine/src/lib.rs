@@ -58,6 +58,7 @@
 //!         },
 //!      }],
 //!      select_font, // Selects fonts covering each cluster.
+//!      false, // Don't produce safe-to-concat flags.
 //!      &mut shaped_text,
 //! );
 //!

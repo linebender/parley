@@ -545,7 +545,9 @@ impl<'a> Atom<'a> {
             .is_soft_wrap_opportunity()
     }
 
-    /// Whether the atom can be broken
+    /// Whether the text can be broken logically before this atom without reshaping.
+    ///
+    /// See also [`ShapedCluster::is_safe_to_break_before`].
     #[inline(always)]
     pub fn is_safe_to_break_before(&self) -> bool {
         self.slice.shaped_clusters[self.clusters.0 as usize].is_safe_to_break_before()
@@ -928,6 +930,7 @@ mod tests {
             &char_style_indices,
             items,
             SingleFont(font),
+            false,
             &mut shaped,
         );
         shaped
