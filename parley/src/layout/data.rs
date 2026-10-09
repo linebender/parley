@@ -527,7 +527,6 @@ impl ContentWidthsMeasurer {
                     }
                 }
                 LayoutItemKind::InlineBox => {
-                    // A forced break right after a box suppresses the box's soft wrap opportunity.
                     let inline_box = &layout_data.inline_boxes[item.index].inline_box;
                     if inline_box.kind == InlineBoxKind::InFlow {
                         let next = items.as_slice().iter().find(|next| {
