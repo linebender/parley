@@ -13,6 +13,7 @@ use alloc::string::String;
 use core::ops::{Bound, Range, RangeBounds};
 use parlance::BaseDirection;
 use parley_engine::break_overrides::LineBreakOverrideFn;
+use parley_engine::{AnalysisDataSources, DictionaryProvider};
 
 use crate::InlineBoxKind;
 use crate::inline_box::{InlineBox, LayoutInlineBox};
@@ -24,6 +25,7 @@ pub(crate) struct BuilderOptions<'a> {
     quantize: bool,
     base_direction: BaseDirection,
     line_break_override: Option<&'a LineBreakOverrideFn>,
+    dictionary_provider: Option<&'a dyn DictionaryProvider>,
 }
 
 impl BuilderOptions<'_> {
@@ -33,6 +35,7 @@ impl BuilderOptions<'_> {
             quantize,
             base_direction: BaseDirection::Auto,
             line_break_override: None,
+            dictionary_provider: None,
         }
     }
 }
@@ -88,6 +91,10 @@ impl<'b, B: Brush> RangedBuilder<'b, B> {
     /// See [`LineBreakOverrideFn`] for more details.
     pub fn set_line_break_override(&mut self, overrides: Option<&'b LineBreakOverrideFn>) {
         self.options.line_break_override = overrides;
+    }
+
+    pub fn set_dictionary_provider(&mut self, provider: Option<&'b dyn DictionaryProvider>) {
+        self.options.dictionary_provider = provider;
     }
 
     pub fn build_into(self, layout: &mut Layout<B>, text: impl AsRef<str>) {
@@ -194,6 +201,10 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
         self.options.line_break_override = overrides;
     }
 
+    pub fn set_dictionary_provider(&mut self, provider: Option<&'b dyn DictionaryProvider>) {
+        self.options.dictionary_provider = provider;
+    }
+
     pub fn build_into(self, layout: &mut Layout<B>, text: impl AsRef<str>) {
         assert!(
             self.cursor == self.len,
@@ -298,6 +309,10 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
         self.options.line_break_override = overrides;
     }
 
+    pub fn set_dictionary_provider(&mut self, provider: Option<&'b dyn DictionaryProvider>) {
+        self.options.dictionary_provider = provider;
+    }
+
     #[inline]
     pub fn build_into(self, layout: &mut Layout<B>) -> String {
         // Apply TreeStyleBuilder styles to LayoutContext.
@@ -344,6 +359,7 @@ fn build_into_layout<B: Brush>(
         text,
         options.base_direction,
         options.line_break_override,
+        &AnalysisDataSources::new(options.dictionary_provider),
     );
 
     layout.data.clear();
@@ -389,7 +405,7 @@ fn build_into_layout<B: Brush>(
             &mut lcx.scx,
             text,
             layout,
-            &lcx.analysis_data_sources,
+            &AnalysisDataSources::new(options.dictionary_provider),
         );
     }
 

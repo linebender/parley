@@ -895,6 +895,7 @@ mod tests {
                 ..AnalysisOptions::default()
             },
             &mut analysis,
+            &crate::AnalysisDataSources::default(),
         );
         analysis
     }

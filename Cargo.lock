@@ -2717,6 +2717,7 @@ dependencies = [
  "icu_locale_core",
  "icu_normalizer",
  "icu_properties",
+ "icu_provider",
  "icu_segmenter",
  "linebender_resource_handle",
  "parlance",

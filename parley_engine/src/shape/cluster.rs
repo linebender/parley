@@ -250,12 +250,12 @@ impl CharCluster {
     }
 
     #[inline(always)]
-    fn contributes_to_shaping(ch: char, analysis_data_sources: &AnalysisDataSources) -> bool {
+    fn contributes_to_shaping(ch: char, analysis_data_sources: &AnalysisDataSources<'_>) -> bool {
         let props = analysis_data_sources.properties(ch);
         crate::analysis::contributes_to_shaping(props.general_category(), props.script())
     }
 
-    fn decomposed(&mut self, analysis_data_sources: &AnalysisDataSources) -> Option<&[Char]> {
+    fn decomposed(&mut self, analysis_data_sources: &AnalysisDataSources<'_>) -> Option<&[Char]> {
         match self.decomp.state {
             FormState::Invalid => None,
             FormState::None => {
@@ -296,7 +296,7 @@ impl CharCluster {
         }
     }
 
-    fn composed(&mut self, analysis_data_sources: &AnalysisDataSources) -> Option<&[Char]> {
+    fn composed(&mut self, analysis_data_sources: &AnalysisDataSources<'_>) -> Option<&[Char]> {
         match self.comp.state {
             FormState::Invalid => None,
             FormState::None => {
@@ -339,7 +339,7 @@ impl CharCluster {
     pub fn calculate_coverage(
         &mut self,
         covers: impl Fn(char) -> bool,
-        analysis_data_sources: &AnalysisDataSources,
+        analysis_data_sources: &AnalysisDataSources<'_>,
     ) -> Coverage {
         let len = self.len();
         let mut best_coverage = Mapper {
