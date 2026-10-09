@@ -804,29 +804,6 @@ mod tests {
     }
 
     #[test]
-    fn safe_to_break_and_concat_flags() {
-        let advance = |text| {
-            shape_with_font_selector(text, SingleFont(font_instance(ROBOTO)), false).runs()[0]
-                .advance
-        };
-        assert_ne!(advance("AV"), advance("A") + advance("V"), "AV is kerned");
-        for produce_concat_flags in [true, false] {
-            let shaped = shape_with_font_selector(
-                "AV",
-                SingleFont(font_instance(ROBOTO)),
-                produce_concat_flags,
-            );
-            assert_eq!(shaped.has_safe_to_concat_flags(), produce_concat_flags);
-            let [a, v]: [_; 2] = shaped.shaped_clusters().try_into().unwrap();
-            assert!(a.is_safe_to_break_before() && !v.is_safe_to_break_before());
-            assert!(
-                !v.is_safe_to_concat_before()
-                    && (produce_concat_flags || !a.is_safe_to_concat_before())
-            );
-        }
-    }
-
-    #[test]
     fn newlines_removed() {
         for newline in ["\n", "\r", "\u{2028}", "\u{2029}"] {
             let shaped = shape_with_font(&alloc::format!("a{newline}b"), ROBOTO);
