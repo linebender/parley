@@ -176,8 +176,6 @@ pub struct ShapedCluster {
     /// the documentation on that method.
     pub glyph_offset: u32,
 
-    // /// Number of glyphs in this cluster (0xFF = single glyph stored inline)
-    // pub glyph_len: u8,
     pub(crate) flags: ShapedClusterFlags,
 
     /// Advance width for this cluster
@@ -197,11 +195,7 @@ impl ShapedCluster {
     /// The number of glyphs of this cluster.
     #[inline(always)]
     pub fn glyph_len(self) -> u8 {
-        if self.has_inline_glyph() {
-            1
-        } else {
-            self.flags.glyph_len()
-        }
+        self.flags.glyph_len()
     }
 
     /// Whether this cluster's glyph is stored inline in [`Self::glyph_offset`].
