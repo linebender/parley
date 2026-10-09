@@ -402,7 +402,7 @@ impl ShapedText {
             //
             // TODO: could this become a single `reverse` over the range?
             for cluster in &self.shaped_clusters[shaped_clusters_start..] {
-                if !cluster.has_inline_glyph() && cluster.glyph_len() > 1 {
+                if cluster.glyph_len() > 1 {
                     let start = cluster.glyph_offset as usize;
                     self.glyphs[start..start + cluster.glyph_len() as usize].reverse();
                 }
