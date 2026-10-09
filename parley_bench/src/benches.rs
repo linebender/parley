@@ -402,8 +402,12 @@ pub fn content_widths() -> Vec<Benchmark> {
                 sample.name, sample.modification
             ),
             |b| {
-                let layout = build_layout(&sample.text, []);
-                b.iter(move || black_box(layout.calculate_content_widths()))
+                let layouts = with_shuffled_text(sample, b.seed, |text| build_layout(text, []));
+                let mut i = 0;
+                b.iter(move || {
+                    i = (i + 1) % layouts.len();
+                    black_box(layouts[i].calculate_content_widths())
+                })
             },
         ));
     }
@@ -415,8 +419,14 @@ pub fn content_widths() -> Vec<Benchmark> {
                 sample.name, sample.modification
             ),
             |b| {
-                let layout = build_layout(&sample.text, styled_spans(&sample.text));
-                b.iter(move || black_box(layout.calculate_content_widths()))
+                let layouts = with_shuffled_text(sample, b.seed, |text| {
+                    build_layout(text, styled_spans(text))
+                });
+                let mut i = 0;
+                b.iter(move || {
+                    i = (i + 1) % layouts.len();
+                    black_box(layouts[i].calculate_content_widths())
+                })
             },
         ));
     }
@@ -431,15 +441,21 @@ pub fn content_widths() -> Vec<Benchmark> {
                 sample.name, sample.modification
             ),
             |b| {
-                let text_range = 0..sample.text.len();
-                let layout = build_layout(
-                    &sample.text,
-                    [
-                        (StyleProperty::WordSpacing(WORD_SPACING), text_range.clone()),
-                        (StyleProperty::LetterSpacing(LETTER_SPACING), text_range),
-                    ],
-                );
-                b.iter(move || black_box(layout.calculate_content_widths()))
+                let layouts = with_shuffled_text(sample, b.seed, |text| {
+                    let text_range = 0..text.len();
+                    build_layout(
+                        text,
+                        [
+                            (StyleProperty::WordSpacing(WORD_SPACING), text_range.clone()),
+                            (StyleProperty::LetterSpacing(LETTER_SPACING), text_range),
+                        ],
+                    )
+                });
+                let mut i = 0;
+                b.iter(move || {
+                    i = (i + 1) % layouts.len();
+                    black_box(layouts[i].calculate_content_widths())
+                })
             },
         ));
     }
@@ -466,6 +482,54 @@ pub(crate) fn build_layout<'a>(
 
         builder.build(text)
     })
+}
+
+/// Calls `build` with copies of `sample` with the words shuffled.
+///
+/// For some functions, working on the same text over and over lets the branch predictor learn some
+/// incidental patterns, and how well it can learn those specific patterns depends on code layout
+/// which doesn't necessarily carry over to different text. By shuffling the words, we can mitigate
+/// that somewhat.
+fn with_shuffled_text<T>(sample: &Sample, seed: u64, build: impl Fn(&str) -> T) -> Vec<T> {
+    let source = get_samples()
+        .iter()
+        .filter(|source| source.name == sample.name)
+        .max_by_key(|source| source.text.len())
+        .unwrap();
+
+    let mut words: Vec<&str> = source
+        .text
+        // Japanese doesn't separate words by spaces, so it's shuffled by clause.
+        .split_inclusive(|c: char| c.is_whitespace() || matches!(c, '、' | '。' | '،'))
+        .collect();
+    let chars = sample.text.chars().count();
+    let mut state = seed;
+
+    // This magic number of shuffled samples to use was chosen such that the content widths
+    // benchmarks didn't show branch predictor variance anymore, but without introducing memory
+    // cache effects. These effects probably aren't *too* sensitive to this constant across "normal
+    // machines", but they may differ a bit.
+    (0..(64_000 / chars))
+        .map(|_| {
+            let mut copy = String::new();
+            let mut copied_chars = 0;
+            for i in 0..words.len() {
+                if copied_chars >= chars {
+                    break;
+                }
+
+                // A tiny pRNG.
+                state = state
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1);
+                let j = i + (state >> 33) as usize % (words.len() - i);
+                words.swap(i, j);
+                copy.push_str(words[i]);
+                copied_chars += words[i].chars().count();
+            }
+            build(&copy.chars().take(chars).collect::<String>())
+        })
+        .collect()
 }
 
 /// Build `text` and line break without a maximum advance, i.e., lines are not wrapped. Each style
@@ -623,8 +687,14 @@ pub fn page() -> Vec<Benchmark> {
                 sample.name, sample.modification
             ),
             move |b| {
-                let layouts = build_page(&paragraphs_of(sample));
-                b.iter(move || black_box(measure_page(&layouts)))
+                let pages = with_shuffled_text(sample, b.seed, |text| {
+                    build_page(&text.split('\n').collect::<Vec<_>>())
+                });
+                let mut i = 0;
+                b.iter(move || {
+                    i = (i + 1) % pages.len();
+                    black_box(measure_page(&pages[i]))
+                })
             },
         ));
     }
