@@ -54,6 +54,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     mut text: &str,
     layout: &mut Layout<B>,
     analysis_data_sources: &AnalysisDataSources<'_>,
+    style_features: &'a mut Vec<SmallVec<[FontFeature; 8]>>,
 ) {
     // If we have both empty text and no inline boxes, shape with a fake space
     // to generate metrics that can be used to size a cursor.
@@ -77,26 +78,25 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
     // Merge font features with letter-spacing ligature suppression.
     //
-    // TODO: This allocation is slightly unfortunate (though solvable). It's required currently,
+    // TODO: This copy is slightly unfortunate (though solvable). It's required currently,
     // because the iterator providing `ShapeOptions` has to provide a borrowed `&'a [FontFeature]`,
     // which cannot be tied to the lifetime of the call to `Iterator::next`. What we'd need is a
     // lending iterator (i.e., we probably just need to let `parley_engine` take some trait
     // providing the items).
-    let style_features: &'_ Vec<SmallVec<[FontFeature; 8]>> = &styles
-        .iter()
-        .map(|style| {
-            let style_features = rcx.features(style.font_features).unwrap_or(&[]);
-            if !nearly_zero(style.letter_spacing) {
-                // Later values override earlier values.
-                OPTIONAL_LIGATURES_OFF
-                    .into_iter()
-                    .chain(style_features.iter().copied())
-                    .collect()
-            } else {
-                style_features.iter().copied().collect()
-            }
-        })
-        .collect();
+    style_features.clear();
+    style_features.extend(styles.iter().map(|style| {
+        let style_features = rcx.features(style.font_features).unwrap_or(&[]);
+        if !nearly_zero(style.letter_spacing) {
+            // Later values override earlier values.
+            OPTIONAL_LIGATURES_OFF
+                .into_iter()
+                .chain(style_features.iter().copied())
+                .collect()
+        } else {
+            style_features.iter().copied().collect()
+        }
+    }));
+    let style_features = &*style_features;
 
     // Split when shaping-relevant style properties change and at inline boxes.
     let items = {
