@@ -528,21 +528,24 @@ impl ContentWidthsMeasurer {
                 }
                 LayoutItemKind::InlineBox => {
                     // A forced break right after a box suppresses the box's soft wrap opportunity.
-                    let followed_by_forced_break = match items.as_slice().first() {
-                        Some(next) if next.kind == LayoutItemKind::TextRun => {
-                            let slice = layout_data.shaped_text.run_slice(next.index as u32);
-                            slice.shaped_clusters()[0].whitespace() == Whitespace::Newline
-                        }
-                        _ => false,
-                    };
                     let inline_box = &layout_data.inline_boxes[item.index].inline_box;
                     if inline_box.kind == InlineBoxKind::InFlow {
-                        let followed = items.as_slice().iter().any(|next| {
+                        let next = items.as_slice().iter().find(|next| {
                             next.kind == LayoutItemKind::TextRun
                                 || layout_data.inline_boxes[next.index].inline_box.kind
                                     == InlineBoxKind::InFlow
                         });
-                        self.measure_inline_box(inline_box, followed && !followed_by_forced_break);
+                        // A forced break right after a box suppresses the box's soft wrap
+                        // opportunity.
+                        let followed_by_inline_content = match next {
+                            Some(next) if next.kind == LayoutItemKind::TextRun => {
+                                let slice = layout_data.shaped_text.run_slice(next.index as u32);
+                                slice.shaped_clusters()[0].whitespace() != Whitespace::Newline
+                            }
+                            Some(_) => true,
+                            None => false,
+                        };
+                        self.measure_inline_box(inline_box, followed_by_inline_content);
                     }
                 }
             }
