@@ -80,13 +80,6 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 
 - Initial release. See the highlights above. ([@tomcur][], with contributions from [@DJMcNab][], [@fundon][], [@GoCoder7][], [@nicoburns][], [@Soundcreates][], [@taj-p][] and [@waywardmonkeys][])
 
-#### Parlance
-
-- `BidiLevel` to encode bidirectional text embedding levels. ([#710][] by [@tomcur][])
-- `Script::is_cursive` returning whether a script is cursive. ([#728][] by [@tomcur][])  
-  This can be used to decide, for example, whether to apply letter spacing.
-- `NormalizedCoord` to encode normalized font coordinates. ([#813][] by [@nicoburns][])
-
 #### Fontique
 
 - `Collection::family_ids` to iterate over unique font family identifiers. ([#725][] by [@tomcur][])
@@ -121,13 +114,6 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 
 - Synthetic font emboldening is now only requested if the weight difference is greater than 200. ([#724][] by [@taj-p][])
 - The `&QueryFont` passed by `Query::matches_with` now lives as long as the query borrow itself. ([#841][] by [@tomcur][])
-
-### Deprecated
-
-#### Parlance
-
-- `parlance::Script::from_str_unchecked` has been deprecated. ([#677][] by [@DJMcNab][])  
-  Use `parlance::Script::from_bytes` instead.
 
 ### Removed
 
@@ -185,10 +171,6 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - `Collection::load_fonts_from_paths` no longer registers duplicate faces. ([#754][] by [@ChrisJr404][])
 - All coverage variants for a family are now included in the query. ([#663][] by [@kane50613][])
 - Select the correct variable font weight in synthesis when the default and declared weights conflict. ([#723][] by [@taj-p][])
-
-#### Parlance
-
-- `GenericFamily::parse` is now case-insensitive. ([#654][] by [@mvanhorn][])
 
 ## [0.11.1] - 2026-08-16
 
@@ -878,18 +860,15 @@ This release has an [MSRV][] of 1.70.
 [#640]: https://github.com/linebender/parley/pull/640
 [#643]: https://github.com/linebender/parley/pull/643
 [#650]: https://github.com/linebender/parley/pull/650
-[#654]: https://github.com/linebender/parley/pull/654
 [#660]: https://github.com/linebender/parley/pull/660
 [#661]: https://github.com/linebender/parley/pull/661
 [#663]: https://github.com/linebender/parley/pull/663
 [#667]: https://github.com/linebender/parley/pull/667
 [#672]: https://github.com/linebender/parley/pull/672
 [#676]: https://github.com/linebender/parley/pull/676
-[#677]: https://github.com/linebender/parley/pull/677
 [#679]: https://github.com/linebender/parley/pull/679
 [#697]: https://github.com/linebender/parley/pull/697
 [#708]: https://github.com/linebender/parley/pull/708
-[#710]: https://github.com/linebender/parley/pull/710
 [#715]: https://github.com/linebender/parley/pull/715
 [#716]: https://github.com/linebender/parley/pull/716
 [#717]: https://github.com/linebender/parley/pull/717
@@ -899,7 +878,6 @@ This release has an [MSRV][] of 1.70.
 [#723]: https://github.com/linebender/parley/pull/723
 [#724]: https://github.com/linebender/parley/pull/724
 [#725]: https://github.com/linebender/parley/pull/725
-[#728]: https://github.com/linebender/parley/pull/728
 [#731]: https://github.com/linebender/parley/pull/731
 [#734]: https://github.com/linebender/parley/pull/734
 [#738]: https://github.com/linebender/parley/pull/738
@@ -923,7 +901,6 @@ This release has an [MSRV][] of 1.70.
 [#810]: https://github.com/linebender/parley/pull/810
 [#811]: https://github.com/linebender/parley/pull/811
 [#812]: https://github.com/linebender/parley/pull/812
-[#813]: https://github.com/linebender/parley/pull/813
 [#814]: https://github.com/linebender/parley/pull/814
 [#815]: https://github.com/linebender/parley/pull/815
 [#819]: https://github.com/linebender/parley/pull/819

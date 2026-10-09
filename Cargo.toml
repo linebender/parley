@@ -34,7 +34,7 @@ repository = "https://github.com/linebender/parley"
 
 [workspace.dependencies]
 # Local crates
-parlance = { version = "0.1.0", default-features = false, path = "parlance" }
+parlance = { version = "0.1.1", default-features = false, path = "parlance" }
 fontique = { version = "0.12.0", default-features = false, path = "fontique" }
 parley = { version = "0.12.0", default-features = false, path = "parley" }
 parley_data = { version = "0.12.0", path = "parley_data", default-features = false }
