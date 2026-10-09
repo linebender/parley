@@ -64,11 +64,12 @@ Carets and selections no longer land inside graphemes (such as between a letter 
   This is especially useful in combination with justification.
 - Breaking change: Added the `WhiteSpaceCollapse::{PreserveBreaks, BreakSpaces}` variants. ([#812][], [#833][] by [@nicoburns][])
 - Breaking change: Support for the CSS `line-break` style. This controls line-breaking behaviour of CJK text. ([#843][] by [@nicoburns][])
+- Breaking change: Added `LineMetrics::content_block_{min, max}_coord`, which are the typographic content bounds of a line independent of line height. ([#697][] by [@tomcur][])
+- Breaking change: Added `LineMetrics::indent`, which is the text indent applied to the line. ([#893][] by [@tomcur][])
 - `Layout::text_len` and `Layout::alignment`, `Cursor::upstream_cluster` and `Cursor::downstream_cluster`, `PlainEditor::is_cursor_visible`, and `PlainEditorDriver::set_selection`. ([#716][] by [@DataTriny][])  
   `ClusterPath::new` and the `Style::locale` field are now public as well.
   Together these make it possible to build an accessibility integration outside of Parley.
 - `Layout::root_span_metrics`, to help with placing directly drawn bullet points. ([#867][] by [@DJMcNab][])
-- `LineMetrics::content_block_{min, max}_coord`, which are the typographic content bounds of a line independent of line height. ([#697][] by [@tomcur][])
 - `Cluster::style_index` and `GlyphRun::style_index`. ([#661][] by [@tomcur][])
 - The base direction of paragraphs can now be set using `{RangedBuilder, StyleRunBuilder, TreeBuilder, PlainEditor}::set_base_direction`. ([#708][] by [@waywardmonkeys][], [#858][] by [@nicoburns][])
 - `Layout::clear` to clear the contents of a layout. This can be used to clean up font resources. ([#804][] by [@taj-p][])
@@ -107,6 +108,7 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - Breaking change: `layout::Cluster::first_style` was renamed to `layout::Cluster::style`. ([#660][] by [@tomcur][])
 - Breaking change: `WhiteSpaceCollapse` is now a style, and `TreeBuilder::set_white_space_mode` was removed. ([#814][] by [@nicoburns][])
 - Breaking change: `LineMetrics::trailing_whitespace` was renamed to `LineMetrics::hanging_advance`. Following CSS Text 4 § 4.3.2, non-breaking spaces no longer hang past line ends. ([#762][] by [@tomcur][])
+- Breaking change: `LineBreakData::{advance, line_height}` were replaced by `LineBreakData::metrics`, which holds the line's full `LineMetrics`.  ([#892][] by [@nicoburns][], [#893][] by [@tomcur][])
 - Breaking change: `Run::normalized_coords` now returns `&[NormalizedCoord]` instead of `&[i16]`. ([#679][] by [@tomcur][])  
   Use `NormalizedCoord::to_bits`, or cast the slice using the new `bytemuck` feature.
 - Ideographic spaces can now hang past line ends. ([#784][] by [@tomcur][])
@@ -154,6 +156,7 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - In `calculate_content_widths`, the max-content width is now floored by the min-content width. ([#834][] by [@nicoburns][])  
   This follows CSS in guarding against cases where the max-content width could be smaller than the min-content width, e.g., in the presence of inline boxes with negative margins.
 - `Layout::calculate_content_widths` now correctly handles hanging of consecutive trailing white space and trailing white space consisting of separate runs (e.g., due to font size changes). ([#785][] by [@tomcur][])
+- `Layout::calculate_content_widths` now accounts for text indent. ([#866][] by [@nicoburns][], [#889][] by [@tomcur][])
 - Justification of lines with overflowing trailing spaces now correctly distributes free space over all interior spaces. ([#738][] by [@tomcur][])
 - Lines aligned with justification now correctly handle runs of consecutive trailing spaces. ([#760][] by [@tomcur][])
 - Trailing white space consisting of separate runs (e.g., due to font size changes) now hangs past line ends. ([#762][] by [@tomcur][])
@@ -938,9 +941,13 @@ This release has an [MSRV][] of 1.70.
 [#858]: https://github.com/linebender/parley/pull/858
 [#863]: https://github.com/linebender/parley/pull/863
 [#864]: https://github.com/linebender/parley/pull/864
+[#866]: https://github.com/linebender/parley/pull/866
 [#867]: https://github.com/linebender/parley/pull/867
 [#872]: https://github.com/linebender/parley/pull/872
 [#878]: https://github.com/linebender/parley/pull/878
+[#889]: https://github.com/linebender/parley/pull/889
+[#892]: https://github.com/linebender/parley/pull/892
+[#893]: https://github.com/linebender/parley/pull/893
 
 [Unreleased]: https://github.com/linebender/parley/compare/v0.12.0...HEAD
 [0.12.0]: https://github.com/linebender/parley/compare/v0.11.1...v0.12.0
