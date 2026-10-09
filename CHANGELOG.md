@@ -16,6 +16,10 @@ Every change to this file must be written by a human.
 
 This release has an [MSRV] of 1.88.
 
+## [0.12.0] - 2026-10-09
+
+This release has an [MSRV] of 1.88.
+
 ### Highlights
 
 #### Parley Engine
@@ -60,11 +64,12 @@ Carets and selections no longer land inside graphemes (such as between a letter 
   This is especially useful in combination with justification.
 - Breaking change: Added the `WhiteSpaceCollapse::{PreserveBreaks, BreakSpaces}` variants. ([#812][], [#833][] by [@nicoburns][])
 - Breaking change: Support for the CSS `line-break` style. This controls line-breaking behaviour of CJK text. ([#843][] by [@nicoburns][])
+- Breaking change: Added `LineMetrics::content_block_{min, max}_coord`, which are the typographic content bounds of a line independent of line height. ([#697][] by [@tomcur][])
+- Breaking change: Added `LineMetrics::indent`, which is the text indent applied to the line. ([#893][] by [@tomcur][])
 - `Layout::text_len` and `Layout::alignment`, `Cursor::upstream_cluster` and `Cursor::downstream_cluster`, `PlainEditor::is_cursor_visible`, and `PlainEditorDriver::set_selection`. ([#716][] by [@DataTriny][])  
   `ClusterPath::new` and the `Style::locale` field are now public as well.
   Together these make it possible to build an accessibility integration outside of Parley.
 - `Layout::root_span_metrics`, to help with placing directly drawn bullet points. ([#867][] by [@DJMcNab][])
-- `LineMetrics::content_block_{min, max}_coord`, which are the typographic content bounds of a line independent of line height. ([#697][] by [@tomcur][])
 - `Cluster::style_index` and `GlyphRun::style_index`. ([#661][] by [@tomcur][])
 - The base direction of paragraphs can now be set using `{RangedBuilder, StyleRunBuilder, TreeBuilder, PlainEditor}::set_base_direction`. ([#708][] by [@waywardmonkeys][], [#858][] by [@nicoburns][])
 - `Layout::clear` to clear the contents of a layout. This can be used to clean up font resources. ([#804][] by [@taj-p][])
@@ -74,13 +79,6 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 #### Parley Engine
 
 - Initial release. See the highlights above. ([@tomcur][], with contributions from [@DJMcNab][], [@fundon][], [@GoCoder7][], [@nicoburns][], [@Soundcreates][], [@taj-p][] and [@waywardmonkeys][])
-
-#### Parlance
-
-- `BidiLevel` to encode bidirectional text embedding levels. ([#710][] by [@tomcur][])
-- `Script::is_cursive` returning whether a script is cursive. ([#728][] by [@tomcur][])  
-  This can be used to decide, for example, whether to apply letter spacing.
-- `NormalizedCoord` to encode normalized font coordinates. ([#813][] by [@nicoburns][])
 
 #### Fontique
 
@@ -103,6 +101,7 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - Breaking change: `layout::Cluster::first_style` was renamed to `layout::Cluster::style`. ([#660][] by [@tomcur][])
 - Breaking change: `WhiteSpaceCollapse` is now a style, and `TreeBuilder::set_white_space_mode` was removed. ([#814][] by [@nicoburns][])
 - Breaking change: `LineMetrics::trailing_whitespace` was renamed to `LineMetrics::hanging_advance`. Following CSS Text 4 § 4.3.2, non-breaking spaces no longer hang past line ends. ([#762][] by [@tomcur][])
+- Breaking change: `LineBreakData::{advance, line_height}` were replaced by `LineBreakData::metrics`, which holds the line's full `LineMetrics`. ([#892][] by [@nicoburns][], [#893][] by [@tomcur][])
 - Breaking change: `Run::normalized_coords` now returns `&[NormalizedCoord]` instead of `&[i16]`. ([#679][] by [@tomcur][])  
   Use `NormalizedCoord::to_bits`, or cast the slice using the new `bytemuck` feature.
 - Ideographic spaces can now hang past line ends. ([#784][] by [@tomcur][])
@@ -115,13 +114,6 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 
 - Synthetic font emboldening is now only requested if the weight difference is greater than 200. ([#724][] by [@taj-p][])
 - The `&QueryFont` passed by `Query::matches_with` now lives as long as the query borrow itself. ([#841][] by [@tomcur][])
-
-### Deprecated
-
-#### Parlance
-
-- `parlance::Script::from_str_unchecked` has been deprecated. ([#677][] by [@DJMcNab][])  
-  Use `parlance::Script::from_bytes` instead.
 
 ### Removed
 
@@ -150,6 +142,7 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - In `calculate_content_widths`, the max-content width is now floored by the min-content width. ([#834][] by [@nicoburns][])  
   This follows CSS in guarding against cases where the max-content width could be smaller than the min-content width, e.g., in the presence of inline boxes with negative margins.
 - `Layout::calculate_content_widths` now correctly handles hanging of consecutive trailing white space and trailing white space consisting of separate runs (e.g., due to font size changes). ([#785][] by [@tomcur][])
+- `Layout::calculate_content_widths` now accounts for text indent. ([#866][] by [@nicoburns][], [#889][] by [@tomcur][])
 - Justification of lines with overflowing trailing spaces now correctly distributes free space over all interior spaces. ([#738][] by [@tomcur][])
 - Lines aligned with justification now correctly handle runs of consecutive trailing spaces. ([#760][] by [@tomcur][])
 - Trailing white space consisting of separate runs (e.g., due to font size changes) now hangs past line ends. ([#762][] by [@tomcur][])
@@ -178,10 +171,6 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - `Collection::load_fonts_from_paths` no longer registers duplicate faces. ([#754][] by [@ChrisJr404][])
 - All coverage variants for a family are now included in the query. ([#663][] by [@kane50613][])
 - Select the correct variable font weight in synthesis when the default and declared weights conflict. ([#723][] by [@taj-p][])
-
-#### Parlance
-
-- `GenericFamily::parse` is now case-insensitive. ([#654][] by [@mvanhorn][])
 
 ## [0.11.1] - 2026-08-16
 
@@ -871,18 +860,15 @@ This release has an [MSRV][] of 1.70.
 [#640]: https://github.com/linebender/parley/pull/640
 [#643]: https://github.com/linebender/parley/pull/643
 [#650]: https://github.com/linebender/parley/pull/650
-[#654]: https://github.com/linebender/parley/pull/654
 [#660]: https://github.com/linebender/parley/pull/660
 [#661]: https://github.com/linebender/parley/pull/661
 [#663]: https://github.com/linebender/parley/pull/663
 [#667]: https://github.com/linebender/parley/pull/667
 [#672]: https://github.com/linebender/parley/pull/672
 [#676]: https://github.com/linebender/parley/pull/676
-[#677]: https://github.com/linebender/parley/pull/677
 [#679]: https://github.com/linebender/parley/pull/679
 [#697]: https://github.com/linebender/parley/pull/697
 [#708]: https://github.com/linebender/parley/pull/708
-[#710]: https://github.com/linebender/parley/pull/710
 [#715]: https://github.com/linebender/parley/pull/715
 [#716]: https://github.com/linebender/parley/pull/716
 [#717]: https://github.com/linebender/parley/pull/717
@@ -892,7 +878,6 @@ This release has an [MSRV][] of 1.70.
 [#723]: https://github.com/linebender/parley/pull/723
 [#724]: https://github.com/linebender/parley/pull/724
 [#725]: https://github.com/linebender/parley/pull/725
-[#728]: https://github.com/linebender/parley/pull/728
 [#731]: https://github.com/linebender/parley/pull/731
 [#734]: https://github.com/linebender/parley/pull/734
 [#738]: https://github.com/linebender/parley/pull/738
@@ -916,7 +901,6 @@ This release has an [MSRV][] of 1.70.
 [#810]: https://github.com/linebender/parley/pull/810
 [#811]: https://github.com/linebender/parley/pull/811
 [#812]: https://github.com/linebender/parley/pull/812
-[#813]: https://github.com/linebender/parley/pull/813
 [#814]: https://github.com/linebender/parley/pull/814
 [#815]: https://github.com/linebender/parley/pull/815
 [#819]: https://github.com/linebender/parley/pull/819
@@ -934,11 +918,16 @@ This release has an [MSRV][] of 1.70.
 [#858]: https://github.com/linebender/parley/pull/858
 [#863]: https://github.com/linebender/parley/pull/863
 [#864]: https://github.com/linebender/parley/pull/864
+[#866]: https://github.com/linebender/parley/pull/866
 [#867]: https://github.com/linebender/parley/pull/867
 [#872]: https://github.com/linebender/parley/pull/872
 [#878]: https://github.com/linebender/parley/pull/878
+[#889]: https://github.com/linebender/parley/pull/889
+[#892]: https://github.com/linebender/parley/pull/892
+[#893]: https://github.com/linebender/parley/pull/893
 
-[Unreleased]: https://github.com/linebender/parley/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/linebender/parley/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/linebender/parley/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.1
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/linebender/parley/compare/v0.9.0...v0.10.0
