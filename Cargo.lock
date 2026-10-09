@@ -2640,7 +2640,7 @@ checksum = "f38d5652c16fde515bb1ecef450ab0f6a219d619a7274976324d5e377f7dceba"
 
 [[package]]
 name = "parlance"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "bytemuck",
 ]
