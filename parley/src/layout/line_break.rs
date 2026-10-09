@@ -544,13 +544,10 @@ pub enum YieldData {
 pub struct LineBreakData {
     /// The reason for the line break (see [`BreakReason`] for details)
     pub reason: BreakReason,
-    /// The computed advance (width) of the line, including trailing whitespace
-    pub advance: f32,
-    /// The portion of [`Self::advance`] that is trailing whitespace hanging past the line's
-    /// end edge (see [`LineMetrics::hanging_advance`](crate::layout::LineMetrics::hanging_advance))
-    pub hanging_advance: f32,
-    /// The computed height of the line
-    pub line_height: f32,
+    /// The metrics of the line.
+    ///
+    /// As the line isn't aligned yet, [`LineMetrics::offset`] is 0.
+    pub metrics: LineMetrics,
     /// The position of the top of the line
     pub line_y_start: f64,
     /// The position of the bottom of the line
@@ -950,12 +947,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
     #[inline(always)]
     fn last_line_data(&self, reason: BreakReason, line_y_start: f64) -> LineBreakData {
-        let line = self.lines.lines.last().unwrap();
         LineBreakData {
             reason,
-            advance: line.metrics.advance,
-            hanging_advance: line.metrics.hanging_advance,
-            line_height: line.size(),
+            metrics: self.lines.lines.last().unwrap().metrics,
             line_y_start,
             line_y_end: self.state.line_y,
         }
@@ -1640,7 +1634,7 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
         let mut layout_full_width = 0_f32;
         let mut height = 0_f64; // f32 causes test failures due to accumulated error
         for line in &self.lines.lines {
-            let indent_extra = line.indent.max(0.0);
+            let indent_extra = line.metrics.indent.max(0.0);
             let line_max = line.metrics.inline_min_coord + line.metrics.advance + indent_extra;
             layout_full_width = layout_full_width.max(line_max);
             layout_width = layout_width.max(line_max - line.metrics.hanging_advance);
@@ -1820,8 +1814,8 @@ fn commit_line<B: Brush>(
             justification_end_cluster,
             ..Justification::NONE
         },
-        indent: line_indent,
         metrics: LineMetrics {
+            indent: line_indent,
             advance: state.x,
             hanging_advance,
             ..Default::default()
