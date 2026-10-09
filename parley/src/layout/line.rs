@@ -168,7 +168,7 @@ pub struct LineMetrics {
     /// Offset for alignment.
     pub offset: f32,
 
-    /// The text indent appleid to this line (see [`Layout::set_text_indent`]).
+    /// The text indent applied to this line (see [`Layout::set_text_indent`]).
     ///
     /// This isn't part of [`Self::advance`]. After alignment, [`Self::offset`] accounts for it.
     pub indent: f32,
