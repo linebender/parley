@@ -118,7 +118,7 @@ static CHROMIUM_LINE_BREAK_TABLE: AsciiLineBreakTable<5> =
 ///     line_break_override: Some(CHROMIUM_LINE_BREAK_OVERRIDE),
 ///     ..AnalysisOptions::default()
 /// };
-/// analyzer.analyze(text, &options, &mut analysis);
+/// analyzer.analyze(text, &options, &mut analysis, &parley_engine::AnalysisDataSources::new());
 /// ```
 #[derive(Clone, Debug)]
 pub struct AsciiLineBreakTable<const N: usize> {

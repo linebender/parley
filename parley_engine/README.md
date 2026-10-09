@@ -48,7 +48,7 @@ let text = "The quick brown ثعلب jumps over the lazy dog.";
 let char_count = text.chars().count();
 let char_style_indices = vec![0; char_count];
 
-analyzer.analyze(text, &AnalysisOptions::default(), &mut analysis);
+analyzer.analyze(text, &AnalysisOptions::default(), &mut analysis, &parley_engine::AnalysisDataSources::new());
 shaper.shape_text(
     text,
     &analysis,

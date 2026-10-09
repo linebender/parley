@@ -43,7 +43,7 @@
 //! let char_count = text.chars().count();
 //! let char_style_indices = vec![0; char_count];
 //!
-//! analyzer.analyze(text, &AnalysisOptions::default(), &mut analysis);
+//! analyzer.analyze(text, &AnalysisOptions::default(), &mut analysis, &parley_engine::AnalysisDataSources::new());
 //! shaper.shape_text(
 //!     text,
 //!     &analysis,
@@ -119,7 +119,7 @@ pub mod shape;
 pub use linebender_resource_handle::FontData;
 pub use parlance::{BaseDirection, NormalizedCoord};
 
-pub use analysis::{Analysis, AnalysisDataSources, CharInfo};
+pub use analysis::{Analysis, AnalysisDataSources, CharInfo, DictionaryProvider};
 pub use analyzer::{AnalysisOptions, Analyzer, LineBreakConfig};
 pub use glyph::Glyph;
 pub use shape::atom::{Atom, Atoms, Grapheme, Graphemes, ShapedClusterGlyphs, ShapedSlice};

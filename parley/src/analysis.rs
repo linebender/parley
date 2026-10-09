@@ -14,6 +14,7 @@ pub(crate) fn analyze_text<B: Brush>(
     text: &str,
     base_direction: BaseDirection,
     line_break_override: Option<&LineBreakOverrideFn>,
+    data_sources: &parley_engine::AnalysisDataSources<'_>,
 ) {
     let text = if text.is_empty() { " " } else { text };
 
@@ -56,5 +57,6 @@ pub(crate) fn analyze_text<B: Brush>(
         break_spaces: &lcx.break_spaces,
         line_break_override,
     };
-    lcx.analyzer.analyze(text, &options, &mut lcx.analysis);
+    lcx.analyzer
+        .analyze(text, &options, &mut lcx.analysis, data_sources);
 }

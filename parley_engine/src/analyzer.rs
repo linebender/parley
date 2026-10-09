@@ -32,9 +32,15 @@ impl Analyzer {
     /// Analyze `text`, overwriting `analysis`.
     ///
     /// This reuses the allocations of `analysis`.
-    pub fn analyze(&mut self, text: &str, options: &AnalysisOptions<'_>, analysis: &mut Analysis) {
+    pub fn analyze(
+        &mut self,
+        text: &str,
+        options: &AnalysisOptions<'_>,
+        analysis: &mut Analysis,
+        data_sources: &crate::AnalysisDataSources<'_>,
+    ) {
         analysis.clear();
-        analyze_text(self, text, options, analysis);
+        analyze_text(self, text, options, analysis, data_sources);
     }
 }
 
@@ -119,6 +125,7 @@ mod tests {
                 ..AnalysisOptions::default()
             },
             &mut analysis,
+            &crate::AnalysisDataSources::default(),
         );
         analysis
     }

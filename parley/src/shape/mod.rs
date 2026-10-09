@@ -53,7 +53,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     scx: &mut Shaper,
     mut text: &str,
     layout: &mut Layout<B>,
-    analysis_data_sources: &AnalysisDataSources,
+    analysis_data_sources: &AnalysisDataSources<'_>,
 ) {
     // If we have both empty text and no inline boxes, shape with a fake space
     // to generate metrics that can be used to size a cursor.
@@ -272,7 +272,7 @@ struct FontSelector<'a, 'b, B: Brush> {
     /// The font to use if [`Self::query`] doesn't return any font.
     last_resort_font: LastResortFont,
 
-    analysis_data_sources: &'a AnalysisDataSources,
+    analysis_data_sources: &'a AnalysisDataSources<'a>,
 }
 
 impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
@@ -284,7 +284,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         query: &'b mut Query<'a>,
         rcx: &'a ResolveContext,
         styles: &'a [ResolvedStyle<B>],
-        analysis_data_sources: &'a AnalysisDataSources,
+        analysis_data_sources: &'a AnalysisDataSources<'a>,
     ) -> Self {
         let attrs = fontique::Attributes::default();
 
