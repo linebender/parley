@@ -46,7 +46,7 @@ parley_linebreaking_cases = { path = "parley_tests/linebreaking_cases" }
 
 # External dependencies
 bytemuck = { version = "1.25.2", default-features = false }
-harfrust = { version = "0.12.0", default-features = false }
+harfrust = { version = "0.14.0", default-features = false }
 hashbrown = { version = "0.17.1", default-features = false, features = [
     "default-hasher",
     "raw-entry",
@@ -61,8 +61,8 @@ packtab = { version = "1.9.0" }
 rand = { version = "0.10.3", default-features = false, features = ["std", "std_rng"] }
 rand_chacha = { version = "0.10.0", default-features = false }
 peniko = { version = "0.6.1", default-features = false }
-read-fonts = { version = "0.41.0", default-features = false }
-skrifa = { version = "0.44.0", default-features = false }
+read-fonts = { version = "0.45.0", default-features = false }
+skrifa = { version = "0.48.0", default-features = false }
 smallvec = "1.16.2"
 swash = { version = "0.2.10", default-features = false }
 vello_common = { version = "0.2.0", default-features = false }

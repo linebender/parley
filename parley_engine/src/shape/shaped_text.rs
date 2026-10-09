@@ -294,8 +294,8 @@ impl ShapedText {
         char_info: &[CharInfo],
         char_style_indices: &[u16],
         font: &FontInstance,
-        glyph_buffer: &harfrust::GlyphBuffer,
-        normalized_coords: &[harfrust::NormalizedCoord],
+        glyph_buffer: &harfrust::Buffer,
+        normalized_coords: &[harfrust::font::NormalizedCoord],
     ) {
         debug_assert_eq!(
             range.char_range.len(),
