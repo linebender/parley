@@ -48,6 +48,7 @@ mod impl_bytemuck;
 mod language;
 mod normalized_coord;
 mod script;
+mod synthesis;
 mod tag;
 mod text;
 
@@ -58,5 +59,6 @@ pub use generic_family::GenericFamily;
 pub use language::{Language, ParseLanguageError};
 pub use normalized_coord::NormalizedCoord;
 pub use script::{ParseScriptError, Script};
+pub use synthesis::Synthesis;
 pub use tag::{FontFeature, FontVariation, ParseSettingsError, ParseSettingsErrorKind, Tag};
 pub use text::{BaseDirection, LineBreak, OverflowWrap, TextWrapMode, WordBreak};
