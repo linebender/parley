@@ -93,6 +93,13 @@ impl<'b, B: Brush> RangedBuilder<'b, B> {
         self.options.line_break_override = overrides;
     }
 
+    /// Set the provider for dictionary data used for word and line segmentation.
+    ///
+    /// See [`DictionaryProvider`] for more details.
+    ///
+    /// # Panics
+    ///
+    /// Building this layout may panic if the provider returns an error other than `IdentifierNotFound`.
     pub fn set_dictionary_provider(&mut self, provider: Option<&'b dyn DictionaryProvider>) {
         self.options.dictionary_provider = provider;
     }
@@ -201,6 +208,13 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
         self.options.line_break_override = overrides;
     }
 
+    /// Set the provider for dictionary data used for word and line segmentation.
+    ///
+    /// See [`DictionaryProvider`] for more details.
+    ///
+    /// # Panics
+    ///
+    /// Building this layout may panic if the provider returns an error other than `IdentifierNotFound`.
     pub fn set_dictionary_provider(&mut self, provider: Option<&'b dyn DictionaryProvider>) {
         self.options.dictionary_provider = provider;
     }
@@ -309,6 +323,13 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
         self.options.line_break_override = overrides;
     }
 
+    /// Set the provider for dictionary data used for word and line segmentation.
+    ///
+    /// See [`DictionaryProvider`] for more details.
+    ///
+    /// # Panics
+    ///
+    /// Building this layout may panic if the provider returns an error other than `IdentifierNotFound`.
     pub fn set_dictionary_provider(&mut self, provider: Option<&'b dyn DictionaryProvider>) {
         self.options.dictionary_provider = provider;
     }

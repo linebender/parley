@@ -1,0 +1,28 @@
+[package]
+name = "external_dictionaries"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+default-run = "external_dictionaries"
+
+[features]
+# Only the generator needs serialization/export support and references to baked dictionaries.
+generate = ["icu_segmenter/datagen", "icu_provider_blob/export"]
+
+[dependencies]
+parley = { workspace = true, features = ["system"] }
+icu_provider = { workspace = true, features = ["sync", "deserialize_postcard_1"] }
+icu_provider_blob = { workspace = true, features = ["alloc"] }
+icu_segmenter = { workspace = true, features = ["serde"] }
+
+[[bin]]
+name = "generate_dictionaries"
+path = "src/bin/generate_dictionaries.rs"
+required-features = ["generate"]
+test = false
+
+[lints]
+workspace = true

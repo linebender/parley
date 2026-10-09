@@ -32,6 +32,10 @@ impl Analyzer {
     /// Analyze `text`, overwriting `analysis`.
     ///
     /// This reuses the allocations of `analysis`.
+    ///
+    /// # Panics
+    ///
+    /// If the provider in `data_sources` returns an error other than `IdentifierNotFound`.
     pub fn analyze(
         &mut self,
         text: &str,
