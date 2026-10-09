@@ -108,7 +108,7 @@ extern crate alloc;
 
 mod analysis;
 mod analyzer;
-pub mod bidi;
+mod bidi;
 pub mod break_overrides;
 mod glyph;
 pub mod itemize;
