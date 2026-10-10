@@ -38,7 +38,7 @@ impl Default for ColorBrush {
 fn main() {
     // The text we are going to style and lay out
     let text = String::from(
-        "Some text here. Let's make it a bit longer so that line wrapping kicks in 😊. And also some اللغة العربية arabic text.\nThis is underline and strikethrough text",
+        "Some text here. Let's make it a bit long\u{FFFC}er so that line wrapping kicks in 😊. And also some اللغة العربية arabic text.\nThis is underline and strikethrough text",
     );
 
     // The display scale for HiDPI rendering
@@ -84,8 +84,8 @@ fn main() {
     builder.push(StyleProperty::FontWeight(bold), 0..4);
 
     // Set the underline & strikethrough style
-    builder.push(StyleProperty::Underline(true), 141..150);
-    builder.push(StyleProperty::Strikethrough(true), 155..168);
+    builder.push(StyleProperty::Underline(true), 144..153);
+    builder.push(StyleProperty::Strikethrough(true), 158..171);
 
     builder.push_inline_box(InlineBox {
         id: 0,

@@ -60,17 +60,21 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
     // Do nothing if there is no text or styles (there should always be a default style)
     if text.is_empty() || styles.is_empty() {
-        // Process any remaining inline boxes whose index is greater than the length of the text
+        // There may be out-of-flow boxes (inline boxes are represented by a U+FFFC character, so
+        // they text wouldn't have been empty).
         for box_idx in 0..inline_boxes.len() {
-            // Push the box to the list of items
-            layout.data.push_inline_box(box_idx, BidiLevel::new(0));
+            layout.data.push_out_of_flow_box(box_idx, BidiLevel::new(0));
         }
         return;
     }
 
     let mut fq = fcx.collection.query(&mut fcx.source_cache);
 
-    let mut inline_box_iter = inline_boxes.iter().map(|b| &b.inline_box).peekable();
+    let mut out_of_flow_box_iter = inline_boxes
+        .iter()
+        .filter(|b| !b.is_inline_object())
+        .map(|b| &b.inline_box)
+        .peekable();
 
     // Merge font features with letter-spacing ligature suppression.
     //
@@ -95,7 +99,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         })
         .collect();
 
-    // Split when shaping-relevant style properties change and at inline boxes.
+    // Split when shaping-relevant style properties change and at out-of-flow boxes.
     let items = {
         // TODO: we currently walk characters here, but we could instead just walk boundaries of
         // styles and inline boxes.
@@ -128,13 +132,13 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 //
                 // We loop because there may be multiple boxes at this index.
                 let mut split = false;
-                while let Some(inline_box) = inline_box_iter.peek() {
+                while let Some(inline_box) = out_of_flow_box_iter.peek() {
                     if inline_box.index < byte_index {
                         // Inline boxes *before* this index are popped (this occurs if the itemizer
                         // split a run and we were not called, such as at a bidi boundary).
-                        inline_box_iter.next();
+                        out_of_flow_box_iter.next();
                     } else if inline_box.index == byte_index {
-                        inline_box_iter.next();
+                        out_of_flow_box_iter.next();
                         split = true;
                     } else {
                         break;
@@ -188,10 +192,12 @@ pub(crate) fn shape_text<'a, B: Brush>(
         &mut layout.data.shaped_text,
     );
 
-    let mut inline_box_iter = inline_boxes
+    // Out-of-flow boxes are laid out as items of their own.
+    let mut out_of_flow_box_iter = inline_boxes
         .iter()
-        .map(|b| &b.inline_box)
         .enumerate()
+        .filter(|(_, b)| !b.is_inline_object())
+        .map(|(box_idx, b)| (box_idx, &b.inline_box))
         .peekable();
     for shaped_run_idx in 0..layout.data.shaped_text.runs().len() {
         let shaped_run = &layout.data.shaped_text.runs()[shaped_run_idx];
@@ -199,20 +205,20 @@ pub(crate) fn shape_text<'a, B: Brush>(
         let run_style_index = char_style_indices[shaped_run.range.char_range.start];
         let run_style = &styles[usize::from(run_style_index)];
 
-        // Push inline boxes positioned before the start of this item.
+        // Push out-of-flow boxes positioned before the start of this item.
         //
-        // TODO: this lets the inline box take the bidi level of the previous run, but in principle
-        // inline boxes should be included in bidi analysis as an object replacement character
-        // (U+FFFC). The box should then take the bidi level of that character.
+        // TODO: this gives the box the bidi level of the previous run. At direction boundaries it
+        // puts the box on the wrong side, e.g. at the start of an RTL paragraph, or at the end of
+        // an LTR one that ends in RTL text.
         let prev_bidi_level = if shaped_run_idx > 0 {
             layout.data.shaped_text.runs()[&shaped_run_idx - 1].bidi_level
         } else {
             BidiLevel::new(0)
         };
-        while let Some((box_idx, inline_box)) = inline_box_iter.peek() {
+        while let Some((box_idx, inline_box)) = out_of_flow_box_iter.peek() {
             if inline_box.index <= run_text_byte_start {
-                layout.data.push_inline_box(*box_idx, prev_bidi_level);
-                inline_box_iter.next();
+                layout.data.push_out_of_flow_box(*box_idx, prev_bidi_level);
+                out_of_flow_box_iter.next();
             } else {
                 break;
             }
@@ -242,8 +248,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
         .last()
         .map(|r| r.bidi_level)
         .unwrap_or(BidiLevel::new(0));
-    for (box_idx, _inline_box) in inline_box_iter {
-        layout.data.push_inline_box(box_idx, bidi_level);
+    for (box_idx, _inline_box) in out_of_flow_box_iter {
+        layout.data.push_out_of_flow_box(box_idx, bidi_level);
     }
 }
 

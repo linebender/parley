@@ -5,6 +5,8 @@
 
 use core::ops::Range;
 
+use icu_properties::CodePointMapData;
+use icu_properties::props::LineBreak as LineBreakClass;
 use parlance::{BaseDirection, Language, LineBreak, WordBreak};
 
 use crate::{bidi::BidiResolver, break_overrides::LineBreakOverrideFn};
@@ -100,6 +102,106 @@ pub struct AnalysisOptions<'a> {
     ///
     /// See [`LineBreakOverrideFn`] for more details.
     pub line_break_override: Option<&'a LineBreakOverrideFn>,
+
+    /// The inline objects in the source text.
+    ///
+    /// These must be in ascending order of [`InlineObject::index`] without duplicates. Each entry
+    /// must point at a U+FFFC OBJECT REPLACEMENT CHARACTER in the source text. Any U+FFFC character
+    /// that is not in this list, is treated as ordinary text (some fonts may render `.notdef`,
+    /// others may have a glyph for it).
+    ///
+    /// Such an in inline object is part of the paragraph, but is not part of the paragraph's text;
+    /// e.g., it may be an image. In CSS, this is known as an [atomic inline][css-atomic-inline].
+    ///
+    /// The analysis marks these objects with
+    /// [`CharInfo::is_inline_object`](crate::CharInfo::is_inline_object), and they are treated
+    /// as follows.
+    ///
+    /// - The soft wrap opportunities before and after an object follow UAX #14 by default. This can
+    ///   be configured using [`break_before`](InlineObject::break_before) and
+    ///   [`break_after`](InlineObject::break_after).
+    /// - Each object is a grapheme of its own.
+    /// - Each object is shaped as a [`ShapedRun`](crate::ShapedRun) of its own. It is a
+    ///   [`ShapedCluster`](crate::shape::ShapedCluster) without glyphs, whose advance can be set
+    ///   using
+    ///   [`ShapedText::set_inline_object_advance`](crate::ShapedText::set_inline_object_advance).
+    ///
+    /// [css-atomic-inline]: https://www.w3.org/TR/css-display-3/#atomic-inline
+    pub inline_objects: &'a [InlineObject],
+}
+
+/// An inline object in the source text, see [`AnalysisOptions::inline_objects`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InlineObject {
+    /// The byte index of the object's U+FFFC OBJECT REPLACEMENT CHARACTER in the source text.
+    pub index: usize,
+
+    /// Whether there is a soft wrap opportunity before the object.
+    ///
+    /// `None` follows UAX #14. `Some(true)` forces one and `Some(false)` suppresses one.
+    ///
+    /// Between two objects, a `Some(false)` of either one wins.
+    /// [`AnalysisOptions::line_break_override`] takes precedence over this.
+    pub break_before: Option<bool>,
+
+    /// Whether there is a soft wrap opportunity after the object.
+    ///
+    /// This works like [`Self::break_before`].
+    pub break_after: Option<bool>,
+}
+
+impl InlineObject {
+    /// An object at byte `index`, with soft wrap opportunities as UAX #14 has them.
+    pub const fn new(index: usize) -> Self {
+        Self {
+            index,
+            break_before: None,
+            break_after: None,
+        }
+    }
+
+    /// An object at byte `index` of `text`, with soft wrap opportunities as
+    /// [CSS Text 4 § 6.5][css-line-breaking-details] has them.
+    ///
+    /// § 6.5 only exempts the GL, WJ and ZWJ classes, but this also keeps UAX #14's other
+    /// non-tailorable rules: there is no opportunity before a space or zero width space (LB7), or
+    /// before a combining mark (LB9).
+    ///
+    /// [css-line-breaking-details]: https://www.w3.org/TR/css-text-4/#line-break-details
+    /// [css-issue-8972]: https://github.com/w3c/csswg-drafts/issues/8972
+    pub fn css(text: &str, index: usize) -> Self {
+        let line_break = const { CodePointMapData::<LineBreakClass>::new() };
+        let joins = |ch: char| {
+            ch != '\u{00A0}'
+                && matches!(
+                    line_break.get(ch),
+                    LineBreakClass::Glue | LineBreakClass::WordJoiner | LineBreakClass::ZWJ
+                )
+        };
+        let mut preceding = text[..index].chars().rev();
+        let before = preceding.next();
+        // A combining character sequence takes the class of its base (UAX #14 LB9).
+        let base = before.into_iter().chain(preceding).find(|&ch| {
+            !matches!(
+                line_break.get(ch),
+                LineBreakClass::CombiningMark | LineBreakClass::ZWJ
+            )
+        });
+        let after = text[index + '\u{FFFC}'.len_utf8()..].chars().next();
+        let break_before = before.is_some_and(|ch| !joins(ch)) && !base.is_some_and(joins);
+        let break_after = after.is_some_and(|ch| {
+            !joins(ch)
+                && !matches!(
+                    line_break.get(ch),
+                    LineBreakClass::Space | LineBreakClass::ZWSpace | LineBreakClass::CombiningMark
+                )
+        });
+        Self {
+            index,
+            break_before: break_before.then_some(true),
+            break_after: break_after.then_some(true),
+        }
+    }
 }
 
 impl core::fmt::Debug for AnalysisOptions<'_> {
@@ -108,15 +210,17 @@ impl core::fmt::Debug for AnalysisOptions<'_> {
             .field("base_direction", &self.base_direction)
             .field("line_break", &self.line_break)
             .field("break_spaces", &self.break_spaces)
+            .field("inline_objects", &self.inline_objects)
             .finish_non_exhaustive()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use parlance::BidiLevel;
+    use alloc::vec::Vec;
+    use parlance::{BidiLevel, LineBreak};
 
-    use super::{AnalysisOptions, Analyzer};
+    use super::{AnalysisOptions, Analyzer, InlineObject, LineBreakConfig};
     use crate::{Analysis, BaseDirection};
 
     fn analyze(text: &str, base_direction: BaseDirection) -> Analysis {
@@ -172,6 +276,96 @@ mod tests {
 
         assert!(analysis.paragraph_level().is_rtl());
         assert!(analysis.bidi_levels().iter().all(|level| level.is_ltr()));
+    }
+
+    #[test]
+    fn inline_objects() {
+        fn objects(inline_objects: &[InlineObject]) -> AnalysisOptions<'_> {
+            AnalysisOptions {
+                inline_objects,
+                ..AnalysisOptions::default()
+            }
+        }
+        let analyze_with = |text: &str, options: &AnalysisOptions<'_>| {
+            let mut analysis = Analysis::new();
+            Analyzer::new().analyze(
+                text,
+                options,
+                &mut analysis,
+                &crate::AnalysisDataSources::default(),
+            );
+            analysis
+        };
+        let opportunities = |text: &str, options: &AnalysisOptions<'_>| -> Vec<usize> {
+            let analysis = analyze_with(text, options);
+            let infos = analysis.char_info().iter().enumerate();
+            infos
+                .filter_map(|(i, info)| info.is_soft_wrap_opportunity().then_some(i))
+                .collect()
+        };
+        let (n, t, f) = (None, Some(true), Some(false));
+        let obj = |index, break_before, break_after| InlineObject {
+            index,
+            break_before,
+            break_after,
+        };
+
+        for (text, inline_objects, expected) in [
+            // By default, an object breaks like any U+FFFC under UAX #14 (LB20), so not before a
+            // full stop (LB15d).
+            ("a\u{FFFC}.", &[obj(1, n, n)][..], &[1][..]),
+            // An object's own conditions win over the text's.
+            ("a\u{FFFC}.", &[obj(1, f, t)], &[2]),
+            // Between two objects, suppressing an opportunity wins.
+            ("\u{FFFC}\u{FFFC}a", &[obj(0, n, t), obj(3, f, n)], &[2]),
+            ("\u{FFFC}\u{FFFC}a", &[obj(0, n, f), obj(3, t, n)], &[2]),
+            // There is never one next to a mandatory break.
+            ("\n\u{FFFC}", &[obj(1, t, n)], &[]),
+        ] {
+            assert_eq!(opportunities(text, &objects(inline_objects)), expected);
+        }
+
+        // CSS Text 3 § 5.5 breaks before a full stop too, and next to U+00A0 NO-BREAK SPACE, but
+        // not next to WJ or other GL characters (even through a combining mark, LB9), nor before a
+        // space (LB7) or a combining mark.
+        for (text, expected) in [
+            ("a\u{FFFC}.", &[1, 2][..]),
+            ("\u{A0}\u{FFFC}\u{A0}", &[1, 2]),
+            ("\u{2060}\u{FFFC}\u{202F}", &[]),
+            ("\u{202F}\u{301}\u{FFFC}", &[]),
+            ("\u{FFFC} b\u{FFFC}\u{301}", &[2, 3]),
+        ] {
+            let indices = text.match_indices('\u{FFFC}');
+            let css: Vec<_> = indices.map(|(i, _)| InlineObject::css(text, i)).collect();
+            assert_eq!(opportunities(text, &objects(&css)), expected);
+        }
+
+        // `line-break: anywhere` breaks between graphemes, so after an object too. A line break
+        // override has the last word on either side of one.
+        let object_at_0 = [obj(0, n, n)];
+        let anywhere = LineBreakConfig {
+            line_break: LineBreak::Anywhere,
+            ..LineBreakConfig::default()
+        };
+        let options = AnalysisOptions {
+            line_break: &[(0..5, anywhere)],
+            ..objects(&object_at_0)
+        };
+        assert_eq!(opportunities("\u{FFFC}\u{301}", &options), [1]);
+        let object_at_1 = [obj(1, t, t)];
+        let options = AnalysisOptions {
+            line_break_override: Some(&|_| Some(false)),
+            ..objects(&object_at_1)
+        };
+        assert_eq!(opportunities("a\u{FFFC}a", &options), []);
+
+        // An object is a grapheme of its own, and needs no font.
+        let analysis = analyze_with("\u{FFFC}\u{301}", &objects(&object_at_0));
+        let [object, mark] = analysis.char_info() else {
+            unreachable!()
+        };
+        assert!(object.is_inline_object() && !object.contributes_to_shaping());
+        assert!(mark.is_grapheme_start() && !mark.is_inline_object());
     }
 
     #[test]

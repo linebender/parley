@@ -205,7 +205,7 @@ fn inbox_content_width() {
     let mut env = TestEnv::new(test_name!(), None);
 
     {
-        let text = "Hello world!";
+        let text = "Hel\u{FFFC}lo world!";
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
@@ -228,7 +228,7 @@ fn inbox_content_width() {
     }
 
     {
-        let text = "A ";
+        let text = "A \u{FFFC}";
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
@@ -264,13 +264,13 @@ fn content_widths_max_floored_by_min() {
     // A negative-width inline box (e.g. an inline-block with a negative margin) reduces the
     // max-content width, but the max-content width can never be smaller than the min-content
     // width.
-    let text = "";
+    let text = "\u{FFFC}\u{FFFC}";
     let mut builder = env.ranged_builder(text);
-    for (id, width) in [(0, 100.0), (1, -50.0)] {
+    for (id, index, width) in [(0, 0, 100.0), (1, 3, -50.0)] {
         builder.push_inline_box(InlineBox {
             id,
             kind: InlineBoxKind::InFlow,
-            index: 0,
+            index,
             width,
             height: 10.0,
             baseline: None,
@@ -496,13 +496,16 @@ fn content_widths_text_indent_inline_box() {
     let indent = 100.0;
 
     // The indent applies to an inline box at the start of the first line.
-    let text = "\nAA";
+    let text = "\u{FFFC}\nAA";
     let mut builder = env.ranged_builder(text);
-    for (id, kind) in [(0, InlineBoxKind::InFlow), (1, InlineBoxKind::OutOfFlow)] {
+    for (id, kind, index) in [
+        (0, InlineBoxKind::InFlow, 0),
+        (1, InlineBoxKind::OutOfFlow, 3),
+    ] {
         builder.push_inline_box(InlineBox {
             id,
             kind,
-            index: 0,
+            index,
             width: 10.0,
             height: 10.0,
             baseline: None,

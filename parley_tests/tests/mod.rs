@@ -30,6 +30,7 @@ mod editor;
 mod emoji;
 mod exclusions;
 mod floats;
+mod inline_objects;
 mod issues;
 mod line_break;
 mod linebreaking_matches_chrome;
