@@ -1789,7 +1789,12 @@ fn commit_line<B: Brush>(
         BreakReason::Regular | BreakReason::Emergency => f32::INFINITY,
         BreakReason::Explicit | BreakReason::None => state.x - max_advance,
     };
-    let (hanging_advance, justification_end_cluster, hanging_opportunities) = hanging_whitespace(
+    let HangingWhitespace {
+        advance: hanging_advance,
+        removed_advance,
+        justification_end_cluster,
+        opportunities: hanging_opportunities,
+    } = hanging_whitespace(
         layout,
         &lines.line_items[start_item_idx..end_item_idx],
         overflow,
@@ -1818,6 +1823,7 @@ fn commit_line<B: Brush>(
             indent: line_indent,
             advance: state.x,
             hanging_advance,
+            removed_advance,
             ..Default::default()
         },
         aligned_subtree_offsets: 0..0,
@@ -1841,10 +1847,22 @@ fn commit_line<B: Brush>(
     };
 }
 
-/// Returns the advance of the whitespace hanging past the end of the line made up of `line_items`,
-/// the index one past its logically last shaped cluster that's eligible for justification (see
-/// [`Justification::justification_end_cluster`]), and the number of justification opportunities
-/// that are no longer eligible, as they are at or beyond that cluster.
+/// The whitespace hanging past the end of a line, as computed by [`hanging_whitespace`].
+struct HangingWhitespace {
+    /// The advance of the hanging whitespace.
+    advance: f32,
+    /// The portion of `advance` that is the line's trailing collapsible whitespace, which CSS
+    /// removes rather than hangs (see [`LineMetrics::removed_advance`]).
+    removed_advance: f32,
+    /// The index one past the line's logically last shaped cluster that's eligible for
+    /// justification (see [`Justification::justification_end_cluster`]).
+    justification_end_cluster: u32,
+    /// The number of justification opportunities that are no longer eligible, as they are at or
+    /// beyond `justification_end_cluster`.
+    opportunities: u32,
+}
+
+/// Returns the whitespace hanging past the end of the line made up of `line_items`.
 ///
 /// `line_items` must be in logical order.
 ///
@@ -1866,8 +1884,11 @@ fn hanging_whitespace<B: Brush>(
     layout: &Layout<B>,
     line_items: &[LineItemData],
     overflow: f32,
-) -> (f32, u32, u32) {
+) -> HangingWhitespace {
     let mut hanging_whitespace_advance = 0.;
+    // Collapsible whitespace can't be conditionally hanging, so this is unaffected by `overflow`.
+    let mut removed_advance = 0.;
+    let mut in_removed_suffix = true;
     // Atoms with shaped clusters before this index may be stretched by justification.
     let mut justification_end_cluster = u32::MAX;
     let mut hanging_opportunities = 0;
@@ -1943,6 +1964,20 @@ fn hanging_whitespace<B: Brush>(
                         }
                     }
                     hanging_whitespace_advance += hanging;
+                    // A forced break doesn't separate collapsible whitespace from the line's end.
+                    if in_removed_suffix && whitespace != Whitespace::Newline {
+                        if all_hang
+                            && atom.characters().iter().all(|character| {
+                                layout.data.styles[character.style_index as usize]
+                                    .white_space_collapse
+                                    .collapses(character.whitespace)
+                            })
+                        {
+                            removed_advance += hanging;
+                        } else {
+                            in_removed_suffix = false;
+                        }
+                    }
                     // Justification can't stretch within an atom, so it stops at the start of the
                     // last atom that hangs in its entirety or only partially.
                     justification_end_cluster = atom.shaped_clusters_range().start;
@@ -1961,11 +1996,12 @@ fn hanging_whitespace<B: Brush>(
         hanging_whitespace_advance -= advance - advance.min(overflow).max(0.);
     }
 
-    (
-        hanging_whitespace_advance,
+    HangingWhitespace {
+        advance: hanging_whitespace_advance,
+        removed_advance,
         justification_end_cluster,
-        hanging_opportunities,
-    )
+        opportunities: hanging_opportunities,
+    }
 }
 
 /// Reorder items within line according to the bidi levels of the items

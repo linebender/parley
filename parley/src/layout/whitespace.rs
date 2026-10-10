@@ -43,6 +43,20 @@ impl WhiteSpaceCollapse {
             Self::PreserveBreaks => matches!(c, ' ' | '\t'),
         }
     }
+
+    /// Whether this mode collapses whitespace of the given kind.
+    ///
+    /// This is [`Self::is_collapsible`] in terms of a shaped character's [`Whitespace`].
+    pub(crate) fn collapses(self, whitespace: Whitespace) -> bool {
+        match self {
+            Self::Collapse => matches!(
+                whitespace,
+                Whitespace::Space | Whitespace::Tab | Whitespace::Newline
+            ),
+            Self::Preserve | Self::BreakSpaces => false,
+            Self::PreserveBreaks => matches!(whitespace, Whitespace::Space | Whitespace::Tab),
+        }
+    }
 }
 
 /// Whether whitespace with the given style hangs past the line's end edge.
