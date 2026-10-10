@@ -232,6 +232,7 @@ impl CharInfo {
     const EMOJI_PRESENTATION_SHIFT: u16 = 10;
     const EMOJI_MODIFIER_SHIFT: u16 = 11;
     const EMOJI_MODIFIER_BASE_SHIFT: u16 = 12;
+    const INLINE_OBJECT_SHIFT: u16 = 13;
 
     const VARIATION_SELECTOR_MASK: u16 = 1 << Self::VARIATION_SELECTOR_SHIFT;
     const REGION_INDICATOR_MASK: u16 = 1 << Self::REGION_INDICATOR_SHIFT;
@@ -246,6 +247,7 @@ impl CharInfo {
     const EMOJI_PRESENTATION_MASK: u16 = 1 << Self::EMOJI_PRESENTATION_SHIFT;
     const EMOJI_MODIFIER_MASK: u16 = 1 << Self::EMOJI_MODIFIER_SHIFT;
     const EMOJI_MODIFIER_BASE_MASK: u16 = 1 << Self::EMOJI_MODIFIER_BASE_SHIFT;
+    const INLINE_OBJECT_MASK: u16 = 1 << Self::INLINE_OBJECT_SHIFT;
 
     fn new(
         script: Script,
@@ -382,6 +384,14 @@ impl CharInfo {
     #[inline(always)]
     pub fn is_soft_wrap_opportunity(self) -> bool {
         self.flags & Self::SOFT_WRAP_OPPORTUNITY_MASK != 0
+    }
+
+    /// Whether this character stands in for an inline object.
+    ///
+    /// See [`AnalysisOptions::inline_objects`].
+    #[inline(always)]
+    pub fn is_inline_object(self) -> bool {
+        self.flags & Self::INLINE_OBJECT_MASK != 0
     }
 }
 
@@ -808,6 +818,10 @@ pub(crate) fn analyze_text(
         ));
     }
 
+    if !options.inline_objects.is_empty() {
+        mark_inline_objects(text, options, &data_sources, &mut analysis.info);
+    }
+
     if needs_bidi_resolution || options.base_direction == BaseDirection::Rtl {
         analyzer.bidi.resolve(
             text.chars().map(|ch| {
@@ -820,6 +834,109 @@ pub(crate) fn analyze_text(
         );
         core::mem::swap(&mut analysis.levels, &mut analyzer.bidi.levels);
         analysis.paragraph_level = analyzer.bidi.base_level();
+    }
+}
+
+/// Mark the inline objects of `text` in `info` (see [`AnalysisOptions::inline_objects`]).
+///
+/// We assume inline objects are rare relative to normal text, so we make the choice to patch the
+/// analysis of each object and of the character after it.
+///
+/// For the same reason this is marked `#[inline(never)]`: inflating the caller's body will probably
+/// cost more on average than inlining would win.
+#[inline(never)]
+fn mark_inline_objects(
+    text: &str,
+    options: &AnalysisOptions<'_>,
+    data_sources: &AnalysisDataSources,
+    info: &mut [CharInfo],
+) {
+    const LEN: usize = '\u{FFFC}'.len_utf8();
+    let is_mandatory = |ch| data_sources.properties(ch).is_mandatory_linebreak();
+
+    // Between two objects, suppressing an opportunity wins.
+    let combine = |a: Option<bool>, b: Option<bool>| match (a, b) {
+        (Some(false), _) | (_, Some(false)) => Some(false),
+        _ => a.or(b),
+    };
+
+    let mut index = 0;
+    let mut counted_to = 0;
+    for (i, object) in options.inline_objects.iter().enumerate() {
+        let byte = object.index;
+        debug_assert!(
+            text[byte..].starts_with('\u{FFFC}'),
+            "Inline objects must be U+FFFC OBJECT REPLACEMENT CHARACTERs, found none at byte {byte}"
+        );
+        index += text[counted_to..byte].chars().count();
+        counted_to = byte;
+        info[index].flags = info[index].flags & !CharInfo::CONTRIBUTES_TO_SHAPING_MASK
+            | CharInfo::INLINE_OBJECT_MASK;
+
+        let break_before = match options.inline_objects[..i].last() {
+            Some(previous) if previous.index + LEN == byte => {
+                combine(previous.break_after, object.break_before)
+            }
+            _ => object.break_before,
+        };
+        let break_after = match options.inline_objects.get(i + 1) {
+            Some(next) if byte + LEN == next.index => {
+                combine(object.break_after, next.break_before)
+            }
+            _ => object.break_after,
+        };
+
+        // The object is a grapheme of its own, with soft wrap opportunities specified by its break
+        // conditions.
+        let mut before = text[..byte].chars().rev();
+        let (before, before_before) = (before.next(), before.next());
+        let after = text[byte + LEN..].chars().next();
+        for (index, byte, [before_before, before, after], condition) in [
+            (
+                index,
+                byte,
+                [before_before, before, Some('\u{FFFC}')],
+                break_before,
+            ),
+            (
+                index + 1,
+                byte + LEN,
+                [before, Some('\u{FFFC}'), after],
+                break_after,
+            ),
+        ] {
+            let Some(info) = info.get_mut(index) else {
+                continue;
+            };
+            info.flags |= CharInfo::GRAPHEME_START_MASK;
+            let (Some(before), Some(after)) = (before, after) else {
+                continue;
+            };
+            if is_mandatory(before) || is_mandatory(after) {
+                continue;
+            }
+            let forced = options.line_break_override.and_then(|lb_override| {
+                lb_override(LineBreakContext {
+                    before_before,
+                    before,
+                    after,
+                })
+            });
+            let is_break_anywhere = {
+                let i = options
+                    .line_break
+                    .partition_point(|(range, _)| range.end <= byte);
+                options.line_break.get(i).is_some_and(|(range, config)| {
+                    range.contains(&byte) && config.line_break == LineBreak::Anywhere
+                })
+            };
+            // Overrides take precedence, then the object's conditions, then the text's rules.
+            let opportunity = forced
+                .or(condition)
+                .unwrap_or_else(|| info.is_soft_wrap_opportunity() || is_break_anywhere);
+            info.flags = info.flags & !CharInfo::SOFT_WRAP_OPPORTUNITY_MASK
+                | (opportunity as u16) << CharInfo::SOFT_WRAP_OPPORTUNITY_SHIFT;
+        }
     }
 }
 

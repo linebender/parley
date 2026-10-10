@@ -64,7 +64,8 @@ fn placing_inboxes() {
         (13, "start_nl"),
     ] {
         let text = "Hello world!\nLine 2\nLine 4";
-        let mut builder = env.ranged_builder(text);
+        let text = format!("{}\u{FFFC}{}", &text[..position], &text[position..]);
+        let mut builder = env.ranged_builder(&text);
         builder.push_inline_box(InlineBox {
             id: 0,
             kind: InlineBoxKind::InFlow,
@@ -74,7 +75,7 @@ fn placing_inboxes() {
             baseline: None,
             vertical_align: VerticalAlign::BASELINE,
         });
-        let mut layout = builder.build(text);
+        let mut layout = builder.build(&text);
         layout.break_all_lines(None);
         layout.align(Alignment::Start, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
@@ -85,20 +86,20 @@ fn placing_inboxes() {
 fn only_inboxes_wrap() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    let text = "";
-    let mut builder = env.ranged_builder(text);
-    for id in 0..10 {
+    let text = "\u{FFFC}".repeat(10);
+    let mut builder = env.ranged_builder(&text);
+    for (id, (index, _)) in text.match_indices('\u{FFFC}').enumerate() {
         builder.push_inline_box(InlineBox {
-            id,
+            id: id as u64,
             kind: InlineBoxKind::InFlow,
-            index: 0,
+            index,
             width: 10.0,
             height: 10.0,
             baseline: None,
             vertical_align: VerticalAlign::BASELINE,
         });
     }
-    let mut layout = builder.build(text);
+    let mut layout = builder.build(&text);
     layout.break_all_lines(Some(40.0));
     layout.align(Alignment::Center, AlignmentOptions::default());
 
@@ -110,7 +111,7 @@ fn full_width_inbox() {
     let mut env = TestEnv::new(test_name!(), None);
 
     for (width, test_case_name) in [(99., "smaller"), (100., "exact"), (101., "larger")] {
-        let text = "ABC";
+        let text = "A\u{FFFC}\u{FFFC}B\u{FFFC}C";
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
@@ -124,7 +125,7 @@ fn full_width_inbox() {
         builder.push_inline_box(InlineBox {
             id: 1,
             kind: InlineBoxKind::InFlow,
-            index: 1,
+            index: 4,
             width,
             height: 10.0,
             baseline: None,
@@ -133,7 +134,7 @@ fn full_width_inbox() {
         builder.push_inline_box(InlineBox {
             id: 2,
             kind: InlineBoxKind::InFlow,
-            index: 2,
+            index: 8,
             width,
             height: 10.0,
             baseline: None,
@@ -209,7 +210,7 @@ fn inbox_with_baseline() {
     // - `middle`: baseline in the middle of the box.
     // - `bottom`: baseline at the bottom, equivalent to not specifying a baseline.
     for (baseline, test_case_name) in [(0.0, "top"), (15.0, "middle"), (30.0, "bottom")] {
-        let text = "Hello world!";
+        let text = "Hello\u{FFFC} world!";
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
@@ -233,7 +234,7 @@ fn inbox_with_baseline() {
 fn inboxes_with_matching_baselines() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    let text = "AxByC";
+    let text = "A\u{FFFC}xB\u{FFFC}yC";
     let mut builder = env.ranged_builder(text);
     // A short box and a tall box, both with their baselines 10px from the top.
     builder.push_inline_box(InlineBox {
@@ -248,7 +249,7 @@ fn inboxes_with_matching_baselines() {
     builder.push_inline_box(InlineBox {
         id: 1,
         kind: InlineBoxKind::InFlow,
-        index: 3,
+        index: 6,
         width: 15.0,
         height: 40.0,
         baseline: Some(10.0),
@@ -270,15 +271,15 @@ fn inboxes_with_large_ascent_and_descent() {
 
     // Surround the line containing the boxes with plain text lines, so we can see how the
     // adjacent lines are positioned relative to the (much taller) box line.
-    let text = "Line above\nAxB\nLine below";
-    let box_line_start = text.find("AxB").unwrap();
+    let text = "Line above\nA\u{FFFC}x\u{FFFC}B\nLine below";
+    let mut box_indices = text.match_indices('\u{FFFC}').map(|(index, _)| index);
     let mut builder = env.ranged_builder(text);
     // Large ascent: the baseline is near the bottom of the box, so most of it is above the
     // baseline.
     builder.push_inline_box(InlineBox {
         id: 0,
         kind: InlineBoxKind::InFlow,
-        index: box_line_start + 1,
+        index: box_indices.next().unwrap(),
         width: 15.0,
         height: 40.0,
         baseline: Some(38.0),
@@ -288,7 +289,7 @@ fn inboxes_with_large_ascent_and_descent() {
     builder.push_inline_box(InlineBox {
         id: 1,
         kind: InlineBoxKind::InFlow,
-        index: box_line_start + 2,
+        index: box_indices.next().unwrap(),
         width: 15.0,
         height: 40.0,
         baseline: Some(2.0),
@@ -314,7 +315,7 @@ fn inboxes_with_large_ascent_and_descent() {
 fn inbox_below_baseline_keeps_grid() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    let text = "AAAA\nBBBB\nCCCC";
+    let text = "AAAA\nBB\u{FFFC}BB\nCCCC";
     let mut builder = env.ranged_builder(text);
     builder.push_default(StyleProperty::LineHeight(LineHeight::Absolute(60.0)));
     builder.push_inline_box(InlineBox {
@@ -508,7 +509,8 @@ fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
     assert_eq!(builder.build().1, "a b");
 
     // Whitespace surrounding an inline box collapses into a single space on each side. The box is
-    // not whitespace, so the two spaces do not collapse with each other.
+    // not whitespace, so the two spaces do not collapse with each other. The box itself is a
+    // U+FFFC OBJECT REPLACEMENT CHARACTER in the text.
     let mut builder = env.tree_builder();
     builder.push_style_modification_span(&[StyleProperty::WhiteSpaceCollapse(
         WhiteSpaceCollapse::Collapse,
@@ -517,7 +519,7 @@ fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
     builder.push_inline_box(inline_box());
     builder.push_text("  b");
     let (layout, text) = builder.build();
-    assert_eq!(text, "a  b");
+    assert_eq!(text, "a \u{FFFC} b");
     assert_eq!(layout.inline_boxes().next().unwrap().index, 2);
 
     // Whitespace at the start and end of the text is removed, including in enclosing spans.
@@ -542,7 +544,7 @@ fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
     builder.push_text("a ");
     builder.push_inline_box(inline_box());
     let (layout, text) = builder.build();
-    assert_eq!(text, "a ");
+    assert_eq!(text, "a \u{FFFC}");
     assert_eq!(layout.inline_boxes().next().unwrap().index, 2);
 
     // Collapsible whitespace on either side of a preserved segment break (e.g. a `<br>`) is
@@ -605,7 +607,7 @@ fn inline_box_index() {
     let mut env = TestEnv::new(test_name!(), None);
 
     // Boxes of every kind are indexed after the text pushed before them, in the current span or
-    // an enclosing one.
+    // an enclosing one. In-flow boxes take up a U+FFFC OBJECT REPLACEMENT CHARACTER.
     let mut builder = env.tree_builder();
     for (id, kind) in [
         InlineBoxKind::InFlow,
@@ -630,9 +632,9 @@ fn inline_box_index() {
         builder.pop_style_span();
     }
     let (layout, text) = builder.build();
-    assert_eq!(text, "abcdabcdabcd");
+    assert_eq!(text, "abcd\u{FFFC}abcdabcd");
     let boxes: Vec<_> = layout.inline_boxes().map(|b| (b.id, b.index)).collect();
-    assert_eq!(boxes, [(0, 4), (1, 8), (2, 12)]);
+    assert_eq!(boxes, [(0, 4), (1, 11), (2, 15)]);
 }
 
 #[test]

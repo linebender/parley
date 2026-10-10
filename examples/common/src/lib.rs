@@ -22,8 +22,9 @@ use peniko::Color;
 /// Latin-only text for the simple layout — exercises basic glyph caching without emoji or bidi.
 pub const SIMPLE_TEXT: &str = "Some text here. Let's make it a bit longer so that line wrapping kicks in easily. This demonstrates basic glyph caching with plain Latin text and common punctuation???";
 
-/// Rich text mixing bitmap emoji, COLR emoji, Arabic (bidi), underline, and strikethrough.
-pub const RICH_TEXT: &str = "Some text here. Let's make it a bit longer so that line wrapping kicks in. Bitmap emoji 😊 and COLR emoji 🎉.\nAnd also some اللغة العربية arabic text.\nThis is underlining pq and strikethrough text.";
+/// Rich text mixing bitmap emoji, COLR emoji, Arabic (bidi), underline, strikethrough, and an
+/// inline box (the `U+FFFC` object replacement character).
+pub const RICH_TEXT: &str = "Some text here. Let's make it a bit long\u{FFFC}er so that line wrapping kicks in. Bitmap emoji 😊 and COLR emoji 🎉.\nAnd also some اللغة العربية arabic text.\nThis is underlining pq and strikethrough text.";
 
 /// Minimal brush type carrying only a solid color, used as the `Brush` generic
 /// parameter for Parley layouts in these examples.
@@ -204,7 +205,7 @@ pub fn build_rich_layout(
     builder.push_inline_box(InlineBox {
         id: 0,
         kind: InlineBoxKind::InFlow,
-        index: 40,
+        index: config.text.find('\u{FFFC}').unwrap(),
         width: 50.0,
         height: 50.0,
         baseline: None,

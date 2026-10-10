@@ -47,9 +47,6 @@ pub(crate) struct TreeStyleBuilder<B: Brush> {
     /// same inline formatting context, so that it can collapse across span and inline box
     /// boundaries and be removed at the end of the text.
     pending_whitespace: Option<PendingWhitespace>,
-    /// Whether the most recently pushed item is an inline box, in which case pending collapsible
-    /// whitespace is not at the start of the inline formatting context.
-    last_item_is_inline_box: bool,
 }
 
 impl<B: Brush> Default for TreeStyleBuilder<B> {
@@ -61,7 +58,6 @@ impl<B: Brush> Default for TreeStyleBuilder<B> {
             text: String::new(),
             current_span: usize::MAX,
             pending_whitespace: None,
-            last_item_is_inline_box: false,
         }
     }
 }
@@ -81,7 +77,6 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.style_runs.clear();
         self.text.clear();
         self.pending_whitespace = None;
-        self.last_item_is_inline_box = false;
 
         // The root style is always materialised at index 0 so that it can act as the parent of
         // every other style (and as the strut for otherwise empty lines).
@@ -97,10 +92,15 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.current_span = 0;
     }
 
-    /// Records that an inline box has been pushed, so that following collapsible whitespace is not
-    /// treated as whitespace at the start of the inline formatting context.
-    pub(crate) fn set_last_item_is_inline_box(&mut self) {
-        self.last_item_is_inline_box = true;
+    /// Appends a U+FFFC OBJECT REPLACEMENT CHARACTER representing an
+    /// [`crate::InlineBoxKind::InFlow`] to the current span.
+    ///
+    /// Returns the new character's byte offset.
+    pub(crate) fn push_inline_object(&mut self) -> usize {
+        self.flush_pending_whitespace();
+        let index = self.text.len();
+        self.commit_text(self.current_span, "\u{FFFC}");
+        index
     }
 
     /// Applies white space processing to `text` in the current span and commits the result, leaving
@@ -173,7 +173,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
         // Whitespace at the start of the inline formatting context is removed, as is whitespace
         // immediately following a preserved segment break. Whitespace following a preserved space
         // or tab is retained, as only collapsible whitespace collapses.
-        let is_at_start = self.text.is_empty() && !self.last_item_is_inline_box;
+        let is_at_start = self.text.is_empty();
         if is_at_start || self.text.ends_with(is_segment_break) {
             return;
         }
@@ -210,7 +210,6 @@ impl<B: Brush> TreeStyleBuilder<B> {
                 range: start..self.text.len(),
             }),
         }
-        self.last_item_is_inline_box = false;
     }
 
     /// The index of `span`'s style in the style table, adding it (and any ancestors that have not
