@@ -120,7 +120,8 @@ impl FontMetrics {
 
         Self {
             ascent: metrics.ascent,
-            descent: -metrics.descent,
+            // Normalize the descender to a distance, regardless of the font's sign convention.
+            descent: metrics.descent.abs(),
             leading: metrics.leading,
             underline_offset,
             underline_size,
@@ -625,7 +626,22 @@ mod tests {
         shape::CharCluster,
     };
 
-    use super::ShapedText;
+    use super::{FontMetrics, ShapedText};
+
+    #[test]
+    fn font_descent_is_a_non_negative_distance() {
+        // Franklin ITC is an example of a font with a positive descender.
+        for (descent, expected) in [(-6.0, 6.0), (0.0, 0.0), (6.0, 6.0)] {
+            let metrics = skrifa::metrics::Metrics {
+                ascent: 18.0,
+                descent,
+                ..Default::default()
+            };
+            let font_metrics = FontMetrics::from_skrifa_metrics(&metrics);
+            assert_eq!(font_metrics.ascent, 18.0);
+            assert_eq!(font_metrics.descent, expected);
+        }
+    }
 
     const ROBOTO: &[u8] =
         include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
