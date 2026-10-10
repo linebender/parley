@@ -43,6 +43,29 @@ pub enum WhiteSpaceCollapse {
     BreakSpaces,
 }
 
+/// The character that a sequence of collapsible white space collapses to.
+///
+/// Only the [`TreeBuilder`](crate::TreeBuilder) collapses white space, using the style of the
+/// span that the sequence starts in.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum CollapsedSpace {
+    /// U+0020 SPACE.
+    #[default]
+    Space,
+    /// U+3000 IDEOGRAPHIC SPACE, as used by CSS `text-transform: full-width`.
+    IdeographicSpace,
+}
+
+impl CollapsedSpace {
+    /// The collapsed space as a string.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Space => " ",
+            Self::IdeographicSpace => "\u{3000}",
+        }
+    }
+}
+
 /// The height that this text takes up. The default is `MetricsRelative(1.0)`, which is the given
 /// font's preferred line height.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -277,6 +300,8 @@ pub enum StyleProperty<'a, B: Brush> {
     TextWrapMode(TextWrapMode),
     /// Whitespace collapsing and hanging behavior.
     WhiteSpaceCollapse(WhiteSpaceCollapse),
+    /// The character that collapsible whitespace collapses to.
+    CollapsedSpace(CollapsedSpace),
 }
 
 /// Unresolved styles.
@@ -334,6 +359,8 @@ pub struct TextStyle<'family, 'settings, B: Brush> {
     pub text_wrap_mode: TextWrapMode,
     /// Whitespace collapsing and hanging behavior.
     pub white_space_collapse: WhiteSpaceCollapse,
+    /// The character that collapsible whitespace collapses to.
+    pub collapsed_space: CollapsedSpace,
 }
 
 impl<B: Brush> Default for TextStyle<'static, 'static, B> {
@@ -365,6 +392,7 @@ impl<B: Brush> Default for TextStyle<'static, 'static, B> {
             overflow_wrap: OverflowWrap::default(),
             text_wrap_mode: TextWrapMode::default(),
             white_space_collapse: WhiteSpaceCollapse::default(),
+            collapsed_space: CollapsedSpace::default(),
         }
     }
 }
