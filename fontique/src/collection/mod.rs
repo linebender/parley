@@ -446,13 +446,9 @@ impl Inner {
             if let Some(families) = self.data.fallbacks.get(selector) {
                 self.fallback_cache.set(script, lang_key, families);
             } else if let Some(system) = self.system.as_ref() {
-                // Some platforms don't need mut System
-                #[allow(unused_mut)]
-                let mut system = system.fonts.lock().unwrap();
-                if let Some(family) = system.fallback(selector) {
-                    self.data.fallbacks.set(selector, core::iter::once(family));
-                    self.fallback_cache.set(script, lang_key, &[family]);
-                }
+                let family = system.fonts.lock().unwrap().fallback(selector);
+                self.data.fallbacks.set(selector, family.into_iter());
+                self.fallback_cache.set(script, lang_key, family.as_slice());
             }
             #[cfg(not(feature = "system"))]
             if let Some(families) = self.data.fallbacks.get(selector) {
