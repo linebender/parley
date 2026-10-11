@@ -43,7 +43,7 @@
 //! let char_count = text.chars().count();
 //! let char_style_indices = vec![0; char_count];
 //!
-//! analyzer.analyze(text, &AnalysisOptions::default(), &mut analysis, &parley_engine::AnalysisDataSources::new());
+//! analyzer.analyze(text, &AnalysisOptions::default(), &mut analysis, &parley_engine::AnalysisDataSources::default());
 //! shaper.shape_text(
 //!     text,
 //!     &analysis,
