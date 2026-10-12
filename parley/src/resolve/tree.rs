@@ -183,7 +183,8 @@ impl<B: Brush> TreeStyleBuilder<B> {
         } else {
             self.resolve_style_id(pending.span)
         };
-        self.commit_styled_text(style_index, " ");
+        let space = self.tree[pending.span].style.collapsed_space;
+        self.commit_styled_text(style_index, space.as_str());
     }
 
     /// The style table index of the span that text is currently being pushed into.
@@ -325,6 +326,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CollapsedSpace;
     use alloc::vec::Vec;
     use core::ops::Range;
 
@@ -599,6 +601,33 @@ mod tests {
         assert_eq!(style_runs[2].style_index, 2);
         assert_eq!(style_runs[3].style_index, 1);
         assert_eq!(style_runs[4].style_index, 0);
+    }
+
+    #[test]
+    fn collapsed_space_uses_style_of_first_whitespace() {
+        let ideographic = [ResolvedProperty::CollapsedSpace(
+            CollapsedSpace::IdeographicSpace,
+        )];
+        for (before, inside, after, expected) in [
+            ("x", "   ", "x", "x\u{3000}x"),
+            ("x ", "  ", "x", "x x"),
+            ("x", " \n\t", " x", "x\u{3000}x"),
+            ("x", "a  b", "", "xa\u{3000}b"),
+            ("", "  a  ", "", "a"),
+        ] {
+            let mut builder = TreeStyleBuilder::<u32>::default();
+            builder.begin(ResolvedStyle {
+                white_space_collapse: WhiteSpaceCollapse::Collapse,
+                ..ResolvedStyle::default()
+            });
+            builder.push_text(before);
+            builder.push_style_modification_span(ideographic.clone().into_iter());
+            builder.push_text(inside);
+            builder.pop_style_span();
+            builder.push_text(after);
+            let text = builder.finish(&mut Vec::new(), &mut Vec::new());
+            assert_eq!(text, expected, "{before:?} {inside:?} {after:?}");
+        }
     }
 
     #[test]
