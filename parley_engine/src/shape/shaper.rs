@@ -3,7 +3,7 @@
 
 //! Shaping of text.
 
-use alloc::{sync::Arc, vec::Vec};
+use alloc::vec::Vec;
 use harfrust::ShapeOptions as HarfShapeOptions;
 use linebender_resource_handle::{Blob, FontData};
 use parlance::{FontFeature, FontVariation, Language};
@@ -288,7 +288,7 @@ fn shape_segment(
         let base_font = scx.shape_data_cache.entry(
             cache::ShapeDataKey::new(font.font.data.id(), font.font.index),
             || {
-                let data: Arc<dyn AsRef<[u8]> + Send + Sync> = Arc::new(font.font.data.clone());
+                let (data, _) = font.font.data.clone().into_raw_parts();
                 // TODO: How do we want to handle errors like this?
                 harfrust::Font::new(data, font.font.index).unwrap()
             },
