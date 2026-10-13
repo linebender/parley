@@ -39,6 +39,7 @@ parlance = { workspace = true }
 parley_engine = { workspace = true }
 core_maths = { version = "0.1.1", optional = true }
 hashbrown = { workspace = true }
+icu_properties = { workspace = true, features = ["compiled_data"] }
 
 [dev-dependencies]
 parlance = { workspace = true, features = ["bytemuck"] }
@@ -46,7 +47,6 @@ parley_dev = { workspace = true }
 peniko = { workspace = true }
 
 bytemuck = { workspace = true }
-icu_properties = { workspace = true, features = ["compiled_data"] }
 icu_segmenter = { workspace = true, features = ["compiled_data"] }
 
 # We special-case android targets because oxipng doesn't build in Android CI.
