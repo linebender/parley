@@ -1,9 +1,6 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! In-flow inline boxes replace a U+FFFC OBJECT REPLACEMENT CHARACTER in the text (which a
-//! `TreeBuilder` inserts for them), and are shaped and broken as part of it.
-
 use parley::{
     Affinity, BaseDirection, Cursor, InlineBox, InlineBoxKind, Layout, PositionedLayoutItem,
     Selection, StyleProperty, VerticalAlign, WhiteSpaceCollapse, YieldData,

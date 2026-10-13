@@ -139,7 +139,7 @@ fn main() {
         // RANGED BUILDER
         // ============
 
-        // In-flow inline boxes replace U+FFFC OBJECT REPLACEMENT CHARACTERs in the text
+        // An in-flow inline box is represented by a U+FFFC OBJECT REPLACEMENT CHARACTER in the text
         let text = format!(
             "{}\u{FFFC}{}\u{FFFC}{}",
             &text[..40],

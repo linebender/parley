@@ -315,8 +315,8 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
     /// Returns the pushed text so far, after whitespace processing, but excluding any trailing
     /// collapsible whitespace.
     ///
-    /// In-flow inline boxes ([`InlineBoxKind::InFlow`]) appear in the text as U+FFFC OBJECT
-    /// REPLACEMENT CHARACTERs (see [`Self::push_inline_box`]).
+    /// An in-flow inline box ([`InlineBoxKind::InFlow`]) appears in the text as a U+FFFC OBJECT
+    /// REPLACEMENT CHARACTER (see [`Self::push_inline_box`]).
     ///
     /// This is a prefix of the text that [`Self::build`] will return. Whether that trailing
     /// collapsible whitespace ends up being kept (as a single space) depends on where it is and on
