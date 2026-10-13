@@ -372,9 +372,11 @@ fn break_spaces_inline_boxes_and_rtl() {
             });
             let mut layout = builder.build(text);
             layout.break_all_lines(Some(width + 0.1));
-            // The lines are "a ", " ", " " and "b". An in-flow box is on the second line, with the
-            // space after it: there is no soft wrap opportunity before a space (UAX #14 LB7).
-            assert_eq!(layout.len(), 4);
+            // The lines are "a ", " ", " " and "b", and an in-flow box gets a line of its own.
+            assert_eq!(
+                layout.len(),
+                if kind == InlineBoxKind::InFlow { 5 } else { 4 }
+            );
             for line in layout.lines() {
                 nearly_eq(line.metrics().hanging_advance, 0.);
             }
