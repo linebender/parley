@@ -10,13 +10,14 @@ use super::style::{Brush, StyleProperty, TextStyle};
 use super::layout::Layout;
 
 use alloc::string::String;
-use core::ops::{Bound, Range, RangeBounds};
+use core::ops::RangeBounds;
 use parlance::BaseDirection;
 use parley_engine::break_overrides::LineBreakOverrideFn;
 
 use crate::InlineBoxKind;
 use crate::inline_box::{InlineBox, LayoutInlineBox};
 use crate::resolve::{ResolvedStyle, StyleRun};
+use crate::util::resolve_range;
 
 #[derive(Clone, Copy)]
 pub(crate) struct BuilderOptions<'a> {
@@ -422,18 +423,4 @@ fn build_into_layout<B: Brush>(
     // Move inline boxes into the layout
     layout.data.inline_boxes.clear();
     core::mem::swap(&mut layout.data.inline_boxes, &mut lcx.inline_boxes);
-}
-
-fn resolve_range(range: impl RangeBounds<usize>, len: usize) -> Range<usize> {
-    let start = match range.start_bound() {
-        Bound::Unbounded => 0,
-        Bound::Included(n) => *n,
-        Bound::Excluded(n) => *n + 1,
-    };
-    let end = match range.end_bound() {
-        Bound::Unbounded => len,
-        Bound::Included(n) => *n + 1,
-        Bound::Excluded(n) => *n,
-    };
-    start.min(len)..end.min(len)
 }
