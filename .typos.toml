@@ -14,6 +14,8 @@ extend-ignore-re = [
     # matching ends at quotes or symbols commonly used to terminate comments.
     "Lorem ipsum [a-zA-Z .,]*",
     "Phasellus in viverra dolor [a-zA-Z .,]*",
+    # Matches words spelled with a Unicode escape, like "Hel\u{AD}lo" for "Hello".
+    '[a-zA-Z]*\\u\{[0-9a-fA-F]+\}[a-zA-Z]*',
 ]
 
 # Match Identifier - Case Sensitive
