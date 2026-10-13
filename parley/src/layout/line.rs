@@ -23,7 +23,7 @@ pub struct Line<'a, B: Brush> {
 
 impl<'a, B: Brush> Line<'a, B> {
     /// Returns the metrics for the line.
-    pub fn metrics(&self) -> &LineMetrics {
+    pub fn metrics(&self) -> &'a LineMetrics {
         &self.data.metrics
     }
 
@@ -302,7 +302,7 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     /// Returns the associated style.
     ///
     /// See also [`Self::style_index`].
-    pub fn style(&self) -> &Style<B> {
+    pub fn style(&self) -> &'a Style<B> {
         &self.run.layout.styles()[usize::from(self.style_index)]
     }
 
@@ -329,12 +329,12 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     }
 
     /// Returns an iterator over the glyphs in the run.
-    pub fn glyphs(&'a self) -> impl Iterator<Item = Glyph> + 'a + Clone {
+    pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + 'a + Clone + use<'a, B> {
         self.run.glyphs_in(self.shaped_clusters.clone())
     }
 
     /// Returns an iterator over the fully positioned glyphs in the run.
-    pub fn positioned_glyphs(&'a self) -> impl Iterator<Item = Glyph> + 'a + Clone {
+    pub fn positioned_glyphs(&self) -> impl Iterator<Item = Glyph> + 'a + Clone + use<'a, B> {
         let mut offset = self.offset;
         let baseline = self.baseline;
         self.glyphs().map(move |mut g| {
