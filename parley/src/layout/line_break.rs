@@ -1072,7 +1072,32 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // Additional spacing to apply between atoms.
                     let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
 
-                    let line_height = run.data.line_height;
+                    // The height to report if the maximum line height is exceeded.
+                    let mut line_height = run.data.line_height;
+                    // An inline object is a run of its own. It exceeds the maximum line height by
+                    // itself if its box is too tall.
+                    if self.state.line_max_height != f32::MAX
+                        && slice
+                            .shaped_clusters()
+                            .first()
+                            .is_some_and(|cluster| cluster.is_inline_object())
+                    {
+                        let first_character = &slice.characters()[0];
+                        // This may have been set by an earlier yield before this object.
+                        self.state.update_max_height_exceeded();
+                        let inline_boxes = &self.layout.data.inline_boxes;
+                        let index = inline_object_box_index(
+                            inline_boxes,
+                            first_character.text_byte_start as usize,
+                        );
+                        let height = inline_boxes[index].inline_box.height;
+                        if !self.state.line.max_height_exceeded
+                            && height > self.state.line_max_height
+                        {
+                            self.state.line.max_height_exceeded = true;
+                            line_height = height;
+                        }
+                    }
 
                     // Iterate over the remaining atoms in the Run
                     for atom in slice.atoms_from(self.state.cluster_idx) {
@@ -1084,9 +1109,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let is_separator = is_word_separator(whitespace);
                         let is_soft_wrap_opportunity =
                             first_character.flags.is_soft_wrap_opportunity();
-                        let mut max_height_exceeded = self.state.line.max_height_exceeded;
-                        // The height to report if the maximum line height is exceeded.
-                        let mut exceeding_height = line_height;
+                        let max_height_exceeded = self.state.line.max_height_exceeded;
                         let style_index = first_character.style_index;
                         let style = &self.layout.data.styles[style_index as usize];
 
@@ -1133,20 +1156,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // Breaking an atom requires reshaping, which we don't do here, so it is
                         // consumed as a whole (this includes all clusters of a ligature).
                         let advance = spacing.atom_advance(&atom);
-                        // An inline object exceeds the maximum line height by itself if its box is
-                        // too tall.
-                        if first_character.flags.is_inline_object() && !max_height_exceeded {
-                            let inline_boxes = &self.layout.data.inline_boxes;
-                            let index = inline_object_box_index(
-                                inline_boxes,
-                                first_character.text_byte_start as usize,
-                            );
-                            let height = inline_boxes[index].inline_box.height;
-                            if height > self.state.line_max_height {
-                                max_height_exceeded = true;
-                                exceeding_height = height;
-                            }
-                        }
 
                         // Compute the x position of the content being currently processed
                         let next_x = self.state.line.x + advance;
@@ -1156,7 +1165,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // We simply append the atom to the current line
                         if next_x <= max_advance {
                             if max_height_exceeded {
-                                return self.max_height_break_data(exceeding_height);
+                                return self.max_height_break_data(line_height);
                             }
                             self.state.append_atom_to_line(
                                 &atom,
@@ -1184,7 +1193,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             );
                             if all_hang || next_x - hanging <= max_advance {
                                 if max_height_exceeded {
-                                    return self.max_height_break_data(exceeding_height);
+                                    return self.max_height_break_data(line_height);
                                 }
                                 self.state.append_atom_to_line(
                                     &atom,
@@ -1228,7 +1237,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             // We fall back to appending the content to the line.
                             else {
                                 if max_height_exceeded {
-                                    return self.max_height_break_data(exceeding_height);
+                                    return self.max_height_break_data(line_height);
                                 }
                                 self.state.append_atom_to_line(
                                     &atom,
