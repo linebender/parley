@@ -5,8 +5,6 @@
 
 use core::ops::Range;
 
-use icu_properties::CodePointMapData;
-use icu_properties::props::LineBreak as LineBreakClass;
 use parlance::{BaseDirection, Language, LineBreak, WordBreak};
 
 use crate::{bidi::BidiResolver, break_overrides::LineBreakOverrideFn};
@@ -149,49 +147,6 @@ impl InlineObject {
             break_after: None,
         }
     }
-
-    /// An object at byte `index` of `text`, with soft wrap opportunities as
-    /// [CSS Text 4 § 6.5][css-line-breaking-details] has them.
-    ///
-    /// § 6.5 only exempts the GL, WJ and ZWJ classes, but this also keeps UAX #14's other
-    /// non-tailorable rules: there is no opportunity before a space or zero width space (LB7), or
-    /// before a combining mark (LB9).
-    ///
-    /// [css-line-breaking-details]: https://www.w3.org/TR/css-text-4/#line-break-details
-    /// [css-issue-8972]: https://github.com/w3c/csswg-drafts/issues/8972
-    pub fn css(text: &str, index: usize) -> Self {
-        let line_break = const { CodePointMapData::<LineBreakClass>::new() };
-        let joins = |ch: char| {
-            ch != '\u{00A0}'
-                && matches!(
-                    line_break.get(ch),
-                    LineBreakClass::Glue | LineBreakClass::WordJoiner | LineBreakClass::ZWJ
-                )
-        };
-        let mut preceding = text[..index].chars().rev();
-        let before = preceding.next();
-        // A combining character sequence takes the class of its base (UAX #14 LB9).
-        let base = before.into_iter().chain(preceding).find(|&ch| {
-            !matches!(
-                line_break.get(ch),
-                LineBreakClass::CombiningMark | LineBreakClass::ZWJ
-            )
-        });
-        let after = text[index + '\u{FFFC}'.len_utf8()..].chars().next();
-        let break_before = before.is_some_and(|ch| !joins(ch)) && !base.is_some_and(joins);
-        let break_after = after.is_some_and(|ch| {
-            !joins(ch)
-                && !matches!(
-                    line_break.get(ch),
-                    LineBreakClass::Space | LineBreakClass::ZWSpace | LineBreakClass::CombiningMark
-                )
-        });
-        Self {
-            index,
-            break_before: break_before.then_some(true),
-            break_after: break_after.then_some(true),
-        }
-    }
 }
 
 impl core::fmt::Debug for AnalysisOptions<'_> {
@@ -307,21 +262,6 @@ mod tests {
             ("\n\u{FFFC}", &[obj(1, t, n)], &[]),
         ] {
             assert_eq!(opportunities(text, &objects(inline_objects)), expected);
-        }
-
-        // CSS Text 3 § 5.5 breaks before a full stop too, and next to U+00A0 NO-BREAK SPACE, but
-        // not next to WJ or other GL characters (even through a combining mark, LB9), nor before a
-        // space (LB7) or a combining mark.
-        for (text, expected) in [
-            ("a\u{FFFC}.", &[1, 2][..]),
-            ("\u{A0}\u{FFFC}\u{A0}", &[1, 2]),
-            ("\u{2060}\u{FFFC}\u{202F}", &[]),
-            ("\u{202F}\u{301}\u{FFFC}", &[]),
-            ("\u{FFFC} b\u{FFFC}\u{301}", &[2, 3]),
-        ] {
-            let indices = text.match_indices('\u{FFFC}');
-            let css: Vec<_> = indices.map(|(i, _)| InlineObject::css(text, i)).collect();
-            assert_eq!(opportunities(text, &objects(&css)), expected);
         }
 
         // `line-break: anywhere` breaks between graphemes, so after an object too. A line break

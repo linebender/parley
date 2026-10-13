@@ -6,7 +6,7 @@
 
 use parley::{
     Affinity, BaseDirection, Cursor, InlineBox, InlineBoxKind, Layout, PositionedLayoutItem,
-    Selection, StyleProperty, VerticalAlign, YieldData,
+    Selection, StyleProperty, VerticalAlign, WhiteSpaceCollapse, YieldData,
 };
 
 use crate::test_name;
@@ -48,16 +48,33 @@ fn inline_object_can_be_resized_after_building() {
 }
 
 #[test]
-fn inline_object_breaks_before_a_full_stop() {
+fn inline_object_breaks_as_a_css_atomic_inline() {
     let mut env = TestEnv::new(test_name!(), None);
     // CSS Text 3 § 5.5 breaks on both sides of an atomic inline "even when adjacent to a character
-    // that would normally suppress them", such as a full stop under UAX #14 (LB15d).
-    let text = "\u{FFFC}.";
-    let mut builder = env.ranged_builder(text);
-    builder.push_inline_box(inline_box(0));
-    let widths = builder.build(text).calculate_content_widths();
-    assert!(widths.max > 20.);
-    assert_eq!(widths.min, 20.);
+    // that would normally suppress them", such as a full stop under UAX #14 (LB15d) or U+00A0
+    // NO-BREAK SPACE, but not next to WJ, ZWJ or other GL characters (even through a combining
+    // mark, LB9). Nor does it break before a space, a zero width space (LB7) or a combining mark.
+    // `break-spaces` keeps spaces from hanging, so that a break before one would show.
+    for (text, line_starts) in [
+        ("a\u{FFFC}.", &[0, 1, 4][..]),
+        ("\u{A0}\u{FFFC}\u{A0}", &[0, 2, 5]),
+        ("\u{2060}\u{FFFC}\u{202F}", &[0]),
+        ("\u{202F}\u{301}\u{FFFC}", &[0]),
+        ("a\u{200D}\u{FFFC}\u{200B}b", &[0, 10]),
+        ("\u{FFFC} b\u{FFFC}\u{301}", &[0, 4, 5]),
+    ] {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::WhiteSpaceCollapse(
+            WhiteSpaceCollapse::BreakSpaces,
+        ));
+        for (index, _) in text.match_indices('\u{FFFC}') {
+            builder.push_inline_box(inline_box(index));
+        }
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(0.));
+        let starts: Vec<_> = layout.lines().map(|line| line.text_range().start).collect();
+        assert_eq!(starts, line_starts, "{text:?}");
+    }
 }
 
 #[test]

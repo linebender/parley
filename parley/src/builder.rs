@@ -11,6 +11,8 @@ use super::layout::Layout;
 
 use alloc::string::String;
 use core::ops::RangeBounds;
+use icu_properties::CodePointMapData;
+use icu_properties::props::LineBreak as LineBreakClass;
 use parlance::BaseDirection;
 use parley_engine::InlineObject;
 use parley_engine::break_overrides::LineBreakOverrideFn;
@@ -409,7 +411,7 @@ fn build_into_layout<B: Brush>(
             "in-flow inline boxes must each have a U+FFFC of their own, but more than one is at \
              index {index}",
         );
-        lcx.inline_objects.push(InlineObject::css(text, index));
+        lcx.inline_objects.push(css_atomic_inline(text, index));
 
         // The box's parent is the span its U+FFFC character is in.
         let run = lcx.style_runs.partition_point(|run| run.range.end <= index);
@@ -496,5 +498,48 @@ fn build_into_layout<B: Brush>(
         layout.data.inline_boxes[box_index].inline_object_cluster =
             (cluster < clusters.len()).then_some(cluster as u32);
         layout.data.place_inline_object(box_index);
+    }
+}
+
+/// The inline object at byte `index` of `text`, with soft wrap opportunities as
+/// [CSS Text 4 § 6.5][css-line-breaking-details] has them for atomic inlines.
+///
+/// § 6.5 only exempts the GL, WJ and ZWJ classes, but this also keeps UAX #14's other
+/// non-tailorable rules: there is no opportunity before a space or zero width space (LB7), or
+/// before a combining mark (LB9).
+///
+/// [css-line-breaking-details]: https://www.w3.org/TR/css-text-4/#line-break-details
+/// [css-issue-8972]: https://github.com/w3c/csswg-drafts/issues/8972
+fn css_atomic_inline(text: &str, index: usize) -> InlineObject {
+    let line_break = const { CodePointMapData::<LineBreakClass>::new() };
+    let joins = |ch: char| {
+        ch != '\u{00A0}'
+            && matches!(
+                line_break.get(ch),
+                LineBreakClass::Glue | LineBreakClass::WordJoiner | LineBreakClass::ZWJ
+            )
+    };
+    let mut preceding = text[..index].chars().rev();
+    let before = preceding.next();
+    // A combining character sequence takes the class of its base (UAX #14 LB9).
+    let base = before.into_iter().chain(preceding).find(|&ch| {
+        !matches!(
+            line_break.get(ch),
+            LineBreakClass::CombiningMark | LineBreakClass::ZWJ
+        )
+    });
+    let after = text[index + '\u{FFFC}'.len_utf8()..].chars().next();
+    let break_before = before.is_some_and(|ch| !joins(ch)) && !base.is_some_and(joins);
+    let break_after = after.is_some_and(|ch| {
+        !joins(ch)
+            && !matches!(
+                line_break.get(ch),
+                LineBreakClass::Space | LineBreakClass::ZWSpace | LineBreakClass::CombiningMark
+            )
+    });
+    InlineObject {
+        index,
+        break_before: break_before.then_some(true),
+        break_after: break_after.then_some(true),
     }
 }
