@@ -866,7 +866,7 @@ fn mark_inline_objects(
         let byte = object.index;
         debug_assert!(
             text[byte..].starts_with('\u{FFFC}'),
-            "Inline objects must be U+FFFC OBJECT REPLACEMENT CHARACTERs, found none at byte {byte}"
+            "An inline object must be a U+FFFC OBJECT REPLACEMENT CHARACTER, found none at byte {byte}"
         );
         index += text[counted_to..byte].chars().count();
         counted_to = byte;
