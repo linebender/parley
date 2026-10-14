@@ -1773,6 +1773,9 @@ fn commit_line<B: Brush>(
             }
         }
     }
+
+    reset_trailing_whitespace_levels(layout, &mut lines.line_items, start_item_idx);
+
     // let end_run_idx = lines.line_items.last().map(|item| item.index).unwrap_or(0);
     let end_item_idx = lines.line_items.len();
 
@@ -1895,9 +1898,9 @@ fn hanging_whitespace<B: Brush>(
             }
             LayoutItemKind::TextRun => {
                 // Trailing whitespace can only hang if it ends up at the line's end edge after bidi
-                // reordering. We don't currently apply UAX #9 L1 (resetting trailing whitespace to
-                // paragraph level), so only logically-last items that match the paragraph level are
-                // guaranteed to be at that edge.
+                // reordering. That's the case for whitespace reset to the paragraph level (see
+                // `reset_trailing_whitespace_levels`), but not for whitespace in an atom that isn't
+                // entirely whitespace.
                 if line_item.bidi_level != layout.data.base_level {
                     break;
                 }
@@ -1966,6 +1969,88 @@ fn hanging_whitespace<B: Brush>(
         justification_end_cluster,
         hanging_opportunities,
     )
+}
+
+/// Resets the bidi level of the trailing whitespace of the line made up of `line_items[start..]` to
+/// the paragraph level, following UAX #9 rule L1. That puts the whitespace at the line's end edge
+/// after reordering, so it can hang.
+///
+/// Where the whitespace ends a text run at another level, the run's line item is split in two.
+/// Whitespace is only split off in whole atoms.
+///
+/// `line_items[start..]` must be in logical order.
+///
+/// See <https://www.unicode.org/reports/tr9/#L1>.
+fn reset_trailing_whitespace_levels<B: Brush>(
+    layout: &Layout<B>,
+    line_items: &mut Vec<LineItemData>,
+    start: usize,
+) {
+    let base_level = layout.data.base_level;
+    for idx in (start..line_items.len()).rev() {
+        let line_item = &line_items[idx];
+        match line_item.kind {
+            LayoutItemKind::InlineBox => {
+                let item = &layout.data.inline_boxes[line_item.index].inline_box;
+
+                // Inline boxes aren't whitespace, but out-of-flow boxes take up no space.
+                if item.kind == InlineBoxKind::InFlow {
+                    return;
+                }
+            }
+            LayoutItemKind::TextRun => {
+                let slice = layout
+                    .data
+                    .shaped_text
+                    .run_slice(line_item.index as u32)
+                    .narrow(line_item.shaped_cluster_range.clone());
+
+                // The shaped cluster and source text byte at which the trailing whitespace starts.
+                let mut whitespace_start = None;
+                for atom in slice.atoms_end().rev() {
+                    // The whitespace that can hang, all of which is of bidi class WS, S or B.
+                    let is_whitespace = atom.characters().iter().all(|character| {
+                        matches!(
+                            character.whitespace,
+                            Whitespace::Space
+                                | Whitespace::IdeographicSpace
+                                | Whitespace::Tab
+                                | Whitespace::Newline
+                        )
+                    });
+                    if !is_whitespace {
+                        break;
+                    }
+                    whitespace_start = Some((
+                        atom.shaped_clusters_range().start,
+                        atom.characters()[0].text_byte_start as usize,
+                    ));
+                }
+
+                match whitespace_start {
+                    // The whole item is whitespace, so whitespace before it is trailing as well.
+                    Some((cluster, _)) if cluster == line_item.shaped_cluster_range.start => {
+                        line_items[idx].bidi_level = base_level;
+                    }
+                    Some((cluster, text)) => {
+                        if line_item.bidi_level != base_level {
+                            let mut whitespace = line_item.clone();
+                            whitespace.bidi_level = base_level;
+                            whitespace.shaped_cluster_range.start = cluster;
+                            whitespace.text_range.start = text;
+                            line_items[idx].shaped_cluster_range.end = cluster;
+                            line_items[idx].text_range.end = text;
+                            line_items.insert(idx + 1, whitespace);
+                        }
+                        return;
+                    }
+                    // An empty item doesn't end the trailing whitespace.
+                    None if slice.shaped_clusters_range().is_empty() => {}
+                    None => return,
+                }
+            }
+        }
+    }
 }
 
 /// Reorder items within line according to the bidi levels of the items
