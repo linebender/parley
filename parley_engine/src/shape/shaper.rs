@@ -88,7 +88,7 @@ pub struct Shaper {
     shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::ShaperData>,
     shape_instance_cache: LruCache<cache::ShapeInstanceId, harfrust::ShaperInstance>,
     shape_plan_cache: LruCache<cache::ShapePlanId, harfrust::ShapePlan>,
-    unicode_buffer: Option<harfrust::UnicodeBuffer>,
+    pub(crate) unicode_buffer: Option<harfrust::UnicodeBuffer>,
     features: Vec<harfrust::Feature>,
     char_cluster: CharCluster,
 }
@@ -235,12 +235,14 @@ impl Shaper {
     /// and font size, that `run` of `shaped` was shaped with.
     ///
     /// `buffer`'s characters and pre/post context must already be set.
+    ///
+    /// Returns `HarfRust`'s shaped glyph buffer and the font unit scale.
     pub(crate) fn shape_like_run(
         &mut self,
         shaped: &ShapedText,
         run: &ShapedRun,
         mut buffer: harfrust::UnicodeBuffer,
-    ) -> harfrust::GlyphBuffer {
+    ) -> (harfrust::GlyphBuffer, f32) {
         let font = &shaped.fonts()[run.font_index];
         // TODO: How do we want to handle errors like this?
         let font_ref =
@@ -305,12 +307,16 @@ impl Shaper {
             buffer.set_language(lang);
         }
 
-        harf_shaper.shape(
+        let glyph_buffer = harf_shaper.shape(
             buffer,
             HarfShapeOptions::new()
                 .plan(Some(shaper_plan))
                 .features(&self.features)
                 .point_size(Some(run.font_size)),
+        );
+        (
+            glyph_buffer,
+            run.font_size / harf_shaper.units_per_em() as f32,
         )
     }
 }
