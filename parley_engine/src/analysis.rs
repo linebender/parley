@@ -197,7 +197,7 @@ impl<'a> AnalysisDataSources<'a> {
         const { GraphemeClusterSegmenter::new() }
     }
 
-    #[inline(always)]
+    #[inline]
     fn word_segmenter(&self) -> WordSegmenter {
         if let Some(provider) = self.provider {
             let mut segmenter =
@@ -217,7 +217,7 @@ impl<'a> AnalysisDataSources<'a> {
         }
     }
 
-    #[inline(always)]
+    #[inline]
     fn line_segmenter(&self, key: SegmenterKey) -> LineSegmenter {
         let options = Self::line_break_options(key);
         match self.provider {

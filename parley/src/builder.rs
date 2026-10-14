@@ -391,12 +391,14 @@ fn build_into_layout<B: Brush>(
         "at least one style run is required"
     );
 
+    let data_sources = AnalysisDataSources::new(options.dictionary_provider);
+
     crate::analysis::analyze_text(
         lcx,
         text,
         options.base_direction,
         options.line_break_override,
-        &AnalysisDataSources::new(options.dictionary_provider),
+        &data_sources,
     );
 
     layout.data.clear();
@@ -442,7 +444,7 @@ fn build_into_layout<B: Brush>(
             &mut lcx.scx,
             text,
             layout,
-            &AnalysisDataSources::new(options.dictionary_provider),
+            &data_sources,
         );
     }
 
