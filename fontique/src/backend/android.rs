@@ -54,6 +54,7 @@ impl SystemFonts {
             family_names: mut name_map,
             families: family_map,
             postscript_names,
+            file_names,
             ..
         } = scan::ScannedCollection::from_paths(Path::new(&android_root).join("fonts").to_str(), 8);
         let mut generic_families = GenericFamilyMap::default();
@@ -116,7 +117,7 @@ impl SystemFonts {
                                         .partition(|c| c.attribute("fallbackFor").is_some());
                                 {
                                     // general fallback families
-                                    let (ps_named, _ps_unnamed): (
+                                    let (ps_named, ps_unnamed): (
                                         Vec<Node<'_, '_>>,
                                         Vec<Node<'_, '_>>,
                                     ) = hasnt_for
@@ -153,6 +154,50 @@ impl SystemFonts {
                                                     }
                                                 }
                                                 locale_fallback.push((locale, *family));
+                                            }
+                                        }
+                                    } else {
+                                        for font_node in &ps_unnamed {
+                                            if let Some(text) = font_node.text() {
+                                                let path = Path::new(text.trim());
+                                                if let Some(base) =
+                                                    path.file_stem().and_then(|s| s.to_str())
+                                                    && let Some(&family_id) = file_names.get(base)
+                                                {
+                                                    for lang in &langs {
+                                                        if let Some(scr) = lang.strip_prefix("und-")
+                                                        {
+                                                            script_fallback.push((
+                                                                scr.parse()
+                                                                    .unwrap_or(Script::UNKNOWN),
+                                                                family_id,
+                                                            ));
+                                                        } else if let Ok(locale) =
+                                                            Language::parse(lang)
+                                                        {
+                                                            if let Some(scr) =
+                                                                locale.script().and_then(|s| {
+                                                                    s.parse::<Script>().ok()
+                                                                })
+                                                            {
+                                                                script_fallback
+                                                                    .push((scr, family_id));
+                                                                if Script::from_bytes(*b"Hant")
+                                                                    == scr
+                                                                {
+                                                                    script_fallback.push((
+                                                                        Script::from_bytes(
+                                                                            *b"Hani",
+                                                                        ),
+                                                                        family_id,
+                                                                    ));
+                                                                }
+                                                            }
+                                                            locale_fallback
+                                                                .push((locale, family_id));
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -203,6 +248,16 @@ impl SystemFonts {
                     .map(|(_, fid)| *fid)
             })
             .or_else(|| {
+                script_to_locale(script).and_then(|locale| {
+                    self.locale_fallback
+                        .iter()
+                        .find(|(other, _)| {
+                            *other == locale || other.as_str().starts_with(locale.as_str())
+                        })
+                        .map(|(_, fid)| *fid)
+                })
+            })
+            .or_else(|| {
                 self.script_fallback
                     .iter()
                     .find(|(s, _)| script == *s)
@@ -215,4 +270,16 @@ impl SystemFonts {
                     .copied()
             })
     }
+}
+fn script_to_locale(script: Script) -> Option<Language> {
+    let lang = match &script.to_bytes() {
+        b"Hira" | b"Kana" | b"Hrkt" => "ja",
+        b"Hang" => "ko",
+        b"Hani" => "zh", // TODO: pick zh-Hans/zh-Hant based on locale, not just "zh" prefix.
+        b"Arab" => "ar",
+        b"Hebr" => "he",
+        b"Thai" => "th",
+        _ => return None,
+    };
+    Language::parse(lang).ok()
 }
