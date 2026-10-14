@@ -91,8 +91,9 @@ impl Analysis {
 /// Some scripts require complex context dependent analysis to find word and line breaks, as their writing
 /// doesn't have inherent word breaks (compare with English, which uses spaces as word break and
 /// soft wrap opportunities).
-/// The scripts we support this analysis for are currently Chinese, Japanese, Khmer, Lao, Myanmar, and Thai.
-/// We use `icu_segmenter` to determine those boundaries in these scripts; its analysis requires access to
+/// The scripts we support this analysis for are currently Chinese, Japanese, Khmer, Lao, Myanmar, and Thai (however,
+/// this might change in patch releases).
+/// We use [`icu_segmenter`] to determine those boundaries in these scripts; its analysis requires access to
 /// somewhat large dictionaries for each supported language.
 ///
 /// Parley supports providing these dictionaries in two ways:
@@ -100,25 +101,37 @@ impl Analysis {
 /// - By enabling the `complex-scripts` cargo feature, which will compile these dictionaries into the binary instead.
 ///   Most users should prefer enabling that feature, as it will be more stable across Parley releases.
 ///
-/// # Using the trait
-///
 /// This trait allows providing these dictionaries externally (i.e. not in the binary).
-/// One such use case is where your application binary will be downloaded many times by each
+/// One use case for this is where your application binary will be downloaded many times by each
 /// user (perhaps due to updates), but the dictionaries can be cached.
 /// You may also wish to avoid downloading any dictionaries your user's text does not use.
 ///
+/// When an implementation of this trait is used, the compiled in (`complex-scripts`) dictionaries will never
+/// be used, even if they cover a script not provided by the trait implementation.
+///
+/// # Using the trait
+///
 /// If you're using Parley, this can be used through layout builder's `set_dictionary_provider` method.
 ///
-/// This trait is implemented for each type which has the `icu_provider` [`DataProvider`] implementations
-/// needed for word and line segmentation.
-/// Unfortunately, this is a somewhat leaky abstraction, as `icu_segmenter` does not guarantee which dictionary
-/// names are used. As such, if using this API, we recommend pinning a specific version of `icu_segmenter`.
+/// This trait is implemented for each type which has the [`icu_provider::DataProvider`] implementations needed
+/// for word and line segmentation. We do not export this trait ourselves; you must instead depend on `icu_provider` directly.
+/// You must also depend directly on `icu_segmenter`; Parley depends on a specific minor version of `icu_segmenter`, which your
+/// dependency specification must be compatible with Parley's:
+///
+/// ```toml
+/// icu_segmenter = "~2.3.0"
+/// icu_provider = "2.3.0"
+/// ```
+///
 /// Additionally, you should avoid the use of [`DeserializingBufferProvider`](icu_provider::buf::DeserializingBufferProvider),
 /// as this would deserialise the dictionaries at the time of each layout. Our `external_dictionaries` example shows how
 /// to create a caching typed provider instead.
-///
 /// If your underlying [`DataProvider`] implementations return an error except `IdentifierNotFound`, Parley Engine
 /// will currently panic during text analysis.
+///
+/// Please note that if the dictionary for one of the scripts mentioned above is not provided,
+/// word boundaries computed by Parley (as used for text selection) will not be valid. In that scenario, they
+/// will be even worse than if neither the dictionary nor `complex-scripts` are not enabled. This is due to a bug in `icu_segmenter`.
 ///
 /// # Note on LSTMs
 ///
@@ -153,10 +166,10 @@ impl core::fmt::Debug for AnalysisDataSources<'_> {
 }
 
 impl<'a> AnalysisDataSources<'a> {
-    /// Create a new `AnalysisDataSources` which will use `provider` for line and word segmentation,
-    /// falling back to data compiled into the binary (if present).
+    /// Create a new `AnalysisDataSources` which will use `provider` for line and word segmentation.
+    /// If not provided, the data compiled into the binary will be used instead (if present).
     ///
-    /// See [`DictionaryProvider`] for more details.
+    /// See [`DictionaryProvider`] for full details.
     pub const fn new(provider: Option<&'a dyn DictionaryProvider>) -> Self {
         Self { provider }
     }
@@ -173,8 +186,7 @@ impl<'a> AnalysisDataSources<'a> {
     /// be removed).
     #[inline(always)]
     fn has_word_dictionary(&self, script: Script) -> bool {
-        // We assume that if external dictionaries are provided, they cover all scripts.
-        // That isn't a guaranteed assumption, but works for our current users
+        // We assume that if external dictionaries are provided, they cover this set of scripts.
         (self.provider.is_some() || cfg!(feature = "complex-scripts"))
             && matches!(
                 script,
