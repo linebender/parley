@@ -19,6 +19,7 @@ libm = ["fontique/libm", "harfrust/libm", "skrifa/libm"]
 bytemuck = ["fontique/bytemuck", "parlance/bytemuck"]
 # Enables dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
 # When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
+# See the docs on `DictionaryProvider` for more details.
 complex-scripts = []
 
 [dependencies]
@@ -32,6 +33,7 @@ hashbrown = { workspace = true }
 icu_locale_core = { workspace = true }
 icu_normalizer = { workspace = true, features = ["compiled_data"] }
 icu_properties = { workspace = true, features = ["compiled_data"] }
+icu_provider = { workspace = true }
 icu_segmenter = { workspace = true, features = ["compiled_data"] }
 linebender_resource_handle = { workspace = true }
 skrifa = { workspace = true }

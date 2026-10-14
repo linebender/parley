@@ -13,6 +13,7 @@ use alloc::string::String;
 use core::ops::RangeBounds;
 use parlance::BaseDirection;
 use parley_engine::break_overrides::LineBreakOverrideFn;
+use parley_engine::{AnalysisDataSources, DictionaryProvider};
 
 use crate::InlineBoxKind;
 use crate::inline_box::{InlineBox, LayoutInlineBox};
@@ -25,6 +26,7 @@ pub(crate) struct BuilderOptions<'a> {
     quantize: bool,
     base_direction: BaseDirection,
     line_break_override: Option<&'a LineBreakOverrideFn>,
+    dictionary_provider: Option<&'a dyn DictionaryProvider>,
 }
 
 impl BuilderOptions<'_> {
@@ -34,6 +36,7 @@ impl BuilderOptions<'_> {
             quantize,
             base_direction: BaseDirection::Auto,
             line_break_override: None,
+            dictionary_provider: None,
         }
     }
 }
@@ -89,6 +92,17 @@ impl<'b, B: Brush> RangedBuilder<'b, B> {
     /// See [`LineBreakOverrideFn`] for more details.
     pub fn set_line_break_override(&mut self, overrides: Option<&'b LineBreakOverrideFn>) {
         self.options.line_break_override = overrides;
+    }
+
+    /// Set the provider for dictionary data used for word and line segmentation.
+    ///
+    /// See [`DictionaryProvider`] for more details.
+    ///
+    /// # Panics
+    ///
+    /// Building this layout may panic if the provider returns an error other than `IdentifierNotFound`.
+    pub fn set_dictionary_provider(&mut self, provider: Option<&'b dyn DictionaryProvider>) {
+        self.options.dictionary_provider = provider;
     }
 
     pub fn build_into(self, layout: &mut Layout<B>, text: impl AsRef<str>) {
@@ -193,6 +207,17 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
     /// See [`LineBreakOverrideFn`] for more details.
     pub fn set_line_break_override(&mut self, overrides: Option<&'b LineBreakOverrideFn>) {
         self.options.line_break_override = overrides;
+    }
+
+    /// Set the provider for dictionary data used for word and line segmentation.
+    ///
+    /// See [`DictionaryProvider`] for more details.
+    ///
+    /// # Panics
+    ///
+    /// Building this layout may panic if the provider returns an error other than `IdentifierNotFound`.
+    pub fn set_dictionary_provider(&mut self, provider: Option<&'b dyn DictionaryProvider>) {
+        self.options.dictionary_provider = provider;
     }
 
     pub fn build_into(self, layout: &mut Layout<B>, text: impl AsRef<str>) {
@@ -315,6 +340,17 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
         self.options.line_break_override = overrides;
     }
 
+    /// Set the provider for dictionary data used for word and line segmentation.
+    ///
+    /// See [`DictionaryProvider`] for more details.
+    ///
+    /// # Panics
+    ///
+    /// Building this layout may panic if the provider returns an error other than `IdentifierNotFound`.
+    pub fn set_dictionary_provider(&mut self, provider: Option<&'b dyn DictionaryProvider>) {
+        self.options.dictionary_provider = provider;
+    }
+
     #[inline]
     pub fn build_into(self, layout: &mut Layout<B>) -> String {
         // Apply TreeStyleBuilder styles to LayoutContext.
@@ -356,11 +392,14 @@ fn build_into_layout<B: Brush>(
         "at least one style run is required"
     );
 
+    let data_sources = AnalysisDataSources::new(options.dictionary_provider);
+
     crate::analysis::analyze_text(
         lcx,
         text,
         options.base_direction,
         options.line_break_override,
+        &data_sources,
     );
 
     layout.data.clear();
@@ -406,7 +445,7 @@ fn build_into_layout<B: Brush>(
             &mut lcx.scx,
             text,
             layout,
-            &lcx.analysis_data_sources,
+            &data_sources,
         );
     }
 
