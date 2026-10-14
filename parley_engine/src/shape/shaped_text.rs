@@ -324,8 +324,6 @@ impl ShapedText {
             "The claimed character range and the text's covered byte range should agree"
         );
 
-        let glyph_infos = glyph_buffer.glyph_infos();
-
         let normalized_coords_range = {
             let start = self.normalized_coords.len();
             self.normalized_coords.extend(
@@ -365,13 +363,6 @@ impl ShapedText {
         let units_per_em = metrics.units_per_em as f32;
         let font_metrics = FontMetrics::from_skrifa_metrics(&metrics, options.font_size);
 
-        // `HarfRust` returns glyphs in visual order, so we need to process them as such while
-        // maintaining logical ordering of clusters.
-
-        let glyph_positions = glyph_buffer.glyph_positions();
-        let scale_factor = options.font_size / units_per_em;
-        let shaped_clusters_start = self.shaped_clusters.len();
-
         // Push all characters.
         let characters_start = self.characters.len();
         for (((byte_offset, ch), info), style_index) in text[range.byte_range.clone()]
@@ -400,42 +391,16 @@ impl ShapedText {
             self.characters[characters_start].grapheme_start = true;
         }
 
-        let glyphs_start = self.glyphs.len();
-        let characters_range = characters_start..self.characters.len();
-        if segment.bidi_level.is_ltr() {
-            process_shaped_clusters(
-                &mut self.shaped_clusters,
-                &mut self.glyphs,
-                scale_factor,
-                glyph_infos.iter(),
-                glyph_positions.iter(),
-                &self.characters,
-                characters_range,
-                self.has_safe_to_concat_flags,
-            );
-        } else {
-            process_shaped_clusters(
-                &mut self.shaped_clusters,
-                &mut self.glyphs,
-                scale_factor,
-                glyph_infos.iter().rev(),
-                glyph_positions.iter().rev(),
-                &self.characters,
-                characters_range,
-                self.has_safe_to_concat_flags,
-            );
-            // Reverse each cluster's glyphs, such that they are in paint order.
-            //
-            // TODO: could this become a single `reverse` over the range?
-            for cluster in &self.shaped_clusters[shaped_clusters_start..] {
-                if cluster.glyph_len() > 1 {
-                    let start = cluster.glyph_offset as usize;
-                    self.glyphs[start..start + cluster.glyph_len() as usize].reverse();
-                }
-            }
-        }
-
-        let shaped_clusters_range = shaped_clusters_start as u32..self.shaped_clusters.len() as u32;
+        let (shaped_clusters_range, glyphs_range) = push_glyph_buffer(
+            &mut self.shaped_clusters,
+            &mut self.glyphs,
+            glyph_buffer,
+            options.font_size / units_per_em,
+            segment.bidi_level.is_rtl(),
+            &self.characters,
+            characters_start..self.characters.len(),
+            self.has_safe_to_concat_flags,
+        );
 
         self.runs.push(ShapedRun {
             range,
@@ -443,7 +408,7 @@ impl ShapedText {
             font_index,
             characters_range: characters_start as u32..self.characters.len() as u32,
             shaped_clusters_range,
-            glyphs_range: glyphs_start..self.glyphs.len(),
+            glyphs_range,
             normalized_coords_range,
             features_range,
             bidi_level: segment.bidi_level,
@@ -485,6 +450,63 @@ pub struct ShapedRun {
     pub language: Option<Language>,
     /// The font metrics of this run.
     pub font_metrics: FontMetrics,
+}
+
+/// Append the clusters and glyphs of `glyph_buffer`.
+pub(crate) fn push_glyph_buffer(
+    shaped_clusters: &mut Vec<ShapedCluster>,
+    glyphs: &mut Vec<Glyph>,
+    glyph_buffer: &harfrust::GlyphBuffer,
+    font_unit_scale: f32,
+    is_rtl: bool,
+    characters: &[Character],
+    characters_range: Range<usize>,
+    produce_safe_to_concat_flags: bool,
+) -> (Range<u32>, Range<usize>) {
+    // `HarfRust` returns glyphs in visual order, so we need to process them as such while
+    // maintaining logical ordering of clusters.
+    let glyph_infos = glyph_buffer.glyph_infos();
+    let glyph_positions = glyph_buffer.glyph_positions();
+    let shaped_clusters_start = shaped_clusters.len();
+    let glyphs_start = glyphs.len();
+
+    if !is_rtl {
+        process_shaped_clusters(
+            shaped_clusters,
+            glyphs,
+            font_unit_scale,
+            glyph_infos.iter(),
+            glyph_positions.iter(),
+            characters,
+            characters_range,
+            produce_safe_to_concat_flags,
+        );
+    } else {
+        process_shaped_clusters(
+            shaped_clusters,
+            glyphs,
+            font_unit_scale,
+            glyph_infos.iter().rev(),
+            glyph_positions.iter().rev(),
+            characters,
+            characters_range,
+            produce_safe_to_concat_flags,
+        );
+        // Reverse each cluster's glyphs, such that they are in paint order.
+        //
+        // TODO: could this become a single `reverse` over the range?
+        for cluster in &shaped_clusters[shaped_clusters_start..] {
+            if cluster.glyph_len() > 1 {
+                let start = cluster.glyph_offset as usize;
+                glyphs[start..start + cluster.glyph_len() as usize].reverse();
+            }
+        }
+    }
+
+    (
+        shaped_clusters_start as u32..shaped_clusters.len() as u32,
+        glyphs_start..glyphs.len(),
+    )
 }
 
 /// Processes shaped glyphs from `HarfRust` and converts them into `ShapedCluster` and `Glyph`.
@@ -637,7 +659,12 @@ fn process_shaped_clusters<'a>(
     }
 
     // Flush the final cluster.
-    flush(&mut cluster, characters_range.end, characters, shaped_clusters);
+    flush(
+        &mut cluster,
+        characters_range.end,
+        characters,
+        shaped_clusters,
+    );
 }
 
 #[cfg(test)]
