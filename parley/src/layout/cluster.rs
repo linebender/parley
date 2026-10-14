@@ -113,9 +113,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
                             return Some((cluster, side));
                         }
                     }
-                    LineItem::InlineBox(inline_box) => {
-                        offset += inline_box.width;
-                    }
+                    LineItem::OutOfFlowBox(_) => {}
                 }
             }
         }
@@ -462,9 +460,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
                         }
                     }
                 }
-                LineItem::InlineBox(inline_box) => {
-                    offset += inline_box.width;
-                }
+                LineItem::OutOfFlowBox(_) => {}
             }
         }
         Some(offset)

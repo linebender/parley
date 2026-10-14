@@ -393,8 +393,9 @@ fn shape_segment(
     };
 
     // This is the run being accumulated, i.e., consecutive graphemes for which `select_font`
-    // returns the same font.
+    // returns the same font, or a single inline object.
     let mut run: Option<(FontInstance, TextRange)> = None;
+    let mut run_is_inline_object = false;
 
     // The segment's characters with their analysis data and style indices.
     let mut chars = segment_text
@@ -421,12 +422,23 @@ fn shape_segment(
             char_range: char_start..char_end,
         };
 
+        // An object is shaped as a run of its own, to ensure it becomes its own shaped cluster. It
+        // doesn't need a font of its own, so it takes the current run's.
+        let is_inline_object = char_info[char_start].is_inline_object();
+        if is_inline_object && let Some((run_font, run_range)) = run.take() {
+            shape_run(&run_font, run_range);
+            run = Some((run_font, grapheme));
+            run_is_inline_object = true;
+            continue;
+        }
+
         let font = select_font
             .select_font(segment, options, char_cluster)
             .ok_or(())?;
 
         if let Some((run_font, run_range)) = &mut run
             && run_font.as_ref() == font
+            && !run_is_inline_object
         {
             run_range.byte_range.end = byte_end;
             run_range.char_range.end = char_end;
@@ -436,6 +448,7 @@ fn shape_segment(
                 shape_run(&run_font, run_range);
             }
             run = Some((font.into(), grapheme));
+            run_is_inline_object = is_inline_object;
         }
     }
     if let Some((run_font, run_range)) = run {

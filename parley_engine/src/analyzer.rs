@@ -90,6 +90,63 @@ pub struct AnalysisOptions<'a> {
     ///
     /// See [`LineBreakOverrideFn`] for more details.
     pub line_break_override: Option<&'a LineBreakOverrideFn>,
+
+    /// The inline objects in the source text.
+    ///
+    /// These must be in ascending order of [`InlineObject::index`] without duplicates. Each entry
+    /// must point at a U+FFFC OBJECT REPLACEMENT CHARACTER in the source text. Any U+FFFC character
+    /// that is not in this list, is treated as ordinary text (some fonts may render `.notdef`,
+    /// others may have a glyph for it).
+    ///
+    /// Such an in inline object is part of the paragraph, but is not part of the paragraph's text;
+    /// e.g., it may be an image. In CSS, this is known as an [atomic inline][css-atomic-inline].
+    ///
+    /// The analysis marks these objects with
+    /// [`CharInfo::is_inline_object`](crate::CharInfo::is_inline_object), and they are treated
+    /// as follows.
+    ///
+    /// - The soft wrap opportunities before and after an object follow UAX #14 by default. This can
+    ///   be configured using [`break_before`](InlineObject::break_before) and
+    ///   [`break_after`](InlineObject::break_after).
+    /// - Each object is a grapheme of its own.
+    /// - Each object is shaped as a [`ShapedRun`](crate::ShapedRun) of its own. It is a
+    ///   [`ShapedCluster`](crate::shape::ShapedCluster) without glyphs, whose advance can be set
+    ///   using
+    ///   [`ShapedText::set_inline_object_advance`](crate::ShapedText::set_inline_object_advance).
+    ///
+    /// [css-atomic-inline]: https://www.w3.org/TR/css-display-3/#atomic-inline
+    pub inline_objects: &'a [InlineObject],
+}
+
+/// An inline object in the source text, see [`AnalysisOptions::inline_objects`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InlineObject {
+    /// The byte index of the object's U+FFFC OBJECT REPLACEMENT CHARACTER in the source text.
+    pub index: usize,
+
+    /// Whether there is a soft wrap opportunity before the object.
+    ///
+    /// `None` follows UAX #14. `Some(true)` forces one and `Some(false)` suppresses one.
+    ///
+    /// Between two objects, a `Some(false)` of either one wins.
+    /// [`AnalysisOptions::line_break_override`] takes precedence over this.
+    pub break_before: Option<bool>,
+
+    /// Whether there is a soft wrap opportunity after the object.
+    ///
+    /// This works like [`Self::break_before`].
+    pub break_after: Option<bool>,
+}
+
+impl InlineObject {
+    /// An object at byte `index`, with soft wrap opportunities as UAX #14 has them.
+    pub const fn new(index: usize) -> Self {
+        Self {
+            index,
+            break_before: None,
+            break_after: None,
+        }
+    }
 }
 
 impl core::fmt::Debug for AnalysisOptions<'_> {
@@ -98,15 +155,17 @@ impl core::fmt::Debug for AnalysisOptions<'_> {
             .field("base_direction", &self.base_direction)
             .field("line_break", &self.line_break)
             .field("break_spaces", &self.break_spaces)
+            .field("inline_objects", &self.inline_objects)
             .finish_non_exhaustive()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use parlance::BidiLevel;
+    use alloc::vec::Vec;
+    use parlance::{BidiLevel, LineBreak};
 
-    use super::{AnalysisOptions, Analyzer};
+    use super::{AnalysisOptions, Analyzer, InlineObject, LineBreakConfig};
     use crate::{Analysis, BaseDirection};
 
     fn analyze(text: &str, base_direction: BaseDirection) -> Analysis {
@@ -161,6 +220,76 @@ mod tests {
 
         assert!(analysis.paragraph_level().is_rtl());
         assert!(analysis.bidi_levels().iter().all(|level| level.is_ltr()));
+    }
+
+    #[test]
+    fn inline_objects() {
+        fn objects(inline_objects: &[InlineObject]) -> AnalysisOptions<'_> {
+            AnalysisOptions {
+                inline_objects,
+                ..AnalysisOptions::default()
+            }
+        }
+        let analyze_with = |text: &str, options: &AnalysisOptions<'_>| {
+            let mut analysis = Analysis::new();
+            Analyzer::new().analyze(text, options, &mut analysis);
+            analysis
+        };
+        let opportunities = |text: &str, options: &AnalysisOptions<'_>| -> Vec<usize> {
+            let analysis = analyze_with(text, options);
+            let infos = analysis.char_info().iter().enumerate();
+            infos
+                .filter_map(|(i, info)| info.is_soft_wrap_opportunity().then_some(i))
+                .collect()
+        };
+        let (n, t, f) = (None, Some(true), Some(false));
+        let obj = |index, break_before, break_after| InlineObject {
+            index,
+            break_before,
+            break_after,
+        };
+
+        for (text, inline_objects, expected) in [
+            // By default, an object breaks like any U+FFFC under UAX #14 (LB20), so not before a
+            // full stop (LB15d).
+            ("a\u{FFFC}.", &[obj(1, n, n)][..], &[1][..]),
+            // An object's own conditions win over the text's.
+            ("a\u{FFFC}.", &[obj(1, f, t)], &[2]),
+            // Between two objects, suppressing an opportunity wins.
+            ("\u{FFFC}\u{FFFC}a", &[obj(0, n, t), obj(3, f, n)], &[2]),
+            ("\u{FFFC}\u{FFFC}a", &[obj(0, n, f), obj(3, t, n)], &[2]),
+            // There is never one next to a mandatory break.
+            ("\n\u{FFFC}", &[obj(1, t, n)], &[]),
+        ] {
+            assert_eq!(opportunities(text, &objects(inline_objects)), expected);
+        }
+
+        // `line-break: anywhere` breaks between graphemes, so after an object too. A line break
+        // override has the last word on either side of one.
+        let object_at_0 = [obj(0, n, n)];
+        let anywhere = LineBreakConfig {
+            line_break: LineBreak::Anywhere,
+            ..LineBreakConfig::default()
+        };
+        let options = AnalysisOptions {
+            line_break: &[(0..5, anywhere)],
+            ..objects(&object_at_0)
+        };
+        assert_eq!(opportunities("\u{FFFC}\u{301}", &options), [1]);
+        let object_at_1 = [obj(1, t, t)];
+        let options = AnalysisOptions {
+            line_break_override: Some(&|_| Some(false)),
+            ..objects(&object_at_1)
+        };
+        assert_eq!(opportunities("a\u{FFFC}a", &options), []);
+
+        // An object is a grapheme of its own, and needs no font.
+        let analysis = analyze_with("\u{FFFC}\u{301}", &objects(&object_at_0));
+        let [object, mark] = analysis.char_info() else {
+            unreachable!()
+        };
+        assert!(object.is_inline_object() && !object.contributes_to_shaping());
+        assert!(mark.is_grapheme_start() && !mark.is_inline_object());
     }
 
     #[test]

@@ -182,9 +182,9 @@ fn inline_boxes_after_newline_max_content_width() {
     let mut env = TestEnv::new(test_name!(), None);
 
     // A newline followed by three inline boxes separated by spaces.
-    let text = "\n  ";
+    let text = "\n\u{FFFC} \u{FFFC} \u{FFFC}";
     let mut builder = env.ranged_builder(text);
-    for (id, index) in [(0_u64, 1_usize), (1, 2), (2, 3)] {
+    for (id, index) in [(0_u64, 1_usize), (1, 5), (2, 9)] {
         builder.push_inline_box(InlineBox {
             id,
             kind: InlineBoxKind::InFlow,
@@ -216,8 +216,7 @@ fn inline_boxes_after_newline_max_content_width() {
 fn no_break_after_inline_box_with_nowrap() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    // "A[box]AA"
-    let text = "AAA";
+    let text = "A\u{FFFC}AA";
     let build_layout = |env: &mut TestEnv, text_wrap_mode| {
         let mut builder = env.ranged_builder(text);
         builder.push_default(StyleProperty::TextWrapMode(text_wrap_mode));

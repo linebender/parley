@@ -12,6 +12,7 @@ use super::layout::Layout;
 use alloc::string::String;
 use core::ops::RangeBounds;
 use parlance::BaseDirection;
+use parley_engine::InlineObject;
 use parley_engine::break_overrides::LineBreakOverrideFn;
 
 use crate::InlineBoxKind;
@@ -69,12 +70,21 @@ impl<'b, B: Brush> RangedBuilder<'b, B> {
         self.lcx.ranged_style_builder.push(resolved, range);
     }
 
+    /// Adds an inline box.
+    ///
+    /// In-flow boxes ([`InlineBoxKind::InFlow`]) must have a matching U+FFFC OBJECT REPLACEMENT
+    /// CHARACTER at its [`index`](InlineBox::index) in the text.
+    ///
+    /// Out-of-flow boxes are not represented in the text.
+    ///
+    /// # Panics
+    ///
+    /// Building the layout panics if an in-flow box's index isn't that of a U+FFFC character in the
+    /// text, or if two in-flow boxes share a single U+FFFC character.
     pub fn push_inline_box(&mut self, inline_box: InlineBox) {
-        self.lcx.inline_boxes.push(LayoutInlineBox {
-            inline_box,
-            parent_style_index: 0,
-            baseline_offset: 0.,
-        });
+        self.lcx
+            .inline_boxes
+            .push(LayoutInlineBox::new(inline_box, 0));
     }
 
     /// Sets the paragraph's base direction.
@@ -173,12 +183,21 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
         self.cursor = range.end;
     }
 
+    /// Adds an inline box.
+    ///
+    /// In-flow boxes ([`InlineBoxKind::InFlow`]) must have a matching U+FFFC OBJECT REPLACEMENT
+    /// CHARACTER at its [`index`](InlineBox::index) in the text.
+    ///
+    /// Out-of-flow boxes are not represented in the text.
+    ///
+    /// # Panics
+    ///
+    /// Building the layout panics if an in-flow box's index isn't that of a U+FFFC character in the
+    /// text, or if two in-flow boxes share a single U+FFFC character.
     pub fn push_inline_box(&mut self, inline_box: InlineBox) {
-        self.lcx.inline_boxes.push(LayoutInlineBox {
-            inline_box,
-            parent_style_index: 0,
-            baseline_offset: 0.,
-        });
+        self.lcx
+            .inline_boxes
+            .push(LayoutInlineBox::new(inline_box, 0));
     }
 
     /// Sets the paragraph's base direction.
@@ -270,6 +289,9 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
     /// Returns the pushed text so far, after whitespace processing, but excluding any trailing
     /// collapsible whitespace.
     ///
+    /// An in-flow inline box ([`InlineBoxKind::InFlow`]) appears in the text as a U+FFFC OBJECT
+    /// REPLACEMENT CHARACTER (see [`Self::push_inline_box`]).
+    ///
     /// This is a prefix of the text that [`Self::build`] will return. Whether that trailing
     /// collapsible whitespace ends up being kept (as a single space) depends on where it is and on
     /// what follows it. See [`Self::has_pending_whitespace`].
@@ -285,20 +307,25 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
         self.lcx.tree_style_builder.has_pending_whitespace()
     }
 
+    /// Pushes an inline box at the current position in the text.
+    ///
+    /// Note: this overwrites the box's [`InlineBox::index`].
+    ///
+    /// Pushing an in-flow box ([`InlineBoxKind::InFlow`]) appends a `U+FFFC` OBJECT REPLACEMENT
+    /// CHARACTER to the text that [`Self::build`] will return.
+    ///
+    /// [atomic inline]: https://www.w3.org/TR/css-display-3/#atomic-inline
     pub fn push_inline_box(&mut self, mut inline_box: InlineBox) {
-        if inline_box.kind == InlineBoxKind::InFlow {
-            self.lcx.tree_style_builder.flush_pending_whitespace();
-            self.lcx.tree_style_builder.set_last_item_is_inline_box();
-        }
-
         // TODO: arrange type better here to factor out the index
-        inline_box.index = self.lcx.tree_style_builder.text().len();
+        inline_box.index = if inline_box.kind == InlineBoxKind::InFlow {
+            self.lcx.tree_style_builder.push_inline_object()
+        } else {
+            self.lcx.tree_style_builder.text().len()
+        };
         let parent_style_index = self.lcx.tree_style_builder.resolve_current_style_id();
-        self.lcx.inline_boxes.push(LayoutInlineBox {
-            inline_box,
-            parent_style_index,
-            baseline_offset: 0.,
-        });
+        self.lcx
+            .inline_boxes
+            .push(LayoutInlineBox::new(inline_box, parent_style_index));
     }
 
     /// Sets the paragraph's base direction.
@@ -356,6 +383,44 @@ fn build_into_layout<B: Brush>(
         "at least one style run is required"
     );
 
+    // Sort the inline boxes as subsequent code assumes that they are in text index order.
+    // Note: It's important that this is a stable sort to allow users to control the order of contiguous inline boxes
+    //
+    // TODO: consider dropping the sort and requiring `push_inline_box` callers to push boxes in text index order
+    // (as `TreeBuilder` already does).
+    lcx.inline_boxes.sort_by_key(|b| b.inline_box.index);
+
+    // In-flow boxes are inline objects, each at a U+FFFC character in the text.
+    lcx.inline_objects.clear();
+    for inline_box in &mut lcx.inline_boxes {
+        if !inline_box.is_inline_object() {
+            continue;
+        }
+        let index = inline_box.inline_box.index;
+        assert!(
+            text.get(index..)
+                .is_some_and(|rest| rest.starts_with('\u{FFFC}')),
+            "in-flow inline box {} must be at a U+FFFC OBJECT REPLACEMENT CHARACTER in the text, \
+             but its index is {index}",
+            inline_box.inline_box.id,
+        );
+        assert!(
+            lcx.inline_objects.last().map(|object| object.index) != Some(index),
+            "in-flow inline boxes must each have a U+FFFC of their own, but more than one is at \
+             index {index}",
+        );
+        // There are soft wrap opportunities on both sides of the box, whatever is next to it.
+        lcx.inline_objects.push(InlineObject {
+            index,
+            break_before: Some(true),
+            break_after: Some(true),
+        });
+
+        // The box's parent is the span its U+FFFC character is in.
+        let run = lcx.style_runs.partition_point(|run| run.range.end <= index);
+        inline_box.parent_style_index = lcx.style_runs[run].style_index;
+    }
+
     crate::analysis::analyze_text(
         lcx,
         text,
@@ -388,13 +453,6 @@ fn build_into_layout<B: Brush>(
         .styles
         .extend(lcx.style_table.iter().map(|s| s.as_layout_style()));
 
-    // Sort the inline boxes as subsequent code assumes that they are in text index order.
-    // Note: It's important that this is a stable sort to allow users to control the order of contiguous inline boxes
-    //
-    // TODO: consider dropping the sort and requiring `push_inline_box` callers to push boxes in text index order
-    // (as `TreeBuilder` already does).
-    lcx.inline_boxes.sort_by_key(|b| b.inline_box.index);
-
     {
         super::shape::shape_text(
             &lcx.rcx,
@@ -423,4 +481,25 @@ fn build_into_layout<B: Brush>(
     // Move inline boxes into the layout
     layout.data.inline_boxes.clear();
     core::mem::swap(&mut layout.data.inline_boxes, &mut lcx.inline_boxes);
+
+    // Find the shaped clusters of the inline objects, and place their boxes there.
+    //
+    // TODO: Maybe `parley_engine` should expose a utility to easily get indices of shaped clusters?
+    for box_index in 0..layout.data.inline_boxes.len() {
+        let layout_box = &layout.data.inline_boxes[box_index];
+        if !layout_box.is_inline_object() {
+            continue;
+        }
+        let index = layout_box.inline_box.index;
+        let characters = layout.data.shaped_text.characters();
+        let clusters = layout.data.shaped_text.shaped_clusters();
+        let char_index =
+            characters.partition_point(|c| (c.text_byte_start as usize) < index) as u32;
+        let cluster = clusters.partition_point(|c| c.chars_range().start < char_index);
+        // Each object is a cluster of its own, but there is none only if shaping was aborted due to
+        // lack of fonts.
+        layout.data.inline_boxes[box_index].inline_object_cluster =
+            (cluster < clusters.len()).then_some(cluster as u32);
+        layout.data.place_inline_object(box_index);
+    }
 }

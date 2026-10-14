@@ -29,6 +29,12 @@ const TEXT: &str = "Some text here. Let's make\n\
 
 const LINE_COUNT: f32 = 14.;
 
+/// [`TEXT`] with a U+FFFC OBJECT REPLACEMENT CHARACTER for each inline box of [`build_layout`].
+fn text_with_boxes() -> String {
+    let text = TEXT.replacen("longer", "long\u{FFFC}er", 1);
+    text.replacen("\n we", "\n\u{FFFC} we", 1)
+}
+
 /// Returns the integral max advance that these tests are designed around.
 fn max_advance(font_size: f32) -> f32 {
     (200. / 16. * font_size).ceil()
@@ -83,7 +89,7 @@ fn ascent_descent_box_height(font_size: f32, line_height_px: f32) -> (f32, f32, 
 fn get_selections<B: Brush>(layout: &Layout<B>) -> Vec<(BoundingBox, usize)> {
     let selection_parts = [
         ("Some text here.", 4),
-        ("a bit longer", 8),
+        ("a bit long", 8),
         ("we have more", 5),
         ("also some latin", 9),
         ("this spot", 7),
@@ -98,10 +104,11 @@ fn get_selections<B: Brush>(layout: &Layout<B>) -> Vec<(BoundingBox, usize)> {
         ("some", 4),
     ];
 
+    let text = text_with_boxes();
     let mut selections = Vec::new();
     let mut idx = 0;
     for (substr, len) in selection_parts {
-        let i = idx + TEXT[idx..].find(substr).unwrap();
+        let i = idx + text[idx..].find(substr).unwrap();
         let j = i + len;
         idx = j;
         let selection = Selection::new(
@@ -120,7 +127,9 @@ fn build_layout<A: Into<Option<f32>>>(
     line_height: f32,
     max_advance: A,
 ) -> Layout<ColorBrush> {
-    let mut builder = env.ranged_builder(TEXT);
+    let text = text_with_boxes();
+    let mut boxes = text.match_indices('\u{FFFC}').map(|(index, _)| index);
+    let mut builder = env.ranged_builder(&text);
     builder.push_default(StyleProperty::FontSize(font_size));
     builder.push_default(LineHeight::Absolute(line_height));
 
@@ -128,15 +137,15 @@ fn build_layout<A: Into<Option<f32>>>(
     let strikethrough_style = StyleProperty::Strikethrough(true);
 
     // Set the underline & strikethrough style
-    let pos_u = TEXT.find("underline").unwrap();
+    let pos_u = text.find("underline").unwrap();
     builder.push(underline_style, pos_u..pos_u + "underline".len());
-    let pos_s = TEXT.find("strikethrough").unwrap();
+    let pos_s = text.find("strikethrough").unwrap();
     builder.push(strikethrough_style, pos_s..pos_s + "strikethrough".len());
 
     builder.push_inline_box(InlineBox {
         id: 0,
         kind: InlineBoxKind::InFlow,
-        index: 40,
+        index: boxes.next().unwrap(),
         width: 50.0,
         height: 5.0,
         baseline: None,
@@ -145,14 +154,14 @@ fn build_layout<A: Into<Option<f32>>>(
     builder.push_inline_box(InlineBox {
         id: 1,
         kind: InlineBoxKind::InFlow,
-        index: 51,
+        index: boxes.next().unwrap(),
         width: 50.0,
         height: 3.0,
         baseline: None,
         vertical_align: VerticalAlign::BASELINE,
     });
 
-    let mut layout = builder.build(TEXT);
+    let mut layout = builder.build(&text);
     layout.break_all_lines(max_advance.into());
     layout
 }
@@ -515,7 +524,7 @@ fn lines_negative_leading_inline_box_grows_line_box() {
     let font_size = 16.0;
     let line_height_px = 12.0;
     let box_height = 14.0;
-    let text = "dig\npug\nyak";
+    let text = "dig\np\u{FFFC}ug\nyak";
 
     let mut env = TestEnv::new(test_name!(), None);
     let mut builder = env.ranged_builder(text);
