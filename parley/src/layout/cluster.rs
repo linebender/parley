@@ -234,6 +234,18 @@ impl<'a, B: Brush> Cluster<'a, B> {
         self.first_character().flags.is_emoji()
     }
 
+    /// Returns `true` if [`Self::glyphs`] yields at least one glyph.
+    ///
+    /// This is cheaper than building the glyph iterator.
+    pub fn has_glyphs(&self) -> bool {
+        self.grapheme.is_atom_start()
+            && self
+                .atom
+                .shaped_clusters()
+                .iter()
+                .any(|cluster| cluster.glyph_len() != 0)
+    }
+
     /// Returns an iterator over the glyphs in the cluster.
     ///
     /// For our purposes, the glyphs of a shaped cluster belong to its first (logical) grapheme
