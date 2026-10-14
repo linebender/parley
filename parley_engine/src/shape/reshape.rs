@@ -17,7 +17,8 @@ use alloc::vec::Vec;
 
 use crate::{
     FontInstance, Glyph, NormalizedCoord, ShapedRun, ShapedSlice, ShapedText, Shaper,
-    shape::ShapedCluster,
+    itemize::TextRange,
+    shape::{ShapedCluster, shaped_text::push_glyph_buffer},
 };
 
 use super::Character;
@@ -164,14 +165,88 @@ impl Shaper {
     ) -> ReshapedLine {
     }
 
-    /// Shape a character range of one run with edits.
+    /// Shape the characters `chars` of the run `run_index` again.
+    ///
+    /// Returns the new run's index in [`ReshapedText::runs`].
+    ///
+    /// `start_edit` and `end_edit` edit the first and last characters of `chars`.
     pub(crate) fn reshape(
         &mut self,
         text: &str,
         shaped: &ShapedText,
-        line: Range<u32>,
+        run_index: u32,
+        chars: Range<u32>,
+        start_edit: Option<Edit<'_>>,
+        end_edit: Option<Edit<'_>>,
         reshaped: &mut ReshapedText,
-    ) {
+    ) -> u32 {
+        let run = &shaped.runs()[run_index as usize];
+        let char_count = chars.len() as u32;
+
+        let start_num_chars_replaced = start_edit.map_or(0, Edit::replaced_chars);
+        let end_num_chars_replaced = end_edit.map_or(0, Edit::replaced_chars);
+        assert!(
+            start_num_chars_replaced + end_num_chars_replaced <= char_count,
+            "the edits must not overlap"
+        );
+
+        let characters = shaped.characters();
+        let bytes = characters[chars.start as usize].text_byte_start as usize
+            ..characters[chars.end as usize - 1].text_byte_range().end;
+
+        let mut buffer = self.unicode_buffer.take().unwrap();
+        buffer.clear();
+
+        // Fill the characters into the `HarfRust` buffer with the start and end edits applied.
+        if let Some(edit) = start_edit {
+            edit.inserted().chars().for_each(|ch| buffer.add(ch, 0));
+        }
+        for (ch, cluster_value) in text[bytes.clone()]
+            .chars()
+            .zip(0..)
+            .take((char_count - end_num_chars_replaced) as usize)
+            .skip(start_num_chars_replaced as usize)
+        {
+            buffer.add(ch, cluster_value);
+        }
+        if let Some(edit) = end_edit {
+            let cluster_value = char_count - end_num_chars_replaced.max(1);
+            edit.inserted
+                .chars()
+                .for_each(|ch| buffer.add(ch, cluster_value));
+        }
+        buffer.set_pre_context(&text[..bytes.start]);
+        buffer.set_post_context(&text[bytes.end..]);
+
+        let (glyph_buffer, font_unit_scale) = self.shape_like_run(shaped, run, buffer);
+        let (shaped_clusters_range, glyphs_range, advance) = push_glyph_buffer(
+            &mut reshaped.shaped_clusters,
+            &mut reshaped.glyphs,
+            &glyph_buffer,
+            font_unit_scale,
+            run.bidi_level.is_rtl(),
+            characters,
+            chars.start as usize..chars.end as usize,
+            shaped.has_safe_to_concat_flags,
+        );
+        self.unicode_buffer = Some(glyph_buffer.clear());
+
+        reshaped.runs.push(ReshapedRun {
+            run: ShapedRun {
+                range: TextRange {
+                    byte_range: bytes,
+                    char_range: chars.start as usize..chars.end as usize,
+                },
+                characters_range: chars,
+                shaped_clusters_range,
+                glyphs_range,
+                advance,
+                ..run.clone()
+            },
+            source_run: run_index,
+        });
+
+        reshaped.runs.len() as u32 - 1
     }
 }
 
