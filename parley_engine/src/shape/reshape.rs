@@ -177,6 +177,17 @@ pub struct ReshapedLineStart<'a> {
     advance_delta: f32,
 }
 
+impl ReshapedLineStart<'_> {
+    /// How much reshaping the line's start changed the line's advance.
+    ///
+    /// Add this to the line's source advance, counted from the line's start, to measure where the
+    /// line ends. Note that, once fully reshaped, the line may again measure differently. See
+    /// [`ReshapedLine::advance_delta`].
+    pub fn advance_delta(&self) -> f32 {
+        self.advance_delta
+    }
+}
+
 /// When the start and end reshape windows overlapped, the whole line was reshaped as a single
 /// piece. In that case, `reshaped_start_run` contains the reshaped run.
 #[derive(Clone, Copy, Debug)]
@@ -191,6 +202,40 @@ pub struct ReshapedLine {
     ///
     /// Source clusters' advances are counted on the line that contains its first character.
     advance_delta: f32,
+}
+
+impl ReshapedLine {
+    /// The reshaped run starting this line, as an index into [`ReshapedText::run`].
+    ///
+    /// `None` if the start was not reshaped.
+    #[inline(always)]
+    pub fn start_run(&self) -> Option<u32> {
+        self.reshaped_start_run
+    }
+
+    //// The shaped clusters this line keeps from the source [`ShapedText`], as a range into
+    /// [`ShapedText::shaped_clusters`].
+    #[inline(always)]
+    pub fn source_shaped_clusters_range(&self) -> Range<u32> {
+        self.source_clusters.0..self.source_clusters.1
+    }
+
+    /// The reshaped run ending this line, as an index into [`ReshapedText::run`].
+    ///
+    /// `None` if the end was not reshaped.
+    #[inline(always)]
+    pub fn end_run(&self) -> Option<u32> {
+        self.reshaped_end_run
+    }
+
+    /// How much reshaping changed the line's advance.
+    ///
+    /// The reshape line's advance is the sum of the advance of the line's source shaped clusters
+    /// and this delta.
+    #[inline(always)]
+    pub fn advance_delta(&self) -> f32 {
+        self.advance_delta
+    }
 }
 
 /// How to determine the boundary at which to splice a reshaped line edge to the line's source
