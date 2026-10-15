@@ -81,10 +81,7 @@ impl ReshapedText {
         self.glyphs.clear();
     }
 
-    /// Create a mark within this reshaped that you can truncate back to later using [`Self::truncate`].
-    ///
-    /// A mark N must not be used anymore if it was created after another mark M, and you truncated
-    /// back to mark M.
+    /// Mark the current state, which you can truncate back to using [`Self::truncate`].
     #[inline(always)]
     pub fn mark(&self) -> ReshapedTextMark {
         ReshapedTextMark {
@@ -94,7 +91,10 @@ impl ReshapedText {
         }
     }
 
-    /// Trim back to a mark created by [`Self::mark`].
+    /// Truncate back to mark created by [`Self::mark`].
+    ///
+    /// This drops everything reshaped since the mark was taken. Other marks, [`ReshapedLineStart`]s
+    /// and [`ReshapedLine`]s created after it must not be used anymore.
     #[inline]
     pub fn truncate(&mut self, mark: ReshapedTextMark) {
         self.runs.truncate(mark.runs_len as usize);
@@ -243,9 +243,17 @@ impl SpliceMode {
 impl Shaper {
     /// Start reshaping a line at `line_start_char` with the given `edit`.
     ///
-    /// `text` must be the original text that `shaped` was produced from.
+    /// `text` must be the text that `shaped` was produced from, and `line_start_char` must be a
+    /// grapheme boundary.
     ///
-    /// Pass the reshaped line start to [`Self::reshape_line_end`] to finish reshaping the line.
+    /// Pass the result to [`Self::reshape_line_end`], with the same `text`, `shaped` and
+    /// `reshaped`, to finish reshaping the line.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `splice` is [`SpliceMode::Exact`] but `shaped` lacks
+    /// [`ShapedText::has_safe_to_concat_flags`]; or if `edit` replaces characters past the end of
+    /// the [`ShapedRun`] at the line's edge.
     #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     pub fn reshape_line_start<'a>(
         &mut self,
@@ -371,7 +379,17 @@ impl Shaper {
         reshaped_line_start
     }
 
-    /// `line_end_char` is the exclusive end of the line.
+    /// Finish reshaping the line started by `line_start`, ending it at `line_end_char` with the
+    /// given `edit`.
+    ///
+    /// `line_end_char` must be a grapheme boundary after the line's start.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `splice` is [`SpliceMode::Exact`] but `shaped` lacks
+    /// [`ShapedText::has_safe_to_concat_flags`], if `edit` replaces characters before the start of
+    /// the [`ShapedRun`] at the line's edge, or if the start and end edits together replace more
+    /// characters than the line has.
     pub fn reshape_line_end(
         &mut self,
         text: &str,
@@ -665,6 +683,8 @@ pub struct Edit<'a> {
 impl<'a> Edit<'a> {
     /// Replace the `replaced_chars` source characters at the line's edge by `inserted`.
     ///
+    /// The replaced characters must lie in the [`ShapedRun`] at that edge of the line.
+    ///
     /// For an edit at the line's logical start, the replaced characters are the line's first
     /// characters. For an edit at a line's logical end, these are the line's last characters.
     /// `replace_chars` may be zero, in which case `inserted` is only inserted. With an empty
@@ -684,11 +704,13 @@ impl<'a> Edit<'a> {
         }
     }
 
+    /// The number of characters replaced by this [`Edit`].
     #[inline(always)]
     pub fn replaced_chars(self) -> u32 {
         self.replaced_chars
     }
 
+    /// The characters inserted by this [`Edit`].
     #[inline(always)]
     pub fn inserted(&self) -> &'a str {
         self.inserted
