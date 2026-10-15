@@ -193,10 +193,36 @@ pub struct ReshapedLine {
     advance_delta: f32,
 }
 
+/// How to determine the boundary at which to splice a reshaped line edge to the line's source
+/// glyphs.
+///
+/// Reshaping a line edge reshapes a fragment of the original line. The glyphs beyond the reshaped
+/// fragment are the glyphs from the original [`ShapedText`] (or the reshaped glyphs from the other
+/// end of the line). This splice mode trades speed for exactness in where that boundary may be.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SpliceMode {
-    Approximate,
-    Correct,
+    /// Join at the nearest cluster that is marked [`ShapedCluster::is_safe_to_break_before`].
+    ///
+    /// The reshaped fragments tend to be short, and the result almost always matches
+    /// [`SpliceMode::Exact`]. However, this flag only describes the source text; a change within
+    /// the reshaped clusters could technically miss a reshape past the join. For example, Fira Code
+    /// gives the hyphen in "down-town" a lowercase form because of the "t" after it. A line ending
+    /// in "down-" should keep that form because of the "n" before it, but `Fast` reshapes only the
+    /// hyphen, which then takes its default form.
+    Fast,
+
+    /// Join at the nearest cluster that is marked [`ShapedCluster::is_safe_to_concat_before`] in
+    /// both the source and the reshaped fragment.
+    ///
+    /// This extends the reshaped fragment until such a boundary is found. Note this repeatedly
+    /// reshapes that fragment.
+    ///
+    /// The result will always be identical to reshaping the whole line, but for some fonts, like
+    /// those that kern many characters, fragments may be much longer than necessary and this
+    /// process may be relatively slow.
+    ///
+    /// Requires text shaped with `produce_safe_to_concat_flags`.
+    Exact,
 }
 
 impl SpliceMode {
@@ -207,8 +233,8 @@ impl SpliceMode {
             false
         } else {
             match self {
-                Self::Approximate => cluster.is_safe_to_break_before(),
-                Self::Correct => cluster.is_safe_to_concat_before(),
+                Self::Fast => cluster.is_safe_to_break_before(),
+                Self::Exact => cluster.is_safe_to_concat_before(),
             }
         }
     }
@@ -231,8 +257,8 @@ impl Shaper {
         reshaped: &mut ReshapedText,
     ) -> ReshapedLineStart<'a> {
         assert!(
-            splice == SpliceMode::Approximate || shaped.has_safe_to_concat_flags(),
-            "`SpliceMode::Correct` requires text shaped with `produce_safe_to_concat_flags`"
+            splice == SpliceMode::Fast || shaped.has_safe_to_concat_flags(),
+            "`SpliceMode::Exact` requires text shaped with `produce_safe_to_concat_flags`"
         );
 
         let mut reshaped_line_start = ReshapedLineStart {
@@ -285,7 +311,7 @@ impl Shaper {
             return reshaped_line_start;
         }
 
-        let reshaped_run_idx = if splice == SpliceMode::Approximate {
+        let reshaped_run_idx = if splice == SpliceMode::Fast {
             self.reshape(
                 text,
                 shaped,
@@ -357,8 +383,8 @@ impl Shaper {
         reshaped: &mut ReshapedText,
     ) -> ReshapedLine {
         assert!(
-            splice == SpliceMode::Approximate || shaped.has_safe_to_concat_flags(),
-            "`SpliceMode::Correct` requires text shaped with `produce_safe_to_concat_flags`"
+            splice == SpliceMode::Fast || shaped.has_safe_to_concat_flags(),
+            "`SpliceMode::Exact` requires text shaped with `produce_safe_to_concat_flags`"
         );
 
         let line_start_char = line_start.line_start_char;
@@ -436,7 +462,7 @@ impl Shaper {
             return reshaped_line;
         }
 
-        let reshaped_run_idx = if splice == SpliceMode::Approximate {
+        let reshaped_run_idx = if splice == SpliceMode::Fast {
             if first_char_idx_of_cluster(seam) < source_start_char {
                 None
             } else {
