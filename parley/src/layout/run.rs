@@ -154,8 +154,13 @@ impl<'a, B: Brush> Run<'a, B> {
     }
 
     /// Returns `true` if the run has right-to-left directionality.
+    ///
+    /// For a run scoped to a line, this is the direction on that line: trailing whitespace takes
+    /// the paragraph's direction (see UAX #9 rule L1).
     pub fn is_rtl(&self) -> bool {
-        self.shaped.bidi_level.is_rtl()
+        self.line_data
+            .map_or(self.shaped.bidi_level, |line_data| line_data.bidi_level)
+            .is_rtl()
     }
 
     /// Returns the cluster range for the run.

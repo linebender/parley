@@ -495,11 +495,6 @@ impl ContentWidthsMeasurer {
                 LayoutItemKind::TextRun => {
                     let slice = layout_data.shaped_text.run_slice(item.index as u32);
                     let run_spacing = layout_data.runs[item.index].spacing;
-                    // Trailing whitespace can only hang if it ends up at the line's end edge after
-                    // bidi reordering. We don't currently apply UAX #9 L1 (resetting trailing
-                    // whitespace to paragraph level), so only logically-last items that match the
-                    // paragraph level are guaranteed to be at that edge.
-                    let can_hang = item.bidi_level == layout_data.base_level;
                     let is_rtl = item.bidi_level.is_rtl();
 
                     if run_spacing.is_zero() {
@@ -507,7 +502,6 @@ impl ContentWidthsMeasurer {
                             &layout_data.styles,
                             slice,
                             run_spacing,
-                            can_hang,
                             is_rtl,
                         );
                     } else {
@@ -515,7 +509,6 @@ impl ContentWidthsMeasurer {
                             &layout_data.styles,
                             slice,
                             run_spacing,
-                            can_hang,
                             is_rtl,
                         );
                     }
@@ -578,7 +571,6 @@ impl ContentWidthsMeasurer {
         styles: &[Style<B>],
         slice: ShapedSlice<'_>,
         spacing: Spacing,
-        can_hang: bool,
         is_rtl: bool,
     ) {
         let clusters = slice.shaped_clusters();
@@ -636,9 +628,10 @@ impl ContentWidthsMeasurer {
             self.running_max_width += advance;
 
             // A cluster hangs if all of its characters hang. Its first character is checked via the
-            // cached flags so the common case never touches `characters`.
-            let hangs = can_hang
-                && whitespace_hangs(whitespace, style)
+            // cached flags so the common case never touches `characters`. Trailing whitespace is
+            // reset to the paragraph level (UAX #9 rule L1), so it ends up at the line's end edge
+            // whatever the run's level.
+            let hangs = whitespace_hangs(whitespace, style)
                 && (cluster.char_len() == 1
                     || slice
                         .characters_in(cluster.chars_range())
