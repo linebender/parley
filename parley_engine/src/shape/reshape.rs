@@ -102,6 +102,48 @@ impl ReshapedText {
         source: &'a ShapedText,
         reshaped_run_idx: u32,
     ) -> ShapedSlice<'a> {
+        let run = &self.runs[reshaped_run_idx as usize].run;
+        ShapedSlice {
+            characters: source.characters(),
+            shaped_clusters: &self.shaped_clusters,
+            glyphs: &self.glyphs,
+            clusters: (
+                run.shaped_clusters_range.start,
+                run.shaped_clusters_range.end,
+            ),
+        }
+    }
+
+    /// Cut the last reshaped run short at the character `end`, if the shaped cluster is safe to concat
+    /// there.
+    ///
+    /// Returns whether it was cut.
+    #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
+    fn cut_at_concat_safe(&mut self, source: &ShapedText, end: u32) -> bool {
+        let run = &mut self.runs.last_mut().unwrap().run;
+        let clusters = &self.shaped_clusters[run.shaped_clusters_range.start as usize..];
+        let kept = clusters.partition_point(|c| c.chars_range().start < end);
+        if !clusters
+            .get(kept)
+            .is_some_and(|c| c.chars_range().start == end && c.is_safe_to_concat_before())
+        {
+            return false;
+        }
+
+        let glyphs_end = clusters[kept..]
+            .iter()
+            .find(|c| !c.has_inline_glyph())
+            .map_or(run.glyphs_range.end, |c| c.glyph_offset as usize);
+        run.advance = clusters[..kept].iter().map(|c| c.advance).sum();
+        run.range.byte_range.end = source.characters()[end as usize].text_byte_start as usize;
+        run.range.char_range.end = end as usize;
+        run.characters_range.end = end;
+        run.shaped_clusters_range.end -= (clusters.len() - kept) as u32;
+        run.glyphs_range.end = glyphs_end;
+        self.shaped_clusters
+            .truncate(run.shaped_clusters_range.end as usize);
+        self.glyphs.truncate(glyphs_end);
+        true
     }
 }
 
