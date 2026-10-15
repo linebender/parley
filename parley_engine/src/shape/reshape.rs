@@ -16,22 +16,10 @@ use core::ops::Range;
 use alloc::vec::Vec;
 
 use crate::{
-    FontInstance, Glyph, NormalizedCoord, ShapedRun, ShapedSlice, ShapedText, Shaper,
+    Glyph,  ShapedRun, ShapedSlice, ShapedText, Shaper,
     itemize::TextRange,
     shape::{ShapedCluster, shaped_text::push_glyph_buffer},
 };
-
-use super::Character;
-
-// #[derive(Clone, Debug, PartialEq, Eq)]
-// pub struct ReshapedLine {
-//     /// Reshaped runs at the start of the line, as a range into [`ReshapedArena::runs`].
-//     pub start: Range<u32>,
-//     /// Reshaped runs in the middle of the line, as a range into [`ShapedText::shaped_clusters`].
-//     pub middle: Range<u32>,
-//     /// Reshaped runs at the start of the line, as a range into [`ReshapedArena::runs`].
-//     pub end: Range<u32>,
-// }
 
 /// A mark that [`ReshapedText`] can be trimmed to.
 #[derive(Clone, Copy, Debug)]
