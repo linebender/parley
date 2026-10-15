@@ -52,6 +52,7 @@ pub struct ReshapedRun {
 /// While reshaping lines, reshapes fragments are appended to this storage. If you're implementing a
 /// line breaker that tries multiple candidates, you can use [`Self::mark`] and [`Self::truncate`]
 /// to trim some abandoned candidates.
+#[derive(Debug)]
 pub struct ReshapedText {
     runs: Vec<ReshapedRun>,
     shaped_clusters: Vec<ShapedCluster>,
