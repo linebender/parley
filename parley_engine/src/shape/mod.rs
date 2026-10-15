@@ -13,5 +13,8 @@ pub(crate) mod shaper;
 
 pub use cluster::{Char, CharCluster, Coverage, SourceRange, Whitespace};
 pub use data::{Character, CharacterFlags, ShapedCluster};
+pub use reshape::{
+    Edit, ReshapedLine, ReshapedLineStart, ReshapedRun, ReshapedText, ReshapedTextMark, SpliceMode,
+};
 
 pub(crate) use data::ShapedClusterFlags;
