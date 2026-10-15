@@ -16,7 +16,7 @@ use core::ops::Range;
 use alloc::vec::Vec;
 
 use crate::{
-    Glyph,  ShapedRun, ShapedSlice, ShapedText, Shaper,
+    Glyph, ShapedRun, ShapedSlice, ShapedText, Shaper,
     itemize::TextRange,
     shape::{ShapedCluster, shaped_text::push_glyph_buffer},
 };
@@ -29,10 +29,26 @@ pub struct ReshapedTextMark {
     glyphs_len: u32,
 }
 
+/// One run of reshaped text, belonging to a [`ReshapedText`].
 #[derive(Clone, Debug)]
 pub struct ReshapedRun {
     run: ShapedRun,
     source_run: u32,
+}
+
+impl ReshapedRun {
+    /// The reshaped run.
+    pub fn shaped_run(&self) -> &ShapedRun {
+        &self.run
+    }
+
+    /// The index of [`ShapedRun`] whose glyphs were reshaped.
+    ///
+    /// This indexes into the original [`ShapedText::runs`] .
+    #[inline(always)]
+    pub fn source_run(&self) -> u32 {
+        self.source_run
+    }
 }
 
 /// Storage for reshapes runs.
@@ -48,6 +64,7 @@ pub struct ReshapedText {
 }
 
 impl ReshapedText {
+    /// Create a reusable [`ReshapedText`].
     pub fn new() -> Self {
         Self {
             runs: Vec::new(),
@@ -56,6 +73,7 @@ impl ReshapedText {
         }
     }
 
+    /// Clear the result while retaining capacity.
     #[inline]
     pub fn clear(&mut self) {
         self.runs.clear();
@@ -63,6 +81,10 @@ impl ReshapedText {
         self.glyphs.clear();
     }
 
+    /// Create a mark within this reshaped that you can truncate back to later using [`Self::truncate`].
+    ///
+    /// A mark N must not be used anymore if it was created after another mark M, and you truncated
+    /// back to mark M.
     #[inline(always)]
     pub fn mark(&self) -> ReshapedTextMark {
         ReshapedTextMark {
@@ -72,6 +94,7 @@ impl ReshapedText {
         }
     }
 
+    /// Trim back to a mark created by [`Self::mark`].
     #[inline]
     pub fn truncate(&mut self, mark: ReshapedTextMark) {
         self.runs.truncate(mark.runs_len as usize);
@@ -80,11 +103,13 @@ impl ReshapedText {
         self.glyphs.truncate(mark.glyphs_len as usize);
     }
 
+    /// Get the reshaped run at the given index.
     #[inline(always)]
     pub fn run(&self, reshaped_run_idx: u32) -> &ReshapedRun {
         &self.runs[reshaped_run_idx as usize]
     }
 
+    /// Get a [`ShapedSlice`] of the reshaped run at the given index.
     #[inline(always)]
     pub fn run_slice<'a>(
         &'a self,
@@ -136,6 +161,8 @@ impl ReshapedText {
     }
 }
 
+/// A marker for a line in the process of being reshaped. Produced by
+/// [`Shaper::reshape_line_start`], consumed by [`Shaper::reshape_line_end`].
 #[derive(Clone, Copy, Debug)]
 pub struct ReshapedLineStart<'a> {
     line_start_char: u32,
@@ -188,6 +215,11 @@ impl SpliceMode {
 }
 
 impl Shaper {
+    /// Start reshaping a line at `line_start_char` with the given `edit`.
+    ///
+    /// `text` must be the original text that `shaped` was produced from.
+    ///
+    /// Pass the reshaped line start to [`Self::reshape_line_end`] to finish reshaping the line.
     #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     pub fn reshape_line_start<'a>(
         &mut self,
