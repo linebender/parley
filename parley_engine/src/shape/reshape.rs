@@ -30,7 +30,7 @@ pub struct ReshapedTextMark {
 }
 
 /// One run of reshaped text, belonging to a [`ReshapedText`].
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ReshapedRun {
     run: ShapedRun,
     source_run: u32,
@@ -38,6 +38,10 @@ pub struct ReshapedRun {
 
 impl ReshapedRun {
     /// The reshaped run.
+    ///
+    /// Its [`ShapedRun::shaped_clusters_range`] and [`ShapedRun::glyphs_range`] index into
+    /// [`ReshapedText`]; use [`ReshapedText::run_slice`] to access them. Its other indices  index
+    /// the source [`ShapedText`].
     pub fn shaped_run(&self) -> &ShapedRun {
         &self.run
     }
@@ -56,7 +60,7 @@ impl ReshapedRun {
 /// While reshaping lines, reshapes fragments are appended to this storage. If you're implementing a
 /// line breaker that tries multiple candidates, you can use [`Self::mark`] and [`Self::truncate`]
 /// to trim some abandoned candidates.
-#[derive(Debug)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct ReshapedText {
     runs: Vec<ReshapedRun>,
     shaped_clusters: Vec<ShapedCluster>,
@@ -66,11 +70,7 @@ pub struct ReshapedText {
 impl ReshapedText {
     /// Create a reusable [`ReshapedText`].
     pub fn new() -> Self {
-        Self {
-            runs: Vec::new(),
-            shaped_clusters: Vec::new(),
-            glyphs: Vec::new(),
-        }
+        Self::default()
     }
 
     /// Clear the result while retaining capacity.
@@ -188,8 +188,10 @@ impl ReshapedLineStart<'_> {
     }
 }
 
-/// When the start and end reshape windows overlapped, the whole line was reshaped as a single
-/// piece. In that case, `reshaped_start_run` contains the reshaped run.
+/// A reshaped line.
+///
+/// In logical order, the line consists of [`Self::start_run`], shaped clusters taken from the
+/// source [`ShapedText`] in [`Self::source_shaped_clusters_range`], and [`Self::end_run`].
 #[derive(Clone, Copy, Debug)]
 pub struct ReshapedLine {
     /// The index into [`ReshapedText::runs`] that starts this line, if the start needed reshaping.
@@ -205,15 +207,15 @@ pub struct ReshapedLine {
 }
 
 impl ReshapedLine {
-    /// The reshaped run starting this line, as an index into [`ReshapedText::run`].
+    /// The reshaped run the line starts with, as an index into [`ReshapedText::run`].
     ///
-    /// `None` if the start was not reshaped.
+    /// `None` if the line's start was not reshaped.
     #[inline(always)]
     pub fn start_run(&self) -> Option<u32> {
         self.reshaped_start_run
     }
 
-    //// The shaped clusters this line keeps from the source [`ShapedText`], as a range into
+    /// The shaped clusters this line keeps from the source [`ShapedText`], as a range into
     /// [`ShapedText::shaped_clusters`].
     #[inline(always)]
     pub fn source_shaped_clusters_range(&self) -> Range<u32> {
@@ -222,7 +224,7 @@ impl ReshapedLine {
 
     /// The reshaped run ending this line, as an index into [`ReshapedText::run`].
     ///
-    /// `None` if the end was not reshaped.
+    /// `None` if the line ends with source clusters or with [`Self::start_run`].
     #[inline(always)]
     pub fn end_run(&self) -> Option<u32> {
         self.reshaped_end_run
@@ -230,8 +232,8 @@ impl ReshapedLine {
 
     /// How much reshaping changed the line's advance.
     ///
-    /// The reshape line's advance is the sum of the advance of the line's source shaped clusters
-    /// and this delta.
+    /// The reshaped line's advance is the sum of this delta and the advance of the line's source
+    /// shaped clusters (including those shaped clusters replaced by this reshaped line).
     #[inline(always)]
     pub fn advance_delta(&self) -> f32 {
         self.advance_delta
