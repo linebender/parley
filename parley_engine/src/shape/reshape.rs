@@ -248,17 +248,17 @@ impl ReshapedLine {
 /// end of the line). This splice mode trades speed for exactness in where that boundary may be.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SpliceMode {
-    /// Join at the nearest cluster that is marked [`ShapedCluster::is_safe_to_break_before`].
+    /// Splice at the nearest cluster that is marked [`ShapedCluster::is_safe_to_break_before`].
     ///
     /// The reshaped fragments tend to be short, and the result almost always matches
     /// [`SpliceMode::Exact`]. However, this flag only describes the source text; a change within
-    /// the reshaped clusters could technically miss a reshape past the join. For example, Fira Code
+    /// the reshaped clusters could technically miss a reshape past the seam. For example, Fira Code
     /// gives the hyphen in "down-town" a lowercase form because of the "t" after it. A line ending
     /// in "down-" should keep that form because of the "n" before it, but `Fast` reshapes only the
     /// hyphen, which then takes its default form.
     Fast,
 
-    /// Join at the nearest cluster that is marked [`ShapedCluster::is_safe_to_concat_before`] in
+    /// Splice at the nearest cluster that is marked [`ShapedCluster::is_safe_to_concat_before`] in
     /// both the source and the reshaped fragment.
     ///
     /// This extends the reshaped fragment until such a boundary is found. Note this repeatedly
