@@ -337,7 +337,6 @@ impl Shaper {
             .partition_point(|run| run.characters_range.end <= line_start_char);
         let run = &shaped.runs()[run_index];
 
-        // let base = run.shaped_clusters_range.start as usize;
         let run_clusters = &shaped.shaped_clusters()
             [run.shaped_clusters_range.start as usize..run.shaped_clusters_range.end as usize];
         let first_char_idx_of_cluster = |i: usize| {
@@ -480,17 +479,10 @@ impl Shaper {
             i == 0 || i == run_clusters.len() || splice.is_safe_to_splice_before(run_clusters[i])
         };
 
-        // The reshaped end can't start before the reshaped start ends (which is where the source
-        // characters start).
-        let source_start_char =
-            line_start
-                .reshaped_start_run
-                .map_or(line_start_char, |reshaped_run_idx| {
-                    reshaped.runs[reshaped_run_idx as usize]
-                        .run
-                        .characters_range
-                        .end
-                });
+        // The reshaped end can't start before the reshaped start ends, which is where the source
+        // clusters start.
+        let min_seam = (line_start.source_clusters_start as usize)
+            .saturating_sub(run.shaped_clusters_range.start as usize);
 
         let mut seam = match edit {
             None if line_end_char == run.characters_range.end => run_clusters.len(),
@@ -511,12 +503,12 @@ impl Shaper {
         }
 
         // The reshaped start may reach past the line end.
-        if first_char_idx_of_cluster(seam) == line_end_char && line_end_char >= source_start_char {
+        if first_char_idx_of_cluster(seam) == line_end_char && seam >= min_seam {
             return reshaped_line;
         }
 
         let reshaped_run_idx = loop {
-            if first_char_idx_of_cluster(seam) < source_start_char {
+            if seam < min_seam {
                 // The reshaped start and end would overlap, so reshape the whole line as one piece.
                 let reshaped_run_idx = self.reshape(
                     text,
@@ -527,11 +519,11 @@ impl Shaper {
                     edit,
                     reshaped,
                 );
-                let source_start = shaped
+                let line_start_cluster = shaped
                     .shaped_clusters()
                     .partition_point(|cluster| cluster.chars_range().start < line_start_char);
                 let source_advance: f32 = shaped.shaped_clusters()
-                    [source_start..source_clusters_end as usize]
+                    [line_start_cluster..source_clusters_end as usize]
                     .iter()
                     .map(|c| c.advance)
                     .sum();
