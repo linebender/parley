@@ -366,50 +366,38 @@ impl Shaper {
             return reshaped_line_start;
         }
 
-        let reshaped_run_idx = if splice == SpliceMode::Fast {
-            self.reshape(
-                text,
-                shaped,
-                run_index as u32,
-                line_start_char..first_char_idx_of_cluster(seam),
-                edit,
-                None,
-                reshaped,
-            )
-        } else {
-            loop {
-                if seam == run_clusters.len() {
-                    break self.reshape(
-                        text,
-                        shaped,
-                        run_index as u32,
-                        line_start_char..first_char_idx_of_cluster(seam),
-                        edit,
-                        None,
-                        reshaped,
-                    );
-                }
-
-                let mut next_seam = seam + 1;
-                while !cluster_is_seam(next_seam) {
-                    next_seam += 1;
-                }
-                let mark = reshaped.mark();
-                let reshaped_run_idx = self.reshape(
+        let reshaped_run_idx = loop {
+            if splice == SpliceMode::Fast || seam == run_clusters.len() {
+                break self.reshape(
                     text,
                     shaped,
                     run_index as u32,
-                    line_start_char..first_char_idx_of_cluster(next_seam),
+                    line_start_char..first_char_idx_of_cluster(seam),
                     edit,
                     None,
                     reshaped,
                 );
-                if reshaped.cut_at_concat_safe(shaped, first_char_idx_of_cluster(seam)) {
-                    break reshaped_run_idx;
-                }
-                reshaped.truncate(mark);
-                seam = next_seam;
             }
+
+            let mut next_seam = seam + 1;
+            while !cluster_is_seam(next_seam) {
+                next_seam += 1;
+            }
+            let mark = reshaped.mark();
+            let reshaped_run_idx = self.reshape(
+                text,
+                shaped,
+                run_index as u32,
+                line_start_char..first_char_idx_of_cluster(next_seam),
+                edit,
+                None,
+                reshaped,
+            );
+            if reshaped.cut_at_concat_safe(shaped, first_char_idx_of_cluster(seam)) {
+                break reshaped_run_idx;
+            }
+            reshaped.truncate(mark);
+            seam = next_seam;
         };
 
         let source_start = reshaped_line_start.source_clusters_start as usize;
@@ -527,81 +515,62 @@ impl Shaper {
             return reshaped_line;
         }
 
-        let reshaped_run_idx = if splice == SpliceMode::Fast {
+        let reshaped_run_idx = loop {
             if first_char_idx_of_cluster(seam) < source_start_char {
-                None
-            } else {
-                Some(self.reshape(
-                    text,
-                    shaped,
-                    run_index as u32,
-                    first_char_idx_of_cluster(seam)..line_end_char,
-                    None,
-                    edit,
-                    reshaped,
-                ))
-            }
-        } else {
-            loop {
-                if first_char_idx_of_cluster(seam) < source_start_char {
-                    break None;
-                }
-
-                let mark = reshaped.mark();
+                // The reshaped start and end would overlap, so reshape the whole line as one piece.
                 let reshaped_run_idx = self.reshape(
                     text,
                     shaped,
                     run_index as u32,
-                    first_char_idx_of_cluster(seam)..line_end_char,
-                    None,
+                    line_start_char..line_end_char,
+                    line_start.start_edit,
                     edit,
                     reshaped,
                 );
-
-                let first_cluster = reshaped.runs[reshaped_run_idx as usize]
-                    .run
-                    .shaped_clusters_range
-                    .start;
-                if seam == 0
-                    || first_char_idx_of_cluster(seam) == line_start_char
-                    || reshaped.shaped_clusters[first_cluster as usize].is_safe_to_concat_before()
-                {
-                    break Some(reshaped_run_idx);
-                }
-                reshaped.truncate(mark);
-                seam -= 1;
-                while !cluster_is_seam(seam) {
-                    seam -= 1;
-                }
+                let source_start = shaped
+                    .shaped_clusters()
+                    .partition_point(|cluster| cluster.chars_range().start < line_start_char);
+                let source_advance: f32 = shaped.shaped_clusters()
+                    [source_start..source_clusters_end as usize]
+                    .iter()
+                    .map(|c| c.advance)
+                    .sum();
+                return ReshapedLine {
+                    reshaped_start_run: Some(reshaped_run_idx),
+                    source_clusters: (source_clusters_end, source_clusters_end),
+                    reshaped_end_run: None,
+                    advance_delta: reshaped.runs[reshaped_run_idx as usize].run.advance
+                        - source_advance,
+                };
             }
-        };
 
-        let Some(reshaped_run_idx) = reshaped_run_idx else {
-            // The reshaped start and end would overlap, so reshape the whole line as one piece.
+            let mark = reshaped.mark();
             let reshaped_run_idx = self.reshape(
                 text,
                 shaped,
                 run_index as u32,
-                line_start_char..line_end_char,
-                line_start.start_edit,
+                first_char_idx_of_cluster(seam)..line_end_char,
+                None,
                 edit,
                 reshaped,
             );
-            let source_start = shaped
-                .shaped_clusters()
-                .partition_point(|cluster| cluster.chars_range().start < line_start_char);
-            let source_advance: f32 = shaped.shaped_clusters()
-                [source_start..source_clusters_end as usize]
-                .iter()
-                .map(|c| c.advance)
-                .sum();
-            return ReshapedLine {
-                reshaped_start_run: Some(reshaped_run_idx),
-                source_clusters: (source_clusters_end, source_clusters_end),
-                reshaped_end_run: None,
-                advance_delta: reshaped.runs[reshaped_run_idx as usize].run.advance
-                    - source_advance,
-            };
+
+            let first_cluster = reshaped.runs[reshaped_run_idx as usize]
+                .run
+                .shaped_clusters_range
+                .start;
+            if splice == SpliceMode::Fast
+                || seam == 0
+                || first_char_idx_of_cluster(seam) == line_start_char
+                || reshaped.shaped_clusters[first_cluster as usize].is_safe_to_concat_before()
+            {
+                break reshaped_run_idx;
+            }
+            reshaped.truncate(mark);
+            seam -= 1;
+            while !cluster_is_seam(seam) {
+                seam -= 1;
+            }
         };
 
         let source_end = run.shaped_clusters_range.start as usize + seam;
