@@ -40,7 +40,7 @@ impl ReshapedRun {
     /// The reshaped run.
     ///
     /// Its [`ShapedRun::shaped_clusters_range`] and [`ShapedRun::glyphs_range`] index into
-    /// [`ReshapedText`]; use [`ReshapedText::run_slice`] to access them. Its other indices  index
+    /// [`ReshapedText`]; use [`ReshapedText::run_slice`] to access them. Its other indices index
     /// the source [`ShapedText`].
     pub fn shaped_run(&self) -> &ShapedRun {
         &self.run
@@ -48,16 +48,16 @@ impl ReshapedRun {
 
     /// The index of [`ShapedRun`] whose glyphs were reshaped.
     ///
-    /// This indexes into the original [`ShapedText::runs`] .
+    /// This indexes into the original [`ShapedText::runs`].
     #[inline(always)]
     pub fn source_run(&self) -> u32 {
         self.source_run
     }
 }
 
-/// Storage for reshapes runs.
+/// Storage for reshaped runs.
 ///
-/// While reshaping lines, reshapes fragments are appended to this storage. If you're implementing a
+/// While reshaping lines, reshaped fragments are appended to this storage. If you're implementing a
 /// line breaker that tries multiple candidates, you can use [`Self::mark`] and [`Self::truncate`]
 /// to trim some abandoned candidates.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -698,7 +698,7 @@ impl<'a> Edit<'a> {
     ///
     /// For an edit at the line's logical start, the replaced characters are the line's first
     /// characters. For an edit at a line's logical end, these are the line's last characters.
-    /// `replace_chars` may be zero, in which case `inserted` is only inserted. With an empty
+    /// `replaced_chars` may be zero, in which case `inserted` is only inserted. With an empty
     /// `inserted`, the characters are only dropped.
     ///
     /// # Examples
