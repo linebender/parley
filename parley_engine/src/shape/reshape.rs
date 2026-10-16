@@ -315,7 +315,7 @@ impl Shaper {
                 shaped.shaped_clusters()[i].chars_range().start
             }
         };
-        let cluster_is_seam = |i: usize| {
+        let cluster_is_seam = |i: usize, splice: SpliceMode| {
             // Note that separate runs are shaped separately, so a run's edge is a seam.
             i == run_start_cluster
                 || i == run_end_cluster
@@ -333,12 +333,16 @@ impl Shaper {
                 }),
             };
 
-        while !cluster_is_seam(seam_cluster) {
-            seam_cluster += 1;
-        }
-        if first_char_idx_of_cluster(seam_cluster) == line_start_char {
-            // The line starts at a seam.
+        // With no `edit`, no reshaping is necessary when at a cluster that is safe to break before.
+        if edit.is_none()
+            && first_char_idx_of_cluster(seam_cluster) == line_start_char
+            && cluster_is_seam(seam_cluster, SpliceMode::Fast)
+        {
             return reshaped_line_start;
+        }
+
+        while !cluster_is_seam(seam_cluster, splice) {
+            seam_cluster += 1;
         }
 
         let reshaped_run_idx = loop {
@@ -355,7 +359,7 @@ impl Shaper {
             }
 
             let mut next_seam_cluster = seam_cluster + 1;
-            while !cluster_is_seam(next_seam_cluster) {
+            while !cluster_is_seam(next_seam_cluster, splice) {
                 next_seam_cluster += 1;
             }
             let mark = reshaped.mark();
@@ -462,7 +466,7 @@ impl Shaper {
                 shaped.shaped_clusters()[i].chars_range().start
             }
         };
-        let cluster_is_seam = |i: usize| {
+        let cluster_is_seam = |i: usize, splice: SpliceMode| {
             // Note that separate runs are shaped separately, so a run's edge is a seam.
             i == run_start_cluster
                 || i == run_end_cluster
@@ -490,15 +494,18 @@ impl Shaper {
                     .saturating_sub(1),
             };
 
-        while !cluster_is_seam(seam_cluster) {
-            seam_cluster -= 1;
-        }
-
-        // The reshaped start may reach past the line end.
-        if first_char_idx_of_cluster(seam_cluster) == line_end_char
+        // With no `edit`, the line end needs no reshaping when at a cluster that is safe to break
+        // before, unless the reshaped start reaches past it.
+        if edit.is_none()
+            && first_char_idx_of_cluster(seam_cluster) == line_end_char
             && seam_cluster >= min_seam_cluster
+            && cluster_is_seam(seam_cluster, SpliceMode::Fast)
         {
             return reshaped_line;
+        }
+
+        while !cluster_is_seam(seam_cluster, splice) {
+            seam_cluster -= 1;
         }
 
         let reshaped_run_idx = loop {
@@ -554,7 +561,7 @@ impl Shaper {
             }
             reshaped.truncate(mark);
             seam_cluster -= 1;
-            while !cluster_is_seam(seam_cluster) {
+            while !cluster_is_seam(seam_cluster, splice) {
                 seam_cluster -= 1;
             }
         };
