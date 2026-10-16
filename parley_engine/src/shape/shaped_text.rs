@@ -643,7 +643,7 @@ fn process_shaped_clusters<'a>(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use alloc::{sync::Arc, vec, vec::Vec};
 
     use fontique::Synthesis;
@@ -658,16 +658,16 @@ mod tests {
 
     use super::ShapedText;
 
-    const ROBOTO: &[u8] =
+    pub(crate) const ROBOTO: &[u8] =
         include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
-    const NOTO_KUFI_ARABIC: &[u8] =
+    pub(crate) const NOTO_KUFI_ARABIC: &[u8] =
         include_bytes!("../../../parley_dev/assets/fonts/noto_fonts/NotoKufiArabic-Regular.otf");
     const NOTO_COLOR_EMOJI: &[u8] = include_bytes!(
         "../../../parley_dev/assets/fonts/noto_color_emoji/NotoColorEmoji-Subset.ttf"
     );
 
     /// A [`FontSelector`] shaping everything with a single font.
-    struct SingleFont(FontInstance);
+    pub(crate) struct SingleFont(pub(crate) FontInstance);
 
     impl FontSelector for SingleFont {
         fn select_font(
@@ -682,10 +682,10 @@ mod tests {
 
     /// A [`FontSelector`] shaping clusters starting with a particular character with one font, and
     /// all other clusters with another, to split the text into runs at that character.
-    struct FontForChar {
-        ch: char,
-        font: FontInstance,
-        other_font: FontInstance,
+    pub(crate) struct FontForChar {
+        pub(crate) ch: char,
+        pub(crate) font: FontInstance,
+        pub(crate) other_font: FontInstance,
     }
 
     impl FontSelector for FontForChar {
@@ -717,7 +717,7 @@ mod tests {
         analysis
     }
 
-    fn font_instance(font_data: &'static [u8]) -> FontInstance {
+    pub(crate) fn font_instance(font_data: &'static [u8]) -> FontInstance {
         FontInstance {
             font: FontData::new(Blob::new(Arc::new(font_data)), 0),
             synthesis: Synthesis::default(),
@@ -728,7 +728,7 @@ mod tests {
         shape_with_font_selector(text, SingleFont(font_instance(font_data)), false)
     }
 
-    fn shape_with_font_selector(
+    pub(crate) fn shape_with_font_selector(
         text: &str,
         select_font: impl FontSelector,
         produce_safe_to_concat_flags: bool,
