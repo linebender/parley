@@ -83,6 +83,7 @@ impl ReshapedText {
 
     /// Mark the current state, which you can truncate back to using [`Self::truncate`].
     #[inline(always)]
+    #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     pub fn mark(&self) -> ReshapedTextMark {
         ReshapedTextMark {
             runs_len: self.runs.len() as u32,
@@ -414,6 +415,7 @@ impl Shaper {
     /// [`ShapedText::has_safe_to_concat_flags`], if `edit` replaces characters before the start of
     /// the [`ShapedRun`] at the line's edge, or if the start and end edits together replace more
     /// characters than the line has.
+    #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     pub fn reshape_line_end(
         &mut self,
         text: &str,
@@ -583,6 +585,7 @@ impl Shaper {
     /// Returns the new run's index in [`ReshapedText::runs`].
     ///
     /// `start_edit` and `end_edit` edit the first and last characters of `chars`.
+    #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     pub(crate) fn reshape(
         &mut self,
         text: &str,
