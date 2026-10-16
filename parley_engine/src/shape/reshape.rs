@@ -762,7 +762,8 @@ impl<'a> Reshaper<'a> {
                 // very least that neighbor is included in the reshaped fragment.
                 Some(edit) => run_clusters
                     .partition_point(|cluster| {
-                        cluster.chars_range().start < line_end_char - edit.replaced_chars()
+                        cluster.chars_range().start
+                            < line_end_char.saturating_sub(edit.replaced_chars())
                     })
                     .saturating_sub(1),
             };
@@ -985,7 +986,7 @@ impl Shaper {
         let end_num_chars_replaced = end_edit.map_or(0, Edit::replaced_chars);
         assert!(
             start_num_chars_replaced + end_num_chars_replaced <= char_count,
-            "the edits must not overlap"
+            "the edits must lie in the run and must not overlap"
         );
 
         let characters = shaped.characters();
