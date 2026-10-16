@@ -12,7 +12,7 @@ use crate::{
     Analysis, CharInfo, ShapedRun, ShapedText,
     itemize::{Item, Segment, TextRange},
     lru_cache::LruCache,
-    shape::{CharCluster, cache},
+    shape::{CharCluster, cache, reshape::FragmentCache},
 };
 
 /// Shaping options for one item.
@@ -97,6 +97,8 @@ pub struct Shaper {
     pub(crate) buffer: harfrust::Buffer,
     features: Vec<harfrust::Feature>,
     char_cluster: CharCluster,
+    /// Storage for the fragments a [`Reshaper`](super::Reshaper) keeps, see [`Shaper::reshaper`].
+    pub(crate) fragment_cache: FragmentCache,
 }
 
 impl Default for Shaper {
@@ -109,6 +111,7 @@ impl Default for Shaper {
             buffer: harfrust::Buffer::new(),
             features: Vec::new(),
             char_cluster: CharCluster::default(),
+            fragment_cache: FragmentCache::default(),
         }
     }
 }
