@@ -127,38 +127,6 @@ impl ReshapedText {
             ),
         }
     }
-
-    /// Cut the last reshaped run short at the character `end`, if the shaped cluster is safe to concat
-    /// there.
-    ///
-    /// Returns whether it was cut.
-    #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
-    fn cut_at_concat_safe(&mut self, source: &ShapedText, end: u32) -> bool {
-        let run = &mut self.runs.last_mut().unwrap().run;
-        let clusters = &self.shaped_clusters[run.shaped_clusters_range.start as usize..];
-        let kept = clusters.partition_point(|c| c.chars_range().start < end);
-        if !clusters
-            .get(kept)
-            .is_some_and(|c| c.chars_range().start == end && c.is_safe_to_concat_before())
-        {
-            return false;
-        }
-
-        let glyphs_end = clusters[kept..]
-            .iter()
-            .find(|c| !c.has_inline_glyph())
-            .map_or(run.glyphs_range.end, |c| c.glyph_offset as usize);
-        run.advance = clusters[..kept].iter().map(|c| c.advance).sum();
-        run.range.byte_range.end = source.characters()[end as usize].text_byte_start as usize;
-        run.range.char_range.end = end as usize;
-        run.characters_range.end = end;
-        run.shaped_clusters_range.end -= (clusters.len() - kept) as u32;
-        run.glyphs_range.end = glyphs_end;
-        self.shaped_clusters
-            .truncate(run.shaped_clusters_range.end as usize);
-        self.glyphs.truncate(glyphs_end);
-        true
-    }
 }
 
 /// A marker for a line in the process of being reshaped. Produced by
@@ -400,11 +368,23 @@ impl Shaper {
                 None,
                 reshaped,
             );
-            if reshaped.cut_at_concat_safe(shaped, first_char_idx_of_cluster(seam_cluster)) {
+            // The fragment has no concat flag at its end, but if the fragment is safe to concat at
+            // a seam before its end, we know the fragment and the source glyphs will match from
+            // that point on (we could in principle trim the fragment back to that point).
+            let fragment_clusters = reshaped
+                .run_slice(shaped, reshaped_run_idx)
+                .shaped_clusters();
+            let is_safe = next_seam_cluster == run_end_cluster
+                || fragment_clusters
+                    .binary_search_by_key(&first_char_idx_of_cluster(seam_cluster), |c| {
+                        c.chars_range().start
+                    })
+                    .is_ok_and(|i| fragment_clusters[i].is_safe_to_concat_before());
+            seam_cluster = next_seam_cluster;
+            if is_safe {
                 break reshaped_run_idx;
             }
             reshaped.truncate(mark);
-            seam_cluster = next_seam_cluster;
         };
 
         let line_start_cluster = reshaped_line_start.source_clusters_start as usize;
