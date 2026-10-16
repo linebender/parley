@@ -1109,3 +1109,124 @@ impl<'a> Edit<'a> {
         self.inserted
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec::Vec;
+
+    use super::{Edit, Range, ReshapedLine, ReshapedText};
+    use crate::{Glyph, ShapedSlice, ShapedText, Shaper, shape::shaped_text::tests::*};
+
+    type Cluster = (Range<u32>, f32, Vec<Glyph>);
+
+    fn clusters(slice: ShapedSlice<'_>) -> impl Iterator<Item = Cluster> {
+        slice.shaped_clusters_range().map(move |i| {
+            let cluster = slice.shaped_clusters[i as usize];
+            let glyphs = slice.shaped_cluster_glyphs(i).collect();
+            (cluster.chars_range(), cluster.advance, glyphs)
+        })
+    }
+
+    /// The clusters of `line` in logical order.
+    fn line_clusters(shaped: &ShapedText, out: &ReshapedText, line: ReshapedLine) -> Vec<Cluster> {
+        let range = line.source_shaped_clusters_range();
+        let source = ShapedSlice {
+            clusters: (range.start, range.end),
+            ..shaped.run_slice(0)
+        };
+        let [start, end] =
+            [line.start_run(), line.end_run()].map(|run| run.map(|run| out.run_slice(shaped, run)));
+        let slices = start.into_iter().chain([source]).chain(end);
+        slices.flat_map(clusters).collect()
+    }
+
+    /// The clusters of reshaping `chars` with the edits at its start and end, by reshaping runs as
+    /// a whole.
+    fn reshape_whole(
+        text: &str,
+        shaped: &ShapedText,
+        chars: Range<u32>,
+        [start_edit, end_edit]: [Option<Edit<'_>>; 2],
+    ) -> Vec<Cluster> {
+        let (mut shaper, mut out, mut result) =
+            (Shaper::default(), ReshapedText::new(), Vec::new());
+        for (i, run) in (0..).zip(shaped.runs()) {
+            let a = chars.start.max(run.characters_range.start);
+            let b = chars.end.min(run.characters_range.end);
+            if a < b {
+                let start = start_edit.filter(|_| a == chars.start);
+                let end = end_edit.filter(|_| b == chars.end);
+                let run = shaper.reshape(text, shaped, i, a..b, start, end, &mut out);
+                result.extend(clusters(out.run_slice(shaped, run)));
+            }
+        }
+        result
+    }
+
+    #[test]
+    fn reshaped_lines() {
+        // The following font selector attempts to shape 'س' with Roboto to split the Arabic text
+        // into runs mid-word, so we can exercise shaping that depends on context.
+        let fonts = |font| FontForChar {
+            ch: 'س',
+            font: font_instance(ROBOTO),
+            other_font: font_instance(font),
+        };
+        let mut shaper = Shaper::default();
+        let mut fast_misses = 0;
+        for (text, font) in [("office AVA", ROBOTO), ("كتب وهب بسلاسة", NOTO_KUFI_ARABIC)]
+        {
+            let shaped = shape_with_font_selector(text, fonts(font), true);
+            let chars = shaped.characters();
+            let len = u32::try_from(chars.len()).unwrap();
+
+            // An edit where the character is replaced by itself.
+            let same = |i: u32| Edit::new(1, &text[chars[i as usize].text_byte_range()]);
+
+            let mut reshaper = shaper.reshaper(text, &shaped);
+            let mut out = ReshapedText::new();
+
+            let boundaries = || (0..=len).filter(|&i| i == len || chars[i as usize].grapheme_start);
+            for p in boundaries() {
+                for q in boundaries().filter(|&q| q >= p) {
+                    let source: f32 = (shaped.shaped_clusters().iter())
+                        .filter(|c| (p..q).contains(&c.chars_range().start))
+                        .map(|c| c.advance)
+                        .sum();
+                    let none = [None; 2];
+                    let insert = [Some(Edit::new(0, "s")), Some(Edit::new(0, "-"))];
+                    // Replacing a character by itself is no edit at all (and empty lines drop their
+                    // edits).
+                    let same = [Some(same(p.min(len - 1))), Some(same(q.max(1) - 1))];
+                    for (edits, equivalent_edits) in [(none, none), (insert, insert), (same, none)]
+                    {
+                        let replaced = edits.map(|edit| edit.map_or(0, Edit::replaced_chars));
+                        if p < q && replaced[0] + replaced[1] > q - p {
+                            continue;
+                        }
+                        let whole = reshape_whole(text, &shaped, p..q, equivalent_edits);
+                        let start = reshaper.measure_start(p, edits[0]);
+                        let end = reshaper.measure_end(q, edits[1]);
+                        let fast = reshaper.line(&start, &end);
+                        for (line, exact) in [(fast, false), (reshaper.make_exact(fast), true)] {
+                            let pushed = reshaper.push_line(&line, &mut out);
+                            let clusters = line_clusters(&shaped, &out, pushed);
+                            let advance: f32 = clusters.iter().map(|c| c.1).sum();
+                            assert!((advance - source - line.advance_delta()).abs() < 1e-3);
+                            assert_eq!(pushed.advance_delta(), line.advance_delta());
+                            if exact {
+                                assert_eq!(clusters, whole, "{text} {p}..{q} {edits:?}");
+                            } else {
+                                fast_misses += usize::from(clusters != whole);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        assert!(
+            fast_misses > 0,
+            "We expect some misses for the 'fast' reshaping, so that we're actually exercising `make_exact`"
+        );
+    }
+}
