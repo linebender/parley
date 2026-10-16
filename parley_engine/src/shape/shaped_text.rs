@@ -431,6 +431,7 @@ pub struct ShapedRun {
 }
 
 /// Append the clusters and glyphs of `glyph_buffer`.
+#[expect(clippy::cast_possible_truncation, reason = "Deferred")]
 pub(crate) fn push_glyph_buffer(
     shaped_clusters: &mut Vec<ShapedCluster>,
     glyphs: &mut Vec<Glyph>,
