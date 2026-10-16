@@ -431,13 +431,15 @@ impl<'a> Reshaper<'a> {
     /// Create the line from `start` to `end`.
     ///
     /// `end` must not be before `start`. If the line is so short that its reshaped start and end
-    /// overlap, the whole line is reshaped as one piece.
+    /// overlap, the whole line is reshaped as one piece. An empty line drops the edits, as it has
+    /// no characters for inserted text to attach to.
     ///
     /// See the note about exactness on [`Self`].
     ///
     /// # Panics
     ///
-    /// Panics if the start and end edits together replace more characters than the line has.
+    /// Panics if the edits of a line together replace more characters than the line has (unless the
+    /// line is empty, in which case the edits are dropped).
     #[inline]
     #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     pub fn line<'e>(&mut self, start: &LineStart<'e>, end: &LineEnd<'e>) -> PendingLine<'e> {
