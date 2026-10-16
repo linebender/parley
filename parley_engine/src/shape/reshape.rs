@@ -348,6 +348,7 @@ impl Shaper {
             }
         };
         let cluster_is_seam = |i: usize| {
+            // Note that separate runs are shaped separately, so a run's edge is a seam.
             i == run_start_cluster
                 || i == run_end_cluster
                 || splice.is_safe_to_splice_before(shaped.shaped_clusters()[i])
@@ -357,6 +358,8 @@ impl Shaper {
             + match edit {
                 None => run_clusters
                     .partition_point(|cluster| cluster.chars_range().start < line_start_char),
+                // The edit may kern or join with the neighboring unchanged character, so at the
+                // very least that neighbor is included in the reshaped fragment.
                 Some(edit) => run_clusters.partition_point(|cluster| {
                     cluster.chars_range().start <= line_start_char + edit.replaced_chars()
                 }),
@@ -366,6 +369,7 @@ impl Shaper {
             seam_cluster += 1;
         }
         if first_char_idx_of_cluster(seam_cluster) == line_start_char {
+            // The line starts at a seam.
             return reshaped_line_start;
         }
 
@@ -479,6 +483,7 @@ impl Shaper {
             }
         };
         let cluster_is_seam = |i: usize| {
+            // Note that separate runs are shaped separately, so a run's edge is a seam.
             i == run_start_cluster
                 || i == run_end_cluster
                 || splice.is_safe_to_splice_before(shaped.shaped_clusters()[i])
@@ -496,7 +501,8 @@ impl Shaper {
                         .partition_point(|cluster| cluster.chars_range().start <= line_end_char)
                         - 1
                 }
-                // Include the last unchanged character, as the edit may kern or join with it.
+                // The edit may kern or join with the neighboring unchanged character, so at the
+                // very least that neighbor is included in the reshaped fragment.
                 Some(edit) => run_clusters
                     .partition_point(|cluster| {
                         cluster.chars_range().start < line_end_char - edit.replaced_chars()
