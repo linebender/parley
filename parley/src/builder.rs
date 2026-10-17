@@ -425,7 +425,6 @@ fn build_into_layout<B: Brush>(
     // (as `TreeBuilder` already does).
     lcx.inline_boxes.sort_by_key(|b| b.inline_box.index);
 
-    // In-flow boxes are inline objects, each at a U+FFFC character in the text.
     lcx.inline_objects.clear();
     for inline_box in &mut lcx.inline_boxes {
         if !inline_box.is_inline_object() {
