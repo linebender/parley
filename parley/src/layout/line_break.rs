@@ -59,7 +59,7 @@ impl LineLayout {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 struct LineState {
     x: f32,
     items: Range<usize>,
@@ -111,7 +111,7 @@ impl LineState {
 /// See <https://www.w3.org/TR/CSS22/visudet.html#line-height>.
 ///
 /// [independent aligned subtree]: crate::layout::style_metrics#aligned-subtrees
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct LineBoxMetrics {
     /// Extents of the root aligned subtree.
     root: SubtreeExtents,
@@ -236,11 +236,25 @@ impl SubtreeExtents {
 ///   entries as they were at that save.
 ///
 /// [independent aligned subtree]: crate::layout::style_metrics#aligned-subtrees
-#[derive(Clone, Default)]
+#[derive(Debug, Default, PartialEq)]
 struct SubtreeHistory {
     entries: Vec<SubtreeExtents>,
     /// The first `frozen_count` entries may be needed by a save, so are never modified.
     frozen_count: usize,
+}
+
+impl Clone for SubtreeHistory {
+    fn clone(&self) -> Self {
+        Self {
+            entries: self.entries.clone(),
+            frozen_count: self.frozen_count,
+        }
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        self.entries.clone_from(&source.entries);
+        self.frozen_count = source.frozen_count;
+    }
 }
 
 impl SubtreeHistory {
@@ -502,7 +516,7 @@ impl LineBoxMetrics {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq)]
 struct PrevBoundaryState {
     item_idx: usize,
     run_idx: usize,
@@ -576,7 +590,6 @@ pub struct BoxBreakData {
     pub advance: f32,
 }
 
-#[derive(Clone)]
 /// The mutable state of the line breaker.
 ///
 /// This is exposed so that callers using [`BreakLines`] directly can inspect and
@@ -584,6 +597,7 @@ pub struct BoxBreakData {
 ///
 /// A `BreakerState` can be cloned and later passed to [`BreakLines::revert_to`]
 /// to retry layout from a saved checkpoint.
+#[derive(Debug, PartialEq)]
 pub struct BreakerState {
     /// The number of items that have been processed (used to revert state)
     items: usize,
@@ -630,6 +644,49 @@ pub struct BreakerState {
     prev_boundary: Option<PrevBoundaryState>,
     /// Saved breaker state for the last emergency line-breaking opportunity
     emergency_boundary: Option<PrevBoundaryState>,
+}
+
+impl Clone for BreakerState {
+    fn clone(&self) -> Self {
+        let mut state = Self::default();
+        state.clone_from(self);
+        state
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        let Self {
+            items,
+            lines,
+            item_idx,
+            run_idx,
+            cluster_idx,
+            line_x,
+            line_y,
+            layout_max_advance,
+            line_max_advance,
+            line_max_height,
+            line,
+            contributed,
+            subtrees,
+            prev_boundary,
+            emergency_boundary,
+        } = self;
+        *items = source.items;
+        *lines = source.lines;
+        *item_idx = source.item_idx;
+        *run_idx = source.run_idx;
+        *cluster_idx = source.cluster_idx;
+        *line_x = source.line_x;
+        *line_y = source.line_y;
+        *layout_max_advance = source.layout_max_advance;
+        *line_max_advance = source.line_max_advance;
+        *line_max_height = source.line_max_height;
+        line.clone_from(&source.line);
+        contributed.clone_from(&source.contributed);
+        subtrees.clone_from(&source.subtrees);
+        prev_boundary.clone_from(&source.prev_boundary);
+        emergency_boundary.clone_from(&source.emergency_boundary);
+    }
 }
 
 impl Default for BreakerState {
@@ -2011,7 +2068,37 @@ fn reorder_line_items(runs: &mut [LineItemData]) {
 
 #[cfg(test)]
 mod tests {
-    use super::{BoxMetrics, BreakerState};
+    use super::{BoxMetrics, BreakerState, SubtreeExtents};
+
+    #[test]
+    fn breaker_state_clone_matches_clone_from() {
+        let mut state = BreakerState {
+            items: 1,
+            lines: 2,
+            item_idx: 3,
+            run_idx: 4,
+            cluster_idx: 5,
+            line_x: 6.,
+            line_y: 7.,
+            layout_max_advance: 80.,
+            line_max_advance: 40.,
+            line_max_height: 20.,
+            ..BreakerState::default()
+        };
+        state.line.x = 8.;
+        state.contributed.extend([1, 2]);
+        state.subtrees.entries.push(SubtreeExtents::new(1));
+        state.mark_line_break_opportunity();
+        state.mark_emergency_break_opportunity();
+
+        let mut cloned_from = BreakerState::default();
+        for source in [&state, &BreakerState::default()] {
+            let cloned = source.clone();
+            cloned_from.clone_from(source);
+            assert_eq!(cloned_from, cloned);
+            assert_eq!(&cloned, source);
+        }
+    }
 
     #[test]
     fn subtree_extents_restored_at_break_opportunities() {
