@@ -443,9 +443,11 @@ fn build_into_layout<B: Brush>(
             "in-flow inline boxes must each have a U+FFFC of their own, but more than one is at \
              index {index}",
         );
-        // There are soft wrap opportunities on both sides of the box, whatever is next to it.
         lcx.inline_objects.push(InlineObject {
             index,
+
+            // TODO: We may want to follow CSS atomic inline's break behavior more closely.
+            // See <https://www.w3.org/TR/css-text-4/#atomic-compat-wrap>.
             break_before: Some(true),
             break_after: Some(true),
         });
