@@ -673,7 +673,8 @@ pub(crate) fn analyze_text(
     let contiguous_substrings = LineBreakSegmentIter::new(text, segments, first_segment);
 
     let mut global_offset = 0;
-    let mut line_boundary_positions: Vec<usize> = Vec::new();
+    let line_boundary_positions = &mut analyzer.line_boundary_positions;
+    line_boundary_positions.clear();
 
     for (substring_index, (substring, segmenter_key, last)) in contiguous_substrings.enumerate() {
         let line_segmenter = data_sources.line_segmenter(segmenter_key);

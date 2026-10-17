@@ -446,6 +446,7 @@ fn build_into_layout<B: Brush>(
             text,
             layout,
             &data_sources,
+            &mut lcx.style_features,
         );
     }
 

@@ -13,10 +13,12 @@ use super::FontContext;
 use super::builder::{BuilderOptions, RangedBuilder, StyleRunBuilder};
 use super::resolve::tree::TreeStyleBuilder;
 use super::resolve::{RangedStyleBuilder, ResolveContext, ResolvedStyle, StyleRun};
-use super::style::{Brush, TextStyle};
+use super::style::{Brush, FontFeature, TextStyle};
 
 use crate::builder::TreeBuilder;
 use crate::inline_box::LayoutInlineBox;
+
+use smallvec::SmallVec;
 
 /// Shared scratch space used when constructing text layouts.
 ///
@@ -40,6 +42,8 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     /// Style index for each character, parallel to [`Analysis::char_info`].
     pub(crate) char_style_indices: Vec<u16>,
     pub(crate) scx: Shaper,
+    /// Font features for each style, parallel to `style_table`.
+    pub(crate) style_features: Vec<SmallVec<[FontFeature; 8]>>,
 }
 
 impl<B: Brush> LayoutContext<B> {
@@ -57,6 +61,7 @@ impl<B: Brush> LayoutContext<B> {
             tree_style_builder: TreeStyleBuilder::default(),
             char_style_indices: vec![],
             scx: Shaper::default(),
+            style_features: Vec::new(),
         }
     }
 
