@@ -94,8 +94,8 @@ pub enum InlineBoxKind {
     /// `InFlow` boxes take up space in the layout and flow in line with text
     ///
     /// They correspond to [atomic inlines] in CSS. Each such box corresponds to a U+FFFC OBJECT
-    /// REPLACEMENT CHARACTER in the text (see [`InlineBox::index`]), and takes part in analysis,
-    /// line breaking, and selection.
+    /// REPLACEMENT CHARACTER in the text (see [`InlineBox::index`]), and takes part in line
+    /// breaking and selection.
     ///
     /// [atomic inline]: https://www.w3.org/TR/css-display-3/#atomic-inline
     InFlow,
