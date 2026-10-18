@@ -170,7 +170,7 @@ impl<B: Brush> Layout<B> {
 
     /// Edit the inline box at `index` in [`Self::inline_boxes`] with `edit`.
     ///
-    /// The changes apply to lines once they are broken again.
+    /// The changes do not apply to line breaks and line metrics until the layout is (re-)broken.
     ///
     /// # Panics
     ///
