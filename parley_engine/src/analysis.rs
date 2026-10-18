@@ -12,10 +12,6 @@ use icu_provider::DataProvider;
 use icu_segmenter::provider::{SegmenterDictionaryAutoV1, SegmenterDictionaryExtendedV1};
 
 use icu_locale_core::{LanguageIdentifier, langid};
-use icu_normalizer::properties::{
-    CanonicalComposition, CanonicalCompositionBorrowed, CanonicalDecomposition,
-    CanonicalDecompositionBorrowed,
-};
 use icu_properties::props::{BidiMirroringGlyph, GeneralCategory, GraphemeClusterBreak, Script};
 use icu_properties::{CodePointMapData, CodePointMapDataBorrowed};
 use icu_segmenter::options::{
@@ -253,16 +249,6 @@ impl<'a> AnalysisDataSources<'a> {
         opt.strictness = Some(key.strictness);
         opt.content_locale = key.ja_zh.then_some(&JA);
         opt
-    }
-
-    #[inline(always)]
-    pub(crate) fn composing_normalizer(&self) -> CanonicalCompositionBorrowed<'_> {
-        const { CanonicalComposition::new() }
-    }
-
-    #[inline(always)]
-    pub(crate) fn decomposing_normalizer(&self) -> CanonicalDecompositionBorrowed<'_> {
-        const { CanonicalDecomposition::new() }
     }
 
     #[inline(always)]
