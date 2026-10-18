@@ -6,9 +6,7 @@
 
 use alloc::vec::Vec;
 use parley_engine::shape::{CharCluster, Coverage};
-use parley_engine::{
-    Analysis, AnalysisDataSources, FontInstance, FontInstanceRef, ShapeOptions, Shaper,
-};
+use parley_engine::{Analysis, FontInstance, FontInstanceRef, ShapeOptions, Shaper};
 use smallvec::SmallVec;
 
 use super::layout::Layout;
@@ -53,7 +51,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
     scx: &mut Shaper,
     mut text: &str,
     layout: &mut Layout<B>,
-    analysis_data_sources: &AnalysisDataSources<'_>,
 ) {
     // If we have both empty text and no inline boxes, shape with a fake space
     // to generate metrics that can be used to size a cursor.
@@ -179,7 +176,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         })
     };
 
-    let font_selector = FontSelector::new(&mut fq, rcx, styles, analysis_data_sources);
+    let font_selector = FontSelector::new(&mut fq, rcx, styles);
 
     scx.shape_text(
         text,
@@ -271,8 +268,6 @@ struct FontSelector<'a, 'b, B: Brush> {
 
     /// The font to use if [`Self::query`] doesn't return any font.
     last_resort_font: LastResortFont,
-
-    analysis_data_sources: &'a AnalysisDataSources<'a>,
 }
 
 impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
@@ -284,7 +279,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         query: &'b mut Query<'a>,
         rcx: &'a ResolveContext,
         styles: &'a [ResolvedStyle<B>],
-        analysis_data_sources: &'a AnalysisDataSources<'a>,
     ) -> Self {
         let attrs = fontique::Attributes::default();
 
@@ -297,8 +291,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             attrs,
             query_yields_font: None,
             last_resort_font: LastResortFont::Unresolved,
-
-            analysis_data_sources,
         }
     }
 }
@@ -406,18 +398,15 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
                 return fontique::QueryStatus::Continue;
             };
 
-            let coverage = cluster.calculate_coverage(
-                |ch| {
-                    charmap
-                        .map(ch)
-                        .map(|g| {
-                            // Any non-zero value indicates the existence of a glyph.
-                            g != 0
-                        })
-                        .unwrap_or_default()
-                },
-                self.analysis_data_sources,
-            );
+            let coverage = cluster.calculate_coverage(|ch| {
+                charmap
+                    .map(ch)
+                    .map(|g| {
+                        // Any non-zero value indicates the existence of a glyph.
+                        g != 0
+                    })
+                    .unwrap_or_default()
+            });
             if coverage > best_coverage {
                 selected_font = Some(font);
                 best_coverage = coverage;
