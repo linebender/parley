@@ -125,6 +125,7 @@ pub struct AnalysisOptions<'a> {
     ///   [`ShapedCluster`](crate::shape::ShapedCluster) without glyphs, whose advance can only be
     ///   set using
     ///   [`ShapedText::set_inline_object_advance`](crate::ShapedText::set_inline_object_advance).
+    ///   The run's font and font metrics say nothing about the inline object.
     ///
     /// [css-atomic-inline]: https://www.w3.org/TR/css-display-3/#atomic-inline
     /// [uax-14-lb20]: https://unicode.org/reports/tr14/#LB20
