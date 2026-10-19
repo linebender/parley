@@ -965,7 +965,7 @@ fn mark_inline_objects(
         _ => a.or(b),
     };
 
-    let mut index = 0;
+    let mut char_index = 0;
     let mut counted_to = 0;
     for (i, object) in options.inline_objects.iter().enumerate() {
         let byte = object.index;
@@ -973,9 +973,9 @@ fn mark_inline_objects(
             text[byte..].starts_with('\u{FFFC}'),
             "An inline object must be a U+FFFC OBJECT REPLACEMENT CHARACTER, found none at byte {byte}"
         );
-        index += text[counted_to..byte].chars().count();
+        char_index += text[counted_to..byte].chars().count();
         counted_to = byte;
-        info[index].flags = info[index].flags & !CharInfo::CONTRIBUTES_TO_SHAPING_MASK
+        info[char_index].flags = info[char_index].flags & !CharInfo::CONTRIBUTES_TO_SHAPING_MASK
             | CharInfo::INLINE_OBJECT_MASK;
 
         let break_before = match options.inline_objects[..i].last() {
@@ -996,21 +996,21 @@ fn mark_inline_objects(
         let mut before = text[..byte].chars().rev();
         let (before, before_before) = (before.next(), before.next());
         let after = text[byte + LEN..].chars().next();
-        for (index, byte, [before_before, before, after], condition) in [
+        for (char_index, byte, [before_before, before, after], condition) in [
             (
-                index,
+                char_index,
                 byte,
                 [before_before, before, Some('\u{FFFC}')],
                 break_before,
             ),
             (
-                index + 1,
+                char_index + 1,
                 byte + LEN,
                 [before, Some('\u{FFFC}'), after],
                 break_after,
             ),
         ] {
-            let Some(info) = info.get_mut(index) else {
+            let Some(info) = info.get_mut(char_index) else {
                 continue;
             };
             info.flags |= CharInfo::GRAPHEME_START_MASK;
