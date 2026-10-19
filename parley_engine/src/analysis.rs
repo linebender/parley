@@ -119,7 +119,7 @@ impl Analysis {
 /// icu_provider = "2.3.0"
 /// ```
 ///
-/// Additionally, you should avoid the use of [`DeserializingBufferProvider`](icu_provider::buf::DeserializingBufferProvider),
+/// Additionally, you should avoid the use of [`DeserializingBufferProvider`](https://docs.rs/icu_provider/latest/icu_provider/buf/struct.DeserializingBufferProvider.html),
 /// as this would deserialise the dictionaries at the time of each layout. Our `external_dictionaries` example shows how
 /// to create a caching typed provider instead.
 /// If your underlying [`DataProvider`] implementations return an error except `IdentifierNotFound`, Parley Engine

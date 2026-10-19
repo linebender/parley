@@ -1045,7 +1045,7 @@ checksum = "edf234dd1594d6dd434a8fb8cada51ddbbc593e40e4a01556a0b31c62da2775b"
 
 [[package]]
 name = "editor"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "accesskit",
  "accesskit_winit",
@@ -1179,7 +1179,7 @@ dependencies = [
 
 [[package]]
 name = "external_dictionaries"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "icu_provider",
  "icu_provider_blob",
@@ -2809,7 +2809,7 @@ dependencies = [
 
 [[package]]
 name = "parley_examples_common"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "parley",
  "peniko",
@@ -4111,7 +4111,7 @@ dependencies = [
 
 [[package]]
 name = "vello_cpu_render"
-version = "0.1.0"
+version = "0.0.0"
 dependencies = [
  "bytemuck",
  "parley",

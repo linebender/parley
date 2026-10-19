@@ -1,26 +1,30 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+// After you edit the crate's doc comment, run this command, then check README.md for any missing links
+// cargo rdme --workspace-project=parley
+
 //! Parley is a library for rich text layout.
+//! It is backed by [HarfRust](https://github.com/harfbuzz/harfrust) for text shaping.
 //!
 //! Some key types are:
-//! - [`FontContext`] and [`LayoutContext`] are resources which should be shared globally (or at coarse-grained boundaries).
-//!   - [`FontContext`] is database of fonts.
-//!   - [`LayoutContext`] is scratch space that allows for reuse of allocations between layouts.
-//! - Builders for creating a [`Layout`]:
-//!   - [`RangedBuilder`]: styles specified as a flat `Vec` of property spans
-//!   - [`TreeBuilder`]: styles specified as a tree of spans
-//!   - [`StyleRunBuilder`]: styles specified as a shared style table plus non-overlapping indexed runs
 //!
-//!   They are constructed using [`LayoutContext::ranged_builder`], [`LayoutContext::tree_builder`],
-//!   and [`LayoutContext::style_run_builder`].
-//! - [`Layout`] which represents styled paragraph(s) of text and can perform shaping, line-breaking, bidi-reordering, and alignment of that text.
+//! - [`FontContext`][] and [`LayoutContext`][] are resources which should be shared globally (or at coarse-grained boundaries).
+//!   - [`FontContext`][] is database of fonts.
+//!   - [`LayoutContext`][] is scratch space that allows for reuse of allocations between layouts.
+//! - Builders for creating a [`Layout`][]:
+//!   - [`RangedBuilder`][]: styles specified as a flat `Vec` of property spans
+//!   - [`TreeBuilder`][]: styles specified as a tree of spans
+//!   - [`StyleRunBuilder`][]: styles specified as a shared style table plus non-overlapping indexed runs
 //!
-//!   `Layout` supports re-linebreaking and re-aligning many times (in case the width at which wrapping should occur changes). But if the text content or
-//!   the styles applied to that content change then a new `Layout` must be created using a new
-//!   `RangedBuilder`, `TreeBuilder`, or `StyleRunBuilder`.
+//!   They are constructed using [`LayoutContext::ranged_builder`][], [`LayoutContext::tree_builder`][], and [`LayoutContext::style_run_builder`][].
+//! - [`Layout`][] which represents styled paragraph(s) of text and can perform shaping, line-breaking, bidi-reordering, and alignment of that text.
 //!
-//! ## Usage Example
+//!   `Layout` supports re-linebreaking and re-aligning many times (in case the width at which wrapping should occur changes).
+//!   But if the text content or the styles applied to that content change then a new `Layout` must be created using a
+//!   new `RangedBuilder`, `TreeBuilder`, or `StyleRunBuilder`.
+//!
+//! # Usage Example
 //!
 //! See the [examples](https://github.com/linebender/parley/tree/main/examples) directory for more complete usage examples that include rendering.
 //!
@@ -73,6 +77,27 @@
 //!     }
 //! }
 //! ```
+//!
+//! # Features
+//!
+//! The following crate [feature flags](https://doc.rust-lang.org/cargo/reference/features.html#dependency-features) are available:
+//!
+//! - `std` (enabled by default): Get floating point functions from the standard library
+//!   (likely using your target's libc).
+//! - `libm`: Use floating point implementations from [libm][].
+//!   This is useful for `no_std` environments.
+//!   However, note that the `libm` crate is not as efficient as the standard library.
+//! - `bytemuck`: Forwarded to [`parlance`][] which then implements traits from `bytemuck` on its types.
+//! - `system` (enabled by default): Enable support for system font backends.
+//!   This also enables `std`.
+//! - `complex-scripts`: Enable dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
+//!   When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
+//!   See [`DictionaryProvider`][] for full details.
+//!
+//! At least one of `std` and `libm` is required; `std` overrides `libm`.
+//! Note that Parley requires that an allocator is available (i.e. it uses [`alloc`][]).
+//!
+//! [libm]: https://crates.io/crates/libm
 
 // LINEBENDER LINT SET - lib.rs - v4
 // See https://linebender.org/wiki/canonical-lints/

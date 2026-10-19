@@ -1,9 +1,10 @@
 [package]
 name = "parlance"
+# When bumping to v0.2.0, also add `extern crate alloc` to the crate root, plus note below `# Features`.
 version = "0.1.1"
 description = "Fundamental text property types"
 keywords = ["text", "style", "css"]
-categories = ["graphics"]
+categories = ["graphics", "no-std"]
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -11,13 +12,12 @@ repository.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
-# There are no platform specific docs.
-default-target = "x86_64-unknown-linux-gnu"
-targets = []
 
 [features]
 default = ["std"]
+# This is currently unused and is provided for forward compatibility.
 std = []
+# Implement traits from `bytemuck` on `GenericFamily`, `BidiLevel` and `NormalizedCoord`.
 bytemuck = ["dep:bytemuck"]
 
 [dependencies]
