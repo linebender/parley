@@ -144,7 +144,7 @@ pub struct InlineObject {
     /// there's no opportunity.
     ///
     /// [`AnalysisOptions::line_break_override`] takes precedence over this.
-    /// 
+    ///
     /// [uax-14-lb20]: https://unicode.org/reports/tr14/#LB20
     pub break_before: Option<bool>,
 
