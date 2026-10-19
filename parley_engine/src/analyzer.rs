@@ -115,9 +115,11 @@ pub struct AnalysisOptions<'a> {
     /// [`CharInfo::is_inline_object`](crate::CharInfo::is_inline_object), and they are treated
     /// as follows.
     ///
-    /// - The soft wrap opportunities before and after an object follow UAX #14 by default. This can
-    ///   be configured using [`break_before`](InlineObject::break_before) and
-    ///   [`break_after`](InlineObject::break_after).
+    /// - The soft wrap opportunities before and after an object can be configured using
+    ///   [`break_before`](InlineObject::break_before) and
+    ///   [`break_after`](InlineObject::break_after). A side left unconfigured follows
+    ///   [UAX #14 LB20][uax-14-lb20]: there's an opportunity, unless suppressed (e.g. before a full
+    ///   stop).
     /// - Each object is a grapheme of its own.
     /// - Each object is shaped as a [`ShapedRun`](crate::ShapedRun) of its own. It is a
     ///   [`ShapedCluster`](crate::shape::ShapedCluster) without glyphs, whose advance can only be
@@ -125,6 +127,7 @@ pub struct AnalysisOptions<'a> {
     ///   [`ShapedText::set_inline_object_advance`](crate::ShapedText::set_inline_object_advance).
     ///
     /// [css-atomic-inline]: https://www.w3.org/TR/css-display-3/#atomic-inline
+    /// [uax-14-lb20]: https://unicode.org/reports/tr14/#LB20
     pub inline_objects: &'a [InlineObject],
 }
 
