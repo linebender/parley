@@ -152,7 +152,7 @@ pub struct InlineObject {
 }
 
 impl InlineObject {
-    /// An object at byte `text_byte_start`, with soft wrap opportunities as UAX #14 has them.
+    /// An object at byte `text_byte_start`.
     pub const fn new(text_byte_start: usize) -> Self {
         Self {
             text_byte_start,
