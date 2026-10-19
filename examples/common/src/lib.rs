@@ -355,8 +355,8 @@ impl FrameStats {
         }
     }
 
-    /// Enable accumulation mode for a label. All subsequent [`start`]/[`end`] calls
-    /// with this label will sum up until [`finish_accumulating`] is called.
+    /// Enable accumulation mode for a label. All subsequent `start`/`end` calls
+    /// with this label will sum up until `finish_accumulating` is called.
     pub fn start_accumulating(&mut self, label: impl Into<String>) {
         self.accumulators.insert(label.into(), Duration::ZERO);
     }

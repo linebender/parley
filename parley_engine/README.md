@@ -34,14 +34,17 @@ See https://linebender.org/blog/doc-include/ for related discussion. -->
 
 Parley Engine provides low level APIs for shaping paragraphs of text.
 
-## Usage
+### Usage
 
-Use [`Analyzer`][], [`Analysis`][], [`Shaper`][] and [`ShapedText`][] to shape a paragraph of text into glyphs.
-Correct reshaping of lines is in progress; in the meantime you can break text at [`Atom`][] or [`ShapedCluster`][crate::shape::ShapedCluster] boundaries.
+Use [`Analyzer`], [`Analysis`], [`Shaper`] and [`ShapedText`] to shape a paragraph of text into
+glyphs. Correct reshaping of lines is in progress; in the meantime you can break text at
+[`Atom`] or [`ShapedCluster`][crate::shape::ShapedCluster] boundaries.
 
-Text analysis is performed before shaping, and the same source string must be passed to each stage.
+Text analysis is performed before shaping, and the same source string must be passed to each
+stage.
 
-Higher-level users may prefer using [`parley`][parley], which uses this crate and implements layout and styling.
+Higher-level users may prefer using [`parley`][parley], which uses this crate and implements
+layout and styling.
 
 ```rust
 let mut analysis = Analysis::default();
@@ -102,10 +105,10 @@ The following crate [feature flags](https://doc.rust-lang.org/cargo/reference/fe
 - `libm`: Use floating point implementations from [libm][].
   This is useful for `no_std` environments.
   However, note that the `libm` crate is not as efficient as the standard library.
-- `bytemuck`: Forwarded to [`parlance`][], which then implements traits from `bytemuck` on its types.
+- `bytemuck`: Forwarded to [`parlance`][] which then implements traits from `bytemuck` on its types.
 - `complex-scripts`: Enable dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
   When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
-  See [`DictionaryProvider`][] for more details.
+  See [`DictionaryProvider`][] for full details.
 
 At least one of `std` and `libm` is required; `std` overrides `libm`.
 Note that Parley Engine requires that an allocator is available (i.e. it uses [`alloc`][]).
