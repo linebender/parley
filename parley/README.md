@@ -72,7 +72,7 @@ let mut layout_cx = LayoutContext::new();
 
 // Create a `RangedBuilder` or a `TreeBuilder`, which are used to construct a `Layout`.
 const DISPLAY_SCALE : f32 = 1.0;
-const TEXT : &str = "Lorem Ipsum...";
+const TEXT : &str = "Lorem\u{FFFC} Ipsum...";
 let mut builder = layout_cx.ranged_builder(&mut font_cx, &TEXT, DISPLAY_SCALE, true);
 
 // Set default styles that apply to the entire layout
@@ -81,7 +81,8 @@ builder.push_default(StyleProperty::FontSize(16.0));
 // Set a style that applies to the first 4 characters
 builder.push(StyleProperty::FontWeight(FontWeight::new(600.0)), 0..4);
 
-// Add a box to be laid out inline with the text
+// Add a box to be laid out inline with the text, in place of the U+FFFC OBJECT REPLACEMENT
+// CHARACTER
 builder.push_inline_box(InlineBox { id: 0, kind: InlineBoxKind::InFlow, index: 5, width: 50.0, height: 50.0, baseline: None, vertical_align: VerticalAlign::BASELINE });
 
 // Build the builder into a Layout
