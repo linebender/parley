@@ -265,7 +265,7 @@ impl ShapedCluster {
 
     /// Whether this cluster is an inline object.
     ///
-    /// An object's cluster consists of just its U+FFFC OBJECT REPLACEMENT CHARACTER (see
+    /// An inline object's cluster consists of just its U+FFFC OBJECT REPLACEMENT CHARACTER (see
     /// [`AnalysisOptions::inline_objects`]), and it is an [`Atom`] of its own. It has no glyphs, and
     /// its advance is zero until the caller, which lays out the object, sets it with
     /// [`ShapedText::set_inline_object_advance`].
