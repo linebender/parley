@@ -1,17 +1,21 @@
 [package]
 name = "parley_data"
+version.workspace = true
 description = "Unicode data for Parley"
 keywords = ["text", "layout"]
-categories = ["gui", "graphics"]
+categories = ["gui", "graphics", "no-std"]
 edition.workspace = true
-version.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
-default = ["baked"]
-baked = []
+default = ["std"]
+# This is currently unused and is provided for forward compatibility.
+std = []
 
 [dependencies]
 icu_collections = { workspace = true }

@@ -26,14 +26,17 @@ See https://linebender.org/blog/doc-include/ for related discussion. -->
 <!-- cargo-rdme start -->
 
 Parley Data packages the Unicode data that Parley's text analysis and shaping pipeline needs at runtime.
-It exposes Unicode character [`Properties`][] backed by compact `PackTab` lookup tables, allowing the engine to obtain all required character properties with a single lookup.
+It exposes Unicode character [`Properties`][] backed by compact `PackTab` lookup tables, allowing the
+engine to obtain all required character properties with a single lookup.
+
+WARNING: This crate is currently designed only for use within Parley; if you have a use case for it,
+please [reach out](https://xi.zulipchat.com/#narrow/channel/205635-parley).
 
 ## Features
 
 The following crate [feature flags](https://doc.rust-lang.org/cargo/reference/features.html#dependency-features) are available:
 
 - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
-- `baked` (enabled by default): Embed pre-generated Unicode property data from `src/generated`.
 
 Note that Parley Data requires that an allocator is available (i.e. it depends on [`alloc`][_alloc]).
 Currently, Parley Data does not actually allocate, but the dependency is kept so starting to allocate in the future is not a breaking change.
