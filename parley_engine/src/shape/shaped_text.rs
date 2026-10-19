@@ -552,7 +552,8 @@ fn process_shaped_clusters<'a>(
             "an inline object must be a cluster of its own"
         );
         let (glyph_offset, glyph_len, inline_glyph, advance) = if is_newline || is_inline_object {
-            // Elide glyphs and advances of newlines and objects.
+            // Elide glyphs and advances of newlines and inline objects. Note that inline objects'
+            // advances can be set later by the user.
             (cluster.glyphs_start as u32, 0, false, 0.)
         } else if let Some(inline_glyph) = cluster.inline_glyph.take() {
             (inline_glyph.id, 1, true, cluster.advance)
