@@ -1,8 +1,13 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Shared layout config, building, and output path for vello_cpu_render and vello_hybrid_render.
+//! Shared layout config, building, and output path for `vello_cpu_render` and `vello_hybrid_render`.
 
+#![expect(
+    clippy::cast_possible_truncation,
+    missing_docs,
+    reason = "Example support - not needed."
+)]
 use std::collections::HashMap;
 use std::ops::Range;
 use std::path::Path;
@@ -303,6 +308,7 @@ pub fn output_dir(manifest_dir: &str) -> PathBuf {
 ///
 /// Supports both single-shot timings and accumulation mode (summing many
 /// start/end intervals into one entry per frame).
+#[derive(Debug)]
 pub struct FrameStats {
     /// Per-label timing data (label -> vec of durations)
     timings: HashMap<String, Vec<Duration>>,
@@ -349,8 +355,8 @@ impl FrameStats {
         }
     }
 
-    /// Enable accumulation mode for a label. All subsequent start()/end() calls
-    /// with this label will sum up until finish_accumulating() is called.
+    /// Enable accumulation mode for a label. All subsequent `start`/`end` calls
+    /// with this label will sum up until `finish_accumulating` is called.
     pub fn start_accumulating(&mut self, label: impl Into<String>) {
         self.accumulators.insert(label.into(), Duration::ZERO);
     }

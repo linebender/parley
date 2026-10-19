@@ -1,7 +1,31 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+// After you edit the crate's doc comment, run this command, then check README.md for any missing links
+// cargo rdme --workspace-project=fontique
+
 //! Font enumeration and fallback.
+//!
+//! # Features
+//!
+//! The following crate [feature flags](https://doc.rust-lang.org/cargo/reference/features.html#dependency-features) are available:
+//!
+//! - `std` (enabled by default): Get floating point functions from the standard library
+//!   (likely using your target's libc).
+//! - `libm`: Use floating point implementations from [libm][].
+//!   This is useful for `no_std` environments.
+//!   However, note that the `libm` crate is not as efficient as the standard library.
+//! - `bytemuck`: Forwarded to [`parlance`][] which then implements traits from `bytemuck` on its types.
+//! - `system` (enabled by default): Enable support for system font backends.
+//!   This also enables `std`.
+//! - `fontconfig-dlopen`: Use dlopen to load the fontconfig library.
+//!   This allows Fontique to compile even if the system does not have fontconfig installed,
+//!   although font fallback to system fonts will not work in this case.
+//!
+//! At least one of `std` and `libm` is required; `std` overrides `libm`.
+//! Note that Fontique requires that an allocator is available (i.e. it uses [`alloc`][]).
+//!
+//! [libm]: https://crates.io/crates/libm
 
 // LINEBENDER LINT SET - lib.rs - v4
 // See https://linebender.org/wiki/canonical-lints/

@@ -1,17 +1,57 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! `parley_data` packages the Unicode data that Parley's text analysis and shaping pipeline needs at runtime.
-//! It exposes a locale-invariant `CompositeProps` data backed by compact `PackTab` lookup tables, allowing the engine to obtain all required character properties with a single lookup.
+// After you edit the crate's doc comment, run this command, then check README.md for any missing links
+// cargo rdme --workspace-project=parley_data
 
+//! Parley Data packages the Unicode data that Parley's text analysis and shaping pipeline needs at runtime.
+//! It exposes Unicode character [`Properties`][] backed by compact `PackTab` lookup tables, allowing the
+//! engine to obtain all required character properties with a single lookup.
+//!
+//! WARNING: This crate is currently designed only for use within Parley; if you have a use case for it,
+//! please [reach out](https://xi.zulipchat.com/#narrow/channel/205635-parley).
+//!
+//! # Features
+//!
+//! The following crate [feature flags](https://doc.rust-lang.org/cargo/reference/features.html#dependency-features) are available:
+//!
+//! - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
+//!
+//! Note that Parley Data requires that an allocator is available (i.e. it depends on [`alloc`][_alloc]).
+//! Currently, Parley Data does not actually allocate, but the dependency is kept so starting to allocate in the future is not a breaking change.
+//!
+//! # Regenerating the baked data
+//!
+//! Run the following from the repository root to regenerate the baked data:
+//!
+//! ```sh
+//! cargo run -p parley_data_gen -- ./parley_data/src/generated
+//! ```
+
+// LINEBENDER LINT SET - lib.rs - v4
+// See https://linebender.org/wiki/canonical-lints/
+// These lints shouldn't apply to examples or tests.
+#![cfg_attr(not(test), warn(unused_crate_dependencies))]
+// These lints shouldn't apply to examples.
+#![warn(clippy::print_stdout, clippy::print_stderr)]
+// Targeting e.g. 32-bit means structs containing usize can give false positives for 64-bit.
+#![cfg_attr(target_pointer_width = "64", warn(clippy::trivially_copy_pass_by_ref))]
+// END LINEBENDER LINT SET
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![no_std]
+
+// Avoid adding alloc in the future being a breaking change.
+extern crate alloc as _alloc;
+
+// Ensure that we don't compile if you're using the std feature on a platform without `std`
+#[cfg(feature = "std")]
+extern crate std as _;
 
 use icu_collections::codepointtrie::TrieValue;
 use icu_properties::props::{BidiClass, GeneralCategory, GraphemeClusterBreak, Script};
 
 /// Baked data (`PackTab` tables).
-#[cfg(feature = "baked")]
-pub mod generated;
+pub(crate) mod generated;
 
 /// Unicode character properties relevant for text analysis.
 #[derive(Copy, Clone, Debug)]
@@ -53,7 +93,6 @@ impl Properties {
     const IS_EMOJI_MODIFIER_BASE_SHIFT: u32 =
         Self::IS_EMOJI_MODIFIER_SHIFT + Self::IS_EMOJI_MODIFIER_BITS;
 
-    #[cfg(feature = "baked")]
     #[inline(always)]
     /// Returns the properties for a given character.
     pub fn get(ch: char) -> Self {
@@ -102,7 +141,7 @@ impl Properties {
     }
 
     #[inline(always)]
-    fn bits(&self, shift: u32, bits: u32) -> u32 {
+    fn bits(self, shift: u32, bits: u32) -> u32 {
         (self.0 >> shift) & ((1 << bits) - 1)
     }
 
@@ -233,7 +272,7 @@ impl From<Properties> for u32 {
     }
 }
 
-#[cfg(all(test, feature = "baked"))]
+#[cfg(test)]
 mod tests {
     use super::Properties;
     use icu_properties::props::{

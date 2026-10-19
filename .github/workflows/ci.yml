@@ -92,22 +92,31 @@ jobs:
       - name: Install ripgrep+cargo-rdme
         uses: taiki-e/install-action@v2
         with:
-          tool: ripgrep@15.1.0,cargo-rdme@1.4.8
+          tool: ripgrep@15.1.0,cargo-rdme@1.5.1
 
       - name: check copyright headers
         run: bash .github/copyright.sh
 
+      - name: Run cargo rdme (fontique)
+        run: cargo rdme --check --workspace-project=fontique
+
+      - name: Run cargo rdme (parley)
+        run: cargo rdme --check --workspace-project=parley
+
+      - name: Run cargo rdme (parley_data)
+        run: cargo rdme --check --workspace-project=parley_data
+
       - name: Run cargo rdme (attributed_text)
-        run: cargo rdme --check --heading-base-level=0 --workspace-project=attributed_text
+        run: cargo rdme --check --workspace-project=attributed_text
 
       - name: Run cargo rdme (parley_engine)
-        run: cargo rdme --check --heading-base-level=0 --workspace-project=parley_engine
+        run: cargo rdme --check --workspace-project=parley_engine
 
       - name: Run cargo rdme (parley_emoji)
         run: cargo rdme --check --workspace-project=parley_emoji
 
       - name: Run cargo rdme (parlance)
-        run: cargo rdme --check --heading-base-level=0 --workspace-project=parlance
+        run: cargo rdme --check --workspace-project=parlance
 
   clippy-stable:
     name: cargo clippy

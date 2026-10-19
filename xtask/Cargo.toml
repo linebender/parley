@@ -1,13 +1,11 @@
 [package]
 name = "xtask"
-publish = false
-edition.workspace = true
-rust-version.workspace = true
-license.workspace = true
-repository.workspace = true
 description = "Dev tooling for Parley"
 keywords = ["testing"]
 categories = ["testing", "graphics"]
+edition.workspace = true
+rust-version.workspace = true
+publish = false
 
 
 [dependencies]

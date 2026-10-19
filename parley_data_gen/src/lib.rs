@@ -103,7 +103,7 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
     code.push('\n');
     write!(
         code,
-        "#[allow(missing_docs, reason = \"packtab generated code\")]\n#[inline]\npub fn composite_get(cp: u32) -> u32 {{\n    {namespace}_get(cp as usize)\n}}\n"
+        "#[allow(missing_docs, reason = \"packtab generated code\")]\n#[inline]\npub(crate) fn composite_get(cp: u32) -> u32 {{\n    {namespace}_get(cp as usize)\n}}\n"
     )
     .unwrap();
 
