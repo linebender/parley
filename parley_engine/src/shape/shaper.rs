@@ -10,10 +10,10 @@ use linebender_resource_handle::{Blob, FontData};
 use parlance::{FontFeature, FontVariation, Language};
 
 use crate::{
-    Analysis, CharInfo, ShapedText,
+    Analysis, CharInfo, ShapedRun, ShapedText,
     itemize::{Item, Segment, TextRange},
     lru_cache::LruCache,
-    shape::{CharCluster, cache},
+    shape::{CharCluster, cache, reshape::FragmentCache},
 };
 
 /// Shaping options for one item.
@@ -88,9 +88,11 @@ pub struct Shaper {
     shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::ShaperData>,
     shape_instance_cache: LruCache<cache::ShapeInstanceId, harfrust::ShaperInstance>,
     shape_plan_cache: LruCache<cache::ShapePlanId, harfrust::ShapePlan>,
-    unicode_buffer: Option<harfrust::UnicodeBuffer>,
+    pub(crate) unicode_buffer: Option<harfrust::UnicodeBuffer>,
     features: Vec<harfrust::Feature>,
     char_cluster: CharCluster,
+    /// Storage for the fragments a [`Reshaper`](super::Reshaper) keeps, see [`Shaper::reshaper`].
+    pub(crate) fragment_cache: FragmentCache,
 }
 
 impl Default for Shaper {
@@ -103,6 +105,7 @@ impl Default for Shaper {
             unicode_buffer: Some(harfrust::UnicodeBuffer::new()),
             features: Vec::new(),
             char_cluster: CharCluster::default(),
+            fragment_cache: FragmentCache::default(),
         }
     }
 }
@@ -230,6 +233,95 @@ impl Shaper {
             "All characters must have been processed"
         );
     }
+
+    /// Shape `buffer` with the font, normalized coordinates, direction, script, language, features
+    /// and font size, that `run` of `shaped` was shaped with.
+    ///
+    /// `buffer`'s characters and pre/post context must already be set.
+    ///
+    /// Returns `HarfRust`'s shaped glyph buffer and the font unit scale.
+    pub(crate) fn shape_like_run(
+        &mut self,
+        shaped: &ShapedText,
+        run: &ShapedRun,
+        mut buffer: harfrust::UnicodeBuffer,
+    ) -> (harfrust::GlyphBuffer, f32) {
+        let font = &shaped.fonts()[run.font_index];
+        // TODO: How do we want to handle errors like this?
+        let font_ref =
+            harfrust::FontRef::from_index(font.font.data.as_ref(), font.font.index).unwrap();
+        let shaper_data = self.shape_data_cache.entry(
+            cache::ShapeDataKey::new(font.font.data.id(), font.font.index),
+            || harfrust::ShaperData::new(&font_ref),
+        );
+        // The run's coordinates already include the synthesis's and the item's variations.
+        let instance = harfrust::ShaperInstance::from_coords(
+            &font_ref,
+            shaped.normalized_coords()[run.normalized_coords_range.clone()]
+                .iter()
+                .map(|coord| harfrust::NormalizedCoord::from_bits(coord.to_bits())),
+        );
+        let harf_shaper = shaper_data
+            .shaper(&font_ref)
+            .instance(Some(&instance))
+            .build();
+
+        let direction = if run.bidi_level.is_rtl() {
+            harfrust::Direction::RightToLeft
+        } else {
+            harfrust::Direction::LeftToRight
+        };
+        let hb_script = script_to_harfrust(run.script);
+        let language = language_to_harfrust(run.language.as_ref());
+        features_to_harfrust(
+            &shaped.features()[run.features_range.clone()],
+            &mut self.features,
+        );
+        let shaper_plan = self.shape_plan_cache.entry(
+            cache::ShapePlanKey::new(
+                font.font.data.id(),
+                font.font.index,
+                direction,
+                hb_script,
+                language.clone(),
+                &self.features,
+                instance.coords(),
+            ),
+            || {
+                harfrust::ShapePlan::new(
+                    &harf_shaper,
+                    direction,
+                    Some(hb_script),
+                    language.as_ref(),
+                    &self.features,
+                )
+            },
+        );
+
+        buffer.set_cluster_level(harfrust::BufferClusterLevel::MonotoneCharacters);
+        buffer.set_flags(if shaped.has_safe_to_concat_flags {
+            harfrust::BufferFlags::PRODUCE_UNSAFE_TO_CONCAT
+        } else {
+            harfrust::BufferFlags::empty()
+        });
+        buffer.set_direction(direction);
+        buffer.set_script(hb_script);
+        if let Some(lang) = language {
+            buffer.set_language(lang);
+        }
+
+        let glyph_buffer = harf_shaper.shape(
+            buffer,
+            HarfShapeOptions::new()
+                .plan(Some(shaper_plan))
+                .features(&self.features)
+                .point_size(Some(run.font_size)),
+        );
+        (
+            glyph_buffer,
+            run.font_size / harf_shaper.units_per_em() as f32,
+        )
+    }
 }
 
 /// Shape one segment.
@@ -270,18 +362,8 @@ fn shape_segment(
         harfrust::Direction::LeftToRight
     };
     let hb_script = script_to_harfrust(segment.script);
-    let language = options
-        .language
-        .as_ref()
-        .and_then(|lang| lang.as_str().parse::<harfrust::Language>().ok());
-    scx.features.clear();
-    scx.features.extend(options.features.iter().map(|feature| {
-        harfrust::Feature::new(
-            harfrust::Tag::new(&feature.tag.to_bytes()),
-            feature.value as u32,
-            ..,
-        )
-    }));
+    let language = language_to_harfrust(options.language.as_ref());
+    features_to_harfrust(options.features, &mut scx.features);
 
     // Shape a run of the segment with a single font, appending it to `shaped_text`.
     let mut shape_run = |font: &FontInstance, range: TextRange| {
@@ -474,6 +556,21 @@ fn variations_iter<'a>(
             tag: harfrust::Tag::new(&variation.tag.to_bytes()),
             value: variation.value,
         }))
+}
+
+fn language_to_harfrust(language: Option<&Language>) -> Option<harfrust::Language> {
+    language.and_then(|lang| lang.as_str().parse::<harfrust::Language>().ok())
+}
+
+fn features_to_harfrust(features: &[FontFeature], out: &mut Vec<harfrust::Feature>) {
+    out.clear();
+    out.extend(features.iter().map(|feature| {
+        harfrust::Feature::new(
+            harfrust::Tag::new(&feature.tag.to_bytes()),
+            feature.value as u32,
+            ..,
+        )
+    }));
 }
 
 pub(crate) fn script_to_harfrust(script: fontique::Script) -> harfrust::Script {
