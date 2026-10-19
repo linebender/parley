@@ -381,7 +381,7 @@ impl LineBoxMetrics {
     /// `line-height: normal`), it also adds the run's box, which matters when the run was shaped
     /// with a fallback font whose metrics differ from the style's first available font, the font
     /// the span box is built from. See [`run_box_metrics`]. If the atom is an inline object, it adds
-    /// the object's box too.
+    /// the inline object's box too.
     ///
     /// [`LineHeight::MetricsRelative`]: crate::LineHeight::MetricsRelative
     #[inline]

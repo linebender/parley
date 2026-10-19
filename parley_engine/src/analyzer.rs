@@ -111,17 +111,17 @@ pub struct AnalysisOptions<'a> {
     /// Such an inline object is part of the paragraph, but is not part of the paragraph's text;
     /// e.g., it may be an image. In CSS, this is known as an [atomic inline][css-atomic-inline].
     ///
-    /// The analysis marks these objects with
+    /// The analysis marks these inline objects with
     /// [`CharInfo::is_inline_object`](crate::CharInfo::is_inline_object), and they are treated
     /// as follows.
     ///
-    /// - The soft wrap opportunities before and after an object can be configured using
+    /// - The soft wrap opportunities before and after an inline object can be configured using
     ///   [`break_before`](InlineObject::break_before) and
     ///   [`break_after`](InlineObject::break_after). A side left unconfigured follows
     ///   [UAX #14 LB20][uax-14-lb20]: there's an opportunity, unless suppressed (e.g. before a full
     ///   stop).
-    /// - Each object is a grapheme of its own.
-    /// - Each object is shaped as a [`ShapedRun`](crate::ShapedRun) of its own. It is a
+    /// - Each inline object is a grapheme of its own.
+    /// - Each inline object is shaped as a [`ShapedRun`](crate::ShapedRun) of its own. It is a
     ///   [`ShapedCluster`](crate::shape::ShapedCluster) without glyphs, whose advance can only be
     ///   set using
     ///   [`ShapedText::set_inline_object_advance`](crate::ShapedText::set_inline_object_advance).
@@ -134,28 +134,29 @@ pub struct AnalysisOptions<'a> {
 /// An inline object in the source text, see [`AnalysisOptions::inline_objects`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct InlineObject {
-    /// The byte index of the object's U+FFFC OBJECT REPLACEMENT CHARACTER in the source text.
+    /// The byte index of the inline object's U+FFFC OBJECT REPLACEMENT CHARACTER in the source
+    /// text.
     pub text_byte_start: usize,
 
-    /// Whether there is a soft wrap opportunity before the object.
+    /// Whether there is a soft wrap opportunity before the inline object.
     ///
     /// If `None`, [UAX #14 LB20] is followed, and there's an opportunity, unless suppressed (e.g.
-    /// before a full stop). Between two objects, if either of the two sides has `Some(false)`,
-    /// there's no opportunity.
+    /// before a full stop). Between two inline objects, if either of the two sides has
+    /// `Some(false)`, there's no opportunity.
     ///
     /// [`AnalysisOptions::line_break_override`] takes precedence over this.
     ///
     /// [uax-14-lb20]: https://unicode.org/reports/tr14/#LB20
     pub break_before: Option<bool>,
 
-    /// Whether there is a soft wrap opportunity after the object.
+    /// Whether there is a soft wrap opportunity after the inline object.
     ///
     /// This works like [`Self::break_before`].
     pub break_after: Option<bool>,
 }
 
 impl InlineObject {
-    /// An object at byte `text_byte_start`.
+    /// An inline object at byte `text_byte_start`.
     pub const fn new(text_byte_start: usize) -> Self {
         Self {
             text_byte_start,

@@ -945,7 +945,7 @@ pub(crate) fn analyze_text(
 /// Mark the inline objects of `text` in `info` (see [`AnalysisOptions::inline_objects`]).
 ///
 /// We assume inline objects are rare relative to normal text, so we make the choice to patch the
-/// analysis of each object and of the character after it.
+/// analysis of each inline object and of the character after it.
 ///
 /// For the same reason this is marked `#[inline(never)]`: inflating the caller's body will probably
 /// cost more on average than inlining would win.

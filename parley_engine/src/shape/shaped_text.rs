@@ -227,7 +227,7 @@ impl ShapedText {
     /// by searching on [`ShapedCluster::chars_range`].
     ///
     /// Its advance is initially zero, see [`ShapedCluster::is_inline_object`]. This also updates
-    /// the advance of the [`ShapedRun`] containing the object.
+    /// the advance of the [`ShapedRun`] containing the inline object.
     ///
     /// # Panics
     ///

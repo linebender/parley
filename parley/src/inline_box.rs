@@ -74,7 +74,7 @@ impl LayoutInlineBox {
 
 /// The index into `inline_boxes` of the inline object whose U+FFFC starts at `text_byte`.
 ///
-/// `inline_boxes` must be sorted by index, and there must be such an object.
+/// `inline_boxes` must be sorted by index, and there must be such an inline object.
 pub(crate) fn inline_object_box_index(inline_boxes: &[LayoutInlineBox], text_byte: usize) -> usize {
     let start = inline_boxes.partition_point(|b| b.inline_box.index < text_byte);
     // There may be some out-of-flow boxes before the in-flow box, so walk over them.
