@@ -968,7 +968,7 @@ fn mark_inline_objects(
     let mut char_index = 0;
     let mut counted_to = 0;
     for (i, object) in options.inline_objects.iter().enumerate() {
-        let byte = object.index;
+        let byte = object.text_byte_start;
         debug_assert!(
             text[byte..].starts_with('\u{FFFC}'),
             "An inline object must be a U+FFFC OBJECT REPLACEMENT CHARACTER, found none at byte {byte}"
@@ -979,13 +979,13 @@ fn mark_inline_objects(
             | CharInfo::INLINE_OBJECT_MASK;
 
         let break_before = match options.inline_objects[..i].last() {
-            Some(previous) if previous.index + LEN == byte => {
+            Some(previous) if previous.text_byte_start + LEN == byte => {
                 combine(previous.break_after, object.break_before)
             }
             _ => object.break_before,
         };
         let break_after = match options.inline_objects.get(i + 1) {
-            Some(next) if byte + LEN == next.index => {
+            Some(next) if byte + LEN == next.text_byte_start => {
                 combine(object.break_after, next.break_before)
             }
             _ => object.break_after,

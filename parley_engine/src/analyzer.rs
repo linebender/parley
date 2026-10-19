@@ -135,7 +135,7 @@ pub struct AnalysisOptions<'a> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct InlineObject {
     /// The byte index of the object's U+FFFC OBJECT REPLACEMENT CHARACTER in the source text.
-    pub index: usize,
+    pub text_byte_start: usize,
 
     /// Whether there is a soft wrap opportunity before the object.
     ///
@@ -152,10 +152,10 @@ pub struct InlineObject {
 }
 
 impl InlineObject {
-    /// An object at byte `index`, with soft wrap opportunities as UAX #14 has them.
-    pub const fn new(index: usize) -> Self {
+    /// An object at byte `text_byte_start`, with soft wrap opportunities as UAX #14 has them.
+    pub const fn new(text_byte_start: usize) -> Self {
         Self {
-            index,
+            text_byte_start,
             break_before: None,
             break_after: None,
         }
@@ -263,7 +263,7 @@ mod tests {
         };
         let (n, t, f) = (None, Some(true), Some(false));
         let obj = |index, break_before, break_after| InlineObject {
-            index,
+            text_byte_start: index,
             break_before,
             break_after,
         };

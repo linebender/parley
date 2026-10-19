@@ -439,12 +439,15 @@ fn build_into_layout<B: Brush>(
             inline_box.inline_box.id,
         );
         assert!(
-            lcx.inline_objects.last().map(|object| object.index) != Some(index),
+            lcx.inline_objects
+                .last()
+                .map(|object| object.text_byte_start)
+                != Some(index),
             "in-flow inline boxes must each have a U+FFFC of their own, but more than one is at \
              index {index}",
         );
         lcx.inline_objects.push(InlineObject {
-            index,
+            text_byte_start: index,
 
             // TODO: We may want to follow CSS atomic inline's break behavior more closely.
             // See <https://www.w3.org/TR/css-text-4/#atomic-compat-wrap>.
