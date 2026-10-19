@@ -139,10 +139,13 @@ pub struct InlineObject {
 
     /// Whether there is a soft wrap opportunity before the object.
     ///
-    /// `None` follows UAX #14. `Some(true)` forces one and `Some(false)` suppresses one.
+    /// If `None`, [UAX #14 LB20] is followed, and there's an opportunity, unless suppressed (e.g.
+    /// before a full stop). Between two objects, if either of the two sides has `Some(false)`,
+    /// there's no opportunity.
     ///
-    /// Between two objects, a `Some(false)` of either one wins.
     /// [`AnalysisOptions::line_break_override`] takes precedence over this.
+    /// 
+    /// [uax-14-lb20]: https://unicode.org/reports/tr14/#LB20
     pub break_before: Option<bool>,
 
     /// Whether there is a soft wrap opportunity after the object.
