@@ -226,8 +226,7 @@ impl ShapedText {
     /// An inline object's shaped cluster consists of just its U+FFFC character, so it can be found
     /// by searching on [`ShapedCluster::chars_range`].
     ///
-    /// Its advance is initially zero, see [`ShapedCluster::is_inline_object`]. This also updates
-    /// the advance of the [`ShapedRun`] containing the inline object.
+    /// Its advance is initially zero, see [`ShapedCluster::is_inline_object`].
     ///
     /// # Panics
     ///
@@ -238,12 +237,7 @@ impl ShapedText {
             cluster.is_inline_object(),
             "shaped cluster {cluster_index} is not an inline object"
         );
-        let delta = advance - cluster.advance;
         cluster.advance = advance;
-        let run = self
-            .runs
-            .partition_point(|run| run.shaped_clusters_range.end <= cluster_index);
-        self.runs[run].advance += delta;
     }
 
     /// Escape hatch for `parley` tests that remap style indices to check whether layouts are
@@ -437,10 +431,6 @@ impl ShapedText {
         }
 
         let shaped_clusters_range = shaped_clusters_start as u32..self.shaped_clusters.len() as u32;
-        let run_advance = self.shaped_clusters[shaped_clusters_start..]
-            .iter()
-            .map(|cluster| cluster.advance)
-            .sum();
 
         self.runs.push(ShapedRun {
             range,
@@ -454,7 +444,6 @@ impl ShapedText {
             bidi_level: segment.bidi_level,
             script: segment.script,
             language: options.language,
-            advance: run_advance,
             font_metrics,
         });
     }
@@ -489,8 +478,6 @@ pub struct ShapedRun {
     pub script: Script,
     /// The language this run was shaped with.
     pub language: Option<Language>,
-    /// Total advance of the run.
-    pub advance: f32,
     /// The font metrics of this run.
     pub font_metrics: FontMetrics,
 }
@@ -797,23 +784,13 @@ mod tests {
         assert_eq!(b.characters_range, 2..3);
 
         assert!(soft_hyphen.glyphs_range.is_empty());
-        assert_eq!(soft_hyphen.advance, 0.);
 
         // The soft-hyphen's run should have a single cluster, and it must be without glyphs.
         let clusters = shaped.run_slice(1).shaped_clusters();
         assert_eq!(clusters.len(), 1);
         assert_eq!(clusters[0].glyph_len(), 0);
+        assert_eq!(clusters[0].advance, 0.);
         assert_eq!(clusters[0].chars_range(), 1..2);
-    }
-
-    #[test]
-    fn single_cluster_run_advance_matches_its_cluster() {
-        let shaped = shape_with_font("A", ROBOTO);
-        let run = &shaped.runs()[0];
-        let cluster = &shaped.shaped_clusters()[run.shaped_clusters_range.start as usize];
-
-        assert!(cluster.advance > 0.0);
-        assert_eq!(run.advance, cluster.advance);
     }
 
     /// [U+0600 U+0623 U+064F] is a single grapheme in text-wide segmentation, but U+0600 has
