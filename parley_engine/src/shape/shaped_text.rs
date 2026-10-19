@@ -220,11 +220,14 @@ impl ShapedText {
         &self.runs
     }
 
-    /// Set the advance of the inline object shaped into the shaped cluster at `cluster_index`,
-    /// which indexes into [`Self::shaped_clusters`].
+    /// Set the advance of the inline object whose shaped cluster is at `cluster_index`, which
+    /// indexes into [`Self::shaped_clusters`].
     ///
-    /// An object's advance is initially zero, see [`ShapedCluster::is_inline_object`]. This also
-    /// updates the advance of the [`ShapedRun`] containing the object.
+    /// An inline object's shaped cluster consists of just its U+FFFC character, so it can be found
+    /// by searching on [`ShapedCluster::chars_range`].
+    ///
+    /// Its advance is initially zero, see [`ShapedCluster::is_inline_object`]. This also updates
+    /// the advance of the [`ShapedRun`] containing the object.
     ///
     /// # Panics
     ///
