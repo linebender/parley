@@ -17,6 +17,9 @@ pub struct InlineBox {
     /// CHARACTER in the text, and this must be the offset of that character. Each such character
     /// holds at most one box.
     ///
+    /// Any U+FFFC character in the text without a corresponding in-flow box, is treated as ordinary
+    /// text (some fonts may render .notdef, others may have a glyph for it).
+    ///
     /// Out-of-flow boxes can be placed at any character boundary.
     ///
     /// When using the [`TreeBuilder`](crate::TreeBuilder), this offset is set by the builder.
