@@ -140,9 +140,9 @@ pub struct InlineObject {
 
     /// Whether there is a soft wrap opportunity before the inline object.
     ///
-    /// If `None`, [UAX #14 LB20] is followed, and there's an opportunity, unless suppressed (e.g.
-    /// before a full stop). Between two inline objects, if either of the two sides has
-    /// `Some(false)`, there's no opportunity.
+    /// If `None`, [UAX #14 LB20][uax-14-lb20] is followed, and there's an opportunity, unless
+    /// suppressed (e.g. before a full stop). Between two inline objects, if either of the two sides
+    /// has `Some(false)`, there's no opportunity.
     ///
     /// [`AnalysisOptions::line_break_override`] takes precedence over this.
     ///
