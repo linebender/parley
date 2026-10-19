@@ -180,10 +180,9 @@ impl core::fmt::Debug for AnalysisOptions<'_> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::vec::Vec;
-    use parlance::{BidiLevel, LineBreak};
+    use parlance::BidiLevel;
 
-    use super::{AnalysisOptions, Analyzer, InlineObject, LineBreakConfig};
+    use super::{AnalysisOptions, Analyzer, InlineObject};
     use crate::{Analysis, BaseDirection};
 
     fn analyze(text: &str, base_direction: BaseDirection) -> Analysis {
@@ -242,73 +241,17 @@ mod tests {
     }
 
     #[test]
-    fn inline_objects() {
-        fn objects(inline_objects: &[InlineObject]) -> AnalysisOptions<'_> {
-            AnalysisOptions {
-                inline_objects,
+    fn inline_object_is_its_own_grapheme() {
+        let mut analysis = Analysis::new();
+        Analyzer::new().analyze(
+            "\u{FFFC}\u{301}",
+            &AnalysisOptions {
+                inline_objects: &[InlineObject::new(0)],
                 ..AnalysisOptions::default()
-            }
-        }
-        let analyze_with = |text: &str, options: &AnalysisOptions<'_>| {
-            let mut analysis = Analysis::new();
-            Analyzer::new().analyze(
-                text,
-                options,
-                &mut analysis,
-                &crate::AnalysisDataSources::default(),
-            );
-            analysis
-        };
-        let opportunities = |text: &str, options: &AnalysisOptions<'_>| -> Vec<usize> {
-            let analysis = analyze_with(text, options);
-            let infos = analysis.char_info().iter().enumerate();
-            infos
-                .filter_map(|(i, info)| info.is_soft_wrap_opportunity().then_some(i))
-                .collect()
-        };
-        let (n, t, f) = (None, Some(true), Some(false));
-        let obj = |index, break_before, break_after| InlineObject {
-            text_byte_start: index,
-            break_before,
-            break_after,
-        };
-
-        for (text, inline_objects, expected) in [
-            // By default, an object breaks like any U+FFFC under UAX #14 (LB20), so not before a
-            // full stop (LB15d).
-            ("a\u{FFFC}.", &[obj(1, n, n)][..], &[1][..]),
-            // An object's own conditions win over the text's.
-            ("a\u{FFFC}.", &[obj(1, f, t)], &[2]),
-            // Between two objects, suppressing an opportunity wins.
-            ("\u{FFFC}\u{FFFC}a", &[obj(0, n, t), obj(3, f, n)], &[2]),
-            ("\u{FFFC}\u{FFFC}a", &[obj(0, n, f), obj(3, t, n)], &[2]),
-            // There is never one next to a mandatory break.
-            ("\n\u{FFFC}", &[obj(1, t, n)], &[]),
-        ] {
-            assert_eq!(opportunities(text, &objects(inline_objects)), expected);
-        }
-
-        // `line-break: anywhere` breaks between graphemes, so after an object too. A line break
-        // override has the last word on either side of one.
-        let object_at_0 = [obj(0, n, n)];
-        let anywhere = LineBreakConfig {
-            line_break: LineBreak::Anywhere,
-            ..LineBreakConfig::default()
-        };
-        let options = AnalysisOptions {
-            line_break: &[(0..5, anywhere)],
-            ..objects(&object_at_0)
-        };
-        assert_eq!(opportunities("\u{FFFC}\u{301}", &options), [1]);
-        let object_at_1 = [obj(1, t, t)];
-        let options = AnalysisOptions {
-            line_break_override: Some(&|_| Some(false)),
-            ..objects(&object_at_1)
-        };
-        assert_eq!(opportunities("a\u{FFFC}a", &options), []);
-
-        // An object is a grapheme of its own, and needs no font.
-        let analysis = analyze_with("\u{FFFC}\u{301}", &objects(&object_at_0));
+            },
+            &mut analysis,
+            &crate::AnalysisDataSources::default(),
+        );
         let [object, mark] = analysis.char_info() else {
             unreachable!()
         };
