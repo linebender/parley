@@ -285,7 +285,11 @@ impl CharacterFlags {
     const SOFT_WRAP_OPPORTUNITY: u8 = 1 << 4;
 
     #[inline(always)]
-    pub fn new(source_char: char, is_word_boundary: bool, is_soft_wrap_opportunity: bool) -> Self {
+    pub(crate) fn new(
+        source_char: char,
+        is_word_boundary: bool,
+        is_soft_wrap_opportunity: bool,
+    ) -> Self {
         // TODO: Defer to ICU4X properties (see: https://docs.rs/icu/latest/icu/properties/props/struct.Emoji.html).
         let is_emoji = matches!(source_char as u32, 0x1F600..=0x1F64F | 0x1F300..=0x1F5FF | 0x1F680..=0x1F6FF | 0x2600..=0x26FF | 0x2700..=0x27BF);
         #[expect(
