@@ -66,7 +66,7 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - Breaking change: Support for the CSS `line-break` style. This controls line-breaking behaviour of CJK text. ([#843][] by [@nicoburns][])
 - Breaking change: Added `LineMetrics::content_block_{min, max}_coord`, which are the typographic content bounds of a line independent of line height. ([#697][] by [@tomcur][])
 - Breaking change: Added `LineMetrics::indent`, which is the text indent applied to the line. ([#893][] by [@tomcur][])
-- `Layout::text_len` and `Layout::alignment`, `Cursor::upstream_cluster` and `Cursor::downstream_cluster`, `PlainEditor::is_cursor_visible`, and `PlainEditorDriver::set_selection`. ([#716][] by [@DataTriny][])  
+- `Layout::text_len` and `Layout::alignment`, `Cursor::upstream_cluster` and `Cursor::downstream_cluster`, `PlainEditor::is_cursor_visible`, and `PlainEditorDriver::set_selection`. ([#716][] by [@DataTriny][] and [@nicoburns][])  
   `ClusterPath::new` and the `Style::locale` field are now public as well.
   Together these make it possible to build an accessibility integration outside of Parley.
 - `Layout::root_span_metrics`, to help with placing directly drawn bullet points. ([#867][] by [@DJMcNab][])
@@ -119,7 +119,7 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 
 #### Parley
 
-- Breaking change: the `accesskit` feature, and the AccessKit integration it enabled, were removed. ([#716][] by [@DataTriny][])  
+- Breaking change: the `accesskit` feature, and the AccessKit integration it enabled, were removed. ([#716][] by [@DataTriny][] and [@nicoburns][])  
   The integration now lives in the `editor` example, where it is easier to evolve and can be copied and adapted by consumers.
   This removed `LayoutAccessibility`, `PlainEditor::try_accessibility`, `PlainEditorDriver::accessibility`, `PlainEditorDriver::select_from_accesskit`, `Cursor::from_access_position`, `Cursor::to_access_position`, `Selection::from_access_selection`, and `Selection::to_access_selection`.
 - Breaking change: `ClusterPath::logical_index` was removed. You can resolve the path to a `Cluster` using `ClusterPath::cluster`. `ClusterPath` still provides the line and run indices, but should otherwise be treated as an opaque handle. ([#810][] by [@tomcur][])
@@ -136,7 +136,7 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - `editing::Cursor::{previous,next}_logical_word` now land at the previous/next logical start of a word and skip over whitespace. ([#215][] by [@tomcur][])
 - Letter and word spacing is now applied once per grapheme. Previously, spacing was mistakenly counted for each character in the grapheme. ([#738][] by [@tomcur][])
 - `Layout::width` no longer under-reports widths when there are explicit newlines present and the style has non-zero letter spacing. Previously, an explicit newline would erroneously subtract the configured letter spacing from its line. ([#738][] by [@tomcur][])
-- Shaping now honours script and region subtags for correct handling of, for example, zh-Hans and zh-Hant. ([#756][] by [@DJMcNab][])
+- Shaping now honours script and region subtags for correct handling of, for example, zh-Hans and zh-Hant. ([#756][] by [@taj-p][] and [@DJMcNab][])
 - All line height changes within a run now contribute to the line box. ([#863][], [#864][] by [@tomcur][])
 - Fix `calculate_content_widths` when an inline box immediately follows a hard/explicit newline. It was previously incorrectly counted as being before the newline. ([#746][] by [@nicoburns][], [#772][] by [@tomcur][])
 - In `calculate_content_widths`, the max-content width is now floored by the min-content width. ([#834][] by [@nicoburns][])  
@@ -146,13 +146,13 @@ Carets and selections no longer land inside graphemes (such as between a letter 
 - Justification of lines with overflowing trailing spaces now correctly distributes free space over all interior spaces. ([#738][] by [@tomcur][])
 - Lines aligned with justification now correctly handle runs of consecutive trailing spaces. ([#760][] by [@tomcur][])
 - Trailing white space consisting of separate runs (e.g., due to font size changes) now hangs past line ends. ([#762][] by [@tomcur][])
-- Collapsible white space is now collapsed across style span and inline box boundaries instead of being trimmed at each span boundary, and is removed around hard line breaks. ([#786][] by [@nicoburns][])
+- Collapsible white space is now collapsed across style span and inline box boundaries instead of being trimmed at each span boundary, and is removed around hard line breaks. ([#786][] by [@nicoburns][] and [@tomcur][])
 - Non-breaking spaces are now preserved when collapsing whitespace. ([#734][] by [@subotac][])
 - Mandatory line breaks (`\n`, `\r\n`, U+2028, U+2029) directly following Thai, Khmer or Lao text are no longer dropped. ([#781][] by [@nicoburns][])
 - Text that shapes into zero glyphs is no longer silently dropped. ([#805][] by [@tomcur][])  
   This fixes some esoteric interactions, such as the string `\r\u{00AD}\n` losing the mandatory newline if the `\u{00AD}` soft-hyphen was shaped with a font missing a space glyph.
 - When using the `TreeBuilder`, out-of-flow boxes are now correctly positioned within the text. ([#815][] by [@tomcur][])
-- Parley's detection of Emoji is now more robust. ([#811][] by [@DJMcNab][])
+- Parley's detection of Emoji is now more robust. ([#811][] by [@fundon][] and [@DJMcNab][])
 - Fixed CJK and Korean word boundary navigation in `Cluster::is_word_boundary()`, properly distinguishing UAX #29 word boundaries from UAX #14 line break opportunities. ([#819][] by [@GoCoder7][], [#829][] by [@tomcur][])  
   Word boundaries of complex scripts, in the absence of dictionary data, now follow Unicode rules.
 - Apply `TextWrapMode::NoWrap` to line-breaking opportunities following inline boxes ([#844][] by [@nicoburns][])
