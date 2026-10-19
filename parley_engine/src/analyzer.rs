@@ -103,10 +103,10 @@ pub struct AnalysisOptions<'a> {
 
     /// The inline objects in the source text.
     ///
-    /// These must be in ascending order of [`InlineObject::index`] without duplicates. Each entry
-    /// must point at a U+FFFC OBJECT REPLACEMENT CHARACTER in the source text. Any U+FFFC character
-    /// that is not in this list is treated as ordinary text (some fonts may render `.notdef`,
-    /// others may have a glyph for it).
+    /// These must be in ascending order of [`InlineObject::text_byte_start`] without duplicates.
+    /// Each entry must point at a U+FFFC OBJECT REPLACEMENT CHARACTER in the source text. Any
+    /// U+FFFC character that is not in this list is treated as ordinary text (some fonts may render
+    /// `.notdef`, others may have a glyph for it).
     ///
     /// Such an inline object is part of the paragraph, but is not part of the paragraph's text;
     /// e.g., it may be an image. In CSS, this is known as an [atomic inline][css-atomic-inline].
