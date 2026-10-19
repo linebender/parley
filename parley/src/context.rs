@@ -7,7 +7,7 @@ use core::ops::Range;
 
 use alloc::{vec, vec::Vec};
 
-use parley_engine::{Analysis, Analyzer, LineBreakConfig, Shaper};
+use parley_engine::{Analysis, Analyzer, InlineObject, LineBreakConfig, Shaper};
 
 use super::FontContext;
 use super::builder::{BuilderOptions, RangedBuilder, StyleRunBuilder};
@@ -32,6 +32,7 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) analysis: Analysis,
     pub(crate) line_break: Vec<(Range<usize>, LineBreakConfig)>,
     pub(crate) break_spaces: Vec<Range<usize>>,
+    pub(crate) inline_objects: Vec<InlineObject>,
 
     // Reusable style builders (to amortise allocations)
     pub(crate) ranged_style_builder: RangedStyleBuilder<B>,
@@ -49,6 +50,7 @@ impl<B: Brush> LayoutContext<B> {
             style_table: vec![],
             style_runs: vec![],
             inline_boxes: vec![],
+            inline_objects: vec![],
             analyzer: Analyzer::new(),
             analysis: Analysis::new(),
             line_break: Vec::new(),

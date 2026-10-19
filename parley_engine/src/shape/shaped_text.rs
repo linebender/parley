@@ -220,6 +220,32 @@ impl ShapedText {
         &self.runs
     }
 
+    /// Set the advance of the inline object whose shaped cluster is at `cluster_index`, which
+    /// indexes into [`Self::shaped_clusters`].
+    ///
+    /// An inline object's shaped cluster consists of just its U+FFFC character, so it can be found
+    /// by searching on [`ShapedCluster::chars_range`].
+    ///
+    /// Its advance is initially zero, see [`ShapedCluster::is_inline_object`]. This also updates
+    /// the advance of the [`ShapedRun`] containing the inline object.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the shaped cluster is not an inline object.
+    pub fn set_inline_object_advance(&mut self, cluster_index: u32, advance: f32) {
+        let cluster = &mut self.shaped_clusters[cluster_index as usize];
+        assert!(
+            cluster.is_inline_object(),
+            "shaped cluster {cluster_index} is not an inline object"
+        );
+        let delta = advance - cluster.advance;
+        cluster.advance = advance;
+        let run = self
+            .runs
+            .partition_point(|run| run.shaped_clusters_range.end <= cluster_index);
+        self.runs[run].advance += delta;
+    }
+
     /// Escape hatch for `parley` tests that remap style indices to check whether layouts are
     /// otherwise identical. This is not for public consumption!
     #[doc(hidden)]
@@ -366,7 +392,8 @@ impl ShapedText {
                     ch,
                     info.is_word_boundary(),
                     info.is_soft_wrap_opportunity(),
-                ),
+                )
+                .with_inline_object(info.is_inline_object()),
                 grapheme_start: info.is_grapheme_start(),
             });
         }
@@ -510,6 +537,7 @@ fn process_shaped_clusters<'a>(
 
     /// Flush `cluster`, whose characters end at `char_end`, onto `shaped_clusters`.
     #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
+    #[inline(always)]
     fn flush(
         cluster: &mut Cluster,
         char_end: usize,
@@ -518,8 +546,14 @@ fn process_shaped_clusters<'a>(
     ) {
         let first_character = &characters[cluster.characters_start];
         let is_newline = first_character.whitespace == Whitespace::Newline;
-        let (glyph_offset, glyph_len, inline_glyph, advance) = if is_newline {
-            // Elide glyphs of newlines.
+        let is_inline_object = first_character.flags.is_inline_object();
+        debug_assert!(
+            !is_inline_object || char_end - cluster.characters_start == 1,
+            "an inline object must be a cluster of its own"
+        );
+        let (glyph_offset, glyph_len, inline_glyph, advance) = if is_newline || is_inline_object {
+            // Elide glyphs and advances of newlines and inline objects. Note that inline objects'
+            // advances can be set later by the user.
             (cluster.glyphs_start as u32, 0, false, 0.)
         } else if let Some(inline_glyph) = cluster.inline_glyph.take() {
             (inline_glyph.id, 1, true, cluster.advance)
@@ -540,6 +574,7 @@ fn process_shaped_clusters<'a>(
                 .with_safe_to_break_before(cluster.safe_to_break_before)
                 .with_safe_to_concat_before(cluster.safe_to_concat_before)
                 .with_inline_glyph(inline_glyph)
+                .with_inline_object(is_inline_object)
                 .with_first_char(
                     first_character.flags.is_soft_wrap_opportunity(),
                     first_character.whitespace,

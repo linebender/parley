@@ -96,8 +96,8 @@ fn break_by_length_with_newline() {
 fn break_by_length_with_inline_box() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    // "A[box]BC" where box counts as 1 cluster
-    let text = "ABC";
+    // The box counts as 1 cluster.
+    let text = "A\u{FFFC}BC";
     let mut builder = env.ranged_builder(text);
     builder.push_inline_box(InlineBox {
         id: 0,
@@ -124,14 +124,14 @@ fn break_by_length_with_inline_box() {
 fn break_by_length_multiple_inline_boxes() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    // "[box][box][box]ABC" - 3 boxes + 3 chars = 6 clusters
-    let text = "ABC";
+    // 3 boxes + 3 chars = 6 clusters
+    let text = "\u{FFFC}\u{FFFC}\u{FFFC}ABC";
     let mut builder = env.ranged_builder(text);
     for id in 0..3 {
         builder.push_inline_box(InlineBox {
             id,
             kind: InlineBoxKind::InFlow,
-            index: 0, // All at the start
+            index: id as usize * '\u{FFFC}'.len_utf8(),
             width: 10.0,
             height: 10.0,
             baseline: None,

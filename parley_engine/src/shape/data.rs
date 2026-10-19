@@ -39,23 +39,25 @@ impl Character {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ShapedClusterFlags(u16);
+pub(crate) struct ShapedClusterFlags(u32);
 
 impl ShapedClusterFlags {
-    const GLYPH_LEN_MASK: u16 = 0x00FF;
-    const INLINE_GLYPH: u16 = 1 << 8;
-    const GRAPHEME_START: u16 = 1 << 9;
+    const GLYPH_LEN_MASK: u32 = 0x00FF;
+    const INLINE_GLYPH: u32 = 1 << 8;
+    const GRAPHEME_START: u32 = 1 << 9;
     /// Whether a soft wrap opportunity exists before the cluster's first character.
-    const SOFT_WRAP_BEFORE: u16 = 1 << 10;
+    const SOFT_WRAP_BEFORE: u32 = 1 << 10;
     /// [`Whitespace`] class of the cluster's first character (3 bits).
-    const WHITESPACE_SHIFT: u16 = 11;
-    const WHITESPACE_MASK: u16 = 0b111 << Self::WHITESPACE_SHIFT;
-    const SAFE_TO_BREAK_BEFORE: u16 = 1 << 14;
-    const SAFE_TO_CONCAT_BEFORE: u16 = 1 << 15;
+    const WHITESPACE_SHIFT: u32 = 11;
+    const WHITESPACE_MASK: u32 = 0b111 << Self::WHITESPACE_SHIFT;
+    /// Whether the cluster is an inline object.
+    const INLINE_OBJECT: u32 = 1 << 14;
+    const SAFE_TO_BREAK_BEFORE: u32 = 1 << 15;
+    const SAFE_TO_CONCAT_BEFORE: u32 = 1 << 16;
 
     #[inline(always)]
     pub(crate) const fn new(glyph_len: u8) -> Self {
-        Self(glyph_len as u16)
+        Self(glyph_len as u32)
     }
 
     #[inline(always)]
@@ -85,6 +87,12 @@ impl ShapedClusterFlags {
     }
 
     #[inline(always)]
+    pub(crate) const fn with_inline_object(mut self, set: bool) -> Self {
+        self.0 = self.0 & !Self::INLINE_OBJECT | if set { Self::INLINE_OBJECT } else { 0 };
+        self
+    }
+
+    #[inline(always)]
     pub(crate) const fn with_first_char(
         mut self,
         soft_wrap_opportunity: bool,
@@ -96,7 +104,7 @@ impl ShapedClusterFlags {
             } else {
                 0
             }
-            | ((whitespace as u16) << Self::WHITESPACE_SHIFT);
+            | ((whitespace as u32) << Self::WHITESPACE_SHIFT);
         self
     }
 
@@ -133,6 +141,11 @@ impl ShapedClusterFlags {
     #[inline(always)]
     const fn is_safe_to_concat_before(self) -> bool {
         self.0 & Self::SAFE_TO_CONCAT_BEFORE != 0
+    }
+
+    #[inline(always)]
+    const fn is_inline_object(self) -> bool {
+        self.0 & Self::INLINE_OBJECT != 0
     }
 }
 
@@ -250,6 +263,21 @@ impl ShapedCluster {
         self.flags.whitespace()
     }
 
+    /// Whether this cluster is an inline object.
+    ///
+    /// An inline object's cluster consists of just its U+FFFC OBJECT REPLACEMENT CHARACTER (see
+    /// [`AnalysisOptions::inline_objects`]), and it is an [`Atom`] of its own. It has no glyphs, and
+    /// its advance is zero until the caller, which lays out the inline object, sets it with
+    /// [`ShapedText::set_inline_object_advance`].
+    ///
+    /// [`AnalysisOptions::inline_objects`]: crate::AnalysisOptions::inline_objects
+    /// [`Atom`]: crate::Atom
+    /// [`ShapedText::set_inline_object_advance`]: crate::ShapedText::set_inline_object_advance
+    #[inline(always)]
+    pub fn is_inline_object(self) -> bool {
+        self.flags.is_inline_object()
+    }
+
     /// The number of characters in this cluster.
     #[inline(always)]
     pub fn char_len(self) -> u32 {
@@ -283,6 +311,8 @@ impl CharacterFlags {
     const WORD_BOUNDARY: u8 = 1 << 3;
     /// Whether there is a soft wrap opportunity before the character.
     const SOFT_WRAP_OPPORTUNITY: u8 = 1 << 4;
+    /// Whether the character stands in for an inline object.
+    const INLINE_OBJECT: u8 = 1 << 5;
 
     #[inline(always)]
     pub(crate) fn new(
@@ -333,6 +363,28 @@ impl CharacterFlags {
     #[inline(always)]
     pub fn is_emoji(self) -> bool {
         self.0 & Self::EMOJI != 0
+    }
+
+    /// Returns these flags, marking whether the character stands in for an inline object.
+    #[inline(always)]
+    #[must_use]
+    pub(crate) const fn with_inline_object(self, is_inline_object: bool) -> Self {
+        Self(
+            self.0 & !Self::INLINE_OBJECT
+                | if is_inline_object {
+                    Self::INLINE_OBJECT
+                } else {
+                    0
+                },
+        )
+    }
+
+    /// Returns if the character stands in for an inline object.
+    ///
+    /// See [`AnalysisOptions::inline_objects`](crate::AnalysisOptions::inline_objects).
+    #[inline(always)]
+    pub fn is_inline_object(self) -> bool {
+        self.0 & Self::INLINE_OBJECT != 0
     }
 
     /// Returns the number of bytes the source character would need if encoded in UTF-8.

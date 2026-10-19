@@ -139,6 +139,14 @@ fn main() {
         // RANGED BUILDER
         // ============
 
+        // An in-flow inline box is represented by a U+FFFC OBJECT REPLACEMENT CHARACTER in the text
+        let text = format!(
+            "{}\u{FFFC}{}\u{FFFC}{}",
+            &text[..40],
+            &text[40..50],
+            &text[50..]
+        );
+
         // Creates a RangedBuilder
         let mut builder = layout_cx.ranged_builder(&mut font_cx, &text, display_scale, quantize);
 
@@ -154,8 +162,8 @@ fn main() {
         builder.push(bold_style, 0..4);
 
         // Set the underline & strikethrough style
-        builder.push(underline_style, 141..150);
-        builder.push(strikethrough_style, 155..168);
+        builder.push(underline_style, 147..156);
+        builder.push(strikethrough_style, 161..174);
 
         builder.push_inline_box(InlineBox {
             id: 0,
@@ -169,7 +177,7 @@ fn main() {
         builder.push_inline_box(InlineBox {
             id: 1,
             kind: InlineBoxKind::InFlow,
-            index: 50,
+            index: 53,
             width: 50.0,
             height: 30.0,
             baseline: None,
