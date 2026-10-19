@@ -1,12 +1,12 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::layout::Style;
 use crate::layout::data::BreakReason;
 use crate::layout::data::{LayoutItemKind, LineData};
 use crate::layout::layout::Layout;
 use crate::layout::run::Run;
 use crate::layout::spacing::EffectiveSpacing;
+use crate::layout::{SpanMetrics, Style};
 use crate::style::Brush;
 use crate::{BaselineShift, InlineBox, InlineBoxKind};
 
@@ -311,6 +311,11 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     /// See also [`Self::style`].
     pub fn style_index(&self) -> u16 {
         self.style_index
+    }
+
+    /// Returns the metrics of the glyph's enclosing span, from the primary font.
+    pub fn span_metrics(&self) -> SpanMetrics {
+        self.run.layout.data.style_metrics[usize::from(self.style_index)].span_metrics()
     }
 
     /// Returns the offset to the baseline.
