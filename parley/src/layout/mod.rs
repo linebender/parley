@@ -10,6 +10,7 @@ mod line_break;
 mod run;
 mod spacing;
 pub(crate) mod style_metrics;
+mod tab;
 mod whitespace;
 
 // TODO - Add to allowed lint set?
