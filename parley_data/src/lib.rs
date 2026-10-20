@@ -65,7 +65,6 @@ impl Properties {
     const BIDI_BITS: u32 = 5;
     const IS_EMOJI_OR_PICTOGRAPH_BITS: u32 = 1;
     const IS_VARIATION_SELECTOR_BITS: u32 = 1;
-    const IS_REGION_INDICATOR_BITS: u32 = 1;
     const IS_MANDATORY_LINE_BREAK_BITS: u32 = 1;
     const NEEDS_DICTIONARY_WORD_BREAK_BITS: u32 = 1;
     const IS_EMOJI_BITS: u32 = 1;
@@ -80,10 +79,8 @@ impl Properties {
     const IS_EMOJI_OR_PICTOGRAPH_SHIFT: u32 = Self::BIDI_SHIFT + Self::BIDI_BITS;
     const IS_VARIATION_SELECTOR_SHIFT: u32 =
         Self::IS_EMOJI_OR_PICTOGRAPH_SHIFT + Self::IS_EMOJI_OR_PICTOGRAPH_BITS;
-    const IS_REGION_INDICATOR_SHIFT: u32 =
-        Self::IS_VARIATION_SELECTOR_SHIFT + Self::IS_VARIATION_SELECTOR_BITS;
     const IS_MANDATORY_LINE_BREAK_SHIFT: u32 =
-        Self::IS_REGION_INDICATOR_SHIFT + Self::IS_REGION_INDICATOR_BITS;
+        Self::IS_VARIATION_SELECTOR_SHIFT + Self::IS_VARIATION_SELECTOR_BITS;
     const NEEDS_DICTIONARY_WORD_BREAK_SHIFT: u32 =
         Self::IS_MANDATORY_LINE_BREAK_SHIFT + Self::IS_MANDATORY_LINE_BREAK_BITS;
     const IS_EMOJI_SHIFT: u32 =
@@ -111,7 +108,6 @@ impl Properties {
         bidi: BidiClass,
         is_emoji_or_pictographic: bool,
         is_variation_selector: bool,
-        is_region_indicator: bool,
         is_mandatory_linebreak: bool,
         needs_dictionary_word_break: bool,
         is_emoji: bool,
@@ -134,7 +130,6 @@ impl Properties {
                 | (bidi << Self::BIDI_SHIFT)
                 | ((is_emoji_or_pictographic as u64) << Self::IS_EMOJI_OR_PICTOGRAPH_SHIFT)
                 | ((is_variation_selector as u64) << Self::IS_VARIATION_SELECTOR_SHIFT)
-                | ((is_region_indicator as u64) << Self::IS_REGION_INDICATOR_SHIFT)
                 | ((is_mandatory_linebreak as u64) << Self::IS_MANDATORY_LINE_BREAK_SHIFT)
                 | ((needs_dictionary_word_break as u64) << Self::NEEDS_DICTIONARY_WORD_BREAK_SHIFT)
                 | ((is_emoji as u64) << Self::IS_EMOJI_SHIFT)
@@ -200,13 +195,12 @@ impl Properties {
         ) != 0
     }
 
-    /// Returns whether the character is a region indicator.
+    /// Returns whether the character is a regional indicator.
     #[inline(always)]
-    pub fn is_region_indicator(&self) -> bool {
-        self.bits(
-            Self::IS_REGION_INDICATOR_SHIFT,
-            Self::IS_REGION_INDICATOR_BITS,
-        ) != 0
+    pub fn is_regional_indicator(&self) -> bool {
+        // We optimise the storage by observing that GraphemeClusterBreak being `RI` is
+        // equivalent to the Regional Indicator unicode property.
+        self.grapheme_cluster_break() == GraphemeClusterBreak::RI
     }
 
     /// Returns whether the character is a mandatory linebreak.
@@ -369,7 +363,8 @@ mod tests {
                 bidi_class: properties.bidi_class(),
                 is_emoji_or_pictograph: properties.is_emoji_or_pictograph(),
                 is_variation_selector: properties.is_variation_selector(),
-                is_region_indicator: properties.is_region_indicator(),
+                // Note that we don't actually pack this value - it's instead inferred from `GraphemeClusterBreak`.
+                is_region_indicator: properties.is_regional_indicator(),
                 is_mandatory_linebreak: properties.is_mandatory_linebreak(),
                 needs_dictionary_word_break: properties.needs_dictionary_word_break(),
                 is_emoji: properties.is_emoji(),
@@ -388,7 +383,6 @@ mod tests {
                 self.bidi_class,
                 self.is_emoji_or_pictograph,
                 self.is_variation_selector,
-                self.is_region_indicator,
                 self.is_mandatory_linebreak,
                 self.needs_dictionary_word_break,
                 self.is_emoji,

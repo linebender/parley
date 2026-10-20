@@ -889,7 +889,7 @@ pub(crate) fn analyze_text(
         let general_category = properties.general_category();
         let is_emoji_or_pictograph = properties.is_emoji_or_pictograph();
         let is_variation_selector = properties.is_variation_selector();
-        let is_region_indicator = properties.is_region_indicator();
+        let is_region_indicator = properties.is_regional_indicator();
 
         let force_normalize = {
             // "Extend" break chars should be normalized first, with two exceptions
