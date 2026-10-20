@@ -26,6 +26,8 @@ use smallvec::SmallVec;
 pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) rcx: ResolveContext,
     pub(crate) style_table: Vec<ResolvedStyle<B>>,
+    /// Font features for each style, parallel to `style_table`.
+    pub(crate) style_features: Vec<SmallVec<[FontFeature; 8]>>,
     pub(crate) style_runs: Vec<StyleRun>,
     pub(crate) inline_boxes: Vec<LayoutInlineBox>,
 
@@ -43,8 +45,6 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     /// Style index for each character, parallel to [`Analysis::char_info`].
     pub(crate) char_style_indices: Vec<u16>,
     pub(crate) scx: Shaper,
-    /// Font features for each style, parallel to `style_table`.
-    pub(crate) style_features: Vec<SmallVec<[FontFeature; 8]>>,
 }
 
 impl<B: Brush> LayoutContext<B> {
@@ -52,6 +52,7 @@ impl<B: Brush> LayoutContext<B> {
         Self {
             rcx: ResolveContext::default(),
             style_table: vec![],
+            style_features: Vec::new(),
             style_runs: vec![],
             inline_boxes: vec![],
             inline_objects: vec![],
@@ -63,7 +64,6 @@ impl<B: Brush> LayoutContext<B> {
             tree_style_builder: TreeStyleBuilder::default(),
             char_style_indices: vec![],
             scx: Shaper::default(),
-            style_features: Vec::new(),
         }
     }
 
