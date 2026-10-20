@@ -47,6 +47,7 @@ Run the following from the repository root to regenerate the baked data:
 
 ```sh
 cargo run -p parley_data_gen -- ./parley_data/src/generated
+cargo fmt -p parley_data
 ```
 
 <!-- cargo-rdme end -->

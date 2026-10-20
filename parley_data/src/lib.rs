@@ -97,8 +97,8 @@ impl Properties {
     #[inline(always)]
     /// Returns the properties for a given character.
     pub fn get(ch: char) -> Self {
-        let inner: u32 = generated::composite_packtab_get(ch.to_u32().try_into().unwrap());
-        // If we ever set the highest bit, `val` would become i64.
+        let inner: u32 = generated::composite_packtab_get(u32::from(ch).try_into().unwrap());
+        // If we ever set the highest bit, `inner` would become i64.
         // Make sure to use `cast_unsigned` in that case.
         Self(inner.into())
     }
