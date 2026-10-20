@@ -26,6 +26,7 @@
 //!
 //! ```sh
 //! cargo run -p parley_data_gen -- ./parley_data/src/generated
+//! cargo fmt -p parley_data
 //! ```
 
 // LINEBENDER LINT SET - lib.rs - v4
@@ -55,7 +56,7 @@ pub(crate) mod generated;
 
 /// Unicode character properties relevant for text analysis.
 #[derive(Copy, Clone, Debug)]
-pub struct Properties(u32);
+pub struct Properties(u64);
 
 impl Properties {
     const SCRIPT_BITS: u32 = 8;
@@ -96,7 +97,10 @@ impl Properties {
     #[inline(always)]
     /// Returns the properties for a given character.
     pub fn get(ch: char) -> Self {
-        Self(generated::composite_get(ch as u32))
+        let inner: u32 = generated::composite_packtab_get(u32::from(ch).try_into().unwrap());
+        // If we ever set the highest bit, `inner` would become i64.
+        // Make sure to use `cast_unsigned` in that case.
+        Self(inner.into())
     }
 
     /// Creates a new [`Properties`] from the given properties
@@ -118,31 +122,33 @@ impl Properties {
         // The TrieValue implementation is guaranteed to be stable (strongly enough for our purposes, at least).
         // See https://github.com/unicode-org/icu4x/issues/6067#issuecomment-5361908792 and
         // https://github.com/linebender/parley/pull/845#discussion_r4102175970
-        let s = script.to_u32();
-        let gc = gc as u32;
-        let gcb = gcb.to_u32();
-        let bidi = bidi.to_u32();
+        let s = u64::from(script.to_u32());
+        let gc = gc as u64;
+        let gcb = u64::from(gcb.to_u32());
+        let bidi = u64::from(bidi.to_u32());
 
         Self(
             (s << Self::SCRIPT_SHIFT)
                 | (gc << Self::GC_SHIFT)
                 | (gcb << Self::GCB_SHIFT)
                 | (bidi << Self::BIDI_SHIFT)
-                | ((is_emoji_or_pictographic as u32) << Self::IS_EMOJI_OR_PICTOGRAPH_SHIFT)
-                | ((is_variation_selector as u32) << Self::IS_VARIATION_SELECTOR_SHIFT)
-                | ((is_region_indicator as u32) << Self::IS_REGION_INDICATOR_SHIFT)
-                | ((is_mandatory_linebreak as u32) << Self::IS_MANDATORY_LINE_BREAK_SHIFT)
-                | ((needs_dictionary_word_break as u32) << Self::NEEDS_DICTIONARY_WORD_BREAK_SHIFT)
-                | ((is_emoji as u32) << Self::IS_EMOJI_SHIFT)
-                | ((is_emoji_presentation as u32) << Self::IS_EMOJI_PRESENTATION_SHIFT)
-                | ((is_emoji_modifier as u32) << Self::IS_EMOJI_MODIFIER_SHIFT)
-                | ((is_emoji_modifier_base as u32) << Self::IS_EMOJI_MODIFIER_BASE_SHIFT),
+                | ((is_emoji_or_pictographic as u64) << Self::IS_EMOJI_OR_PICTOGRAPH_SHIFT)
+                | ((is_variation_selector as u64) << Self::IS_VARIATION_SELECTOR_SHIFT)
+                | ((is_region_indicator as u64) << Self::IS_REGION_INDICATOR_SHIFT)
+                | ((is_mandatory_linebreak as u64) << Self::IS_MANDATORY_LINE_BREAK_SHIFT)
+                | ((needs_dictionary_word_break as u64) << Self::NEEDS_DICTIONARY_WORD_BREAK_SHIFT)
+                | ((is_emoji as u64) << Self::IS_EMOJI_SHIFT)
+                | ((is_emoji_presentation as u64) << Self::IS_EMOJI_PRESENTATION_SHIFT)
+                | ((is_emoji_modifier as u64) << Self::IS_EMOJI_MODIFIER_SHIFT)
+                | ((is_emoji_modifier_base as u64) << Self::IS_EMOJI_MODIFIER_BASE_SHIFT),
         )
     }
 
     #[inline(always)]
+    #[expect(clippy::cast_possible_truncation, reason = "valid input doesn't.")]
+    /// `bits` must be less than 32; this is enough for all of the current property fields.
     fn bits(self, shift: u32, bits: u32) -> u32 {
-        (self.0 >> shift) & ((1 << bits) - 1)
+        ((self.0 >> shift) & ((1 << bits) - 1)) as u32
     }
 
     /// Returns the script for the character.
@@ -266,7 +272,7 @@ impl Properties {
     }
 }
 
-impl From<Properties> for u32 {
+impl From<Properties> for u64 {
     fn from(value: Properties) -> Self {
         value.0
     }
@@ -298,8 +304,8 @@ mod tests {
             );
             let packed = expected.pack();
             assert_eq!(
-                u32::from(actual),
-                u32::from(packed),
+                u64::from(actual),
+                u64::from(packed),
                 "packed mismatch at U+{cp:04X}: actual={actual:?}, expected={packed:?}"
             );
         }

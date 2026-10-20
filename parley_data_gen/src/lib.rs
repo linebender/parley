@@ -12,7 +12,6 @@ use icu_properties::{
     },
 };
 use parley_data::Properties;
-use std::fmt::Write as _;
 use std::io::{BufWriter, Write};
 
 const COPYRIGHT_HEADER: &str =
@@ -82,7 +81,7 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
             emoji_modifier_data.contains32(cp),
             emoji_modifier_base_data.contains32(cp),
         );
-        characters.push(u32::from(v) as i64);
+        characters.push(u64::from(v).cast_signed());
     }
 
     let (info, best) = packtab::pack_table(&characters, Some(0), config.compression);
@@ -100,12 +99,6 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
     if !code.ends_with('\n') {
         code.push('\n');
     }
-    code.push('\n');
-    write!(
-        code,
-        "#[allow(missing_docs, reason = \"packtab generated code\")]\n#[inline]\npub(crate) fn composite_get(cp: u32) -> u32 {{\n    {namespace}_get(cp as usize)\n}}\n"
-    )
-    .unwrap();
 
     let mut file = BufWriter::new(std::fs::File::create(out.join("mod.rs")).unwrap());
     writeln!(&mut file, "{COPYRIGHT_HEADER}").unwrap();

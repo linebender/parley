@@ -1015,9 +1015,3 @@ pub(crate) fn composite_packtab_get(u: usize) -> u32 {
         0
     }
 }
-
-#[allow(missing_docs, reason = "packtab generated code")]
-#[inline]
-pub(crate) fn composite_get(cp: u32) -> u32 {
-    composite_packtab_get(cp as usize)
-}
