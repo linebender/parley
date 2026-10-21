@@ -1,12 +1,20 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+// After you edit the crate's doc comment, run this command, then check README.md for any missing links
+// cargo rdme --workspace-project=attributed_text
+
 //! Attributed Text is a Rust crate which ...
 //!
-//! ## Features
+//! # Features
+//!
+//! The following crate [feature flags](https://doc.rust-lang.org/cargo/reference/features.html#dependency-features) are available:
 //!
 //! - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
-// LINEBENDER LINT SET - lib.rs - v3
+//!
+//! Note that Attributed Text requires that an allocator is available (i.e. it uses [`alloc`][]).
+
+// LINEBENDER LINT SET - lib.rs - v4
 // See https://linebender.org/wiki/canonical-lints/
 // These lints shouldn't apply to examples or tests.
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
@@ -19,6 +27,10 @@
 #![no_std]
 
 extern crate alloc;
+
+// Ensure that we don't compile if you're using the std feature on a platform without `std`
+#[cfg(feature = "std")]
+extern crate std as _;
 
 mod attribute_segments;
 mod attributed_text;

@@ -10,11 +10,10 @@ use alloc::vec::Vec;
 use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
+use crate::inline_box::{LayoutInlineBox, inline_object_box_index};
 use crate::layout::data::{AlignedSubtreeOffset, run_box_metrics};
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
-use crate::layout::style_metrics::{
-    BoxMetrics, InlineBoxPlacement, StyleMetrics, inline_box_placement,
-};
+use crate::layout::style_metrics::{BoxMetrics, StyleMetrics, inline_box_placement};
 use crate::layout::whitespace::atom_hanging_advance;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
@@ -22,8 +21,7 @@ use crate::layout::{
 };
 use crate::style::Brush;
 use crate::{
-    BaselineShift, InlineBox, InlineBoxKind, OverflowWrap, TextWrapMode, VerticalAlign,
-    WhiteSpaceCollapse,
+    BaselineShift, InlineBoxKind, OverflowWrap, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
 };
 
 use core::ops::Range;
@@ -123,8 +121,8 @@ struct LineBoxMetrics {
     line_relative_top_height: f32,
     /// Height of the tallest `vertical-align: bottom` inline box.
     line_relative_bottom_height: f32,
-    /// Whether the line has any text or non-empty in-flow inline box. A line with only empty
-    /// inline boxes is treated as having zero height (an "invisible" line box).
+    /// Whether the line has any text or inline objects. A line with only out-of-flow boxes is
+    /// treated as having zero height (an "invisible" line box).
     has_content: bool,
     /// The layout item and style of the last text atom added, whose boxes are already on the line.
     last_text: (usize, u16),
@@ -236,11 +234,25 @@ impl SubtreeExtents {
 ///   entries as they were at that save.
 ///
 /// [independent aligned subtree]: crate::layout::style_metrics#aligned-subtrees
-#[derive(Clone, Default)]
+#[derive(Default)]
 struct SubtreeHistory {
     entries: Vec<SubtreeExtents>,
     /// The first `frozen_count` entries may be needed by a save, so are never modified.
     frozen_count: usize,
+}
+
+impl Clone for SubtreeHistory {
+    fn clone(&self) -> Self {
+        Self {
+            entries: self.entries.clone(),
+            frozen_count: self.frozen_count,
+        }
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        self.entries.clone_from(&source.entries);
+        self.frozen_count = source.frozen_count;
+    }
 }
 
 impl SubtreeHistory {
@@ -382,7 +394,8 @@ impl LineBoxMetrics {
     /// style's line height is [`LineHeight::MetricsRelative`] (which corresponds to CSS
     /// `line-height: normal`), it also adds the run's box, which matters when the run was shaped
     /// with a fallback font whose metrics differ from the style's first available font, the font
-    /// the span box is built from. See [`run_box_metrics`]
+    /// the span box is built from. See [`run_box_metrics`]. If the atom is an inline object, it adds
+    /// the inline object's box too.
     ///
     /// [`LineHeight::MetricsRelative`]: crate::LineHeight::MetricsRelative
     #[inline]
@@ -447,17 +460,54 @@ impl LineBoxMetrics {
         }
         let style = usize::from(style_index);
         let shaped_run = &data.shaped_text.runs()[run_idx];
-        let Some(run_box) = data.runs[run_idx]
+        if let Some(run_box) = data.runs[run_idx]
             .run_box
             .or_else(|| run_box_metrics(&data.styles[style], shaped_run, data.quantize))
-        else {
-            return;
-        };
-        let (baseline_offset, aligned_subtree_root) = data
-            .style_metrics
-            .get(style)
-            .map_or((0., 0), |m| (m.baseline_offset, m.aligned_subtree_root));
-        self.add_box(aligned_subtree_root, baseline_offset, run_box, subtrees);
+        {
+            let (baseline_offset, aligned_subtree_root) = data
+                .style_metrics
+                .get(style)
+                .map_or((0., 0), |m| (m.baseline_offset, m.aligned_subtree_root));
+            self.add_box(aligned_subtree_root, baseline_offset, run_box, subtrees);
+        }
+        if let Some(first) = characters.first()
+            && first.flags.is_inline_object()
+        {
+            let index = inline_object_box_index(&data.inline_boxes, first.text_byte_start as usize);
+            self.add_inline_object(&data.inline_boxes[index], data, subtrees);
+        }
+    }
+
+    /// Add the box of an inline object, aligned relative to the span box of the style containing
+    /// it.
+    fn add_inline_object<B: Brush>(
+        &mut self,
+        layout_box: &LayoutInlineBox,
+        data: &LayoutData<B>,
+        subtrees: &mut SubtreeHistory,
+    ) {
+        let inline_box = &layout_box.inline_box;
+        if inline_box.vertical_align.is_line_relative() {
+            self.add_line_relative_inline_box(
+                inline_box.vertical_align,
+                inline_box.height,
+                data.quantize,
+            );
+        } else {
+            let placement = inline_box_placement(
+                inline_box,
+                layout_box.parent_style_index,
+                &data.style_metrics,
+                data.quantize,
+            );
+            self.add_inline_box(
+                placement.aligned_subtree_root,
+                placement.baseline_offset,
+                placement.ascent,
+                placement.descent,
+                subtrees,
+            );
+        }
     }
 
     /// Add an inline box extending `ascent` above and `descent` below a baseline that is
@@ -576,7 +626,6 @@ pub struct BoxBreakData {
     pub advance: f32,
 }
 
-#[derive(Clone)]
 /// The mutable state of the line breaker.
 ///
 /// This is exposed so that callers using [`BreakLines`] directly can inspect and
@@ -630,6 +679,64 @@ pub struct BreakerState {
     prev_boundary: Option<PrevBoundaryState>,
     /// Saved breaker state for the last emergency line-breaking opportunity
     emergency_boundary: Option<PrevBoundaryState>,
+}
+
+impl Clone for BreakerState {
+    fn clone(&self) -> Self {
+        Self {
+            items: self.items,
+            lines: self.lines,
+            item_idx: self.item_idx,
+            run_idx: self.run_idx,
+            cluster_idx: self.cluster_idx,
+            line_x: self.line_x,
+            line_y: self.line_y,
+            layout_max_advance: self.layout_max_advance,
+            line_max_advance: self.line_max_advance,
+            line_max_height: self.line_max_height,
+            line: self.line.clone(),
+            contributed: self.contributed.clone(),
+            subtrees: self.subtrees.clone(),
+            prev_boundary: self.prev_boundary.clone(),
+            emergency_boundary: self.emergency_boundary.clone(),
+        }
+    }
+
+    /// Reuses the allocations of `self`, as a state is saved at the start of every line.
+    fn clone_from(&mut self, source: &Self) {
+        let Self {
+            items,
+            lines,
+            item_idx,
+            run_idx,
+            cluster_idx,
+            line_x,
+            line_y,
+            layout_max_advance,
+            line_max_advance,
+            line_max_height,
+            line,
+            contributed,
+            subtrees,
+            prev_boundary,
+            emergency_boundary,
+        } = source;
+        self.items = *items;
+        self.lines = *lines;
+        self.item_idx = *item_idx;
+        self.run_idx = *run_idx;
+        self.cluster_idx = *cluster_idx;
+        self.line_x = *line_x;
+        self.line_y = *line_y;
+        self.layout_max_advance = *layout_max_advance;
+        self.line_max_advance = *line_max_advance;
+        self.line_max_height = *line_max_height;
+        self.line.clone_from(line);
+        self.contributed.clone_from(contributed);
+        self.subtrees.clone_from(subtrees);
+        self.prev_boundary.clone_from(prev_boundary);
+        self.emergency_boundary.clone_from(emergency_boundary);
+    }
 }
 
 impl Default for BreakerState {
@@ -699,36 +806,6 @@ impl BreakerState {
         self.line
             .box_metrics
             .add_inline_box(0, 0., ascent, descent, &mut self.subtrees);
-        self.update_max_height_exceeded();
-    }
-
-    /// Add an in-flow inline box to the line at its resolved `placement` (ignored for
-    /// `vertical-align: top | bottom`, which only constrains the line box).
-    fn append_aligned_inline_box_to_line(
-        &mut self,
-        next_x: f32,
-        inline_box: &InlineBox,
-        placement: InlineBoxPlacement,
-        quantize: bool,
-    ) {
-        self.item_idx += 1;
-        self.line.items.end += 1;
-        self.line.x = next_x;
-        if inline_box.vertical_align.is_line_relative() {
-            self.line.box_metrics.add_line_relative_inline_box(
-                inline_box.vertical_align,
-                inline_box.height,
-                quantize,
-            );
-        } else {
-            self.line.box_metrics.add_inline_box(
-                placement.aligned_subtree_root,
-                placement.baseline_offset,
-                placement.ascent,
-                placement.descent,
-                &mut self.subtrees,
-            );
-        }
         self.update_max_height_exceeded();
     }
 
@@ -877,28 +954,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         state.update_max_height_exceeded();
     }
 
-    /// Add the layout's inline box `index` to the current line. Out-of-flow boxes contribute
-    /// nothing to the line's metrics.
-    fn append_layout_inline_box(&mut self, index: usize, next_x: f32) {
-        let quantize = self.layout.data.quantize;
-        let layout_box = &mut self.layout.data.inline_boxes[index];
-        let inline_box = &layout_box.inline_box;
-        if inline_box.kind == InlineBoxKind::InFlow {
-            let placement = inline_box_placement(
-                inline_box,
-                layout_box.parent_style_index,
-                &self.layout.data.style_metrics,
-                quantize,
-            );
-            layout_box.baseline_offset = placement.baseline_offset;
-            self.state
-                .append_aligned_inline_box_to_line(next_x, inline_box, placement, quantize);
-        } else {
-            self.state
-                .append_inline_box_to_line(next_x, f32::NEG_INFINITY, f32::NEG_INFINITY);
-        }
-    }
-
     /// Reset state when a line has been committed
     fn start_new_line(
         &mut self,
@@ -915,7 +970,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             line_indent,
         );
 
-        // A line containing only empty inline boxes (and no text) is an invisible line box with
+        // A line containing only out-of-flow boxes (and no text) is an invisible line box with
         // zero height; the strut only applies once the line has content. The trailing empty line
         // after a final newline has no items and keeps the strut so the cursor has a position.
         let invisible = !self.state.line.box_metrics.has_content
@@ -1059,60 +1114,26 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             let item = &self.layout.data.items[self.state.item_idx];
 
             match item.kind {
-                LayoutItemKind::InlineBox => {
+                LayoutItemKind::OutOfFlowBox => {
+                    // Out-of-flow boxes neither contribute to the line's extents nor introduce a
+                    // line break opportunity, so they are appended to the line and otherwise
+                    // skipped.
                     let inline_box = &self.layout.data.inline_boxes[item.index].inline_box;
 
-                    // In-flow boxes are aligned relative to their containing style's span box
-                    // (see `append_aligned_inline_box_to_line`). Out-of-flow boxes are not in-flow
-                    // content: unlike an atomic inline they neither contribute to the line's
-                    // extents nor introduce a line break opportunity, so they are appended to the
-                    // line and otherwise skipped.
-                    let (width_contribution, height_contribution) = match inline_box.kind {
-                        InlineBoxKind::InFlow => (inline_box.width, inline_box.height),
-                        InlineBoxKind::OutOfFlow => {
-                            self.append_layout_inline_box(item.index, self.state.line.x);
-                            continue;
-                        }
-                        // If the box is a `CustomOutOfFlow` box then we yield control flow back to the caller.
-                        // It is then the caller's responsibility to handle placement of the box.
-                        InlineBoxKind::CustomOutOfFlow => {
-                            return Some(YieldData::InlineBoxBreak(BoxBreakData {
-                                inline_box_id: inline_box.id,
-                                inline_box_index: item.index,
-                                advance: self.state.line.x,
-                            }));
-                        }
-                    };
-
-                    // Compute the x position of the content being currently processed
-                    let next_x = self.state.line.x + width_contribution;
-
-                    let box_will_be_appended = next_x <= max_advance || self.state.line.x == 0.0;
-                    if height_contribution > self.state.line_max_height && box_will_be_appended {
-                        return self.max_height_break_data(height_contribution);
+                    // If the box is a `CustomOutOfFlow` box then we yield control flow back to the caller.
+                    // It is then the caller's responsibility to handle placement of the box.
+                    if inline_box.kind == InlineBoxKind::CustomOutOfFlow {
+                        return Some(YieldData::InlineBoxBreak(BoxBreakData {
+                            inline_box_id: inline_box.id,
+                            inline_box_index: item.index,
+                            advance: self.state.line.x,
+                        }));
                     }
-
-                    // If the box fits on the current line (or we are at the start of the current line)
-                    // then simply move on to the next item
-                    if next_x <= max_advance || self.state.line.text_wrap_mode != TextWrapMode::Wrap
-                    {
-                        self.append_layout_inline_box(item.index, next_x);
-
-                        // There is a soft wrap opportunity after an inline box, unless wrapping
-                        // is disabled
-                        if self.state.line.text_wrap_mode == TextWrapMode::Wrap {
-                            self.state.mark_line_break_opportunity();
-                        }
-                    } else {
-                        // If we're at the start of the line, this box will never fit, so consume it and accept the overflow.
-                        let reason = if self.state.line.x == 0.0 {
-                            self.append_layout_inline_box(item.index, next_x);
-                            BreakReason::Emergency
-                        } else {
-                            BreakReason::Regular
-                        };
-                        return self.start_new_line(reason, max_advance, line_indent);
-                    }
+                    self.state.append_inline_box_to_line(
+                        self.state.line.x,
+                        f32::NEG_INFINITY,
+                        f32::NEG_INFINITY,
+                    );
                 }
                 LayoutItemKind::TextRun => {
                     let run_idx = item.index;
@@ -1122,7 +1143,32 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // Additional spacing to apply between atoms.
                     let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
 
-                    let line_height = run.data.line_height;
+                    // The height to report if the maximum line height is exceeded.
+                    let mut line_height = run.data.line_height;
+                    // An inline object is a run of its own. It exceeds the maximum line height by
+                    // itself if its box is too tall.
+                    if self.state.line_max_height != f32::MAX
+                        && slice
+                            .shaped_clusters()
+                            .first()
+                            .is_some_and(|cluster| cluster.is_inline_object())
+                    {
+                        let first_character = &slice.characters()[0];
+                        // This may have been set by an earlier yield before this object.
+                        self.state.update_max_height_exceeded();
+                        let inline_boxes = &self.layout.data.inline_boxes;
+                        let index = inline_object_box_index(
+                            inline_boxes,
+                            first_character.text_byte_start as usize,
+                        );
+                        let height = inline_boxes[index].inline_box.height;
+                        if !self.state.line.max_height_exceeded
+                            && height > self.state.line_max_height
+                        {
+                            self.state.line.max_height_exceeded = true;
+                            line_height = height;
+                        }
+                    }
 
                     // Iterate over the remaining atoms in the Run
                     for atom in slice.atoms_from(self.state.cluster_idx) {
@@ -1291,7 +1337,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     ///
     /// This method breaks lines based on the number of characters rather than advance width.
     /// Each character of text (including whitespace and newlines) counts as 1.
-    /// Each inline box also counts as 1 character.
+    /// Each in-flow inline box also counts as 1 character (that of its U+FFFC).
     ///
     /// Unlike `break_next`, this method does not respect normal line break opportunities and
     /// will break when the character limit is reached. It does not break on newlines, for example.
@@ -1314,42 +1360,13 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             let item = &self.layout.data.items[self.state.item_idx];
 
             match item.kind {
-                LayoutItemKind::InlineBox => {
-                    let inline_box = &self.layout.data.inline_boxes[item.index].inline_box;
-
-                    if inline_box.kind != InlineBoxKind::InFlow {
-                        self.append_layout_inline_box(item.index, self.state.line.x);
-                        continue;
-                    }
-
-                    // Check if adding this box would exceed the limit
-                    if char_count >= max_chars && max_chars != 0 {
-                        // Break before this box
-                        self.start_new_line(BreakReason::Regular, f32::MAX, line_indent);
-                        return Some(());
-                    }
-
-                    // Compute the x position for the line width tracking
-                    let next_x = self.state.line.x + inline_box.width;
-                    self.append_layout_inline_box(item.index, next_x);
-                    char_count += 1;
-
-                    // Check if we've reached the limit after adding this box
-                    if char_count >= max_chars {
-                        // Check if we've consumed all content (this is the last line).
-                        let is_last_item = self.state.item_idx >= self.layout.data.items.len();
-                        let break_reason = if is_last_item {
-                            BreakReason::None
-                        } else {
-                            BreakReason::Regular
-                        };
-
-                        if break_reason == BreakReason::None {
-                            self.done = true;
-                        }
-                        self.start_new_line(break_reason, f32::MAX, line_indent);
-                        return Some(());
-                    }
+                LayoutItemKind::OutOfFlowBox => {
+                    // Out-of-flow boxes take up no space and don't count as characters.
+                    self.state.append_inline_box_to_line(
+                        self.state.line.x,
+                        f32::NEG_INFINITY,
+                        f32::NEG_INFINITY,
+                    );
                 }
                 LayoutItemKind::TextRun => {
                     let run_idx = item.index;
@@ -1705,9 +1722,9 @@ fn commit_line<B: Brush>(
     let mut needs_reorder = false;
     for (i, item) in items_to_commit.iter().enumerate() {
         match item.kind {
-            LayoutItemKind::InlineBox => {
+            LayoutItemKind::OutOfFlowBox => {
                 lines.line_items.push(LineItemData {
-                    kind: LayoutItemKind::InlineBox,
+                    kind: LayoutItemKind::OutOfFlowBox,
                     index: item.index,
                     bidi_level: item.bidi_level,
 
@@ -1835,9 +1852,9 @@ fn commit_line<B: Brush>(
         // in line N+1). The item is later filtered out (see `continue` in loop above)
         // if there are not actually any clusters in line N+1.
         LayoutItemKind::TextRun => state.items.end.saturating_sub(1),
-        // Inline boxes cannot be spread across multiple lines, so we should set
+        // Out-of-flow boxes cannot be spread across multiple lines, so we should set
         // the first item of line N+1 to be the item AFTER the last item in line N.
-        LayoutItemKind::InlineBox => state.items.end,
+        LayoutItemKind::OutOfFlowBox => state.items.end,
     };
 }
 
@@ -1885,14 +1902,8 @@ fn hanging_whitespace<B: Brush>(
 
     'items: for line_item in line_items.iter().rev() {
         match line_item.kind {
-            LayoutItemKind::InlineBox => {
-                let item = &layout.data.inline_boxes[line_item.index].inline_box;
-
-                // Inline boxes don't hang.
-                if item.kind == InlineBoxKind::InFlow {
-                    break;
-                }
-            }
+            // Out-of-flow boxes take up no space.
+            LayoutItemKind::OutOfFlowBox => {}
             LayoutItemKind::TextRun => {
                 // Trailing whitespace can only hang if it ends up at the line's end edge after bidi
                 // reordering. We don't currently apply UAX #9 L1 (resetting trailing whitespace to

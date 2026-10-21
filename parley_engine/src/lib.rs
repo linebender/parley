@@ -1,6 +1,9 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+// After you edit the crate's doc comment, run this command, then check README.md for any missing links
+// cargo rdme --workspace-project=parley_engine
+
 //! Parley Engine provides low level APIs for shaping paragraphs of text.
 //!
 //! ## Usage
@@ -43,7 +46,7 @@
 //! let char_count = text.chars().count();
 //! let char_style_indices = vec![0; char_count];
 //!
-//! analyzer.analyze(text, &AnalysisOptions::default(), &mut analysis);
+//! analyzer.analyze(text, &AnalysisOptions::default(), &mut analysis, &parley_engine::AnalysisDataSources::default());
 //! shaper.shape_text(
 //!     text,
 //!     &analysis,
@@ -83,15 +86,28 @@
 //! }
 //! ```
 //!
-//! ## Features
+//! # Features
 //!
-//! - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
-//! - `bytemuck`: Forwarded to [`parlance`], which then implements traits from `bytemuck` on its
-//!   types.
+//! The following crate [feature flags](https://doc.rust-lang.org/cargo/reference/features.html#dependency-features) are available:
 //!
-//! [parley]: https://docs.rs/parley
+//! - `std` (enabled by default): Get floating point functions from the standard library
+//!   (likely using your target's libc).
+//! - `libm`: Use floating point implementations from [libm][].
+//!   This is useful for `no_std` environments.
+//!   However, note that the `libm` crate is not as efficient as the standard library.
+//! - `bytemuck`: Forwarded to [`parlance`][] which then implements traits from `bytemuck` on its types.
+//! - `complex-scripts`: Enable dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
+//!   When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
+//!   See [`DictionaryProvider`][] for full details.
+//!
+//! At least one of `std` and `libm` is required; `std` overrides `libm`.
+//! Note that Parley Engine requires that an allocator is available (i.e. it uses [`alloc`][]).
+//!
+//! [parley]: https://docs.rs/parley/latest/parley/
+//!
+//! [libm]: https://crates.io/crates/libm
 
-// LINEBENDER LINT SET - lib.rs - v3
+// LINEBENDER LINT SET - lib.rs - v4
 // See https://linebender.org/wiki/canonical-lints/
 // These lints shouldn't apply to examples or tests.
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
@@ -102,6 +118,10 @@
 // END LINEBENDER LINT SET
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![no_std]
+
+#[cfg(not(any(feature = "std", feature = "libm")))]
+compile_error!("parley_engine requires either the `std` or `libm` feature to be enabled");
+
 #[cfg(feature = "std")]
 extern crate std;
 
@@ -119,8 +139,8 @@ pub mod shape;
 pub use linebender_resource_handle::FontData;
 pub use parlance::{BaseDirection, NormalizedCoord};
 
-pub use analysis::{Analysis, AnalysisDataSources, CharInfo};
-pub use analyzer::{AnalysisOptions, Analyzer, LineBreakConfig};
+pub use analysis::{Analysis, AnalysisDataSources, CharInfo, DictionaryProvider};
+pub use analyzer::{AnalysisOptions, Analyzer, InlineObject, LineBreakConfig};
 pub use glyph::Glyph;
 pub use shape::atom::{Atom, Atoms, Grapheme, Graphemes, ShapedClusterGlyphs, ShapedSlice};
 pub use shape::shaped_text::{FontMetrics, ShapedRun, ShapedText};

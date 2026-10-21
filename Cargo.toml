@@ -19,12 +19,13 @@ members = [
     "examples/tiny_skia_render",
     "examples/vello_cpu_render",
     "examples/editor",
+    "examples/external_dictionaries",
     "xtask",
 ]
 
 [workspace.package]
-edition = "2024"
 version = "0.12.0"
+edition = "2024"
 # Keep in sync with RUST_MIN_VER in .github/workflows/ci.yml, with the relevant README.md files
 # and with the MSRV in the `Unreleased` section of CHANGELOG.md.
 # Until MSRV is bumped to 1.96+, use `core::ops::Range*` rather than `core::range::Range*`.
@@ -55,7 +56,10 @@ icu_collections = { version = "2.3.0", default-features = false }
 icu_locale_core = { version = "2.3.0", default-features = false }
 icu_normalizer = { version = "2.3.0", default-features = false }
 icu_properties = { version = "2.3.0", default-features = false }
-icu_segmenter = { version = "2.3.0", default-features = false }
+icu_provider = { version = "2.3.0", default-features = false }
+icu_provider_blob = { version = "2.3.0", default-features = false }
+# Check CachingDictionary and DictionaryProvider when upgrading.
+icu_segmenter = { version = "~2.3.0", default-features = false }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
 packtab = { version = "1.9.0" }
 rand = { version = "0.10.3", default-features = false, features = ["std", "std_rng"] }
@@ -71,7 +75,7 @@ vello_cpu = { version = "0.2.0", default-features = false, features = ["u8_pipel
 [workspace.lints]
 rust.unsafe_code = "deny"
 
-# LINEBENDER LINT SET - Cargo.toml - v7
+# LINEBENDER LINT SET - Cargo.toml - v8
 # See https://linebender.org/wiki/canonical-lints/
 rust.keyword_idents_2024 = "forbid"
 rust.non_ascii_idents = "forbid"
@@ -93,6 +97,7 @@ clippy.too_many_arguments = "allow"
 
 clippy.allow_attributes_without_reason = "warn"
 clippy.cast_possible_truncation = "warn"
+clippy.cast_possible_wrap = "warn"
 clippy.collection_is_never_read = "warn"
 clippy.default_trait_access = "warn"
 clippy.dbg_macro = "warn"

@@ -7,10 +7,11 @@
 use core::cmp::Ordering;
 
 use alloc::vec::Vec;
-use icu_normalizer::properties::Decomposed;
+use icu_normalizer::properties::{CanonicalComposition, CanonicalDecomposition, Decomposed};
+use parley_data::Properties;
 use parley_emoji::{EmojiDFA, EmojiPresentationStyle, EmojiSegmentationCategory};
 
-use crate::{CharInfo, analysis::AnalysisDataSources};
+use crate::CharInfo;
 
 #[derive(Debug, Default)]
 pub struct CharCluster {
@@ -266,12 +267,12 @@ impl CharCluster {
     }
 
     #[inline(always)]
-    fn contributes_to_shaping(ch: char, analysis_data_sources: &AnalysisDataSources) -> bool {
-        let props = analysis_data_sources.properties(ch);
+    fn contributes_to_shaping(ch: char) -> bool {
+        let props = Properties::get(ch);
         crate::analysis::contributes_to_shaping(props.general_category(), props.script())
     }
 
-    fn decomposed(&mut self, analysis_data_sources: &AnalysisDataSources) -> Option<&[Char]> {
+    fn decomposed(&mut self) -> Option<&[Char]> {
         match self.decomp.state {
             FormState::Invalid => None,
             FormState::None => {
@@ -282,7 +283,7 @@ impl CharCluster {
                     return None;
                 }
 
-                let decomposer = analysis_data_sources.decomposing_normalizer();
+                let decomposer = const { CanonicalDecomposition::new() };
                 let decomp = decomposer.decompose(self.chars[0].ch);
                 match decomp {
                     Decomposed::Default | Decomposed::Singleton(_) => {
@@ -291,13 +292,11 @@ impl CharCluster {
                     Decomposed::Expansion(a, b) => {
                         let mut copy = self.chars[0];
                         copy.ch = a;
-                        copy.contributes_to_shaping =
-                            Self::contributes_to_shaping(a, analysis_data_sources);
+                        copy.contributes_to_shaping = Self::contributes_to_shaping(a);
                         self.decomp.chars[0] = copy;
 
                         copy.ch = b;
-                        copy.contributes_to_shaping =
-                            Self::contributes_to_shaping(b, analysis_data_sources);
+                        copy.contributes_to_shaping = Self::contributes_to_shaping(b);
                         self.decomp.chars[1] = copy;
 
                         self.decomp.len = 2;
@@ -312,7 +311,7 @@ impl CharCluster {
         }
     }
 
-    fn composed(&mut self, analysis_data_sources: &AnalysisDataSources) -> Option<&[Char]> {
+    fn composed(&mut self) -> Option<&[Char]> {
         match self.comp.state {
             FormState::Invalid => None,
             FormState::None => {
@@ -323,13 +322,12 @@ impl CharCluster {
                     return None;
                 }
 
-                let composer = analysis_data_sources.composing_normalizer();
+                let composer = const { CanonicalComposition::new() };
                 let ch = composer.compose(self.chars[0].ch, self.chars[1].ch)?;
 
                 let mut copy = self.chars[0];
                 copy.ch = ch;
-                copy.contributes_to_shaping =
-                    Self::contributes_to_shaping(ch, analysis_data_sources);
+                copy.contributes_to_shaping = Self::contributes_to_shaping(ch);
                 self.comp.chars[0] = copy;
                 self.comp.len = 1;
 
@@ -352,11 +350,7 @@ impl CharCluster {
     /// [`Coverage::total`] may be different from the count of [`Self::chars`], and may also differ
     /// between subsequent calls due to returning the best coverage of either the original
     /// characters or one of the normalized forms.
-    pub fn calculate_coverage(
-        &mut self,
-        covers: impl Fn(char) -> bool,
-        analysis_data_sources: &AnalysisDataSources,
-    ) -> Coverage {
+    pub fn calculate_coverage(&mut self, covers: impl Fn(char) -> bool) -> Coverage {
         let len = self.len();
         let mut best_coverage = Mapper {
             chars: &self.chars[..len],
@@ -366,7 +360,7 @@ impl CharCluster {
         if best_coverage.is_complete() {
             return best_coverage;
         }
-        if self.force_normalize && self.composed(analysis_data_sources).is_some() {
+        if self.force_normalize && self.composed().is_some() {
             let coverage = self.comp.coverage(&covers);
             if coverage > best_coverage {
                 best_coverage = coverage;
@@ -375,7 +369,7 @@ impl CharCluster {
                 }
             }
         }
-        if self.decomposed(analysis_data_sources).is_some() {
+        if self.decomposed().is_some() {
             let coverage = self.decomp.coverage(&covers);
             if coverage > best_coverage {
                 best_coverage = coverage;
@@ -383,7 +377,7 @@ impl CharCluster {
                     return best_coverage;
                 }
             }
-            if !self.force_normalize && self.composed(analysis_data_sources).is_some() {
+            if !self.force_normalize && self.composed().is_some() {
                 let coverage = self.comp.coverage(&covers);
                 if coverage > best_coverage {
                     best_coverage = coverage;

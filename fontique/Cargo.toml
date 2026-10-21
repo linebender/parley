@@ -3,7 +3,7 @@ name = "fontique"
 version.workspace = true
 description = "Font enumeration and fallback."
 keywords = ["font", "text"]
-categories = ["gui", "os"]
+categories = ["gui", "os", "no-std"]
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -12,15 +12,19 @@ repository.workspace = true
 [package.metadata.docs.rs]
 all-features = true
 
-[lints]
-workspace = true
-
 [features]
 default = ["system"]
+# Get floating point functions from the standard library
+# (likely using your target's libc).
 std = ["read-fonts/std", "dep:memmap2", "parlance/std"]
+# Use floating point implementations from libm.
+# This is useful for `no_std` environments.
+# However, note that the `libm` crate is not as efficient as the standard library.
 libm = ["read-fonts/libm"]
+# Forwarded to `parlance`, which then implements traits from `bytemuck` on its types.
 bytemuck = ["parlance/bytemuck"]
-# Enables support for system font backends
+# Enable support for system font backends.
+# This also enables `std`.
 system = [
     "std",
     "dep:windows",
@@ -72,8 +76,12 @@ objc2-core-text = { version = "0.3.2", optional = true, default-features = false
     "CTFontCollection",
 ] }
 
-[target.'cfg(any(target_os = "linux", target_os="freebsd"))'.dependencies]
+# OpenHarmony reports `target_os = "linux"` but ships no Fontconfig library.
+[target.'cfg(all(any(target_os = "linux", target_os = "freebsd"), not(target_env = "ohos")))'.dependencies]
 yeslogic-fontconfig-sys = { version = "6.0.1", optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
 roxmltree = { version = "0.21.1", optional = true }
+
+[lints]
+workspace = true

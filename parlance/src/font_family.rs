@@ -3,8 +3,6 @@
 
 //! CSS font-family parsing and representation.
 
-extern crate alloc;
-
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use core::fmt;

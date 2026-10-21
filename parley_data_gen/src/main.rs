@@ -38,7 +38,11 @@ fn main() {
         .iter()
         .find_map(|a| a.strip_prefix("--compression="))
         .and_then(|v| v.parse::<f64>().ok())
-        .unwrap_or(1.0);
+        // Compression level 5 was chosen because:
+        // - Level 5 produced the greatest performance gain
+        // - Levels 5 through 9 produced the same output
+        // - Level 10 regressed performance but only reduced binary size by 128 bytes
+        .unwrap_or(5.0);
     let unsafe_access = remaining.iter().any(|a| a == "--unsafe");
 
     let config = parley_data_gen::Config {

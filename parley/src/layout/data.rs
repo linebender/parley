@@ -1,16 +1,14 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::inline_box::{InlineBox, LayoutInlineBox};
+use crate::inline_box::LayoutInlineBox;
 use crate::layout::spacing::{Justification, Spacing};
-use crate::layout::style_metrics::{BoxMetrics, StyleMetrics};
+use crate::layout::style_metrics::{BoxMetrics, StyleMetrics, inline_box_placement};
 use crate::layout::whitespace::whitespace_hangs;
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
-use crate::{
-    IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode, WhiteSpaceCollapse,
-};
+use crate::{IndentOptions, LineHeight, OverflowWrap, TextWrapMode, WhiteSpaceCollapse};
 use core::ops::Range;
 
 use alloc::vec::Vec;
@@ -148,9 +146,9 @@ impl LineData {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LineItemData {
-    /// Whether the item is a run or an inline box
+    /// Whether the item is a run or an out-of-flow box
     pub(crate) kind: LayoutItemKind,
-    /// The index of the run or inline box in the runs or `inline_boxes` vec
+    /// The index of the run or out-of-flow box in the runs or `inline_boxes` vec
     pub(crate) index: usize,
     /// Bidi level for the item (used for reordering)
     pub(crate) bidi_level: BidiLevel,
@@ -175,14 +173,14 @@ impl LineItemData {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LayoutItemKind {
     TextRun,
-    InlineBox,
+    OutOfFlowBox,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LayoutItem {
-    /// Whether the item is a run or an inline box
+    /// Whether the item is a run or an out-of-flow box
     pub(crate) kind: LayoutItemKind,
-    /// The index of the run or inline box in the runs or `inline_boxes` vec
+    /// The index of the run or out-of-flow box in the runs or `inline_boxes` vec
     pub(crate) index: usize,
     /// Bidi level for the item (used for reordering)
     pub(crate) bidi_level: BidiLevel,
@@ -289,10 +287,31 @@ impl<B: Brush> LayoutData<B> {
         self.alignment = None;
     }
 
-    /// Push an inline box to the list of items
-    pub(crate) fn push_inline_box(&mut self, index: usize, bidi_level: BidiLevel) {
+    /// Place inline box `index`, which must be an inline object: its width becomes the advance of
+    /// its object, and its baseline offset is resolved.
+    pub(crate) fn place_inline_object(&mut self, index: usize) {
+        let layout_box = &mut self.inline_boxes[index];
+        debug_assert!(
+            layout_box.is_inline_object(),
+            "box {index} is not an inline object"
+        );
+        layout_box.baseline_offset = inline_box_placement(
+            &layout_box.inline_box,
+            layout_box.parent_style_index,
+            &self.style_metrics,
+            self.quantize,
+        )
+        .baseline_offset;
+        if let Some(cluster) = layout_box.inline_object_cluster {
+            self.shaped_text
+                .set_inline_object_advance(cluster, layout_box.inline_box.width);
+        }
+    }
+
+    /// Push an out-of-flow box to the list of items
+    pub(crate) fn push_out_of_flow_box(&mut self, index: usize, bidi_level: BidiLevel) {
         self.items.push(LayoutItem {
-            kind: LayoutItemKind::InlineBox,
+            kind: LayoutItemKind::OutOfFlowBox,
             index,
             bidi_level,
         });
@@ -489,8 +508,7 @@ impl ContentWidthsMeasurer {
 
     #[inline(always)]
     fn measure<B: Brush>(mut self, layout_data: &LayoutData<B>) -> ContentWidths {
-        let mut items = layout_data.items.iter();
-        while let Some(item) = items.next() {
+        for item in &layout_data.items {
             match item.kind {
                 LayoutItemKind::TextRun => {
                     let slice = layout_data.shaped_text.run_slice(item.index as u32);
@@ -520,27 +538,8 @@ impl ContentWidthsMeasurer {
                         );
                     }
                 }
-                LayoutItemKind::InlineBox => {
-                    let inline_box = &layout_data.inline_boxes[item.index].inline_box;
-                    if inline_box.kind == InlineBoxKind::InFlow {
-                        let next = items.as_slice().iter().find(|next| {
-                            next.kind == LayoutItemKind::TextRun
-                                || layout_data.inline_boxes[next.index].inline_box.kind
-                                    == InlineBoxKind::InFlow
-                        });
-                        // A forced break right after a box suppresses the box's soft wrap
-                        // opportunity.
-                        let followed_by_inline_content = match next {
-                            Some(next) if next.kind == LayoutItemKind::TextRun => {
-                                let slice = layout_data.shaped_text.run_slice(next.index as u32);
-                                slice.shaped_clusters()[0].whitespace() != Whitespace::Newline
-                            }
-                            Some(_) => true,
-                            None => false,
-                        };
-                        self.measure_inline_box(inline_box, followed_by_inline_content);
-                    }
-                }
+                // Out-of-flow boxes take up no space.
+                LayoutItemKind::OutOfFlowBox => {}
             }
         }
 
@@ -658,23 +657,5 @@ impl ContentWidthsMeasurer {
             }
         }
         self.line_has_content = empty_at != clusters.len();
-    }
-
-    fn measure_inline_box(&mut self, inline_box: &InlineBox, followed_by_inline_content: bool) {
-        // Inline boxes have soft wrap opportunities on both sides.
-        let wraps = self.text_wrap_mode == TextWrapMode::Wrap;
-        if wraps {
-            self.soft_break(self.line_has_content);
-        }
-        // Inline boxes don't hang.
-        self.running_hanging_whitespace = 0.0;
-        self.running_min_width += inline_box.width;
-        self.running_max_width += inline_box.width;
-        self.line_has_content = true;
-        if wraps && followed_by_inline_content {
-            self.soft_break(true);
-            // Nothing has been placed on the new line yet.
-            self.line_has_content = false;
-        }
     }
 }

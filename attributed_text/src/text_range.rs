@@ -23,13 +23,13 @@ use crate::{Endpoint, Error, TextStorage};
 /// `TextRange` lets you validate once and then pass the range to APIs that can be infallible with
 /// respect to range correctness.
 ///
-/// ## Important
+/// # Important
 ///
 /// `TextRange` does not currently encode which specific text buffer it was validated against. It
 /// is the caller's responsibility to only reuse a `TextRange` with the same underlying text
 /// content it was validated for.
 ///
-/// ## Example
+/// # Example
 ///
 /// ```
 /// use attributed_text::{AttributedText, TextRange};

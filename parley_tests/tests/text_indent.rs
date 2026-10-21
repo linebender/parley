@@ -516,7 +516,7 @@ fn text_indent_hit_testing() {
 
     let cursor_line2_start = Cursor::from_point(&layout, 5.0, line1_y);
     assert!(
-        (cursor_line2_start.index() as isize - line1_text_start as isize).unsigned_abs() <= 1,
+        cursor_line2_start.index().abs_diff(line1_text_start) <= 1,
         "Clicking at x=5 on non-indented line should resolve near line start ({}), got {}",
         line1_text_start,
         cursor_line2_start.index()

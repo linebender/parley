@@ -6,9 +6,7 @@
 
 use alloc::vec::Vec;
 use parley_engine::shape::{CharCluster, Coverage};
-use parley_engine::{
-    Analysis, AnalysisDataSources, FontInstance, FontInstanceRef, ShapeOptions, Shaper,
-};
+use parley_engine::{Analysis, FontInstance, FontInstanceRef, ShapeOptions, Shaper};
 use smallvec::SmallVec;
 
 use super::layout::Layout;
@@ -53,7 +51,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     scx: &mut Shaper,
     mut text: &str,
     layout: &mut Layout<B>,
-    analysis_data_sources: &AnalysisDataSources,
+    style_features: &'a mut Vec<SmallVec<[FontFeature; 8]>>,
 ) {
     // If we have both empty text and no inline boxes, shape with a fake space
     // to generate metrics that can be used to size a cursor.
@@ -63,42 +61,44 @@ pub(crate) fn shape_text<'a, B: Brush>(
 
     // Do nothing if there is no text or styles (there should always be a default style)
     if text.is_empty() || styles.is_empty() {
-        // Process any remaining inline boxes whose index is greater than the length of the text
+        // Empty text may still have out-of-flow boxes.
         for box_idx in 0..inline_boxes.len() {
-            // Push the box to the list of items
-            layout.data.push_inline_box(box_idx, BidiLevel::new(0));
+            layout.data.push_out_of_flow_box(box_idx, BidiLevel::new(0));
         }
         return;
     }
 
     let mut fq = fcx.collection.query(&mut fcx.source_cache);
 
-    let mut inline_box_iter = inline_boxes.iter().map(|b| &b.inline_box).peekable();
+    let mut out_of_flow_box_iter = inline_boxes
+        .iter()
+        .filter(|b| !b.is_inline_object())
+        .map(|b| &b.inline_box)
+        .peekable();
 
     // Merge font features with letter-spacing ligature suppression.
     //
-    // TODO: This allocation is slightly unfortunate (though solvable). It's required currently,
+    // TODO: This copy is slightly unfortunate (though solvable). It's required currently,
     // because the iterator providing `ShapeOptions` has to provide a borrowed `&'a [FontFeature]`,
     // which cannot be tied to the lifetime of the call to `Iterator::next`. What we'd need is a
     // lending iterator (i.e., we probably just need to let `parley_engine` take some trait
     // providing the items).
-    let style_features: &'_ Vec<SmallVec<[FontFeature; 8]>> = &styles
-        .iter()
-        .map(|style| {
-            let style_features = rcx.features(style.font_features).unwrap_or(&[]);
-            if !nearly_zero(style.letter_spacing) {
-                // Later values override earlier values.
-                OPTIONAL_LIGATURES_OFF
-                    .into_iter()
-                    .chain(style_features.iter().copied())
-                    .collect()
-            } else {
-                style_features.iter().copied().collect()
-            }
-        })
-        .collect();
+    style_features.clear();
+    style_features.extend(styles.iter().map(|style| {
+        let style_features = rcx.features(style.font_features).unwrap_or(&[]);
+        if !nearly_zero(style.letter_spacing) {
+            // Later values override earlier values.
+            OPTIONAL_LIGATURES_OFF
+                .into_iter()
+                .chain(style_features.iter().copied())
+                .collect()
+        } else {
+            style_features.iter().copied().collect()
+        }
+    }));
+    let style_features = &*style_features;
 
-    // Split when shaping-relevant style properties change and at inline boxes.
+    // Split when shaping-relevant style properties change and at out-of-flow boxes.
     let items = {
         // TODO: we currently walk characters here, but we could instead just walk boundaries of
         // styles and inline boxes.
@@ -131,13 +131,13 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 //
                 // We loop because there may be multiple boxes at this index.
                 let mut split = false;
-                while let Some(inline_box) = inline_box_iter.peek() {
+                while let Some(inline_box) = out_of_flow_box_iter.peek() {
                     if inline_box.index < byte_index {
                         // Inline boxes *before* this index are popped (this occurs if the itemizer
                         // split a run and we were not called, such as at a bidi boundary).
-                        inline_box_iter.next();
+                        out_of_flow_box_iter.next();
                     } else if inline_box.index == byte_index {
-                        inline_box_iter.next();
+                        out_of_flow_box_iter.next();
                         split = true;
                     } else {
                         break;
@@ -179,7 +179,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         })
     };
 
-    let font_selector = FontSelector::new(&mut fq, rcx, styles, analysis_data_sources);
+    let font_selector = FontSelector::new(&mut fq, rcx, styles);
 
     scx.shape_text(
         text,
@@ -191,10 +191,12 @@ pub(crate) fn shape_text<'a, B: Brush>(
         &mut layout.data.shaped_text,
     );
 
-    let mut inline_box_iter = inline_boxes
+    // Out-of-flow boxes are laid out as items of their own.
+    let mut out_of_flow_box_iter = inline_boxes
         .iter()
-        .map(|b| &b.inline_box)
         .enumerate()
+        .filter(|(_, b)| !b.is_inline_object())
+        .map(|(box_idx, b)| (box_idx, &b.inline_box))
         .peekable();
     for shaped_run_idx in 0..layout.data.shaped_text.runs().len() {
         let shaped_run = &layout.data.shaped_text.runs()[shaped_run_idx];
@@ -202,20 +204,20 @@ pub(crate) fn shape_text<'a, B: Brush>(
         let run_style_index = char_style_indices[shaped_run.range.char_range.start];
         let run_style = &styles[usize::from(run_style_index)];
 
-        // Push inline boxes positioned before the start of this item.
+        // Push out-of-flow boxes positioned before the start of this item.
         //
-        // TODO: this lets the inline box take the bidi level of the previous run, but in principle
-        // inline boxes should be included in bidi analysis as an object replacement character
-        // (U+FFFC). The box should then take the bidi level of that character.
+        // TODO: this gives the box the bidi level of the previous run. At direction boundaries it
+        // puts the box on the wrong side, e.g. at the start of an RTL paragraph, or at the end of
+        // an LTR one that ends in RTL text.
         let prev_bidi_level = if shaped_run_idx > 0 {
             layout.data.shaped_text.runs()[&shaped_run_idx - 1].bidi_level
         } else {
             BidiLevel::new(0)
         };
-        while let Some((box_idx, inline_box)) = inline_box_iter.peek() {
+        while let Some((box_idx, inline_box)) = out_of_flow_box_iter.peek() {
             if inline_box.index <= run_text_byte_start {
-                layout.data.push_inline_box(*box_idx, prev_bidi_level);
-                inline_box_iter.next();
+                layout.data.push_out_of_flow_box(*box_idx, prev_bidi_level);
+                out_of_flow_box_iter.next();
             } else {
                 break;
             }
@@ -245,8 +247,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
         .last()
         .map(|r| r.bidi_level)
         .unwrap_or(BidiLevel::new(0));
-    for (box_idx, _inline_box) in inline_box_iter {
-        layout.data.push_inline_box(box_idx, bidi_level);
+    for (box_idx, _inline_box) in out_of_flow_box_iter {
+        layout.data.push_out_of_flow_box(box_idx, bidi_level);
     }
 }
 
@@ -271,8 +273,6 @@ struct FontSelector<'a, 'b, B: Brush> {
 
     /// The font to use if [`Self::query`] doesn't return any font.
     last_resort_font: LastResortFont,
-
-    analysis_data_sources: &'a AnalysisDataSources,
 }
 
 impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
@@ -284,7 +284,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         query: &'b mut Query<'a>,
         rcx: &'a ResolveContext,
         styles: &'a [ResolvedStyle<B>],
-        analysis_data_sources: &'a AnalysisDataSources,
     ) -> Self {
         let attrs = fontique::Attributes::default();
 
@@ -297,8 +296,6 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
             attrs,
             query_yields_font: None,
             last_resort_font: LastResortFont::Unresolved,
-
-            analysis_data_sources,
         }
     }
 }
@@ -406,18 +403,15 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
                 return fontique::QueryStatus::Continue;
             };
 
-            let coverage = cluster.calculate_coverage(
-                |ch| {
-                    charmap
-                        .map(ch)
-                        .map(|g| {
-                            // Any non-zero value indicates the existence of a glyph.
-                            g != 0
-                        })
-                        .unwrap_or_default()
-                },
-                self.analysis_data_sources,
-            );
+            let coverage = cluster.calculate_coverage(|ch| {
+                charmap
+                    .map(ch)
+                    .map(|g| {
+                        // Any non-zero value indicates the existence of a glyph.
+                        g != 0
+                    })
+                    .unwrap_or_default()
+            });
             if coverage > best_coverage {
                 selected_font = Some(font);
                 best_coverage = coverage;

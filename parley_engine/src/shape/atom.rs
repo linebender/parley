@@ -553,6 +553,14 @@ impl<'a> Atom<'a> {
         self.slice.shaped_clusters[self.clusters.0 as usize].is_safe_to_break_before()
     }
 
+    /// Whether this atom is an inline object.
+    ///
+    /// See [`ShapedCluster::is_inline_object`].
+    #[inline(always)]
+    pub fn is_inline_object(&self) -> bool {
+        self.slice.shaped_clusters[self.clusters.0 as usize].is_inline_object()
+    }
+
     /// The atom's total advance.
     ///
     /// This is the sum of the atom's clusters' advances.
@@ -887,6 +895,7 @@ mod tests {
                 ..AnalysisOptions::default()
             },
             &mut analysis,
+            &crate::AnalysisDataSources::default(),
         );
         analysis
     }

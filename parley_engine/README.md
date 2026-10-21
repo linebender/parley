@@ -16,17 +16,25 @@
 
 <!-- We use cargo-rdme to update the README with the contents of lib.rs.
 To edit the following section, update it in lib.rs, then run:
-cargo rdme --workspace-project=parley_engine --heading-base-level=0
+cargo rdme --workspace-project=parley_engine
 Full documentation at https://github.com/orium/cargo-rdme -->
 
 <!-- Intra-doc links used in lib.rs should be evaluated here.
 See https://linebender.org/blog/doc-include/ for related discussion. -->
-
+[`Analyzer`]: https://docs.rs/parley_engine/latest/parley_engine/struct.Analyzer.html
+[`Analysis`]: https://docs.rs/parley_engine/latest/parley_engine/struct.Analysis.html
+[`Shaper`]: https://docs.rs/parley_engine/latest/parley_engine/struct.Shaper.html
+[`ShapedText`]: https://docs.rs/parley_engine/latest/parley_engine/struct.ShapedText.html
+[`Atom`]: https://docs.rs/parley_engine/latest/parley_engine/struct.Atom.html
+[crate::shape::ShapedCluster]: https://docs.rs/parley_engine/latest/parley_engine/shape/struct.ShapedCluster.html
+[`DictionaryProvider`]: https://docs.rs/parley_engine/latest/parley_engine/trait.DictionaryProvider.html
+[`parlance`]: https://docs.rs/parlance/latest/parlance/
+[`alloc`]: https://doc.rust-lang.org/stable/alloc/
 <!-- cargo-rdme start -->
 
 Parley Engine provides low level APIs for shaping paragraphs of text.
 
-## Usage
+### Usage
 
 Use [`Analyzer`], [`Analysis`], [`Shaper`] and [`ShapedText`] to shape a paragraph of text into
 glyphs. Correct reshaping of lines is in progress; in the meantime you can break text at
@@ -48,7 +56,7 @@ let text = "The quick brown ثعلب jumps over the lazy dog.";
 let char_count = text.chars().count();
 let char_style_indices = vec![0; char_count];
 
-analyzer.analyze(text, &AnalysisOptions::default(), &mut analysis);
+analyzer.analyze(text, &AnalysisOptions::default(), &mut analysis, &parley_engine::AnalysisDataSources::default());
 shaper.shape_text(
     text,
     &analysis,
@@ -90,11 +98,24 @@ for (run_idx, run) in shaped_text.runs().iter().enumerate() {
 
 ## Features
 
-- `std` (enabled by default): This is currently unused and is provided for forward compatibility.
-- `bytemuck`: Forwarded to [`parlance`], which then implements traits from `bytemuck` on its
-  types.
+The following crate [feature flags](https://doc.rust-lang.org/cargo/reference/features.html#dependency-features) are available:
 
-[parley]: https://docs.rs/parley
+- `std` (enabled by default): Get floating point functions from the standard library
+  (likely using your target's libc).
+- `libm`: Use floating point implementations from [libm][].
+  This is useful for `no_std` environments.
+  However, note that the `libm` crate is not as efficient as the standard library.
+- `bytemuck`: Forwarded to [`parlance`][] which then implements traits from `bytemuck` on its types.
+- `complex-scripts`: Enable dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
+  When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
+  See [`DictionaryProvider`][] for full details.
+
+At least one of `std` and `libm` is required; `std` overrides `libm`.
+Note that Parley Engine requires that an allocator is available (i.e. it uses [`alloc`][]).
+
+[parley]: https://docs.rs/parley/latest/parley/
+
+[libm]: https://crates.io/crates/libm
 
 <!-- cargo-rdme end -->
 
@@ -122,10 +143,6 @@ cargo update -p package_name --precise 0.1.1
 Discussion of Parley Engine development happens in the [Linebender Zulip](https://xi.zulipchat.com/), specifically the [#parley channel](https://xi.zulipchat.com/#narrow/channel/205635-parley).
 All public content can be read without logging in.
 
-Contributions are welcome by pull request. The [Rust code of conduct] applies.
-
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache 2.0 license, shall be licensed as noted in the [License](#license) section, without any additional terms or conditions.
-
 ## License
 
 Licensed under either of
@@ -135,4 +152,13 @@ Licensed under either of
 
 at your option.
 
+## Contribution
+
+Contributions are welcome by pull request.
+The [Rust code of conduct] applies.
+Please feel free to add your name to the [AUTHORS] file in any substantive pull request.
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be licensed as above, without any additional terms or conditions.
+
 [Rust code of conduct]: https://www.rust-lang.org/policies/code-of-conduct
+[AUTHORS]: ../AUTHORS

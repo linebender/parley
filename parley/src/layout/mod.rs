@@ -34,7 +34,6 @@ pub use line_break::{
 pub use run::Run;
 
 pub(crate) use data::{LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData};
-pub(crate) use line::LineItem;
 pub(crate) use spacing::Spacing;
 
 // TODO - Deprecation not yet active to ease internal code migration.

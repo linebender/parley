@@ -3,7 +3,7 @@ name = "attributed_text"
 version = "0.1.0"
 description = "A library for working with attributed text"
 keywords = ["text", "rich text", "attributed text"]
-categories = ["graphics", "text"]
+categories = ["graphics", "text", "no-std"]
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -13,12 +13,10 @@ publish = false
 
 [package.metadata.docs.rs]
 all-features = true
-# There are no platform specific docs.
-default-target = "x86_64-unknown-linux-gnu"
-targets = []
 
 [features]
 default = ["std"]
+# This is currently unused and is provided for forward compatibility.
 std = []
 
 [dependencies]
