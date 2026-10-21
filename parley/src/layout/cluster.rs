@@ -305,7 +305,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
             Some(next)
         } else {
             let index = self.text_range().end;
-            if index >= self.run.layout.data.text_len {
+            if index >= self.run.layout.data.text.len() {
                 return None;
             }
             // We have to search for the cluster containing our end index

@@ -11,6 +11,7 @@ use crate::style::Brush;
 use crate::{IndentOptions, LineHeight, OverflowWrap, TextWrapMode, WhiteSpaceCollapse};
 use core::ops::Range;
 
+use alloc::string::String;
 use alloc::vec::Vec;
 use parlance::BidiLevel;
 use parley_engine::shape::Whitespace;
@@ -195,8 +196,8 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) quantize: bool,
     /// The `BiDi` base level
     pub(crate) base_level: BidiLevel,
-    /// The length of the text in the layout
-    pub(crate) text_len: usize,
+    /// The text of the layout
+    pub(crate) text: String,
 
     // Output of style resolution (input to line breaking)
     pub(crate) styles: Vec<Style<B>>,
@@ -242,7 +243,7 @@ impl<B: Brush> Default for LayoutData<B> {
             scale: 1.,
             quantize: true,
             base_level: BidiLevel::new(0),
-            text_len: 0,
+            text: String::new(),
             width: 0.,
             full_width: 0.,
             height: 0.,
@@ -268,7 +269,7 @@ impl<B: Brush> LayoutData<B> {
         self.scale = 1.;
         self.quantize = true;
         self.base_level = BidiLevel::new(0);
-        self.text_len = 0;
+        self.text.clear();
         self.width = 0.;
         self.full_width = 0.;
         self.height = 0.;
