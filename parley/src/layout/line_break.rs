@@ -26,7 +26,7 @@ use crate::{
 
 use core::ops::Range;
 use parley_engine::Atom;
-use parley_engine::shape::{Character, Whitespace};
+use parley_engine::shape::{Character, ReshapedTextMark, Whitespace};
 use smallvec::SmallVec;
 
 #[derive(Default)]
@@ -638,6 +638,8 @@ pub struct BreakerState {
     items: usize,
     /// The number of lines that have been processed (used to revert state)
     lines: usize,
+    /// A mark in a [`LayoutData::reshaped`] (used to revert state)
+    reshaped: ReshapedTextMark,
 
     /// Iteration state: the current item (within the layout)
     item_idx: usize,
@@ -744,6 +746,7 @@ impl Default for BreakerState {
         Self {
             items: 0,
             lines: 0,
+            reshaped: ReshapedTextMark::default(),
             item_idx: 0,
             run_idx: 0,
             cluster_idx: 0,
@@ -921,6 +924,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     pub(crate) fn new(layout: &'a mut Layout<B>) -> Self {
         layout.data.width = 0.;
         layout.data.height = 0.;
+        layout.data.reshaped.clear();
         let mut lines = LineLayout::default();
         lines.swap(&mut layout.data);
         lines.lines.clear();
@@ -984,6 +988,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         self.state.items = self.lines.line_items.len();
         self.state.lines = self.lines.lines.len();
+        self.state.reshaped = self.layout.data.reshaped.mark();
         self.state.prev_boundary = None;
         self.state.emergency_boundary = None;
 
@@ -1052,6 +1057,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         self.state = state;
         self.lines.truncate(self.state.lines);
         self.lines.line_items.truncate(self.state.items);
+        self.layout.data.reshaped.truncate(self.state.reshaped);
         self.done = false;
     }
 
