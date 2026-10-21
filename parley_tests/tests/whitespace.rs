@@ -1,13 +1,16 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use core::ops::Range;
+
 use crate::{
     test_name,
     util::{ColorBrush, TestEnv},
 };
 use parley::{
-    Alignment, AlignmentOptions, BaseDirection, BreakReason, InlineBox, InlineBoxKind, Layout,
-    OverflowWrap, StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse, WordBreak,
+    Alignment, AlignmentOptions, BaseDirection, BreakReason, Cluster, InlineBox, InlineBoxKind,
+    Layout, OverflowWrap, StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
+    WordBreak,
 };
 
 fn nearly_eq(actual: f32, expected: f32) {
@@ -381,6 +384,93 @@ fn break_spaces_inline_boxes_and_rtl() {
                 nearly_eq(line.metrics().hanging_advance, 0.);
             }
             nearly_eq(layout.full_width(), layout.calculate_content_widths().min);
+        }
+    }
+}
+
+#[test]
+fn trailing_whitespace_takes_paragraph_direction() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Following UAX #9 rule L1, the whitespace at the end of a line is reset to the paragraph's
+    // level, so it ends up at the line's end edge, where it hangs (CSS Text 4 § 4.3.2). That
+    // includes whitespace ending text of the opposite direction.
+    let arabic = "\u{0627}\u{0628}\u{062A}";
+    let space = advance(&mut env, " ");
+    for (word, direction) in [
+        ("aaaa", BaseDirection::Ltr),
+        ("aaaa", BaseDirection::Rtl),
+        (arabic, BaseDirection::Ltr),
+        (arabic, BaseDirection::Rtl),
+    ] {
+        let text = format!("{word} {word}");
+        let word_advance = advance(&mut env, word);
+        let is_rtl = direction == BaseDirection::Rtl;
+        for collapse in [
+            WhiteSpaceCollapse::Collapse,
+            WhiteSpaceCollapse::Preserve,
+            WhiteSpaceCollapse::BreakSpaces,
+        ] {
+            let hangs = collapse != WhiteSpaceCollapse::BreakSpaces;
+            // The first line's content without its hanging whitespace.
+            let width = if hangs {
+                word_advance
+            } else {
+                word_advance + space
+            };
+            let mut builder = env.ranged_builder(&text);
+            builder.set_base_direction(direction);
+            builder.push_default(StyleProperty::WhiteSpaceCollapse(collapse));
+            let mut layout = builder.build(&text);
+            nearly_eq(layout.calculate_content_widths().min, width);
+
+            layout.break_all_lines(Some(width));
+            assert_eq!(layout.len(), 2, "{text:?} {direction:?} {collapse:?}");
+            let line = layout.get(0).unwrap();
+            assert_eq!(&text[line.text_range()], format!("{word} "));
+            nearly_eq(
+                line.metrics().hanging_advance,
+                if hangs { space } else { 0. },
+            );
+            nearly_eq(layout.width(), width);
+
+            for alignment in [
+                Alignment::Start,
+                Alignment::End,
+                Alignment::Left,
+                Alignment::Center,
+                Alignment::Right,
+            ] {
+                // The content fits the line exactly, so the word is in the same place under every
+                // alignment, and the space is at the line's end edge.
+                layout.align(alignment, AlignmentOptions::default());
+                let extent = |range: Range<usize>| {
+                    range
+                        .filter(|&index| text.is_char_boundary(index))
+                        .map(|index| {
+                            let cluster = Cluster::from_byte_index(&layout, index).unwrap();
+                            let offset = cluster.visual_offset().unwrap();
+                            (offset, offset + cluster.advance())
+                        })
+                        .fold((f32::INFINITY, f32::NEG_INFINITY), |a, b| {
+                            (a.0.min(b.0), a.1.max(b.1))
+                        })
+                };
+                let word_extent = extent(0..word.len());
+                let space_extent = extent(word.len()..word.len() + 1);
+                let space_cluster = Cluster::from_byte_index(&layout, word.len()).unwrap();
+                assert_eq!(space_cluster.is_rtl(), is_rtl);
+                let word_start = if hangs || !is_rtl { 0. } else { space };
+                nearly_eq(word_extent.0, word_start);
+                nearly_eq(word_extent.1, word_start + word_advance);
+                let space_start = if is_rtl {
+                    word_start - space
+                } else {
+                    word_advance
+                };
+                nearly_eq(space_extent.0, space_start);
+                nearly_eq(space_extent.1, space_start + space);
+            }
         }
     }
 }
