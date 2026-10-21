@@ -67,16 +67,6 @@ impl<B: Brush> Layout<B> {
         &self.data.styles
     }
 
-    /// The metrics of the span with the given style index, from the span's first available
-    /// font face and size. Importantly, this excludes metrics derived from fallback fonts
-    /// that were used in shaping. `None` until layout is built.
-    pub fn span_metrics(&self, style_index: u16) -> Option<SpanMetrics> {
-        self.data
-            .style_metrics
-            .get(usize::from(style_index))
-            .map(StyleMetrics::span_metrics)
-    }
-
     /// The inherent metrics of the root span (in CSS terms, that is the metrics of the
     /// [root inline box](https://www.w3.org/TR/css-inline-3/#root-inline-box)).
     ///
@@ -87,7 +77,10 @@ impl<B: Brush> Layout<B> {
     /// The motivating use case is placing bullet list markers - Blink uses the root
     /// span's ascent and descent for their location and size.
     pub fn root_span_metrics(&self) -> Option<SpanMetrics> {
-        self.span_metrics(0)
+        self.data
+            .style_metrics
+            .first()
+            .map(StyleMetrics::span_metrics)
     }
 
     /// Returns the length of the source text, in bytes.

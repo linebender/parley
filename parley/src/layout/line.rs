@@ -313,7 +313,11 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
         self.style_index
     }
 
-    /// Returns the metrics of the glyph's enclosing span, from the primary font.
+    /// Returns the inherent metrics of the run's associated span, from the first available font.
+    ///
+    /// The metrics are identical for every run in the span, including runs that fell back to
+    /// another font. Blink positions `line-through` from this ascent (i.e. the primary font's),
+    /// for example, so a strikethrough placed from it keeps one height across fallback fonts.
     pub fn span_metrics(&self) -> SpanMetrics {
         self.run.layout.data.style_metrics[usize::from(self.style_index)].span_metrics()
     }
