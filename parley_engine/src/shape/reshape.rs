@@ -28,7 +28,9 @@ use crate::{
 };
 
 /// A mark that [`ReshapedText`] can be trimmed to.
-#[derive(Clone, Copy, Debug)]
+///
+/// [`ReshapedTextMark::default`] is the empty start of a [`ReshapedText`].
+#[derive(Clone, Copy, Debug, Default)]
 pub struct ReshapedTextMark {
     runs_len: u32,
     shaped_clusters_len: u32,
