@@ -271,7 +271,7 @@ impl ShapedCluster {
 
     /// The [`Whitespace`] class of this cluster's first character.
     ///
-    /// See [`Self::is_soft_wrap_opportunity_before`].
+    /// Cached here so that measuring text does not need to read the character array.
     #[inline(always)]
     pub fn whitespace(self) -> Whitespace {
         self.flags.whitespace()
@@ -398,6 +398,7 @@ impl CharacterFlags {
     /// Returns if the character is default ignorable.
     ///
     /// These are the characters with the Unicode [`Default_Ignorable_Code_Point`] property.
+    /// This property is used in Parley to disable letter-spacing for some atoms, matching Blink.
     ///
     /// [`Default_Ignorable_Code_Point`]: https://www.unicode.org/reports/tr44/#Default_Ignorable_Code_Point
     #[inline(always)]

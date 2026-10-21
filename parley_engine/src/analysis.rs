@@ -458,9 +458,11 @@ impl CharInfo {
         self.flags & Self::EMOJI_MODIFIER_BASE_MASK != 0
     }
 
-    /// Whether this character has the `Default_Ignorable_Code_Point` property ([UAX #44][]).
+    /// Whether this character has the [`Default_Ignorable_Code_Point`] property.
     ///
-    /// [UAX #44]: https://www.unicode.org/reports/tr44/#Default_Ignorable_Code_Point
+    /// This property is used in Parley to disable letter-spacing for some atoms, matching Blink.
+    ///
+    /// [`Default_Ignorable_Code_Point`]: https://www.unicode.org/reports/tr44/#Default_Ignorable_Code_Point
     #[inline(always)]
     pub fn is_default_ignorable(self) -> bool {
         self.flags & Self::DEFAULT_IGNORABLE_MASK != 0
