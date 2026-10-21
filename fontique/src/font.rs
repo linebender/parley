@@ -424,7 +424,9 @@ fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
         let style = if fs_selection.contains(SelectionFlags::ITALIC) {
             FontStyle::Italic
         } else if fs_selection.contains(SelectionFlags::OBLIQUE) {
-            let angle = post.map(|post| post.italic_angle().to_f64() as f32);
+            // A positive `italicAngle` slants counter-clockwise, whereas positive CSS obliques
+            // slant clockwise. Hence, we need to negate the angle.
+            let angle = post.map(|post| -post.italic_angle().to_f64() as f32);
             FontStyle::Oblique(angle)
         } else {
             FontStyle::Normal
