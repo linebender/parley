@@ -277,9 +277,9 @@ impl ShapedCluster {
         self.flags.whitespace()
     }
 
-    /// Whether this cluster's first character is default ignorable.
+    /// Whether this cluster's first character's [`CharacterFlags::is_default_ignorable`] flag is `true`.
     ///
-    /// See [`Self::is_soft_wrap_opportunity_before`].
+    /// Cached here so that measuring text does not need to read the character array.
     #[inline(always)]
     pub fn is_default_ignorable(self) -> bool {
         self.flags.is_default_ignorable()

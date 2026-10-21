@@ -100,14 +100,14 @@ impl Spacing {
     /// - has the given whitespace class, and
     /// - has the given value for its [`CharacterFlags::is_default_ignorable`].
     ///
-    /// This ignore [`EffectiveSpacing::gaps`] under [`Justification::NONE`].
+    /// This is [`EffectiveSpacing::gaps`] under [`Justification::NONE`].
     ///
     /// In CSS [letter-spacing][] ignores "invisible zero-width formatting characters", but
     /// doesn't specify an exact list. Blink chooses to ignore clusters which start with a default
     /// ignorable character, so we do the same. Blink does additionally hardcode skipping letter-spacing
     /// for U+000C FORM FEED, but we choose not to, as the WPTs suggest it should have ink.
     ///
-    /// Only checking the first character does sometimes cause underisable results, primarily due to
+    /// Only checking the first character does sometimes cause undesirable results, primarily due to
     /// U+115F HANGUL CHOSEONG FILLER. Blink has the same bug, but fixing this would be welcome.
     ///
     /// [`CharacterFlags::is_default_ignorable`]: parley_engine::shape::CharacterFlags::is_default_ignorable
