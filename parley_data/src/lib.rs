@@ -71,6 +71,7 @@ impl Properties {
     const IS_EMOJI_PRESENTATION_BITS: u32 = 1;
     const IS_EMOJI_MODIFIER_BITS: u32 = 1;
     const IS_EMOJI_MODIFIER_BASE_BITS: u32 = 1;
+    const IS_DEFAULT_IGNORABLE_BITS: u32 = 1;
 
     const SCRIPT_SHIFT: u32 = 0;
     const GC_SHIFT: u32 = Self::SCRIPT_SHIFT + Self::SCRIPT_BITS;
@@ -90,6 +91,8 @@ impl Properties {
         Self::IS_EMOJI_PRESENTATION_SHIFT + Self::IS_EMOJI_PRESENTATION_BITS;
     const IS_EMOJI_MODIFIER_BASE_SHIFT: u32 =
         Self::IS_EMOJI_MODIFIER_SHIFT + Self::IS_EMOJI_MODIFIER_BITS;
+    const IS_DEFAULT_IGNORABLE_SHIFT: u32 =
+        Self::IS_EMOJI_MODIFIER_BASE_SHIFT + Self::IS_EMOJI_MODIFIER_BASE_BITS;
 
     #[inline(always)]
     /// Returns the properties for a given character.
@@ -108,6 +111,7 @@ impl Properties {
         bidi: BidiClass,
         is_emoji_or_pictographic: bool,
         is_variation_selector: bool,
+        is_default_ignorable: bool,
         is_mandatory_linebreak: bool,
         needs_dictionary_word_break: bool,
         is_emoji: bool,
@@ -130,6 +134,7 @@ impl Properties {
                 | (bidi << Self::BIDI_SHIFT)
                 | ((is_emoji_or_pictographic as u64) << Self::IS_EMOJI_OR_PICTOGRAPH_SHIFT)
                 | ((is_variation_selector as u64) << Self::IS_VARIATION_SELECTOR_SHIFT)
+                | ((is_default_ignorable as u64) << Self::IS_DEFAULT_IGNORABLE_SHIFT)
                 | ((is_mandatory_linebreak as u64) << Self::IS_MANDATORY_LINE_BREAK_SHIFT)
                 | ((needs_dictionary_word_break as u64) << Self::NEEDS_DICTIONARY_WORD_BREAK_SHIFT)
                 | ((is_emoji as u64) << Self::IS_EMOJI_SHIFT)
@@ -264,6 +269,18 @@ impl Properties {
             Self::IS_EMOJI_MODIFIER_BASE_BITS,
         ) != 0
     }
+
+    /// Returns whether the character has the `Default_Ignorable_Code_Point` property
+    /// ([UAX #44][]).
+    ///
+    /// [UAX #44]: https://www.unicode.org/reports/tr44/#Default_Ignorable_Code_Point
+    #[inline(always)]
+    pub fn is_default_ignorable(&self) -> bool {
+        self.bits(
+            Self::IS_DEFAULT_IGNORABLE_SHIFT,
+            Self::IS_DEFAULT_IGNORABLE_BITS,
+        ) != 0
+    }
 }
 
 impl From<Properties> for u64 {
@@ -276,9 +293,9 @@ impl From<Properties> for u64 {
 mod tests {
     use super::Properties;
     use icu_properties::props::{
-        BidiClass, Emoji, EmojiModifier, EmojiModifierBase, EmojiPresentation,
-        ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, RegionalIndicator,
-        Script, VariationSelector,
+        BidiClass, DefaultIgnorableCodePoint, Emoji, EmojiModifier, EmojiModifierBase,
+        EmojiPresentation, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak,
+        RegionalIndicator, Script, VariationSelector,
     };
     use icu_properties::{CodePointMapData, CodePointSetData};
 
@@ -315,6 +332,7 @@ mod tests {
         is_emoji_or_pictograph: bool,
         is_variation_selector: bool,
         is_region_indicator: bool,
+        is_default_ignorable: bool,
         is_mandatory_linebreak: bool,
         needs_dictionary_word_break: bool,
         is_emoji: bool,
@@ -334,6 +352,8 @@ mod tests {
                     || CodePointSetData::new::<ExtendedPictographic>().contains32(cp),
                 is_variation_selector: CodePointSetData::new::<VariationSelector>().contains32(cp),
                 is_region_indicator: CodePointSetData::new::<RegionalIndicator>().contains32(cp),
+                is_default_ignorable: CodePointSetData::new::<DefaultIgnorableCodePoint>()
+                    .contains32(cp),
                 is_mandatory_linebreak: matches!(
                     CodePointMapData::<LineBreak>::new().get32(cp),
                     LineBreak::MandatoryBreak
@@ -365,6 +385,7 @@ mod tests {
                 is_variation_selector: properties.is_variation_selector(),
                 // Note that we don't actually pack this value - it's instead inferred from `GraphemeClusterBreak`.
                 is_region_indicator: properties.is_regional_indicator(),
+                is_default_ignorable: properties.is_default_ignorable(),
                 is_mandatory_linebreak: properties.is_mandatory_linebreak(),
                 needs_dictionary_word_break: properties.needs_dictionary_word_break(),
                 is_emoji: properties.is_emoji(),
@@ -383,6 +404,7 @@ mod tests {
                 self.bidi_class,
                 self.is_emoji_or_pictograph,
                 self.is_variation_selector,
+                self.is_default_ignorable,
                 self.is_mandatory_linebreak,
                 self.needs_dictionary_word_break,
                 self.is_emoji,

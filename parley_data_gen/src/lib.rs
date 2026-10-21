@@ -6,9 +6,9 @@
 use icu_properties::{
     CodePointMapData, CodePointSetData,
     props::{
-        BidiClass, Emoji, EmojiModifier, EmojiModifierBase, EmojiPresentation,
-        ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, Script,
-        VariationSelector,
+        BidiClass, DefaultIgnorableCodePoint, Emoji, EmojiModifier, EmojiModifierBase,
+        EmojiPresentation, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak,
+        Script, VariationSelector,
     },
 };
 use parley_data::Properties;
@@ -37,6 +37,7 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
     let bidi_class_data = CodePointMapData::<BidiClass>::new();
 
     let variation_selector_data = CodePointSetData::new::<VariationSelector>();
+    let default_ignorable_data = CodePointSetData::new::<DefaultIgnorableCodePoint>();
     let line_break_data = CodePointMapData::<LineBreak>::new();
 
     let emoji_presentation_data = CodePointSetData::new::<EmojiPresentation>();
@@ -65,6 +66,7 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
             bidi_class_data.get32(cp),
             is_emoji || is_extended_pictographic,
             variation_selector_data.contains32(cp),
+            default_ignorable_data.contains32(cp),
             // See: https://github.com/unicode-org/icu4x/blob/ee5399a77a6b94efb5d4b60678bb458c5eedb25d/components/segmenter/src/line.rs#L338-L351
             matches!(
                 line_break_data.get32(cp),

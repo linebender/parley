@@ -54,6 +54,8 @@ impl ShapedClusterFlags {
     const INLINE_OBJECT: u32 = 1 << 14;
     const SAFE_TO_BREAK_BEFORE: u32 = 1 << 15;
     const SAFE_TO_CONCAT_BEFORE: u32 = 1 << 16;
+    /// Whether the cluster's first character is default ignorable.
+    const DEFAULT_IGNORABLE: u32 = 1 << 17;
 
     #[inline(always)]
     pub(crate) const fn new(glyph_len: u8) -> Self {
@@ -97,14 +99,21 @@ impl ShapedClusterFlags {
         mut self,
         soft_wrap_opportunity: bool,
         whitespace: Whitespace,
+        default_ignorable: bool,
     ) -> Self {
-        self.0 = self.0 & !(Self::SOFT_WRAP_BEFORE | Self::WHITESPACE_MASK)
+        self.0 = self.0
+            & !(Self::SOFT_WRAP_BEFORE | Self::WHITESPACE_MASK | Self::DEFAULT_IGNORABLE)
             | if soft_wrap_opportunity {
                 Self::SOFT_WRAP_BEFORE
             } else {
                 0
             }
-            | ((whitespace as u32) << Self::WHITESPACE_SHIFT);
+            | ((whitespace as u32) << Self::WHITESPACE_SHIFT)
+            | if default_ignorable {
+                Self::DEFAULT_IGNORABLE
+            } else {
+                0
+            };
         self
     }
 
@@ -116,6 +125,11 @@ impl ShapedClusterFlags {
     #[inline(always)]
     const fn whitespace(self) -> Whitespace {
         Whitespace::from_u8(((self.0 & Self::WHITESPACE_MASK) >> Self::WHITESPACE_SHIFT) as u8)
+    }
+
+    #[inline(always)]
+    const fn is_default_ignorable(self) -> bool {
+        self.0 & Self::DEFAULT_IGNORABLE != 0
     }
 
     #[inline(always)]
@@ -263,6 +277,14 @@ impl ShapedCluster {
         self.flags.whitespace()
     }
 
+    /// Whether this cluster's first character is default ignorable.
+    ///
+    /// See [`Self::is_soft_wrap_opportunity_before`].
+    #[inline(always)]
+    pub fn is_default_ignorable(self) -> bool {
+        self.flags.is_default_ignorable()
+    }
+
     /// Whether this cluster is an inline object.
     ///
     /// An inline object's cluster consists of just its U+FFFC OBJECT REPLACEMENT CHARACTER (see
@@ -313,12 +335,15 @@ impl CharacterFlags {
     const SOFT_WRAP_OPPORTUNITY: u8 = 1 << 4;
     /// Whether the character stands in for an inline object.
     const INLINE_OBJECT: u8 = 1 << 5;
+    /// Whether the character has the `Default_Ignorable_Code_Point` unicode property.
+    const DEFAULT_IGNORABLE: u8 = 1 << 6;
 
     #[inline(always)]
     pub(crate) fn new(
         source_char: char,
         is_word_boundary: bool,
         is_soft_wrap_opportunity: bool,
+        is_default_ignorable: bool,
     ) -> Self {
         // TODO: Defer to ICU4X properties (see: https://docs.rs/icu/latest/icu/properties/props/struct.Emoji.html).
         let is_emoji = matches!(source_char as u32, 0x1F600..=0x1F64F | 0x1F300..=0x1F5FF | 0x1F680..=0x1F6FF | 0x2600..=0x26FF | 0x2700..=0x27BF);
@@ -337,6 +362,11 @@ impl CharacterFlags {
                 }
                 | if is_soft_wrap_opportunity {
                     Self::SOFT_WRAP_OPPORTUNITY
+                } else {
+                    0
+                }
+                | if is_default_ignorable {
+                    Self::DEFAULT_IGNORABLE
                 } else {
                     0
                 },
@@ -363,6 +393,16 @@ impl CharacterFlags {
     #[inline(always)]
     pub fn is_emoji(self) -> bool {
         self.0 & Self::EMOJI != 0
+    }
+
+    /// Returns if the character is default ignorable.
+    ///
+    /// These are the characters with the Unicode [`Default_Ignorable_Code_Point`] property.
+    ///
+    /// [`Default_Ignorable_Code_Point`]: https://www.unicode.org/reports/tr44/#Default_Ignorable_Code_Point
+    #[inline(always)]
+    pub fn is_default_ignorable(self) -> bool {
+        self.0 & Self::DEFAULT_IGNORABLE != 0
     }
 
     /// Returns these flags, marking whether the character stands in for an inline object.
@@ -413,10 +453,16 @@ mod tests {
             ('\u{2600}', 3, true),
             ('\u{1F600}', 4, true),
         ] {
-            for (is_word_boundary, is_soft_wrap_opportunity) in
-                [(false, false), (true, false), (false, true), (true, true)]
-            {
-                let flags = CharacterFlags::new(ch, is_word_boundary, is_soft_wrap_opportunity);
+            for bits in 0..8_u8 {
+                let is_word_boundary = bits & 1 != 0;
+                let is_soft_wrap_opportunity = bits & 2 != 0;
+                let is_default_ignorable = bits & 4 != 0;
+                let flags = CharacterFlags::new(
+                    ch,
+                    is_word_boundary,
+                    is_soft_wrap_opportunity,
+                    is_default_ignorable,
+                );
                 assert_eq!(flags.len_utf8(), len, "{ch:?}");
                 assert_eq!(flags.is_emoji(), emoji, "{ch:?}");
                 assert_eq!(flags.is_word_boundary(), is_word_boundary, "{ch:?}");
@@ -425,13 +471,14 @@ mod tests {
                     is_soft_wrap_opportunity,
                     "{ch:?}"
                 );
+                assert_eq!(flags.is_default_ignorable(), is_default_ignorable, "{ch:?}");
             }
 
             let character = Character {
                 text_byte_start: 3,
                 style_index: 7,
                 whitespace: Whitespace::from_char(ch),
-                flags: CharacterFlags::new(ch, false, false),
+                flags: CharacterFlags::new(ch, false, false, false),
                 grapheme_start: true,
             };
             assert_eq!(character.text_byte_range(), 3..3 + len, "{ch:?}");
@@ -453,13 +500,16 @@ mod tests {
         ];
         for soft_wrap in soft_wraps {
             for whitespace in whitespaces {
-                let flags = ShapedClusterFlags::new(3)
-                    .with_grapheme_start(true)
-                    .with_first_char(soft_wrap, whitespace);
-                assert_eq!(flags.is_soft_wrap_opportunity_before(), soft_wrap);
-                assert_eq!(flags.whitespace(), whitespace);
-                assert_eq!(flags.glyph_len(), 3);
-                assert!(flags.is_grapheme_start());
+                for default_ignorable in [false, true] {
+                    let flags = ShapedClusterFlags::new(3)
+                        .with_grapheme_start(true)
+                        .with_first_char(soft_wrap, whitespace, default_ignorable);
+                    assert_eq!(flags.is_soft_wrap_opportunity_before(), soft_wrap);
+                    assert_eq!(flags.whitespace(), whitespace);
+                    assert_eq!(flags.is_default_ignorable(), default_ignorable);
+                    assert_eq!(flags.glyph_len(), 3);
+                    assert!(flags.is_grapheme_start());
+                }
             }
         }
     }

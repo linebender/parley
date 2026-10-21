@@ -386,6 +386,7 @@ impl ShapedText {
                     ch,
                     info.is_word_boundary(),
                     info.is_soft_wrap_opportunity(),
+                    info.is_default_ignorable(),
                 )
                 .with_inline_object(info.is_inline_object()),
                 grapheme_start: info.is_grapheme_start(),
@@ -565,6 +566,7 @@ fn process_shaped_clusters<'a>(
                 .with_first_char(
                     first_character.flags.is_soft_wrap_opportunity(),
                     first_character.whitespace,
+                    first_character.flags.is_default_ignorable(),
                 ),
             glyph_offset,
             advance,
