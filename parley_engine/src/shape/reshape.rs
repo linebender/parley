@@ -598,6 +598,10 @@ impl Reshaper {
         line: &PendingLine<'_>,
         reshaped: &mut ReshapedText,
     ) -> ReshapedLine {
+        debug_assert!(
+            line.start.source_clusters_start <= line.end.source_clusters_end,
+            "a line's reshaped start and end must not overlap"
+        );
         ReshapedLine {
             reshaped_start_run: (line.start.start_fragment)
                 .map(|fragment| self.push_fragment(text, shaped, line, fragment, reshaped)),
@@ -833,10 +837,9 @@ impl Reshaper {
             };
 
         // With no `edit`, the line end needs no reshaping when at a cluster that is safe to break
-        // before, unless the reshaped start reaches past it.
+        // before.
         if edit.is_none()
             && first_char_idx_of_cluster(seam_cluster) == line_end_char
-            && seam_cluster >= min_seam_cluster
             && cluster_is_seam(seam_cluster, SpliceMode::Fast)
         {
             return Some(line_end);
