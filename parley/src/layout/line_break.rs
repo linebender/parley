@@ -1098,7 +1098,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         // HACK: ignore max_advance for empty layouts
         // Prevents crash when width is too small (https://github.com/linebender/parley/issues/186)
         let max_advance =
-            if self.layout.data.text_len == 0 && self.layout.data.inline_boxes.is_empty() {
+            if self.layout.data.text.is_empty() && self.layout.data.inline_boxes.is_empty() {
                 f32::MAX
             } else {
                 self.state.line_max_advance
@@ -1466,7 +1466,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
     /// Consumes the line breaker and finalizes all line computations.
     pub fn finish(mut self) {
-        if self.layout.data.text_len == 0
+        if self.layout.data.text.is_empty()
             && let Some(line) = self.lines.line_items.first_mut()
         {
             line.text_range = 0..0;
@@ -1494,7 +1494,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.line_height = line_height;
 
         if line.item_range.is_empty() {
-            line.text_range = self.layout.data.text_len..self.layout.data.text_len;
+            let text_len = self.layout.data.text.len();
+            line.text_range = text_len..text_len;
         }
 
         // Whether metrics should be quantized to pixel boundaries

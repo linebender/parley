@@ -32,7 +32,7 @@ impl<B: Brush> fmt::Debug for Layout<B> {
             f.debug_struct("Layout").field("data", &self.data).finish()
         } else {
             f.debug_struct("Layout")
-                .field("text_len", &self.data.text_len)
+                .field("text_len", &self.data.text.len())
                 .field("width", &self.data.width)
                 .field("height", &self.data.height)
                 .field("lines", &self.data.lines.len())
@@ -85,7 +85,7 @@ impl<B: Brush> Layout<B> {
 
     /// Returns the length of the source text, in bytes.
     pub fn text_len(&self) -> usize {
-        self.data.text_len
+        self.data.text.len()
     }
 
     /// Returns the alignment that was applied to the layout by [`Layout::align`].
