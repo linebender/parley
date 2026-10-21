@@ -340,6 +340,7 @@ impl CharInfo {
     const EMOJI_MODIFIER_SHIFT: u16 = 11;
     const EMOJI_MODIFIER_BASE_SHIFT: u16 = 12;
     const INLINE_OBJECT_SHIFT: u16 = 13;
+    const DEFAULT_IGNORABLE_SHIFT: u16 = 14;
 
     const VARIATION_SELECTOR_MASK: u16 = 1 << Self::VARIATION_SELECTOR_SHIFT;
     const REGION_INDICATOR_MASK: u16 = 1 << Self::REGION_INDICATOR_SHIFT;
@@ -355,6 +356,7 @@ impl CharInfo {
     const EMOJI_MODIFIER_MASK: u16 = 1 << Self::EMOJI_MODIFIER_SHIFT;
     const EMOJI_MODIFIER_BASE_MASK: u16 = 1 << Self::EMOJI_MODIFIER_BASE_SHIFT;
     const INLINE_OBJECT_MASK: u16 = 1 << Self::INLINE_OBJECT_SHIFT;
+    const DEFAULT_IGNORABLE_MASK: u16 = 1 << Self::DEFAULT_IGNORABLE_SHIFT;
 
     fn new(
         script: Script,
@@ -371,6 +373,7 @@ impl CharInfo {
         is_emoji_presentation: bool,
         is_emoji_modifier: bool,
         is_emoji_modifier_base: bool,
+        is_default_ignorable: bool,
     ) -> Self {
         Self {
             script,
@@ -386,7 +389,8 @@ impl CharInfo {
                 | (is_emoji as u16) << Self::EMOJI_SHIFT
                 | (is_emoji_presentation as u16) << Self::EMOJI_PRESENTATION_SHIFT
                 | (is_emoji_modifier as u16) << Self::EMOJI_MODIFIER_SHIFT
-                | (is_emoji_modifier_base as u16) << Self::EMOJI_MODIFIER_BASE_SHIFT,
+                | (is_emoji_modifier_base as u16) << Self::EMOJI_MODIFIER_BASE_SHIFT
+                | (is_default_ignorable as u16) << Self::DEFAULT_IGNORABLE_SHIFT,
         }
     }
 
@@ -452,6 +456,16 @@ impl CharInfo {
     #[inline(always)]
     pub fn is_emoji_modifier_base(self) -> bool {
         self.flags & Self::EMOJI_MODIFIER_BASE_MASK != 0
+    }
+
+    /// Whether this character has the [`Default_Ignorable_Code_Point`] property.
+    ///
+    /// This property is used in Parley to disable letter-spacing for some atoms, matching Blink.
+    ///
+    /// [`Default_Ignorable_Code_Point`]: https://www.unicode.org/reports/tr44/#Default_Ignorable_Code_Point
+    #[inline(always)]
+    pub fn is_default_ignorable(self) -> bool {
+        self.flags & Self::DEFAULT_IGNORABLE_MASK != 0
     }
 
     /// Whether this character contributes glyphs to shaping (`false` for control characters and
@@ -921,6 +935,7 @@ pub(crate) fn analyze_text(
             properties.is_emoji_presentation(),
             properties.is_emoji_modifier(),
             properties.is_emoji_modifier_base(),
+            properties.is_default_ignorable(),
         ));
     }
 

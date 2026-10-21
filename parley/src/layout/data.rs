@@ -610,7 +610,9 @@ impl ContentWidthsMeasurer {
                     continue;
                 }
                 if SPACED {
-                    gap = spacing.gaps(whitespace).after;
+                    gap = spacing
+                        .gaps(whitespace, cluster.is_default_ignorable())
+                        .after;
                 }
             } else if skip_atom {
                 // The next line starts after the whole newline atom.
