@@ -14,7 +14,7 @@ use core::ops::Range;
 use alloc::string::String;
 use alloc::vec::Vec;
 use parlance::BidiLevel;
-use parley_engine::shape::Whitespace;
+use parley_engine::shape::{ReshapedText, Whitespace};
 use parley_engine::{ShapedRun, ShapedSlice, ShapedText};
 
 /// `HarfRust`-based run data
@@ -214,6 +214,8 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) lines: Vec<LineData>,
     /// Items within each line
     pub(crate) line_items: Vec<LineItemData>,
+    /// Reshaped pieces of lines
+    pub(crate) reshaped: ReshapedText,
     /// Position of each aligned subtree rooted at a `vertical-align: top | bottom` style on each line.
     /// The root aligned subtree of each line doesn't have an entry as its offset is trivially zero.
     ///
@@ -255,6 +257,7 @@ impl<B: Brush> Default for LayoutData<B> {
             items: Vec::new(),
             lines: Vec::new(),
             line_items: Vec::new(),
+            reshaped: ReshapedText::new(),
             aligned_subtree_offsets: Vec::new(),
             alignment: None,
             layout_max_advance: 0.0,
@@ -284,6 +287,7 @@ impl<B: Brush> LayoutData<B> {
         self.items.clear();
         self.lines.clear();
         self.line_items.clear();
+        self.reshaped.clear();
         self.aligned_subtree_offsets.clear();
         self.alignment = None;
     }
