@@ -5,6 +5,7 @@ use crate::IndentOptions;
 use crate::InlineBox;
 use crate::layout::alignment::align;
 use crate::layout::data::LayoutData;
+use crate::layout::style_metrics::StyleMetrics;
 use crate::layout::{
     ContentWidths, SpanMetrics, Style, alignment::Alignment, alignment::AlignmentOptions,
     line::Line, line_break::BreakLines,
@@ -76,11 +77,10 @@ impl<B: Brush> Layout<B> {
     /// The motivating use case is placing bullet list markers - Blink uses the root
     /// span's ascent and descent for their location and size.
     pub fn root_span_metrics(&self) -> Option<SpanMetrics> {
-        self.data.style_metrics.first().map(|it| SpanMetrics {
-            ascent: it.ascent,
-            descent: it.descent,
-            x_height: it.x_height,
-        })
+        self.data
+            .style_metrics
+            .first()
+            .map(StyleMetrics::span_metrics)
     }
 
     /// Returns the length of the source text, in bytes.

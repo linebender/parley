@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::inline_box::inline_object_box_index;
-use crate::layout::Style;
 use crate::layout::data::BreakReason;
 use crate::layout::data::{LayoutItemKind, LineData};
 use crate::layout::layout::Layout;
 use crate::layout::run::Run;
 use crate::layout::spacing::EffectiveSpacing;
+use crate::layout::{SpanMetrics, Style};
 use crate::style::Brush;
 use crate::{BaselineShift, InlineBoxKind};
 
@@ -310,6 +310,15 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     /// See also [`Self::style`].
     pub fn style_index(&self) -> u16 {
         self.style_index
+    }
+
+    /// Returns the inherent metrics of the run's associated span, from the first available font.
+    ///
+    /// The metrics are identical for every run in the span, including runs that fell back to
+    /// another font. Blink positions `line-through` from this ascent (i.e. the primary font's),
+    /// for example, so a strikethrough placed from it keeps one height across fallback fonts.
+    pub fn span_metrics(&self) -> SpanMetrics {
+        self.run.layout.data.style_metrics[usize::from(self.style_index)].span_metrics()
     }
 
     /// Returns the offset to the baseline.

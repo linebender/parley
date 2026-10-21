@@ -114,8 +114,8 @@ pub struct IndentOptions {
 /// These metrics are based only on the [first available font](fontique::Query::first_available_font), and don't
 /// take into account any fallback fonts (in contrast to, say, [`LineMetrics`]).
 ///
-/// This is currently only available for the root span,
-/// as [`Layout::root_span_metrics`](crate::Layout::root_span_metrics).
+/// Available through [`GlyphRun::span_metrics`](crate::GlyphRun::span_metrics) and, for the
+/// root span, [`Layout::root_span_metrics`](crate::Layout::root_span_metrics).
 #[derive(Copy, Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct SpanMetrics {
