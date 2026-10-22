@@ -6,7 +6,7 @@
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
 use parley::{
-    Alignment, AlignmentOptions, BreakReason, CHROMIUM_LINE_BREAK_OVERRIDE, OverflowWrap,
+    Alignment, AlignmentOptions, BreakReason, CHROMIUM_LINE_BREAK_OVERRIDE, Layout, OverflowWrap,
     StyleProperty, TextWrapMode, WordBreak,
 };
 use peniko::color::palette::css;
@@ -130,6 +130,50 @@ fn overflow_wrap_narrow() {
         ColorBrush::new(css::BLUE),
         5.0,
     );
+}
+
+#[test]
+fn reshaped_lines_measure_as_shaped_alone() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut width = |text: &str| {
+        let mut layout = env.ranged_builder(text).build(text);
+        layout.break_all_lines(None);
+        layout.width()
+    };
+    let (a, v, av) = (width("A"), width("V"), width("AV"));
+    assert!(av < a + v, "the test assumes 'AV' actually ends up kerning");
+
+    let text = "AVAVA";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::OverflowWrap(OverflowWrap::Anywhere));
+    let mut layout = builder.build(text);
+    let line_width = a.max(v) + 0.1;
+    layout.break_all_lines(Some(line_width));
+    let round = |advance: f32| (advance * 64.).round() / 64.;
+    let lines = |layout: &Layout<ColorBrush>| {
+        (layout.lines())
+            .map(|line| (line.text_range(), round(line.metrics().advance)))
+            .collect::<Vec<_>>()
+    };
+    let expected: Vec<_> = (0..5).map(|i| (i..i + 1, round([a, v][i % 2]))).collect();
+    assert_eq!(lines(&layout), expected);
+    // The reshaped pieces address the source text and its graphemes like the original runs.
+    let runs = || layout.lines().flat_map(|line| line.runs());
+    let graphemes: Vec<_> = (0..5).map(|i| i..i + 1).collect();
+    let cluster_ranges: Vec<_> = runs().map(|run| run.cluster_range()).collect();
+    assert_eq!(cluster_ranges, graphemes);
+    let clusters = runs().flat_map(|run| run.clusters());
+    let text_ranges: Vec<_> = clusters.map(|c| c.text_range()).collect();
+    assert_eq!(text_ranges, graphemes);
+
+    let mut breaker = layout.break_lines();
+    breaker.state_mut().set_layout_max_advance(line_width);
+    breaker.state_mut().set_line_max_advance(line_width);
+    breaker.break_next();
+    breaker.break_next();
+    breaker.revert();
+    breaker.break_remaining(line_width);
+    assert_eq!(lines(&layout), expected);
 }
 
 #[test]
