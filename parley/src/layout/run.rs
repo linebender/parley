@@ -10,6 +10,7 @@ use crate::style::Brush;
 
 use core::ops::Range;
 use fontique::Synthesis;
+use parley_engine::shape::Character;
 use parley_engine::{
     Atom, Atoms, FontMetrics, Glyph, Graphemes, NormalizedCoord, ShapedClusterGlyphs, ShapedRun,
     ShapedSlice,
@@ -57,23 +58,15 @@ impl<'a, B: Brush> Run<'a, B> {
         }
     }
 
-    /// Borrow the shaped content of this run as a slice.
-    ///
-    /// Note this covers the whole shaped run even when this [`Run`] is scoped to a line. Also see
-    /// [`Self::line_slice`].
-    pub(crate) fn full_slice(&self) -> ShapedSlice<'a> {
-        self.layout
-            .data
-            .shaped_text
-            .run_slice(self.shaped_text_run_index)
-    }
-
     /// Borrow the shaped content of this run as a slice, narrowed to this [`Run`]'s line.
     pub(crate) fn line_slice(&self) -> ShapedSlice<'a> {
-        let slice = self.full_slice();
         match self.line_data {
-            Some(line_data) => slice.narrow(line_data.shaped_cluster_range.clone()),
-            None => slice,
+            Some(line_data) => line_data.slice(&self.layout.data),
+            None => self
+                .layout
+                .data
+                .shaped_text
+                .run_slice(self.shaped_text_run_index),
         }
     }
 
@@ -168,9 +161,17 @@ impl<'a, B: Brush> Run<'a, B> {
     /// length.
     pub fn cluster_range(&self) -> Range<usize> {
         let start = match self.line_data {
-            Some(line_data) => count_graphemes(self.full_slice().narrow(
-                self.shaped.shaped_clusters_range.start..line_data.shaped_cluster_range.start,
-            )),
+            Some(_) => {
+                // Count the number of graphemes before the run's first character.
+                let slice = self.line_slice();
+                let start_char = if slice.shaped_clusters_range().is_empty() {
+                    self.shaped.characters_range.end
+                } else {
+                    slice.char_range().start
+                };
+                let chars = self.shaped.characters_range.start as usize..start_char as usize;
+                count_graphemes(&self.layout.data.shaped_text.characters()[chars])
+            }
             None => 0,
         };
         start..start + self.len()
@@ -181,7 +182,7 @@ impl<'a, B: Brush> Run<'a, B> {
     /// Note this counts the run's clusters, so the cost is linear in the run's length. To check
     /// whether the run has any clusters, use [`Self::is_empty`].
     pub fn len(&self) -> usize {
-        count_graphemes(self.line_slice())
+        count_graphemes(self.line_slice().characters())
     }
 
     /// Returns `true` if the run is empty.
@@ -248,11 +249,11 @@ impl<'a, B: Brush> Run<'a, B> {
     ///
     /// This includes additional spacing from [`EffectiveSpacing`].
     ///
-    /// `shaped_clusters` indexes into the shaped run this [`Run`] belongs to, and must be
-    /// atom-aligned.
+    /// `shaped_clusters` indexes into the shaped run this [`Run`] belongs to, must be atom-aligned,
+    /// and must be within this [`Run`]'s line if it is scoped to one.
     pub(crate) fn glyphs_in(self, shaped_clusters: Range<u32>) -> Glyphs<'a> {
         Glyphs::new(
-            self.full_slice().narrow(shaped_clusters),
+            self.line_slice().narrow(shaped_clusters),
             self.is_rtl(),
             self.line_spacing(),
         )
@@ -439,16 +440,15 @@ impl<'a, B: Brush> Iterator for Clusters<'a, B> {
     }
 }
 
-/// The number of graphemes in `slice`, also counting a grapheme the slice starts inside of.
+/// The number of graphemes in `characters`, also counting a grapheme `characters` starts inside of.
 ///
-/// This effectively counts the number of [`Cluster`]s the `slice` would produce.
+/// This effectively counts the number of [`Cluster`]s a slice of `characters` would produce.
 ///
-/// This is `O(n)` in the slice's characters.
-fn count_graphemes(slice: ShapedSlice<'_>) -> usize {
-    slice
-        .characters()
+/// This is `O(n)` in the number of characters.
+fn count_graphemes(characters: &[Character]) -> usize {
+    characters
         .iter()
         .filter(|character| character.grapheme_start)
         .count()
-        + usize::from(slice.grapheme_continues_before())
+        + usize::from(characters.first().is_some_and(|c| !c.grapheme_start))
 }
