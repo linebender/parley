@@ -312,3 +312,18 @@ fn tab_trailing_hangs_like_a_space() {
     nearly_eq(layout.width(), 4. * space);
     nearly_eq(layout.full_width(), 4. * space);
 }
+
+#[test]
+fn tab_columns_align() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Each line's second column starts at the first stop a tab reaches: the same stop for the
+    // first three lines, and the next one for the line whose first word is wider.
+    let text = "1\tfoo\tx\n12\tfoo\tx\n123\tfoo\tx\n1234567\tfoo\tx";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::TabSize(TabSize::Spaces(4.)));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    layout.align(Alignment::Start, AlignmentOptions::default());
+    env.check_layout_snapshot(&layout);
+}
