@@ -240,6 +240,25 @@ impl ShapedText {
         cluster.advance = advance;
     }
 
+    /// Sets the advance of the tab shaped cluster at `cluster_index`.
+    ///
+    /// Tabs shape to the advance of a space (see [`Whitespace::Tab`] and
+    /// [`ShapedRun::space_advance`]). A layout engine implementing tab stops replaces that with the
+    /// distance to the next tab stop, which depends on the tab's position on the line.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the shaped cluster is not a tab.
+    pub fn set_tab_advance(&mut self, cluster_index: u32, advance: f32) {
+        let cluster = &mut self.shaped_clusters[cluster_index as usize];
+        assert_eq!(
+            cluster.whitespace(),
+            Whitespace::Tab,
+            "shaped cluster {cluster_index} is not a tab"
+        );
+        cluster.advance = advance;
+    }
+
     /// Escape hatch for `parley` tests that remap style indices to check whether layouts are
     /// otherwise identical. This is not for public consumption!
     #[doc(hidden)]
@@ -270,15 +289,6 @@ impl ShapedText {
     #[inline(always)]
     pub fn shaped_clusters(&self) -> &[ShapedCluster] {
         &self.shaped_clusters
-    }
-
-    /// The shaped clusters, mutably.
-    ///
-    /// This lets a layout engine adjust [`ShapedCluster::advance`] after shaping, e.g., to give a
-    /// tab the distance to its tab stop (see [`Whitespace::Tab`]).
-    #[inline(always)]
-    pub fn shaped_clusters_mut(&mut self) -> &mut [ShapedCluster] {
-        &mut self.shaped_clusters
     }
 
     /// The shaped glyphs.
@@ -569,7 +579,7 @@ fn process_shaped_clusters<'a>(
             // Tabs render as a horizontal shift rather than as glyphs. Fonts rarely map U+0009 to
             // a meaningful glyph, so the shaped glyphs are elided, and the tab measures as a
             // space. A layout engine implementing tab stops replaces this advance with the
-            // distance to the next tab stop (see `ShapedText::shaped_clusters_mut`).
+            // distance to the next tab stop (see `ShapedText::set_tab_advance`).
             Whitespace::Tab => (cluster.glyphs_start as u32, 0, false, space_advance),
             // Inline objects' glyphs are elided too; their advances are set later by the user.
             _ if is_inline_object => (cluster.glyphs_start as u32, 0, false, 0.),

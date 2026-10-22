@@ -65,8 +65,10 @@ pub(crate) fn size_tab<B: Brush>(
         return;
     }
     let tab_size = styles[cluster.style_index as usize].tab_size;
-    shaped_text.shaped_clusters_mut()[cluster_idx as usize].advance =
-        tab_advance(x, tab_size, space_advance, spacing);
+    shaped_text.set_tab_advance(
+        cluster_idx,
+        tab_advance(x, tab_size, space_advance, spacing),
+    );
 }
 
 #[cfg(test)]
