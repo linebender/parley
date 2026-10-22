@@ -141,18 +141,18 @@ pub(crate) struct Justification {
     /// The amount of additional spacing to apply per justification opportunity.
     pub(crate) amount_per_opportunity: f32,
 
-    /// One past the line's logically last shaped cluster eligible for justification. Shaped
-    /// clusters at or beyond this index are not justified, as they hang past the line's end, or are
-    /// part of the last atom that doesn't fully hang (e.g., an NBSP doesn't hang, but if it closes
-    /// the line, it shouldn't get justified).
-    pub(crate) justification_end_cluster: u32,
+    /// One past the line's logically last character eligible for justification. Atoms with
+    /// characters at or beyond this index are not justified, as they hang past the line's end, or
+    /// are the last atom that doesn't fully hang (e.g., an NBSP doesn't hang, but if it closes the
+    /// line, it shouldn't get justified).
+    pub(crate) justification_end_char: u32,
 }
 
 impl Justification {
     /// No justification.
     pub(crate) const NONE: Self = Self {
         amount_per_opportunity: 0.,
-        justification_end_cluster: u32::MAX,
+        justification_end_char: u32::MAX,
     };
 }
 
@@ -196,7 +196,7 @@ impl EffectiveSpacing {
             .gaps(whitespace, first_character.flags.is_default_ignorable());
 
         if is_word_separator(whitespace)
-            && atom.shaped_clusters_range().end <= self.justification.justification_end_cluster
+            && atom.char_range().end <= self.justification.justification_end_char
         {
             gaps.after += self.justification.amount_per_opportunity;
         }

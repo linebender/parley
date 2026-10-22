@@ -99,6 +99,7 @@ pub(crate) fn assert_eq_layout_data<B: Brush>(a: &LayoutData<B>, b: &LayoutData<
     // Output of line breaking
     assert_eq!(a.lines, b.lines, "{case} lines mismatch");
     assert_eq!(a.line_items, b.line_items, "{case} line_items mismatch");
+    assert_eq!(a.reshaped, b.reshaped, "{case} reshaped mismatch");
 
     // Output of alignment
     assert_eq!(

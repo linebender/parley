@@ -25,8 +25,8 @@ use crate::{
 };
 
 use core::ops::Range;
+use parley_engine::Atom;
 use parley_engine::shape::{Character, ReshapedTextMark, Reshaper, Whitespace};
-use parley_engine::{Atom, ShapedText};
 use smallvec::SmallVec;
 
 #[derive(Default)]
@@ -681,10 +681,17 @@ pub struct BreakerState {
     subtrees: SubtreeHistory,
 
     // Saved breaker states for reverting to a previously encountered line-breaking opportunity
-    /// Saved breaker state for the last non-emergency line-breaking opportunity
-    prev_boundary: Option<PrevBoundaryState>,
-    /// Saved breaker state for the last emergency line-breaking opportunity
-    emergency_boundary: Option<PrevBoundaryState>,
+    /// Saved breaker states for the last two non-emergency line-breaking opportunities.
+    ///
+    /// We store two: once we need to break, we first we check the latest one (at index 0), and if
+    /// the line ends up overflowing once it's reshaped, we take the earlier one (index 1). It's
+    /// very unlikely that that one will also overflow, as taking away a character will almost
+    /// always take away more advance than reshaping would introduce.
+    prev_boundaries: [Option<PrevBoundaryState>; 2],
+    /// Saved breaker states for the last two emergency line-breaking opportunities.
+    ///
+    /// As for [`Self::prev_boundaries`], we store two (see the explanation above).
+    emergency_boundaries: [Option<PrevBoundaryState>; 2],
 }
 
 impl Clone for BreakerState {
@@ -703,8 +710,8 @@ impl Clone for BreakerState {
             line: self.line.clone(),
             contributed: self.contributed.clone(),
             subtrees: self.subtrees.clone(),
-            prev_boundary: self.prev_boundary.clone(),
-            emergency_boundary: self.emergency_boundary.clone(),
+            prev_boundaries: self.prev_boundaries.clone(),
+            emergency_boundaries: self.emergency_boundaries.clone(),
         }
     }
 
@@ -724,8 +731,8 @@ impl Clone for BreakerState {
             line,
             contributed,
             subtrees,
-            prev_boundary,
-            emergency_boundary,
+            prev_boundaries,
+            emergency_boundaries,
         } = source;
         self.items = *items;
         self.lines = *lines;
@@ -740,8 +747,8 @@ impl Clone for BreakerState {
         self.line.clone_from(line);
         self.contributed.clone_from(contributed);
         self.subtrees.clone_from(subtrees);
-        self.prev_boundary.clone_from(prev_boundary);
-        self.emergency_boundary.clone_from(emergency_boundary);
+        self.prev_boundaries.clone_from(prev_boundaries);
+        self.emergency_boundaries.clone_from(emergency_boundaries);
     }
 }
 
@@ -762,8 +769,8 @@ impl Default for BreakerState {
             line: LineState::default(),
             contributed: Vec::new(),
             subtrees: SubtreeHistory::default(),
-            prev_boundary: None,
-            emergency_boundary: None,
+            prev_boundaries: [None, None],
+            emergency_boundaries: [None, None],
         }
     }
 }
@@ -819,27 +826,33 @@ impl BreakerState {
     /// Store the current iteration state so that we can revert to it if we later want to take
     /// the line breaking opportunity at this point.
     fn mark_line_break_opportunity(&mut self) {
-        self.prev_boundary = Some(PrevBoundaryState {
-            item_idx: self.item_idx,
-            run_idx: self.run_idx,
-            cluster_idx: self.cluster_idx,
-            state: self.line.clone(),
-            contributed_len: self.contributed.len(),
-            subtrees_len: self.subtrees.save(),
-        });
+        self.prev_boundaries = [
+            Some(PrevBoundaryState {
+                item_idx: self.item_idx,
+                run_idx: self.run_idx,
+                cluster_idx: self.cluster_idx,
+                state: self.line.clone(),
+                contributed_len: self.contributed.len(),
+                subtrees_len: self.subtrees.save(),
+            }),
+            self.prev_boundaries[0].take(),
+        ];
     }
 
     /// Store the current iteration state so that we can revert to it if we later want to take
     /// an *emergency* line breaking opportunity at this point.
     fn mark_emergency_break_opportunity(&mut self) {
-        self.emergency_boundary = Some(PrevBoundaryState {
-            item_idx: self.item_idx,
-            run_idx: self.run_idx,
-            cluster_idx: self.cluster_idx,
-            state: self.line.clone(),
-            contributed_len: self.contributed.len(),
-            subtrees_len: self.subtrees.save(),
-        });
+        self.emergency_boundaries = [
+            Some(PrevBoundaryState {
+                item_idx: self.item_idx,
+                run_idx: self.run_idx,
+                cluster_idx: self.cluster_idx,
+                state: self.line.clone(),
+                contributed_len: self.contributed.len(),
+                subtrees_len: self.subtrees.save(),
+            }),
+            self.emergency_boundaries[0].take(),
+        ];
     }
 
     /// Revert boundary state to prev state
@@ -982,6 +995,59 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
     }
 
+    /// End the line at the line-breaking opportunity `boundary`, or, if the line no longer fits
+    /// after reshaping at `boundary`, take the `earlier` boundary before it.
+    ///
+    /// Just having one `earlier` as fallback should *almost always* be enough, as taking away a
+    /// character normally takes away more advance than e.g. a change in kerning introduces.
+    fn take_boundary(
+        &mut self,
+        boundary: PrevBoundaryState,
+        earlier: Option<PrevBoundaryState>,
+        max_advance: f32,
+    ) {
+        self.state.reset_to(boundary);
+        let Some(earlier) = earlier else {
+            return;
+        };
+        let line = &self.state.line;
+        // A line that already doesn't fit as shaped originally only has trailing whitespace hanging
+        // past the end, which is fine.
+        let (x, fits_as_shaped) = (line.x, line.x + line.start_advance_delta <= max_advance);
+        if fits_as_shaped && x + self.reshaped_advance_delta() > max_advance {
+            self.state.reset_to(earlier);
+        }
+    }
+
+    /// How much reshaping the line changes the advance of the line if it's ended at the current
+    /// position. See [`Reshaper::measure_end`].
+    fn reshaped_advance_delta(&mut self) -> f32 {
+        let data = &self.layout.data;
+        let shaped_clusters = data.shaped_text.shaped_clusters();
+        let line = &self.state.line;
+
+        // If the end needs no reshaping, reshaping only changes the line by its start, which we
+        // already measured when we started this line.
+        let Some(end_cluster) = shaped_clusters.get(self.state.cluster_idx as usize) else {
+            return line.start_advance_delta;
+        };
+        if end_cluster.is_safe_to_break_before() {
+            return line.start_advance_delta;
+        }
+
+        let (text, shaped_text) = (&data.text, &data.shaped_text);
+        let line_start_char = shaped_clusters[line.clusters.start as usize]
+            .chars_range()
+            .start;
+        let line_end_char = end_cluster.chars_range().start;
+        let reshaper = &mut self.reshaper;
+        let start = reshaper.measure_start(text, shaped_text, line_start_char, None);
+        let end = reshaper.measure_end(text, shaped_text, line_end_char, None);
+        reshaper
+            .line(text, shaped_text, &start, &end)
+            .advance_delta()
+    }
+
     /// Reset state when a line has been committed
     fn start_new_line(
         &mut self,
@@ -991,6 +1057,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     ) -> Option<YieldData> {
         commit_line(
             self.layout,
+            &mut self.reshaper,
             &mut self.lines,
             &mut self.state.line,
             max_advance,
@@ -1013,8 +1080,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         self.state.items = self.lines.line_items.len();
         self.state.lines = self.lines.lines.len();
         self.state.reshaped = self.layout.data.reshaped.mark();
-        self.state.prev_boundary = None;
-        self.state.emergency_boundary = None;
+        self.state.prev_boundaries = [None, None];
+        self.state.emergency_boundaries = [None, None];
 
         // `finish_line` reads the line's accumulated vertical metrics from `self.state.line`, so
         // it must run before we reset the per-line running state. It may grow the line (e.g. the
@@ -1311,8 +1378,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             //
                             // We "take" the line-breaking opportunity by starting a new line and resetting our
                             // item/run/cluster iteration state back to how it was when the line-breaking opportunity was encountered
-                            else if let Some(prev) = self.state.prev_boundary.take() {
-                                self.state.reset_to(prev);
+                            else if let Some(prev) = self.state.prev_boundaries[0].take() {
+                                let earlier = self.state.prev_boundaries[1].take();
+                                self.take_boundary(prev, earlier, max_advance);
                                 return self.start_new_line(
                                     BreakReason::Regular,
                                     max_advance,
@@ -1324,9 +1392,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             // We "take" the line-breaking opportunity by starting a new line and resetting our
                             // item/run/cluster iteration state back to how it was when the line-breaking opportunity was encountered
                             else if let Some(prev_emergency) =
-                                self.state.emergency_boundary.take()
+                                self.state.emergency_boundaries[0].take()
                             {
-                                self.state.reset_to(prev_emergency);
+                                let earlier = self.state.emergency_boundaries[1].take();
+                                self.take_boundary(prev_emergency, earlier, max_advance);
                                 return self.start_new_line(
                                     BreakReason::Emergency,
                                     max_advance,
@@ -1723,7 +1792,8 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
 
 #[expect(clippy::cast_possible_truncation, reason = "deferred")]
 fn commit_line<B: Brush>(
-    layout: &Layout<B>,
+    layout: &mut Layout<B>,
+    reshaper: &mut Reshaper,
     lines: &mut LineLayout,
     state: &mut LineState,
     max_advance: f32,
@@ -1736,6 +1806,33 @@ fn commit_line<B: Brush>(
     // Ensure that the cluster and item endpoints are within range
     state.clusters.end = state.clusters.end.min(shaped_clusters.len() as u32);
     state.items.end = state.items.end.min(layout.data.items.len());
+
+    let char_at = |cluster: u32| match shaped_clusters.get(cluster as usize) {
+        Some(cluster) => cluster.chars_range().start,
+        None => shaped_text.characters().len() as u32,
+    };
+    let unsafe_edge = |cluster: u32| {
+        (shaped_clusters.get(cluster as usize)).is_some_and(|c| !c.is_safe_to_break_before())
+    };
+    // Reshape the line if it's edges fell at positions that are unsafe to break at.
+    let reshaped_line = (unsafe_edge(state.clusters.start) || unsafe_edge(state.clusters.end))
+        .then(|| {
+            let text = &layout.data.text;
+            let start =
+                reshaper.measure_start(text, shaped_text, char_at(state.clusters.start), None);
+            let end = reshaper.measure_end(text, shaped_text, char_at(state.clusters.end), None);
+            let line = reshaper.line(text, shaped_text, &start, &end);
+            reshaper.push_line(text, shaped_text, &line, &mut layout.data.reshaped)
+        });
+    let source_clusters =
+        reshaped_line.map_or(state.clusters.clone(), |l| l.source_shaped_clusters_range());
+    let (start_run, end_run) = reshaped_line.map_or((None, None), |l| (l.start_run(), l.end_run()));
+    let piece_clusters = |piece: u32| {
+        (layout.data.reshaped.run(piece).shaped_run())
+            .shaped_clusters_range
+            .clone()
+    };
+    let advance = state.x + reshaped_line.map_or(0., |l| l.advance_delta());
 
     let start_item_idx = lines.line_items.len();
 
@@ -1775,54 +1872,47 @@ fn commit_line<B: Brush>(
                 let shaped_run = &shaped_text.runs()[item.index];
 
                 // Compute cluster range
-                // The first and last ranges have overrides to account for line-breaks within runs
-                let mut cluster_range = shaped_run.shaped_clusters_range.clone();
-                if i == first_run_pos {
-                    cluster_range.start = state.clusters.start;
+                let run_clusters = &shaped_run.shaped_clusters_range;
+                let start = run_clusters.start.max(source_clusters.start);
+                let cluster_range = start..run_clusters.end.min(source_clusters.end).max(start);
+
+                // The line may have been reshaped, in which case its start piece precedes the
+                // line's first source run, and its end piece follows its last source run.
+                let start_piece = (i == first_run_pos).then_some(start_run);
+                let end_piece = (i == last_run_pos).then_some(end_run);
+                let (start_piece, end_piece) = (start_piece.flatten(), end_piece.flatten());
+                let pieces = [
+                    start_piece.map(|piece| (Some(piece), piece_clusters(piece))),
+                    (!cluster_range.is_empty()).then_some((None, cluster_range)),
+                    end_piece.map(|piece| (Some(piece), piece_clusters(piece))),
+                ];
+                for (reshaped_run, cluster_range) in pieces.into_iter().flatten() {
+                    last_item_kind = item.kind;
+                    committed_text_run = true;
+
+                    // Map the cluster range to the source-text range.
+                    let slice = match reshaped_run {
+                        Some(piece) => layout.data.reshaped.run_slice(shaped_text, piece),
+                        None => shaped_text.run_slice(item.index as u32),
+                    };
+                    let item_text_range =
+                        slice.text_byte_range(slice.narrow(cluster_range.clone()).char_range());
+
+                    // Compute the text range for the line
+                    // Q: Can we not simplify this computation by assuming that items are in order?
+                    text_start = text_start.min(item_text_range.start);
+                    text_end = text_end.max(item_text_range.end);
+                    needs_reorder |= shaped_run.bidi_level != BidiLevel::new(0);
+
+                    lines.line_items.push(LineItemData {
+                        kind: LayoutItemKind::TextRun,
+                        index: item.index,
+                        bidi_level: shaped_run.bidi_level,
+                        shaped_cluster_range: cluster_range,
+                        text_range: item_text_range,
+                        reshaped_run,
+                    });
                 }
-                if i == last_run_pos {
-                    cluster_range.end = state.clusters.end;
-                }
-
-                if cluster_range.start >= shaped_run.shaped_clusters_range.end {
-                    continue;
-                }
-
-                last_item_kind = item.kind;
-                committed_text_run = true;
-
-                // Map the cluster range to the source-text range.
-                let slice = shaped_text.run_slice(item.index as u32);
-                let item_text_range = if cluster_range.is_empty() {
-                    let char_pos = shaped_clusters[cluster_range.start as usize]
-                        .chars_range()
-                        .start;
-                    let text_pos = slice.text_byte_at(char_pos);
-                    text_pos..text_pos
-                } else {
-                    let char_range = shaped_clusters[cluster_range.start as usize]
-                        .chars_range()
-                        .start
-                        ..shaped_clusters[cluster_range.end as usize - 1]
-                            .chars_range()
-                            .end;
-                    slice.text_byte_range(char_range)
-                };
-
-                // Compute the text range for the line
-                // Q: Can we not simplify this computation by assuming that items are in order?
-                text_start = text_start.min(item_text_range.start);
-                text_end = text_end.max(item_text_range.end);
-                needs_reorder |= shaped_run.bidi_level != BidiLevel::new(0);
-
-                lines.line_items.push(LineItemData {
-                    kind: LayoutItemKind::TextRun,
-                    index: item.index,
-                    bidi_level: shaped_run.bidi_level,
-                    shaped_cluster_range: cluster_range,
-                    text_range: item_text_range,
-                    reshaped_run: None,
-                });
             }
         }
     }
@@ -1840,9 +1930,9 @@ fn commit_line<B: Brush>(
     // Hence an `overflow` of `f32::INFINITY` can be used to model that case.
     let overflow = match break_reason {
         BreakReason::Regular | BreakReason::Emergency => f32::INFINITY,
-        BreakReason::Explicit | BreakReason::None => state.x - max_advance,
+        BreakReason::Explicit | BreakReason::None => advance - max_advance,
     };
-    let (hanging_advance, justification_end_cluster, hanging_opportunities) = hanging_whitespace(
+    let (hanging_advance, justification_end_char, hanging_opportunities) = hanging_whitespace(
         layout,
         &lines.line_items[start_item_idx..end_item_idx],
         overflow,
@@ -1864,12 +1954,12 @@ fn commit_line<B: Brush>(
         break_reason,
         num_justification_opportunities,
         justification: Justification {
-            justification_end_cluster,
+            justification_end_char,
             ..Justification::NONE
         },
         metrics: LineMetrics {
             indent: line_indent,
-            advance: state.x,
+            advance,
             hanging_advance,
             ..Default::default()
         },
@@ -1895,9 +1985,9 @@ fn commit_line<B: Brush>(
 }
 
 /// Returns the advance of the whitespace hanging past the end of the line made up of `line_items`,
-/// the index one past its logically last shaped cluster that's eligible for justification (see
-/// [`Justification::justification_end_cluster`]), and the number of justification opportunities
-/// that are no longer eligible, as they are at or beyond that cluster.
+/// the index one past its logically last character that's eligible for justification (see
+/// [`Justification::justification_end_char`]), and the number of justification opportunities
+/// that are no longer eligible, as they are at or beyond that character.
 ///
 /// `line_items` must be in logical order.
 ///
@@ -1921,8 +2011,8 @@ fn hanging_whitespace<B: Brush>(
     overflow: f32,
 ) -> (f32, u32, u32) {
     let mut hanging_whitespace_advance = 0.;
-    // Atoms with shaped clusters before this index may be stretched by justification.
-    let mut justification_end_cluster = u32::MAX;
+    // Atoms with characters before this index may be stretched by justification.
+    let mut justification_end_char = u32::MAX;
     let mut hanging_opportunities = 0;
     // Following CSS Text 4 § 4.3.2, a sequence of whitespace with `WhiteSpaceCollapse::Preserve`
     // directly preceding a forced line break hangs conditionally. All other whitespace hangs
@@ -1988,7 +2078,7 @@ fn hanging_whitespace<B: Brush>(
                     hanging_whitespace_advance += hanging;
                     // Justification can't stretch within an atom, so it stops at the start of the
                     // last atom that hangs in its entirety or only partially.
-                    justification_end_cluster = atom.shaped_clusters_range().start;
+                    justification_end_char = atom.char_range().start;
                     if is_word_separator(whitespace) {
                         hanging_opportunities += 1;
                     }
@@ -2006,7 +2096,7 @@ fn hanging_whitespace<B: Brush>(
 
     (
         hanging_whitespace_advance,
-        justification_end_cluster,
+        justification_end_char,
         hanging_opportunities,
     )
 }
@@ -2086,9 +2176,9 @@ mod tests {
             assert_eq!(state.subtrees.current().len(), 1);
 
             let boundary = if emergency {
-                state.emergency_boundary.take().unwrap()
+                state.emergency_boundaries[0].take().unwrap()
             } else {
-                state.prev_boundary.take().unwrap()
+                state.prev_boundaries[0].take().unwrap()
             };
             state.reset_to(boundary);
             let expected = if emergency { 12. } else { 9. };
