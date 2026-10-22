@@ -26,7 +26,7 @@ use crate::{
 
 use core::ops::Range;
 use parley_engine::Atom;
-use parley_engine::shape::{Character, ReshapedTextMark, Whitespace};
+use parley_engine::shape::{Character, ReshapedTextMark, Reshaper, Whitespace};
 use smallvec::SmallVec;
 
 #[derive(Default)]
@@ -915,6 +915,11 @@ impl BreakerState {
 pub struct BreakLines<'a, B: Brush> {
     layout: &'a mut Layout<B>,
     lines: LineLayout,
+    /// Reshapes the edges of lines whose breaks fall at positions that are unsafe to break at.
+    ///
+    /// Its cache is only valid for one [`parley_engine::ShapedText`], so it is created per session
+    /// rather than kept on the [`Layout`].
+    reshaper: Reshaper,
     state: BreakerState,
     prev_state: Option<BreakerState>,
     done: bool,
@@ -933,6 +938,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         let mut this = Self {
             layout,
             lines,
+            reshaper: Reshaper::default(),
             state: BreakerState::default(),
             prev_state: None,
             done: false,
