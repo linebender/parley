@@ -403,8 +403,12 @@ impl<'a> AtomIter<'a> {
         self.peeked = None;
     }
 
-    /// The number of glyphs in `atom` and the sum of their advances (including spacing gaps),
-    /// matching what [`Run::glyphs_in`] yields for the atom's clusters.
+    /// The number of glyphs in `atom` and its advance including spacing gaps.
+    ///
+    /// For an atom with glyphs, this matches what [`Run::glyphs_in`] yields for the atom's
+    /// clusters. An atom without glyphs can still have an advance (a tab, see
+    /// [`Whitespace::Tab`](parley_engine::shape::Whitespace::Tab)), which the line breaker counts
+    /// the same way.
     #[inline]
     fn measure(&self, atom: &Atom<'a>) -> (usize, f32) {
         let glyph_count: usize = atom
@@ -413,7 +417,7 @@ impl<'a> AtomIter<'a> {
             .map(|cluster| usize::from(cluster.glyph_len()))
             .sum();
         let mut advance = atom.advance();
-        if glyph_count != 0 && !self.spacing.is_zero() {
+        if !self.spacing.is_zero() {
             advance += self.spacing.gaps(atom).total();
         }
         (glyph_count, advance)
@@ -467,48 +471,60 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
 
                     // Styles are uniform within an atom, so glyph runs always end on atom
                     // boundaries and the iterator only needs to resume at atom granularity.
-                    // Atoms without glyphs don't take part.
+                    // Atoms without glyphs don't take part, but a tab's advance still moves what
+                    // follows it.
                     let mut advance = 0.0;
                     let mut glyph_count = 0;
                     // The style index and shaped cluster range of the glyph run being accumulated.
                     let mut glyph_run: Option<(u16, Range<u32>)> = None;
                     while let Some(atom) = atoms.peek() {
                         let (atom_glyph_count, atom_advance) = atoms.measure(&atom);
-                        if atom_glyph_count != 0 {
-                            let atom_style_index = atom.characters()[0].style_index;
-                            let atom_clusters = atom.shaped_clusters_range();
-                            match &mut glyph_run {
-                                Some((style_index, shaped_clusters)) => {
-                                    if *style_index != atom_style_index {
-                                        break;
-                                    }
-                                    // In case the run is RTL, atoms are visited in reverse logical
-                                    // order, so just grow both sides of the range.
-                                    shaped_clusters.start =
-                                        shaped_clusters.start.min(atom_clusters.start);
-                                    shaped_clusters.end =
-                                        shaped_clusters.end.max(atom_clusters.end);
+                        if atom_glyph_count == 0 {
+                            if atom.is_inline_object() {
+                                // An inline object ends the glyph run and is yielded as a box.
+                                if glyph_run.is_some() {
+                                    break;
                                 }
-                                None => glyph_run = Some((atom_style_index, atom_clusters)),
+                                atoms.consume();
+                                let box_index = inline_object_box_index(
+                                    &self.line.layout.data.inline_boxes,
+                                    atom.characters()[0].text_byte_start as usize,
+                                );
+                                // The object's advance is its box's width plus its spacing gaps.
+                                let x = self.offset + atoms.spacing.gaps(&atom).before;
+                                self.offset += atom_advance;
+                                return Some(self.positioned_inline_box(box_index, x));
                             }
-                            glyph_count += atom_glyph_count;
-                            advance += atom_advance;
-                        } else if atom.is_inline_object() {
-                            // An inline object ends the glyph run and is yielded as a box.
-                            if glyph_run.is_some() {
-                                break;
+                            if atom_advance != 0. {
+                                // A glyph run positions its glyphs by their advances alone, so
+                                // an advance without glyphs can't sit inside one: end the glyph
+                                // run being accumulated, and shift the next one.
+                                if glyph_run.is_some() {
+                                    break;
+                                }
+                                self.offset += atom_advance;
                             }
                             atoms.consume();
-                            let box_index = inline_object_box_index(
-                                &self.line.layout.data.inline_boxes,
-                                atom.characters()[0].text_byte_start as usize,
-                            );
-                            // The object's advance is its box's width.
-                            let gaps = atoms.spacing.gaps(&atom);
-                            let x = self.offset + gaps.before;
-                            self.offset += atom_advance + gaps.total();
-                            return Some(self.positioned_inline_box(box_index, x));
+                            continue;
                         }
+
+                        let atom_style_index = atom.characters()[0].style_index;
+                        let atom_clusters = atom.shaped_clusters_range();
+                        match &mut glyph_run {
+                            Some((style_index, shaped_clusters)) => {
+                                if *style_index != atom_style_index {
+                                    break;
+                                }
+                                // In case the run is RTL, atoms are visited in reverse logical
+                                // order, so just grow both sides of the range.
+                                shaped_clusters.start =
+                                    shaped_clusters.start.min(atom_clusters.start);
+                                shaped_clusters.end = shaped_clusters.end.max(atom_clusters.end);
+                            }
+                            None => glyph_run = Some((atom_style_index, atom_clusters)),
+                        }
+                        glyph_count += atom_glyph_count;
+                        advance += atom_advance;
                         atoms.consume();
                     }
 
