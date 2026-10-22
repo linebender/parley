@@ -327,3 +327,59 @@ fn tab_columns_align() {
     layout.align(Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
+
+/// The glyph runs on line `line_index` as `(offset, advance)`, in visual order.
+fn glyph_run_extents(layout: &Layout<ColorBrush>, line_index: usize) -> Vec<(f32, f32)> {
+    let line = layout.get(line_index).expect("line exists");
+    line.items()
+        .filter_map(|item| match item {
+            PositionedLayoutItem::GlyphRun(run) => Some((run.offset(), run.advance())),
+            PositionedLayoutItem::InlineBox(_) => None,
+        })
+        .collect()
+}
+
+#[test]
+fn tab_stops_in_rtl_text_are_measured_from_the_right_edge() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let space = advance(&mut env, " ");
+    let base = 4. * space;
+    let alefs = advance(&mut env, "\u{627}\u{627}");
+    let bas = advance(&mut env, "\u{628}\u{628}\u{628}\u{628}");
+    assert!(alefs < base - space / 2. && bas > base && bas < 2. * base - space / 2.);
+
+    // In a right-to-left line the start edge is the right edge, so the logically first word sits
+    // at the right and the tab fills out to the first stop measured from there. Visually, the
+    // glyph run after the tab must then end exactly one tab size short of the right edge.
+    let mut layout = build(
+        &mut env,
+        "\u{627}\u{627}\t\u{628}\u{628}\u{628}\u{628}",
+        TabSize::Spaces(4.),
+    );
+    layout.align(Alignment::Start, AlignmentOptions::default());
+    nearly_eq(layout.width(), base + bas);
+    let [(bas_offset, bas_advance), (alefs_offset, alefs_advance)] =
+        glyph_run_extents(&layout, 0)[..]
+    else {
+        panic!("expected two glyph runs split by the tab");
+    };
+    nearly_eq(bas_offset, 0.);
+    nearly_eq(bas_advance, bas);
+    nearly_eq(alefs_offset, layout.width() - alefs);
+    nearly_eq(alefs_advance, alefs);
+    nearly_eq(alefs_offset - (bas_offset + bas_advance), base - alefs);
+
+    // A first word wider than one tab size pushes the tab to the second stop from the right edge.
+    let mut layout = build(
+        &mut env,
+        "\u{628}\u{628}\u{628}\u{628}\t\u{627}\u{627}",
+        TabSize::Spaces(4.),
+    );
+    layout.align(Alignment::Start, AlignmentOptions::default());
+    nearly_eq(layout.width(), 2. * base + alefs);
+    let [(alefs_offset, _), (bas_offset, _)] = glyph_run_extents(&layout, 0)[..] else {
+        panic!("expected two glyph runs split by the tab");
+    };
+    nearly_eq(alefs_offset, 0.);
+    nearly_eq(bas_offset, layout.width() - bas);
+}
