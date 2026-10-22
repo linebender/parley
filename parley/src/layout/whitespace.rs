@@ -26,11 +26,10 @@
 //! is collapsed; e.g., the Ideographic Space (U+3000) does not collapse. It generally takes
 //! deliberate effort to write a sample that exercises these edge cases.
 
+use parley_engine::Atom;
 use parley_engine::shape::Whitespace;
-use parley_engine::{Atom, ShapedSlice};
 
 use crate::layout::Style;
-use crate::layout::spacing::EffectiveSpacing;
 use crate::style::Brush;
 use crate::{TextWrapMode, WhiteSpaceCollapse};
 
@@ -72,56 +71,18 @@ pub(crate) fn whitespace_hangs<B: Brush>(whitespace: Whitespace, style: &Style<B
     }
 }
 
-/// The advance of the logically trailing clusters of `atom` that hang past the line's end, and
-/// whether that is the atom in its entirety.
+/// Whether `atom` hangs past the line's end.
 ///
-/// An atom can hang partially: e.g., a prepend character followed by a space is a single atom (as
-/// it's a grapheme), but may consist of multiple shaped clusters, of which the spaces can hang.
-/// The atom's spacing at its logical end hangs along with the clusters, and if the atom hangs in
-/// its entirety does its spacing at its logical start hang as well.
+/// Atoms are the unit of hanging whitespace in Parley. There are some cases where an atom could
+/// have a suffix which nominally would hang (primarily a prefix grapheme + a space). However, we don't
+/// expect this to actually happen in non-adversarial text, and supporting it would make a number of other
+/// code much more complicated (especially for bidi reordering).
 #[inline(always)]
-pub(crate) fn atom_hanging_advance<B: Brush>(
-    slice: ShapedSlice<'_>,
-    atom: &Atom<'_>,
-    styles: &[Style<B>],
-    spacing: EffectiveSpacing,
-    is_rtl: bool,
-) -> (f32, bool) {
-    let gaps = spacing.gaps(atom);
-    let (gap_start, gap_end) = if is_rtl {
-        (gaps.after, gaps.before)
-    } else {
-        (gaps.before, gaps.after)
-    };
-    let mut last_cluster = true;
-    let mut all_hang = true;
-    let mut hanging = 0.;
-    for cluster in atom.shaped_clusters().iter().rev() {
-        let cluster_hangs = slice
-            .characters_in(cluster.chars_range())
-            .iter()
-            .all(|character| {
-                whitespace_hangs(
-                    character.whitespace,
-                    &styles[character.style_index as usize],
-                )
-            });
-        if !cluster_hangs {
-            all_hang = false;
-            break;
-        }
-        if last_cluster {
-            hanging += gap_end;
-            last_cluster = false;
-        }
-        hanging += cluster.advance;
-    }
-
-    let hanging = if all_hang {
-        hanging + gap_start
-    } else {
-        hanging
-    };
-
-    (hanging, all_hang)
+pub(crate) fn atom_hangs<B: Brush>(atom: &Atom<'_>, styles: &[Style<B>]) -> bool {
+    atom.characters().iter().all(|character| {
+        whitespace_hangs(
+            character.whitespace,
+            &styles[character.style_index as usize],
+        )
+    })
 }

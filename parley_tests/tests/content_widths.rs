@@ -6,8 +6,9 @@
 use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
-    Alignment, AlignmentOptions, ContentWidths, IndentOptions, InlineBox, InlineBoxKind, Layout,
-    LineBreak, StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
+    Alignment, AlignmentOptions, BaseDirection, ContentWidths, IndentOptions, InlineBox,
+    InlineBoxKind, Layout, LineBreak, StyleProperty, TextWrapMode, VerticalAlign,
+    WhiteSpaceCollapse,
 };
 
 /// Checks that calculated content widths agree with actual line breaking.
@@ -73,91 +74,25 @@ fn content_widths_multiple_trailing_spaces() {
 }
 
 #[test]
-fn content_widths_partially_hanging_atom() {
+fn content_widths_prepend_space() {
     let mut env = TestEnv::new(test_name!(), None);
 
     // A prepend character followed by a space forms a single grapheme, and so a single atom, of
-    // two shaped clusters. Only the space's cluster hangs.
-    for (text, word) in [
-        // LTR
-        ("a\u{0D4E} b c", "a\u{0D4E}"),
-        // RTL
-        ("\u{0710}\u{070F} \u{0712} \u{0713}", "\u{0710}\u{070F}"),
-    ] {
-        let mut layout = env.ranged_builder(text).build(text);
-        let widths = assert_content_widths_match_layout(&mut layout);
-        assert_eq!(
-            layout.len(),
-            3,
-            "one word per line at the min content width"
-        );
+    // two shaped clusters.
+    for text in ["a\u{0D4E} b c", "\u{0710}\u{070F} \u{0712} \u{0713}"] {
+        for direction in [BaseDirection::Ltr, BaseDirection::Rtl] {
+            let mut builder = env.ranged_builder(text);
+            builder.set_base_direction(direction);
+            let mut layout = builder.build(text);
+            assert_content_widths_match_layout(&mut layout);
 
-        let word_width = single_line_width(&mut env, word);
-        assert!(
-            (widths.min - word_width).abs() < 1e-3,
-            "Min content width {} should equal the widest word's width {} (excluding the space)",
-            widths.min,
-            word_width
-        );
-
-        let mut builder = env.ranged_builder(text);
-        builder.push_default(StyleProperty::LetterSpacing(2.));
-        builder.push_default(StyleProperty::WordSpacing(3.));
-        let mut layout = builder.build(text);
-        assert_content_widths_match_layout(&mut layout);
-        assert_eq!(
-            layout.len(),
-            3,
-            "one word per line at the min content width"
-        );
-    }
-}
-
-#[test]
-fn content_widths_partially_hanging_atom_mixed_collapse_modes() {
-    let mut env = TestEnv::new(test_name!(), None);
-
-    // The "\u{0D4E} " in the following is a grapheme (and thus an atom). Whether the space hangs
-    // conditionally follows the space's style.
-    let text = "a\u{0D4E} ";
-    let word_width = single_line_width(&mut env, "a\u{0D4E}");
-    let word_with_space_width = single_line_width(&mut env, text);
-    for (prepend_mode, space_mode, expected_max) in [
-        (
-            WhiteSpaceCollapse::Preserve,
-            WhiteSpaceCollapse::Collapse,
-            word_width,
-        ),
-        (
-            WhiteSpaceCollapse::Collapse,
-            WhiteSpaceCollapse::Preserve,
-            word_with_space_width,
-        ),
-    ] {
-        let mut builder = env.ranged_builder(text);
-        builder.push(StyleProperty::WhiteSpaceCollapse(prepend_mode), 0..4);
-        builder.push(StyleProperty::WhiteSpaceCollapse(space_mode), 4..5);
-        let mut layout = builder.build(text);
-
-        let widths = assert_content_widths_match_layout(&mut layout);
-        assert!(
-            (widths.max - expected_max).abs() < 1e-3,
-            "Max content width {} should be {expected_max} for {prepend_mode:?} and {space_mode:?}",
-            widths.max,
-        );
-        assert!(
-            (widths.min - word_width).abs() < 1e-3,
-            "Min content width {} should be {word_width} for {prepend_mode:?} and {space_mode:?}",
-            widths.min,
-        );
-
-        // The same holds with spacing applied.
-        let mut builder = env.ranged_builder(text);
-        builder.push_default(StyleProperty::LetterSpacing(2.));
-        builder.push(StyleProperty::WhiteSpaceCollapse(prepend_mode), 0..4);
-        builder.push(StyleProperty::WhiteSpaceCollapse(space_mode), 4..5);
-        let mut layout = builder.build(text);
-        assert_content_widths_match_layout(&mut layout);
+            let mut builder = env.ranged_builder(text);
+            builder.set_base_direction(direction);
+            builder.push_default(StyleProperty::LetterSpacing(2.));
+            builder.push_default(StyleProperty::WordSpacing(3.));
+            let mut layout = builder.build(text);
+            assert_content_widths_match_layout(&mut layout);
+        }
     }
 }
 

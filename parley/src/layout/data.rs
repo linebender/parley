@@ -163,13 +163,6 @@ pub(crate) struct LineItemData {
     pub(crate) shaped_cluster_range: Range<u32>,
 }
 
-impl LineItemData {
-    #[inline(always)]
-    pub(crate) fn is_rtl(&self) -> bool {
-        self.bidi_level.is_rtl()
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LayoutItemKind {
     TextRun,
@@ -518,7 +511,6 @@ impl ContentWidthsMeasurer {
                     // whitespace to paragraph level), so only logically-last items that match the
                     // paragraph level are guaranteed to be at that edge.
                     let can_hang = item.bidi_level == layout_data.base_level;
-                    let is_rtl = item.bidi_level.is_rtl();
 
                     if run_spacing.is_zero() {
                         self.measure_text_run::<B, false>(
@@ -526,7 +518,6 @@ impl ContentWidthsMeasurer {
                             slice,
                             run_spacing,
                             can_hang,
-                            is_rtl,
                         );
                     } else {
                         self.measure_text_run::<B, true>(
@@ -534,7 +525,6 @@ impl ContentWidthsMeasurer {
                             slice,
                             run_spacing,
                             can_hang,
-                            is_rtl,
                         );
                     }
                 }
@@ -562,15 +552,8 @@ impl ContentWidthsMeasurer {
 
     /// Measures a text run.
     ///
-    /// The run is scanned one shaped cluster at a time. break opportunities are only considered at
-    /// grapheme starts, and the hanging-whitespace accumulator is updated per cluster (a cluster
-    /// that doesn't hang resets it, one that does extends it), which is equivalent to the per-atom
-    /// "hangs entirely / hangs partially from the logical end" rule of
-    /// [`atom_hanging_advance`](crate::layout::whitespace::atom_hanging_advance).
-    ///
-    /// With `SPACED`, each atom's spacing gap is added to the cluster on its visual end, i.e., its
-    /// logically last cluster for LTR and its logically first cluster for RTL. The gap then hangs
-    /// with that cluster, as in `atom_hanging_advance`. Without `SPACED`, `spacing` is ignored.
+    /// With `SPACED`, each atom's spacing gaps are included in the measured widths, and hang along
+    /// with the atom. Without `SPACED`, `spacing` is ignored.
     #[inline(always)]
     fn measure_text_run<B: Brush, const SPACED: bool>(
         &mut self,
@@ -578,14 +561,12 @@ impl ContentWidthsMeasurer {
         slice: ShapedSlice<'_>,
         spacing: Spacing,
         can_hang: bool,
-        is_rtl: bool,
     ) {
         let clusters = slice.shaped_clusters();
         // The cluster index at which nothing has been placed on the current line yet, if any.
         let mut empty_at = if self.line_has_content { usize::MAX } else { 0 };
 
-        // The spacing gap of the current atom.
-        let mut gap = 0.;
+        let mut atom_hangs = false;
         let mut skip_atom = false;
         for (i, cluster) in clusters.iter().enumerate() {
             let whitespace = cluster.whitespace();
@@ -609,11 +590,6 @@ impl ContentWidthsMeasurer {
                     skip_atom = true;
                     continue;
                 }
-                if SPACED {
-                    gap = spacing
-                        .gaps(whitespace, cluster.is_default_ignorable())
-                        .after;
-                }
             } else if skip_atom {
                 // The next line starts after the whole newline atom.
                 empty_at = i + 1;
@@ -621,24 +597,22 @@ impl ContentWidthsMeasurer {
             }
 
             let mut advance = cluster.advance;
-            if SPACED {
-                let owns_gap = if is_rtl {
-                    is_atom_start
-                } else {
-                    clusters
-                        .get(i + 1)
-                        .is_none_or(|next| next.is_grapheme_start())
-                };
-                if owns_gap {
-                    advance += gap;
-                }
+            if SPACED && is_atom_start {
+                // Each atom gets spacing exactly once, and we don't maintain per-cluster advances,
+                // so we can just add it eagerly.
+                advance += spacing
+                    .gaps(whitespace, cluster.is_default_ignorable())
+                    .total();
             }
             self.running_min_width += advance;
             self.running_max_width += advance;
 
-            // A cluster hangs if all of its characters hang. Its first character is checked via the
+            // An atom hangs if all of its characters hang. Each cluster's first character is checked via the
             // cached flags so the common case never touches `characters`.
-            let hangs = can_hang
+            if is_atom_start {
+                atom_hangs = can_hang;
+            }
+            atom_hangs = atom_hangs
                 && whitespace_hangs(whitespace, style)
                 && (cluster.char_len() == 1
                     || slice
@@ -650,7 +624,7 @@ impl ContentWidthsMeasurer {
                                 &styles[character.style_index as usize],
                             )
                         }));
-            if hangs {
+            if atom_hangs {
                 self.running_hanging_whitespace += advance;
                 self.hangs_conditionally =
                     style.white_space_collapse == WhiteSpaceCollapse::Preserve;
