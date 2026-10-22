@@ -38,25 +38,6 @@ impl<B: Brush> Clone for Run<'_, B> {
 }
 
 impl<'a, B: Brush> Run<'a, B> {
-    #[expect(clippy::cast_possible_truncation, reason = "deferred")]
-    pub(crate) fn new(
-        layout: &'a Layout<B>,
-        line_index: u32,
-        index: u32,
-        run_index: usize,
-        line_data: Option<&'a LineItemData>,
-    ) -> Self {
-        Self {
-            layout,
-            line_index,
-            index,
-            shaped_text_run_index: run_index as u32,
-            shaped: &layout.data.shaped_text.runs()[run_index],
-            data: &layout.data.runs[run_index],
-            line_data,
-        }
-    }
-
     /// Borrow the shaped content of this run as a slice.
     ///
     /// Note this covers the whole shaped run even when this [`Run`] is scoped to a line. Also see

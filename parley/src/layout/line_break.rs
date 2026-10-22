@@ -14,10 +14,11 @@ use crate::inline_box::{LayoutInlineBox, inline_object_box_index};
 use crate::layout::data::{AlignedSubtreeOffset, run_box_metrics};
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
 use crate::layout::style_metrics::{BoxMetrics, StyleMetrics, inline_box_placement};
+use crate::layout::tab::size_tab;
 use crate::layout::whitespace::atom_hanging_advance;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
-    LineMetrics, Run,
+    LineMetrics,
 };
 use crate::style::Brush;
 use crate::{
@@ -1137,16 +1138,20 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 }
                 LayoutItemKind::TextRun => {
                     let run_idx = item.index;
-                    let run = Run::new(self.layout, 0, 0, run_idx, None);
-                    let slice = run.full_slice();
+                    let run_data = &self.layout.data.runs[run_idx];
+                    let shaped_run = &self.layout.data.shaped_text.runs()[run_idx];
+                    let cluster_end = shaped_run.shaped_clusters_range.end;
+                    let space_advance = shaped_run.space_advance;
 
                     // Additional spacing to apply between atoms.
-                    let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
+                    let run_spacing = run_data.spacing;
+                    let spacing = EffectiveSpacing::new(run_spacing, Justification::NONE);
 
                     // The height to report if the maximum line height is exceeded.
-                    let mut line_height = run.data.line_height;
+                    let mut line_height = run_data.line_height;
                     // An inline object is a run of its own. It exceeds the maximum line height by
                     // itself if its box is too tall.
+                    let slice = self.layout.data.shaped_text.run_slice(run_idx as u32);
                     if self.state.line_max_height != f32::MAX
                         && slice
                             .shaped_clusters()
@@ -1171,7 +1176,23 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     }
 
                     // Iterate over the remaining atoms in the Run
-                    for atom in slice.atoms_from(self.state.cluster_idx) {
+                    while self.state.cluster_idx < cluster_end {
+                        // A tab's advance depends on its position on the line, so size it before
+                        // measuring the atom. The slice is taken afterwards, as sizing mutates the
+                        // shaped text.
+                        size_tab(
+                            &mut self.layout.data.shaped_text,
+                            &self.layout.data.styles,
+                            self.state.cluster_idx,
+                            self.state.line.x + line_indent,
+                            space_advance,
+                            run_spacing,
+                        );
+                        let slice = self.layout.data.shaped_text.run_slice(run_idx as u32);
+                        let Some(atom) = slice.atoms_from(self.state.cluster_idx).next() else {
+                            break;
+                        };
+
                         // Retrieve metadata about the atom
                         let first_character = &atom.characters()[0];
                         let whitespace = first_character.whitespace;
@@ -1371,17 +1392,31 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 LayoutItemKind::TextRun => {
                     let run_idx = item.index;
                     let shaped_run = &self.layout.data.shaped_text.runs()[run_idx];
-                    let run = Run::new(self.layout, 0, 0, run_idx, None);
-                    let slice = run.full_slice();
-                    let spacing = run.line_spacing();
                     let cluster_end = shaped_run.shaped_clusters_range.end;
+                    let space_advance = shaped_run.space_advance;
+                    let run_spacing = self.layout.data.runs[run_idx].spacing;
+                    let spacing = EffectiveSpacing::new(run_spacing, Justification::NONE);
 
-                    for atom in slice.atoms_from(self.state.cluster_idx) {
+                    while self.state.cluster_idx < cluster_end {
                         // Check if we should break before this atom
                         if char_count >= max_chars && max_chars != 0 {
                             self.start_new_line(BreakReason::Regular, f32::MAX, line_indent);
                             return Some(());
                         }
+
+                        // Size tabs by their position on the line (see `break_next`).
+                        size_tab(
+                            &mut self.layout.data.shaped_text,
+                            &self.layout.data.styles,
+                            self.state.cluster_idx,
+                            self.state.line.x + line_indent,
+                            space_advance,
+                            run_spacing,
+                        );
+                        let slice = self.layout.data.shaped_text.run_slice(run_idx as u32);
+                        let Some(atom) = slice.atoms_from(self.state.cluster_idx).next() else {
+                            break;
+                        };
 
                         let first_character = &atom.characters()[0];
                         let whitespace = first_character.whitespace;

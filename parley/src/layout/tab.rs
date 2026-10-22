@@ -12,7 +12,10 @@
 //! [css-tab-stop]: https://www.w3.org/TR/css-text-4/#tab-stop
 
 use crate::TabSize;
-use crate::layout::Spacing;
+use crate::layout::{Spacing, Style};
+use crate::style::Brush;
+use parley_engine::ShapedText;
+use parley_engine::shape::Whitespace;
 
 /// The advance of a tab whose start edge is at `x`, measured from the line's start edge.
 ///
@@ -22,7 +25,6 @@ use crate::layout::Spacing;
 /// The tab shifts to the next tab stop, or to the one after it if the next is less than half a
 /// space away so that a tab is always visible. CSS phrases that threshold as `0.5ch`; like Blink,
 /// we use half the space advance. A tab size that isn't positive renders the tab as nothing.
-#[allow(dead_code)]
 pub(crate) fn tab_advance(x: f32, tab_size: TabSize, space_advance: f32, spacing: Spacing) -> f32 {
     let base = match tab_size {
         TabSize::Spaces(spaces) => spaces * (space_advance + spacing.letter + spacing.word),
@@ -44,6 +46,27 @@ pub(crate) fn tab_advance(x: f32, tab_size: TabSize, space_advance: f32, spacing
         distance += base;
     }
     distance
+}
+
+/// Sizes the cluster at `cluster_idx` if it is a tab starting at `x` on the line.
+///
+/// `space_advance` and `spacing` are those of the cluster's run; `x` is measured from the line's
+/// start edge, i.e., it includes the line's indent.
+pub(crate) fn size_tab<B: Brush>(
+    shaped_text: &mut ShapedText,
+    styles: &[Style<B>],
+    cluster_idx: u32,
+    x: f32,
+    space_advance: f32,
+    spacing: Spacing,
+) {
+    let cluster = shaped_text.shaped_clusters()[cluster_idx as usize];
+    if cluster.whitespace() != Whitespace::Tab {
+        return;
+    }
+    let tab_size = styles[cluster.style_index as usize].tab_size;
+    shaped_text.shaped_clusters_mut()[cluster_idx as usize].advance =
+        tab_advance(x, tab_size, space_advance, spacing);
 }
 
 #[cfg(test)]
