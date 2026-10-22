@@ -116,6 +116,8 @@ impl FontInfo {
         } else if weight.value() > self.weight.value() + 200.0 {
             synth.embolden = true;
         }
+        // A positive `slnt` slants counter-clockwise, whereas positive CSS obliques slant
+        // clockwise. Hence, we need to negate angles for `slnt`.
         match style {
             FontStyle::Normal => {}
             FontStyle::Italic => {
@@ -123,7 +125,7 @@ impl FontInfo {
                     synth.vars[len] = (Tag::new(b"ital"), 1.0);
                     len += 1;
                 } else if self.has_slant_axis() {
-                    synth.vars[len] = (Tag::new(b"slnt"), 14.0);
+                    synth.vars[len] = (Tag::new(b"slnt"), -14.0);
                     len += 1;
                 } else if self.style == FontStyle::Normal {
                     synth.skew = 14;
@@ -132,7 +134,7 @@ impl FontInfo {
             FontStyle::Oblique(angle) => {
                 let degrees = angle.unwrap_or(14.0);
                 if self.has_slant_axis() {
-                    synth.vars[len] = (Tag::new(b"slnt"), degrees);
+                    synth.vars[len] = (Tag::new(b"slnt"), -degrees);
                     len += 1;
                 } else if self.has_italic_axis() && degrees > 0. {
                     synth.vars[len] = (Tag::new(b"ital"), 1.0);
