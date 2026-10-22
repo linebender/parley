@@ -45,6 +45,11 @@ pub enum WhiteSpaceCollapse {
 
 /// The distance between tab stops, following CSS `tab-size`.
 ///
+/// A preserved tab shifts the glyph after it to the next tab stop. Tab stops sit at multiples of
+/// the tab size from the line's start edge, including any text indent. If the next stop is less
+/// than half a space away, the tab shifts to the stop after it, so that a tab is always visible.
+/// A tab size that isn't positive renders tabs as nothing.
+///
 /// See: <https://www.w3.org/TR/css-text-4/#tab-size-property>
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TabSize {

@@ -12,6 +12,7 @@
 //! [css-tab-stop]: https://www.w3.org/TR/css-text-4/#tab-stop
 
 use crate::TabSize;
+use crate::layout::spacing::{EffectiveSpacing, Justification};
 use crate::layout::{Spacing, Style};
 use crate::style::Brush;
 use parley_engine::ShapedText;
@@ -69,6 +70,59 @@ pub(crate) fn size_tab<B: Brush>(
         cluster_idx,
         tab_advance(x, tab_size, space_advance, spacing),
     );
+}
+
+/// Sizes the next tab of run `run_idx` at or after `cluster_idx`, if any, and returns the cluster
+/// index just past that tab's atom, or the run's end if there is none.
+///
+/// The tab is sized as if the line breaker places every atom before it on the current line, from
+/// `x`, the line's current advance including its indent. Should a line break fall before the tab
+/// after all, the breaker returns and the next call sizes it again from its new position. The
+/// scan stops at a newline, where the breaker returns regardless.
+///
+/// This lets the breaker consume the clusters up to and including the tab with a plain atom
+/// iterator, keeping its hot loop free of mutable access to the shaped text.
+pub(crate) fn size_next_tab<B: Brush>(
+    shaped_text: &mut ShapedText,
+    styles: &[Style<B>],
+    run_idx: u32,
+    cluster_idx: u32,
+    x: f32,
+    space_advance: f32,
+    spacing: Spacing,
+) -> u32 {
+    let effective_spacing = EffectiveSpacing::new(spacing, Justification::NONE);
+    let slice = shaped_text.run_slice(run_idx);
+    let cluster_end = slice.shaped_clusters_range().end;
+
+    let mut x = x;
+    let mut tab = None;
+    for atom in slice.atoms_from(cluster_idx) {
+        let clusters = atom.shaped_clusters_range();
+        match atom.shaped_clusters()[0].whitespace() {
+            Whitespace::Tab => {
+                tab = Some(clusters);
+                break;
+            }
+            Whitespace::Newline => break,
+            _ => x += effective_spacing.atom_advance(&atom),
+        }
+    }
+
+    match tab {
+        Some(clusters) => {
+            size_tab(
+                shaped_text,
+                styles,
+                clusters.start,
+                x,
+                space_advance,
+                spacing,
+            );
+            clusters.end
+        }
+        None => cluster_end,
+    }
 }
 
 #[cfg(test)]

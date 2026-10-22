@@ -461,6 +461,9 @@ impl ShapedText {
         }
 
         let shaped_clusters_range = shaped_clusters_start as u32..self.shaped_clusters.len() as u32;
+        let has_tabs = self.shaped_clusters[shaped_clusters_start..]
+            .iter()
+            .any(|cluster| cluster.whitespace() == Whitespace::Tab);
 
         self.runs.push(ShapedRun {
             range,
@@ -476,6 +479,7 @@ impl ShapedText {
             language: options.language,
             font_metrics,
             space_advance,
+            has_tabs,
         });
     }
 }
@@ -513,6 +517,9 @@ pub struct ShapedRun {
     pub font_metrics: FontMetrics,
     /// The advance of U+0020 in this run's font and size, 0 if the font has no space glyph.
     pub space_advance: f32,
+    /// Whether any of this run's shaped clusters is a tab (see [`Whitespace::Tab`]).
+    /// Lets a layout engine skip tab sizing for the common run without tabs.
+    pub has_tabs: bool,
 }
 
 /// Processes shaped glyphs from `HarfRust` and converts them into `ShapedCluster` and `Glyph`.
