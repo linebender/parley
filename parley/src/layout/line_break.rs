@@ -1144,7 +1144,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 LayoutItemKind::TextRun => {
                     let run_idx = item.index;
                     let run = Run::new(self.layout, 0, 0, run_idx, None);
-                    let slice = run.full_slice();
+                    let slice = run.line_slice();
 
                     // Additional spacing to apply between atoms.
                     let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
@@ -1378,7 +1378,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let run_idx = item.index;
                     let shaped_run = &self.layout.data.shaped_text.runs()[run_idx];
                     let run = Run::new(self.layout, 0, 0, run_idx, None);
-                    let slice = run.full_slice();
+                    let slice = run.line_slice();
                     let spacing = run.line_spacing();
                     let cluster_end = shaped_run.shaped_clusters_range.end;
 
@@ -1545,6 +1545,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     bidi_level: BidiLevel::new(0),
                     shaped_cluster_range: cluster..cluster,
                     text_range: text..text,
+                    reshaped_run: None,
                 });
                 line.item_range = run_index..run_index + 1;
             }
@@ -1738,6 +1739,7 @@ fn commit_line<B: Brush>(
                     // These properties are ignored for inline boxes. So we just put a dummy value.
                     shaped_cluster_range: 0..0,
                     text_range: 0..0,
+                    reshaped_run: None,
                 });
 
                 last_item_kind = item.kind;
@@ -1792,6 +1794,7 @@ fn commit_line<B: Brush>(
                     bidi_level: shaped_run.bidi_level,
                     shaped_cluster_range: cluster_range,
                     text_range: item_text_range,
+                    reshaped_run: None,
                 });
             }
         }
@@ -1923,11 +1926,7 @@ fn hanging_whitespace<B: Brush>(
                     layout.data.runs[line_item.index].spacing,
                     Justification::NONE,
                 );
-                let slice = layout
-                    .data
-                    .shaped_text
-                    .run_slice(line_item.index as u32)
-                    .narrow(line_item.shaped_cluster_range.clone());
+                let slice = line_item.slice(&layout.data);
 
                 for atom in slice.atoms_end().rev() {
                     let (hanging, all_hang) = atom_hanging_advance(

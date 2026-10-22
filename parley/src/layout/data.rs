@@ -158,16 +158,36 @@ pub(crate) struct LineItemData {
     // TODO: factor this out?
     /// Range of the source text.
     pub(crate) text_range: Range<usize>,
-    /// This run's shaped clusters on this line, as a range into [`ShapedText::shaped_clusters`].
+    /// This run's shaped clusters on this line, as a range into [`ShapedText::shaped_clusters`], or
+    /// into [`LayoutData::reshaped`] if [`Self::reshaped_run`] is set.
     ///
     /// The bounds are atom-aligned.
     pub(crate) shaped_cluster_range: Range<u32>,
+    /// If `Some`, this is item is a reshaped run, and this is that run's index into
+    /// [`LayoutData::reshaped`].
+    ///
+    /// [`Self::index`] is the index of the run it was reshaped from.
+    ///
+    /// This will be set for lines whose break falls at a position that is not
+    /// [`parley_engine::shape::ShapedCluster::is_safe_to_break_before`].
+    pub(crate) reshaped_run: Option<u32>,
 }
 
 impl LineItemData {
     #[inline(always)]
     pub(crate) fn is_rtl(&self) -> bool {
         self.bidi_level.is_rtl()
+    }
+
+    /// This item's shaped clusters.
+    #[inline(always)]
+    #[expect(clippy::cast_possible_truncation, reason = "deferred")]
+    pub(crate) fn slice<'a, B: Brush>(&self, data: &'a LayoutData<B>) -> ShapedSlice<'a> {
+        match self.reshaped_run {
+            Some(reshaped_run) => data.reshaped.run_slice(&data.shaped_text, reshaped_run),
+            None => data.shaped_text.run_slice(self.index as u32),
+        }
+        .narrow(self.shaped_cluster_range.clone())
     }
 }
 
