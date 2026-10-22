@@ -1755,8 +1755,7 @@ fn commit_line<B: Brush>(
                 last_item_kind = item.kind;
                 committed_text_run = true;
 
-                // Map the cluster range to the source-text range. Line boundaries are always
-                // aligned to `Atom`s, i.e., line bounds are always grapheme bounds.
+                // Map the cluster range to the source-text range.
                 let slice = shaped_text.run_slice(item.index as u32);
                 let item_text_range = if cluster_range.is_empty() {
                     let char_pos = shaped_clusters[cluster_range.start as usize]

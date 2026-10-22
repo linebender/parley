@@ -12,6 +12,9 @@ use super::data::{Character, ShapedCluster};
 /// Note that character and cluster indices (including those given out by [`Atom`] and [`Grapheme`])
 /// are absolute into the underlying storage.
 ///
+/// The slice's edges are guaranteed to be shaped cluster edges, but not necessarily grapheme
+/// boundaries. See [`Self::grapheme_continues_before`] and [`Self::grapheme_continues_after`].
+///
 // NOTE: The motivation for this type, is that once `parley_engine` supports reshaping, this can
 // hold reshaped slices that don't depend on `ShapedText`.
 #[derive(Copy, Clone, Debug)]
@@ -50,6 +53,40 @@ impl<'a> ShapedSlice<'a> {
     #[inline(always)]
     pub fn characters(&self) -> &'a [Character] {
         self.characters_in(self.char_range())
+    }
+
+    /// Whether the grapheme containing this slice's first character began before the slice.
+    ///
+    /// The slice's first [`Atom`] and [`Grapheme`] then hold only this slice's part of the
+    /// grapheme.
+    ///
+    /// A grapheme spanning across a slice's edge can happen in a few cases. For example, a grapheme
+    /// can span across a [`ShapedRun`] (e.g., because of a grapheme spanning a script change). You
+    /// can also use [`Self::narrow`] to narrow a slice to any arbitrary shaped cluster boundary.
+    ///
+    /// This is `false` for an empty slice.
+    ///
+    /// [`ShapedRun`]: crate::ShapedRun
+    //
+    // TODO: once reshaping lands, perhaps also mention it here (if we indeed allow reshaping
+    // partial graphemes).
+    #[inline]
+    pub fn grapheme_continues_before(&self) -> bool {
+        let char_range = self.char_range();
+        !char_range.is_empty() && !self.characters[char_range.start as usize].grapheme_start
+    }
+
+    /// Whether the grapheme containing this slice's last character continues after the slice.
+    ///
+    /// See [`Self::grapheme_continues_before`]. This is `false` for an empty slice.
+    #[inline]
+    pub fn grapheme_continues_after(&self) -> bool {
+        let char_range = self.char_range();
+        !char_range.is_empty()
+            && self
+                .characters
+                .get(char_range.end as usize)
+                .is_some_and(|character| !character.grapheme_start)
     }
 
     /// The [`Character`]s within this slice spanned by `chars_range`.
@@ -121,10 +158,8 @@ impl<'a> ShapedSlice<'a> {
             "called `text_byte_at` with a character index out of the slice's range"
         );
         if char_idx == char_range.end {
-            // The character after this boundary is outside this slice. Note that `Self::characters`
-            // is the full slice of characters that were shaped, so the character after
-            // `char_range.end` is not necessarily the next character in the source text. We use the
-            // boundary behind the last character of this slice instead.
+            // The character after this boundary is outside this slice, and may not exist. We use
+            // the boundary behind the last character of this slice instead.
             self.characters[char_idx as usize - 1].text_byte_range().end
         } else {
             self.characters[char_idx as usize].text_byte_start as usize
@@ -266,9 +301,12 @@ impl<'a> ShapedSlice<'a> {
 
     /// Narrow the shaped slice to the given range of clusters.
     ///
-    /// The range indexes into [`Self::shaped_clusters`], must be a subrange of
-    /// [`Self::shaped_clusters_range`], and both bounds must be an atom boundary (i.e.,
-    /// [`ShapedCluster::is_grapheme_start`] must be `true`).
+    /// The range indexes into [`Self::shaped_clusters`] and must be a subrange of
+    /// [`Self::shaped_clusters_range`].
+    ///
+    /// If either side of the narrowed slice is not at a grapheme boundary (i.e.,
+    /// [`ShapedCluster::is_grapheme_start`] is `false`), the narrowed slice reports that through
+    /// [`Self::grapheme_continues_before`] and/or [`Self::grapheme_continues_after`].
     #[inline(always)]
     pub fn narrow(&self, clusters: Range<u32>) -> Self {
         debug_assert!(
@@ -278,14 +316,6 @@ impl<'a> ShapedSlice<'a> {
         debug_assert!(
             self.clusters.0 <= clusters.start && clusters.end <= self.clusters.1,
             "narrowed cluster range out of this slice's range"
-        );
-        debug_assert!(
-            clusters.is_empty()
-                || ((clusters.start == self.clusters.0
-                    || self.shaped_clusters[clusters.start as usize].is_grapheme_start())
-                    && (clusters.end == self.clusters.1
-                        || self.shaped_clusters[clusters.end as usize].is_grapheme_start())),
-            "narrowed cluster range is not atom-aligned"
         );
         Self {
             clusters: (clusters.start, clusters.end),
@@ -472,8 +502,8 @@ impl<'a> Iterator for Atoms<'a> {
 
 /// An atom of shaped text.
 ///
-/// This is smallest span of text where both edges are a [`Grapheme`] boundary and [`ShapedCluster`]
-/// boundary.
+/// This is the smallest span of text where both edges are a [`ShapedCluster`] boundary and either a
+/// [`Grapheme`] boundary or the edge of the [`ShapedSlice`] this atom was walked from.
 ///
 /// An atom cannot be broken without reshaping. Check [`Self::is_safe_to_break_before`] to see if
 /// you can break the text before this atom without requiring reshaping.
@@ -569,6 +599,27 @@ impl<'a> Atom<'a> {
         self.advance
     }
 
+    /// Whether this atom's grapheme began before the atom's first character.
+    ///
+    /// This can only be `true` for the first atom of a slice; see
+    /// [`ShapedSlice::grapheme_continues_before`].
+    #[inline]
+    pub fn grapheme_continues_before(&self) -> bool {
+        !self.slice.characters[self.chars.0 as usize].grapheme_start
+    }
+
+    /// Whether this atom's grapheme continues after the atom's last character.
+    ///
+    /// This can only be `true` for the last atom of a slice; see
+    /// [`ShapedSlice::grapheme_continues_after`].
+    #[inline]
+    pub fn grapheme_continues_after(&self) -> bool {
+        self.slice
+            .characters
+            .get(self.chars.1 as usize)
+            .is_some_and(|character| !character.grapheme_start)
+    }
+
     /// Get a cursor to walk atoms, starting logically before this atom.
     pub fn cursor_before(&self) -> Atoms<'a> {
         Atoms {
@@ -656,6 +707,11 @@ impl<'a> Graphemes<'a> {
                 first_char.whitespace,
                 is_atom_start,
                 is_atom_end,
+                !first_char.grapheme_start,
+                self.slice
+                    .characters
+                    .get(grapheme_end as usize)
+                    .is_some_and(|character| !character.grapheme_start),
             ),
         })
     }
@@ -719,6 +775,11 @@ impl<'a> Iterator for Graphemes<'a> {
                 first_char.whitespace,
                 is_atom_start,
                 is_atom_end,
+                !first_char.grapheme_start,
+                self.slice
+                    .characters
+                    .get(idx as usize)
+                    .is_some_and(|character| !character.grapheme_start),
             ),
         })
     }
@@ -741,9 +802,11 @@ impl GraphemeFlags {
     const WHITESPACE_MASK: u16 = 0b111 << Self::WHITESPACE_SHIFT;
     const ATOM_START: u16 = 1 << 4;
     const ATOM_END: u16 = 1 << 5;
+    const CONTINUES_BEFORE: u16 = 1 << 6;
+    const CONTINUES_AFTER: u16 = 1 << 7;
 
     // TODO: do we want to expose safe to break?
-    // const SAFE_TO_BREAK_BEFORE: u16 = 1 << 6;
+    // const SAFE_TO_BREAK_BEFORE: u16 = 1 << 8;
 }
 
 impl GraphemeFlags {
@@ -753,6 +816,8 @@ impl GraphemeFlags {
         whitespace: Whitespace,
         atom_start: bool,
         atom_end: bool,
+        continues_before: bool,
+        continues_after: bool,
     ) -> Self {
         Self(
             if is_soft_wrap_opportunity {
@@ -761,7 +826,17 @@ impl GraphemeFlags {
                 0
             } | ((whitespace as u16) << Self::WHITESPACE_SHIFT)
                 | if atom_start { Self::ATOM_START } else { 0 }
-                | if atom_end { Self::ATOM_END } else { 0 },
+                | if atom_end { Self::ATOM_END } else { 0 }
+                | if continues_before {
+                    Self::CONTINUES_BEFORE
+                } else {
+                    0
+                }
+                | if continues_after {
+                    Self::CONTINUES_AFTER
+                } else {
+                    0
+                },
         )
     }
 
@@ -784,6 +859,16 @@ impl GraphemeFlags {
     fn is_atom_end(self) -> bool {
         self.0 & Self::ATOM_END != 0
     }
+
+    #[inline(always)]
+    fn continues_before(self) -> bool {
+        self.0 & Self::CONTINUES_BEFORE != 0
+    }
+
+    #[inline(always)]
+    fn continues_after(self) -> bool {
+        self.0 & Self::CONTINUES_AFTER != 0
+    }
 }
 
 /// A grapheme of shaped text.
@@ -801,6 +886,9 @@ impl GraphemeFlags {
 ///
 /// A combination of these is also possible, e.g., a grapheme containing multiple shaped clusters
 /// and crossing a shaped cluster boundary on one or both sides.
+///
+/// A grapheme walked from a [`ShapedSlice`] stops at that slice's edges. It may continue past it:
+/// see [`Self::continues_before`] and [`Self::continues_after`].
 ///
 /// [uax-grapheme]: https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries
 /// [monotone-characters]: https://harfbuzz.github.io/working-with-harfbuzz-clusters.html
@@ -851,6 +939,24 @@ impl Grapheme {
     #[inline(always)]
     pub fn is_atom_end(&self) -> bool {
         self.flags.is_atom_end()
+    }
+
+    /// Whether the text-wide grapheme this grapheme is part of began before it.
+    ///
+    /// This can only be `true` for the first [`Grapheme`] of a slice; see
+    /// [`ShapedSlice::grapheme_continues_before`].
+    #[inline(always)]
+    pub fn continues_before(&self) -> bool {
+        self.flags.continues_before()
+    }
+
+    /// Whether the text-wide grapheme this grapheme is part of continues after it.
+    ///
+    /// This can only be `true` for the last [`Grapheme`] of a slice; see
+    /// [`ShapedSlice::grapheme_continues_after`].
+    #[inline(always)]
+    pub fn continues_after(&self) -> bool {
+        self.flags.continues_after()
     }
 }
 

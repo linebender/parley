@@ -439,7 +439,9 @@ impl<'a, B: Brush> Iterator for Clusters<'a, B> {
     }
 }
 
-/// The number of graphemes in `slice`.
+/// The number of graphemes in `slice`, also counting a grapheme the slice starts inside of.
+///
+/// This effectively counts the number of [`Cluster`]s the `slice` would produce.
 ///
 /// This is `O(n)` in the slice's characters.
 fn count_graphemes(slice: ShapedSlice<'_>) -> usize {
@@ -448,4 +450,5 @@ fn count_graphemes(slice: ShapedSlice<'_>) -> usize {
         .iter()
         .filter(|character| character.grapheme_start)
         .count()
+        + usize::from(slice.grapheme_continues_before())
 }
