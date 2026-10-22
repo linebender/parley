@@ -25,8 +25,8 @@ use crate::{
 };
 
 use core::ops::Range;
-use parley_engine::Atom;
 use parley_engine::shape::{Character, ReshapedTextMark, Reshaper, Whitespace};
+use parley_engine::{Atom, ShapedText};
 use smallvec::SmallVec;
 
 #[derive(Default)]
@@ -60,6 +60,9 @@ impl LineLayout {
 #[derive(Clone, Default)]
 struct LineState {
     x: f32,
+    /// The change in advance when reshaping the line's start, relative to the original shaped
+    /// clusters. See [`Reshaper::measure_start`].
+    start_advance_delta: f32,
     items: Range<usize>,
     /// The line's shaped clusters, as a range into [`parley_engine::ShapedText::shaped_clusters`].
     /// The bounds are atom-aligned.
@@ -87,6 +90,7 @@ impl LineState {
     /// Reset the per-line running state in preparation for building a new line.
     fn reset(&mut self) {
         self.x = 0.0;
+        self.start_advance_delta = 0.0;
         self.box_metrics.reset();
         self.num_word_separators = 0;
     }
@@ -962,6 +966,20 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             &mut state.subtrees,
         );
         state.update_max_height_exceeded();
+
+        let data = &self.layout.data;
+        if let Some(cluster) = data
+            .shaped_text
+            .shaped_clusters()
+            .get(state.cluster_idx as usize)
+            && !cluster.is_safe_to_break_before()
+        {
+            let line_start_char = cluster.chars_range().start;
+            state.line.start_advance_delta = self
+                .reshaper
+                .measure_start(&data.text, &data.shaped_text, line_start_char, None)
+                .advance_delta();
+        }
     }
 
     /// Reset state when a line has been committed
@@ -1119,6 +1137,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         let line_indent = self.resolve_indent();
 
         let max_advance = max_advance - line_indent;
+        // The advance available in "source shaped cluster space" when accounting for the difference
+        // that reshaping the line's start causes.
+        let fit_max_advance = max_advance - self.state.line.start_advance_delta;
 
         // Iterate over remaining runs in the Layout
         let item_count = self.layout.data.items.len();
@@ -1246,7 +1267,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // If the content fits (the x position does NOT exceed max_advance)
                         //
                         // We simply append the atom to the current line
-                        if next_x <= max_advance {
+                        if next_x <= fit_max_advance {
                             if max_height_exceeded {
                                 return self.max_height_break_data(line_height);
                             }
@@ -1274,7 +1295,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 spacing,
                                 item.bidi_level.is_rtl(),
                             );
-                            if all_hang || next_x - hanging <= max_advance {
+                            if all_hang || next_x - hanging <= fit_max_advance {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
