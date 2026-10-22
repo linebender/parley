@@ -566,7 +566,6 @@ impl ContentWidthsMeasurer {
         // The cluster index at which nothing has been placed on the current line yet, if any.
         let mut empty_at = if self.line_has_content { usize::MAX } else { 0 };
 
-        // We only hang full atoms, which makes later bidi reordering a lot simpler.
         let mut atom_hangs = false;
         let mut skip_atom = false;
         for (i, cluster) in clusters.iter().enumerate() {
