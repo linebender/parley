@@ -461,3 +461,58 @@ fn tab_stops_survive_justification() {
     nearly_eq(xs[2], a + space);
     nearly_eq(xs[3], base);
 }
+
+#[test]
+fn justification_keeps_every_tab_on_its_stop() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let space = advance(&mut env, " ");
+    let a = advance(&mut env, "a");
+    let b = advance(&mut env, "b");
+    let c = advance(&mut env, "c");
+    let base = 8. * space;
+    assert!(a < base - space / 2. && base + b + space + b < 2. * base - space / 2.);
+    let justify_all = AlignmentOptions {
+        last_line_alignment: Some(Alignment::Justify),
+        ..AlignmentOptions::default()
+    };
+
+    // Only the space after the last tab stretches, so both tabs stay on their stops and the
+    // space between them keeps its width. Glyphs: a, b, space, b, c, space, c.
+    let text = "a\tb b\tc c";
+    let width = 200.;
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::TabSize(TabSize::Spaces(8.)));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(width));
+    layout.align(Alignment::Justify, justify_all);
+    let xs = glyph_xs(&layout, 0);
+    nearly_eq(xs[1], base);
+    nearly_eq(xs[3], base + b + space);
+    nearly_eq(xs[4], 2. * base);
+    nearly_eq(xs[6], width - c);
+}
+
+#[test]
+fn justification_with_a_hanging_tab() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let space = advance(&mut env, " ");
+    let a = advance(&mut env, "a");
+    let justify_all = AlignmentOptions {
+        last_line_alignment: Some(Alignment::Justify),
+        ..AlignmentOptions::default()
+    };
+
+    // The trailing space and tab hang past the line's end. The space precedes the line's last tab,
+    // so it was never a justification opportunity and must not be subtracted as a hanging one.
+    let text = "a a \t";
+    let width = 2. * a + space + 0.5;
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::TabSize(TabSize::Spaces(8.)));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(width));
+    layout.align(Alignment::Justify, justify_all);
+    assert_eq!(layout.len(), 1);
+    let xs = glyph_xs(&layout, 0);
+    nearly_eq(xs[0], 0.);
+    nearly_eq(xs[2], a + space);
+}

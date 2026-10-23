@@ -83,9 +83,6 @@ pub(crate) fn size_tab<B: Brush>(
 /// scan runs through newlines, which have no advance: `break_next` returns at a newline and
 /// re-sizes the tab on re-entry, while `break_next_with_length` keeps the line going past it.
 ///
-/// This lets the breaker consume the clusters up to and including the tab with a plain atom
-/// iterator, keeping its hot loop free of mutable access to the shaped text.
-///
 /// The scan looks at most [`MAX_SCAN_ATOMS`] atoms ahead. Past that, it returns where it stopped
 /// without sizing anything, and the breaker calls again once it has consumed those atoms. Without
 /// the cap, a tab far into a run would be scanned towards again on every line before it, making
