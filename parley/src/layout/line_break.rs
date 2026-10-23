@@ -77,11 +77,16 @@ struct LineState {
     /// being triggered on the cluster after the linebreak.
     text_wrap_mode: TextWrapMode,
 
-    /// The number of word separators appended to the line so far.
+    /// The number of word separators appended to the line since its last tab.
     ///
     /// These are the line's justification opportunities, before subtracting those that end up in
-    /// the line's hanging whitespace.
+    /// the line's hanging whitespace. Separators before a tab don't count: stretching them would
+    /// move the text after the tab off its tab stop.
     num_word_separators: u32,
+
+    /// One past the line's last tab cluster, or zero without one: where justification may start
+    /// (see [`Justification::justification_start_cluster`]).
+    justification_start_cluster: u32,
 }
 
 impl LineState {
@@ -90,6 +95,7 @@ impl LineState {
         self.x = 0.0;
         self.box_metrics.reset();
         self.num_word_separators = 0;
+        self.justification_start_cluster = 0;
     }
 }
 
@@ -768,7 +774,9 @@ impl BreakerState {
     /// `style_index` is the style of the atom's first character. The span boxes of the atom's
     /// styles (and those of their ancestors) are added to the line too, as is the box of the atom's
     /// run, see [`LineBoxMetrics::add_text`]. `is_word_separator` is `true` iff the atom is a
-    /// [word separator](`is_word_separator`), i.e., a justification opportunity.
+    /// [word separator](`is_word_separator`), i.e., a justification opportunity. `is_tab` is
+    /// `true` iff the atom is a tab, which restarts the count of justification opportunities so
+    /// that justification can't move it off its tab stop.
     #[inline]
     fn append_atom_to_line<B: Brush>(
         &mut self,
@@ -777,12 +785,18 @@ impl BreakerState {
         style_index: u16,
         data: &LayoutData<B>,
         is_word_separator: bool,
+        is_tab: bool,
     ) {
         self.line.items.end = self.item_idx + 1;
         self.line.clusters.end = atom.shaped_clusters_range().end;
         self.cluster_idx = atom.shaped_clusters_range().end;
         self.line.x = next_x;
-        self.line.num_word_separators += u32::from(is_word_separator);
+        if is_tab {
+            self.line.num_word_separators = 0;
+            self.line.justification_start_cluster = atom.shaped_clusters_range().end;
+        } else {
+            self.line.num_word_separators += u32::from(is_word_separator);
+        }
         self.line.box_metrics.add_text(
             self.item_idx,
             self.run_idx,
@@ -1208,6 +1222,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             let is_newline = whitespace == Whitespace::Newline;
                             // Whether this atom is a justification opportunity.
                             let is_separator = is_word_separator(whitespace);
+                            let is_tab = whitespace == Whitespace::Tab;
                             let is_soft_wrap_opportunity =
                                 first_character.flags.is_soft_wrap_opportunity();
                             let max_height_exceeded = self.state.line.max_height_exceeded;
@@ -1230,6 +1245,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     style_index,
                                     &self.layout.data,
                                     is_separator,
+                                    is_tab,
                                 );
 
                                 return self.start_new_line(
@@ -1276,6 +1292,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     style_index,
                                     &self.layout.data,
                                     is_separator,
+                                    is_tab,
                                 );
                             }
                             // Else we attempt to line break:
@@ -1304,6 +1321,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                         style_index,
                                         &self.layout.data,
                                         is_separator,
+                                        is_tab,
                                     );
                                 }
                                 // Case: we have previously encountered a REGULAR line-breaking opportunity in the current line
@@ -1348,6 +1366,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                         style_index,
                                         &self.layout.data,
                                         is_separator,
+                                        is_tab,
                                     );
                                 }
                             }
@@ -1443,6 +1462,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             let whitespace = first_character.whitespace;
                             let is_newline = whitespace == Whitespace::Newline;
                             let is_separator = is_word_separator(whitespace);
+                            let is_tab = whitespace == Whitespace::Tab;
                             let advance = spacing.atom_advance(&atom);
 
                             // Compute the x position.
@@ -1458,6 +1478,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 first_character.style_index,
                                 &self.layout.data,
                                 is_separator,
+                                is_tab,
                             );
                             char_count += atom.char_range().len() as u32;
 
@@ -1867,6 +1888,7 @@ fn commit_line<B: Brush>(
         layout,
         &lines.line_items[start_item_idx..end_item_idx],
         overflow,
+        state.justification_start_cluster,
     );
     // The word separators counted as the line was built include the line's hanging whitespace, and
     // hanging whitespace is not stretched by justification.
@@ -1885,6 +1907,7 @@ fn commit_line<B: Brush>(
         break_reason,
         num_justification_opportunities,
         justification: Justification {
+            justification_start_cluster: state.justification_start_cluster,
             justification_end_cluster,
             ..Justification::NONE
         },
@@ -1940,6 +1963,7 @@ fn hanging_whitespace<B: Brush>(
     layout: &Layout<B>,
     line_items: &[LineItemData],
     overflow: f32,
+    justification_start_cluster: u32,
 ) -> (f32, u32, u32) {
     let mut hanging_whitespace_advance = 0.;
     // Atoms with shaped clusters before this index may be stretched by justification.
@@ -2014,7 +2038,11 @@ fn hanging_whitespace<B: Brush>(
                     // Justification can't stretch within an atom, so it stops at the start of the
                     // last atom that hangs in its entirety or only partially.
                     justification_end_cluster = atom.shaped_clusters_range().start;
-                    if is_word_separator(whitespace) {
+                    // Only opportunities that were counted can be subtracted: those before the
+                    // line's last tab never were.
+                    if is_word_separator(whitespace)
+                        && atom.shaped_clusters_range().start >= justification_start_cluster
+                    {
                         hanging_opportunities += 1;
                     }
                     if !all_hang {

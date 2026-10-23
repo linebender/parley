@@ -48,7 +48,9 @@ pub enum WhiteSpaceCollapse {
 /// A preserved tab shifts the glyph after it to the next tab stop. Tab stops sit at multiples of
 /// the tab size from the line's start edge, including any text indent. If the next stop is less
 /// than half a space away, the tab shifts to the stop after it, so that a tab is always visible.
-/// A tab size that isn't positive renders tabs as nothing.
+/// A tab size that isn't positive gives tabs no advance of their own; letter spacing after them
+/// still applies. Justification leaves a line's text up to its last tab in place, so tab stops
+/// keep lining up.
 ///
 /// See: <https://www.w3.org/TR/css-text-4/#tab-size-property>
 #[derive(Debug, Clone, Copy, PartialEq)]

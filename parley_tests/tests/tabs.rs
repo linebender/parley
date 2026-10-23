@@ -3,9 +3,9 @@
 
 //! Tab stop tests.
 //!
-//! Tabs shift the following glyph to the next tab stop, following CSS Text 4 § 4.1.3. The tests
-//! measure the shift against the advance of the space character, as [`TabSize::Spaces`] is a
-//! multiple of it.
+//! Tabs shift the following glyph to the next tab stop, following CSS Text 4 (`#tab-stop`). The
+//! tests measure the shift against the advance of the space character, as [`TabSize::Spaces`] is
+//! a multiple of it.
 
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
@@ -159,7 +159,7 @@ fn tab_consecutive_tabs_each_advance_a_stop() {
 }
 
 #[test]
-fn tab_size_zero_renders_nothing() {
+fn tab_size_zero_removes_the_tabs_advance() {
     let mut env = TestEnv::new(test_name!(), None);
     let a = advance(&mut env, "a");
 
@@ -167,6 +167,16 @@ fn tab_size_zero_renders_nothing() {
     let b_x = glyph_xs(&layout, 0)[1];
     nearly_eq(b_x, a);
     nearly_eq(layout.width(), advance(&mut env, "ab"));
+
+    // The tab is still a cluster, so it keeps its letter-spacing gap: "b" follows the gaps after
+    // both "a" and the tab.
+    let text = "a\tb";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::TabSize(TabSize::Spaces(0.)));
+    builder.push_default(StyleProperty::LetterSpacing(2.));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    nearly_eq(glyph_xs(&layout, 0)[1], a + 2. + 2.);
 }
 
 #[test]
@@ -406,4 +416,48 @@ fn tab_sized_after_newline_when_breaking_by_length() {
     assert_eq!(layout.len(), 1);
     // Glyphs in order: a b c d e f; "e" shows where the tab landed.
     nearly_eq(glyph_xs(&layout, 0)[4], base);
+}
+
+#[test]
+fn tab_stops_survive_justification() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let space = advance(&mut env, " ");
+    let a = advance(&mut env, "a");
+    let b = advance(&mut env, "b");
+    let base = 8. * space;
+    assert!(2. * a + space < base - space / 2.);
+    // Justify every line, including the last, so a single line suffices.
+    let justify_all = AlignmentOptions {
+        last_line_alignment: Some(Alignment::Justify),
+        ..AlignmentOptions::default()
+    };
+
+    // The space before the tab isn't a justification opportunity, as stretching it would move
+    // "b" off its stop. The space after the tab takes up all of the free space instead.
+    // Glyphs in order: a, space, a, b, space, b.
+    let text = "a a\tb b";
+    let width = 200.;
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::TabSize(TabSize::Spaces(8.)));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(width));
+    layout.align(Alignment::Justify, justify_all);
+    assert_eq!(layout.len(), 1);
+    let xs = glyph_xs(&layout, 0);
+    nearly_eq(xs[0], 0.);
+    nearly_eq(xs[2], a + space);
+    nearly_eq(xs[3], base);
+    nearly_eq(xs[5], width - b);
+
+    // With no opportunity after the tab, the line isn't justified at all.
+    let text = "a a\tb";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::TabSize(TabSize::Spaces(8.)));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(Some(width));
+    layout.align(Alignment::Justify, justify_all);
+    let xs = glyph_xs(&layout, 0);
+    nearly_eq(xs[0], 0.);
+    nearly_eq(xs[2], a + space);
+    nearly_eq(xs[3], base);
 }
