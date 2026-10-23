@@ -383,3 +383,27 @@ fn tab_stops_in_rtl_text_are_measured_from_the_right_edge() {
     nearly_eq(alefs_offset, 0.);
     nearly_eq(bas_offset, layout.width() - bas);
 }
+
+#[test]
+fn tab_sized_after_newline_when_breaking_by_length() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let space = advance(&mut env, " ");
+    let ab_cd = advance(&mut env, "abcd");
+    let base = 20. * space;
+    assert!(ab_cd < base - space / 2.);
+
+    // `break_next_with_length` does not break at newlines, so the newline and the tab share a
+    // line. The newline has no advance, so the tab starts after "ab" + "cd" and must reach the
+    // first stop.
+    let text = "ab\ncd\tef";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::TabSize(TabSize::Spaces(20.)));
+    let mut layout = builder.build(text);
+    let mut breaker = layout.break_lines();
+    breaker.break_next_with_length(100);
+    breaker.finish();
+
+    assert_eq!(layout.len(), 1);
+    // Glyphs in order: a b c d e f; "e" shows where the tab landed.
+    nearly_eq(glyph_xs(&layout, 0)[4], base);
+}

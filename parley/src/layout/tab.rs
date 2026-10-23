@@ -77,11 +77,10 @@ pub(crate) fn size_tab<B: Brush>(
 ///
 /// The tab is sized as if the line breaker places every atom before it on the current line, from
 /// `x`, the line's current advance including its indent. Should a line break fall before the tab
-/// after all, the breaker returns and the next call sizes it again from its new position. The
-/// scan stops at a newline, where the breaker returns regardless.
-///
-/// This lets the breaker consume the clusters up to and including the tab with a plain atom
-/// iterator, keeping its hot loop free of mutable access to the shaped text.
+/// after all, the breaker returns and the next call sizes it again from its new position. That
+/// holds across newlines too: `break_next` returns at a newline and re-sizes on re-entry, while
+/// `break_next_with_length` continues the line through it, which the scan's zero newline advance
+/// matches.
 pub(crate) fn size_next_tab<B: Brush>(
     shaped_text: &mut ShapedText,
     styles: &[Style<B>],
@@ -104,7 +103,6 @@ pub(crate) fn size_next_tab<B: Brush>(
                 tab = Some(clusters);
                 break;
             }
-            Whitespace::Newline => break,
             _ => x += effective_spacing.atom_advance(&atom),
         }
     }
