@@ -681,74 +681,72 @@ pub struct BreakerState {
     subtrees: SubtreeHistory,
 
     // Saved breaker states for reverting to a previously encountered line-breaking opportunity
-    /// Saved breaker states for the last two non-emergency line-breaking opportunities.
-    ///
-    /// We store two: once we need to break, we first we check the latest one (at index 0), and if
-    /// the line ends up overflowing once it's reshaped, we take the earlier one (index 1). It's
-    /// very unlikely that that one will also overflow, as taking away a character will almost
-    /// always take away more advance than reshaping would introduce.
-    prev_boundaries: [Option<PrevBoundaryState>; 2],
-    /// Saved breaker states for the last two emergency line-breaking opportunities.
-    ///
-    /// As for [`Self::prev_boundaries`], we store two (see the explanation above).
-    emergency_boundaries: [Option<PrevBoundaryState>; 2],
+    /// Saved breaker state for the last non-emergency line-breaking opportunities
+    prev_boundaries: SavedBoundaries,
+    /// Saved breaker state for the last emergency line-breaking opportunities
+    emergency_boundaries: SavedBoundaries,
 }
 
-impl Clone for BreakerState {
+/// A saved line-breaking opportunity and an earlier one before it.
+///
+/// The reason we store two opportunities is that, if we need to reshape after taking the break
+/// opportunity, the line may end up overflowing. In that case, we take the earlier break. It's very
+/// unlikely that that one will also overflow, as taking away a character will almost always take
+/// away more advance than reshaping would introduce.
+#[derive(Default)]
+struct SavedBoundaries {
+    /// The last two saved opportunities.
+    slots: [Option<PrevBoundaryState>; 2],
+    /// The index into `slots` (as `0` or `1`) of the last opportunity; the other slot holds the
+    /// earlier opportunity.
+    last: bool,
+}
+
+impl Clone for SavedBoundaries {
     fn clone(&self) -> Self {
         Self {
-            items: self.items,
-            lines: self.lines,
-            item_idx: self.item_idx,
-            run_idx: self.run_idx,
-            cluster_idx: self.cluster_idx,
-            line_x: self.line_x,
-            line_y: self.line_y,
-            layout_max_advance: self.layout_max_advance,
-            line_max_advance: self.line_max_advance,
-            line_max_height: self.line_max_height,
-            line: self.line.clone(),
-            contributed: self.contributed.clone(),
-            subtrees: self.subtrees.clone(),
-            prev_boundaries: self.prev_boundaries.clone(),
-            emergency_boundaries: self.emergency_boundaries.clone(),
+            slots: self.slots.clone(),
+            last: self.last,
         }
     }
 
-    /// Reuses the allocations of `self`, as a state is saved at the start of every line.
     fn clone_from(&mut self, source: &Self) {
-        let Self {
-            items,
-            lines,
-            item_idx,
-            run_idx,
-            cluster_idx,
-            line_x,
-            line_y,
-            layout_max_advance,
-            line_max_advance,
-            line_max_height,
-            line,
-            contributed,
-            subtrees,
-            prev_boundaries,
-            emergency_boundaries,
-        } = source;
-        self.items = *items;
-        self.lines = *lines;
-        self.item_idx = *item_idx;
-        self.run_idx = *run_idx;
-        self.cluster_idx = *cluster_idx;
-        self.line_x = *line_x;
-        self.line_y = *line_y;
-        self.layout_max_advance = *layout_max_advance;
-        self.line_max_advance = *line_max_advance;
-        self.line_max_height = *line_max_height;
-        self.line.clone_from(line);
-        self.contributed.clone_from(contributed);
-        self.subtrees.clone_from(subtrees);
-        self.prev_boundaries.clone_from(prev_boundaries);
-        self.emergency_boundaries.clone_from(emergency_boundaries);
+        // Writing `None` only sets the discriminant, while cloning would copy the slots' full data.
+        // The slots are `None` when we clone state at the start of a line, so this turns out to be
+        // quite a bit faster.
+        for (slot, source) in self.slots.iter_mut().zip(&source.slots) {
+            match source {
+                None => *slot = None,
+                Some(_) => slot.clone_from(source),
+            }
+        }
+        self.last = source.last;
+    }
+}
+
+impl SavedBoundaries {
+    #[inline(always)]
+    fn next_slot(&mut self) -> &mut Option<PrevBoundaryState> {
+        self.last = !self.last;
+        &mut self.slots[usize::from(self.last)]
+    }
+
+    /// Take the last saved opportunity.
+    #[inline(always)]
+    fn take_last(&mut self) -> Option<PrevBoundaryState> {
+        self.slots[usize::from(self.last)].take()
+    }
+
+    /// Take the saved opportunity before the last one.
+    #[inline(always)]
+    fn take_earlier(&mut self) -> Option<PrevBoundaryState> {
+        self.slots[usize::from(!self.last)].take()
+    }
+
+    #[inline(always)]
+    fn clear(&mut self) {
+        self.slots[0] = None;
+        self.slots[1] = None;
     }
 }
 
@@ -769,9 +767,57 @@ impl Default for BreakerState {
             line: LineState::default(),
             contributed: Vec::new(),
             subtrees: SubtreeHistory::default(),
-            prev_boundaries: [None, None],
-            emergency_boundaries: [None, None],
+            prev_boundaries: SavedBoundaries::default(),
+            emergency_boundaries: SavedBoundaries::default(),
         }
+    }
+}
+
+impl Clone for BreakerState {
+    fn clone(&self) -> Self {
+        let mut clone = Self::default();
+        clone.clone_from(self);
+        clone
+    }
+
+    // The breaker saves its state at the start of every line. At that point, there are no saved
+    // break opportunities yet. Those saved opportunities are quite big structs, and cloning
+    // field-by-field allows us to prevent copying their data when not needed.
+    fn clone_from(&mut self, source: &Self) {
+        let Self {
+            items,
+            lines,
+            reshaped,
+            item_idx,
+            run_idx,
+            cluster_idx,
+            line_x,
+            line_y,
+            layout_max_advance,
+            line_max_advance,
+            line_max_height,
+            line,
+            contributed,
+            subtrees,
+            prev_boundaries,
+            emergency_boundaries,
+        } = source;
+        self.items = *items;
+        self.lines = *lines;
+        self.reshaped = *reshaped;
+        self.item_idx = *item_idx;
+        self.run_idx = *run_idx;
+        self.cluster_idx = *cluster_idx;
+        self.line_x = *line_x;
+        self.line_y = *line_y;
+        self.layout_max_advance = *layout_max_advance;
+        self.line_max_advance = *line_max_advance;
+        self.line_max_height = *line_max_height;
+        self.line.clone_from(line);
+        self.contributed.clone_from(contributed);
+        self.subtrees.clone_from(subtrees);
+        self.prev_boundaries.clone_from(prev_boundaries);
+        self.emergency_boundaries.clone_from(emergency_boundaries);
     }
 }
 
@@ -826,33 +872,27 @@ impl BreakerState {
     /// Store the current iteration state so that we can revert to it if we later want to take
     /// the line breaking opportunity at this point.
     fn mark_line_break_opportunity(&mut self) {
-        self.prev_boundaries = [
-            Some(PrevBoundaryState {
-                item_idx: self.item_idx,
-                run_idx: self.run_idx,
-                cluster_idx: self.cluster_idx,
-                state: self.line.clone(),
-                contributed_len: self.contributed.len(),
-                subtrees_len: self.subtrees.save(),
-            }),
-            self.prev_boundaries[0].take(),
-        ];
+        *self.prev_boundaries.next_slot() = Some(self.boundary());
     }
 
     /// Store the current iteration state so that we can revert to it if we later want to take
     /// an *emergency* line breaking opportunity at this point.
     fn mark_emergency_break_opportunity(&mut self) {
-        self.emergency_boundaries = [
-            Some(PrevBoundaryState {
-                item_idx: self.item_idx,
-                run_idx: self.run_idx,
-                cluster_idx: self.cluster_idx,
-                state: self.line.clone(),
-                contributed_len: self.contributed.len(),
-                subtrees_len: self.subtrees.save(),
-            }),
-            self.emergency_boundaries[0].take(),
-        ];
+        *self.emergency_boundaries.next_slot() = Some(self.boundary());
+    }
+
+    /// The current iteration state, to revert to if we later want to take the line breaking
+    /// opportunity at this point.
+    #[inline(always)]
+    fn boundary(&mut self) -> PrevBoundaryState {
+        PrevBoundaryState {
+            item_idx: self.item_idx,
+            run_idx: self.run_idx,
+            cluster_idx: self.cluster_idx,
+            state: self.line.clone(),
+            contributed_len: self.contributed.len(),
+            subtrees_len: self.subtrees.save(),
+        }
     }
 
     /// Revert boundary state to prev state
@@ -1080,8 +1120,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         self.state.items = self.lines.line_items.len();
         self.state.lines = self.lines.lines.len();
         self.state.reshaped = self.layout.data.reshaped.mark();
-        self.state.prev_boundaries = [None, None];
-        self.state.emergency_boundaries = [None, None];
+        self.state.prev_boundaries.clear();
+        self.state.emergency_boundaries.clear();
 
         // `finish_line` reads the line's accumulated vertical metrics from `self.state.line`, so
         // it must run before we reset the per-line running state. It may grow the line (e.g. the
@@ -1378,8 +1418,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             //
                             // We "take" the line-breaking opportunity by starting a new line and resetting our
                             // item/run/cluster iteration state back to how it was when the line-breaking opportunity was encountered
-                            else if let Some(prev) = self.state.prev_boundaries[0].take() {
-                                let earlier = self.state.prev_boundaries[1].take();
+                            else if let Some(prev) = self.state.prev_boundaries.take_last() {
+                                let earlier = self.state.prev_boundaries.take_earlier();
                                 self.take_boundary(prev, earlier, max_advance);
                                 return self.start_new_line(
                                     BreakReason::Regular,
@@ -1392,9 +1432,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             // We "take" the line-breaking opportunity by starting a new line and resetting our
                             // item/run/cluster iteration state back to how it was when the line-breaking opportunity was encountered
                             else if let Some(prev_emergency) =
-                                self.state.emergency_boundaries[0].take()
+                                self.state.emergency_boundaries.take_last()
                             {
-                                let earlier = self.state.emergency_boundaries[1].take();
+                                let earlier = self.state.emergency_boundaries.take_earlier();
                                 self.take_boundary(prev_emergency, earlier, max_advance);
                                 return self.start_new_line(
                                     BreakReason::Emergency,
@@ -1827,11 +1867,6 @@ fn commit_line<B: Brush>(
     let source_clusters =
         reshaped_line.map_or(state.clusters.clone(), |l| l.source_shaped_clusters_range());
     let (start_run, end_run) = reshaped_line.map_or((None, None), |l| (l.start_run(), l.end_run()));
-    let piece_clusters = |piece: u32| {
-        (layout.data.reshaped.run(piece).shaped_run())
-            .shaped_clusters_range
-            .clone()
-    };
     let advance = state.x + reshaped_line.map_or(0., |l| l.advance_delta());
 
     let start_item_idx = lines.line_items.len();
@@ -1847,8 +1882,7 @@ fn commit_line<B: Brush>(
     let mut last_item_kind = LayoutItemKind::TextRun;
     let mut committed_text_run = false;
     // The line's source text range, as the union of the ranges of the text runs committed to it.
-    let mut text_start = usize::MAX;
-    let mut text_end = 0;
+    let mut text_range = (usize::MAX, 0);
     // Mark line as needing bidi re-ordering if it contains any runs with non-zero bidi level
     // (zero is the default level, so this is equivalent to marking lines that have multiple levels)
     let mut needs_reorder = false;
@@ -1871,37 +1905,82 @@ fn commit_line<B: Brush>(
             LayoutItemKind::TextRun => {
                 let shaped_run = &shaped_text.runs()[item.index];
 
-                // Compute cluster range
                 let run_clusters = &shaped_run.shaped_clusters_range;
-                let start = run_clusters.start.max(source_clusters.start);
-                let cluster_range = start..run_clusters.end.min(source_clusters.end).max(start);
 
-                // The line may have been reshaped, in which case its start piece precedes the
-                // line's first source run, and its end piece follows its last source run.
-                let start_piece = (i == first_run_pos).then_some(start_run);
-                let end_piece = (i == last_run_pos).then_some(end_run);
-                let (start_piece, end_piece) = (start_piece.flatten(), end_piece.flatten());
-                let pieces = [
-                    start_piece.map(|piece| (Some(piece), piece_clusters(piece))),
-                    (!cluster_range.is_empty()).then_some((None, cluster_range)),
-                    end_piece.map(|piece| (Some(piece), piece_clusters(piece))),
-                ];
-                for (reshaped_run, cluster_range) in pieces.into_iter().flatten() {
+                /// Commit a reshaped piece of the line.
+                ///
+                /// This will run at most twice per line, and only if the line was actually
+                /// reshaped. Therefore, it should be quite cold and we ensure it's not inlined.
+                #[cold]
+                #[inline(never)]
+                fn commit_piece<B: Brush>(
+                    data: &LayoutData<B>,
+                    lines: &mut LineLayout,
+                    item: &LayoutItem,
+                    piece: u32,
+                    text_range: &mut (usize, usize),
+                    last_item_kind: &mut LayoutItemKind,
+                    committed_text_run: &mut bool,
+                    needs_reorder: &mut bool,
+                ) {
+                    let bidi_level = data.shaped_text.runs()[item.index].bidi_level;
+                    let slice = data.reshaped.run_slice(&data.shaped_text, piece);
+                    let item_text_range = slice.text_byte_range(slice.char_range());
+                    text_range.0 = text_range.0.min(item_text_range.start);
+                    text_range.1 = text_range.1.max(item_text_range.end);
+                    *last_item_kind = item.kind;
+                    *committed_text_run = true;
+                    *needs_reorder |= bidi_level != BidiLevel::new(0);
+                    lines.line_items.push(LineItemData {
+                        kind: LayoutItemKind::TextRun,
+                        index: item.index,
+                        bidi_level,
+                        shaped_cluster_range: slice.shaped_clusters_range(),
+                        text_range: item_text_range,
+                        reshaped_run: Some(piece),
+                    });
+                }
+
+                // Compute cluster range
+                let mut cluster_range = run_clusters.clone();
+                if i == first_run_pos {
+                    cluster_range.start = source_clusters.start;
+                    // The line's reshaped start piece precedes its first source run.
+                    if let Some(piece) = start_run {
+                        commit_piece(
+                            &layout.data,
+                            lines,
+                            item,
+                            piece,
+                            &mut text_range,
+                            &mut last_item_kind,
+                            &mut committed_text_run,
+                            &mut needs_reorder,
+                        );
+                    }
+                }
+                if i == last_run_pos {
+                    cluster_range.end = source_clusters.end.max(cluster_range.start);
+                }
+
+                if !cluster_range.is_empty() {
                     last_item_kind = item.kind;
                     committed_text_run = true;
 
                     // Map the cluster range to the source-text range.
-                    let slice = match reshaped_run {
-                        Some(piece) => layout.data.reshaped.run_slice(shaped_text, piece),
-                        None => shaped_text.run_slice(item.index as u32),
-                    };
-                    let item_text_range =
-                        slice.text_byte_range(slice.narrow(cluster_range.clone()).char_range());
+                    let slice = shaped_text.run_slice(item.index as u32);
+                    let char_range = shaped_clusters[cluster_range.start as usize]
+                        .chars_range()
+                        .start
+                        ..shaped_clusters[cluster_range.end as usize - 1]
+                            .chars_range()
+                            .end;
+                    let item_text_range = slice.text_byte_range(char_range);
 
                     // Compute the text range for the line
                     // Q: Can we not simplify this computation by assuming that items are in order?
-                    text_start = text_start.min(item_text_range.start);
-                    text_end = text_end.max(item_text_range.end);
+                    text_range.0 = text_range.0.min(item_text_range.start);
+                    text_range.1 = text_range.1.max(item_text_range.end);
                     needs_reorder |= shaped_run.bidi_level != BidiLevel::new(0);
 
                     lines.line_items.push(LineItemData {
@@ -1910,8 +1989,24 @@ fn commit_line<B: Brush>(
                         bidi_level: shaped_run.bidi_level,
                         shaped_cluster_range: cluster_range,
                         text_range: item_text_range,
-                        reshaped_run,
+                        reshaped_run: None,
                     });
+                }
+
+                // The line's reshaped end piece follows its last source run.
+                if i == last_run_pos
+                    && let Some(piece) = end_run
+                {
+                    commit_piece(
+                        &layout.data,
+                        lines,
+                        item,
+                        piece,
+                        &mut text_range,
+                        &mut last_item_kind,
+                        &mut committed_text_run,
+                        &mut needs_reorder,
+                    );
                 }
             }
         }
@@ -1949,7 +2044,7 @@ fn commit_line<B: Brush>(
 
     lines.lines.push(LineData {
         item_range: start_item_idx..end_item_idx,
-        text_range: text_start..text_end,
+        text_range: text_range.0..text_range.1,
         max_advance,
         break_reason,
         num_justification_opportunities,
@@ -2176,11 +2271,11 @@ mod tests {
             assert_eq!(state.subtrees.current().len(), 1);
 
             let boundary = if emergency {
-                state.emergency_boundaries[0].take().unwrap()
+                state.emergency_boundaries.take_last()
             } else {
-                state.prev_boundaries[0].take().unwrap()
+                state.prev_boundaries.take_last()
             };
-            state.reset_to(boundary);
+            state.reset_to(boundary.unwrap());
             let expected = if emergency { 12. } else { 9. };
             assert_eq!(state.line.box_metrics.line_height(), expected);
             assert_eq!(subtree_height(&state), expected);
