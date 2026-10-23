@@ -3,11 +3,11 @@
 
 //! Tab stops, following [CSS Text 4 § 4.1.3][css-tab-stop].
 //!
-//! A tab shapes to no glyphs and the advance of a space. Its advance
-//! depends on where it lands on the line, so the line breaker sizes each tab as it places it, by
-//! overwriting the tab cluster's advance with [`tab_advance`]. Everything downstream (hanging
-//! whitespace, alignment, glyph positioning, hit testing) then sees the sized tab through the
-//! cluster advance like any other cluster.
+//! A tab shapes to no glyphs, with the advance of a space. Its advance depends on where it lands
+//! on the line, so the line breaker sizes each tab as it places it, by overwriting the tab
+//! cluster's advance with [`tab_advance`]. Everything downstream (hanging whitespace, alignment,
+//! glyph positioning, hit testing) then sees the sized tab through the cluster advance like any
+//! other cluster.
 //!
 //! [css-tab-stop]: https://www.w3.org/TR/css-text-4/#tab-stop
 
@@ -77,10 +77,9 @@ pub(crate) fn size_tab<B: Brush>(
 ///
 /// The tab is sized as if the line breaker places every atom before it on the current line, from
 /// `x`, the line's current advance including its indent. Should a line break fall before the tab
-/// after all, the breaker returns and the next call sizes it again from its new position. That
-/// holds across newlines too: `break_next` returns at a newline and re-sizes on re-entry, while
-/// `break_next_with_length` continues the line through it, which the scan's zero newline advance
-/// matches.
+/// after all, the breaker returns and the next call sizes it again from its new position. The
+/// scan runs through newlines, which have no advance: `break_next` returns at a newline and
+/// re-sizes the tab on re-entry, while `break_next_with_length` keeps the line going past it.
 pub(crate) fn size_next_tab<B: Brush>(
     shaped_text: &mut ShapedText,
     styles: &[Style<B>],

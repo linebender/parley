@@ -407,8 +407,8 @@ impl<'a> AtomIter<'a> {
     ///
     /// For an atom with glyphs, this matches what [`Run::glyphs_in`] yields for the atom's
     /// clusters. An atom without glyphs can still have an advance (a tab, see
-    /// [`Whitespace::Tab`](parley_engine::shape::Whitespace::Tab)), which the line breaker counts
-    /// the same way.
+    /// [`Whitespace::Tab`](parley_engine::shape::Whitespace::Tab)), which the line breaker includes
+    /// in the line's advance and so must be counted here too.
     #[inline]
     fn measure(&self, atom: &Atom<'a>) -> (usize, f32) {
         let glyph_count: usize = atom

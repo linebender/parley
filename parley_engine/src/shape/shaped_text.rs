@@ -518,7 +518,7 @@ pub struct ShapedRun {
     /// The advance of U+0020 in this run's font and size, 0 if the font has no space glyph.
     pub space_advance: f32,
     /// Whether any of this run's shaped clusters is a tab (see [`Whitespace::Tab`]).
-    /// Lets a layout engine skip tab sizing for the common run without tabs.
+    /// Lets a layout engine skip tab sizing in the common case, a run without tabs.
     pub has_tabs: bool,
 }
 

@@ -584,10 +584,10 @@ impl ContentWidthsMeasurer {
     /// with that cluster, as in `atom_hanging_advance`. Without `SPACED`, `spacing` is ignored
     /// for gaps, but still contributes to the size of tabs (see [`tab_advance`]).
     ///
-    /// A tab's advance depends on where it lands, so it is measured from the running width of
-    /// each constraint rather than taken from the cluster, as the line breaker sizes it. The
-    /// tab's advance under the two constraints differs, so the hanging whitespace is tracked per
-    /// constraint as well.
+    /// A tab's advance depends on where it lands, so it is computed from the running width of
+    /// each constraint rather than read from the cluster, whose advance holds whatever the line
+    /// breaker last wrote for its own line positions. The tab's advance under the two constraints
+    /// differs, so the hanging whitespace is tracked per constraint as well.
     #[inline(always)]
     fn measure_text_run<B: Brush, const SPACED: bool>(
         &mut self,
