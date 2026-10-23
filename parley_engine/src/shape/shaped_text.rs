@@ -251,9 +251,8 @@ impl ShapedText {
     /// Panics if the shaped cluster is not a tab.
     pub fn set_tab_advance(&mut self, cluster_index: u32, advance: f32) {
         let cluster = &mut self.shaped_clusters[cluster_index as usize];
-        assert_eq!(
-            cluster.whitespace(),
-            Whitespace::Tab,
+        assert!(
+            cluster.whitespace() == Whitespace::Tab,
             "shaped cluster {cluster_index} is not a tab"
         );
         cluster.advance = advance;
@@ -518,6 +517,7 @@ pub struct ShapedRun {
     /// The advance of U+0020 in this run's font and size, 0 if the font has no space glyph.
     pub space_advance: f32,
     /// Whether any of this run's shaped clusters is a tab (see [`Whitespace::Tab`]).
+    ///
     /// Lets a layout engine skip tab sizing in the common case, a run without tabs.
     pub has_tabs: bool,
 }
