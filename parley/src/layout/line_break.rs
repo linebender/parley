@@ -630,6 +630,7 @@ pub struct BoxBreakData {
     pub advance: f32,
 }
 
+#[derive(Clone)]
 /// The mutable state of the line breaker.
 ///
 /// This is exposed so that callers using [`BreakLines`] directly can inspect and
@@ -681,73 +682,10 @@ pub struct BreakerState {
     subtrees: SubtreeHistory,
 
     // Saved breaker states for reverting to a previously encountered line-breaking opportunity
-    /// Saved breaker state for the last non-emergency line-breaking opportunities
-    prev_boundaries: SavedBoundaries,
-    /// Saved breaker state for the last emergency line-breaking opportunities
-    emergency_boundaries: SavedBoundaries,
-}
-
-/// A saved line-breaking opportunity and an earlier one before it.
-///
-/// The reason we store two opportunities is that, if we need to reshape after taking the break
-/// opportunity, the line may end up overflowing. In that case, we take the earlier break. It's very
-/// unlikely that that one will also overflow, as taking away a character will almost always take
-/// away more advance than reshaping would introduce.
-#[derive(Default)]
-struct SavedBoundaries {
-    /// The last two saved opportunities.
-    slots: [Option<PrevBoundaryState>; 2],
-    /// The index into `slots` (as `0` or `1`) of the last opportunity; the other slot holds the
-    /// earlier opportunity.
-    last: bool,
-}
-
-impl Clone for SavedBoundaries {
-    fn clone(&self) -> Self {
-        Self {
-            slots: self.slots.clone(),
-            last: self.last,
-        }
-    }
-
-    fn clone_from(&mut self, source: &Self) {
-        // Writing `None` only sets the discriminant, while cloning would copy the slots' full data.
-        // The slots are `None` when we clone state at the start of a line, so this turns out to be
-        // quite a bit faster.
-        for (slot, source) in self.slots.iter_mut().zip(&source.slots) {
-            match source {
-                None => *slot = None,
-                Some(_) => slot.clone_from(source),
-            }
-        }
-        self.last = source.last;
-    }
-}
-
-impl SavedBoundaries {
-    #[inline(always)]
-    fn next_slot(&mut self) -> &mut Option<PrevBoundaryState> {
-        self.last = !self.last;
-        &mut self.slots[usize::from(self.last)]
-    }
-
-    /// Take the last saved opportunity.
-    #[inline(always)]
-    fn take_last(&mut self) -> Option<PrevBoundaryState> {
-        self.slots[usize::from(self.last)].take()
-    }
-
-    /// Take the saved opportunity before the last one.
-    #[inline(always)]
-    fn take_earlier(&mut self) -> Option<PrevBoundaryState> {
-        self.slots[usize::from(!self.last)].take()
-    }
-
-    #[inline(always)]
-    fn clear(&mut self) {
-        self.slots[0] = None;
-        self.slots[1] = None;
-    }
+    /// Saved breaker state for the last non-emergency line-breaking opportunity
+    prev_boundary: Option<PrevBoundaryState>,
+    /// Saved breaker state for the last emergency line-breaking opportunity
+    emergency_boundary: Option<PrevBoundaryState>,
 }
 
 impl Default for BreakerState {
@@ -767,57 +705,9 @@ impl Default for BreakerState {
             line: LineState::default(),
             contributed: Vec::new(),
             subtrees: SubtreeHistory::default(),
-            prev_boundaries: SavedBoundaries::default(),
-            emergency_boundaries: SavedBoundaries::default(),
+            prev_boundary: None,
+            emergency_boundary: None,
         }
-    }
-}
-
-impl Clone for BreakerState {
-    fn clone(&self) -> Self {
-        let mut clone = Self::default();
-        clone.clone_from(self);
-        clone
-    }
-
-    // The breaker saves its state at the start of every line. At that point, there are no saved
-    // break opportunities yet. Those saved opportunities are quite big structs, and cloning
-    // field-by-field allows us to prevent copying their data when not needed.
-    fn clone_from(&mut self, source: &Self) {
-        let Self {
-            items,
-            lines,
-            reshaped,
-            item_idx,
-            run_idx,
-            cluster_idx,
-            line_x,
-            line_y,
-            layout_max_advance,
-            line_max_advance,
-            line_max_height,
-            line,
-            contributed,
-            subtrees,
-            prev_boundaries,
-            emergency_boundaries,
-        } = source;
-        self.items = *items;
-        self.lines = *lines;
-        self.reshaped = *reshaped;
-        self.item_idx = *item_idx;
-        self.run_idx = *run_idx;
-        self.cluster_idx = *cluster_idx;
-        self.line_x = *line_x;
-        self.line_y = *line_y;
-        self.layout_max_advance = *layout_max_advance;
-        self.line_max_advance = *line_max_advance;
-        self.line_max_height = *line_max_height;
-        self.line.clone_from(line);
-        self.contributed.clone_from(contributed);
-        self.subtrees.clone_from(subtrees);
-        self.prev_boundaries.clone_from(prev_boundaries);
-        self.emergency_boundaries.clone_from(emergency_boundaries);
     }
 }
 
@@ -872,27 +762,27 @@ impl BreakerState {
     /// Store the current iteration state so that we can revert to it if we later want to take
     /// the line breaking opportunity at this point.
     fn mark_line_break_opportunity(&mut self) {
-        *self.prev_boundaries.next_slot() = Some(self.boundary());
-    }
-
-    /// Store the current iteration state so that we can revert to it if we later want to take
-    /// an *emergency* line breaking opportunity at this point.
-    fn mark_emergency_break_opportunity(&mut self) {
-        *self.emergency_boundaries.next_slot() = Some(self.boundary());
-    }
-
-    /// The current iteration state, to revert to if we later want to take the line breaking
-    /// opportunity at this point.
-    #[inline(always)]
-    fn boundary(&mut self) -> PrevBoundaryState {
-        PrevBoundaryState {
+        self.prev_boundary = Some(PrevBoundaryState {
             item_idx: self.item_idx,
             run_idx: self.run_idx,
             cluster_idx: self.cluster_idx,
             state: self.line.clone(),
             contributed_len: self.contributed.len(),
             subtrees_len: self.subtrees.save(),
-        }
+        });
+    }
+
+    /// Store the current iteration state so that we can revert to it if we later want to take
+    /// an *emergency* line breaking opportunity at this point.
+    fn mark_emergency_break_opportunity(&mut self) {
+        self.emergency_boundary = Some(PrevBoundaryState {
+            item_idx: self.item_idx,
+            run_idx: self.run_idx,
+            cluster_idx: self.cluster_idx,
+            state: self.line.clone(),
+            contributed_len: self.contributed.len(),
+            subtrees_len: self.subtrees.save(),
+        });
     }
 
     /// Revert boundary state to prev state
@@ -979,6 +869,18 @@ pub struct BreakLines<'a, B: Brush> {
     reshaper: Reshaper,
     state: BreakerState,
     prev_state: Option<BreakerState>,
+    /// Reshaping a line at a break can cause it to overflow `max_advance`. When that happens, we
+    /// attempt breaking the line again (see [`Self::break_line_again`]), and only accept break
+    /// opportunities where the line is narrower than at the failed break.
+    ///
+    /// This field stores the line's advance at that failed break (`f32::INFINITY` if we're breaking
+    /// it for the first time).
+    ///
+    /// Note we could in theory lower `max_advance`, but we don't track any number we could lower it
+    /// to: because trailing whitespace is allowed to hang past `max_advance`, the line breaker
+    /// could then find the same failed break again. By only allowing breaks at narrower lines than
+    /// the previous failed break, we don't have that problem.
+    step_back_from: f32,
     done: bool,
 }
 
@@ -998,6 +900,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             reshaper: Reshaper::default(),
             state: BreakerState::default(),
             prev_state: None,
+            step_back_from: f32::INFINITY,
             done: false,
         };
         this.reset_line();
@@ -1035,28 +938,45 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
     }
 
-    /// End the line at the line-breaking opportunity `boundary`, or, if the line no longer fits
-    /// after reshaping at `boundary`, take the `earlier` boundary before it.
-    ///
-    /// Just having one `earlier` as fallback should *almost always* be enough, as taking away a
-    /// character normally takes away more advance than e.g. a change in kerning introduces.
-    fn take_boundary(
-        &mut self,
-        boundary: PrevBoundaryState,
-        earlier: Option<PrevBoundaryState>,
-        max_advance: f32,
-    ) {
-        self.state.reset_to(boundary);
-        let Some(earlier) = earlier else {
-            return;
-        };
+    /// Whether the line ends at a position that is unsafe to break at, if ended at the current
+    /// position.
+    #[inline(always)]
+    fn ends_unsafe(&self) -> bool {
+        (self.layout.data.shaped_text.shaped_clusters())
+            .get(self.state.cluster_idx as usize)
+            .is_some_and(|cluster| !cluster.is_safe_to_break_before())
+    }
+
+    /// Whether the line, ended at the current position (which is unsafe to break at), no longer
+    /// fits once reshaped, so that it should be broken again (see [`Self::break_line_again`]).
+    #[cold]
+    #[inline(never)]
+    fn overflows_once_reshaped(&mut self, max_advance: f32) -> bool {
+        if self.step_back_from.is_finite() {
+            // We already stepped back.
+            return false;
+        }
         let line = &self.state.line;
         // A line that already doesn't fit as shaped originally only has trailing whitespace hanging
         // past the end, which is fine.
         let (x, fits_as_shaped) = (line.x, line.x + line.start_advance_delta <= max_advance);
-        if fits_as_shaped && x + self.reshaped_advance_delta() > max_advance {
-            self.state.reset_to(earlier);
-        }
+        fits_as_shaped && x + self.reshaped_advance_delta() > max_advance
+    }
+
+    /// Break the line again from where this call to [`Self::break_next`] started, now ending it at
+    /// the last line-breaking opportunity where it is narrower than at the current one, if any.
+    ///
+    /// Just stepping back once should *almost always* be enough, as taking away a character
+    /// normally takes away more advance than e.g. a change in kerning introduces.
+    #[cold]
+    #[inline(never)]
+    fn break_line_again(&mut self) -> Option<YieldData> {
+        self.step_back_from = self.state.line.x;
+        // Nothing was committed since `break_next` saved its starting state. Nothing yielded since
+        // either, so breaking again from there doesn't yield anything twice.
+        let start = self.prev_state.as_ref().expect("saved by `break_next`");
+        self.state.clone_from(start);
+        self.break_next()
     }
 
     /// How much reshaping the line changes the advance of the line if it's ended at the current
@@ -1120,8 +1040,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         self.state.items = self.lines.line_items.len();
         self.state.lines = self.lines.lines.len();
         self.state.reshaped = self.layout.data.reshaped.mark();
-        self.state.prev_boundaries.clear();
-        self.state.emergency_boundaries.clear();
+        self.state.prev_boundary = None;
+        self.state.emergency_boundary = None;
+        self.step_back_from = f32::INFINITY;
 
         // `finish_line` reads the line's accumulated vertical metrics from `self.state.line`, so
         // it must run before we reset the per-line running state. It may grow the line (e.g. the
@@ -1350,7 +1271,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         } else if is_soft_wrap_opportunity && text_wrap_mode == TextWrapMode::Wrap {
                             // We don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
                             // line breaks. We should accept the overflowing fragment in that scenario.
-                            if self.state.line.x != 0.0 {
+                            //
+                            // When breaking the line again (see `break_line_again`), we skip the
+                            // opportunities where it's at least as wide as where it was first
+                            // ended, unless there's no earlier one.
+                            if self.state.line.x != 0.0
+                                && (self.state.line.x < self.step_back_from
+                                    || self.state.prev_boundary.is_none())
+                            {
                                 self.state.mark_line_break_opportunity();
                                 // break_opportunity = true;
                             }
@@ -1360,6 +1288,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         && text_wrap_mode == TextWrapMode::Wrap
                         // If we're at the start of the line, this particular atom will never fit, so it's not a valid emergency break opportunity.
                         && self.state.line.x != 0.0
+                        // As above, skip the opportunities where the line isn't narrower.
+                        && (self.state.line.x < self.step_back_from
+                            || self.state.emergency_boundary.is_none())
                         {
                             self.state.mark_emergency_break_opportunity();
                         }
@@ -1418,9 +1349,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             //
                             // We "take" the line-breaking opportunity by starting a new line and resetting our
                             // item/run/cluster iteration state back to how it was when the line-breaking opportunity was encountered
-                            else if let Some(prev) = self.state.prev_boundaries.take_last() {
-                                let earlier = self.state.prev_boundaries.take_earlier();
-                                self.take_boundary(prev, earlier, max_advance);
+                            else if let Some(prev) = self.state.prev_boundary.take() {
+                                self.state.reset_to(prev);
+                                if self.ends_unsafe() && self.overflows_once_reshaped(max_advance) {
+                                    return self.break_line_again();
+                                }
                                 return self.start_new_line(
                                     BreakReason::Regular,
                                     max_advance,
@@ -1432,10 +1365,12 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             // We "take" the line-breaking opportunity by starting a new line and resetting our
                             // item/run/cluster iteration state back to how it was when the line-breaking opportunity was encountered
                             else if let Some(prev_emergency) =
-                                self.state.emergency_boundaries.take_last()
+                                self.state.emergency_boundary.take()
                             {
-                                let earlier = self.state.emergency_boundaries.take_earlier();
-                                self.take_boundary(prev_emergency, earlier, max_advance);
+                                self.state.reset_to(prev_emergency);
+                                if self.ends_unsafe() && self.overflows_once_reshaped(max_advance) {
+                                    return self.break_line_again();
+                                }
                                 return self.start_new_line(
                                     BreakReason::Emergency,
                                     max_advance,
@@ -2271,11 +2206,11 @@ mod tests {
             assert_eq!(state.subtrees.current().len(), 1);
 
             let boundary = if emergency {
-                state.emergency_boundaries.take_last()
+                state.emergency_boundary.take().unwrap()
             } else {
-                state.prev_boundaries.take_last()
+                state.prev_boundary.take().unwrap()
             };
-            state.reset_to(boundary.unwrap());
+            state.reset_to(boundary);
             let expected = if emergency { 12. } else { 9. };
             assert_eq!(state.line.box_metrics.line_height(), expected);
             assert_eq!(subtree_height(&state), expected);
