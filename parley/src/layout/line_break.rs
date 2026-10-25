@@ -718,7 +718,7 @@ impl BreakerState {
     /// styles (and those of their ancestors) are added to the line too, as is the box of the atom's
     /// run, see [`LineBoxMetrics::add_text`]. `is_word_separator` is `true` iff the atom is a
     /// [word separator](`is_word_separator`), i.e., a justification opportunity.
-    #[inline]
+    #[inline(always)]
     fn append_atom_to_line<B: Brush>(
         &mut self,
         atom: &Atom<'_>,
