@@ -62,7 +62,7 @@ struct LineState {
     x: f32,
     /// The change in advance when reshaping the line's start, relative to the original shaped
     /// clusters. See [`Reshaper::measure_start`].
-    start_advance_delta: f32,
+    reshaped_start_advance_delta: f32,
     items: Range<usize>,
     /// The line's shaped clusters, as a range into [`parley_engine::ShapedText::shaped_clusters`].
     /// The bounds are atom-aligned.
@@ -90,7 +90,7 @@ impl LineState {
     /// Reset the per-line running state in preparation for building a new line.
     fn reset(&mut self) {
         self.x = 0.0;
-        self.start_advance_delta = 0.0;
+        self.reshaped_start_advance_delta = 0.0;
         self.box_metrics.reset();
         self.num_word_separators = 0;
     }
@@ -921,7 +921,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             && !cluster.is_safe_to_break_before()
         {
             let line_start_char = cluster.chars_range().start;
-            state.line.start_advance_delta = self
+            state.line.reshaped_start_advance_delta = self
                 .reshaper
                 .measure_start(&data.text, &data.shaped_text, line_start_char, None)
                 .advance_delta();
@@ -951,7 +951,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
             // A line that already doesn't fit as shaped originally only has trailing whitespace
             // hanging past the end, which is fine.
-            if line.x + line.start_advance_delta > max_advance {
+            if line.x + line.reshaped_start_advance_delta > max_advance {
                 return false;
             }
 
@@ -1167,8 +1167,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         let max_advance = max_advance - line_indent;
         // The advance available in "source shaped cluster space" when accounting for the difference
         // that reshaping the line's start causes.
-        let fit_max_advance =
-            (max_advance - self.state.line.start_advance_delta).min(self.step_back_max_advance);
+        let fit_max_advance = (max_advance - self.state.line.reshaped_start_advance_delta)
+            .min(self.step_back_max_advance);
 
         // Iterate over remaining runs in the Layout
         let item_count = self.layout.data.items.len();
