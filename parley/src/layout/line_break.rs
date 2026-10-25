@@ -987,7 +987,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             .get(self.state.cluster_idx as usize)
             .is_some_and(|cluster| !cluster.is_safe_to_break_before());
 
-        // Note that, if the ends needs no reshaping, reshaping changes only the line's start. We
+        // Note that, if the end needs no reshaping, reshaping changes only the line's start. We
         // already took that into account when fitting the line.
         end_is_unsafe_to_break && overflows(self, max_advance)
     }
