@@ -234,7 +234,7 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) lines: Vec<LineData>,
     /// Items within each line
     pub(crate) line_items: Vec<LineItemData>,
-    /// Reshaped pieces of lines
+    /// Reshaped runs of lines
     pub(crate) reshaped: ReshapedText,
     /// Position of each aligned subtree rooted at a `vertical-align: top | bottom` style on each line.
     /// The root aligned subtree of each line doesn't have an entry as its offset is trivially zero.
