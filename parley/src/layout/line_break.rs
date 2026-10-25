@@ -870,17 +870,11 @@ pub struct BreakLines<'a, B: Brush> {
     state: BreakerState,
     prev_state: Option<BreakerState>,
     /// Reshaping a line at a break can cause it to overflow `max_advance`. When that happens, we
-    /// attempt breaking the line again (see [`Self::break_line_again`]), and only accept break
-    /// opportunities where the line is narrower than at the failed break.
+    /// break the line again (see [`Self::break_line_again`]), this time with a `max_advance` just
+    /// below the line's advance at the failed break.
     ///
-    /// This field stores the line's advance at that failed break (`f32::INFINITY` if we're breaking
-    /// it for the first time).
-    ///
-    /// Note we could in theory lower `max_advance`, but we don't track any number we could lower it
-    /// to: because trailing whitespace is allowed to hang past `max_advance`, the line breaker
-    /// could then find the same failed break again. By only allowing breaks at narrower lines than
-    /// the previous failed break, we don't have that problem.
-    step_back_from: f32,
+    /// This is `f32::INFINITY` if we're breaking the line for the first time.
+    step_back_max_advance: f32,
     done: bool,
 }
 
@@ -900,7 +894,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             reshaper: Reshaper::default(),
             state: BreakerState::default(),
             prev_state: None,
-            step_back_from: f32::INFINITY,
+            step_back_max_advance: f32::INFINITY,
             done: false,
         };
         this.reset_line();
@@ -951,7 +945,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         #[cold]
         #[inline(never)]
         fn overflows<B: Brush>(this: &mut BreakLines<'_, B>, max_advance: f32) -> bool {
-            if this.step_back_from.is_finite() {
+            if this.step_back_max_advance.is_finite() {
                 // We already stepped back once, so let's just accept this line. There's technically
                 // a small chance it may overflow again, but that should be quite unlikely.
                 return false;
@@ -1002,8 +996,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         end_is_unsafe_to_break && overflows(self, max_advance)
     }
 
-    /// Attempt breaking the line again, this time only accepting line-break opportunities where
-    /// they are narrower than the current one.
+    /// Attempt breaking the line again, this time fitting it to less than its current advance.
     ///
     /// To be used when reshaping a line caused it to overflow. Using this only once should *almost
     /// always* be enough, as taking away a character normally takes away more advance than e.g. a
@@ -1013,7 +1006,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     #[cold]
     #[inline(never)]
     fn break_line_again(&mut self) -> Option<YieldData> {
-        self.step_back_from = self.state.line.x;
+        self.step_back_max_advance = self.state.line.x.next_down();
         let start = self.prev_state.as_ref().expect("saved by `break_next`");
         self.state.clone_from(start);
         self.break_next()
@@ -1053,7 +1046,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         self.state.reshaped = self.layout.data.reshaped.mark();
         self.state.prev_boundary = None;
         self.state.emergency_boundary = None;
-        self.step_back_from = f32::INFINITY;
+        self.step_back_max_advance = f32::INFINITY;
 
         // `finish_line` reads the line's accumulated vertical metrics from `self.state.line`, so
         // it must run before we reset the per-line running state. It may grow the line (e.g. the
@@ -1178,7 +1171,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         let max_advance = max_advance - line_indent;
         // The advance available in "source shaped cluster space" when accounting for the difference
         // that reshaping the line's start causes.
-        let fit_max_advance = max_advance - self.state.line.start_advance_delta;
+        let fit_max_advance =
+            (max_advance - self.state.line.start_advance_delta).min(self.step_back_max_advance);
 
         // Iterate over remaining runs in the Layout
         let item_count = self.layout.data.items.len();
@@ -1282,15 +1276,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         } else if is_soft_wrap_opportunity && text_wrap_mode == TextWrapMode::Wrap {
                             // We don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
                             // line breaks. We should accept the overflowing fragment in that scenario.
-                            //
-                            // When breaking the line again due to an overflowing reshape (see
-                            // `break_line_again`), we only accept opportunities where the line is
-                            // narrower than at the failed break (unless the first opportunity is
-                            // already wider).
-                            if self.state.line.x != 0.0
-                                && (self.state.line.x < self.step_back_from
-                                    || self.state.prev_boundary.is_none())
-                            {
+                            if self.state.line.x != 0.0 {
                                 self.state.mark_line_break_opportunity();
                                 // break_opportunity = true;
                             }
@@ -1300,9 +1286,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         && text_wrap_mode == TextWrapMode::Wrap
                         // If we're at the start of the line, this particular atom will never fit, so it's not a valid emergency break opportunity.
                         && self.state.line.x != 0.0
-                        // As above, skip the opportunities where the line isn't narrower.
-                        && (self.state.line.x < self.step_back_from
-                            || self.state.emergency_boundary.is_none())
                         {
                             self.state.mark_emergency_break_opportunity();
                         }
