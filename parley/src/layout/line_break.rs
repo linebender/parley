@@ -938,74 +938,75 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
     }
 
-    /// Whether the line ends at a position that is unsafe to break at, if ended at the current
-    /// position.
-    #[inline(always)]
-    fn ends_unsafe(&self) -> bool {
-        (self.layout.data.shaped_text.shaped_clusters())
-            .get(self.state.cluster_idx as usize)
-            .is_some_and(|cluster| !cluster.is_safe_to_break_before())
-    }
-
-    /// Whether the line, ended at the current position (which is unsafe to break at), no longer
-    /// fits once reshaped, so that it should be broken again (see [`Self::break_line_again`]).
-    #[cold]
-    #[inline(never)]
-    fn overflows_once_reshaped(&mut self, max_advance: f32) -> bool {
-        if self.step_back_from.is_finite() {
-            // We already stepped back.
-            return false;
-        }
-        let line = &self.state.line;
-        // A line that already doesn't fit as shaped originally only has trailing whitespace hanging
-        // past the end, which is fine.
-        let (x, fits_as_shaped) = (line.x, line.x + line.start_advance_delta <= max_advance);
-        fits_as_shaped && x + self.reshaped_advance_delta() > max_advance
-    }
-
-    /// Break the line again from where this call to [`Self::break_next`] started, now ending it at
-    /// the last line-breaking opportunity where it is narrower than at the current one, if any.
+    /// Returns whether the line ended at the current position would no longer fit once reshaped.
     ///
-    /// Just stepping back once should *almost always* be enough, as taking away a character
-    /// normally takes away more advance than e.g. a change in kerning introduces.
+    /// See also [`Self::break_line_again`].
+    #[inline(always)]
+    fn overflows_once_reshaped(&mut self, max_advance: f32) -> bool {
+        /// Usually the break positions we try will be safe to break. Marking this path as cold and
+        /// ensuring it's not inlined keeps that expected common path faster.
+        ///
+        /// If our assumption is wrong for some combination of text and font, the pessimization will
+        /// be tiny compared to the cost of reshaping.
+        #[cold]
+        #[inline(never)]
+        fn overflows<B: Brush>(this: &mut BreakLines<'_, B>, max_advance: f32) -> bool {
+            if this.step_back_from.is_finite() {
+                // We already stepped back once, so let's just accept this line. There's technically
+                // a small chance it may overflow again, but that should be quite unlikely.
+                return false;
+            }
+
+            let line = &this.state.line;
+
+            // A line that already doesn't fit as shaped originally only has trailing whitespace
+            // hanging past the end, which is fine.
+            if line.x + line.start_advance_delta > max_advance {
+                return false;
+            }
+
+            let data = &this.layout.data;
+            let (text, shaped_text) = (&data.text, &data.shaped_text);
+            let shaped_clusters = shaped_text.shaped_clusters();
+            let line_start_char = shaped_clusters[line.clusters.start as usize]
+                .chars_range()
+                .start;
+            let line_end_char = shaped_clusters[this.state.cluster_idx as usize]
+                .chars_range()
+                .start;
+            let reshaper = &mut this.reshaper;
+            let start = reshaper.measure_start(text, shaped_text, line_start_char, None);
+            let end = reshaper.measure_end(text, shaped_text, line_end_char, None);
+            let delta = reshaper
+                .line(text, shaped_text, &start, &end)
+                .advance_delta();
+            line.x + delta > max_advance
+        }
+
+        let end_is_unsafe_to_break = (self.layout.data.shaped_text.shaped_clusters())
+            .get(self.state.cluster_idx as usize)
+            .is_some_and(|cluster| !cluster.is_safe_to_break_before());
+
+        // Note that, if the ends needs no reshaping, reshaping changes only the line's start. We
+        // already took that into account when fitting the line.
+        end_is_unsafe_to_break && overflows(self, max_advance)
+    }
+
+    /// Attempt breaking the line again, this time only accepting line-break opportunities where
+    /// they are narrower than the current one.
+    ///
+    /// To be used when reshaping a line caused it to overflow. Using this only once should *almost
+    /// always* be enough, as taking away a character normally takes away more advance than e.g. a
+    /// change in kerning introduces.
+    ///
+    /// This retries from where the call to [`Self::break_next`] started.
     #[cold]
     #[inline(never)]
     fn break_line_again(&mut self) -> Option<YieldData> {
         self.step_back_from = self.state.line.x;
-        // Nothing was committed since `break_next` saved its starting state. Nothing yielded since
-        // either, so breaking again from there doesn't yield anything twice.
         let start = self.prev_state.as_ref().expect("saved by `break_next`");
         self.state.clone_from(start);
         self.break_next()
-    }
-
-    /// How much reshaping the line changes the advance of the line if it's ended at the current
-    /// position. See [`Reshaper::measure_end`].
-    fn reshaped_advance_delta(&mut self) -> f32 {
-        let data = &self.layout.data;
-        let shaped_clusters = data.shaped_text.shaped_clusters();
-        let line = &self.state.line;
-
-        // If the end needs no reshaping, reshaping only changes the line by its start, which we
-        // already measured when we started this line.
-        let Some(end_cluster) = shaped_clusters.get(self.state.cluster_idx as usize) else {
-            return line.start_advance_delta;
-        };
-        if end_cluster.is_safe_to_break_before() {
-            return line.start_advance_delta;
-        }
-
-        let (text, shaped_text) = (&data.text, &data.shaped_text);
-        let line_start_char = shaped_clusters[line.clusters.start as usize]
-            .chars_range()
-            .start;
-        let line_end_char = end_cluster.chars_range().start;
-        let reshaper = &mut self.reshaper;
-        let start = reshaper.measure_start(text, shaped_text, line_start_char, None);
-        let end = reshaper.measure_end(text, shaped_text, line_end_char, None);
-        reshaper
-            .line(text, shaped_text, &start, &end)
-            .advance_delta()
     }
 
     /// Reset state when a line has been committed
@@ -1272,9 +1273,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             // We don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
                             // line breaks. We should accept the overflowing fragment in that scenario.
                             //
-                            // When breaking the line again (see `break_line_again`), we skip the
-                            // opportunities where it's at least as wide as where it was first
-                            // ended, unless there's no earlier one.
+                            // When breaking the line again due to an overflowing reshape (see
+                            // `break_line_again`), we only accept opportunities where the line is
+                            // narrower than at the failed break (unless the first opportunity is
+                            // already wider).
                             if self.state.line.x != 0.0
                                 && (self.state.line.x < self.step_back_from
                                     || self.state.prev_boundary.is_none())
@@ -1351,7 +1353,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             // item/run/cluster iteration state back to how it was when the line-breaking opportunity was encountered
                             else if let Some(prev) = self.state.prev_boundary.take() {
                                 self.state.reset_to(prev);
-                                if self.ends_unsafe() && self.overflows_once_reshaped(max_advance) {
+                                if self.overflows_once_reshaped(max_advance) {
                                     return self.break_line_again();
                                 }
                                 return self.start_new_line(
@@ -1368,7 +1370,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 self.state.emergency_boundary.take()
                             {
                                 self.state.reset_to(prev_emergency);
-                                if self.ends_unsafe() && self.overflows_once_reshaped(max_advance) {
+                                if self.overflows_once_reshaped(max_advance) {
                                     return self.break_line_again();
                                 }
                                 return self.start_new_line(
@@ -1786,19 +1788,19 @@ fn commit_line<B: Brush>(
         Some(cluster) => cluster.chars_range().start,
         None => shaped_text.characters().len() as u32,
     };
-    let unsafe_edge = |cluster: u32| {
+    let edge_is_unsafe_to_break = |cluster: u32| {
         (shaped_clusters.get(cluster as usize)).is_some_and(|c| !c.is_safe_to_break_before())
     };
     // Reshape the line if it's edges fell at positions that are unsafe to break at.
-    let reshaped_line = (unsafe_edge(state.clusters.start) || unsafe_edge(state.clusters.end))
-        .then(|| {
-            let text = &layout.data.text;
-            let start =
-                reshaper.measure_start(text, shaped_text, char_at(state.clusters.start), None);
-            let end = reshaper.measure_end(text, shaped_text, char_at(state.clusters.end), None);
-            let line = reshaper.line(text, shaped_text, &start, &end);
-            reshaper.push_line(text, shaped_text, &line, &mut layout.data.reshaped)
-        });
+    let reshaped_line = (edge_is_unsafe_to_break(state.clusters.start)
+        || edge_is_unsafe_to_break(state.clusters.end))
+    .then(|| {
+        let text = &layout.data.text;
+        let start = reshaper.measure_start(text, shaped_text, char_at(state.clusters.start), None);
+        let end = reshaper.measure_end(text, shaped_text, char_at(state.clusters.end), None);
+        let line = reshaper.line(text, shaped_text, &start, &end);
+        reshaper.push_line(text, shaped_text, &line, &mut layout.data.reshaped)
+    });
     let source_clusters =
         reshaped_line.map_or(state.clusters.clone(), |l| l.source_shaped_clusters_range());
     let (start_run, end_run) = reshaped_line.map_or((None, None), |l| (l.start_run(), l.end_run()));
