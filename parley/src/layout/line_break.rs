@@ -1803,7 +1803,8 @@ fn commit_line<B: Brush>(
     });
     let source_clusters =
         reshaped_line.map_or(state.clusters.clone(), |l| l.source_shaped_clusters_range());
-    let (start_run, end_run) = reshaped_line.map_or((None, None), |l| (l.start_run(), l.end_run()));
+    let (reshaped_start_run, reshaped_end_run) =
+        reshaped_line.map_or((None, None), |l| (l.start_run(), l.end_run()));
     let advance = state.x + reshaped_line.map_or(0., |l| l.advance_delta());
 
     let start_item_idx = lines.line_items.len();
@@ -1844,24 +1845,24 @@ fn commit_line<B: Brush>(
 
                 let run_clusters = &shaped_run.shaped_clusters_range;
 
-                /// Commit a reshaped piece of the line.
+                /// Commit a reshaped run of the line.
                 ///
                 /// This will run at most twice per line, and only if the line was actually
                 /// reshaped. Therefore, it should be quite cold and we ensure it's not inlined.
                 #[cold]
                 #[inline(never)]
-                fn commit_piece<B: Brush>(
+                fn commit_reshaped_run<B: Brush>(
                     data: &LayoutData<B>,
                     lines: &mut LineLayout,
                     item: &LayoutItem,
-                    piece: u32,
+                    reshaped_run: u32,
                     text_range: &mut (usize, usize),
                     last_item_kind: &mut LayoutItemKind,
                     committed_text_run: &mut bool,
                     needs_reorder: &mut bool,
                 ) {
                     let bidi_level = data.shaped_text.runs()[item.index].bidi_level;
-                    let slice = data.reshaped.run_slice(&data.shaped_text, piece);
+                    let slice = data.reshaped.run_slice(&data.shaped_text, reshaped_run);
                     let item_text_range = slice.text_byte_range(slice.char_range());
                     text_range.0 = text_range.0.min(item_text_range.start);
                     text_range.1 = text_range.1.max(item_text_range.end);
@@ -1874,7 +1875,7 @@ fn commit_line<B: Brush>(
                         bidi_level,
                         shaped_cluster_range: slice.shaped_clusters_range(),
                         text_range: item_text_range,
-                        reshaped_run: Some(piece),
+                        reshaped_run: Some(reshaped_run),
                     });
                 }
 
@@ -1882,13 +1883,13 @@ fn commit_line<B: Brush>(
                 let mut cluster_range = run_clusters.clone();
                 if i == first_run_pos {
                     cluster_range.start = source_clusters.start;
-                    // The line's reshaped start piece precedes its first source run.
-                    if let Some(piece) = start_run {
-                        commit_piece(
+                    // The line's reshaped start run precedes its first source run.
+                    if let Some(reshaped_run) = reshaped_start_run {
+                        commit_reshaped_run(
                             &layout.data,
                             lines,
                             item,
-                            piece,
+                            reshaped_run,
                             &mut text_range,
                             &mut last_item_kind,
                             &mut committed_text_run,
@@ -1930,15 +1931,15 @@ fn commit_line<B: Brush>(
                     });
                 }
 
-                // The line's reshaped end piece follows its last source run.
+                // The line's reshaped end run follows its last source run.
                 if i == last_run_pos
-                    && let Some(piece) = end_run
+                    && let Some(reshaped_run) = reshaped_end_run
                 {
-                    commit_piece(
+                    commit_reshaped_run(
                         &layout.data,
                         lines,
                         item,
-                        piece,
+                        reshaped_run,
                         &mut text_range,
                         &mut last_item_kind,
                         &mut committed_text_run,
