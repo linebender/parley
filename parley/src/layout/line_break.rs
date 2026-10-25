@@ -1783,13 +1783,17 @@ fn commit_line<B: Brush>(
     // Reshape the line if it's edges fell at positions that are unsafe to break at.
     let reshaped_line = (edge_is_unsafe_to_break(state.clusters.start)
         || edge_is_unsafe_to_break(state.clusters.end))
-    .then(|| {
-        let text = &layout.data.text;
-        let start = reshaper.measure_start(text, shaped_text, char_at(state.clusters.start), None);
-        let end = reshaper.measure_end(text, shaped_text, char_at(state.clusters.end), None);
-        let line = reshaper.line(text, shaped_text, &start, &end);
-        reshaper.push_line(text, shaped_text, &line, &mut layout.data.reshaped)
-    });
+    .then(
+        #[inline(never)]
+        || {
+            let text = &layout.data.text;
+            let start =
+                reshaper.measure_start(text, shaped_text, char_at(state.clusters.start), None);
+            let end = reshaper.measure_end(text, shaped_text, char_at(state.clusters.end), None);
+            let line = reshaper.line(text, shaped_text, &start, &end);
+            reshaper.push_line(text, shaped_text, &line, &mut layout.data.reshaped)
+        },
+    );
     let source_clusters =
         reshaped_line.map_or(state.clusters.clone(), |l| l.source_shaped_clusters_range());
     let (reshaped_start_run, reshaped_end_run) =
