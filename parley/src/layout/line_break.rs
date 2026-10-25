@@ -862,10 +862,6 @@ impl BreakerState {
 pub struct BreakLines<'a, B: Brush> {
     layout: &'a mut Layout<B>,
     lines: LineLayout,
-    /// Reshapes the edges of lines whose breaks fall at positions that are unsafe to break at.
-    ///
-    /// Its cache is only valid for one [`parley_engine::ShapedText`], so it is created per session
-    /// rather than kept on the [`Layout`].
     reshaper: Reshaper,
     state: BreakerState,
     prev_state: Option<BreakerState>,
@@ -1876,7 +1872,6 @@ fn commit_line<B: Brush>(
                 let mut cluster_range = run_clusters.clone();
                 if i == first_run_pos {
                     cluster_range.start = source_clusters.start;
-                    // The line's reshaped start run precedes its first source run.
                     if let Some(reshaped_run) = reshaped_start_run {
                         commit_reshaped_run(
                             &layout.data,
@@ -1924,7 +1919,6 @@ fn commit_line<B: Brush>(
                     });
                 }
 
-                // The line's reshaped end run follows its last source run.
                 if i == last_run_pos
                     && let Some(reshaped_run) = reshaped_end_run
                 {
