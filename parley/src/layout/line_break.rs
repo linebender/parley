@@ -14,7 +14,7 @@ use crate::inline_box::{LayoutInlineBox, inline_object_box_index};
 use crate::layout::data::{AlignedSubtreeOffset, run_box_metrics};
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
 use crate::layout::style_metrics::{BoxMetrics, StyleMetrics, inline_box_placement};
-use crate::layout::whitespace::atom_hanging_advance;
+use crate::layout::whitespace::{atom_hanging_advance, whitespace_hangs};
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -974,6 +974,16 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             let line_end_char = shaped_clusters[this.state.cluster_idx as usize]
                 .chars_range()
                 .start;
+            let last = &shaped_text.characters()[line_end_char as usize - 1];
+            if whitespace_hangs(last.whitespace, &data.styles[last.style_index as usize]) {
+                // As a shortcut, we don't check if reshaping hanging whitespace causes overflow.
+                // The hanging whitespace itself doesn't need to fit, and reshaping would only
+                // change how far it hangs, except in the rare instance where a font's lookups reach
+                // across the trailing whitespace. Doing this fully correctly would entail walking
+                // the reshaped end's clusters to figure out if any part of the change in advance is
+                // in the non-hanging part.
+                return false;
+            }
             let reshaper = &mut this.reshaper;
             let start = reshaper.measure_start(text, shaped_text, line_start_char, None);
             let end = reshaper.measure_end(text, shaped_text, line_end_char, None);
