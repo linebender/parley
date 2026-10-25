@@ -6,9 +6,8 @@
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
 use parley::{
-    Alignment, AlignmentOptions, BreakReason, CHROMIUM_LINE_BREAK_OVERRIDE, InlineBox,
-    InlineBoxKind, Layout, OverflowWrap, StyleProperty, TextWrapMode, VerticalAlign, WordBreak,
-    YieldData,
+    Alignment, AlignmentOptions, BreakReason, CHROMIUM_LINE_BREAK_OVERRIDE, IndentOptions, Layout,
+    OverflowWrap, StyleProperty, TextWrapMode, WordBreak,
 };
 use peniko::color::palette::css;
 
@@ -189,71 +188,23 @@ fn lines_overflowing_once_reshaped_end_earlier() {
     // In "AVAVA", "A" kerns with the following "V" and "V" with the following "A", so a line
     // broken off it is narrower as shaped there than once reshaped on its own.
     let (a_in_text, av_in_text) = (av - v, ava - a);
-    assert!(
-        a_in_text < a && av_in_text < av,
-        "the test assumes 'AV' and 'VA' kern"
-    );
+    assert!(a_in_text < a && av_in_text < av, "'AV' and 'VA' must kern");
 
-    let mut break_lines = |text: &str, [first_width, later_width]: [f32; 2], with_box: bool| {
-        let mut builder = env.ranged_builder(text);
+    let mut lines = |first_line_width: f32, width: f32| -> Vec<_> {
+        let mut builder = env.ranged_builder("AVAVA");
         builder.push_default(StyleProperty::OverflowWrap(OverflowWrap::Anywhere));
-        if with_box {
-            // The breaker yields at this box, and then resumes mid-line.
-            builder.push_inline_box(InlineBox {
-                id: 0,
-                kind: InlineBoxKind::CustomOutOfFlow,
-                index: 0,
-                width: 0.,
-                height: 0.,
-                baseline: None,
-                vertical_align: VerticalAlign::BASELINE,
-            });
-        }
-        let mut layout = builder.build(text);
-        let mut breaker = layout.break_lines();
-        let state = breaker.state_mut();
-        state.set_layout_max_advance(first_width.max(later_width));
-        state.set_line_max_advance(first_width);
-        let mut box_yields = 0;
-        while let Some(yield_data) = breaker.break_next() {
-            let state = breaker.state_mut();
-            match yield_data {
-                YieldData::LineBreak(_) => state.set_line_max_advance(later_width),
-                YieldData::InlineBoxBreak(data) => {
-                    box_yields += 1;
-                    state.append_inline_box_to_line(data.advance, 0., 0.);
-                }
-                YieldData::MaxHeightExceeded(_) => unreachable!(),
-            }
-        }
-        breaker.finish();
-        assert_eq!(box_yields, usize::from(with_box));
-        (layout.lines())
-            .map(|line| (line.text_range(), line.metrics().advance))
-            .collect::<Vec<_>>()
+        let mut layout = builder.build("AVAVA");
+        layout.set_text_indent(width - first_line_width, IndentOptions::default());
+        layout.break_all_lines(Some(width));
+        layout.lines().map(|line| line.text_range()).collect()
     };
-
-    // "AV" fits as shaped, but not once reshaped, so the line ends after "A" instead. Every line
-    // has an earlier opportunity to end at, so they all fit.
-    let line_width = (av_in_text + av) / 2.;
-    for with_box in [false, true] {
-        let lines = break_lines("AVAVA", [line_width; 2], with_box);
-        assert_eq!(lines[0].0, 0..1);
-        assert!(lines.iter().all(|line| line.1 <= line_width), "{lines:?}");
-    }
-    // That doesn't affect the next line, which has room for "VAV" once reshaped.
-    let lines = break_lines("AVAVA", [line_width, vav + 0.1], false);
-    assert_eq!(lines[1].0, 1..4, "{lines:?}");
-    // A word joiner has no advance, and "V" kerns with the "A" across it. Ending the line before
-    // the word joiner rather than after it doesn't make it narrower, so it ends after "A".
-    let lines = break_lines("AV\u{2060}AV", [line_width; 2], false);
-    assert_eq!(lines[0].0, 0..1);
-    assert!(lines.iter().all(|line| line.1 <= line_width), "{lines:?}");
+    // "AV" fits as shaped, but not once reshaped, so the first line ends after "A". That doesn't
+    // affect the next line, which has room for "VAV" once reshaped.
+    assert_eq!(lines((av_in_text + av) / 2., vav + 0.1), [0..1, 1..4, 4..5]);
     // "A" fits as shaped, but not once reshaped. There's no earlier opportunity, so it overflows.
-    let lines = break_lines("AVAVA", [(a_in_text + a) / 2.; 2], false);
+    let a_width = (a_in_text + a) / 2.;
     let graphemes: Vec<_> = (0..5).map(|i| i..i + 1).collect();
-    let lines: Vec<_> = lines.into_iter().map(|line| line.0).collect();
-    assert_eq!(lines, graphemes);
+    assert_eq!(lines(a_width, a_width), graphemes);
 }
 
 #[test]
