@@ -887,8 +887,8 @@ impl GraphemeFlags {
 /// A combination of these is also possible, e.g., a grapheme containing multiple shaped clusters
 /// and crossing a shaped cluster boundary on one or both sides.
 ///
-/// A grapheme walked from a [`ShapedSlice`] stops at that slice's edges. It may continue past it:
-/// see [`Self::continues_before`] and [`Self::continues_after`].
+/// This is a [`ShapedSlice`]'s view of a grapheme: a slice's first and last `Grapheme` may cover
+/// only part of a text-wide grapheme. See [`Self::continues_before`] and [`Self::continues_after`].
 ///
 /// [uax-grapheme]: https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries
 /// [monotone-characters]: https://harfbuzz.github.io/working-with-harfbuzz-clusters.html
