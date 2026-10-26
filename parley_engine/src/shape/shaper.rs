@@ -182,6 +182,7 @@ impl Shaper {
                 "items must not span past the text"
             );
 
+            let mut is_item_start = true;
             loop {
                 let segment = itemizer
                     .next(
@@ -194,6 +195,7 @@ impl Shaper {
                     self,
                     text,
                     &segment,
+                    is_item_start,
                     &item.options,
                     &mut select_font,
                     analysis.char_info(),
@@ -215,6 +217,7 @@ impl Shaper {
                 if segment.range.char_range.end == item.char_end as usize {
                     break;
                 }
+                is_item_start = false;
             }
 
             previous_item_end = item.char_end;
@@ -234,12 +237,15 @@ impl Shaper {
 
 /// Shape one segment.
 ///
+/// `is_item_start` is `true` iff the segment is the first of its [`Item`].
+///
 /// Returns `Err(())` if shaping should be aborted, which happens iff [`FontSelector::select_font`]
 /// returned `None`.
 fn shape_segment(
     scx: &mut Shaper,
     text: &str,
     segment: &Segment,
+    is_item_start: bool,
     options: &ShapeOptions<'_>,
     select_font: &mut impl FontSelector,
     char_info: &[CharInfo],
@@ -380,6 +386,7 @@ fn shape_segment(
             text,
             range,
             segment,
+            is_item_start,
             options,
             char_info,
             char_style_indices,
