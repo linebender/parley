@@ -607,13 +607,9 @@ impl ContentWidthsMeasurer {
             self.running_min_width += advance;
             self.running_max_width += advance;
 
-            // An atom hangs if all of its characters hang. Each cluster's first character is checked via the
+            // A cluster hangs if all of its characters hang. Its first character is checked via the
             // cached flags so the common case never touches `characters`.
-            if is_atom_start {
-                atom_hangs = can_hang;
-            }
-            atom_hangs = atom_hangs
-                && whitespace_hangs(whitespace, style)
+            let cluster_hangs = whitespace_hangs(whitespace, style)
                 && (cluster.char_len() == 1
                     || slice
                         .characters_in(cluster.chars_range())
@@ -624,6 +620,9 @@ impl ContentWidthsMeasurer {
                                 &styles[character.style_index as usize],
                             )
                         }));
+            // We only hang in full atoms, so we can only actually hang this cluster if
+            // every prior cluster in the atom was hanging.
+            atom_hangs = can_hang && cluster_hangs && (is_atom_start || atom_hangs);
             if atom_hangs {
                 self.running_hanging_whitespace += advance;
                 self.hangs_conditionally =
