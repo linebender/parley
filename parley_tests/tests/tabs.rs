@@ -168,15 +168,14 @@ fn tab_size_zero_removes_the_tabs_advance() {
     nearly_eq(b_x, a);
     nearly_eq(layout.width(), advance(&mut env, "ab"));
 
-    // The tab is still a cluster, so it keeps its letter-spacing gap: "b" follows the gaps after
-    // both "a" and the tab.
+    // The tab gets no letter-spacing gap of its own: "b" follows the gap after "a" only.
     let text = "a\tb";
     let mut builder = env.ranged_builder(text);
     builder.push_default(StyleProperty::TabSize(TabSize::Spaces(0.)));
     builder.push_default(StyleProperty::LetterSpacing(2.));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    nearly_eq(glyph_xs(&layout, 0)[1], a + 2. + 2.);
+    nearly_eq(glyph_xs(&layout, 0)[1], a + 2.);
 }
 
 #[test]
@@ -209,8 +208,44 @@ fn tab_spaces_include_letter_and_word_spacing() {
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
     let b_x = glyph_xs(&layout, 0)[0];
-    // The tab itself gets letter spacing after it, like any other character.
-    nearly_eq(b_x, 4. * (space + 1. + 2.) + 1.);
+    // The spacing is part of the unit, not a gap after the tab: "b" sits exactly on the stop.
+    nearly_eq(b_x, 4. * (space + 1. + 2.));
+}
+
+#[test]
+fn tab_gets_no_letter_or_word_spacing_of_its_own() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let space = advance(&mut env, " ");
+    let a = advance(&mut env, "a");
+    let tab_size = 8. * space;
+    assert!(a + 10. < tab_size);
+
+    // Letter spacing applies after "a", but not after the tab, so "b" lands exactly on the stop.
+    // (Chrome agrees: with `tab-size: 4; letter-spacing: 10px`, the glyph after a tab sits on
+    // the stop.)
+    let text = "a\tb";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::TabSize(TabSize::Length(tab_size)));
+    builder.push_default(StyleProperty::LetterSpacing(10.));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    nearly_eq(glyph_xs(&layout, 0)[1], tab_size);
+
+    // The same with word spacing: the space before the tab gets both gaps, the tab gets neither.
+    let text = "a \tb";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::TabSize(TabSize::Length(tab_size)));
+    builder.push_default(StyleProperty::LetterSpacing(10.));
+    builder.push_default(StyleProperty::WordSpacing(10.));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    let xs = glyph_xs(&layout, 0);
+    nearly_eq(xs[1], a + 10.);
+    assert!(
+        a + 10. + space + 20. > tab_size,
+        "the space pushes past the first stop"
+    );
+    nearly_eq(xs[2], 2. * tab_size);
 }
 
 #[test]

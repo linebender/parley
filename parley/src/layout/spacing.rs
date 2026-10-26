@@ -110,11 +110,16 @@ impl Spacing {
     /// Only checking the first character does sometimes cause undesirable results, primarily due to
     /// U+115F HANGUL CHOSEONG FILLER. Blink has the same bug, but fixing this would be welcome.
     ///
+    /// Tabs get no spacing of their own either: CSS puts letter and word spacing into the tab
+    /// size's unit (the advance of a space, [CSS `tab-size`][tab-size]) rather than around the
+    /// tab, so that the text after a tab lands exactly on its stop. Blink does the same.
+    ///
     /// [`CharacterFlags::is_default_ignorable`]: parley_engine::shape::CharacterFlags::is_default_ignorable
     /// [letter-spacing]: https://www.w3.org/TR/css-text-4/#letter-spacing-property
+    /// [tab-size]: https://www.w3.org/TR/css-text-4/#tab-size-property
     #[inline(always)]
     pub(crate) fn gaps(self, whitespace: Whitespace, is_default_ignorable: bool) -> Gaps {
-        if whitespace == Whitespace::Newline {
+        if whitespace == Whitespace::Newline || whitespace == Whitespace::Tab {
             return Gaps::ZERO;
         }
 
