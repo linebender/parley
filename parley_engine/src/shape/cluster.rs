@@ -103,10 +103,9 @@ pub enum Whitespace {
 
     /// Horizontal tab.
     ///
-    /// Tabs shape to no glyphs, with the advance of a space in the run's font (see
-    /// [`ShapedRun::space_advance`](crate::ShapedRun::space_advance)). A layout engine implementing
-    /// tab stops replaces that advance with the distance to the next tab stop (see
-    /// [`ShapedText::set_tab_advance`](crate::ShapedText::set_tab_advance)).
+    /// Tabs shape to no glyphs and a zero advance, like [`Self::Newline`]: the width of a tab is
+    /// the distance to the next tab stop, which depends on where the tab lands on a line, so it is
+    /// left to the layout engine (see [`ShapedText::set_tab_advance`](crate::ShapedText::set_tab_advance)).
     Tab = 5,
 
     /// Newline (CR, LF, CRLF, LS, or PS).

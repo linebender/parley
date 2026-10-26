@@ -242,9 +242,9 @@ impl ShapedText {
 
     /// Sets the advance of the tab shaped cluster at `cluster_index`.
     ///
-    /// Tabs shape to the advance of a space (see [`Whitespace::Tab`] and
-    /// [`ShapedRun::space_advance`]). A layout engine implementing tab stops replaces that with the
-    /// distance to the next tab stop, which depends on the tab's position on the line.
+    /// Tabs shape to a zero advance (see [`Whitespace::Tab`]). A layout engine implementing tab
+    /// stops sets it to the distance to the next tab stop, which depends on the tab's position on
+    /// the line.
     ///
     /// # Panics
     ///
@@ -370,23 +370,15 @@ impl ShapedText {
                 index
             });
 
-        let (metrics, space_advance) = {
+        let metrics = {
             let font = &self.fonts[font_index];
             let font_ref =
                 skrifa::FontRef::from_index(font.font.data.as_ref(), font.font.index).unwrap();
-            let size = skrifa::prelude::Size::new(options.font_size);
-            let metrics = skrifa::metrics::Metrics::new(&font_ref, size, normalized_coords);
-            // The advance of U+0020 SPACE, which sizes tabs (see `ShapedRun::space_advance`).
-            let space_advance = font_ref
-                .charmap()
-                .map(' ')
-                .and_then(|glyph_id| {
-                    font_ref
-                        .glyph_metrics(size, normalized_coords)
-                        .advance_width(glyph_id)
-                })
-                .unwrap_or(0.);
-            (metrics, space_advance)
+            skrifa::metrics::Metrics::new(
+                &font_ref,
+                skrifa::prelude::Size::new(options.font_size),
+                normalized_coords,
+            )
         };
         let units_per_em = metrics.units_per_em as f32;
         let font_metrics = FontMetrics::from_skrifa_metrics(&metrics, options.font_size);
@@ -430,7 +422,6 @@ impl ShapedText {
                 &mut self.shaped_clusters,
                 &mut self.glyphs,
                 scale_factor,
-                space_advance,
                 glyph_infos.iter(),
                 glyph_positions.iter(),
                 &self.characters,
@@ -442,7 +433,6 @@ impl ShapedText {
                 &mut self.shaped_clusters,
                 &mut self.glyphs,
                 scale_factor,
-                space_advance,
                 glyph_infos.iter().rev(),
                 glyph_positions.iter().rev(),
                 &self.characters,
@@ -478,7 +468,6 @@ impl ShapedText {
             script: segment.script,
             language: options.language,
             font_metrics,
-            space_advance,
             has_tabs,
         });
     }
@@ -515,8 +504,6 @@ pub struct ShapedRun {
     pub language: Option<Language>,
     /// The font metrics of this run.
     pub font_metrics: FontMetrics,
-    /// The advance of U+0020 in this run's font and size, 0 if the font has no space glyph.
-    pub space_advance: f32,
     /// Whether any of this run's shaped clusters is a tab (see [`Whitespace::Tab`]).
     /// Lets a layout engine skip tab sizing in the common case, a run without tabs.
     pub has_tabs: bool,
@@ -533,7 +520,6 @@ pub struct ShapedRun {
 ///
 /// ## Input Parameters:
 /// * `scale_factor` - Scaling factor used to convert font units to the target size.
-/// * `space_advance` - The advance of the space glyph at the target size, which tabs shape to.
 /// * `glyph_infos` - `HarfRust` glyph information in logical order (i.e., reversed for RTL runs).
 /// * `glyph_positions` - `HarfRust` glyph positioning data in logical order (i.e., reversed for RTL
 ///   runs).
@@ -546,7 +532,6 @@ fn process_shaped_clusters<'a>(
     shaped_clusters: &mut Vec<ShapedCluster>,
     glyphs: &mut Vec<Glyph>,
     scale_factor: f32,
-    space_advance: f32,
     glyph_infos: impl Iterator<Item = &'a harfrust::GlyphInfo>,
     glyph_positions: impl Iterator<Item = &'a harfrust::GlyphPosition>,
     characters: &[Character],
@@ -572,7 +557,6 @@ fn process_shaped_clusters<'a>(
         char_end: usize,
         characters: &[Character],
         shaped_clusters: &mut Vec<ShapedCluster>,
-        space_advance: f32,
     ) {
         let first_character = &characters[cluster.characters_start];
         let is_inline_object = first_character.flags.is_inline_object();
@@ -583,11 +567,11 @@ fn process_shaped_clusters<'a>(
         let (glyph_offset, glyph_len, inline_glyph, advance) = match first_character.whitespace {
             // Elide glyphs and advances of newlines.
             Whitespace::Newline => (cluster.glyphs_start as u32, 0, false, 0.),
-            // Tabs render as a horizontal shift rather than as glyphs. Fonts rarely map U+0009 to
-            // a meaningful glyph, so the shaped glyphs are elided, and the tab measures as a
-            // space. A layout engine implementing tab stops replaces this advance with the
-            // distance to the next tab stop (see `ShapedText::set_tab_advance`).
-            Whitespace::Tab => (cluster.glyphs_start as u32, 0, false, space_advance),
+            // Tabs render as a horizontal shift rather than as glyphs, and the size of that shift
+            // is the distance to the next tab stop, which depends on where the tab lands on a
+            // line. So the shaped glyphs are elided, and the advance is left to the layout engine
+            // (see `ShapedText::set_tab_advance`).
+            Whitespace::Tab => (cluster.glyphs_start as u32, 0, false, 0.),
             // Inline objects' glyphs are elided too; their advances are set later by the user.
             _ if is_inline_object => (cluster.glyphs_start as u32, 0, false, 0.),
             _ => {
@@ -639,13 +623,7 @@ fn process_shaped_clusters<'a>(
     for (glyph_info, glyph_pos) in glyph_infos.zip(glyph_positions) {
         if glyph_info.cluster != cluster.id {
             let char_end = characters_start + glyph_info.cluster as usize;
-            flush(
-                &mut cluster,
-                char_end,
-                characters,
-                shaped_clusters,
-                space_advance,
-            );
+            flush(&mut cluster, char_end, characters, shaped_clusters);
 
             cluster = Cluster {
                 id: glyph_info.cluster,
@@ -688,13 +666,7 @@ fn process_shaped_clusters<'a>(
     }
 
     // Flush the final cluster.
-    flush(
-        &mut cluster,
-        characters.len(),
-        characters,
-        shaped_clusters,
-        space_advance,
-    );
+    flush(&mut cluster, characters.len(), characters, shaped_clusters);
 }
 
 #[cfg(test)]
@@ -922,38 +894,21 @@ mod tests {
         }
     }
 
-    /// Tabs shape to no glyphs, and measure as a space of the run's font until a layout engine
-    /// applies tab stops.
+    /// Tabs shape to no glyphs and no advance, like newlines. The distance to the next tab stop
+    /// depends on where the tab lands on a line, so a layout engine adds it when placing the tab.
     #[test]
-    fn tabs_shape_to_a_glyphless_space() {
-        let shaped = shape_with_font("a\tb", ROBOTO);
-        let space = shape_with_font(" ", ROBOTO);
-        let space_advance = space.shaped_clusters()[0].advance;
-        assert!(space_advance > 0., "Roboto has a space glyph");
-
-        let [run] = shaped.runs() else {
-            panic!("expected one run, got {}", shaped.runs().len());
-        };
-        assert_eq!(run.space_advance, space_advance);
-
-        let tab_cluster = shaped
-            .shaped_clusters()
-            .iter()
-            .find(|cluster| cluster.chars_range().start == 1)
-            .unwrap();
-        assert_eq!(tab_cluster.whitespace(), Whitespace::Tab);
-        assert_eq!(tab_cluster.glyph_len(), 0, "tab glyphs are removed");
-        assert_eq!(tab_cluster.advance, space_advance);
-    }
-
-    /// A font without a space glyph gives tabs (and `space_advance`) a zero advance.
-    #[test]
-    fn tabs_without_space_glyph_have_zero_advance() {
-        // Our Noto Color Emoji subset has no space character.
-        let shaped = shape_with_font("\t", NOTO_COLOR_EMOJI);
-        assert_eq!(shaped.runs()[0].space_advance, 0.);
-        assert_eq!(shaped.shaped_clusters()[0].advance, 0.);
-        assert_eq!(shaped.shaped_clusters()[0].glyph_len(), 0);
+    fn tabs_shape_to_no_glyphs_and_zero_advance() {
+        for font in [ROBOTO, NOTO_COLOR_EMOJI] {
+            let shaped = shape_with_font("a\tb", font);
+            let tab_cluster = shaped
+                .shaped_clusters()
+                .iter()
+                .find(|cluster| cluster.chars_range().start == 1)
+                .unwrap();
+            assert_eq!(tab_cluster.whitespace(), Whitespace::Tab);
+            assert_eq!(tab_cluster.glyph_len(), 0, "tab glyphs are removed");
+            assert_eq!(tab_cluster.advance, 0., "tab advance is set to 0");
+        }
     }
 
     /// An itemization boundary forces a cluster break in shaping, and must force a grapheme start.
