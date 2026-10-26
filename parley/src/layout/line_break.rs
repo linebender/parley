@@ -14,7 +14,7 @@ use crate::inline_box::{LayoutInlineBox, inline_object_box_index};
 use crate::layout::data::{AlignedSubtreeOffset, run_box_metrics};
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
 use crate::layout::style_metrics::{BoxMetrics, StyleMetrics, inline_box_placement};
-use crate::layout::whitespace::atom_hanging_advance;
+use crate::layout::whitespace::atom_hangs;
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -1252,17 +1252,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // in the line. If there is no such line-breaking opportunity (such as if wrapping is disabled), then
                         // we fall back to appending the content to the line anyway.
                         else {
-                            // Case: the atom fits once its hanging whitespace is excluded.
+                            // Case: the atom is hanging whitespace.
                             //
-                            // We append it to the line, with the whitespace hanging past the end.
-                            let (hanging, all_hang) = atom_hanging_advance(
-                                slice,
-                                &atom,
-                                &self.layout.data.styles,
-                                spacing,
-                                item.bidi_level.is_rtl(),
-                            );
-                            if all_hang || next_x - hanging <= max_advance {
+                            // We append it to the line, hanging past the end.
+                            if atom_hangs(&atom, &self.layout.data.styles) {
                                 if max_height_exceeded {
                                     return self.max_height_break_data(line_height);
                                 }
@@ -1923,23 +1916,19 @@ fn hanging_whitespace<B: Brush>(
                     .narrow(line_item.shaped_cluster_range.clone());
 
                 for atom in slice.atoms_end().rev() {
-                    let (hanging, all_hang) = atom_hanging_advance(
-                        slice,
-                        &atom,
-                        &layout.data.styles,
-                        effective_spacing,
-                        line_item.is_rtl(),
-                    );
-                    let whitespace = atom.characters()[0].whitespace;
-                    if in_conditional_suffix && whitespace != Whitespace::Newline {
-                        // The atom hangs from its logical end, so use the last cluster's style to
-                        // decide whether it hangs conditionally.
-                        let last_cluster = atom.shaped_clusters().last().unwrap();
-                        if layout.data.styles[last_cluster.style_index as usize]
+                    let hangs = atom_hangs(&atom, &layout.data.styles);
+                    let hanging_advance: f32 = if hangs {
+                        effective_spacing.atom_advance(&atom)
+                    } else {
+                        0.
+                    };
+                    let first_character = &atom.characters()[0];
+                    if in_conditional_suffix && first_character.whitespace != Whitespace::Newline {
+                        if layout.data.styles[first_character.style_index as usize]
                             .white_space_collapse
                             == WhiteSpaceCollapse::Preserve
                         {
-                            *conditional_advance.get_or_insert(0.) += hanging;
+                            *conditional_advance.get_or_insert(0.) += hanging_advance;
                         } else {
                             in_conditional_suffix = false;
                             // A conditionally hanging atom that fits (including one with a
@@ -1948,18 +1937,19 @@ fn hanging_whitespace<B: Brush>(
                             if conditional_advance
                                 .is_some_and(|advance| advance <= 0. || advance > overflow)
                             {
+                                // TODO: Think about justification semantics here.
                                 break 'items;
                             }
                         }
                     }
-                    hanging_whitespace_advance += hanging;
+                    hanging_whitespace_advance += hanging_advance;
                     // Justification can't stretch within an atom, so it stops at the start of the
-                    // last atom that hangs in its entirety or only partially.
+                    // last atom that hangs.
                     justification_end_cluster = atom.shaped_clusters_range().start;
-                    if is_word_separator(whitespace) {
+                    if is_word_separator(first_character.whitespace) {
                         hanging_opportunities += 1;
                     }
-                    if !all_hang {
+                    if !hangs {
                         break 'items;
                     }
                 }
