@@ -308,8 +308,12 @@ enum SpliceMode {
 impl SpliceMode {
     fn is_safe_to_splice_before(self, cluster: ShapedCluster) -> bool {
         if !cluster.is_grapheme_start() {
-            // For now, for simplicity, we want to ensure reshaped pieces are aligned to graphemes,
-            // so that they're also an `Atom` boundary.
+            // We put seams at grapheme boundaries, so that reshaping doesn't add shaped run
+            // boundaries inside graphemes. A consumer that doesn't break inside graphemes and
+            // perhaps otherwise already ignores graphemes spanning such boundaries (like bidi
+            // boundaries), then doesn't need to check after reshaping either. Boundaries inside
+            // graphemes are rarely safe to break, so this should not normally lead to any
+            // appreciable additional work.
             false
         } else {
             match self {
@@ -436,8 +440,6 @@ impl Reshaper {
 
     /// Measure the effect of starting a line at `line_start_char` with the given `edit`.
     ///
-    /// `line_start_char` must be a grapheme boundary.
-    ///
     /// # Panics
     ///
     /// Panics if `edit` replaces characters past the end of the [`ShapedRun`] at the line's edge.
@@ -454,8 +456,6 @@ impl Reshaper {
     }
 
     /// Measure the effect of ending a line at `line_end_char` with the given `edit`.
-    ///
-    /// `line_end_char` must be a grapheme boundary.
     ///
     /// # Panics
     ///
