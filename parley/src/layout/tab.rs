@@ -1,7 +1,7 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Tab stops, following [CSS Text 4][css-tab-stop].
+//! Tab stops, following [CSS `tab-size`][tab-size].
 //!
 //! A tab shapes to no glyphs and no advance (see [`Whitespace::Tab`]). Its advance is the
 //! distance to the next tab stop from where it lands, which depends on the line breaking, so the
@@ -9,12 +9,13 @@
 //! (see [`TabAdvance`]). Everything that reads the line back adds it to the tab's shaped advance
 //! through [`EffectiveSpacing`], like justification.
 //!
-//! [css-tab-stop]: https://www.w3.org/TR/css-text-4/#tab-stop
+//! [tab-size]: https://www.w3.org/TR/css-text-4/#tab-size-property
 //! [`Whitespace::Tab`]: parley_engine::shape::Whitespace::Tab
 //! [`TabAdvance`]: crate::layout::data::TabAdvance
 //! [`EffectiveSpacing`]: crate::layout::spacing::EffectiveSpacing
 
-/// The advance of a tab that starts `x` past the line's start edge, with tab stops every `tab_size`.
+/// The advance of a tab that starts `x` past the line's start edge, with tab stops every
+/// `tab_size`.
 ///
 /// `x` includes the line's indent, as tab stops are measured from the line's start edge. The tab
 /// advances to the next stop, or to the one after it if the next is less than a sixteenth of the

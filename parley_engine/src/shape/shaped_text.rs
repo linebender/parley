@@ -240,25 +240,6 @@ impl ShapedText {
         cluster.advance = advance;
     }
 
-    /// Sets the advance of the tab shaped cluster at `cluster_index`.
-    ///
-    /// Tabs shape to a zero advance (see [`Whitespace::Tab`]). A layout engine implementing tab
-    /// stops sets it to the distance to the next tab stop, which depends on the tab's position on
-    /// the line.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the shaped cluster is not a tab.
-    pub fn set_tab_advance(&mut self, cluster_index: u32, advance: f32) {
-        let cluster = &mut self.shaped_clusters[cluster_index as usize];
-        assert_eq!(
-            cluster.whitespace(),
-            Whitespace::Tab,
-            "shaped cluster {cluster_index} is not a tab"
-        );
-        cluster.advance = advance;
-    }
-
     /// Escape hatch for `parley` tests that remap style indices to check whether layouts are
     /// otherwise identical. This is not for public consumption!
     #[doc(hidden)]
@@ -451,9 +432,6 @@ impl ShapedText {
         }
 
         let shaped_clusters_range = shaped_clusters_start as u32..self.shaped_clusters.len() as u32;
-        let has_tabs = self.shaped_clusters[shaped_clusters_start..]
-            .iter()
-            .any(|cluster| cluster.whitespace() == Whitespace::Tab);
 
         self.runs.push(ShapedRun {
             range,
@@ -468,7 +446,6 @@ impl ShapedText {
             script: segment.script,
             language: options.language,
             font_metrics,
-            has_tabs,
         });
     }
 }
@@ -504,9 +481,6 @@ pub struct ShapedRun {
     pub language: Option<Language>,
     /// The font metrics of this run.
     pub font_metrics: FontMetrics,
-    /// Whether any of this run's shaped clusters is a tab (see [`Whitespace::Tab`]).
-    /// Lets a layout engine skip tab sizing in the common case, a run without tabs.
-    pub has_tabs: bool,
 }
 
 /// Processes shaped glyphs from `HarfRust` and converts them into `ShapedCluster` and `Glyph`.
@@ -559,34 +533,33 @@ fn process_shaped_clusters<'a>(
         shaped_clusters: &mut Vec<ShapedCluster>,
     ) {
         let first_character = &characters[cluster.characters_start];
+        // Newlines and tabs render as no glyphs: a newline ends the line, and a tab's advance is
+        // the distance to the next tab stop, which depends on where the tab lands on a line, so a
+        // layout engine computes it when placing the tab (see `Whitespace::Tab`).
+        let is_glyphless_control = matches!(
+            first_character.whitespace,
+            Whitespace::Newline | Whitespace::Tab
+        );
         let is_inline_object = first_character.flags.is_inline_object();
         debug_assert!(
             !is_inline_object || char_end - cluster.characters_start == 1,
             "an inline object must be a cluster of its own"
         );
-        let (glyph_offset, glyph_len, inline_glyph, advance) = match first_character.whitespace {
-            // Elide glyphs and advances of newlines.
-            Whitespace::Newline => (cluster.glyphs_start as u32, 0, false, 0.),
-            // Tabs render as a horizontal shift rather than as glyphs, and the size of that shift
-            // is the distance to the next tab stop, which depends on where the tab lands on a
-            // line. So the shaped glyphs are elided, and the advance is left to the layout engine
-            // (see `ShapedText::set_tab_advance`).
-            Whitespace::Tab => (cluster.glyphs_start as u32, 0, false, 0.),
-            // Inline objects' glyphs are elided too; their advances are set later by the user.
-            _ if is_inline_object => (cluster.glyphs_start as u32, 0, false, 0.),
-            _ => {
-                if let Some(inline_glyph) = cluster.inline_glyph.take() {
-                    (inline_glyph.id, 1, true, cluster.advance)
-                } else {
-                    (
-                        cluster.glyphs_start as u32,
-                        cluster.glyphs as u8,
-                        false,
-                        cluster.advance,
-                    )
-                }
-            }
-        };
+        let (glyph_offset, glyph_len, inline_glyph, advance) =
+            if is_glyphless_control || is_inline_object {
+                // Elide glyphs and advances of newlines, tabs and inline objects. Note that inline
+                // objects' advances can be set later by the user.
+                (cluster.glyphs_start as u32, 0, false, 0.)
+            } else if let Some(inline_glyph) = cluster.inline_glyph.take() {
+                (inline_glyph.id, 1, true, cluster.advance)
+            } else {
+                (
+                    cluster.glyphs_start as u32,
+                    cluster.glyphs as u8,
+                    false,
+                    cluster.advance,
+                )
+            };
 
         shaped_clusters.push(ShapedCluster {
             chars_range: (cluster.characters_start as u32, char_end as u32),

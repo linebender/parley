@@ -105,7 +105,9 @@ pub enum Whitespace {
     ///
     /// Tabs shape to no glyphs and a zero advance, like [`Self::Newline`]: the width of a tab is
     /// the distance to the next tab stop, which depends on where the tab lands on a line, so it is
-    /// left to the layout engine (see [`ShapedText::set_tab_advance`](crate::ShapedText::set_tab_advance)).
+    /// left to the layout engine to compute when placing the tab (see [CSS `tab-size`][tab-size]).
+    ///
+    /// [tab-size]: https://www.w3.org/TR/css-text-4/#tab-size-property
     Tab = 5,
 
     /// Newline (CR, LF, CRLF, LS, or PS).
