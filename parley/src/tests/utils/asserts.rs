@@ -51,7 +51,7 @@ pub(crate) fn assert_eq_layout_data<B: Brush>(a: &LayoutData<B>, b: &LayoutData<
     assert_eq!(a.scale, b.scale, "{case} scale mismatch");
     assert_eq!(a.quantize, b.quantize, "{case} quantize mismatch");
     assert_eq!(a.base_level, b.base_level, "{case} base_level mismatch");
-    assert_eq!(a.text_len, b.text_len, "{case} text_len mismatch");
+    assert_eq!(a.text, b.text, "{case} text mismatch");
     assert_eq!(a.width, b.width, "{case} width mismatch");
     assert_eq!(a.full_width, b.full_width, "{case} full_width mismatch");
     assert_eq!(a.height, b.height, "{case} height mismatch");
@@ -99,6 +99,7 @@ pub(crate) fn assert_eq_layout_data<B: Brush>(a: &LayoutData<B>, b: &LayoutData<
     // Output of line breaking
     assert_eq!(a.lines, b.lines, "{case} lines mismatch");
     assert_eq!(a.line_items, b.line_items, "{case} line_items mismatch");
+    assert_eq!(a.reshaped, b.reshaped, "{case} reshaped mismatch");
 
     // Output of alignment
     assert_eq!(

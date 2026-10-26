@@ -6,8 +6,8 @@
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
 use parley::{
-    Alignment, AlignmentOptions, BreakReason, CHROMIUM_LINE_BREAK_OVERRIDE, OverflowWrap,
-    StyleProperty, TextWrapMode, WordBreak,
+    Alignment, AlignmentOptions, BreakReason, CHROMIUM_LINE_BREAK_OVERRIDE, IndentOptions, Layout,
+    OverflowWrap, StyleProperty, TextWrapMode, WordBreak,
 };
 use peniko::color::palette::css;
 
@@ -130,6 +130,81 @@ fn overflow_wrap_narrow() {
         ColorBrush::new(css::BLUE),
         5.0,
     );
+}
+
+#[test]
+fn reshaped_lines_measure_as_shaped_alone() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut width = |text: &str| {
+        let mut layout = env.ranged_builder(text).build(text);
+        layout.break_all_lines(None);
+        layout.width()
+    };
+    let (a, v, av) = (width("A"), width("V"), width("AV"));
+    assert!(av < a + v, "the test assumes 'AV' actually ends up kerning");
+
+    let text = "AVAVA";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::OverflowWrap(OverflowWrap::Anywhere));
+    let mut layout = builder.build(text);
+    let line_width = a.max(v) + 0.1;
+    layout.break_all_lines(Some(line_width));
+    let round = |advance: f32| (advance * 64.).round() / 64.;
+    let lines = |layout: &Layout<ColorBrush>| {
+        (layout.lines())
+            .map(|line| (line.text_range(), round(line.metrics().advance)))
+            .collect::<Vec<_>>()
+    };
+    let expected: Vec<_> = (0..5).map(|i| (i..i + 1, round([a, v][i % 2]))).collect();
+    assert_eq!(lines(&layout), expected);
+    // The reshaped pieces address the source text and its graphemes like the original runs.
+    let runs = || layout.lines().flat_map(|line| line.runs());
+    let graphemes: Vec<_> = (0..5).map(|i| i..i + 1).collect();
+    let cluster_ranges: Vec<_> = runs().map(|run| run.cluster_range()).collect();
+    assert_eq!(cluster_ranges, graphemes);
+    let clusters = runs().flat_map(|run| run.clusters());
+    let text_ranges: Vec<_> = clusters.map(|c| c.text_range()).collect();
+    assert_eq!(text_ranges, graphemes);
+
+    let mut breaker = layout.break_lines();
+    breaker.state_mut().set_layout_max_advance(line_width);
+    breaker.state_mut().set_line_max_advance(line_width);
+    breaker.break_next();
+    breaker.break_next();
+    breaker.revert();
+    breaker.break_remaining(line_width);
+    assert_eq!(lines(&layout), expected);
+}
+
+#[test]
+fn lines_overflowing_once_reshaped_end_earlier() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut width = |text: &str| {
+        let mut layout = env.ranged_builder(text).build(text);
+        layout.break_all_lines(None);
+        layout.width()
+    };
+    let [a, v, av, ava, vav] = ["A", "V", "AV", "AVA", "VAV"].map(&mut width);
+    // In "AVAVA", "A" kerns with the following "V" and "V" with the following "A", so a line
+    // broken off it is narrower as shaped there than once reshaped on its own.
+    let (a_in_text, av_in_text) = (av - v, ava - a);
+    assert!(a_in_text < a && av_in_text < av, "'AV' and 'VA' must kern");
+
+    let mut lines = |first_line_width: f32, width: f32| -> Vec<_> {
+        let mut builder = env.ranged_builder("AVAVA");
+        builder.push_default(StyleProperty::OverflowWrap(OverflowWrap::Anywhere));
+        let mut layout = builder.build("AVAVA");
+        layout.set_text_indent(width - first_line_width, IndentOptions::default());
+        layout.break_all_lines(Some(width));
+        layout.lines().map(|line| line.text_range()).collect()
+    };
+    // "AV" fits as shaped, but not once reshaped, so the first line ends after "A". That doesn't
+    // affect the next line, which has room for "VAV" once reshaped.
+    assert_eq!(lines((av_in_text + av) / 2., vav + 0.1), [0..1, 1..4, 4..5]);
+    // "A" fits as shaped, but not once reshaped. There's no earlier opportunity, so it overflows.
+    let a_width = (a_in_text + a) / 2.;
+    let graphemes: Vec<_> = (0..5).map(|i| i..i + 1).collect();
+    assert_eq!(lines(a_width, a_width), graphemes);
 }
 
 #[test]

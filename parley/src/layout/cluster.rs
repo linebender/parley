@@ -149,14 +149,14 @@ impl<'a, B: Brush> Cluster<'a, B> {
     pub(crate) fn first_character(&self) -> &'a Character {
         &self
             .run
-            .full_slice()
+            .line_slice()
             .characters_in(self.grapheme.char_range())[0]
     }
 
     /// Returns the range of text that defines the cluster.
     pub fn text_range(&self) -> Range<usize> {
         self.run
-            .full_slice()
+            .line_slice()
             .text_byte_range(self.grapheme.char_range())
     }
 
@@ -305,7 +305,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
             Some(next)
         } else {
             let index = self.text_range().end;
-            if index >= self.run.layout.data.text_len {
+            if index >= self.run.layout.data.text.len() {
                 return None;
             }
             // We have to search for the cluster containing our end index

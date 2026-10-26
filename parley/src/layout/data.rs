@@ -11,9 +11,10 @@ use crate::style::Brush;
 use crate::{IndentOptions, LineHeight, OverflowWrap, TextWrapMode, WhiteSpaceCollapse};
 use core::ops::Range;
 
+use alloc::string::String;
 use alloc::vec::Vec;
 use parlance::BidiLevel;
-use parley_engine::shape::Whitespace;
+use parley_engine::shape::{ReshapedText, Whitespace};
 use parley_engine::{ShapedRun, ShapedSlice, ShapedText};
 
 /// `HarfRust`-based run data
@@ -157,16 +158,36 @@ pub(crate) struct LineItemData {
     // TODO: factor this out?
     /// Range of the source text.
     pub(crate) text_range: Range<usize>,
-    /// This run's shaped clusters on this line, as a range into [`ShapedText::shaped_clusters`].
+    /// This run's shaped clusters on this line, as a range into [`ShapedText::shaped_clusters`], or
+    /// into [`LayoutData::reshaped`] if [`Self::reshaped_run`] is set.
     ///
     /// The bounds are atom-aligned.
     pub(crate) shaped_cluster_range: Range<u32>,
+    /// If `Some`, this is item is a reshaped run, and this is that run's index into
+    /// [`LayoutData::reshaped`].
+    ///
+    /// [`Self::index`] is the index of the run it was reshaped from.
+    ///
+    /// This will be set for lines whose break falls at a position that is not
+    /// [`parley_engine::shape::ShapedCluster::is_safe_to_break_before`].
+    pub(crate) reshaped_run: Option<u32>,
 }
 
 impl LineItemData {
     #[inline(always)]
     pub(crate) fn is_rtl(&self) -> bool {
         self.bidi_level.is_rtl()
+    }
+
+    /// This item's shaped clusters.
+    #[inline(always)]
+    #[expect(clippy::cast_possible_truncation, reason = "deferred")]
+    pub(crate) fn slice<'a, B: Brush>(&self, data: &'a LayoutData<B>) -> ShapedSlice<'a> {
+        match self.reshaped_run {
+            Some(reshaped_run) => data.reshaped.run_slice(&data.shaped_text, reshaped_run),
+            None => data.shaped_text.run_slice(self.index as u32),
+        }
+        .narrow(self.shaped_cluster_range.clone())
     }
 }
 
@@ -195,8 +216,8 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) quantize: bool,
     /// The `BiDi` base level
     pub(crate) base_level: BidiLevel,
-    /// The length of the text in the layout
-    pub(crate) text_len: usize,
+    /// The text of the layout
+    pub(crate) text: String,
 
     // Output of style resolution (input to line breaking)
     pub(crate) styles: Vec<Style<B>>,
@@ -213,6 +234,8 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) lines: Vec<LineData>,
     /// Items within each line
     pub(crate) line_items: Vec<LineItemData>,
+    /// Reshaped runs of lines
+    pub(crate) reshaped: ReshapedText,
     /// Position of each aligned subtree rooted at a `vertical-align: top | bottom` style on each line.
     /// The root aligned subtree of each line doesn't have an entry as its offset is trivially zero.
     ///
@@ -242,7 +265,7 @@ impl<B: Brush> Default for LayoutData<B> {
             scale: 1.,
             quantize: true,
             base_level: BidiLevel::new(0),
-            text_len: 0,
+            text: String::new(),
             width: 0.,
             full_width: 0.,
             height: 0.,
@@ -254,6 +277,7 @@ impl<B: Brush> Default for LayoutData<B> {
             items: Vec::new(),
             lines: Vec::new(),
             line_items: Vec::new(),
+            reshaped: ReshapedText::new(),
             aligned_subtree_offsets: Vec::new(),
             alignment: None,
             layout_max_advance: 0.0,
@@ -268,7 +292,7 @@ impl<B: Brush> LayoutData<B> {
         self.scale = 1.;
         self.quantize = true;
         self.base_level = BidiLevel::new(0);
-        self.text_len = 0;
+        self.text.clear();
         self.width = 0.;
         self.full_width = 0.;
         self.height = 0.;
@@ -283,6 +307,7 @@ impl<B: Brush> LayoutData<B> {
         self.items.clear();
         self.lines.clear();
         self.line_items.clear();
+        self.reshaped.clear();
         self.aligned_subtree_offsets.clear();
         self.alignment = None;
     }

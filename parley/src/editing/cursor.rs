@@ -28,7 +28,7 @@ impl Cursor {
             }
         } else {
             Self {
-                index: layout.data.text_len,
+                index: layout.data.text.len(),
                 affinity: Affinity::Upstream,
             }
         }
@@ -55,7 +55,7 @@ impl Cursor {
                 }
             }
         } else {
-            (layout.data.text_len, Affinity::Downstream)
+            (layout.data.text.len(), Affinity::Downstream)
         };
         Self { index, affinity }
     }
