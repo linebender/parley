@@ -3,6 +3,7 @@
 
 //! Additional advance applied on top of shaped advance.
 
+use crate::layout::data::TabAdvance;
 use parley_engine::{Atom, Grapheme, ShapedSlice, shape::Whitespace};
 
 /// Whether the whitespace is a word separator.
@@ -112,7 +113,8 @@ impl Spacing {
     ///
     /// Tabs get no spacing of their own either: CSS puts letter and word spacing into the tab
     /// size's unit (the advance of a space, [CSS `tab-size`][tab-size]) rather than around the
-    /// tab, so that the text after a tab lands exactly on its stop. Blink does the same.
+    /// tab, so that the text after a tab lands exactly on its stop. Blink does the same. The
+    /// tab's advance to its stop is layout-time spacing, see [`EffectiveSpacing::gaps`].
     ///
     /// [`CharacterFlags::is_default_ignorable`]: parley_engine::shape::CharacterFlags::is_default_ignorable
     /// [letter-spacing]: https://www.w3.org/TR/css-text-4/#letter-spacing-property
@@ -174,28 +176,61 @@ impl Default for Justification {
     }
 }
 
-/// Additional spacing to apply, including justification (if any).
+/// The layout-time spacing of a single line: its justification and the advances of its tabs.
+///
+/// Both depend on where the line's content lands, so neither is written into the shaped text,
+/// whose advances are independent of layout. The line breaker records the tab advances and
+/// alignment the justification per line, and [`EffectiveSpacing`] adds them to the shaped
+/// advances when the line is read back.
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct EffectiveSpacing {
-    spacing: Spacing,
-    justification: Justification,
+pub(crate) struct LineSpacing<'a> {
+    pub(crate) justification: Justification,
+    /// The advances of the line's tabs, sorted by shaped cluster index. See
+    /// [`LayoutData::tab_advances`](crate::layout::data::LayoutData::tab_advances).
+    pub(crate) tab_advances: &'a [TabAdvance],
 }
 
-impl EffectiveSpacing {
-    /// The combined [`Spacing`] and [`Justification`] effective for a run.
+impl LineSpacing<'static> {
+    /// No layout-time spacing, e.g. for measuring text while breaking lines.
+    pub(crate) const NONE: Self = Self {
+        justification: Justification::NONE,
+        tab_advances: &[],
+    };
+}
+
+impl LineSpacing<'_> {
+    /// The advance of the tab whose shaped cluster is `cluster`, or zero if the line has no
+    /// entry for it.
+    #[inline]
+    fn tab_advance(&self, cluster: u32) -> f32 {
+        // A line rarely has more than a handful of tabs.
+        self.tab_advances
+            .binary_search_by_key(&cluster, |tab| tab.cluster)
+            .map_or(0., |index| self.tab_advances[index].advance)
+    }
+}
+
+/// Additional spacing to apply, including the line's layout-time spacing (if any).
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct EffectiveSpacing<'a> {
+    spacing: Spacing,
+    line: LineSpacing<'a>,
+}
+
+impl<'a> EffectiveSpacing<'a> {
+    /// The combined [`Spacing`] of a run and [`LineSpacing`] of a line.
     ///
-    /// To measure text for purposes like line breaking, pass [`Justification::NONE`].
+    /// To measure text for purposes like line breaking, pass [`LineSpacing::NONE`].
     #[inline(always)]
-    pub(crate) const fn new(spacing: Spacing, justification: Justification) -> Self {
-        Self {
-            spacing,
-            justification,
-        }
+    pub(crate) const fn new(spacing: Spacing, line: LineSpacing<'a>) -> Self {
+        Self { spacing, line }
     }
 
     #[inline(always)]
     pub(crate) const fn is_zero(self) -> bool {
-        self.spacing.is_zero() && self.justification.amount_per_opportunity == 0.
+        self.spacing.is_zero()
+            && self.line.justification.amount_per_opportunity == 0.
+            && self.line.tab_advances.is_empty()
     }
 
     /// The gaps around `atom`.
@@ -207,12 +242,17 @@ impl EffectiveSpacing {
             .spacing
             .gaps(whitespace, first_character.flags.is_default_ignorable());
 
-        let clusters = atom.shaped_clusters_range();
-        if is_word_separator(whitespace)
-            && clusters.start >= self.justification.justification_start_cluster
-            && clusters.end <= self.justification.justification_end_cluster
-        {
-            gaps.after += self.justification.amount_per_opportunity;
+        if whitespace == Whitespace::Tab {
+            // A tab shapes to no advance; its advance to its tab stop is recorded per line.
+            gaps.after += self.line.tab_advance(atom.shaped_clusters_range().start);
+        } else if is_word_separator(whitespace) {
+            let justification = self.line.justification;
+            let clusters = atom.shaped_clusters_range();
+            if clusters.start >= justification.justification_start_cluster
+                && clusters.end <= justification.justification_end_cluster
+            {
+                gaps.after += justification.amount_per_opportunity;
+            }
         }
 
         gaps

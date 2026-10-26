@@ -363,7 +363,7 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
 #[derive(Clone)]
 struct AtomIter<'a> {
     atoms: Atoms<'a>,
-    spacing: EffectiveSpacing,
+    spacing: EffectiveSpacing<'a>,
     is_rtl: bool,
     /// The next atom in visual order, if it has been peeked but not yet consumed.
     peeked: Option<Atom<'a>>,
@@ -406,9 +406,9 @@ impl<'a> AtomIter<'a> {
     /// The number of glyphs in `atom` and its advance including spacing gaps.
     ///
     /// For an atom with glyphs, this matches what [`Run::glyphs_in`] yields for the atom's
-    /// clusters. An atom without glyphs can still have an advance (a tab, see
-    /// [`Whitespace::Tab`](parley_engine::shape::Whitespace::Tab)), which the line breaker includes
-    /// in the line's advance and so must be counted here too.
+    /// clusters. An atom without glyphs can still have an advance (a tab's advance to its stop is
+    /// a gap, see [`EffectiveSpacing::gaps`]), which the line breaker includes in the line's
+    /// advance and so must be counted here too.
     #[inline]
     fn measure(&self, atom: &Atom<'a>) -> (usize, f32) {
         let glyph_count: usize = atom

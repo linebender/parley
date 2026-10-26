@@ -84,7 +84,7 @@ pub(crate) fn atom_hanging_advance<B: Brush>(
     slice: ShapedSlice<'_>,
     atom: &Atom<'_>,
     styles: &[Style<B>],
-    spacing: EffectiveSpacing,
+    spacing: EffectiveSpacing<'_>,
     is_rtl: bool,
 ) -> (f32, bool) {
     let gaps = spacing.gaps(atom);

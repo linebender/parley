@@ -5,7 +5,7 @@ use crate::FontData;
 use crate::layout::cluster::Cluster;
 use crate::layout::data::{LineItemData, RunData};
 use crate::layout::layout::Layout;
-use crate::layout::spacing::{EffectiveSpacing, Gaps, Justification};
+use crate::layout::spacing::{EffectiveSpacing, Gaps, LineSpacing};
 use crate::style::Brush;
 
 use core::ops::Range;
@@ -38,6 +38,25 @@ impl<B: Brush> Clone for Run<'_, B> {
 }
 
 impl<'a, B: Brush> Run<'a, B> {
+    #[expect(clippy::cast_possible_truncation, reason = "deferred")]
+    pub(crate) fn new(
+        layout: &'a Layout<B>,
+        line_index: u32,
+        index: u32,
+        run_index: usize,
+        line_data: Option<&'a LineItemData>,
+    ) -> Self {
+        Self {
+            layout,
+            line_index,
+            index,
+            shaped_text_run_index: run_index as u32,
+            shaped: &layout.data.shaped_text.runs()[run_index],
+            data: &layout.data.runs[run_index],
+            line_data,
+        }
+    }
+
     /// Borrow the shaped content of this run as a slice.
     ///
     /// Note this covers the whole shaped run even when this [`Run`] is scoped to a line. Also see
@@ -106,14 +125,22 @@ impl<'a, B: Brush> Run<'a, B> {
         &self.shaped.font_metrics
     }
 
+    /// The spacing effective for this run on its line: the run's own spacing plus the line's
+    /// justification and tab advances. A run not scoped to a line has no layout-time spacing.
     #[inline]
-    pub(crate) fn line_spacing(&self) -> EffectiveSpacing {
-        let justification = if self.line_data.is_some() {
-            self.layout.data.lines[self.line_index as usize].justification
+    pub(crate) fn line_spacing(&self) -> EffectiveSpacing<'a> {
+        let line = if self.line_data.is_some() {
+            let data = &self.layout.data;
+            let line = &data.lines[self.line_index as usize];
+            LineSpacing {
+                justification: line.justification,
+                tab_advances: &data.tab_advances
+                    [line.tab_advances.start as usize..line.tab_advances.end as usize],
+            }
         } else {
-            Justification::NONE
+            LineSpacing::NONE
         };
-        EffectiveSpacing::new(self.data.spacing, justification)
+        EffectiveSpacing::new(self.data.spacing, line)
     }
 
     /// Returns the advance for the run.
@@ -249,7 +276,7 @@ pub(crate) struct Glyphs<'a> {
     slice: ShapedSlice<'a>,
     is_rtl: bool,
     /// The spacing to apply, if any. Without spacing, atoms are not tracked.
-    spacing: Option<EffectiveSpacing>,
+    spacing: Option<EffectiveSpacing<'a>>,
     /// The shaped clusters not yet visited: all of `slice`'s clusters without spacing, otherwise
     /// those of the current atom. Visited in logical order for LTR text and in reverse for RTL.
     shaped_clusters: Range<u32>,
@@ -265,7 +292,7 @@ pub(crate) struct Glyphs<'a> {
 }
 
 impl<'a> Glyphs<'a> {
-    fn new(slice: ShapedSlice<'a>, is_rtl: bool, spacing: EffectiveSpacing) -> Self {
+    fn new(slice: ShapedSlice<'a>, is_rtl: bool, spacing: EffectiveSpacing<'a>) -> Self {
         let clusters = slice.shaped_clusters_range();
         Self {
             slice,

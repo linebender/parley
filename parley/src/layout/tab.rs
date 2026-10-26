@@ -3,19 +3,16 @@
 
 //! Tab stops, following [CSS Text 4][css-tab-stop].
 //!
-//! A tab shapes to no glyphs, with the advance of a space. Its advance depends on where it lands
-//! on the line, so the line breaker sizes each tab as it places it, by overwriting the tab
-//! cluster's advance with [`tab_advance`]. Everything downstream (hanging whitespace, alignment,
-//! glyph positioning, hit testing) then sees the sized tab through the cluster advance like any
-//! other cluster.
+//! A tab shapes to no glyphs and no advance (see [`Whitespace::Tab`]). Its advance is the
+//! distance to the next tab stop from where it lands, which depends on the line breaking, so the
+//! line breaker computes it with [`tab_advance`] as it places the tab, and records it for the line
+//! (see [`TabAdvance`]). Everything that reads the line back adds it to the tab's shaped advance
+//! through [`EffectiveSpacing`], like justification.
 //!
 //! [css-tab-stop]: https://www.w3.org/TR/css-text-4/#tab-stop
-
-use crate::layout::spacing::{EffectiveSpacing, Justification};
-use crate::layout::{Spacing, Style};
-use crate::style::Brush;
-use parley_engine::ShapedText;
-use parley_engine::shape::Whitespace;
+//! [`Whitespace::Tab`]: parley_engine::shape::Whitespace::Tab
+//! [`TabAdvance`]: crate::layout::data::TabAdvance
+//! [`EffectiveSpacing`]: crate::layout::spacing::EffectiveSpacing
 
 /// The advance of a tab that starts `x` past the line's start edge, with tab stops every `tab_size`.
 ///
@@ -43,76 +40,6 @@ pub(crate) fn tab_advance(x: f32, tab_size: f32) -> f32 {
     }
     distance
 }
-
-/// Sizes the cluster at `cluster_idx` if it is a tab starting at `x` on the line.
-///
-/// `x` is measured from the line's start edge, i.e., it includes the line's indent.
-pub(crate) fn size_tab<B: Brush>(
-    shaped_text: &mut ShapedText,
-    styles: &[Style<B>],
-    cluster_idx: u32,
-    x: f32,
-) {
-    let cluster = shaped_text.shaped_clusters()[cluster_idx as usize];
-    if cluster.whitespace() != Whitespace::Tab {
-        return;
-    }
-    let tab_size = styles[cluster.style_index as usize].tab_size;
-    shaped_text.set_tab_advance(cluster_idx, tab_advance(x, tab_size));
-}
-
-/// Sizes the next tab of run `run_idx` at or after `cluster_idx`, if it is within reach, and
-/// returns the cluster index up to which the breaker can now proceed: just past that tab's atom,
-/// or the run's end if there is none.
-///
-/// The tab is sized as if the line breaker places every atom before it on the current line, from
-/// `x`, the line's current advance including its indent. Should a line break fall before the tab
-/// after all, the breaker returns and the next call sizes it again from its new position. The
-/// scan runs through newlines, which have no advance: `break_next` returns at a newline and
-/// re-sizes the tab on re-entry, while `break_next_with_length` keeps the line going past it.
-///
-/// The scan looks at most [`MAX_SCAN_ATOMS`] atoms ahead. Past that, it returns where it stopped
-/// without sizing anything, and the breaker calls again once it has consumed those atoms. Without
-/// the cap, a tab far into a run would be scanned towards again on every line before it, making
-/// line breaking quadratic in the number of lines.
-pub(crate) fn size_next_tab<B: Brush>(
-    shaped_text: &mut ShapedText,
-    styles: &[Style<B>],
-    run_idx: u32,
-    cluster_idx: u32,
-    x: f32,
-    spacing: Spacing,
-) -> u32 {
-    let effective_spacing = EffectiveSpacing::new(spacing, Justification::NONE);
-    let slice = shaped_text.run_slice(run_idx);
-
-    let mut x = x;
-    let mut scanned_to = slice.shaped_clusters_range().end;
-    let mut tab = None;
-    for (count, atom) in slice.atoms_from(cluster_idx).enumerate() {
-        let clusters = atom.shaped_clusters_range();
-        if atom.shaped_clusters()[0].whitespace() == Whitespace::Tab {
-            tab = Some(clusters);
-            break;
-        }
-        x += effective_spacing.atom_advance(&atom);
-        if count + 1 == MAX_SCAN_ATOMS {
-            scanned_to = clusters.end;
-            break;
-        }
-    }
-
-    match tab {
-        Some(clusters) => {
-            size_tab(shaped_text, styles, clusters.start, x);
-            clusters.end
-        }
-        None => scanned_to,
-    }
-}
-
-/// The most atoms [`size_next_tab`] scans ahead before handing back to the breaker.
-const MAX_SCAN_ATOMS: usize = 64;
 
 #[cfg(test)]
 mod tests {
