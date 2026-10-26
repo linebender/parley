@@ -7,7 +7,7 @@ use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
     Alignment, AlignmentOptions, ContentWidths, IndentOptions, InlineBox, InlineBoxKind, Layout,
-    LineBreak, StyleProperty, TabSize, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
+    LineBreak, StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
 };
 
 /// Checks that calculated content widths agree with actual line breaking.
@@ -361,13 +361,13 @@ fn content_widths_tabs() {
     let bb_cc = single_line_width(&mut env, "BB CC");
     let dd = single_line_width(&mut env, "DD");
     // The first tab reaches the first stop; "BB CC" then ends between the second stop (minus
-    // the half-space threshold) and the third, so the second tab reaches the third stop.
+    // the skip threshold) and the third, so the second tab reaches the third stop.
     assert!(aa < tab_size);
-    assert!(bb_cc >= tab_size - space / 2. && bb_cc < 2. * tab_size - space / 2.);
+    assert!(bb_cc >= tab_size - tab_size / 16. && bb_cc < 2. * tab_size - tab_size / 16.);
 
     let text = "AA\tBB CC\tDD";
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(TabSize::Spaces(8.)));
+    builder.push_default(StyleProperty::TabSize(tab_size));
     let mut layout = builder.build(text);
     let widths = assert_content_widths_match_layout(&mut layout);
     let widest_word = ["AA", "BB", "CC", "DD"]
@@ -390,7 +390,7 @@ fn content_widths_tabs() {
     // takes a full tab size.
     for text in ["AA\tBB", "\tAA BB", "AA\n\tBB"] {
         let mut builder = env.ranged_builder(text);
-        builder.push_default(StyleProperty::TabSize(TabSize::Spaces(8.)));
+        builder.push_default(StyleProperty::TabSize(tab_size));
         let mut layout = builder.build(text);
         layout.set_text_indent(10., IndentOptions::default());
         assert_content_widths_match_layout(&mut layout);
@@ -398,9 +398,12 @@ fn content_widths_tabs() {
 
     // Tabs in mixed-direction text are positioned along the logical advance, both when breaking
     // lines and when measuring.
-    for text in ["abc\tااا ببب\tdef", "ااا\tabc\tببب"] {
+    for text in [
+        "abc\t\u{627}\u{627}\u{627} \u{628}\u{628}\u{628}\tdef",
+        "\u{627}\u{627}\u{627}\tabc\t\u{628}\u{628}\u{628}",
+    ] {
         let mut builder = env.ranged_builder(text);
-        builder.push_default(StyleProperty::TabSize(TabSize::Spaces(4.)));
+        builder.push_default(StyleProperty::TabSize(4. * space));
         let mut layout = builder.build(text);
         assert_content_widths_match_layout(&mut layout);
     }

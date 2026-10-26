@@ -521,7 +521,6 @@ impl ContentWidthsMeasurer {
                 LayoutItemKind::TextRun => {
                     let slice = layout_data.shaped_text.run_slice(item.index as u32);
                     let run_spacing = layout_data.runs[item.index].spacing;
-                    let space_advance = layout_data.shaped_text.runs()[item.index].space_advance;
                     // Trailing whitespace can only hang if it ends up at the line's end edge after
                     // bidi reordering. We don't currently apply UAX #9 L1 (resetting trailing
                     // whitespace to paragraph level), so only logically-last items that match the
@@ -534,7 +533,6 @@ impl ContentWidthsMeasurer {
                             &layout_data.styles,
                             slice,
                             run_spacing,
-                            space_advance,
                             can_hang,
                             is_rtl,
                         );
@@ -543,7 +541,6 @@ impl ContentWidthsMeasurer {
                             &layout_data.styles,
                             slice,
                             run_spacing,
-                            space_advance,
                             can_hang,
                             is_rtl,
                         );
@@ -581,8 +578,7 @@ impl ContentWidthsMeasurer {
     ///
     /// With `SPACED`, each atom's spacing gap is added to the cluster on its visual end, i.e., its
     /// logically last cluster for LTR and its logically first cluster for RTL. The gap then hangs
-    /// with that cluster, as in `atom_hanging_advance`. Without `SPACED`, `spacing` is ignored
-    /// for gaps, but still contributes to the size of tabs (see [`tab_advance`]).
+    /// with that cluster, as in `atom_hanging_advance`. Without `SPACED`, `spacing` is ignored.
     ///
     /// A tab's advance depends on where it lands, so it is computed from the running width of
     /// each constraint rather than read from the cluster, whose advance holds whatever the line
@@ -594,7 +590,6 @@ impl ContentWidthsMeasurer {
         styles: &[Style<B>],
         slice: ShapedSlice<'_>,
         spacing: Spacing,
-        space_advance: f32,
         can_hang: bool,
         is_rtl: bool,
     ) {
@@ -639,10 +634,9 @@ impl ContentWidthsMeasurer {
             }
 
             let (mut min_advance, mut max_advance) = if whitespace == Whitespace::Tab {
-                let tab_size = style.tab_size;
                 (
-                    tab_advance(self.running_min_width, tab_size, space_advance, spacing),
-                    tab_advance(self.running_max_width, tab_size, space_advance, spacing),
+                    tab_advance(self.running_min_width, style.tab_size),
+                    tab_advance(self.running_max_width, style.tab_size),
                 )
             } else {
                 (cluster.advance, cluster.advance)

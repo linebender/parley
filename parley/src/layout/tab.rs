@@ -11,66 +11,54 @@
 //!
 //! [css-tab-stop]: https://www.w3.org/TR/css-text-4/#tab-stop
 
-use crate::TabSize;
 use crate::layout::spacing::{EffectiveSpacing, Justification};
 use crate::layout::{Spacing, Style};
 use crate::style::Brush;
 use parley_engine::ShapedText;
 use parley_engine::shape::Whitespace;
 
-/// The advance of a tab whose start edge is at `x`, measured from the line's start edge.
+/// The advance of a tab that starts `x` past the line's start edge, with tab stops every `tab_size`.
 ///
-/// `space_advance` is the advance of the space glyph of the tab's font, and `spacing` the word and
-/// letter spacing of the tab's run, which together make up the unit of [`TabSize::Spaces`].
-///
-/// The tab shifts to the next tab stop, or to the one after it if the next is less than half a
-/// space away so that a tab is always visible. CSS phrases that threshold as `0.5ch`; like Blink,
-/// we use half the space advance. A tab size that isn't positive gives the tab no advance of its
-/// own (spacing gaps still apply).
-pub(crate) fn tab_advance(x: f32, tab_size: TabSize, space_advance: f32, spacing: Spacing) -> f32 {
-    let base = match tab_size {
-        TabSize::Spaces(spaces) => spaces * (space_advance + spacing.letter + spacing.word),
-        TabSize::Length(length) => length,
-    };
-    if base <= 0. || base.is_nan() {
+/// `x` includes the line's indent, as tab stops are measured from the line's start edge. The tab
+/// advances to the next stop, or to the one after it if the next is less than a sixteenth of the
+/// tab size away, so that a tab is always visible. CSS phrases that threshold as half a space; the
+/// tab size is a length here, so the threshold is taken relative to it instead, which agrees with
+/// CSS at its default of eight spaces per tab stop. A tab size that isn't positive gives the tab
+/// no advance.
+pub(crate) fn tab_advance(x: f32, tab_size: f32) -> f32 {
+    if tab_size.is_nan() || tab_size <= 0. {
         return 0.;
     }
 
-    // The distance from the previous tab stop, in `0.0..base`. The remainder takes the sign of
+    // The distance past the previous tab stop, in `0.0..tab_size`. The remainder takes the sign of
     // `x`, which can be negative under a negative indent.
-    let mut past_stop = x % base;
+    let mut past_stop = x % tab_size;
     if past_stop < 0. {
-        past_stop += base;
+        past_stop += tab_size;
     }
 
-    let mut distance = base - past_stop;
-    if distance < space_advance / 2. {
-        distance += base;
+    let mut distance = tab_size - past_stop;
+    if distance < tab_size / 16. {
+        distance += tab_size;
     }
     distance
 }
 
 /// Sizes the cluster at `cluster_idx` if it is a tab starting at `x` on the line.
 ///
-/// `space_advance` and `spacing` are those of the cluster's run; `x` is measured from the line's
-/// start edge, i.e., it includes the line's indent.
+/// `x` is measured from the line's start edge, i.e., it includes the line's indent.
 pub(crate) fn size_tab<B: Brush>(
     shaped_text: &mut ShapedText,
     styles: &[Style<B>],
     cluster_idx: u32,
     x: f32,
-    space_advance: f32,
-    spacing: Spacing,
 ) {
     let cluster = shaped_text.shaped_clusters()[cluster_idx as usize];
     if cluster.whitespace() != Whitespace::Tab {
         return;
     }
     let tab_size = styles[cluster.style_index as usize].tab_size;
-    shaped_text.set_tab_advance(
-        cluster_idx,
-        tab_advance(x, tab_size, space_advance, spacing),
-    );
+    shaped_text.set_tab_advance(cluster_idx, tab_advance(x, tab_size));
 }
 
 /// Sizes the next tab of run `run_idx` at or after `cluster_idx`, if it is within reach, and
@@ -93,7 +81,6 @@ pub(crate) fn size_next_tab<B: Brush>(
     run_idx: u32,
     cluster_idx: u32,
     x: f32,
-    space_advance: f32,
     spacing: Spacing,
 ) -> u32 {
     let effective_spacing = EffectiveSpacing::new(spacing, Justification::NONE);
@@ -117,14 +104,7 @@ pub(crate) fn size_next_tab<B: Brush>(
 
     match tab {
         Some(clusters) => {
-            size_tab(
-                shaped_text,
-                styles,
-                clusters.start,
-                x,
-                space_advance,
-                spacing,
-            );
+            size_tab(shaped_text, styles, clusters.start, x);
             clusters.end
         }
         None => scanned_to,
@@ -136,58 +116,34 @@ const MAX_SCAN_ATOMS: usize = 64;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::tab_advance;
 
-    const SPACE: f32 = 10.;
-    const NO_SPACING: Spacing = Spacing::new(0., 0.);
-
-    fn eight_spaces(x: f32) -> f32 {
-        tab_advance(x, TabSize::default(), SPACE, NO_SPACING)
+    #[test]
+    fn tab_advances_to_the_next_stop() {
+        assert_eq!(tab_advance(0., 80.), 80.);
+        assert_eq!(tab_advance(80., 80.), 80.);
+        assert_eq!(tab_advance(30., 80.), 50.);
+        assert_eq!(tab_advance(170., 80.), 70.);
     }
 
     #[test]
-    fn default_is_eight_spaces() {
-        assert_eq!(eight_spaces(0.), 80.);
-        assert_eq!(eight_spaces(80.), 80.);
-        assert_eq!(eight_spaces(30.), 50.);
-        assert_eq!(eight_spaces(170.), 70.);
+    fn tab_skips_a_stop_less_than_a_sixteenth_away() {
+        assert_eq!(tab_advance(76., 80.), 84.);
+        // Exactly a sixteenth away is not "less than", so the next stop is kept.
+        assert_eq!(tab_advance(75., 80.), 5.);
+        assert_eq!(tab_advance(74., 80.), 6.);
     }
 
     #[test]
-    fn skips_a_stop_that_is_less_than_half_a_space_away() {
-        assert_eq!(eight_spaces(76.), 84.);
-        // Exactly half a space away is not "less than", so the next stop is kept.
-        assert_eq!(eight_spaces(75.), 5.);
-        assert_eq!(eight_spaces(74.), 6.);
+    fn tab_under_a_negative_indent_measures_from_the_previous_stop() {
+        assert_eq!(tab_advance(-30., 80.), 30.);
+        assert_eq!(tab_advance(-80., 80.), 80.);
     }
 
     #[test]
-    fn negative_x_measures_from_the_previous_stop() {
-        assert_eq!(eight_spaces(-30.), 30.);
-        assert_eq!(eight_spaces(-80.), 80.);
-    }
-
-    #[test]
-    fn spaces_include_letter_and_word_spacing() {
-        let advance = tab_advance(0., TabSize::Spaces(4.), SPACE, Spacing::new(2., 1.));
-        assert_eq!(advance, 4. * (10. + 2. + 1.));
-    }
-
-    #[test]
-    fn length_is_absolute() {
-        assert_eq!(
-            tab_advance(10., TabSize::Length(25.), SPACE, Spacing::new(2., 1.)),
-            15.
-        );
-    }
-
-    #[test]
-    fn non_positive_size_renders_nothing() {
-        assert_eq!(tab_advance(10., TabSize::Spaces(0.), SPACE, NO_SPACING), 0.);
-        assert_eq!(
-            tab_advance(10., TabSize::Length(-1.), SPACE, NO_SPACING),
-            0.
-        );
-        assert_eq!(tab_advance(10., TabSize::Spaces(8.), 0., NO_SPACING), 0.);
+    fn tab_size_that_is_not_positive_gives_no_advance() {
+        assert_eq!(tab_advance(10., 0.), 0.);
+        assert_eq!(tab_advance(10., -1.), 0.);
+        assert_eq!(tab_advance(10., f32::NAN), 0.);
     }
 }

@@ -44,7 +44,7 @@ pub use crate::editing::{Cursor, Selection};
 // TODO - Move the following to `style` module and submodules.
 
 use crate::style::Brush;
-use crate::{LineHeight, OverflowWrap, TabSize, TextWrapMode, VerticalAlign, WhiteSpaceCollapse};
+use crate::{LineHeight, OverflowWrap, TextWrapMode, VerticalAlign, WhiteSpaceCollapse};
 
 /// Style properties.
 #[derive(Clone, Debug, PartialEq)]
@@ -68,8 +68,9 @@ pub struct Style<B: Brush> {
     pub(crate) text_wrap_mode: TextWrapMode,
     /// Per-cluster whitespace collapsing and hanging behavior.
     pub(crate) white_space_collapse: WhiteSpaceCollapse,
-    /// The distance between tab stops for tabs in this style.
-    pub(crate) tab_size: TabSize,
+    /// The distance between tab stops, in layout units (see
+    /// [`StyleProperty::TabSize`](crate::StyleProperty::TabSize)).
+    pub(crate) tab_size: f32,
     /// The locale of the text, if any.
     ///
     /// This is useful for consumers exposing the text to assistive technologies,

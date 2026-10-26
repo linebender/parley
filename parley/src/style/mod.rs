@@ -43,51 +43,6 @@ pub enum WhiteSpaceCollapse {
     BreakSpaces,
 }
 
-/// The distance between tab stops, following CSS `tab-size`.
-///
-/// A preserved tab shifts the glyph after it to the next tab stop. Tab stops sit at multiples of
-/// the tab size from the line's start edge, including any text indent. If the next stop is less
-/// than half a space away, the tab shifts to the stop after it, so that a tab is always visible.
-/// A tab size that isn't positive gives tabs no advance of their own; letter spacing after them
-/// still applies. Justification leaves a line's text up to its last tab in place, so tab stops
-/// keep lining up.
-///
-/// See: <https://www.w3.org/TR/css-text-4/#tab-size-property>
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum TabSize {
-    /// A multiple of the advance of the space (U+0020) in the tab's own font, including letter
-    /// and word spacing. CSS measures the block container's font; Parley has no block container.
-    Spaces(f32),
-    /// An absolute distance in layout units.
-    Length(f32),
-}
-
-impl Default for TabSize {
-    /// The CSS initial value, `tab-size: 8`.
-    fn default() -> Self {
-        Self::Spaces(8.0)
-    }
-}
-
-impl TabSize {
-    pub(crate) fn nearly_eq(self, other: Self) -> bool {
-        match (self, other) {
-            (Self::Spaces(a), Self::Spaces(b)) | (Self::Length(a), Self::Length(b)) => {
-                nearly_eq(a, b)
-            }
-            _ => false,
-        }
-    }
-
-    pub(crate) fn scale(self, scale: f32) -> Self {
-        match self {
-            Self::Length(value) => Self::Length(value * scale),
-            // Relative to the space advance, which scales with the font size.
-            value => value,
-        }
-    }
-}
-
 /// The height that this text takes up. The default is `MetricsRelative(1.0)`, which is the given
 /// font's preferred line height.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -322,8 +277,9 @@ pub enum StyleProperty<'a, B: Brush> {
     TextWrapMode(TextWrapMode),
     /// Whitespace collapsing and hanging behavior.
     WhiteSpaceCollapse(WhiteSpaceCollapse),
-    /// The distance between tab stops.
-    TabSize(TabSize),
+    /// The distance between tab stops, in layout units. Defaults to `0.0`, which gives tabs no
+    /// advance: CSS's default of eight spaces can't be measured yet.
+    TabSize(f32),
 }
 
 /// Unresolved styles.
@@ -382,7 +338,7 @@ pub struct TextStyle<'family, 'settings, B: Brush> {
     /// Whitespace collapsing and hanging behavior.
     pub white_space_collapse: WhiteSpaceCollapse,
     /// The distance between tab stops.
-    pub tab_size: TabSize,
+    pub tab_size: f32,
 }
 
 impl<B: Brush> Default for TextStyle<'static, 'static, B> {
@@ -414,7 +370,7 @@ impl<B: Brush> Default for TextStyle<'static, 'static, B> {
             overflow_wrap: OverflowWrap::default(),
             text_wrap_mode: TextWrapMode::default(),
             white_space_collapse: WhiteSpaceCollapse::default(),
-            tab_size: TabSize::default(),
+            tab_size: 0.0,
         }
     }
 }
@@ -506,11 +462,5 @@ impl<B: Brush> From<OverflowWrap> for StyleProperty<'_, B> {
 impl<B: Brush> From<TextWrapMode> for StyleProperty<'_, B> {
     fn from(value: TextWrapMode) -> Self {
         StyleProperty::TextWrapMode(value)
-    }
-}
-
-impl<B: Brush> From<TabSize> for StyleProperty<'_, B> {
-    fn from(value: TabSize) -> Self {
-        StyleProperty::TabSize(value)
     }
 }

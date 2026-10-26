@@ -18,7 +18,7 @@ use crate::font::FontContext;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
 use crate::{LineBreak, LineHeight, OverflowWrap, VerticalAlign, layout};
-use crate::{TabSize, TextWrapMode, WhiteSpaceCollapse, WordBreak};
+use crate::{TextWrapMode, WhiteSpaceCollapse, WordBreak};
 use core::borrow::Borrow;
 use core::ops::Range;
 use fontique::FamilyId;
@@ -169,7 +169,7 @@ impl ResolveContext {
             StyleProperty::OverflowWrap(value) => OverflowWrap(*value),
             StyleProperty::TextWrapMode(value) => TextWrapMode(*value),
             StyleProperty::WhiteSpaceCollapse(value) => WhiteSpaceCollapse(*value),
-            StyleProperty::TabSize(value) => TabSize(value.scale(scale)),
+            StyleProperty::TabSize(value) => TabSize(*value * scale),
         }
     }
 
@@ -211,7 +211,7 @@ impl ResolveContext {
             overflow_wrap: raw_style.overflow_wrap,
             text_wrap_mode: raw_style.text_wrap_mode,
             white_space_collapse: raw_style.white_space_collapse,
-            tab_size: raw_style.tab_size.scale(scale),
+            tab_size: raw_style.tab_size * scale,
         }
     }
 
@@ -403,7 +403,7 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     /// Whitespace collapsing and hanging behavior.
     WhiteSpaceCollapse(WhiteSpaceCollapse),
     /// The distance between tab stops.
-    TabSize(TabSize),
+    TabSize(f32),
 }
 
 /// Flattened group of style properties.
@@ -453,7 +453,7 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     /// Whitespace collapsing and hanging behavior.
     pub(crate) white_space_collapse: WhiteSpaceCollapse,
     /// The distance between tab stops.
-    pub(crate) tab_size: TabSize,
+    pub(crate) tab_size: f32,
 }
 
 impl<B: Brush> ResolvedStyle<B> {
@@ -520,7 +520,7 @@ impl<B: Brush> ResolvedStyle<B> {
             OverflowWrap(value) => self.overflow_wrap == *value,
             TextWrapMode(value) => self.text_wrap_mode == *value,
             WhiteSpaceCollapse(value) => self.white_space_collapse == *value,
-            TabSize(value) => self.tab_size.nearly_eq(*value),
+            TabSize(value) => nearly_eq(self.tab_size, *value),
         }
     }
 

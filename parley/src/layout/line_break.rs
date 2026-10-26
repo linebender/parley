@@ -1155,7 +1155,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let run_data = &self.layout.data.runs[run_idx];
                     let shaped_run = &self.layout.data.shaped_text.runs()[run_idx];
                     let cluster_end = shaped_run.shaped_clusters_range.end;
-                    let space_advance = shaped_run.space_advance;
                     let has_tabs = shaped_run.has_tabs;
 
                     // Additional spacing to apply between atoms.
@@ -1203,7 +1202,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 run_idx as u32,
                                 self.state.cluster_idx,
                                 self.state.line.x + line_indent,
-                                space_advance,
                                 run_spacing,
                             )
                         } else {
@@ -1424,7 +1422,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let run_idx = item.index;
                     let shaped_run = &self.layout.data.shaped_text.runs()[run_idx];
                     let cluster_end = shaped_run.shaped_clusters_range.end;
-                    let space_advance = shaped_run.space_advance;
                     let has_tabs = shaped_run.has_tabs;
                     let run_spacing = self.layout.data.runs[run_idx].spacing;
                     let spacing = EffectiveSpacing::new(run_spacing, Justification::NONE);
@@ -1439,7 +1436,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 run_idx as u32,
                                 self.state.cluster_idx,
                                 self.state.line.x + line_indent,
-                                space_advance,
                                 run_spacing,
                             )
                         } else {
