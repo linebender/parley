@@ -1018,7 +1018,8 @@ impl Reshaper {
             }
         };
         self.cache.recent[slot / 2] = slot % 2;
-        (slot, self.cache.slots[slot].fragment.runs[0].run.advance)
+        let clusters = &self.cache.slots[slot].fragment.shaped_clusters;
+        (slot, clusters.iter().map(|c| c.advance).sum())
     }
 
     /// Shape the characters `chars` of the run `run_index` again.
