@@ -829,17 +829,30 @@ fn last_line_alignment() {
 
 #[test]
 /// On overflow without alignment-on-overflow, RTL-text should be start-aligned (i.e., aligned to
-/// the right edge, overflowing on the left).
+/// the right edge, overflowing on the left). Justified text is too (even with
+/// alignment-on-overflow, because it can't shrink the line).
 fn overflow_alignment_rtl() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    let text = "عند برمجة أجهزة الكمبيوتر، قد تجد نفسك فجأة في مواقف غريبة، مثل الكتابة بلغة لا تتحدثها فعليًا.";
-    let builder = env.ranged_builder(text);
-    let mut layout = builder.build(text);
-    layout.break_all_lines(Some(1000.0));
-    layout.align(Alignment::Center, AlignmentOptions::default());
-    env.rendering_config().size = Some(Size::new(10., layout.height().into()));
-    env.check_layout_snapshot(&layout);
+    // The NBSP in the text below produces a line that slightly overflows, and gives that line a
+    // justification opportunity whose spacing should remain at 0 (because the line overflows).
+    let text = "عند برمجة أجهزة\u{A0}الكمبيوتر، قد تجد نفسك فجأة في مواقف غريبة، مثل الكتابة بلغة لا تتحدثها فعليًا.";
+    for (alignment, align_when_overflowing, test_case_name) in [
+        (Alignment::Center, false, "center"),
+        (Alignment::Justify, true, "justify_awo"),
+    ] {
+        let builder = env.ranged_builder(text);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(100.0));
+        layout.align(
+            alignment,
+            AlignmentOptions {
+                align_when_overflowing,
+                ..AlignmentOptions::default()
+            },
+        );
+        env.with_name(test_case_name).check_layout_snapshot(&layout);
+    }
 }
 
 #[test]
