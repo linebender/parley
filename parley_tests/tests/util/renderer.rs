@@ -107,10 +107,11 @@ pub(crate) fn draw_layout(
         .ceil() as u16;
 
     // Scale dimensions
-    let width = (((base_width as f64) * scale).ceil() as u16).max(layout.width().ceil() as u16);
+    let width = ((base_width as f64) * scale).ceil() as u16;
+    let img_width = width.max(layout.width().ceil() as u16);
     let height = ((base_height as f64) * scale).ceil() as u16;
     let scaled_padding = ((padding as f64) * scale).ceil() as u16;
-    let padded_width = width + scaled_padding * 2;
+    let padded_width = img_width + scaled_padding * 2;
     let padded_height = height + scaled_padding * 2;
     let fpadding = scaled_padding as f64;
 
