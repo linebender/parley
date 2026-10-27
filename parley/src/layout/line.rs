@@ -1,15 +1,15 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::BaselineShift;
 use crate::inline_box::inline_object_box_index;
 use crate::layout::data::BreakReason;
-use crate::layout::data::{LayoutItemKind, LineData};
+use crate::layout::data::LineData;
 use crate::layout::layout::Layout;
 use crate::layout::run::Run;
 use crate::layout::spacing::Gaps;
 use crate::layout::{SpanMetrics, Style};
 use crate::style::Brush;
-use crate::{BaselineShift, InlineBoxKind};
 
 use core::ops::Range;
 use parley_engine::Glyph;
@@ -48,8 +48,8 @@ impl<'a, B: Brush> Line<'a, B> {
         self.data.item_range.is_empty()
     }
 
-    /// Returns the line item at the specified index.
-    pub(crate) fn item(&self, index: usize) -> Option<LineItem<'a, B>> {
+    /// Returns the run at the specified index.
+    pub(crate) fn item(&self, index: usize) -> Option<Run<'a, B>> {
         let original_index = index;
         let index = self.data.item_range.start + index;
         if index >= self.data.item_range.end {
@@ -57,17 +57,14 @@ impl<'a, B: Brush> Line<'a, B> {
         }
         let item = self.layout.data.line_items.get(index)?;
 
-        Some(match item.kind {
-            LayoutItemKind::TextRun => LineItem::Run(Run {
-                layout: self.layout,
-                line_index: self.index,
-                index: original_index as u32,
-                shaped_text_run_index: item.index as u32,
-                shaped: self.layout.data.shaped_text.runs().get(item.index)?,
-                data: self.layout.data.runs.get(item.index)?,
-                line_data: Some(item),
-            }),
-            LayoutItemKind::OutOfFlowBox => LineItem::OutOfFlowBox(item.index),
+        Some(Run {
+            layout: self.layout,
+            line_index: self.index,
+            index: original_index as u32,
+            shaped_text_run_index: item.index as u32,
+            shaped: self.layout.data.shaped_text.runs().get(item.index)?,
+            data: self.layout.data.runs.get(item.index)?,
+            line_data: Some(item),
         })
     }
 
@@ -110,29 +107,19 @@ impl<'a, B: Brush> Line<'a, B> {
 
     /// Returns an iterator over the runs for the line.
     pub fn runs(&self) -> impl Iterator<Item = Run<'a, B>> + 'a + Clone + use<'a, B> {
-        self.items_nonpositioned().filter_map(|item| item.run())
-    }
-
-    /// Returns an iterator over the non-glyph runs and inline boxes for the line.
-    pub(crate) fn items_nonpositioned(
-        &self,
-    ) -> impl Iterator<Item = LineItem<'a, B>> + Clone + use<'a, B> {
         let copy = self.clone();
         let line_items = &copy.layout.data.line_items[self.data.item_range];
         line_items
             .iter()
             .enumerate()
-            .map(move |(item_index, line_data)| match line_data.kind {
-                LayoutItemKind::TextRun => LineItem::Run(Run {
-                    layout: copy.layout,
-                    line_index: copy.index,
-                    index: item_index as u32,
-                    shaped_text_run_index: line_data.index as u32,
-                    shaped: &copy.layout.data.shaped_text.runs()[line_data.index],
-                    data: &copy.layout.data.runs[line_data.index],
-                    line_data: Some(line_data),
-                }),
-                LayoutItemKind::OutOfFlowBox => LineItem::OutOfFlowBox(line_data.index),
+            .map(move |(item_index, line_data)| Run {
+                layout: copy.layout,
+                line_index: copy.index,
+                index: item_index as u32,
+                shaped_text_run_index: line_data.index as u32,
+                shaped: &copy.layout.data.shaped_text.runs()[line_data.index],
+                data: &copy.layout.data.runs[line_data.index],
+                line_data: Some(line_data),
             })
     }
 
@@ -238,24 +225,6 @@ impl LineMetrics {
     }
 }
 
-/// A line item and its corresponding data (a run or out-of-flow box). Unlike a
-/// [`PositionedLayoutItem`], runs are not guaranteed to be split by style.
-pub(crate) enum LineItem<'a, B: Brush> {
-    Run(Run<'a, B>),
-    /// An out-of-flow box, by its index into the layout's inline boxes. Note in-flow boxes are
-    /// inline objects, and are part of the runs.
-    OutOfFlowBox(usize),
-}
-
-impl<'a, B: Brush> LineItem<'a, B> {
-    pub(crate) fn run(self) -> Option<Run<'a, B>> {
-        match self {
-            LineItem::Run(run) => Some(run),
-            _ => None,
-        }
-    }
-}
-
 /// The computed result of an item (glyph run or inline box) within a layout
 #[derive(Clone)]
 pub enum PositionedLayoutItem<'a, B: Brush> {
@@ -276,7 +245,6 @@ pub struct PositionedInlineBox {
     /// aligned with the text baseline.
     pub baseline: Option<f32>,
     pub id: u64,
-    pub kind: InlineBoxKind,
 }
 
 /// Sequence of fully positioned glyphs with the same style.
@@ -377,7 +345,6 @@ impl<'a, B: Brush> GlyphRunIter<'a, B> {
             height: inline_box.height,
             baseline: inline_box.baseline,
             id: inline_box.id,
-            kind: inline_box.kind,
         })
     }
 }
@@ -387,15 +354,7 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let run = match self.line.item(self.item_index)? {
-                // Out-of-flow boxes take up no space. In-flow boxes are inline objects, which are
-                // yielded from the runs below.
-                LineItem::OutOfFlowBox(box_index) => {
-                    self.item_index += 1;
-                    return Some(self.positioned_inline_box(box_index, self.offset));
-                }
-                LineItem::Run(run) => run,
-            };
+            let run = self.line.item(self.item_index)?;
 
             let line_slice = run.line_slice();
             let run_cluster_range = line_slice.shaped_clusters_range();
