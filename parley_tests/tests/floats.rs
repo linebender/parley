@@ -6,8 +6,7 @@ use crate::{
     test_name,
     util::{ColorBrush, draw_layout, render_to_pixmap, samples::LOREM_IPSUM},
 };
-use parley::VerticalAlign;
-use parley::{Alignment, AlignmentOptions, InlineBox, InlineBoxKind, Layout, YieldData};
+use parley::{Alignment, AlignmentOptions, FloatedBox, Layout, YieldData};
 use peniko::{Color, kurbo::Rect};
 use taffy::{Clear, FloatContext, FloatDirection};
 
@@ -53,14 +52,9 @@ fn float_simple() {
     let mut builder = env.ranged_builder(text);
 
     for (id, fbox) in floated_boxes.iter().enumerate() {
-        builder.push_inline_box(InlineBox {
+        builder.push_floated_box(FloatedBox {
             id: id as u64,
-            kind: InlineBoxKind::CustomOutOfFlow,
             index: fbox.text_index,
-            width: 0.0,
-            height: 0.0,
-            baseline: None,
-            vertical_align: VerticalAlign::BASELINE,
         });
     }
 
@@ -152,9 +146,9 @@ fn layout_floats(
                 // TODO
                 continue;
             }
-            YieldData::InlineBoxBreak(box_break_data) => {
+            YieldData::FloatedBox(floated_box_data) => {
                 let state = breaker.state_mut();
-                let box_id = box_break_data.inline_box_id as usize;
+                let box_id = floated_box_data.id as usize;
                 let fbox = &mut floated_boxes[box_id];
 
                 let direction = fbox.side;
@@ -179,8 +173,6 @@ fn layout_floats(
                 state.set_line_max_advance(next_slot.width);
                 state.set_line_x(next_slot.x);
                 state.set_line_y((next_slot.y) as f64);
-
-                state.append_inline_box_to_line(box_break_data.advance, 0.0, 0.0);
             }
         }
     }

@@ -6,9 +6,9 @@
 use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
-    Alignment, AlignmentOptions, BreakReason, ContentWidths, FontFamily, FontWeight, InlineBox,
-    InlineBoxKind, Layout, LineHeight, PositionedLayoutItem, StyleProperty, TextStyle,
-    TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
+    Alignment, AlignmentOptions, BreakReason, ContentWidths, FloatedBox, FontFamily, FontWeight,
+    InlineBox, Layout, LineHeight, PositionedLayoutItem, StyleProperty, TextStyle, TextWrapMode,
+    VerticalAlign, WhiteSpaceCollapse,
 };
 use peniko::color::{AlphaColor, Srgb, palette};
 use peniko::kurbo::Size;
@@ -68,7 +68,6 @@ fn placing_inboxes() {
         let mut builder = env.ranged_builder(&text);
         builder.push_inline_box(InlineBox {
             id: 0,
-            kind: InlineBoxKind::InFlow,
             index: position,
             width: 10.0,
             height: 10.0,
@@ -91,7 +90,6 @@ fn only_inboxes_wrap() {
     for (id, (index, _)) in text.match_indices('\u{FFFC}').enumerate() {
         builder.push_inline_box(InlineBox {
             id: id as u64,
-            kind: InlineBoxKind::InFlow,
             index,
             width: 10.0,
             height: 10.0,
@@ -115,7 +113,6 @@ fn full_width_inbox() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
-            kind: InlineBoxKind::InFlow,
             index: 1,
             width: 10.,
             height: 10.0,
@@ -124,7 +121,6 @@ fn full_width_inbox() {
         });
         builder.push_inline_box(InlineBox {
             id: 1,
-            kind: InlineBoxKind::InFlow,
             index: 4,
             width,
             height: 10.0,
@@ -133,7 +129,6 @@ fn full_width_inbox() {
         });
         builder.push_inline_box(InlineBox {
             id: 2,
-            kind: InlineBoxKind::InFlow,
             index: 8,
             width,
             height: 10.0,
@@ -154,7 +149,6 @@ fn inbox_separated_by_whitespace() {
     let mut builder = env.tree_builder();
     builder.push_inline_box(InlineBox {
         id: 0,
-        kind: InlineBoxKind::InFlow,
         index: 0,
         width: 10.,
         height: 10.0,
@@ -164,7 +158,6 @@ fn inbox_separated_by_whitespace() {
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
         id: 1,
-        kind: InlineBoxKind::InFlow,
         index: 1,
         width: 10.0,
         height: 10.0,
@@ -174,7 +167,6 @@ fn inbox_separated_by_whitespace() {
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
         id: 2,
-        kind: InlineBoxKind::InFlow,
         index: 2,
         width: 10.0,
         height: 10.0,
@@ -184,7 +176,6 @@ fn inbox_separated_by_whitespace() {
     builder.push_text(" ");
     builder.push_inline_box(InlineBox {
         id: 3,
-        kind: InlineBoxKind::InFlow,
         index: 3,
         width: 10.0,
         height: 10.0,
@@ -214,7 +205,6 @@ fn inbox_with_baseline() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
-            kind: InlineBoxKind::InFlow,
             index: 5,
             width: 20.0,
             height: 30.0,
@@ -239,7 +229,6 @@ fn inboxes_with_matching_baselines() {
     // A short box and a tall box, both with their baselines 10px from the top.
     builder.push_inline_box(InlineBox {
         id: 0,
-        kind: InlineBoxKind::InFlow,
         index: 1,
         width: 15.0,
         height: 15.0,
@@ -248,7 +237,6 @@ fn inboxes_with_matching_baselines() {
     });
     builder.push_inline_box(InlineBox {
         id: 1,
-        kind: InlineBoxKind::InFlow,
         index: 6,
         width: 15.0,
         height: 40.0,
@@ -278,7 +266,6 @@ fn inboxes_with_large_ascent_and_descent() {
     // baseline.
     builder.push_inline_box(InlineBox {
         id: 0,
-        kind: InlineBoxKind::InFlow,
         index: box_indices.next().unwrap(),
         width: 15.0,
         height: 40.0,
@@ -288,7 +275,6 @@ fn inboxes_with_large_ascent_and_descent() {
     // Large descent: the baseline is near the top of the box, so most of it is below the baseline.
     builder.push_inline_box(InlineBox {
         id: 1,
-        kind: InlineBoxKind::InFlow,
         index: box_indices.next().unwrap(),
         width: 15.0,
         height: 40.0,
@@ -320,7 +306,6 @@ fn inbox_below_baseline_keeps_grid() {
     builder.push_default(StyleProperty::LineHeight(LineHeight::Absolute(60.0)));
     builder.push_inline_box(InlineBox {
         id: 0,
-        kind: InlineBoxKind::InFlow,
         index: 7, // between the B's on the middle line
         width: 20.0,
         height: 15.0,
@@ -467,7 +452,6 @@ fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
         width: 10.,
         height: 10.,
         baseline: None,
-        kind: InlineBoxKind::InFlow,
         vertical_align: VerticalAlign::BASELINE,
     };
 
@@ -568,25 +552,20 @@ fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
     builder.push_text(" c");
     assert_eq!(builder.build().1, "a\nb   c");
 
-    // An out-of-flow box is not content: it neither splits a word nor prevents the whitespace on
+    // A floated box is not content: it neither splits a word nor prevents the whitespace on
     // either side of it from collapsing together.
-    let out_of_flow_box = |width| InlineBox {
-        kind: InlineBoxKind::OutOfFlow,
-        width,
-        height: width,
-        ..inline_box()
-    };
+    let floated_box = FloatedBox { id: 0, index: 0 };
     for split in 0..=7 {
         let mut builder = env.tree_builder();
         builder.push_style_modification_span(&[StyleProperty::WhiteSpaceCollapse(
             WhiteSpaceCollapse::Collapse,
         )]);
         builder.push_text(&"XXXXXXX"[..split]);
-        builder.push_inline_box(out_of_flow_box(100.));
+        builder.push_floated_box(floated_box.clone());
         builder.push_text(&"XXXXXXX"[split..]);
         let (mut layout, text) = builder.build();
         assert_eq!(text, "XXXXXXX");
-        assert_eq!(layout.inline_boxes().next().unwrap().index, split);
+        assert_eq!(layout.floated_boxes().next().unwrap().index, split);
         layout.break_all_lines(Some(1.));
         assert_eq!(layout.len(), 1, "box at {split}");
     }
@@ -596,7 +575,7 @@ fn collapsible_whitespace_crosses_spans_and_inline_boxes() {
             WhiteSpaceCollapse::Collapse,
         )]);
         builder.push_text("a  ");
-        builder.push_inline_box(out_of_flow_box(0.));
+        builder.push_floated_box(floated_box.clone());
         builder.push_text(suffix);
         assert_eq!(builder.build().1, "a b");
     }
@@ -609,31 +588,34 @@ fn inline_box_index() {
     // Boxes of every kind are indexed after the text pushed before them, in the current span or
     // an enclosing one. In-flow boxes take up a U+FFFC OBJECT REPLACEMENT CHARACTER.
     let mut builder = env.tree_builder();
-    for (id, kind) in [
-        InlineBoxKind::InFlow,
-        InlineBoxKind::OutOfFlow,
-        InlineBoxKind::CustomOutOfFlow,
-    ]
-    .into_iter()
-    .enumerate()
-    {
+    for (id, in_flow) in [true, false, false].into_iter().enumerate() {
         builder.push_text("ab");
         builder.push_style_modification_span(None);
         builder.push_text("cd");
-        builder.push_inline_box(InlineBox {
-            id: id as u64,
-            index: 0,
-            width: 10.,
-            height: 10.,
-            baseline: None,
-            kind,
-            vertical_align: VerticalAlign::BASELINE,
-        });
+        if in_flow {
+            builder.push_inline_box(InlineBox {
+                id: id as u64,
+                index: 0,
+                width: 10.,
+                height: 10.,
+                baseline: None,
+                vertical_align: VerticalAlign::BASELINE,
+            });
+        } else {
+            builder.push_floated_box(FloatedBox {
+                id: id as u64,
+                index: 0,
+            });
+        }
         builder.pop_style_span();
     }
     let (layout, text) = builder.build();
     assert_eq!(text, "abcd\u{FFFC}abcdabcd");
-    let boxes: Vec<_> = layout.inline_boxes().map(|b| (b.id, b.index)).collect();
+    let boxes: Vec<_> = layout
+        .inline_boxes()
+        .map(|b| (b.id, b.index))
+        .chain(layout.floated_boxes().map(|b| (b.id, b.index)))
+        .collect();
     assert_eq!(boxes, [(0, 4), (1, 11), (2, 15)]);
 }
 

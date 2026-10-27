@@ -6,7 +6,7 @@
 use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
-    Alignment, AlignmentOptions, ContentWidths, IndentOptions, InlineBox, InlineBoxKind, Layout,
+    Alignment, AlignmentOptions, ContentWidths, FloatedBox, IndentOptions, InlineBox, Layout,
     LineBreak, StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
 };
 
@@ -209,7 +209,6 @@ fn inbox_content_width() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
-            kind: InlineBoxKind::InFlow,
             index: 3,
             width: 100.0,
             height: 10.0,
@@ -232,7 +231,6 @@ fn inbox_content_width() {
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
-            kind: InlineBoxKind::InFlow,
             index: 2,
             width: 10.0,
             height: 10.0,
@@ -269,7 +267,6 @@ fn content_widths_max_floored_by_min() {
     for (id, index, width) in [(0, 0, 100.0), (1, 3, -50.0)] {
         builder.push_inline_box(InlineBox {
             id,
-            kind: InlineBoxKind::InFlow,
             index,
             width,
             height: 10.0,
@@ -498,20 +495,15 @@ fn content_widths_text_indent_inline_box() {
     // The indent applies to an inline box at the start of the first line.
     let text = "\u{FFFC}\nAA";
     let mut builder = env.ranged_builder(text);
-    for (id, kind, index) in [
-        (0, InlineBoxKind::InFlow, 0),
-        (1, InlineBoxKind::OutOfFlow, 3),
-    ] {
-        builder.push_inline_box(InlineBox {
-            id,
-            kind,
-            index,
-            width: 10.0,
-            height: 10.0,
-            baseline: None,
-            vertical_align: VerticalAlign::BASELINE,
-        });
-    }
+    builder.push_inline_box(InlineBox {
+        id: 0,
+        index: 0,
+        width: 10.0,
+        height: 10.0,
+        baseline: None,
+        vertical_align: VerticalAlign::BASELINE,
+    });
+    builder.push_floated_box(FloatedBox { id: 1, index: 3 });
     let mut layout = builder.build(text);
     layout.set_text_indent(indent, IndentOptions::default());
     let widths = layout.calculate_content_widths();
@@ -523,7 +515,7 @@ fn content_widths_text_indent_inline_box() {
     );
 
     // With `each-line hanging`, only lines after the first soft wrap are indented. Here, the forced
-    // break suppresses the in-flow inline box's soft wrap opportunity (ignoring the out-of-flow
+    // break suppresses the in-flow inline box's soft wrap opportunity (ignoring the floated
     // box), and so no line should be indented.
     layout.set_text_indent(
         indent,

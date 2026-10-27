@@ -5,8 +5,7 @@ use crate::{
     test_name,
     util::{ColorBrush, TestEnv},
 };
-use parley::VerticalAlign;
-use parley::{Alignment, AlignmentOptions, InlineBox, InlineBoxKind, Layout, PositionedLayoutItem};
+use parley::{Alignment, AlignmentOptions, FloatedBox, Layout, PositionedLayoutItem};
 
 #[test]
 fn out_of_flow_box_has_no_effect_on_layout() {
@@ -19,17 +18,9 @@ fn out_of_flow_box_has_no_effect_on_layout() {
     let layout_ref = builder_ref.build(text);
     let widths_ref = layout_ref.calculate_content_widths();
 
-    // Treatment layout with a large OutOfFlow box
+    // Treatment layout with a floated box
     let mut builder_oof = env.ranged_builder(text);
-    builder_oof.push_inline_box(InlineBox {
-        id: 42,
-        kind: InlineBoxKind::OutOfFlow,
-        index: 6,
-        width: 9999.0,
-        height: 9999.0,
-        baseline: None,
-        vertical_align: VerticalAlign::BASELINE,
-    });
+    builder_oof.push_floated_box(FloatedBox { id: 42, index: 6 });
     let layout_oof = builder_oof.build(text);
     let widths_oof = layout_oof.calculate_content_widths();
 
@@ -67,16 +58,6 @@ fn out_of_flow_box_has_no_effect_on_layout() {
             .collect()
     };
     assert_eq!(glyph_xs(&layout_ref), glyph_xs(&layout_oof),);
-
-    // The OutOfFlow box should still appear in the positioned items
-    let found_oof = layout_oof.lines().flat_map(|l| l.items()).any(|item| {
-        matches!(
-            item,
-            PositionedLayoutItem::InlineBox(ref ibox)
-                if ibox.id == 42 && ibox.kind == InlineBoxKind::OutOfFlow
-        )
-    });
-    assert!(found_oof);
 }
 
 /// An out-of-flow box is not in-flow content, so it must not introduce a line break
@@ -98,15 +79,7 @@ fn out_of_flow_box_is_not_a_line_break_opportunity() {
     // A box anywhere in the word, including at either edge, leaves the line breaking unchanged.
     for index in [0, 5, text.len()] {
         let mut builder = env.ranged_builder(text);
-        builder.push_inline_box(InlineBox {
-            id: 42,
-            kind: InlineBoxKind::OutOfFlow,
-            index,
-            width: 9999.0,
-            height: 9999.0,
-            baseline: None,
-            vertical_align: VerticalAlign::BASELINE,
-        });
+        builder.push_floated_box(FloatedBox { id: 42, index });
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(20.0));
 

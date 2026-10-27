@@ -6,7 +6,7 @@ use crate::{
     util::{ColorBrush, TestEnv},
 };
 use parley::{
-    Alignment, AlignmentOptions, BaseDirection, BreakReason, InlineBox, InlineBoxKind, Layout,
+    Alignment, AlignmentOptions, BaseDirection, BreakReason, FloatedBox, InlineBox, Layout,
     OverflowWrap, StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse, WordBreak,
 };
 
@@ -345,38 +345,30 @@ fn break_spaces_inline_boxes_and_rtl() {
     let mut env = TestEnv::new(test_name!(), None);
     let width = advance(&mut env, " ");
     for direction in [BaseDirection::Ltr, BaseDirection::Rtl] {
-        for kind in [
-            InlineBoxKind::InFlow,
-            InlineBoxKind::OutOfFlow,
-            InlineBoxKind::CustomOutOfFlow,
-        ] {
-            // An in-flow box replaces a U+FFFC; out-of-flow boxes take up no text.
-            let text = if kind == InlineBoxKind::InFlow {
-                "a \u{FFFC}  b"
-            } else {
-                "a   b"
-            };
+        for inline in [true, false] {
+            // An inline box replaces a U+FFFC; floated boxes take up no text.
+            let text = if inline { "a \u{FFFC}  b" } else { "a   b" };
             let mut builder = env.ranged_builder(text);
             builder.set_base_direction(direction);
             builder.push_default(StyleProperty::WhiteSpaceCollapse(
                 WhiteSpaceCollapse::BreakSpaces,
             ));
-            builder.push_inline_box(InlineBox {
-                id: 0,
-                index: 2,
-                width,
-                height: 10.,
-                baseline: None,
-                vertical_align: VerticalAlign::BASELINE,
-                kind,
-            });
+            if inline {
+                builder.push_inline_box(InlineBox {
+                    id: 0,
+                    index: 2,
+                    width,
+                    height: 10.,
+                    baseline: None,
+                    vertical_align: VerticalAlign::BASELINE,
+                });
+            } else {
+                builder.push_floated_box(FloatedBox { id: 0, index: 2 });
+            }
             let mut layout = builder.build(text);
             layout.break_all_lines(Some(width + 0.1));
             // The lines are "a ", " ", " " and "b", and an in-flow box gets a line of its own.
-            assert_eq!(
-                layout.len(),
-                if kind == InlineBoxKind::InFlow { 5 } else { 4 }
-            );
+            assert_eq!(layout.len(), if inline { 5 } else { 4 });
             for line in layout.lines() {
                 nearly_eq(line.metrics().hanging_advance, 0.);
             }

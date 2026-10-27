@@ -29,11 +29,11 @@ pub use data::BreakReason;
 pub use layout::Layout;
 pub use line::{GlyphRun, Line, LineMetrics, PositionedInlineBox, PositionedLayoutItem};
 pub use line_break::{
-    BoxBreakData, BreakLines, BreakerState, LineBreakData, MaxHeightBreakData, YieldData,
+    BreakLines, BreakerState, FloatedBoxData, LineBreakData, MaxHeightBreakData, YieldData,
 };
 pub use run::Run;
 
-pub(crate) use data::{LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData};
+pub(crate) use data::{LayoutData, LineData, LineItemData};
 pub(crate) use spacing::Spacing;
 
 // TODO - Deprecation not yet active to ease internal code migration.

@@ -20,7 +20,7 @@ use parley::VerticalAlign;
 use parley::fontique::Blob;
 use parley::{
     Alignment, AlignmentOptions, FontContext, FontFamily, FontWeight, GenericFamily, InlineBox,
-    InlineBoxKind, Layout, LayoutContext, LineHeight, StyleProperty,
+    Layout, LayoutContext, LineHeight, StyleProperty,
 };
 use peniko::Color;
 
@@ -209,7 +209,6 @@ pub fn build_rich_layout(
     builder.push(FontFamily::named("Noto Color Emoji"), party_emoji_range);
     builder.push_inline_box(InlineBox {
         id: 0,
-        kind: InlineBoxKind::InFlow,
         index: config.text.find('\u{FFFC}').unwrap(),
         width: 50.0,
         height: 50.0,

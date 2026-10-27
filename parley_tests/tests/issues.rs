@@ -7,7 +7,7 @@ use crate::test_name;
 use crate::util::TestEnv;
 use parley::VerticalAlign;
 use parley::{
-    Alignment, AlignmentOptions, FontFamily, InlineBox, InlineBoxKind, PositionedLayoutItem,
+    Alignment, AlignmentOptions, FloatedBox, FontFamily, InlineBox, PositionedLayoutItem,
     StyleProperty, TextWrapMode,
 };
 
@@ -120,7 +120,7 @@ Third line that ends with newlines\n\n";
 }
 
 /// Test that `break_all_lines` terminates when the layout contains a
-/// `CustomOutOfFlow` inline box.
+/// floated box.
 ///
 /// Regression test for <https://github.com/linebender/parley/issues/752>.
 #[test]
@@ -130,15 +130,7 @@ fn issue_752() {
     let text = "Hello world this is some text";
 
     let mut builder = env.ranged_builder(text);
-    builder.push_inline_box(InlineBox {
-        id: 0,
-        kind: InlineBoxKind::CustomOutOfFlow,
-        index: 5,
-        width: 10.0,
-        height: 10.0,
-        baseline: None,
-        vertical_align: VerticalAlign::BASELINE,
-    });
+    builder.push_floated_box(FloatedBox { id: 0, index: 5 });
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(100.0));
 
@@ -187,7 +179,6 @@ fn inline_boxes_after_newline_max_content_width() {
     for (id, index) in [(0_u64, 1_usize), (1, 5), (2, 9)] {
         builder.push_inline_box(InlineBox {
             id,
-            kind: InlineBoxKind::InFlow,
             index,
             width: 14.0,
             height: 30.0,
@@ -222,7 +213,6 @@ fn no_break_after_inline_box_with_nowrap() {
         builder.push_default(StyleProperty::TextWrapMode(text_wrap_mode));
         builder.push_inline_box(InlineBox {
             id: 0,
-            kind: InlineBoxKind::InFlow,
             index: 1,
             width: 10.0,
             height: 10.0,

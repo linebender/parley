@@ -12,7 +12,7 @@
 use parley::VerticalAlign;
 use parley::{
     Alignment, AlignmentOptions, FontContext, FontWeight, GenericFamily, GlyphRun, InlineBox,
-    InlineBoxKind, Layout, LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty,
+    Layout, LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty,
 };
 use skrifa::{
     GlyphId, MetadataProvider, OutlineGlyph,
@@ -89,7 +89,6 @@ fn main() {
 
     builder.push_inline_box(InlineBox {
         id: 0,
-        kind: InlineBoxKind::InFlow,
         index: 40,
         width: 50.0,
         height: 50.0,

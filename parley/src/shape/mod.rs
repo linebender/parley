@@ -12,12 +12,12 @@ use smallvec::SmallVec;
 use super::layout::Layout;
 use super::resolve::{ResolveContext, ResolvedStyle};
 use super::style::{Brush, FontFeature};
-use crate::inline_box::LayoutInlineBox;
+use crate::FloatedBox;
 use crate::util::{nearly_eq, nearly_zero};
 use crate::{FontContext, FontData, Spacing};
 
 use fontique::{self, Query, QueryFamily, QueryFont};
-use parlance::{BidiLevel, GenericFamily, Tag};
+use parlance::{GenericFamily, Tag};
 
 /// If these font features are passed to the shaper, optional ligatures are not applied.
 ///
@@ -45,7 +45,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     rcx: &'a ResolveContext,
     fcx: &'a mut FontContext,
     styles: &'a [ResolvedStyle<B>],
-    inline_boxes: &[LayoutInlineBox],
+    floated_boxes: &[FloatedBox],
     analysis: &Analysis,
     char_style_indices: &[u16],
     scx: &mut Shaper,
@@ -53,28 +53,20 @@ pub(crate) fn shape_text<'a, B: Brush>(
     layout: &mut Layout<B>,
     style_features: &'a mut Vec<SmallVec<[FontFeature; 8]>>,
 ) {
-    // If we have both empty text and no inline boxes, shape with a fake space
+    // If we have both empty text and no floated boxes, shape with a fake space
     // to generate metrics that can be used to size a cursor.
-    if text.is_empty() && inline_boxes.is_empty() {
+    if text.is_empty() && floated_boxes.is_empty() {
         text = " ";
     }
 
     // Do nothing if there is no text or styles (there should always be a default style)
     if text.is_empty() || styles.is_empty() {
-        // Empty text may still have out-of-flow boxes.
-        for box_idx in 0..inline_boxes.len() {
-            layout.data.push_out_of_flow_box(box_idx, BidiLevel::new(0));
-        }
         return;
     }
 
     let mut fq = fcx.collection.query(&mut fcx.source_cache);
 
-    let mut out_of_flow_box_iter = inline_boxes
-        .iter()
-        .filter(|b| !b.is_inline_object())
-        .map(|b| &b.inline_box)
-        .peekable();
+    let mut floated_box_iter = floated_boxes.iter().peekable();
 
     // Merge font features with letter-spacing ligature suppression.
     //
@@ -98,10 +90,10 @@ pub(crate) fn shape_text<'a, B: Brush>(
     }));
     let style_features = &*style_features;
 
-    // Split when shaping-relevant style properties change and at out-of-flow boxes.
+    // Split when shaping-relevant style properties change and at floated boxes.
     let items = {
         // TODO: we currently walk characters here, but we could instead just walk boundaries of
-        // styles and inline boxes.
+        // styles and floated boxes.
         let char_count = char_style_indices.len();
 
         // The first character of the item currently being built.
@@ -127,17 +119,17 @@ pub(crate) fn shape_text<'a, B: Brush>(
                     break char_count;
                 };
 
-                // Split at inlines boxes, so each box falls on a shaping boundary.
+                // Split at floated boxes, so each box falls on a shaping boundary.
                 //
                 // We loop because there may be multiple boxes at this index.
                 let mut split = false;
-                while let Some(inline_box) = out_of_flow_box_iter.peek() {
-                    if inline_box.index < byte_index {
-                        // Inline boxes *before* this index are popped (this occurs if the itemizer
+                while let Some(floated_box) = floated_box_iter.peek() {
+                    if floated_box.index < byte_index {
+                        // Floated boxes *before* this index are popped (this occurs if the itemizer
                         // split a run and we were not called, such as at a bidi boundary).
-                        out_of_flow_box_iter.next();
-                    } else if inline_box.index == byte_index {
-                        out_of_flow_box_iter.next();
+                        floated_box_iter.next();
+                    } else if floated_box.index == byte_index {
+                        floated_box_iter.next();
                         split = true;
                     } else {
                         break;
@@ -191,37 +183,10 @@ pub(crate) fn shape_text<'a, B: Brush>(
         &mut layout.data.shaped_text,
     );
 
-    // Out-of-flow boxes are laid out as items of their own.
-    let mut out_of_flow_box_iter = inline_boxes
-        .iter()
-        .enumerate()
-        .filter(|(_, b)| !b.is_inline_object())
-        .map(|(box_idx, b)| (box_idx, &b.inline_box))
-        .peekable();
     for shaped_run_idx in 0..layout.data.shaped_text.runs().len() {
         let shaped_run = &layout.data.shaped_text.runs()[shaped_run_idx];
-        let run_text_byte_start = shaped_run.range.byte_range.start;
         let run_style_index = char_style_indices[shaped_run.range.char_range.start];
         let run_style = &styles[usize::from(run_style_index)];
-
-        // Push out-of-flow boxes positioned before the start of this item.
-        //
-        // TODO: this gives the box the bidi level of the previous run. At direction boundaries it
-        // puts the box on the wrong side, e.g. at the start of an RTL paragraph, or at the end of
-        // an LTR one that ends in RTL text.
-        let prev_bidi_level = if shaped_run_idx > 0 {
-            layout.data.shaped_text.runs()[&shaped_run_idx - 1].bidi_level
-        } else {
-            BidiLevel::new(0)
-        };
-        while let Some((box_idx, inline_box)) = out_of_flow_box_iter.peek() {
-            if inline_box.index <= run_text_byte_start {
-                layout.data.push_out_of_flow_box(*box_idx, prev_bidi_level);
-                out_of_flow_box_iter.next();
-            } else {
-                break;
-            }
-        }
 
         layout.data.process_shaped_run(
             shaped_run_idx,
@@ -234,21 +199,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
             Spacing::new(run_style.word_spacing, run_style.letter_spacing),
             char_style_indices,
         );
-    }
-
-    // Process any remaining inline boxes whose index is greater than the length of the text
-    //
-    // Give the box the same bidi level as the last text run (or else default to 0 if there is no
-    // text run).
-    let bidi_level = layout
-        .data
-        .shaped_text
-        .runs()
-        .last()
-        .map(|r| r.bidi_level)
-        .unwrap_or(BidiLevel::new(0));
-    for (box_idx, _inline_box) in out_of_flow_box_iter {
-        layout.data.push_out_of_flow_box(box_idx, bidi_level);
     }
 }
 

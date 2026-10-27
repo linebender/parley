@@ -76,10 +76,13 @@ pub(crate) fn assert_eq_layout_data<B: Brush>(a: &LayoutData<B>, b: &LayoutData<
         a.inline_boxes, b.inline_boxes,
         "{case} inline_boxes mismatch"
     );
+    assert_eq!(
+        a.floated_boxes, b.floated_boxes,
+        "{case} floated_boxes mismatch"
+    );
 
     // Output of shaping
     assert_eq!(a.runs, b.runs, "{case} runs mismatch");
-    assert_eq!(a.items, b.items, "{case} items mismatch");
     assert_eq!(
         a.shaped_text.characters(),
         b.shaped_text.characters(),
