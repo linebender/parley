@@ -93,7 +93,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
     }
 
     /// Appends a U+FFFC OBJECT REPLACEMENT CHARACTER representing an
-    /// [`crate::InlineBoxKind::InFlow`] to the current span.
+    /// [`crate::InlineBox`] to the current span.
     ///
     /// Returns the new character's byte offset.
     pub(crate) fn push_inline_object(&mut self) -> usize {

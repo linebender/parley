@@ -1,9 +1,7 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use parley::{
-    Affinity, BaseDirection, Cursor, InlineBox, InlineBoxKind, Layout, Selection, VerticalAlign,
-};
+use parley::{Affinity, BaseDirection, Cursor, InlineBox, Layout, Selection, VerticalAlign};
 
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
@@ -11,7 +9,6 @@ use crate::util::{ColorBrush, TestEnv};
 fn inline_box(index: usize) -> InlineBox {
     InlineBox {
         id: 0,
-        kind: InlineBoxKind::InFlow,
         index,
         width: 20.,
         height: 10.,

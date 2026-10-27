@@ -6,7 +6,7 @@
 use crate::test_name;
 use crate::util::TestEnv;
 use parley::style::StyleProperty;
-use parley::{InlineBox, InlineBoxKind, VerticalAlign};
+use parley::{InlineBox, VerticalAlign};
 
 /// Every keyword, applied to a span in the middle of a line of text.
 #[test]
@@ -105,7 +105,6 @@ fn vertical_align_inline_boxes() {
         builder.push_text("Hx");
         builder.push_inline_box(InlineBox {
             id: 0,
-            kind: InlineBoxKind::InFlow,
             index: 0,
             width: 12.,
             height: 12.,
