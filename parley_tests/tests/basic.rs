@@ -839,7 +839,7 @@ fn overflow_alignment_rtl() {
     let text = "عند برمجة أجهزة\u{A0}الكمبيوتر، قد تجد نفسك فجأة في مواقف غريبة، مثل الكتابة بلغة لا تتحدثها فعليًا.";
     for (alignment, align_when_overflowing, test_case_name) in [
         (Alignment::Center, false, "center"),
-        (Alignment::Justify, true, "justify_awo"),
+        (Alignment::Justify, true, "justify_align_when_overflowing"),
     ] {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
@@ -1151,7 +1151,7 @@ fn realign_all() {
                 ..AlignmentOptions::default()
             },
             "none",
-            "awo_true",
+            "align_when_overflowing_true",
         ),
         (
             None,
@@ -1160,7 +1160,7 @@ fn realign_all() {
                 ..AlignmentOptions::default()
             },
             "none",
-            "awo_false",
+            "align_when_overflowing_false",
         ),
     ];
 
