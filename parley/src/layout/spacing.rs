@@ -189,11 +189,11 @@ impl EffectiveSpacing {
     /// The gaps around `atom`.
     #[inline(always)]
     pub(crate) fn gaps(self, atom: &Atom<'_>) -> Gaps {
-        let first_character = atom.characters()[0];
-        let whitespace = first_character.whitespace;
+        let first_cluster = atom.shaped_clusters()[0];
+        let whitespace = first_cluster.whitespace();
         let mut gaps = self
             .spacing
-            .gaps(whitespace, first_character.flags.is_default_ignorable());
+            .gaps(whitespace, first_cluster.is_default_ignorable());
 
         if is_word_separator(whitespace)
             && atom.shaped_clusters_range().end <= self.justification.justification_end_cluster

@@ -1172,16 +1172,16 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                     // Iterate over the remaining atoms in the Run
                     for atom in slice.atoms_from(self.state.cluster_idx) {
-                        // Retrieve metadata about the atom
-                        let first_character = &atom.characters()[0];
-                        let whitespace = first_character.whitespace;
+                        // Retrieve metadata about the atom.
+                        let first_cluster = atom.shaped_clusters()[0];
+                        let whitespace = first_cluster.whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
                         // Whether this atom is a justification opportunity.
                         let is_separator = is_word_separator(whitespace);
                         let is_soft_wrap_opportunity =
-                            first_character.flags.is_soft_wrap_opportunity();
+                            first_cluster.is_soft_wrap_opportunity_before();
                         let max_height_exceeded = self.state.line.max_height_exceeded;
-                        let style_index = first_character.style_index;
+                        let style_index = first_cluster.style_index;
                         let style = &self.layout.data.styles[style_index as usize];
 
                         // Lag text_wrap_mode style by one atom
@@ -1383,8 +1383,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             return Some(());
                         }
 
-                        let first_character = &atom.characters()[0];
-                        let whitespace = first_character.whitespace;
+                        let first_cluster = atom.shaped_clusters()[0];
+                        let whitespace = first_cluster.whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
                         let is_separator = is_word_separator(whitespace);
                         let advance = spacing.atom_advance(&atom);
@@ -1399,7 +1399,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         self.state.append_atom_to_line(
                             &atom,
                             next_x,
-                            first_character.style_index,
+                            first_cluster.style_index,
                             &self.layout.data,
                             is_separator,
                         );
@@ -1930,7 +1930,7 @@ fn hanging_whitespace<B: Brush>(
                         effective_spacing,
                         line_item.is_rtl(),
                     );
-                    let whitespace = atom.characters()[0].whitespace;
+                    let whitespace = atom.shaped_clusters()[0].whitespace();
                     if in_conditional_suffix && whitespace != Whitespace::Newline {
                         // The atom hangs from its logical end, so use the last cluster's style to
                         // decide whether it hangs conditionally.
