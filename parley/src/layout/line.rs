@@ -405,10 +405,9 @@ impl<'a> AtomIter<'a> {
 
     /// The number of glyphs in `atom` and its advance including spacing gaps.
     ///
-    /// For an atom with glyphs, this matches what [`Run::glyphs_in`] yields for the atom's
-    /// clusters. An atom without glyphs can still have an advance (a tab's advance to its stop is
-    /// a gap, see [`EffectiveSpacing::gaps`]), which the line breaker includes in the line's
-    /// advance and so must be counted here too.
+    /// A tab has no glyphs but does have an advance (its gap), which [`Run::glyphs_in`] can't
+    /// yield as there is no glyph to attach it to; the glyph run iterator moves the next glyph run
+    /// along by it instead.
     #[inline]
     fn measure(&self, atom: &Atom<'a>) -> (usize, f32) {
         let glyph_count: usize = atom

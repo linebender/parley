@@ -1,18 +1,11 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Tab stops, following [CSS `tab-size`][tab-size].
-//!
-//! A tab shapes to no glyphs and no advance (see [`Whitespace::Tab`]). Its advance is the
-//! distance to the next tab stop from where it lands, which depends on the line breaking, so the
-//! line breaker computes it with [`tab_advance`] as it places the tab, and records it for the line
-//! (see [`TabAdvance`]). Everything that reads the line back adds it to the tab's shaped advance
-//! through [`EffectiveSpacing`], like justification.
+//! Tab stops, following [CSS `tab-size`][tab-size]. See [`TabAdvance`] for how a tab's advance
+//! flows through layout.
 //!
 //! [tab-size]: https://www.w3.org/TR/css-text-4/#tab-size-property
-//! [`Whitespace::Tab`]: parley_engine::shape::Whitespace::Tab
 //! [`TabAdvance`]: crate::layout::data::TabAdvance
-//! [`EffectiveSpacing`]: crate::layout::spacing::EffectiveSpacing
 
 /// The advance of a tab that starts `x` past the line's start edge, with tab stops every
 /// `tab_size`.

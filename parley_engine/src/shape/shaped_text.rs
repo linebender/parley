@@ -533,10 +533,6 @@ fn process_shaped_clusters<'a>(
         shaped_clusters: &mut Vec<ShapedCluster>,
     ) {
         let first_character = &characters[cluster.characters_start];
-        // Newlines and tabs render as no glyphs: a newline ends the line, and a tab's advance is
-        // the distance to the next tab stop, which depends on where the tab lands on a line, so a
-        // layout engine computes it when placing the tab (see `Whitespace::Tab`).
-        //
         // A tab is always its own grapheme (UAX #29 breaks before and after a control character),
         // and so is a newline apart from CRLF, which the analysis splits into two clusters anyway.
         // Shaping can still merge a character it draws nothing for into such a cluster, which
@@ -857,35 +853,24 @@ mod tests {
     }
 
     #[test]
-    fn newlines_removed() {
-        for newline in ["\n", "\r", "\u{2028}", "\u{2029}"] {
-            let shaped = shape_with_font(&alloc::format!("a{newline}b"), ROBOTO);
-
-            let index = shaped
-                .shaped_clusters
-                .iter()
-                .position(|cluster| cluster.chars_range().start == 1)
-                .unwrap();
-            let newline_cluster = &shaped.shaped_clusters[index];
-            assert_eq!(newline_cluster.glyph_len(), 0, "newline glyphs are removed");
-            assert_eq!(newline_cluster.advance, 0., "newline advance is set to 0");
-        }
-    }
-
-    /// Tabs shape to no glyphs and no advance, like newlines. The distance to the next tab stop
-    /// depends on where the tab lands on a line, so a layout engine adds it when placing the tab.
-    #[test]
-    fn tabs_shape_to_no_glyphs_and_zero_advance() {
+    fn newlines_and_tabs_removed() {
         for font in [ROBOTO, NOTO_COLOR_EMOJI] {
-            let shaped = shape_with_font("a\tb", font);
-            let tab_cluster = shaped
-                .shaped_clusters()
-                .iter()
-                .find(|cluster| cluster.chars_range().start == 1)
-                .unwrap();
-            assert_eq!(tab_cluster.whitespace(), Whitespace::Tab);
-            assert_eq!(tab_cluster.glyph_len(), 0, "tab glyphs are removed");
-            assert_eq!(tab_cluster.advance, 0., "tab advance is set to 0");
+            for control in ["\n", "\r", "\u{2028}", "\u{2029}", "\t"] {
+                let shaped = shape_with_font(&alloc::format!("a{control}b"), font);
+                let cluster = shaped
+                    .shaped_clusters
+                    .iter()
+                    .find(|cluster| cluster.chars_range().start == 1)
+                    .unwrap();
+                let expected = if control == "\t" {
+                    Whitespace::Tab
+                } else {
+                    Whitespace::Newline
+                };
+                assert_eq!(cluster.whitespace(), expected);
+                assert_eq!(cluster.glyph_len(), 0, "{control:?} glyphs are removed");
+                assert_eq!(cluster.advance, 0., "{control:?} advance is set to 0");
+            }
         }
     }
 

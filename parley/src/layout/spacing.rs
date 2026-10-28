@@ -229,7 +229,7 @@ impl<'a> EffectiveSpacing<'a> {
             .gaps(whitespace, first_character.flags.is_default_ignorable());
 
         if whitespace == Whitespace::Tab {
-            // A tab shapes to no advance; its advance to its tab stop is recorded per line.
+            // A tab's advance depends on its horizontal position, calculated in line breaking.
             gaps.after += self.tab_advance(atom.shaped_clusters_range().start);
         } else if is_word_separator(whitespace)
             && atom.shaped_clusters_range().end <= self.justification.justification_end_cluster

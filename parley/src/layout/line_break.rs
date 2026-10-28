@@ -1271,11 +1271,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         // Breaking an atom requires reshaping, which we don't do here, so it is
                         // consumed as a whole (this includes all clusters of a ligature).
-                        //
-                        // A tab shapes to no advance: its advance is the distance to the next tab
-                        // stop from where it lands, measured from the line's start edge (so
-                        // including the indent). It is computed here, as it depends on the line
-                        // breaking, and recorded for the line once the tab is appended.
                         let advance = if is_tab {
                             tab_advance(
                                 self.state.line.x + line_indent,
@@ -2021,7 +2016,6 @@ fn hanging_whitespace<B: Brush>(
                     break;
                 }
 
-                // The line's tab advances hang along with their tabs.
                 let effective_spacing = EffectiveSpacing::new(
                     layout.data.runs[line_item.index].spacing,
                     Justification::NONE,

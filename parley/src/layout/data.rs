@@ -104,11 +104,12 @@ pub(crate) struct LineData {
 
 /// The advance of a tab on a line, computed by the line breaker when it placed the tab.
 ///
-/// A tab's advance is the distance from where it lands to the next tab stop (see
-/// [`tab_advance`]), so it depends on the line breaking. It is
-/// stored here rather than in the shaped text, whose advances are independent of layout, and is
-/// added to the tab's (zero) shaped advance on read, like justification; see
-/// [`EffectiveSpacing`](crate::layout::spacing::EffectiveSpacing).
+/// A tab shapes to no glyphs and no advance (see [`Whitespace::Tab`]). Its advance is the
+/// distance from where it lands to the next tab stop (see [`tab_advance`]), so it depends on the
+/// line breaking: the line breaker computes it as it places the tab and records it here, per
+/// line, rather than in the shaped text, whose advances are independent of layout. Everything
+/// that reads the line back adds it to the tab's shaped advance through
+/// [`EffectiveSpacing`](crate::layout::spacing::EffectiveSpacing), like justification.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct TabAdvance {
     /// The tab's shaped cluster, as an index into [`ShapedText::shaped_clusters`].
@@ -602,11 +603,6 @@ impl ContentWidthsMeasurer {
     /// With `SPACED`, each atom's spacing gap is added to the cluster on its visual end, i.e., its
     /// logically last cluster for LTR and its logically first cluster for RTL. The gap then hangs
     /// with that cluster, as in `atom_hanging_advance`. Without `SPACED`, `spacing` is ignored.
-    ///
-    /// A tab's advance depends on where it lands (see [`tab_advance`]), so it is computed from the
-    /// running width of each constraint, as the line breaker computes it from the line's running
-    /// advance; the tab's shaped advance is zero. The tab's advance under the two constraints
-    /// differs, so the hanging whitespace is tracked per constraint as well.
     #[inline(always)]
     fn measure_text_run<B: Brush, const SPACED: bool>(
         &mut self,
