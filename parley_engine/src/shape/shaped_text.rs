@@ -536,6 +536,11 @@ fn process_shaped_clusters<'a>(
         // Newlines and tabs render as no glyphs: a newline ends the line, and a tab's advance is
         // the distance to the next tab stop, which depends on where the tab lands on a line, so a
         // layout engine computes it when placing the tab (see `Whitespace::Tab`).
+        //
+        // A tab is always its own grapheme (UAX #29 breaks before and after a control character),
+        // and so is a newline apart from CRLF, which the analysis splits into two clusters anyway.
+        // Shaping can still merge a character it draws nothing for into such a cluster, which
+        // keeps the cluster glyphless; see `marks_and_joiners_after_a_tab_leave_it_glyphless`.
         let is_glyphless_control = matches!(
             first_character.whitespace,
             Whitespace::Newline | Whitespace::Tab
@@ -881,6 +886,57 @@ mod tests {
             assert_eq!(tab_cluster.whitespace(), Whitespace::Tab);
             assert_eq!(tab_cluster.glyph_len(), 0, "tab glyphs are removed");
             assert_eq!(tab_cluster.advance, 0., "tab advance is set to 0");
+        }
+    }
+
+    /// A tab is always its own grapheme, as UAX #29 breaks before and after a control character,
+    /// so a combining mark after a tab never attaches to it; so is a newline, apart from CRLF,
+    /// which is one grapheme of two clusters. Grapheme boundaries don't bound shaping clusters,
+    /// though: `HarfRust` merges a default-ignorable character that it removes (rather than
+    /// replacing it with the font's invisible glyph, which the Noto Color Emoji subset lacks) into
+    /// the cluster before it, which can be a tab or a newline. Such a cluster still has no glyphs
+    /// and no advance, so it is handled like a bare tab or newline.
+    #[test]
+    fn marks_and_joiners_after_a_tab_leave_it_glyphless() {
+        for font in [ROBOTO, NOTO_COLOR_EMOJI] {
+            for control in ["\t", "\n", "\r\n"] {
+                for follower in ["\u{301}", "\u{200D}"] {
+                    let text = alloc::format!("a{control}{follower}b");
+                    let shaped = shape_with_font(&text, font);
+                    let after = u32::try_from(1 + control.chars().count()).unwrap();
+                    // The character after the control starts a grapheme of its own.
+                    assert!(shaped.characters[after as usize].grapheme_start, "{text:?}");
+                    // Each character of the control starts a cluster of its own (CR and LF each
+                    // do), and none of them has glyphs or an advance.
+                    let controls: Vec<_> = shaped
+                        .shaped_clusters
+                        .iter()
+                        .filter(|cluster| (1..after).contains(&cluster.chars_range().start))
+                        .collect();
+                    assert_eq!(controls.len(), (after - 1) as usize, "{text:?}");
+                    assert_eq!(controls[0].chars_range().start, 1, "{text:?}");
+                    for cluster in controls {
+                        assert_eq!(cluster.glyph_len(), 0, "{text:?}");
+                        assert_eq!(cluster.advance, 0., "{text:?}");
+                    }
+                    // A combining mark is never merged into a control's cluster. A removed joiner
+                    // may be; either way "b" starts the next cluster with glyphs.
+                    if follower == "\u{301}" {
+                        let last_control = shaped
+                            .shaped_clusters
+                            .iter()
+                            .find(|cluster| cluster.chars_range().start == after - 1)
+                            .unwrap();
+                        assert_eq!(last_control.chars_range().end, after, "{text:?}");
+                    }
+                    let b = shaped
+                        .shaped_clusters
+                        .iter()
+                        .find(|cluster| cluster.chars_range().start == after + 1)
+                        .unwrap();
+                    assert_eq!(b.glyph_len(), 1, "{text:?}");
+                }
+            }
         }
     }
 

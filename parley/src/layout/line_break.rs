@@ -811,6 +811,9 @@ impl BreakerState {
     /// Record the advance of a tab atom about to be [appended](Self::append_atom_to_line) to the
     /// line, which [`EffectiveSpacing`] adds to the tab's (zero) shaped advance when the line is
     /// read back. `tab_advances` is [`LineLayout::tab_advances`].
+    ///
+    /// A tab without an advance (e.g. under a zero tab size) gets no entry: a tab the line has no
+    /// entry for reads as zero.
     fn push_tab_advance(
         &mut self,
         tab_advances: &mut Vec<TabAdvance>,
@@ -818,9 +821,11 @@ impl BreakerState {
         advance: f32,
     ) {
         debug_assert_eq!(tab_advances.len(), self.tab_advances);
-        let clusters = atom.shaped_clusters_range();
+        if advance == 0. {
+            return;
+        }
         tab_advances.push(TabAdvance {
-            cluster: clusters.start,
+            cluster: atom.shaped_clusters_range().start,
             advance,
         });
         self.tab_advances = tab_advances.len();

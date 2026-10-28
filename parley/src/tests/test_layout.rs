@@ -124,6 +124,19 @@ fn tab_advances_dropped_when_reverting_a_line() {
 }
 
 #[test]
+fn tabs_without_an_advance_get_no_entry() {
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+    let text = "a\tb\tc";
+    let mut builder = lcx.ranged_builder(&mut fcx, text, 1., false);
+    builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    assert!(layout.data.tab_advances.is_empty());
+    assert!(layout.data.lines[0].tab_advances.is_empty());
+}
+
+#[test]
 fn tab_size_scales_like_other_lengths() {
     let mut fcx = create_font_context();
     let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
