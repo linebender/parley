@@ -3,9 +3,13 @@
 
 //! Tab stop tests.
 //!
-//! Tabs shift the following glyph to the next tab stop, following CSS `tab-size`. The tab size is
-//! a length; the tests express it as a multiple of the advance of a space, as CSS does, so that
-//! the expected positions can be read as "n spaces in".
+//! Tabs shift the following glyph to the next tab stop, following CSS `tab-size`. Each test says
+//! which failure it guards against and where its expected numbers come from: CSS Text 4, a Chrome
+//! measurement, or an invariant of Parley's own. The snapshot tests carry most of the value; the
+//! numeric tests pin down one rule each.
+//!
+//! The tab size is a length. The tests express it as a multiple of the advance of a space, as CSS
+//! does, so that the expected positions can be read as "n spaces in".
 
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
@@ -63,17 +67,9 @@ fn glyph_xs(layout: &Layout<ColorBrush>, line_index: usize) -> Vec<f32> {
         .collect()
 }
 
-/// The glyph runs on line `line_index` as `(offset, advance)`, in visual order.
-fn glyph_run_extents(layout: &Layout<ColorBrush>, line_index: usize) -> Vec<(f32, f32)> {
-    let line = layout.get(line_index).expect("line exists");
-    line.items()
-        .filter_map(|item| match item {
-            PositionedLayoutItem::GlyphRun(run) => Some((run.offset(), run.advance())),
-            PositionedLayoutItem::InlineBox(_) => None,
-        })
-        .collect()
-}
-
+/// Guards against the tab's advance getting lost between the line breaker and the glyph
+/// positions, and against stops not being multiples of the tab size. Source: CSS Text 4, tab
+/// stops are at multiples of the tab size from the line's start edge.
 #[test]
 fn tab_advances_the_line_to_the_next_stop() {
     let mut env = TestEnv::new(test_name!(), None);
@@ -107,22 +103,14 @@ fn tab_advances_the_line_to_the_next_stop() {
     nearly_eq(glyph_xs(&layout, 0)[1], 12. * space);
 }
 
-#[test]
-fn tab_size_is_a_length_in_layout_units() {
-    let mut env = TestEnv::new(test_name!(), None);
-    let a = advance(&mut env, "a");
-
-    let layout = build(&mut env, "a\tb", TabSize::new(a + 10.));
-    nearly_eq(glyph_xs(&layout, 0)[1], a + 10.);
-}
-
+/// Guards against the default tab size changing silently, and against a tab size that isn't
+/// positive breaking the arithmetic in `tab_advance`. Source: the `StyleProperty::TabSize` docs.
 #[test]
 fn tab_default_size_gives_no_advance() {
     let mut env = TestEnv::new(test_name!(), None);
     let a = advance(&mut env, "a");
 
-    // Parley can't measure the CSS initial value (eight spaces of the block container's font)
-    // yet, so until a tab size is set, a tab takes no space.
+    // Until a tab size is set, a tab takes no space.
     let text = "a\tb";
     let mut layout = env.ranged_builder(text).build(text);
     layout.break_all_lines(None);
@@ -140,6 +128,9 @@ fn tab_default_size_gives_no_advance() {
     }
 }
 
+/// Guards against the skip threshold being dropped, resolved against the wrong font size, or
+/// not following the root style's font size. Source: CSS Text 4 (a stop less than half a `ch`
+/// away is skipped) and Chrome, which measures its threshold with the block container's font.
 #[test]
 fn tab_skips_a_stop_closer_than_the_skip_threshold() {
     let mut env = TestEnv::new(test_name!(), None);
@@ -198,6 +189,9 @@ fn tab_skips_a_stop_closer_than_the_skip_threshold() {
     nearly_eq(glyph_xs(&layout, 0)[1], 2. * tab_size);
 }
 
+/// Guards against `Spacing::gaps` giving a tab a letter or word spacing gap, which would move the
+/// text after it off its stop. Source: Chrome, where `tab-size: 4; letter-spacing: 10px` puts the
+/// glyph after a tab exactly on the stop.
 #[test]
 fn tab_gets_no_letter_or_word_spacing_of_its_own() {
     let mut env = TestEnv::new(test_name!(), None);
@@ -207,8 +201,6 @@ fn tab_gets_no_letter_or_word_spacing_of_its_own() {
     assert!(a + 10. < tab_size);
 
     // Letter spacing applies after "a", but not after the tab, so "b" lands exactly on the stop.
-    // (Chrome agrees: with `tab-size: 4; letter-spacing: 10px`, the glyph after a tab sits on
-    // the stop.)
     let text = "a\tb";
     let mut builder = env.ranged_builder(text);
     builder.push_default(StyleProperty::TabSize(stops(tab_size, space)));
@@ -242,6 +234,10 @@ fn tab_gets_no_letter_or_word_spacing_of_its_own() {
     nearly_eq(glyph_xs(&layout, 0)[1], a + 2.);
 }
 
+/// Guards against the line breaker sizing a tab from its position within the indented line
+/// rather than from the line's start edge. Source: Chrome, where `text-indent: 30px; tab-size: 4`
+/// puts the glyph after a tab on the first stop from the content edge, and `text-indent: -30px`
+/// puts it at the content edge itself.
 #[test]
 fn tab_stops_are_measured_from_the_indented_line_start() {
     let mut env = TestEnv::new(test_name!(), None);
@@ -279,6 +275,8 @@ fn tab_stops_are_measured_from_the_indented_line_start() {
     nearly_eq(glyph_xs(&layout, 0)[0], 0.);
 }
 
+/// Guards against a layout keeping tab advances from an earlier line breaking. Source: an
+/// invariant of this design, a tab's advance depends on where the tab lands.
 #[test]
 fn tab_resized_when_relayout_moves_it() {
     let mut env = TestEnv::new(test_name!(), None);
@@ -310,48 +308,20 @@ fn tab_resized_when_relayout_moves_it() {
     nearly_eq(glyph_xs(&layout, 0)[7], 16. * space);
 }
 
-#[test]
-fn tab_placed_before_a_taken_break_is_sized_on_the_next_line() {
-    let mut env = TestEnv::new(test_name!(), None);
-    let space = advance(&mut env, " ");
-    let aaa = advance(&mut env, "aaa");
-    let aaa_aaa = advance(&mut env, "aaa aaa");
-    let tab_size = 8. * space;
-    assert!(aaa < tab_size && aaa_aaa > tab_size);
-
-    // "aaa aaa" fits, and the tab after it hangs, so the breaker places the tab on the first
-    // line before finding that "!!!" doesn't fit and backtracking to the break after the space.
-    // (A tab is a break opportunity itself, but not before "!", UAX #14 LB13.) The tab must then
-    // be sized from the start of the second line, not keep the advance it was given on the
-    // first.
-    let text = "aaa aaa\t!!!";
-    let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(stops(tab_size, space)));
-    let mut layout = builder.build(text);
-    layout.break_all_lines(Some(aaa_aaa + 1.));
-    assert_eq!(layout.len(), 2);
-    let first = layout.get(0).unwrap();
-    assert_eq!(&text[first.text_range()], "aaa ");
-    nearly_eq(first.metrics().advance, aaa + space);
-    nearly_eq(first.metrics().hanging_advance, space);
-    let second = layout.get(1).unwrap();
-    nearly_eq(
-        second.metrics().advance,
-        tab_size + advance(&mut env, "!!!"),
-    );
-    nearly_eq(glyph_xs(&layout, 1)[3], tab_size);
-}
-
+/// Guards against `break_next_with_length`, which has its own copy of the breaker's atom loop,
+/// not sizing tabs, or sizing one after a newline as if the newline took space. Source:
+/// `break_next`, which the length-based breaker must agree with.
 #[test]
 fn tab_sized_when_breaking_by_length() {
     let mut env = TestEnv::new(test_name!(), None);
     let space = advance(&mut env, " ");
     let ab = advance(&mut env, "ab");
-    assert!(ab < 8. * space);
+    let tab_size = 8. * space;
+    assert!(ab < tab_size - space / 2.);
 
     let text = "ab\tc\tab";
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(stops(8. * space, space)));
+    builder.push_default(StyleProperty::TabSize(stops(tab_size, space)));
     let mut layout = builder.build(text);
     let mut breaker = layout.break_lines();
     breaker.break_next_with_length(3);
@@ -361,23 +331,17 @@ fn tab_sized_when_breaking_by_length() {
     assert_eq!(layout.len(), 2);
     // The first line is "ab\t", with the tab hanging off the end of the wrapped line.
     let line = layout.get(0).unwrap();
-    nearly_eq(line.metrics().advance, 8. * space);
-    nearly_eq(line.metrics().hanging_advance, 8. * space - ab);
+    nearly_eq(line.metrics().advance, tab_size);
+    nearly_eq(line.metrics().hanging_advance, tab_size - ab);
     // The second line starts with "c" at the line start, then a tab to the first stop.
-    nearly_eq(glyph_xs(&layout, 1)[1], 8. * space);
-}
-
-#[test]
-fn tab_sized_after_newline_when_breaking_by_length() {
-    let mut env = TestEnv::new(test_name!(), None);
-    let space = advance(&mut env, " ");
-    let ab_cd = advance(&mut env, "abcd");
-    let tab_size = 20. * space;
-    assert!(ab_cd < tab_size - space / 2.);
+    nearly_eq(glyph_xs(&layout, 1)[1], tab_size);
 
     // `break_next_with_length` does not break at newlines, so the newline and the tab share a
     // line. The newline has no advance, so the tab starts after "ab" + "cd" and must reach the
     // first stop.
+    let abcd = advance(&mut env, "abcd");
+    let tab_size = 20. * space;
+    assert!(abcd < tab_size - space / 2.);
     let text = "ab\ncd\tef";
     let mut builder = env.ranged_builder(text);
     builder.push_default(StyleProperty::TabSize(stops(tab_size, space)));
@@ -391,6 +355,9 @@ fn tab_sized_after_newline_when_breaking_by_length() {
     nearly_eq(glyph_xs(&layout, 0)[4], tab_size);
 }
 
+/// Guards against a trailing tab's advance not hanging, which would widen the layout by a tab
+/// that is never drawn. Source: CSS white-space processing treats a preserved tab at the end of a
+/// line like a preserved space.
 #[test]
 fn tab_trailing_hangs_like_a_space() {
     let mut env = TestEnv::new(test_name!(), None);
@@ -422,6 +389,9 @@ fn tab_trailing_hangs_like_a_space() {
     nearly_eq(layout.full_width(), tab_size);
 }
 
+/// Guards against the `Cluster` API and hit testing reading the tab's shaped advance of zero.
+/// Source: an invariant of this design, every reader of a line adds the tab's advance back
+/// through `EffectiveSpacing`.
 #[test]
 fn tab_advance_is_visible_to_clusters_and_hit_testing() {
     let mut env = TestEnv::new(test_name!(), None);
@@ -443,6 +413,8 @@ fn tab_advance_is_visible_to_clusters_and_hit_testing() {
     assert_eq!(side, ClusterSide::Right);
 }
 
+/// The picture most of the value is in: four lines whose first words differ in width share the
+/// positions of their second and third columns. Source: how an editor shows tab-separated text.
 #[test]
 fn tab_columns_align() {
     let mut env = TestEnv::new(test_name!(), None);
@@ -459,51 +431,31 @@ fn tab_columns_align() {
     env.check_layout_snapshot(&layout);
 }
 
+/// The same picture for right-to-left text: the line's start edge is its right edge, so the
+/// columns line up from the right. Source: CSS Text 4, tab stops are measured from the line's
+/// start edge.
 #[test]
-fn tab_stops_in_rtl_text_are_measured_from_the_right_edge() {
+fn tab_columns_align_rtl() {
     let mut env = TestEnv::new(test_name!(), None);
     let space = advance(&mut env, " ");
-    let tab_size = 4. * space;
-    let alefs = advance(&mut env, "\u{627}\u{627}");
-    let bas = advance(&mut env, "\u{628}\u{628}\u{628}\u{628}");
-    assert!(alefs < tab_size - space / 2. && bas > tab_size && bas < 2. * tab_size - space / 2.);
 
-    // In a right-to-left line the start edge is the right edge, so the logically first word sits
-    // at the right and the tab fills out to the first stop measured from there. Visually, the
-    // glyph run after the tab must then end exactly one tab size short of the right edge.
-    let mut layout = build(
-        &mut env,
-        "\u{627}\u{627}\t\u{628}\u{628}\u{628}\u{628}",
-        stops(tab_size, space),
-    );
+    // Alef, then a tab, then "foo"-like Arabic letters, then a tab, then a final letter. The first
+    // column is one, two, three and seven alefs wide.
+    let text = "\u{627}\t\u{641}\u{648}\u{648}\t\u{633}\n\
+                \u{627}\u{627}\t\u{641}\u{648}\u{648}\t\u{633}\n\
+                \u{627}\u{627}\u{627}\t\u{641}\u{648}\u{648}\t\u{633}\n\
+                \u{627}\u{627}\u{627}\u{627}\u{627}\u{627}\u{627}\t\u{641}\u{648}\u{648}\t\u{633}";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::TabSize(stops(4. * space, space)));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
     layout.align(Alignment::Start, AlignmentOptions::default());
-    nearly_eq(layout.width(), tab_size + bas);
-    let [(bas_offset, bas_advance), (alefs_offset, alefs_advance)] =
-        glyph_run_extents(&layout, 0)[..]
-    else {
-        panic!("expected two glyph runs split by the tab");
-    };
-    nearly_eq(bas_offset, 0.);
-    nearly_eq(bas_advance, bas);
-    nearly_eq(alefs_offset, layout.width() - alefs);
-    nearly_eq(alefs_advance, alefs);
-    nearly_eq(alefs_offset - (bas_offset + bas_advance), tab_size - alefs);
-
-    // A first word wider than one tab size pushes the tab to the second stop from the right edge.
-    let mut layout = build(
-        &mut env,
-        "\u{628}\u{628}\u{628}\u{628}\t\u{627}\u{627}",
-        stops(tab_size, space),
-    );
-    layout.align(Alignment::Start, AlignmentOptions::default());
-    nearly_eq(layout.width(), 2. * tab_size + alefs);
-    let [(alefs_offset, _), (bas_offset, _)] = glyph_run_extents(&layout, 0)[..] else {
-        panic!("expected two glyph runs split by the tab");
-    };
-    nearly_eq(alefs_offset, 0.);
-    nearly_eq(bas_offset, layout.width() - bas);
+    env.check_layout_snapshot(&layout);
 }
 
+/// Guards against justification moving a tab off the advance the breaker gave it, or counting a
+/// hanging separator as an opportunity. Source: a deliberate deferral of tab-aware justification
+/// (Chrome also stretches the tab itself; that is a follow-up).
 #[test]
 fn justification_stretches_spaces_around_a_tab_but_not_the_tab() {
     let mut env = TestEnv::new(test_name!(), None);

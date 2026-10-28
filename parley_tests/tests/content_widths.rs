@@ -348,6 +348,9 @@ fn content_widths_trailing_whitespace_by_collapse_mode() {
     );
 }
 
+/// Guards against the content width measurer and the line breaker disagreeing on tab advances,
+/// in either constraint, with indents, and in mixed-direction text. Source: the layout itself,
+/// through `assert_content_widths_match_layout`.
 #[test]
 fn content_widths_tabs() {
     let mut env = TestEnv::new(test_name!(), None);

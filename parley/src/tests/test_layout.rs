@@ -57,6 +57,8 @@ fn tab_advances_per_line(layout: &Layout<ColorBrush>) -> Vec<Vec<(u32, f32)>> {
         .collect()
 }
 
+/// Guards against a tab's advance surviving the backtrack that moves the tab to the next line.
+/// Source: an invariant of the side table, each line owns exactly the entries of its own tabs.
 #[test]
 fn tab_advances_dropped_when_backtracking_before_a_tab() {
     // "aaa aaa" fits and the tab after it hangs, so the breaker places the tab before it finds
@@ -88,6 +90,8 @@ fn tab_advances_dropped_when_backtracking_before_a_tab() {
     );
 }
 
+/// Guards against `BreakLines::revert` keeping the reverted line's tab advances. Source: the
+/// same invariant.
 #[test]
 fn tab_advances_dropped_when_reverting_a_line() {
     let text = "a\tb\nc\td\ne\tf";
@@ -123,6 +127,8 @@ fn tab_advances_dropped_when_reverting_a_line() {
     );
 }
 
+/// Guards against tabs with no advance filling the side table. Source: `push_tab_advance`'s
+/// contract, a missing entry reads as zero.
 #[test]
 fn tabs_without_an_advance_get_no_entry() {
     let mut fcx = create_font_context();
@@ -136,6 +142,8 @@ fn tabs_without_an_advance_get_no_entry() {
     assert!(layout.data.lines[0].tab_advances.is_empty());
 }
 
+/// Guards against `TabSize` not being scaled like other lengths, or the default skip threshold
+/// being resolved before scaling. Source: `FontSize` and `LetterSpacing`, which are scaled.
 #[test]
 fn tab_size_scales_like_other_lengths() {
     let mut fcx = create_font_context();
