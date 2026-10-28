@@ -120,8 +120,8 @@ impl FontMetrics {
         };
 
         Self {
-            ascent: metrics.ascent,
-            // Normalize the descender to a distance, regardless of the font's sign convention.
+            // Normalize ascender and descender to magnitudes, as a hack to deal with fonts with mixed-up signs.
+            ascent: metrics.ascent.abs(),
             descent: metrics.descent.abs(),
             leading: metrics.leading,
             underline_offset,
