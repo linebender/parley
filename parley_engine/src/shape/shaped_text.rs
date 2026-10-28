@@ -664,7 +664,7 @@ mod tests {
                 descent,
                 ..Default::default()
             };
-            let font_metrics = FontMetrics::from_skrifa_metrics(&metrics);
+            let font_metrics = FontMetrics::from_skrifa_metrics(&metrics, 24.0);
             assert_eq!(font_metrics.ascent, 18.0);
             assert_eq!(font_metrics.descent, expected);
         }
