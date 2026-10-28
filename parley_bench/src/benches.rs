@@ -261,14 +261,15 @@ fn alternating_spans<'s>(
         .map(move |range| (style.clone(), range))
 }
 
-/// Build a styled layout for `text`, changing style every few characters.
-fn build_styled_layout(text: &str) -> Layout<ColorBrush> {
-    const DISPLAY_SCALE: f32 = 1.0;
-    const MAX_ADVANCE: f32 = 200.0 * DISPLAY_SCALE;
-
-    let mut layout = build_layout(text, styled_spans(text));
-    layout.break_all_lines(Some(MAX_ADVANCE));
-    layout.align(Alignment::Start, AlignmentOptions::default());
+fn build_wrapped_layout<'a>(
+    text: &str,
+    styles: impl IntoIterator<Item = (StyleProperty<'a, ColorBrush>, Range<usize>)>,
+    alignment: Alignment,
+) -> Layout<ColorBrush> {
+    const WRAPPED_MAX_ADVANCE: f32 = 200.;
+    let mut layout = build_layout(text, styles);
+    layout.break_all_lines(Some(WRAPPED_MAX_ADVANCE));
+    layout.align(alignment, AlignmentOptions::default());
     layout
 }
 
@@ -283,7 +284,11 @@ pub fn styled() -> Vec<Benchmark> {
                 format!("Styled - {} {}", sample.name, sample.modification),
                 |b| {
                     b.iter(|| {
-                        black_box(build_styled_layout(&sample.text));
+                        black_box(build_wrapped_layout(
+                            &sample.text,
+                            styled_spans(&sample.text),
+                            Alignment::Start,
+                        ));
                     })
                 },
             )
@@ -352,7 +357,11 @@ pub fn iterate_glyph_runs() -> Vec<Benchmark> {
                 sample.name, sample.modification
             ),
             |b| {
-                let layout = build_styled_layout(&sample.text);
+                let layout = build_wrapped_layout(
+                    &sample.text,
+                    styled_spans(&sample.text),
+                    Alignment::Start,
+                );
                 b.iter(move || black_box(walk_items(&layout)))
             },
         ));
