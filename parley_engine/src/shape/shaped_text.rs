@@ -533,10 +533,6 @@ fn process_shaped_clusters<'a>(
         shaped_clusters: &mut Vec<ShapedCluster>,
     ) {
         let first_character = &characters[cluster.characters_start];
-        // A tab is always its own grapheme (UAX #29 breaks before and after a control character),
-        // and so is a newline apart from CRLF, which the analysis splits into two clusters anyway.
-        // Shaping can still merge a character it draws nothing for into such a cluster, which
-        // keeps the cluster glyphless; see `marks_and_joiners_after_a_tab_leave_it_glyphless`.
         let is_glyphless_control = matches!(
             first_character.whitespace,
             Whitespace::Newline | Whitespace::Tab
@@ -880,7 +876,8 @@ mod tests {
     /// though: `HarfRust` merges a default-ignorable character that it removes (rather than
     /// replacing it with the font's invisible glyph, which the Noto Color Emoji subset lacks) into
     /// the cluster before it, which can be a tab or a newline. Such a cluster still has no glyphs
-    /// and no advance, so it is handled like a bare tab or newline.
+    /// and no advance, and its whitespace class is still that of the control, so it is handled
+    /// like a bare tab or newline.
     #[test]
     fn marks_and_joiners_after_a_tab_leave_it_glyphless() {
         for font in [ROBOTO, NOTO_COLOR_EMOJI] {
@@ -900,7 +897,13 @@ mod tests {
                         .collect();
                     assert_eq!(controls.len(), (after - 1) as usize, "{text:?}");
                     assert_eq!(controls[0].chars_range().start, 1, "{text:?}");
+                    let expected_whitespace = if control == "\t" {
+                        Whitespace::Tab
+                    } else {
+                        Whitespace::Newline
+                    };
                     for cluster in controls {
+                        assert_eq!(cluster.whitespace(), expected_whitespace, "{text:?}");
                         assert_eq!(cluster.glyph_len(), 0, "{text:?}");
                         assert_eq!(cluster.advance, 0., "{text:?}");
                     }

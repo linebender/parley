@@ -11,10 +11,10 @@
 /// `tab_size`.
 ///
 /// `x` includes the line's indent, as tab stops are measured from the line's start edge. The tab
-/// advances to the next stop, or to the one after it if the next is closer than `skip_threshold`,
-/// so that a tab is always visible (see [`TabSize::skip_threshold`](crate::TabSize::skip_threshold)).
-/// Only that one stop is skipped, so with stops closer together than the threshold the advance can
-/// still be less than it. A tab size that isn't positive gives the tab no advance.
+/// advances to the next stop, or to the one after it if the next is closer than `skip_threshold`
+/// (see [`TabSize::skip_threshold`](crate::TabSize::skip_threshold)). Only that one stop is
+/// skipped, so with stops closer together than the threshold the advance can still be less than
+/// it. A tab size that isn't positive gives the tab no advance.
 pub(crate) fn tab_advance(x: f32, tab_size: f32, skip_threshold: f32) -> f32 {
     if tab_size.is_nan() || tab_size <= 0. {
         return 0.;

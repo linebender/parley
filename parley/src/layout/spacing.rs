@@ -173,8 +173,8 @@ impl Default for Justification {
 ///
 /// Justification and tab advances depend on where the line's content lands, so neither is
 /// written into the shaped text, whose advances are independent of layout. The line breaker
-/// records the tab advances and alignment the justification per line, and this adds them to the
-/// shaped advances when the line is read back.
+/// records the tab advances, and alignment records the justification, per line. This adds them
+/// to the shaped advances when the line is read back.
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct EffectiveSpacing<'a> {
     spacing: Spacing,

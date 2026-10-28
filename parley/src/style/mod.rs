@@ -113,8 +113,7 @@ pub struct TabSize {
     /// The distance between tab stops, in layout units.
     pub size: f32,
     /// The skip threshold, in layout units: a tab whose next stop is closer than this skips to the
-    /// stop after it (one stop at most), so that a tab is always visible. `None` uses half the
-    /// root style's font size (`0.5em`).
+    /// stop after it, one stop at most. `None` uses half the root style's font size (`0.5em`).
     pub skip_threshold: Option<f32>,
 }
 
