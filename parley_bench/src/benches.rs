@@ -358,6 +358,8 @@ pub fn iterate_glyph_runs() -> Vec<Benchmark> {
         }
         for (label, case, alignment) in [
             ("wrapped", Styles::Uniform, Alignment::Start),
+            // Note our Japanese sample doesn't have spaces, so in the Japanese case this
+            // is not really applying justification.
             ("wrapped + justified", Styles::Uniform, Alignment::Justify),
             ("wrapped + spacing", Styles::Spacing, Alignment::Start),
             ("mixed", Styles::Mixed, Alignment::Start),
