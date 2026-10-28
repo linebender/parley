@@ -328,7 +328,11 @@ pub enum StyleProperty<'a, B: Brush> {
     TextWrapMode(TextWrapMode),
     /// Whitespace collapsing and hanging behavior.
     WhiteSpaceCollapse(WhiteSpaceCollapse),
-    /// The distance between tab stops, in layout units.
+    /// The distance between tab stops, in layout units. Corresponds to providing a length as
+    /// [`tab-size`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/tab-size)
+    /// in CSS. Defaults to 0.0, so tabs have no effect on the text.
+    ///
+    /// A tab too close to its next stop skips to the one after it; see [`TabSize::skip_threshold`].
     TabSize(TabSize),
 }
 
