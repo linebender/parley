@@ -12,7 +12,7 @@ use parlance::BidiLevel;
 
 use crate::inline_box::{LayoutInlineBox, inline_object_box_index};
 use crate::layout::data::{AlignedSubtreeOffset, TabAdvance, run_box_metrics};
-use crate::layout::spacing::{EffectiveSpacing, Justification, LineSpacing, is_word_separator};
+use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
 use crate::layout::style_metrics::{BoxMetrics, StyleMetrics, inline_box_placement};
 use crate::layout::tab::tab_advance;
 use crate::layout::whitespace::atom_hanging_advance;
@@ -1180,7 +1180,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let slice = run.full_slice();
 
                     // Additional spacing to apply between atoms.
-                    let spacing = EffectiveSpacing::new(run.data.spacing, LineSpacing::NONE);
+                    let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE, &[]);
 
                     // The height to report if the maximum line height is exceeded.
                     let mut line_height = run.data.line_height;
@@ -2011,10 +2011,8 @@ fn hanging_whitespace<B: Brush>(
                 // The line's tab advances hang along with their tabs.
                 let effective_spacing = EffectiveSpacing::new(
                     layout.data.runs[line_item.index].spacing,
-                    LineSpacing {
-                        justification: Justification::NONE,
-                        tab_advances,
-                    },
+                    Justification::NONE,
+                    tab_advances,
                 );
                 let slice = layout
                     .data

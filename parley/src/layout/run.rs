@@ -5,7 +5,7 @@ use crate::FontData;
 use crate::layout::cluster::Cluster;
 use crate::layout::data::{LineItemData, RunData};
 use crate::layout::layout::Layout;
-use crate::layout::spacing::{EffectiveSpacing, Gaps, LineSpacing};
+use crate::layout::spacing::{EffectiveSpacing, Gaps, Justification};
 use crate::style::Brush;
 
 use core::ops::Range;
@@ -129,18 +129,18 @@ impl<'a, B: Brush> Run<'a, B> {
     /// justification and tab advances. A run not scoped to a line has no layout-time spacing.
     #[inline]
     pub(crate) fn line_spacing(&self) -> EffectiveSpacing<'a> {
-        let line = if self.line_data.is_some() {
+        let (justification, tab_advances) = if self.line_data.is_some() {
             let data = &self.layout.data;
             let line = &data.lines[self.line_index as usize];
-            LineSpacing {
-                justification: line.justification,
-                tab_advances: &data.tab_advances
+            (
+                line.justification,
+                &data.tab_advances
                     [line.tab_advances.start as usize..line.tab_advances.end as usize],
-            }
+            )
         } else {
-            LineSpacing::NONE
+            (Justification::NONE, &[][..])
         };
-        EffectiveSpacing::new(self.data.spacing, line)
+        EffectiveSpacing::new(self.data.spacing, justification, tab_advances)
     }
 
     /// Returns the advance for the run.
