@@ -148,8 +148,6 @@ pub fn repeated_justification() -> [Benchmark; 1] {
 pub fn line_breaking() -> Vec<Benchmark> {
     const NARROW_MAX_ADVANCE: f32 = 50.;
     const MAX_ADVANCE: f32 = 200.;
-    const WORD_SPACING: f32 = 2.;
-    const LETTER_SPACING: f32 = 1.;
 
     // The maximum advances to break at, with the name each is given in the benchmark name.
     const MAX_ADVANCES: [(&str, Option<f32>); 3] = [
@@ -197,14 +195,7 @@ pub fn line_breaking() -> Vec<Benchmark> {
                 sample.name, sample.modification
             ),
             |b| {
-                let text_range = 0..sample.text.len();
-                let mut layout = build_layout(
-                    &sample.text,
-                    [
-                        (StyleProperty::WordSpacing(WORD_SPACING), text_range.clone()),
-                        (StyleProperty::LetterSpacing(LETTER_SPACING), text_range),
-                    ],
-                );
+                let mut layout = build_layout(&sample.text, spacing_styles(0..sample.text.len()));
                 b.iter(move || break_lines(&mut layout, Some(MAX_ADVANCE)))
             },
         ));
@@ -247,6 +238,16 @@ fn styled_spans(
             };
             Some((style, range))
         })
+}
+
+fn spacing_styles(
+    range: Range<usize>,
+) -> impl Iterator<Item = (StyleProperty<'static, ColorBrush>, Range<usize>)> {
+    [
+        (StyleProperty::WordSpacing(2.), range.clone()),
+        (StyleProperty::LetterSpacing(1.), range),
+    ]
+    .into_iter()
 }
 
 /// Apply `style` to every other chunk of `chunk_char_len` characters of `text`.
@@ -388,9 +389,6 @@ fn walk_items(layout: &Layout<ColorBrush>) -> (usize, f32) {
 /// sequencing that'll likely be used by clients (i.e., measure possible sizes, and later on line
 /// break once the target size is known).
 pub fn content_widths() -> Vec<Benchmark> {
-    const WORD_SPACING: f32 = 2.;
-    const LETTER_SPACING: f32 = 1.;
-
     let samples = get_samples();
 
     let mut benchmarks = Vec::new();
@@ -442,14 +440,7 @@ pub fn content_widths() -> Vec<Benchmark> {
             ),
             |b| {
                 let layouts = with_shuffled_text(sample, b.seed, |text| {
-                    let text_range = 0..text.len();
-                    build_layout(
-                        text,
-                        [
-                            (StyleProperty::WordSpacing(WORD_SPACING), text_range.clone()),
-                            (StyleProperty::LetterSpacing(LETTER_SPACING), text_range),
-                        ],
-                    )
+                    build_layout(text, spacing_styles(0..text.len()))
                 });
                 let mut i = 0;
                 b.iter(move || {
