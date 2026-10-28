@@ -162,6 +162,7 @@ pub fn line_breaking() -> Vec<Benchmark> {
 
     fn break_lines(layout: &mut Layout<ColorBrush>, max_advance: Option<f32>) {
         layout.break_all_lines(max_advance);
+        layout.align(Alignment::Start, AlignmentOptions::default());
         black_box((layout.len(), layout.width(), layout.height()));
     }
 
